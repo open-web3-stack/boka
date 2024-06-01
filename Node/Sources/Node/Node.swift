@@ -1,8 +1,10 @@
-// The Swift Programming Language
-// https://docs.swift.org/swift-book
+import Blockchain
 
 public class Node {
+    private var blockchain: Blockchain
+    
     public init() {
+        blockchain = Blockchain()
     }
     public func sayHello() {
         print("Hello, World!")
