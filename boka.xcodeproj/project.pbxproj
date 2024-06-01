@@ -3,13 +3,24 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
+
+/* Begin PBXFileReference section */
+		066C926E2C095D67005DDE4F /* Boka */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Boka; sourceTree = "<group>"; };
+		066C926F2C095D76005DDE4F /* Blockchain */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Blockchain; sourceTree = "<group>"; };
+		066C92702C095D85005DDE4F /* Node */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Node; sourceTree = "<group>"; };
+		06F2335F2C0B306000A5E2E0 /* Database */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Database; sourceTree = "<group>"; };
+/* End PBXFileReference section */
 
 /* Begin PBXGroup section */
 		066C92652C095CE5005DDE4F = {
 			isa = PBXGroup;
 			children = (
+				06F2335F2C0B306000A5E2E0 /* Database */,
+				066C92702C095D85005DDE4F /* Node */,
+				066C926F2C095D76005DDE4F /* Blockchain */,
+				066C926E2C095D67005DDE4F /* Boka */,
 			);
 			sourceTree = "<group>";
 		};
@@ -31,6 +42,9 @@
 				Base,
 			);
 			mainGroup = 066C92652C095CE5005DDE4F;
+			packageReferences = (
+				066C92772C0B2DF7005DDE4F /* XCLocalSwiftPackageReference "Blockchain" */,
+			);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -64,6 +78,13 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		066C92772C0B2DF7005DDE4F /* XCLocalSwiftPackageReference "Blockchain" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Blockchain;
+		};
+/* End XCLocalSwiftPackageReference section */
 	};
 	rootObject = 066C92662C095CE5005DDE4F /* Project object */;
 }
