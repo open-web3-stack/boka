@@ -1,7 +1,7 @@
 import Blockchain
 
 public class Node {
-    private var blockchain: Blockchain
+    public private(set) var blockchain: Blockchain
     
     public init() {
         blockchain = Blockchain()

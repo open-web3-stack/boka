@@ -4,27 +4,20 @@
 import PackageDescription
 
 let package = Package(
-    name: "Blockchain",
+    name: "Utils",
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
-            name: "Blockchain",
-            targets: ["Blockchain"]),
-    ],
-    dependencies: [
-        .package(url: "https://github.com/tesseract-one/ScaleCodec.swift.git", from: "0.3.0"),
-        .package(path: "../Utils")
+            name: "Utils",
+            targets: ["Utils"]),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "Blockchain", dependencies: [
-                .product(name: "ScaleCodec", package: "ScaleCodec.swift"),
-                .product(name: "Utils", package: "Utils")
-            ]),
+            name: "Utils"),
         .testTarget(
-            name: "BlockchainTests",
-            dependencies: ["Blockchain"]),
+            name: "UtilsTests",
+            dependencies: ["Utils"]),
     ]
 )
