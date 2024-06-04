@@ -1,12 +1,11 @@
 import AsyncChannels
 
 public struct BlockImporter {
-  private var pendingBlocks = Channel<PendingBlock>(capacity: 500)
+    private var pendingBlocks = Channel<PendingBlock>(capacity: 500)
 
-  public init() {
-  }
+    public init() {}
 
-  public func importBlock(_ block: PendingBlock) {
-    pendingBlocks.send(block)
-  }
+    public func importBlock(_ block: PendingBlock) async {
+        await pendingBlocks.send(block)
+    }
 }
