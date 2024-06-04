@@ -1,0 +1,9 @@
+disabled_rules:
+    - trailing_comma
+    - todo
+
+excluded:
+    - "**/.build"
+
+identifier_name:
+    min_length: 1
