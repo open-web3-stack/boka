@@ -24,5 +24,3 @@ extension H256: CustomStringConvertible, CustomDebugStringConvertible {
     return description
   }
 }
-
-
