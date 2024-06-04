@@ -1,3 +1,3 @@
 public class Blockchain {
-  public init() {}
+    public init() {}
 }

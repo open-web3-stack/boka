@@ -1,3 +1,1 @@
-public struct Extrinsic {
-
-}
+public struct Extrinsic {}

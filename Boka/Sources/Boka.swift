@@ -8,7 +8,7 @@ import ArgumentParser
 
 @main
 struct Boka: ParsableCommand {
-  mutating func run() throws {
-    print("Hello, world!")
-  }
+    mutating func run() throws {
+        print("Hello, world!")
+    }
 }

@@ -1,3 +1,2 @@
 // @TODO: figure out the type
-public struct ExtrinsicAvailability {
-}
+public struct ExtrinsicAvailability {}
