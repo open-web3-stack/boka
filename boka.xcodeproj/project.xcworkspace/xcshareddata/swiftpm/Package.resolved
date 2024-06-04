@@ -1,6 +1,15 @@
 {
-  "originHash" : "abc91af3a7683f16c0114bb029c8a6b3e00728988336829f73b9ba9d738978bd",
+  "originHash" : "b578da78329a065abfa4d3423647483a61d7fc81ec6963d5b5a064c699c949c8",
   "pins" : [
+    {
+      "identity" : "async-channels",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/gh123man/Async-Channels",
+      "state" : {
+        "branch" : "679ee7d",
+        "revision" : "679ee7d35e493e181be844dadbe78636cefaace4"
+      }
+    },
     {
       "identity" : "scalecodec.swift",
       "kind" : "remoteSourceControl",
@@ -17,6 +26,24 @@
       "state" : {
         "revision" : "0fbc8848e389af3bb55c182bc19ca9d5dc2f255b",
         "version" : "1.4.0"
+      }
+    },
+    {
+      "identity" : "swift-async-algorithms",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-async-algorithms",
+      "state" : {
+        "revision" : "da4e36f86544cdf733a40d59b3a2267e3a7bbf36",
+        "version" : "1.0.0"
+      }
+    },
+    {
+      "identity" : "swift-collections",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-collections.git",
+      "state" : {
+        "revision" : "94cf62b3ba8d4bed62680a282d4c25f9c63c2efb",
+        "version" : "1.1.0"
       }
     },
     {
