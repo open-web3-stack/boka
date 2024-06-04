@@ -40,7 +40,7 @@ extension SizeLimitedArray: ExpressibleByArrayLiteral {
 
 extension SizeLimitedArray: Equatable where T: Equatable {
     public static func == (lhs: SizeLimitedArray<T>, rhs: SizeLimitedArray<T>) -> Bool {
-        return lhs.array == rhs.array
+        lhs.array == rhs.array
     }
 }
 
@@ -49,16 +49,16 @@ extension SizeLimitedArray: RandomAccessCollection {
     public typealias Index = Int
 
     public var startIndex: Int {
-        return 0
+        0
     }
 
     public var endIndex: Int {
-        return array.count
+        array.count
     }
 
     public subscript(position: Int) -> T {
         get {
-            return array[position]
+            array[position]
         }
         set {
             assert(position >= 0 && position < maxLength)
@@ -67,27 +67,27 @@ extension SizeLimitedArray: RandomAccessCollection {
     }
 
     public func index(after i: Int) -> Int {
-        return i + 1
+        i + 1
     }
 
     public func index(before i: Int) -> Int {
-        return i - 1
+        i - 1
     }
 
     public func index(_ i: Int, offsetBy distance: Int) -> Int {
-        return i + distance
+        i + distance
     }
 
     public func index(_ i: Int, offsetBy distance: Int, limitedBy limit: Int) -> Int? {
-        return i + distance < limit ? i + distance : nil
+        i + distance < limit ? i + distance : nil
     }
 
     public func distance(from start: Int, to end: Int) -> Int {
-        return end - start
+        end - start
     }
 
     public func index(from start: Int) -> Int {
-        return start
+        start
     }
 
     public func formIndex(after i: inout Int) {

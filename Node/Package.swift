@@ -4,21 +4,24 @@
 import PackageDescription
 
 let package = Package(
-  name: "Node",
-  products: [
-    // Products define the executables and libraries a package produces, making them visible to other packages.
-    .library(
-      name: "Node",
-      targets: ["Node"])
-  ],
-  dependencies: [.package(path: "../Blockchain")],
-  targets: [
-    // Targets are the basic building blocks of a package, defining a module or a test suite.
-    // Targets can depend on other targets in this package and products from dependencies.
-    .target(
-      name: "Node", dependencies: ["Blockchain"]),
-    .testTarget(
-      name: "NodeTests",
-      dependencies: ["Node"]),
-  ]
+    name: "Node",
+    products: [
+        // Products define the executables and libraries a package produces, making them visible to other packages.
+        .library(
+            name: "Node",
+            targets: ["Node"]
+        ),
+    ],
+    dependencies: [.package(path: "../Blockchain")],
+    targets: [
+        // Targets are the basic building blocks of a package, defining a module or a test suite.
+        // Targets can depend on other targets in this package and products from dependencies.
+        .target(
+            name: "Node", dependencies: ["Blockchain"]
+        ),
+        .testTarget(
+            name: "NodeTests",
+            dependencies: ["Node"]
+        ),
+    ]
 )

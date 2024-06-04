@@ -1,4 +1,2 @@
 // @TODO: figure out the type
-public struct SafroleState {
-
-}
+public struct SafroleState {}

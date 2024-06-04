@@ -1,3 +1,2 @@
 // @TODO: figure out the type
-public struct ExtrinsicJudgement {
-}
+public struct ExtrinsicJudgement {}
