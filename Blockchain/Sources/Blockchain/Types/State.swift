@@ -2,8 +2,13 @@ import Utils
 
 public struct State {
     // α: The core αuthorizations pool.
-    public private(set) var coreAuthorizationPool:
-        CoreAuthorizationPool
+    public private(set) var coreAuthorizationPool: SizeLimitedArray<
+        SizeLimitedArray<
+            H256, Constants.Zero, Constants.MaxAuthorizationsPoolItems
+        >,
+        Constants.TotalNumberOfCores,
+        Constants.TotalNumberOfCores
+    >
 
     // β: Information on the most recent βlocks.
     public private(set) var lastBlock: Block

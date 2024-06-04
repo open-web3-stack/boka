@@ -17,10 +17,11 @@ public struct Header {
     // the header’s epoch marker He is either empty or, if the block is the first in a new epoch,
     // then a tuple of the epoch randomness and a sequence of Bandersnatch keys
     // defining the Bandersnatch validator keys (kb) beginning in the next epoch
-    public private(set) var epoch: () // @TODO: figure out the type
+    public private(set) var epoch: (randomness: H256, keys: [BandersnatchPublicKey])?
 
     // Hw: winning-tickets
-    // The winning-tickets marker Hw is either empty or, if the block is the first after the end of the submission period
+    // The winning-tickets marker Hw is either empty or,
+    // if the block is the first after the end of the submission period
     // for tickets and if the ticket accumulator is saturated, then the final sequence of ticket identifiers
     public private(set) var winningTickets: () // @TODO: figure out the type
 
