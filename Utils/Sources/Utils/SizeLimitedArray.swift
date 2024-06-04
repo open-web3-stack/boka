@@ -1,45 +1,43 @@
 // @TODO: add tests
 
-public struct SizeLimitedArray<T> {
+public struct SizeLimitedArray<T, TMinLength: ConstInt, TMaxLength: ConstInt> {
     private var array: [T]
-    public private(set) var minLength: Int
-    public private(set) var maxLength: Int
-
-    public init(deafultValue: T, minLength: Int = 0, maxLength: Int = Int.max) {
-        assert(minLength >= 0)
-        assert(maxLength >= minLength)
-        array = Array(repeating: deafultValue, count: minLength)
-        self.minLength = minLength
-        self.maxLength = maxLength
+    public static var minLength: Int {
+        TMinLength.value
     }
 
-    public init(deafultValue: T, length: Int) {
-        self.init(deafultValue: deafultValue, minLength: length, maxLength: length)
+    public static var maxLength: Int {
+        TMaxLength.value
     }
 
-    public init(array: [T], minLength: Int = 0, maxLength: Int = Int.max) {
-        assert(minLength >= 0)
-        assert(maxLength >= minLength)
-        assert(array.count >= minLength)
-        assert(array.count <= maxLength)
+    public init(deafultValue: T) {
+        self.init(Array(repeating: deafultValue, count: Self.minLength))
+    }
+
+    public init(_ array: [T]) {
+        assert(Self.minLength >= 0)
+        assert(Self.maxLength >= Self.minLength)
         self.array = array
-        self.minLength = minLength
-        self.maxLength = maxLength
+
+        validate()
     }
 
-    public init(array: [T], length: Int) {
-        self.init(array: array, minLength: length, maxLength: length)
+    private func validate() {
+        assert(array.count >= Self.minLength)
+        assert(array.count < Self.maxLength)
     }
 }
 
 extension SizeLimitedArray: ExpressibleByArrayLiteral {
     public init(arrayLiteral elements: T...) {
-        self.init(array: elements, length: elements.count)
+        self.init(elements)
     }
 }
 
 extension SizeLimitedArray: Equatable where T: Equatable {
-    public static func == (lhs: SizeLimitedArray<T>, rhs: SizeLimitedArray<T>) -> Bool {
+    public static func == (
+        lhs: SizeLimitedArray<T, TMinLength, TMaxLength>, rhs: SizeLimitedArray<T, TMinLength, TMaxLength>
+    ) -> Bool {
         lhs.array == rhs.array
     }
 }
@@ -61,8 +59,8 @@ extension SizeLimitedArray: RandomAccessCollection {
             array[position]
         }
         set {
-            assert(position >= 0 && position < maxLength)
             array[position] = newValue
+            validate()
         }
     }
 
@@ -101,17 +99,17 @@ extension SizeLimitedArray: RandomAccessCollection {
 
 public extension SizeLimitedArray {
     mutating func append(_ newElement: T) {
-        assert(array.count < maxLength)
         array.append(newElement)
+        validate()
     }
 
     mutating func insert(_ newElement: T, at i: Int) {
-        assert(i >= 0 && i <= maxLength)
         array.insert(newElement, at: i)
+        validate()
     }
 
     mutating func remove(at i: Int) -> T {
-        assert(i >= 0 && i < maxLength)
+        defer { validate() }
         return array.remove(at: i)
     }
 }
