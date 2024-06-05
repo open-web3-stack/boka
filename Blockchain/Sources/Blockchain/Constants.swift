@@ -46,4 +46,11 @@ public enum Constants {
             8
         }
     }
+
+    // V: The total number of validators.
+    public enum TotalNumberOfValidators: ConstInt {
+        public static var value: Int {
+            1023
+        }
+    }
 }
