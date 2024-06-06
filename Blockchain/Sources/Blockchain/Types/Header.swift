@@ -49,3 +49,9 @@ public struct Header {
     // Hs: block seal
     public private(set) var seal: BandersnatchSignature
 }
+
+public extension Header {
+    var hash: H256 {
+        H256() // TODO: implement this
+    }
+}

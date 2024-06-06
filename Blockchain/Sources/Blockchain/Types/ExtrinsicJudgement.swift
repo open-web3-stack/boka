@@ -1,2 +1,2 @@
-// @TODO: figure out the type
+// TODO: figure out the type
 public struct ExtrinsicJudgement {}
