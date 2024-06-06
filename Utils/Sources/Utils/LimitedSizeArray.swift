@@ -1,6 +1,6 @@
 // TODO: add tests
 
-public struct SizeLimitedArray<T, TMinLength: ConstInt, TMaxLength: ConstInt> {
+public struct LimitedSizeArray<T, TMinLength: ConstInt, TMaxLength: ConstInt> {
     private var array: [T]
     public static var minLength: Int {
         TMinLength.value
@@ -28,21 +28,21 @@ public struct SizeLimitedArray<T, TMinLength: ConstInt, TMaxLength: ConstInt> {
     }
 }
 
-extension SizeLimitedArray: ExpressibleByArrayLiteral {
+extension LimitedSizeArray: ExpressibleByArrayLiteral {
     public init(arrayLiteral elements: T...) {
         self.init(elements)
     }
 }
 
-extension SizeLimitedArray: Equatable where T: Equatable {
+extension LimitedSizeArray: Equatable where T: Equatable {
     public static func == (
-        lhs: SizeLimitedArray<T, TMinLength, TMaxLength>, rhs: SizeLimitedArray<T, TMinLength, TMaxLength>
+        lhs: LimitedSizeArray<T, TMinLength, TMaxLength>, rhs: LimitedSizeArray<T, TMinLength, TMaxLength>
     ) -> Bool {
         lhs.array == rhs.array
     }
 }
 
-extension SizeLimitedArray: RandomAccessCollection {
+extension LimitedSizeArray: RandomAccessCollection {
     public typealias Element = T
     public typealias Index = Int
 
@@ -97,7 +97,7 @@ extension SizeLimitedArray: RandomAccessCollection {
     }
 }
 
-public extension SizeLimitedArray {
+public extension LimitedSizeArray {
     mutating func append(_ newElement: T) {
         array.append(newElement)
         validate()
@@ -113,3 +113,5 @@ public extension SizeLimitedArray {
         return array.remove(at: i)
     }
 }
+
+public typealias FixedSizeArray<T, TLength: ConstInt> = LimitedSizeArray<T, TLength, TLength>
