@@ -66,6 +66,13 @@ public enum Constants {
         }
     }
 
+    // Q: The maximum number of items in the authorizations queue.
+    public enum MaxAuthorizationsQueueItems: ConstInt {
+        public static var value: Int {
+            80
+        }
+    }
+
     // S: The maximum size of service code in octets.
     public enum MaxServiceCodeSize: ConstInt {
         public static var value: Int {
