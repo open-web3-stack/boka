@@ -9,7 +9,7 @@ public struct WorkReport {
     public var output: Data
 
     // x: refinement context
-    public var refinementContext: () // TODO: figure out the type
+    public var refinementContext: RefinementContext
 
     // s: package specification
     public var packageSpecification: () // TODO: figure out the type
