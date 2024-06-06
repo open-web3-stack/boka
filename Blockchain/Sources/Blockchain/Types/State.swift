@@ -4,7 +4,9 @@ public struct State {
     // α: The core αuthorizations pool.
     public private(set) var coreAuthorizationPool: FixedSizeArray<
         LimitedSizeArray<
-            H256, Constants.Zero, Constants.MaxAuthorizationsPoolItems
+            H256,
+            Constants.Zero,
+            Constants.MaxAuthorizationsPoolItems
         >,
         Constants.TotalNumberOfCores
     >
@@ -54,13 +56,23 @@ public struct State {
     public private(set) var timestamp: TimeslotIndex
 
     // φ: The authorization queue.
-    public private(set) var authorizationQueue: () // TODO: figure out the type
-
-    // ψ: Votes regarding any ongoing disputes.
-    public private(set) var disputes: () // TODO: figure out the type
+    public private(set) var authorizationQueue: FixedSizeArray<
+        FixedSizeArray<
+            H256,
+            Constants.MaxAuthorizationsQueueItems
+        >,
+        Constants.TotalNumberOfCores
+    >
 
     // χ: The privileged service indices.
-    public private(set) var privilegedServiceIndices: () // TODO: figure out the type
+    public private(set) var privilegedServiceIndices: (
+        empower: ServiceIdentifier,
+        assign: ServiceIdentifier,
+        designate: ServiceIdentifier
+    )
+
+    // ψ: past judgements
+    public private(set) var judgements: JudgementsState
 }
 
 public typealias StateRef = Ref<State>
