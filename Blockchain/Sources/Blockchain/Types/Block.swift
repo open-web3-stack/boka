@@ -1,3 +1,5 @@
+import Utils
+
 public struct Block {
     public private(set) var header: Header
     public private(set) var extrinsic: Extrinsic
@@ -7,3 +9,5 @@ public struct Block {
         self.extrinsic = extrinsic
     }
 }
+
+public typealias BlockRef = Ref<Block>

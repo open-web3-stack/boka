@@ -1,11 +1,27 @@
 import AsyncChannels
 
-public struct BlockImporter {
-    private var pendingBlocks = Channel<PendingBlock>(capacity: 500)
+public class BlockImporter {
+    private var validator: BlockValidator
+    private var blockchain: Blockchain
 
-    public init() {}
+    public init(validator: BlockValidator, blockchain: Blockchain) {
+        self.validator = validator
+        self.blockchain = blockchain
+    }
 
     public func importBlock(_ block: PendingBlock) async {
-        await pendingBlocks.send(block)
+        let result = await validator.validate(block: block, chain: blockchain)
+
+        switch result {
+        case let .success(state):
+            blockchain.newHead(state)
+
+        case .failure(.future):
+            // TODO: save this somewhere else and import it later
+            break
+
+        case .failure(.invalid):
+            break
+        }
     }
 }

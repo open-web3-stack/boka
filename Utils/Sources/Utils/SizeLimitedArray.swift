@@ -1,4 +1,4 @@
-// @TODO: add tests
+// TODO: add tests
 
 public struct SizeLimitedArray<T, TMinLength: ConstInt, TMaxLength: ConstInt> {
     private var array: [T]

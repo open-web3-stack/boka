@@ -1,7 +1,7 @@
 public struct PendingBlock {
-    public private(set) var block: Block
+    public private(set) var block: BlockRef
 
-    public init(block: Block) {
+    public init(block: BlockRef) {
         self.block = block
     }
 }

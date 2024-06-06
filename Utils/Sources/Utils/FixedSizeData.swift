@@ -1,7 +1,7 @@
 import Foundation
 
 public struct FixedSizeData<T: ConstInt> {
-    // @TODO: completly hide data and only allow access via protocol methods
+    // TODO: completly hide data and only allow access via protocol methods
     public private(set) var data: Data
 
     public init?(_ value: Data) {
