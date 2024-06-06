@@ -1,7 +1,6 @@
 import Foundation
 
 public struct FixedSizeData<T: ConstInt> {
-    // TODO: completly hide data and only allow access via protocol methods
     public private(set) var data: Data
 
     public init?(_ value: Data) {
@@ -28,24 +27,8 @@ extension FixedSizeData: CustomStringConvertible, CustomDebugStringConvertible {
     }
 }
 
-public enum ConstInt32: ConstInt {
-    public static var value: Int {
-        32
-    }
-}
-
-public enum ConstInt64: ConstInt {
-    public static var value: Int {
-        64
-    }
-}
-
-public enum ConstUInt96: ConstInt {
-    public static var value: Int {
-        96
-    }
-}
-
 public typealias Data32 = FixedSizeData<ConstInt32>
 public typealias Data64 = FixedSizeData<ConstInt64>
 public typealias Data96 = FixedSizeData<ConstUInt96>
+public typealias Data128 = FixedSizeData<ConstUInt128>
+public typealias Data144 = FixedSizeData<ConstUInt144>

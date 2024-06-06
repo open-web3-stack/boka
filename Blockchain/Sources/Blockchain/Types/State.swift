@@ -2,11 +2,10 @@ import Utils
 
 public struct State {
     // α: The core αuthorizations pool.
-    public private(set) var coreAuthorizationPool: SizeLimitedArray<
-        SizeLimitedArray<
+    public private(set) var coreAuthorizationPool: FixedSizeArray<
+        LimitedSizeArray<
             H256, Constants.Zero, Constants.MaxAuthorizationsPoolItems
         >,
-        Constants.TotalNumberOfCores,
         Constants.TotalNumberOfCores
     >
 
@@ -20,19 +19,36 @@ public struct State {
     public private(set) var serviceAccounts: [ServiceIdentifier: ServiceAccount]
 
     // η: The eηtropy accumulator and epochal raηdomness.
-    public private(set) var entropyPool: () // TODO: figure out the type
+    public private(set) var entropyPool: (H256, H256, H256, H256)
 
     // ι: The validator keys and metadata to be drawn from next.
-    public private(set) var validatorQueue: () // TODO: figure out the type
+    public private(set) var validatorQueue: FixedSizeArray<
+        ValidatorKey, Constants.TotalNumberOfValidators
+    >
 
     // κ: The validator κeys and metadata currently active.
-    public private(set) var currentValidators: () // TODO: figure out the type
+    public private(set) var currentValidators: FixedSizeArray<
+        ValidatorKey, Constants.TotalNumberOfValidators
+    >
 
     // λ: The validator keys and metadata which were active in the prior epoch.
-    public private(set) var previousValidators: () // TODO: figure out the type
+    public private(set) var previousValidators: FixedSizeArray<
+        ValidatorKey, Constants.TotalNumberOfValidators
+    >
 
     // ρ: The ρending reports, per core, which are being made available prior to accumulation.
-    public private(set) var reports: () // TODO: figure out the type
+    public private(set) var reports: FixedSizeArray<
+        (
+            workReport: WorkReport,
+            guarantors: LimitedSizeArray<
+                Ed25519PublicKey,
+                Constants.Two,
+                Constants.Three
+            >,
+            timestamp: TimeslotIndex
+        )?,
+        Constants.TotalNumberOfCores
+    >
 
     // τ: The most recent block’s τimeslot.
     public private(set) var timestamp: TimeslotIndex

@@ -19,7 +19,7 @@ public struct Header {
     // defining the Bandersnatch validator keys (kb) beginning in the next epoch
     public private(set) var epoch: (
         randomness: H256,
-        keys: SizeLimitedArray<
+        keys: LimitedSizeArray<
             BandersnatchPublicKey,
             Constants.TotalNumberOfValidators,
             Constants.TotalNumberOfValidators
@@ -30,7 +30,7 @@ public struct Header {
     // The winning-tickets marker Hw is either empty or,
     // if the block is the first after the end of the submission period
     // for tickets and if the ticket accumulator is saturated, then the final sequence of ticket identifiers
-    public private(set) var winningTickets: SizeLimitedArray<
+    public private(set) var winningTickets: LimitedSizeArray<
         Ticket,
         Constants.EpochLength,
         Constants.EpochLength

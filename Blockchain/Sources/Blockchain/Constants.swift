@@ -13,6 +13,18 @@ public enum Constants {
         }
     }
 
+    public enum Two: ConstInt {
+        public static var value: Int {
+            2
+        }
+    }
+
+    public enum Three: ConstInt {
+        public static var value: Int {
+            3
+        }
+    }
+
     public enum IntMax: ConstInt {
         public static var value: Int {
             Int.max
@@ -33,6 +45,13 @@ public enum Constants {
         }
     }
 
+    // I: The maximum amount of work items in a package.
+    public enum MaxWorkItems: ConstInt {
+        public static var value: Int {
+            4
+        }
+    }
+
     // N: The number of ticket entries per validator.
     public enum ValidatorTicketEntriesCount: ConstInt {
         public static var value: Int {
@@ -44,6 +63,13 @@ public enum Constants {
     public enum MaxAuthorizationsPoolItems: ConstInt {
         public static var value: Int {
             8
+        }
+    }
+
+    // S: The maximum size of service code in octets.
+    public enum MaxServiceCodeSize: ConstInt {
+        public static var value: Int {
+            4_000_000
         }
     }
 
