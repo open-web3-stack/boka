@@ -1,4 +1,4 @@
-enum Either<A, B> {
+public enum Either<A, B> {
     case left(A)
     case right(B)
 }
@@ -6,7 +6,7 @@ enum Either<A, B> {
 extension Either: Equatable where A: Equatable, B: Equatable {}
 
 extension Either: CustomStringConvertible where A: CustomStringConvertible, B: CustomStringConvertible {
-    var description: String {
+    public var description: String {
         switch self {
         case let .left(a):
             "Left(\(a))"
