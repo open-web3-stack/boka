@@ -12,12 +12,12 @@ public struct WorkReport {
     public var refinementContext: RefinementContext
 
     // s: package specification
-    public var packageSpecification: () // TODO: figure out the type
+    public var packageSpecification: AvailabilitySpecifications
 
     // r: the results of the evaluation of each of the items in the package
     public var results: LimitedSizeArray<
         WorkResult,
-        Constants.One,
+        ConstInt1,
         Constants.MaxWorkItems
     >
 }
