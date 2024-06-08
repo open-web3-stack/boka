@@ -14,5 +14,5 @@ public struct RefinementContext {
         timeslot: TimeslotIndex
     )
 
-    public var prerequistieWorkPackage: Hash?
+    public var prerequistieWorkPackage: H256?
 }

@@ -5,7 +5,7 @@ public struct State {
     public private(set) var coreAuthorizationPool: FixedSizeArray<
         LimitedSizeArray<
             H256,
-            Constants.Zero,
+            ConstInt0,
             Constants.MaxAuthorizationsPoolItems
         >,
         Constants.TotalNumberOfCores
@@ -44,8 +44,8 @@ public struct State {
             workReport: WorkReport,
             guarantors: LimitedSizeArray<
                 Ed25519PublicKey,
-                Constants.Two,
-                Constants.Three
+                ConstInt2,
+                ConstInt3
             >,
             timestamp: TimeslotIndex
         )?,

@@ -1,36 +1,6 @@
 import Utils
 
 public enum Constants {
-    public enum Zero: ConstInt {
-        public static var value: Int {
-            0
-        }
-    }
-
-    public enum One: ConstInt {
-        public static var value: Int {
-            1
-        }
-    }
-
-    public enum Two: ConstInt {
-        public static var value: Int {
-            2
-        }
-    }
-
-    public enum Three: ConstInt {
-        public static var value: Int {
-            3
-        }
-    }
-
-    public enum IntMax: ConstInt {
-        public static var value: Int {
-            Int.max
-        }
-    }
-
     // C: The total number of cores.
     public enum TotalNumberOfCores: ConstInt {
         public static var value: Int {
