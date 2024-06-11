@@ -8,11 +8,11 @@ public struct ExtrinsicAvailability {
             parentHash: H256,
 
             // f
-            assurance: Data // bit string with length of Constants.TotalNumberOfCores
+            assurance: Data, // bit string with length of Constants.TotalNumberOfCores
             // TODO: use a BitString type
 
             // v
-            validatorIndex: ValidatorIndex
+            validatorIndex: ValidatorIndex,
 
             // s
             signature: Ed25519Signature
