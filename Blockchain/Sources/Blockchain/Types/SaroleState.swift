@@ -7,7 +7,7 @@ public struct SafroleState {
     >
 
     // γz
-    public var epochRoot: BandersnatchRingVRFProof
+    public var epochRoot: BandersnatchRingVRFRoot
 
     // γs
     public var slotSealerSeries: Either<

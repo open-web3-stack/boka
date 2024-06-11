@@ -56,4 +56,10 @@ public enum Constants {
             1023
         }
     }
+
+    public enum TwoThirdValidatorsPlusOne: ConstInt {
+        public static var value: Int {
+            Constants.TotalNumberOfValidators.value * 2 / 3 + 1
+        }
+    }
 }
