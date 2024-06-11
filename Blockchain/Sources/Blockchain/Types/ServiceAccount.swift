@@ -10,7 +10,7 @@ public struct ServiceAccount {
 
     // l
     public var preimageInfos: [
-        (hash: H256, length: DataLength): LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>
+        HashAndLength: LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>
     ]
 
     // c
@@ -24,4 +24,9 @@ public struct ServiceAccount {
 
     // m
     public var onTransferGasLimit: Gas
+}
+
+public struct HashAndLength: Hashable {
+    public var hash: H256
+    public var length: DataLength
 }
