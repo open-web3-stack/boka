@@ -67,8 +67,8 @@ public enum ConstUInt144: ConstInt {
     }
 }
 
-public enum ConstUInt196608: ConstInt {
+public enum ConstUInt784: ConstInt {
     public static var value: Int {
-        196_608
+        784
     }
 }

@@ -2,7 +2,7 @@ import Utils
 
 public struct State {
     // α: The core αuthorizations pool.
-    public private(set) var coreAuthorizationPool: FixedSizeArray<
+    public var coreAuthorizationPool: FixedSizeArray<
         LimitedSizeArray<
             H256,
             ConstInt0,
@@ -12,34 +12,34 @@ public struct State {
     >
 
     // β: Information on the most recent βlocks.
-    public private(set) var lastBlock: Block
+    public var lastBlock: Block
 
     // γ: State concerning Safrole.
-    public private(set) var safroleState: SafroleState
+    public var safroleState: SafroleState
 
     // δ: The (prior) state of the service accounts.
-    public private(set) var serviceAccounts: [ServiceIdentifier: ServiceAccount]
+    public var serviceAccounts: [ServiceIdentifier: ServiceAccount]
 
     // η: The eηtropy accumulator and epochal raηdomness.
-    public private(set) var entropyPool: (H256, H256, H256, H256)
+    public var entropyPool: (H256, H256, H256, H256)
 
     // ι: The validator keys and metadata to be drawn from next.
-    public private(set) var validatorQueue: FixedSizeArray<
+    public var validatorQueue: FixedSizeArray<
         ValidatorKey, Constants.TotalNumberOfValidators
     >
 
     // κ: The validator κeys and metadata currently active.
-    public private(set) var currentValidators: FixedSizeArray<
+    public var currentValidators: FixedSizeArray<
         ValidatorKey, Constants.TotalNumberOfValidators
     >
 
     // λ: The validator keys and metadata which were active in the prior epoch.
-    public private(set) var previousValidators: FixedSizeArray<
+    public var previousValidators: FixedSizeArray<
         ValidatorKey, Constants.TotalNumberOfValidators
     >
 
     // ρ: The ρending reports, per core, which are being made available prior to accumulation.
-    public private(set) var reports: FixedSizeArray<
+    public var reports: FixedSizeArray<
         (
             workReport: WorkReport,
             guarantors: LimitedSizeArray<
@@ -53,10 +53,10 @@ public struct State {
     >
 
     // τ: The most recent block’s τimeslot.
-    public private(set) var timestamp: TimeslotIndex
+    public var timestamp: TimeslotIndex
 
     // φ: The authorization queue.
-    public private(set) var authorizationQueue: FixedSizeArray<
+    public var authorizationQueue: FixedSizeArray<
         FixedSizeArray<
             H256,
             Constants.MaxAuthorizationsQueueItems
@@ -65,14 +65,14 @@ public struct State {
     >
 
     // χ: The privileged service indices.
-    public private(set) var privilegedServiceIndices: (
+    public var privilegedServiceIndices: (
         empower: ServiceIdentifier,
         assign: ServiceIdentifier,
         designate: ServiceIdentifier
     )
 
     // ψ: past judgements
-    public private(set) var judgements: JudgementsState
+    public var judgements: JudgementsState
 }
 
 public typealias StateRef = Ref<State>
