@@ -1,8 +1,8 @@
 import XCTest
 
-@testable import Database
+@testable import Boka
 
-final class DatabaseTests: XCTestCase {
+final class BokaTests: XCTestCase {
     func testExample() throws {
         // XCTest Documentation
         // https://developer.apple.com/documentation/xctest
