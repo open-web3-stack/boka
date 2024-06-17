@@ -32,5 +32,4 @@ jobs:
         swift-version: "5.10"
     - name: Run Script
       run: |
-        chmod +x ./scripts/run.sh
         make test
