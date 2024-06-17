@@ -1,3 +1,4 @@
+import Foundation
 import Utils
 
 /// Holds the state of the blockchain.
