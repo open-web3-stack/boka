@@ -76,3 +76,24 @@ public struct State {
 }
 
 public typealias StateRef = Ref<State>
+
+public extension State {
+    func update(with block: Block) -> State {
+        let state = State(
+            coreAuthorizationPool: coreAuthorizationPool,
+            lastBlock: block,
+            safroleState: safroleState,
+            serviceAccounts: serviceAccounts,
+            entropyPool: entropyPool,
+            validatorQueue: validatorQueue,
+            currentValidators: currentValidators,
+            previousValidators: previousValidators,
+            reports: reports,
+            timestamp: timestamp,
+            authorizationQueue: authorizationQueue,
+            privilegedServiceIndices: privilegedServiceIndices,
+            judgements: judgements
+        )
+        return state
+    }
+}
