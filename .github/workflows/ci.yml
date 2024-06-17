@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+
+jobs:
+  lint:
+    name: Swift Lint
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Check swift codestyle
+      uses: norio-nomura/action-swiftlint@3.2.1
+      with:
+        args: lint --config .swiftlint.yml --strict
+
+  test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+    - uses: actions/cache@v3
+      with:
+        path: '**/.build'
+        key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+        restore-keys: |
+          ${{ runner.os }}-spm-
+    - name: Setup Swift
+      uses: swift-actions/setup-swift@v2
+      with:
+        swift-version: "5.10"
+    - name: Run Script
+      run: |
+        make test
