@@ -20,7 +20,6 @@ let package = Package(
         .package(url: "https://github.com/tesseract-one/ScaleCodec.swift.git", from: "0.3.0"),
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
         .package(url: "https://github.com/gh123man/Async-Channels", revision: "679ee7d"),
-        .package(url: "https://github.com/apple/swift-corelibs-foundation.git", revision: "ca3669eb9ac282c649e71824d9357dbe140c8251"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -32,7 +31,6 @@ let package = Package(
                 .product(name: "ScaleCodec", package: "ScaleCodec.swift"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
                 .product(name: "AsyncChannels", package: "Async-Channels"),
-                .product(name: "Foundation", package: "swift-corelibs-foundation"),
             ]
         ),
         .testTarget(
