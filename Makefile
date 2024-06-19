@@ -12,6 +12,10 @@ test: githooks
 build: githooks
 	./scripts/run.sh build
 
+.PHONY: clean
+clean:
+	./scripts/run.sh package clean
+
 .PHONY: lint
 lint: githooks
 	swiftlint lint --config .swiftlint.yml --strict
