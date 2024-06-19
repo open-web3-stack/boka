@@ -1,4 +1,4 @@
-public class Ref<T> {
+public final class Ref<T> {
     public let value: T
 
     public init(_ value: T) {
@@ -6,7 +6,7 @@ public class Ref<T> {
     }
 }
 
-public class RefMut<T> {
+public final class RefMut<T> {
     public var value: T
 
     public init(_ value: T) {
@@ -27,5 +27,11 @@ extension Ref: Equatable where T: Equatable {
 extension Ref: Hashable where T: Hashable {
     public func hash(into hasher: inout Hasher) {
         hasher.combine(value)
+    }
+}
+
+extension Ref: Dummy where T: Dummy {
+    public static var dummy: Ref<T> {
+        Ref(T.dummy)
     }
 }

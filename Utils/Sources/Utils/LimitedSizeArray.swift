@@ -24,7 +24,7 @@ public struct LimitedSizeArray<T, TMinLength: ConstInt, TMaxLength: ConstInt> {
 
     private func validate() {
         assert(array.count >= Self.minLength)
-        assert(array.count < Self.maxLength)
+        assert(array.count <= Self.maxLength)
     }
 }
 
