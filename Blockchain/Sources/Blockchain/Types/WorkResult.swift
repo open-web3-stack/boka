@@ -1,4 +1,5 @@
 import Foundation
+import ScaleCodec
 import Utils
 
 public struct WorkResult {
@@ -34,13 +35,6 @@ public struct WorkResult {
     }
 }
 
-public enum WorkResultError: Error {
-    case outofGas
-    case panic
-    case invalidCode
-    case codeTooLarge // code larger than MaxServiceCodeSize
-}
-
 extension WorkResult: Dummy {
     public static var dummy: WorkResult {
         WorkResult(
@@ -50,5 +44,25 @@ extension WorkResult: Dummy {
             gas: 0,
             output: .success(Data())
         )
+    }
+}
+
+extension WorkResult: ScaleCodec.Codable {
+    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(
+            serviceIdentifier: decoder.decode(),
+            codeHash: decoder.decode(),
+            payloadHash: decoder.decode(),
+            gas: decoder.decode(),
+            output: decoder.decode()
+        )
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(serviceIdentifier)
+        try encoder.encode(codeHash)
+        try encoder.encode(payloadHash)
+        try encoder.encode(gas)
+        try encoder.encode(output)
     }
 }

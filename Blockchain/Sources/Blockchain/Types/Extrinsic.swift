@@ -1,3 +1,4 @@
+import ScaleCodec
 import Utils
 
 public struct Extrinsic {
@@ -42,5 +43,25 @@ extension Extrinsic: Dummy {
             availability: ExtrinsicAvailability.dummy,
             reports: ExtrinsicGuarantees.dummy
         )
+    }
+}
+
+extension Extrinsic: ScaleCodec.Codable {
+    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(
+            tickets: decoder.decode(),
+            judgements: decoder.decode(),
+            preimages: decoder.decode(),
+            availability: decoder.decode(),
+            reports: decoder.decode()
+        )
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(tickets)
+        try encoder.encode(judgements)
+        try encoder.encode(preimages)
+        try encoder.encode(availability)
+        try encoder.encode(reports)
     }
 }

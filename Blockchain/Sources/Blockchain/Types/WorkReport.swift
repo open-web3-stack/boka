@@ -1,4 +1,5 @@
 import Foundation
+import ScaleCodec
 import Utils
 
 public struct WorkReport {
@@ -49,5 +50,25 @@ extension WorkReport: Dummy {
             packageSpecification: AvailabilitySpecifications.dummy,
             results: []
         )
+    }
+}
+
+extension WorkReport: ScaleCodec.Codable {
+    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(
+            authorizerHash: decoder.decode(),
+            output: decoder.decode(),
+            refinementContext: decoder.decode(),
+            packageSpecification: decoder.decode(),
+            results: decoder.decode()
+        )
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(authorizerHash)
+        try encoder.encode(output)
+        try encoder.encode(refinementContext)
+        try encoder.encode(packageSpecification)
+        try encoder.encode(results)
     }
 }

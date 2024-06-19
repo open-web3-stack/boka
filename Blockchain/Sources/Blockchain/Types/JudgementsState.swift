@@ -1,3 +1,4 @@
+import ScaleCodec
 import Utils
 
 public struct JudgementsState {
@@ -30,5 +31,21 @@ extension JudgementsState: Dummy {
             banSet: [],
             punishSet: []
         )
+    }
+}
+
+extension JudgementsState: ScaleCodec.Codable {
+    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(
+            allowSet: decoder.decode(),
+            banSet: decoder.decode(),
+            punishSet: decoder.decode()
+        )
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(allowSet)
+        try encoder.encode(banSet)
+        try encoder.encode(punishSet)
     }
 }

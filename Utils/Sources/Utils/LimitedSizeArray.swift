@@ -1,3 +1,5 @@
+import ScaleCodec
+
 // TODO: add tests
 
 public struct LimitedSizeArray<T, TMinLength: ConstInt, TMaxLength: ConstInt> {
@@ -115,3 +117,25 @@ public extension LimitedSizeArray {
 }
 
 public typealias FixedSizeArray<T, TLength: ConstInt> = LimitedSizeArray<T, TLength, TLength>
+
+extension LimitedSizeArray: ScaleCodec.Codable where T: ScaleCodec.Codable {
+    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+        if TMinLength.value == TMaxLength.value {
+            // fixed size array
+            try self.init(decoder.decode(.fixed(UInt(TMinLength.value))))
+        } else {
+            // variable size array
+            try self.init(decoder.decode())
+        }
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        if TMinLength.value == TMaxLength.value {
+            // fixed size array
+            try encoder.encode(array, .fixed(UInt(TMinLength.value)))
+        } else {
+            // variable size array
+            try encoder.encode(array)
+        }
+    }
+}
