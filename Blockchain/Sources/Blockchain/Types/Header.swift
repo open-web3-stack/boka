@@ -19,9 +19,8 @@ public struct Header {
     // defining the Bandersnatch validator keys (kb) beginning in the next epoch
     public var epoch: (
         randomness: H256,
-        keys: LimitedSizeArray<
+        keys: FixedSizeArray<
             BandersnatchPublicKey,
-            Constants.TotalNumberOfValidators,
             Constants.TotalNumberOfValidators
         >
     )?
@@ -30,9 +29,8 @@ public struct Header {
     // The winning-tickets marker Hw is either empty or,
     // if the block is the first after the end of the submission period
     // for tickets and if the ticket accumulator is saturated, then the final sequence of ticket identifiers
-    public var winningTickets: LimitedSizeArray<
+    public var winningTickets: FixedSizeArray<
         Ticket,
-        Constants.EpochLength,
         Constants.EpochLength
     >?
 
@@ -48,6 +46,58 @@ public struct Header {
 
     // Hs: block seal
     public var seal: BandersnatchSignature
+
+    public init(
+        parentHash: H256,
+        priorStateRoot: H256,
+        extrinsicsRoot: H256,
+        timeslotIndex: TimeslotIndex,
+        epoch: (
+            randomness: H256,
+            keys: LimitedSizeArray<
+                BandersnatchPublicKey,
+                Constants.TotalNumberOfValidators,
+                Constants.TotalNumberOfValidators
+            >
+        )?,
+        winningTickets: LimitedSizeArray<
+            Ticket,
+            Constants.EpochLength,
+            Constants.EpochLength
+        >?,
+        judgementsMarkers: [H256],
+        authorKey: BandersnatchPublicKey,
+        vrfSignature: BandersnatchSignature,
+        seal: BandersnatchSignature
+    ) {
+        self.parentHash = parentHash
+        self.priorStateRoot = priorStateRoot
+        self.extrinsicsRoot = extrinsicsRoot
+        self.timeslotIndex = timeslotIndex
+        self.epoch = epoch
+        self.winningTickets = winningTickets
+        self.judgementsMarkers = judgementsMarkers
+        self.authorKey = authorKey
+        self.vrfSignature = vrfSignature
+        self.seal = seal
+    }
+}
+
+extension Header: Dummy {
+    public static var dummy: Header {
+        Header(
+            parentHash: H256(),
+            priorStateRoot: H256(),
+            extrinsicsRoot: H256(),
+            timeslotIndex: 0,
+            epoch: nil,
+            winningTickets: nil,
+            judgementsMarkers: [],
+            authorKey: BandersnatchPublicKey(),
+            vrfSignature: BandersnatchSignature(),
+            seal: BandersnatchSignature()
+        )
+    }
 }
 
 public extension Header {

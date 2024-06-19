@@ -1,3 +1,5 @@
+import Utils
+
 public struct Extrinsic {
     // ET: Tickets, used for the mechanism which manages the selection of validators for the
     // permissioning of block authoring
@@ -15,4 +17,30 @@ public struct Extrinsic {
 
     // EG: Reports of newly completed workloads whose accuracy is guaranteed by specific validators
     public var reports: ExtrinsicGuarantees
+
+    public init(
+        tickets: ExtrinsicTickets,
+        judgements: ExtrinsicJudgement,
+        preimages: ExtrinsicPreimages,
+        availability: ExtrinsicAvailability,
+        reports: ExtrinsicGuarantees
+    ) {
+        self.tickets = tickets
+        self.judgements = judgements
+        self.preimages = preimages
+        self.availability = availability
+        self.reports = reports
+    }
+}
+
+extension Extrinsic: Dummy {
+    public static var dummy: Extrinsic {
+        Extrinsic(
+            tickets: ExtrinsicTickets.dummy,
+            judgements: ExtrinsicJudgement.dummy,
+            preimages: ExtrinsicPreimages.dummy,
+            availability: ExtrinsicAvailability.dummy,
+            reports: ExtrinsicGuarantees.dummy
+        )
+    }
 }

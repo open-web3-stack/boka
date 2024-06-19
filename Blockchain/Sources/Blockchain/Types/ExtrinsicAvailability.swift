@@ -2,7 +2,7 @@ import Foundation
 import Utils
 
 public struct ExtrinsicAvailability {
-    public var assurances: LimitedSizeArray<
+    public typealias AssurancesList = LimitedSizeArray<
         (
             // a
             parentHash: H256,
@@ -20,4 +20,18 @@ public struct ExtrinsicAvailability {
         ConstInt0,
         Constants.TotalNumberOfValidators
     >
+
+    public var assurances: AssurancesList
+
+    public init(
+        assurances: AssurancesList
+    ) {
+        self.assurances = assurances
+    }
+}
+
+extension ExtrinsicAvailability: Dummy {
+    public static var dummy: ExtrinsicAvailability {
+        ExtrinsicAvailability(assurances: [])
+    }
 }
