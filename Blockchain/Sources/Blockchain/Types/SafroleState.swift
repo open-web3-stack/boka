@@ -1,3 +1,4 @@
+import ScaleCodec
 import Utils
 
 public struct SafroleState {
@@ -64,5 +65,23 @@ extension SafroleState: Dummy {
             slotSealerSeries: .right(FixedSizeArray(defaultValue: BandersnatchPublicKey())),
             ticketAccumulator: []
         )
+    }
+}
+
+extension SafroleState: ScaleCodec.Codable {
+    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(
+            pendingValidators: decoder.decode(),
+            epochRoot: decoder.decode(),
+            slotSealerSeries: decoder.decode(),
+            ticketAccumulator: decoder.decode()
+        )
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(pendingValidators)
+        try encoder.encode(epochRoot)
+        try encoder.encode(slotSealerSeries)
+        try encoder.encode(ticketAccumulator)
     }
 }

@@ -1,3 +1,5 @@
+import ScaleCodec
+
 public final class Ref<T> {
     public let value: T
 
@@ -33,5 +35,15 @@ extension Ref: Hashable where T: Hashable {
 extension Ref: Dummy where T: Dummy {
     public static var dummy: Ref<T> {
         Ref(T.dummy)
+    }
+}
+
+extension Ref: ScaleCodec.Codable where T: ScaleCodec.Codable {
+    public convenience init(from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(decoder.decode())
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(value)
     }
 }

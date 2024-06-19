@@ -37,3 +37,21 @@ extension AvailabilitySpecifications: Dummy {
         )
     }
 }
+
+extension AvailabilitySpecifications: ScaleCodec.Codable {
+    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(
+            workPackageHash: decoder.decode(),
+            length: decoder.decode(),
+            erasureRoot: decoder.decode(),
+            segmentRoot: decoder.decode()
+        )
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(workPackageHash)
+        try encoder.encode(length)
+        try encoder.encode(erasureRoot)
+        try encoder.encode(segmentRoot)
+    }
+}

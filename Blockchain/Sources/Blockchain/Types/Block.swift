@@ -1,3 +1,4 @@
+import ScaleCodec
 import Utils
 
 public struct Block {
@@ -18,5 +19,19 @@ extension Block: Dummy {
             header: Header.dummy,
             extrinsic: Extrinsic.dummy
         )
+    }
+}
+
+extension Block: ScaleCodec.Codable {
+    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(
+            header: decoder.decode(),
+            extrinsic: decoder.decode()
+        )
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(header)
+        try encoder.encode(extrinsic)
     }
 }

@@ -4,7 +4,6 @@ public typealias Balances = UInt64
 public typealias H256 = Data32
 public typealias ServiceIdentifier = H256
 public typealias TimeslotIndex = UInt32
-public typealias Ticket = (identifier: H256, entryIndex: TicketIndex)
 public typealias Gas = UInt64
 public typealias DataLength = UInt32
 public typealias ValidatorIndex = UInt32 // TODO: confirm this
