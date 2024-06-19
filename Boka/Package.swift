@@ -9,6 +9,7 @@ let package = Package(
         .macOS(.v14),
     ],
     dependencies: [
+        .package(path: "../Node"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.4.0"),
     ],
     targets: [
@@ -17,6 +18,7 @@ let package = Package(
         .executableTarget(
             name: "Boka",
             dependencies: [
+                "Node",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),

@@ -59,9 +59,9 @@ public struct SafroleState {
 extension SafroleState: Dummy {
     public static var dummy: SafroleState {
         SafroleState(
-            pendingValidators: [],
+            pendingValidators: FixedSizeArray(defaultValue: ValidatorKey.dummy),
             epochRoot: BandersnatchRingVRFRoot(),
-            slotSealerSeries: .left([]),
+            slotSealerSeries: .right(FixedSizeArray(defaultValue: BandersnatchPublicKey())),
             ticketAccumulator: []
         )
     }

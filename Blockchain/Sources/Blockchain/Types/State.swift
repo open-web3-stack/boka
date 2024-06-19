@@ -144,17 +144,17 @@ public typealias StateRef = Ref<State>
 extension State: Dummy {
     public static var dummy: State {
         State(
-            coreAuthorizationPool: [],
+            coreAuthorizationPool: FixedSizeArray(defaultValue: []),
             lastBlock: Block.dummy,
             safroleState: SafroleState.dummy,
             serviceAccounts: [:],
             entropyPool: (H256(), H256(), H256(), H256()),
-            validatorQueue: [],
-            currentValidators: [],
-            previousValidators: [],
-            reports: [],
+            validatorQueue: FixedSizeArray(defaultValue: ValidatorKey.dummy),
+            currentValidators: FixedSizeArray(defaultValue: ValidatorKey.dummy),
+            previousValidators: FixedSizeArray(defaultValue: ValidatorKey.dummy),
+            reports: FixedSizeArray(defaultValue: nil),
             timestamp: 0,
-            authorizationQueue: [],
+            authorizationQueue: FixedSizeArray(defaultValue: FixedSizeArray(defaultValue: H256())),
             privilegedServiceIndices: (
                 empower: ServiceIdentifier(),
                 assign: ServiceIdentifier(),
