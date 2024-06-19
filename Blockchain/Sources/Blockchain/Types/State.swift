@@ -1,6 +1,23 @@
+import ScaleCodec
 import Utils
 
 public struct State {
+    public struct ReportItem {
+        public var workReport: WorkReport
+        public var guarantors: LimitedSizeArray<Ed25519PublicKey, ConstInt2, ConstInt3>
+        public var timestamp: TimeslotIndex
+
+        public init(
+            workReport: WorkReport,
+            guarantors: LimitedSizeArray<Ed25519PublicKey, ConstInt2, ConstInt3>,
+            timestamp: TimeslotIndex
+        ) {
+            self.workReport = workReport
+            self.guarantors = guarantors
+            self.timestamp = timestamp
+        }
+    }
+
     // α: The core αuthorizations pool.
     public var coreAuthorizationPool: FixedSizeArray<
         LimitedSizeArray<
@@ -40,15 +57,7 @@ public struct State {
 
     // ρ: The ρending reports, per core, which are being made available prior to accumulation.
     public var reports: FixedSizeArray<
-        (
-            workReport: WorkReport,
-            guarantors: LimitedSizeArray<
-                Ed25519PublicKey,
-                ConstInt2,
-                ConstInt3
-            >,
-            timestamp: TimeslotIndex
-        )?,
+        ReportItem?,
         Constants.TotalNumberOfCores
     >
 
@@ -97,15 +106,7 @@ public struct State {
             ValidatorKey, Constants.TotalNumberOfValidators
         >,
         reports: FixedSizeArray<
-            (
-                workReport: WorkReport,
-                guarantors: LimitedSizeArray<
-                    Ed25519PublicKey,
-                    ConstInt2,
-                    ConstInt3
-                >,
-                timestamp: TimeslotIndex
-            )?,
+            ReportItem?,
             Constants.TotalNumberOfCores
         >,
         timestamp: TimeslotIndex,
@@ -162,6 +163,58 @@ extension State: Dummy {
             ),
             judgements: JudgementsState.dummy
         )
+    }
+}
+
+extension State.ReportItem: ScaleCodec.Codable {
+    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(
+            workReport: decoder.decode(),
+            guarantors: decoder.decode(),
+            timestamp: decoder.decode()
+        )
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(workReport)
+        try encoder.encode(guarantors)
+        try encoder.encode(timestamp)
+    }
+}
+
+extension State: ScaleCodec.Codable {
+    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(
+            coreAuthorizationPool: decoder.decode(),
+            lastBlock: decoder.decode(),
+            safroleState: decoder.decode(),
+            serviceAccounts: decoder.decode(),
+            entropyPool: decoder.decode(),
+            validatorQueue: decoder.decode(),
+            currentValidators: decoder.decode(),
+            previousValidators: decoder.decode(),
+            reports: decoder.decode(),
+            timestamp: decoder.decode(),
+            authorizationQueue: decoder.decode(),
+            privilegedServiceIndices: decoder.decode(),
+            judgements: decoder.decode()
+        )
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(coreAuthorizationPool)
+        try encoder.encode(lastBlock)
+        try encoder.encode(safroleState)
+        try encoder.encode(serviceAccounts)
+        try encoder.encode(entropyPool)
+        try encoder.encode(validatorQueue)
+        try encoder.encode(currentValidators)
+        try encoder.encode(previousValidators)
+        try encoder.encode(reports)
+        try encoder.encode(timestamp)
+        try encoder.encode(authorizationQueue)
+        try encoder.encode(privilegedServiceIndices)
+        try encoder.encode(judgements)
     }
 }
 
