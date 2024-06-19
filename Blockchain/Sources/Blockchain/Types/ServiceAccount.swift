@@ -28,9 +28,7 @@ public struct ServiceAccount {
     public init(
         storage: [H256: Data],
         preimages: [H256: Data],
-        preimageInfos: [
-            HashAndLength: LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>,
-        ],
+        preimageInfos: [HashAndLength: LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>],
         codeHash: H256,
         balance: Balances,
         accumlateGasLimit: Gas,
