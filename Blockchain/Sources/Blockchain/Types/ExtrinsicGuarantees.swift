@@ -1,7 +1,7 @@
 import Utils
 
 public struct ExtrinsicGuarantees {
-    public var guarantees: LimitedSizeArray<
+    public typealias GuaranteesList = LimitedSizeArray<
         (
             coreIndex: CoreIndex,
             workReport: WorkReport,
@@ -15,4 +15,18 @@ public struct ExtrinsicGuarantees {
         ConstInt0,
         Constants.TotalNumberOfCores
     >
+
+    public var guarantees: GuaranteesList
+
+    public init(
+        guarantees: GuaranteesList
+    ) {
+        self.guarantees = guarantees
+    }
+}
+
+extension ExtrinsicGuarantees: Dummy {
+    public static var dummy: ExtrinsicGuarantees {
+        ExtrinsicGuarantees(guarantees: [])
+    }
 }

@@ -73,9 +73,97 @@ public struct State {
 
     // ψ: past judgements
     public var judgements: JudgementsState
+
+    public init(
+        coreAuthorizationPool: FixedSizeArray<
+            LimitedSizeArray<
+                H256,
+                ConstInt0,
+                Constants.MaxAuthorizationsPoolItems
+            >,
+            Constants.TotalNumberOfCores
+        >,
+        lastBlock: Block,
+        safroleState: SafroleState,
+        serviceAccounts: [ServiceIdentifier: ServiceAccount],
+        entropyPool: (H256, H256, H256, H256),
+        validatorQueue: FixedSizeArray<
+            ValidatorKey, Constants.TotalNumberOfValidators
+        >,
+        currentValidators: FixedSizeArray<
+            ValidatorKey, Constants.TotalNumberOfValidators
+        >,
+        previousValidators: FixedSizeArray<
+            ValidatorKey, Constants.TotalNumberOfValidators
+        >,
+        reports: FixedSizeArray<
+            (
+                workReport: WorkReport,
+                guarantors: LimitedSizeArray<
+                    Ed25519PublicKey,
+                    ConstInt2,
+                    ConstInt3
+                >,
+                timestamp: TimeslotIndex
+            )?,
+            Constants.TotalNumberOfCores
+        >,
+        timestamp: TimeslotIndex,
+        authorizationQueue: FixedSizeArray<
+            FixedSizeArray<
+                H256,
+                Constants.MaxAuthorizationsQueueItems
+            >,
+            Constants.TotalNumberOfCores
+        >,
+        privilegedServiceIndices: (
+            empower: ServiceIdentifier,
+            assign: ServiceIdentifier,
+            designate: ServiceIdentifier
+        ),
+        judgements: JudgementsState
+    ) {
+        self.coreAuthorizationPool = coreAuthorizationPool
+        self.lastBlock = lastBlock
+        self.safroleState = safroleState
+        self.serviceAccounts = serviceAccounts
+        self.entropyPool = entropyPool
+        self.validatorQueue = validatorQueue
+        self.currentValidators = currentValidators
+        self.previousValidators = previousValidators
+        self.reports = reports
+        self.timestamp = timestamp
+        self.authorizationQueue = authorizationQueue
+        self.privilegedServiceIndices = privilegedServiceIndices
+        self.judgements = judgements
+    }
 }
 
 public typealias StateRef = Ref<State>
+
+extension State: Dummy {
+    public static var dummy: State {
+        State(
+            coreAuthorizationPool: [],
+            lastBlock: Block.dummy,
+            safroleState: SafroleState.dummy,
+            serviceAccounts: [:],
+            entropyPool: (H256(), H256(), H256(), H256()),
+            validatorQueue: [],
+            currentValidators: [],
+            previousValidators: [],
+            reports: [],
+            timestamp: 0,
+            authorizationQueue: [],
+            privilegedServiceIndices: (
+                empower: ServiceIdentifier(),
+                assign: ServiceIdentifier(),
+                designate: ServiceIdentifier()
+            ),
+            judgements: JudgementsState.dummy
+        )
+    }
+}
 
 public extension State {
     func update(with block: Block) -> State {

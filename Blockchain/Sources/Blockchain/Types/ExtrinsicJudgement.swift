@@ -1,7 +1,7 @@
 import Utils
 
 public struct ExtrinsicJudgement {
-    public var judgements: [
+    public typealias JudgementsList = [
         (
             reportHash: H256,
             signatures: FixedSizeArray<
@@ -14,4 +14,18 @@ public struct ExtrinsicJudgement {
             >
         )
     ]
+
+    public var judgements: JudgementsList
+
+    public init(
+        judgements: JudgementsList
+    ) {
+        self.judgements = judgements
+    }
+}
+
+extension ExtrinsicJudgement: Dummy {
+    public static var dummy: ExtrinsicJudgement {
+        ExtrinsicJudgement(judgements: [])
+    }
 }

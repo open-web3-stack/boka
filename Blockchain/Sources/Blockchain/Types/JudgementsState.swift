@@ -11,4 +11,24 @@ public struct JudgementsState {
     // ψp; he punish-set is a set of keys of Bandersnatch keys which were found to have guaranteed
     // a report which was confidently found to be invalid.
     public var punishSet: Set<BandersnatchPublicKey>
+
+    public init(
+        allowSet: Set<H256>,
+        banSet: Set<H256>,
+        punishSet: Set<BandersnatchPublicKey>
+    ) {
+        self.allowSet = allowSet
+        self.banSet = banSet
+        self.punishSet = punishSet
+    }
+}
+
+extension JudgementsState: Dummy {
+    public static var dummy: JudgementsState {
+        JudgementsState(
+            allowSet: [],
+            banSet: [],
+            punishSet: []
+        )
+    }
 }
