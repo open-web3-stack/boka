@@ -10,8 +10,8 @@ public struct LimitedSizeArray<T, TMinLength: ConstInt, TMaxLength: ConstInt> {
         TMaxLength.value
     }
 
-    public init(deafultValue: T) {
-        self.init(Array(repeating: deafultValue, count: Self.minLength))
+    public init(defaultValue: T) {
+        self.init(Array(repeating: defaultValue, count: Self.minLength))
     }
 
     public init(_ array: [T]) {
@@ -24,7 +24,7 @@ public struct LimitedSizeArray<T, TMinLength: ConstInt, TMaxLength: ConstInt> {
 
     private func validate() {
         assert(array.count >= Self.minLength)
-        assert(array.count < Self.maxLength)
+        assert(array.count <= Self.maxLength)
     }
 }
 

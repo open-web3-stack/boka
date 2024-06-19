@@ -5,10 +5,12 @@
 // https://swiftpackageindex.com/apple/swift-argument-parser/documentation
 
 import ArgumentParser
+import Node
 
 @main
 struct Boka: ParsableCommand {
     mutating func run() throws {
-        print("Hello, world!")
+        let node = try Node(genesis: .dev)
+        node.sayHello()
     }
 }

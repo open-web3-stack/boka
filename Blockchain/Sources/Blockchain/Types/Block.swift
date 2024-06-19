@@ -11,3 +11,12 @@ public struct Block {
 }
 
 public typealias BlockRef = Ref<Block>
+
+extension Block: Dummy {
+    public static var dummy: Block {
+        Block(
+            header: Header.dummy,
+            extrinsic: Extrinsic.dummy
+        )
+    }
+}
