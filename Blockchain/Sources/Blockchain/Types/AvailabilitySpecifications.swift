@@ -1,3 +1,4 @@
+import ScaleCodec
 import Utils
 
 public struct AvailabilitySpecifications {

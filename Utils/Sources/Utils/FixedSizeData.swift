@@ -1,4 +1,5 @@
 import Foundation
+import ScaleCodec
 
 public struct FixedSizeData<T: ConstInt> {
     public private(set) var data: Data
@@ -24,6 +25,16 @@ extension FixedSizeData: CustomStringConvertible, CustomDebugStringConvertible {
 
     public var debugDescription: String {
         description
+    }
+}
+
+extension FixedSizeData: ScaleCodec.Codable {
+    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(decoder.decode(Data.self, .fixed(UInt(T.value))))!
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(data, .fixed(UInt(T.value)))
     }
 }
 
