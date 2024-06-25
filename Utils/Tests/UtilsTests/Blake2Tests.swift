@@ -1,4 +1,3 @@
-import Blake2
 import XCTest
 
 @testable import Utils
