@@ -17,6 +17,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/tesseract-one/ScaleCodec.swift.git", from: "0.3.0"),
+        .package(url: "https://github.com/tesseract-one/Blake2.swift.git", from: "0.2.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -25,6 +26,7 @@ let package = Package(
             name: "Utils",
             dependencies: [
                 .product(name: "ScaleCodec", package: "ScaleCodec.swift"),
+                .product(name: "Blake2", package: "Blake2.swift"),
             ]
         ),
         .testTarget(
