@@ -39,7 +39,7 @@ extension Ref where T == ProtocolConfig {
         pvmProgramInitSegmentSize: 1 << 16
     ))
 
-    public static let prod = Ref(ProtocolConfig(
+    public static let mainnet = Ref(ProtocolConfig(
         auditTranchePeriod: 8,
         additionalMinBalancePerStateItem: 10,
         additionalMinBalancePerStateByte: 1,
