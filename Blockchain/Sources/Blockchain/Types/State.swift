@@ -156,7 +156,9 @@ extension State: Dummy {
             previousValidators: ConfigFixedSizeArray(withConfig: config, defaultValue: ValidatorKey.dummy(withConfig: config)),
             reports: ConfigFixedSizeArray(withConfig: config, defaultValue: nil),
             timestamp: 0,
-            authorizationQueue: ConfigFixedSizeArray(withConfig: config, defaultValue: ConfigFixedSizeArray(withConfig: config, defaultValue: H256())),
+            authorizationQueue: ConfigFixedSizeArray(
+                withConfig: config, defaultValue: ConfigFixedSizeArray(withConfig: config, defaultValue: H256())
+            ),
             privilegedServiceIndices: (
                 empower: ServiceIdentifier(),
                 assign: ServiceIdentifier(),
