@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: ["master"]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
@@ -35,7 +38,7 @@ jobs:
     - name: Setup Swift
       uses: swift-actions/setup-swift@v2
       with:
-        swift-version: "5.10"
+        swift-version: "6.0"
     - name: Build
       run: make build
     - name: Test
