@@ -97,18 +97,18 @@ extension ConfigLimitedSizeArray: RandomAccessCollection {
     }
 }
 
-public extension ConfigLimitedSizeArray {
-    mutating func append(_ newElement: T) {
+extension ConfigLimitedSizeArray {
+    public mutating func append(_ newElement: T) {
         array.append(newElement)
         validate()
     }
 
-    mutating func insert(_ newElement: T, at i: Int) {
+    public mutating func insert(_ newElement: T, at i: Int) {
         array.insert(newElement, at: i)
         validate()
     }
 
-    mutating func remove(at i: Int) -> T {
+    public mutating func remove(at i: Int) -> T {
         defer { validate() }
         return array.remove(at: i)
     }
@@ -116,8 +116,8 @@ public extension ConfigLimitedSizeArray {
 
 public typealias ConfigFixedSizeArray<T, TLength: ReadInt> = ConfigLimitedSizeArray<T, TLength, TLength>
 
-public extension ConfigLimitedSizeArray {
-    init<D: ScaleCodec.Decoder>(withConfig config: TMinLength.TConfig, from decoder: inout D, decodeItem: @escaping (inout D) throws -> T) throws {
+extension ConfigLimitedSizeArray {
+    public init<D: ScaleCodec.Decoder>(withConfig config: TMinLength.TConfig, from decoder: inout D, decodeItem: @escaping (inout D) throws -> T) throws {
         let minLength = TMinLength.read(config: config)
         let maxLength = TMaxLength.read(config: config)
 
@@ -126,22 +126,14 @@ public extension ConfigLimitedSizeArray {
             try self.init(decoder.decode(.fixed(UInt(minLength), decodeItem)), minLength: minLength, maxLength: maxLength)
         } else {
             // variable size array
-            try self.init(decoder.decode(CustomDecoderFactory {
-                let size = try $0.decode(UInt32.self, .compact)
-                var array: [T] = []
-                array.reserveCapacity(Int(size))
-                for _ in 0 ..< size {
-                    try array.append(decodeItem(&$0))
-                }
-                return array
-            }), minLength: minLength, maxLength: maxLength)
+            try self.init(decoder.decode(.array(decodeItem)), minLength: minLength, maxLength: maxLength)
         }
     }
 }
 
 // not ScaleCodec.Decodable because we need to have the config to know the size limit
-public extension ConfigLimitedSizeArray where T: ScaleCodec.Decodable {
-    init(withConfig config: TMinLength.TConfig, from decoder: inout some ScaleCodec.Decoder) throws {
+extension ConfigLimitedSizeArray where T: ScaleCodec.Decodable {
+    public init(withConfig config: TMinLength.TConfig, from decoder: inout some ScaleCodec.Decoder) throws {
         let minLength = TMinLength.read(config: config)
         let maxLength = TMaxLength.read(config: config)
 

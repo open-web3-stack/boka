@@ -2,6 +2,41 @@ import ScaleCodec
 import Utils
 
 public struct ExtrinsicJudgement {
+    public struct JudgementItem {
+        public struct SignatureItem {
+            public var isValid: Bool
+            public var validatorIndex: ValidatorIndex
+            public var signature: BandersnatchSignature
+
+            public init(
+                isValid: Bool,
+                validatorIndex: ValidatorIndex,
+                signature: BandersnatchSignature
+            ) {
+                self.isValid = isValid
+                self.validatorIndex = validatorIndex
+                self.signature = signature
+            }
+        }
+
+        public var reportHash: H256
+        public var signatures: ConfigFixedSizeArray<
+            SignatureItem,
+            ProtocolConfig.TwoThirdValidatorsPlusOne
+        >
+
+        public init(
+            reportHash: H256,
+            signatures: ConfigFixedSizeArray<
+                SignatureItem,
+                ProtocolConfig.TwoThirdValidatorsPlusOne
+            >
+        ) {
+            self.reportHash = reportHash
+            self.signatures = signatures
+        }
+    }
+
     public typealias JudgementsList = [JudgementItem]
 
     public var judgements: JudgementsList
@@ -20,10 +55,10 @@ extension ExtrinsicJudgement: Dummy {
     }
 }
 
-extension ExtrinsicJudgement: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+extension ExtrinsicJudgement: ScaleCodec.Encodable {
+    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            judgements: decoder.decode()
+            judgements: decoder.decode(.array { try JudgementItem(withConfig: config, from: &$0) })
         )
     }
 
@@ -32,46 +67,11 @@ extension ExtrinsicJudgement: ScaleCodec.Codable {
     }
 }
 
-public struct JudgementItem {
-    public var reportHash: H256
-    public var signatures: FixedSizeArray<
-        SignatureItem,
-        Constants.TwoThirdValidatorsPlusOne
-    >
-
-    public init(
-        reportHash: H256,
-        signatures: FixedSizeArray<
-            SignatureItem,
-            Constants.TwoThirdValidatorsPlusOne
-        >
-    ) {
-        self.reportHash = reportHash
-        self.signatures = signatures
-    }
-
-    public struct SignatureItem {
-        public var isValid: Bool
-        public var validatorIndex: ValidatorIndex
-        public var signature: BandersnatchSignature
-
-        public init(
-            isValid: Bool,
-            validatorIndex: ValidatorIndex,
-            signature: BandersnatchSignature
-        ) {
-            self.isValid = isValid
-            self.validatorIndex = validatorIndex
-            self.signature = signature
-        }
-    }
-}
-
-extension JudgementItem: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+extension ExtrinsicJudgement.JudgementItem: ScaleCodec.Encodable {
+    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             reportHash: decoder.decode(),
-            signatures: decoder.decode()
+            signatures: ConfigFixedSizeArray(withConfig: config, from: &decoder)
         )
     }
 
@@ -81,7 +81,7 @@ extension JudgementItem: ScaleCodec.Codable {
     }
 }
 
-extension JudgementItem.SignatureItem: ScaleCodec.Codable {
+extension ExtrinsicJudgement.JudgementItem.SignatureItem: ScaleCodec.Codable {
     public init(from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             isValid: decoder.decode(),

@@ -39,12 +39,12 @@ public class Blockchain {
     }
 }
 
-public extension Blockchain {
-    subscript(hash: H256) -> StateRef? {
+extension Blockchain {
+    public subscript(hash: H256) -> StateRef? {
         stateByBlockHash[hash]
     }
 
-    subscript(index: TimeslotIndex) -> [StateRef]? {
+    public subscript(index: TimeslotIndex) -> [StateRef]? {
         stateByTimeslot[index]
     }
 }

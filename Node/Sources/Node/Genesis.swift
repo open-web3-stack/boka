@@ -6,8 +6,8 @@ public enum Genesis {
     case file(path: String)
 }
 
-public extension Genesis {
-    func toState(withConfig config: ProtocolConfigRef) throws -> StateRef {
+extension Genesis {
+    public func toState(withConfig config: ProtocolConfigRef) throws -> StateRef {
         switch self {
         case .file:
             fatalError("TODO: not implemented")

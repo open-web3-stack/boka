@@ -181,241 +181,248 @@ public struct ProtocolConfig {
 
 public typealias ProtocolConfigRef = Ref<ProtocolConfig>
 
-public extension ProtocolConfig {
-    enum AuditTranchePeriod: ReadInt {
+extension ProtocolConfig {
+    public enum AuditTranchePeriod: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.auditTranchePeriod
         }
     }
 
-    enum AdditionalMinBalancePerStateItem: ReadInt {
+    public enum AdditionalMinBalancePerStateItem: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.additionalMinBalancePerStateItem
         }
     }
 
-    enum AdditionalMinBalancePerStateByte: ReadInt {
+    public enum AdditionalMinBalancePerStateByte: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.additionalMinBalancePerStateByte
         }
     }
 
-    enum ServiceMinBalance: ReadInt {
+    public enum ServiceMinBalance: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.serviceMinBalance
         }
     }
 
-    enum TotalNumberOfCores: ReadInt {
+    public enum TotalNumberOfCores: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.totalNumberOfCores
         }
     }
 
-    enum PreimagePurgePeriod: ReadInt {
+    public enum PreimagePurgePeriod: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.preimagePurgePeriod
         }
     }
 
-    enum EpochLength: ReadInt {
+    public enum EpochLength: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.epochLength
         }
     }
 
-    enum AuditBiasFactor: ReadInt {
+    public enum AuditBiasFactor: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.auditBiasFactor
         }
     }
 
-    enum CoreAccumulationGas: ReadInt {
+    public enum CoreAccumulationGas: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.coreAccumulationGas
         }
     }
 
-    enum WorkPackageAuthorizerGas: ReadInt {
+    public enum WorkPackageAuthorizerGas: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.workPackageAuthorizerGas
         }
     }
 
-    enum WorkPackageRefineGas: ReadInt {
+    public enum WorkPackageRefineGas: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.workPackageRefineGas
         }
     }
 
-    enum RecentHistorySize: ReadInt {
+    public enum RecentHistorySize: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.recentHistorySize
         }
     }
 
-    enum MaxWorkItems: ReadInt {
+    public enum MaxWorkItems: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.maxWorkItems
         }
     }
 
-    enum MaxTicketsPerExtrinsic: ReadInt {
+    public enum MaxTicketsPerExtrinsic: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.maxTicketsPerExtrinsic
         }
     }
 
-    enum MaxLookupAnchorAge: ReadInt {
+    public enum MaxLookupAnchorAge: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.maxLookupAnchorAge
         }
     }
 
-    enum TransferMemoSize: ReadInt {
+    public enum TransferMemoSize: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.transferMemoSize
         }
     }
 
-    enum TicketEntriesPerValidator: ReadInt {
+    public enum TicketEntriesPerValidator: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.ticketEntriesPerValidator
         }
     }
 
-    enum MaxAuthorizationsPoolItems: ReadInt {
+    public enum MaxAuthorizationsPoolItems: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.maxAuthorizationsPoolItems
         }
     }
 
-    enum SlotPeriodSeconds: ReadInt {
+    public enum SlotPeriodSeconds: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.slotPeriodSeconds
         }
     }
 
-    enum MaxAuthorizationsQueueItems: ReadInt {
+    public enum MaxAuthorizationsQueueItems: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.maxAuthorizationsQueueItems
         }
     }
 
-    enum CoreAssignmentRotationPeriod: ReadInt {
+    public enum CoreAssignmentRotationPeriod: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.coreAssignmentRotationPeriod
         }
     }
 
-    enum MaxServiceCodeSize: ReadInt {
+    public enum MaxServiceCodeSize: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.maxServiceCodeSize
         }
     }
 
-    enum PreimageReplacementPeriod: ReadInt {
+    public enum PreimageReplacementPeriod: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.preimageReplacementPeriod
         }
     }
 
-    enum TotalNumberOfValidators: ReadInt {
+    public enum TotalNumberOfValidators: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.totalNumberOfValidators
         }
     }
 
-    enum ErasureCodedPieceSize: ReadInt {
+    public enum ErasureCodedPieceSize: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.erasureCodedPieceSize
         }
     }
 
-    enum MaxWorkPackageManifestEntries: ReadInt {
+    public enum MaxWorkPackageManifestEntries: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.maxWorkPackageManifestEntries
         }
     }
 
-    enum MaxEncodedWorkPackageSize: ReadInt {
+    public enum MaxEncodedWorkPackageSize: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.maxEncodedWorkPackageSize
         }
     }
 
-    enum MaxEncodedWorkReportSize: ReadInt {
+    public enum MaxEncodedWorkReportSize: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.maxEncodedWorkReportSize
         }
     }
 
-    enum ErasureCodedSegmentSize: ReadInt {
+    public enum ErasureCodedSegmentSize: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.erasureCodedSegmentSize
         }
     }
 
-    enum TicketSubmissionEndSlot: ReadInt {
+    public enum TicketSubmissionEndSlot: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.ticketSubmissionEndSlot
         }
     }
 
-    enum PvmDynamicAddressAlignmentFactor: ReadInt {
+    public enum PvmDynamicAddressAlignmentFactor: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.pvmDynamicAddressAlignmentFactor
         }
     }
 
-    enum PvmProgramInitInputDataSize: ReadInt {
+    public enum PvmProgramInitInputDataSize: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.pvmProgramInitInputDataSize
         }
     }
+
+    public enum TwoThirdValidatorsPlusOne: ReadInt {
+        public typealias TConfig = ProtocolConfigRef
+        public static func read(config: ProtocolConfigRef) -> Int {
+            config.value.totalNumberOfValidators * 2 / 3 + 1
+        }
+    }
 }
 
-public extension ProtocolConfig {
-    enum Int0: ReadInt {
+extension ProtocolConfig {
+    public enum Int0: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config _: ProtocolConfigRef) -> Int {
             0
         }
     }
 
-    enum Int1: ReadInt {
+    public enum Int1: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config _: ProtocolConfigRef) -> Int {
             1

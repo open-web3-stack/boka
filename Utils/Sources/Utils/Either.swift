@@ -18,8 +18,8 @@ extension Either: CustomStringConvertible where A: CustomStringConvertible, B: C
     }
 }
 
-public extension Either {
-    init<D: ScaleCodec.Decoder>(from decoder: inout D, decodeLeft: (inout D) throws -> A, decodeRight: (inout D) throws -> B) throws {
+extension Either {
+    public init<D: ScaleCodec.Decoder>(from decoder: inout D, decodeLeft: (inout D) throws -> A, decodeRight: (inout D) throws -> B) throws {
         let id = try decoder.decode(.enumCaseId)
         switch id {
         case 0:

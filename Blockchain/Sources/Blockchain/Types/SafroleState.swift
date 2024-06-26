@@ -3,8 +3,8 @@ import Utils
 
 public struct SafroleState {
     // γk
-    public var pendingValidators: FixedSizeArray<
-        ValidatorKey, Constants.TotalNumberOfValidators
+    public var pendingValidators: ConfigFixedSizeArray<
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
     >
 
     // γz
@@ -30,8 +30,8 @@ public struct SafroleState {
     >
 
     public init(
-        pendingValidators: FixedSizeArray<
-            ValidatorKey, Constants.TotalNumberOfValidators
+        pendingValidators: ConfigFixedSizeArray<
+            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
         >,
         epochRoot: BandersnatchRingVRFRoot,
         slotSealerSeries: Either<
@@ -61,7 +61,7 @@ extension SafroleState: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(withConfig config: Config) -> SafroleState {
         SafroleState(
-            pendingValidators: FixedSizeArray(defaultValue: ValidatorKey.dummy(withConfig: config)),
+            pendingValidators: ConfigFixedSizeArray(withConfig: config, defaultValue: ValidatorKey.dummy(withConfig: config)),
             epochRoot: BandersnatchRingVRFRoot(),
             slotSealerSeries: .right(ConfigFixedSizeArray(withConfig: config, defaultValue: BandersnatchPublicKey())),
             ticketAccumulator: ConfigLimitedSizeArray(withConfig: config)
@@ -72,7 +72,7 @@ extension SafroleState: Dummy {
 extension SafroleState: ScaleCodec.Encodable {
     public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            pendingValidators: decoder.decode(),
+            pendingValidators: ConfigFixedSizeArray(withConfig: config, from: &decoder),
             epochRoot: decoder.decode(),
             slotSealerSeries: Either(
                 from: &decoder,

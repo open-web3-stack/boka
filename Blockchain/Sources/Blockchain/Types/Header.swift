@@ -4,16 +4,16 @@ import Utils
 public struct Header {
     public struct EpochMarker {
         public var randomness: H256
-        public var keys: FixedSizeArray<
+        public var keys: ConfigFixedSizeArray<
             BandersnatchPublicKey,
-            Constants.TotalNumberOfValidators
+            ProtocolConfig.TotalNumberOfValidators
         >
 
         public init(
             randomness: H256,
-            keys: FixedSizeArray<
+            keys: ConfigFixedSizeArray<
                 BandersnatchPublicKey,
-                Constants.TotalNumberOfValidators
+                ProtocolConfig.TotalNumberOfValidators
             >
         ) {
             self.randomness = randomness
@@ -114,7 +114,7 @@ extension Header: ScaleCodec.Encodable {
             priorStateRoot: decoder.decode(),
             extrinsicsRoot: decoder.decode(),
             timeslotIndex: decoder.decode(),
-            epoch: decoder.decode(),
+            epoch: EpochMarker(withConfig: config, from: &decoder),
             winningTickets: ConfigFixedSizeArray(withConfig: config, from: &decoder),
             judgementsMarkers: decoder.decode(),
             authorKey: decoder.decode(),
@@ -137,11 +137,11 @@ extension Header: ScaleCodec.Encodable {
     }
 }
 
-extension Header.EpochMarker: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+extension Header.EpochMarker: ScaleCodec.Encodable {
+    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             randomness: decoder.decode(),
-            keys: decoder.decode()
+            keys: ConfigFixedSizeArray(withConfig: config, from: &decoder)
         )
     }
 
@@ -151,8 +151,8 @@ extension Header.EpochMarker: ScaleCodec.Codable {
     }
 }
 
-public extension Header {
-    var hash: H256 {
+extension Header {
+    public var hash: H256 {
         H256() // TODO: implement this
     }
 }

@@ -3,10 +3,33 @@ import ScaleCodec
 import Utils
 
 public struct ExtrinsicAvailability {
-    public typealias AssurancesList = LimitedSizeArray<
+    public struct AssuranceItem {
+        // a
+        public var parentHash: H256
+        // f
+        public var assurance: Data // bit string with length of Constants.TotalNumberOfCores TODO: use a BitString type
+        // v
+        public var validatorIndex: ValidatorIndex
+        // s
+        public var signature: Ed25519Signature
+
+        public init(
+            parentHash: H256,
+            assurance: Data,
+            validatorIndex: ValidatorIndex,
+            signature: Ed25519Signature
+        ) {
+            self.parentHash = parentHash
+            self.assurance = assurance
+            self.validatorIndex = validatorIndex
+            self.signature = signature
+        }
+    }
+
+    public typealias AssurancesList = ConfigLimitedSizeArray<
         AssuranceItem,
-        ConstInt0,
-        Constants.TotalNumberOfValidators
+        ProtocolConfig.Int0,
+        ProtocolConfig.TotalNumberOfValidators
     >
 
     public var assurances: AssurancesList
@@ -20,15 +43,15 @@ public struct ExtrinsicAvailability {
 
 extension ExtrinsicAvailability: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig _: Config) -> ExtrinsicAvailability {
-        ExtrinsicAvailability(assurances: [])
+    public static func dummy(withConfig config: Config) -> ExtrinsicAvailability {
+        ExtrinsicAvailability(assurances: ConfigLimitedSizeArray(withConfig: config))
     }
 }
 
-extension ExtrinsicAvailability: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+extension ExtrinsicAvailability: ScaleCodec.Encodable {
+    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            assurances: decoder.decode()
+            assurances: ConfigLimitedSizeArray(withConfig: config, from: &decoder)
         )
     }
 
@@ -37,30 +60,7 @@ extension ExtrinsicAvailability: ScaleCodec.Codable {
     }
 }
 
-public struct AssuranceItem {
-    // a
-    public var parentHash: H256
-    // f
-    public var assurance: Data // bit string with length of Constants.TotalNumberOfCores TODO: use a BitString type
-    // v
-    public var validatorIndex: ValidatorIndex
-    // s
-    public var signature: Ed25519Signature
-
-    public init(
-        parentHash: H256,
-        assurance: Data,
-        validatorIndex: ValidatorIndex,
-        signature: Ed25519Signature
-    ) {
-        self.parentHash = parentHash
-        self.assurance = assurance
-        self.validatorIndex = validatorIndex
-        self.signature = signature
-    }
-}
-
-extension AssuranceItem: ScaleCodec.Codable {
+extension ExtrinsicAvailability.AssuranceItem: ScaleCodec.Codable {
     public init(from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             parentHash: decoder.decode(),

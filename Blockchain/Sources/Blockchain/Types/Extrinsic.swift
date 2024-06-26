@@ -51,9 +51,9 @@ extension Extrinsic: ScaleCodec.Encodable {
     public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             tickets: decoder.decode(),
-            judgements: decoder.decode(),
+            judgements: ExtrinsicJudgement(withConfig: config, from: &decoder),
             preimages: decoder.decode(),
-            availability: decoder.decode(),
+            availability: ExtrinsicAvailability(withConfig: config, from: &decoder),
             reports: ExtrinsicGuarantees(withConfig: config, from: &decoder)
         )
     }

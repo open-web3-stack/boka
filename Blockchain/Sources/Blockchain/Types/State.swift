@@ -41,18 +41,18 @@ public struct State {
     public var entropyPool: (H256, H256, H256, H256)
 
     // ι: The validator keys and metadata to be drawn from next.
-    public var validatorQueue: FixedSizeArray<
-        ValidatorKey, Constants.TotalNumberOfValidators
+    public var validatorQueue: ConfigFixedSizeArray<
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
     >
 
     // κ: The validator κeys and metadata currently active.
-    public var currentValidators: FixedSizeArray<
-        ValidatorKey, Constants.TotalNumberOfValidators
+    public var currentValidators: ConfigFixedSizeArray<
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
     >
 
     // λ: The validator keys and metadata which were active in the prior epoch.
-    public var previousValidators: FixedSizeArray<
-        ValidatorKey, Constants.TotalNumberOfValidators
+    public var previousValidators: ConfigFixedSizeArray<
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
     >
 
     // ρ: The ρending reports, per core, which are being made available prior to accumulation.
@@ -66,9 +66,9 @@ public struct State {
 
     // φ: The authorization queue.
     public var authorizationQueue: ConfigFixedSizeArray<
-        FixedSizeArray<
+        ConfigFixedSizeArray<
             H256,
-            Constants.MaxAuthorizationsQueueItems
+            ProtocolConfig.MaxAuthorizationsQueueItems
         >,
         ProtocolConfig.TotalNumberOfCores
     >
@@ -96,14 +96,14 @@ public struct State {
         safroleState: SafroleState,
         serviceAccounts: [ServiceIdentifier: ServiceAccount],
         entropyPool: (H256, H256, H256, H256),
-        validatorQueue: FixedSizeArray<
-            ValidatorKey, Constants.TotalNumberOfValidators
+        validatorQueue: ConfigFixedSizeArray<
+            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
         >,
-        currentValidators: FixedSizeArray<
-            ValidatorKey, Constants.TotalNumberOfValidators
+        currentValidators: ConfigFixedSizeArray<
+            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
         >,
-        previousValidators: FixedSizeArray<
-            ValidatorKey, Constants.TotalNumberOfValidators
+        previousValidators: ConfigFixedSizeArray<
+            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
         >,
         reports: ConfigFixedSizeArray<
             ReportItem?,
@@ -111,9 +111,9 @@ public struct State {
         >,
         timestamp: TimeslotIndex,
         authorizationQueue: ConfigFixedSizeArray<
-            FixedSizeArray<
+            ConfigFixedSizeArray<
                 H256,
-                Constants.MaxAuthorizationsQueueItems
+                ProtocolConfig.MaxAuthorizationsQueueItems
             >,
             ProtocolConfig.TotalNumberOfCores
         >,
@@ -151,12 +151,12 @@ extension State: Dummy {
             safroleState: SafroleState.dummy(withConfig: config),
             serviceAccounts: [:],
             entropyPool: (H256(), H256(), H256(), H256()),
-            validatorQueue: FixedSizeArray(defaultValue: ValidatorKey.dummy(withConfig: config)),
-            currentValidators: FixedSizeArray(defaultValue: ValidatorKey.dummy(withConfig: config)),
-            previousValidators: FixedSizeArray(defaultValue: ValidatorKey.dummy(withConfig: config)),
+            validatorQueue: ConfigFixedSizeArray(withConfig: config, defaultValue: ValidatorKey.dummy(withConfig: config)),
+            currentValidators: ConfigFixedSizeArray(withConfig: config, defaultValue: ValidatorKey.dummy(withConfig: config)),
+            previousValidators: ConfigFixedSizeArray(withConfig: config, defaultValue: ValidatorKey.dummy(withConfig: config)),
             reports: ConfigFixedSizeArray(withConfig: config, defaultValue: nil),
             timestamp: 0,
-            authorizationQueue: ConfigFixedSizeArray(withConfig: config, defaultValue: FixedSizeArray(defaultValue: H256())),
+            authorizationQueue: ConfigFixedSizeArray(withConfig: config, defaultValue: ConfigFixedSizeArray(withConfig: config, defaultValue: H256())),
             privilegedServiceIndices: (
                 empower: ServiceIdentifier(),
                 assign: ServiceIdentifier(),
@@ -193,12 +193,14 @@ extension State: ScaleCodec.Encodable {
             safroleState: SafroleState(withConfig: config, from: &decoder),
             serviceAccounts: decoder.decode(),
             entropyPool: decoder.decode(),
-            validatorQueue: decoder.decode(),
-            currentValidators: decoder.decode(),
-            previousValidators: decoder.decode(),
+            validatorQueue: ConfigFixedSizeArray(withConfig: config, from: &decoder),
+            currentValidators: ConfigFixedSizeArray(withConfig: config, from: &decoder),
+            previousValidators: ConfigFixedSizeArray(withConfig: config, from: &decoder),
             reports: ConfigFixedSizeArray(withConfig: config, from: &decoder) { try ReportItem(withConfig: config, from: &$0) },
             timestamp: decoder.decode(),
-            authorizationQueue: ConfigFixedSizeArray(withConfig: config, from: &decoder),
+            authorizationQueue: ConfigFixedSizeArray(withConfig: config, from: &decoder) {
+                try ConfigFixedSizeArray(withConfig: config, from: &$0)
+            },
             privilegedServiceIndices: decoder.decode(),
             judgements: decoder.decode()
         )
@@ -221,8 +223,8 @@ extension State: ScaleCodec.Encodable {
     }
 }
 
-public extension State {
-    func update(with block: Block) -> State {
+extension State {
+    public func update(with block: Block) -> State {
         let state = State(
             coreAuthorizationPool: coreAuthorizationPool,
             lastBlock: block,
