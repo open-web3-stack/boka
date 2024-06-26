@@ -36,7 +36,8 @@ public struct RefinementContext {
 }
 
 extension RefinementContext: Dummy {
-    public static var dummy: RefinementContext {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig _: Config) -> RefinementContext {
         RefinementContext(
             anchor: (
                 headerHash: H256(),

@@ -99,18 +99,18 @@ extension LimitedSizeArray: RandomAccessCollection {
     }
 }
 
-public extension LimitedSizeArray {
-    mutating func append(_ newElement: T) {
+extension LimitedSizeArray {
+    public mutating func append(_ newElement: T) {
         array.append(newElement)
         validate()
     }
 
-    mutating func insert(_ newElement: T, at i: Int) {
+    public mutating func insert(_ newElement: T, at i: Int) {
         array.insert(newElement, at: i)
         validate()
     }
 
-    mutating func remove(at i: Int) -> T {
+    public mutating func remove(at i: Int) -> T {
         defer { validate() }
         return array.remove(at: i)
     }

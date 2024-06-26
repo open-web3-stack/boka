@@ -36,7 +36,8 @@ public struct WorkResult {
 }
 
 extension WorkResult: Dummy {
-    public static var dummy: WorkResult {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig _: Config) -> WorkResult {
         WorkResult(
             serviceIdentifier: ServiceIdentifier(),
             codeHash: H256(),
