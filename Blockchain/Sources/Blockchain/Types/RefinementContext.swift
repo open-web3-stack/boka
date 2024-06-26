@@ -1,3 +1,4 @@
+import ScaleCodec
 import Utils
 
 // A refinement context, denoted by the set X, describes the context of the chain
@@ -35,7 +36,8 @@ public struct RefinementContext {
 }
 
 extension RefinementContext: Dummy {
-    public static var dummy: RefinementContext {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig _: Config) -> RefinementContext {
         RefinementContext(
             anchor: (
                 headerHash: H256(),
@@ -48,5 +50,21 @@ extension RefinementContext: Dummy {
             ),
             prerequistieWorkPackage: nil
         )
+    }
+}
+
+extension RefinementContext: ScaleCodec.Codable {
+    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(
+            anchor: decoder.decode(),
+            lokupAnchor: decoder.decode(),
+            prerequistieWorkPackage: decoder.decode()
+        )
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(anchor)
+        try encoder.encode(lokupAnchor)
+        try encoder.encode(prerequistieWorkPackage)
     }
 }

@@ -1,3 +1,4 @@
+import ScaleCodec
 import Utils
 
 public struct Extrinsic {
@@ -34,13 +35,34 @@ public struct Extrinsic {
 }
 
 extension Extrinsic: Dummy {
-    public static var dummy: Extrinsic {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig config: Config) -> Extrinsic {
         Extrinsic(
-            tickets: ExtrinsicTickets.dummy,
-            judgements: ExtrinsicJudgement.dummy,
-            preimages: ExtrinsicPreimages.dummy,
-            availability: ExtrinsicAvailability.dummy,
-            reports: ExtrinsicGuarantees.dummy
+            tickets: ExtrinsicTickets.dummy(withConfig: config),
+            judgements: ExtrinsicJudgement.dummy(withConfig: config),
+            preimages: ExtrinsicPreimages.dummy(withConfig: config),
+            availability: ExtrinsicAvailability.dummy(withConfig: config),
+            reports: ExtrinsicGuarantees.dummy(withConfig: config)
         )
+    }
+}
+
+extension Extrinsic: ScaleCodec.Encodable {
+    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(
+            tickets: decoder.decode(),
+            judgements: ExtrinsicJudgement(withConfig: config, from: &decoder),
+            preimages: decoder.decode(),
+            availability: ExtrinsicAvailability(withConfig: config, from: &decoder),
+            reports: ExtrinsicGuarantees(withConfig: config, from: &decoder)
+        )
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(tickets)
+        try encoder.encode(judgements)
+        try encoder.encode(preimages)
+        try encoder.encode(availability)
+        try encoder.encode(reports)
     }
 }

@@ -1,3 +1,4 @@
+import ScaleCodec
 import Utils
 
 public struct JudgementsState {
@@ -24,11 +25,28 @@ public struct JudgementsState {
 }
 
 extension JudgementsState: Dummy {
-    public static var dummy: JudgementsState {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig _: Config) -> JudgementsState {
         JudgementsState(
             allowSet: [],
             banSet: [],
             punishSet: []
         )
+    }
+}
+
+extension JudgementsState: ScaleCodec.Codable {
+    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(
+            allowSet: decoder.decode(),
+            banSet: decoder.decode(),
+            punishSet: decoder.decode()
+        )
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(allowSet)
+        try encoder.encode(banSet)
+        try encoder.encode(punishSet)
     }
 }

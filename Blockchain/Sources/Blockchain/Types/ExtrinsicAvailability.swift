@@ -1,24 +1,35 @@
 import Foundation
+import ScaleCodec
 import Utils
 
 public struct ExtrinsicAvailability {
-    public typealias AssurancesList = LimitedSizeArray<
-        (
-            // a
+    public struct AssuranceItem {
+        // a
+        public var parentHash: H256
+        // f
+        public var assurance: Data // bit string with length of Constants.TotalNumberOfCores TODO: use a BitString type
+        // v
+        public var validatorIndex: ValidatorIndex
+        // s
+        public var signature: Ed25519Signature
+
+        public init(
             parentHash: H256,
-
-            // f
-            assurance: Data, // bit string with length of Constants.TotalNumberOfCores
-            // TODO: use a BitString type
-
-            // v
+            assurance: Data,
             validatorIndex: ValidatorIndex,
-
-            // s
             signature: Ed25519Signature
-        ),
-        ConstInt0,
-        Constants.TotalNumberOfValidators
+        ) {
+            self.parentHash = parentHash
+            self.assurance = assurance
+            self.validatorIndex = validatorIndex
+            self.signature = signature
+        }
+    }
+
+    public typealias AssurancesList = ConfigLimitedSizeArray<
+        AssuranceItem,
+        ProtocolConfig.Int0,
+        ProtocolConfig.TotalNumberOfValidators
     >
 
     public var assurances: AssurancesList
@@ -31,7 +42,38 @@ public struct ExtrinsicAvailability {
 }
 
 extension ExtrinsicAvailability: Dummy {
-    public static var dummy: ExtrinsicAvailability {
-        ExtrinsicAvailability(assurances: [])
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig config: Config) -> ExtrinsicAvailability {
+        ExtrinsicAvailability(assurances: ConfigLimitedSizeArray(withConfig: config))
+    }
+}
+
+extension ExtrinsicAvailability: ScaleCodec.Encodable {
+    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(
+            assurances: ConfigLimitedSizeArray(withConfig: config, from: &decoder)
+        )
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(assurances)
+    }
+}
+
+extension ExtrinsicAvailability.AssuranceItem: ScaleCodec.Codable {
+    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(
+            parentHash: decoder.decode(),
+            assurance: decoder.decode(),
+            validatorIndex: decoder.decode(),
+            signature: decoder.decode()
+        )
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(parentHash)
+        try encoder.encode(assurance)
+        try encoder.encode(validatorIndex)
+        try encoder.encode(signature)
     }
 }

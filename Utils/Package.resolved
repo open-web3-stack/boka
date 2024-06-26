@@ -1,0 +1,24 @@
+{
+  "originHash" : "7e6e33157836e05375f90c70184331ac5884a4dc78788ca4ae9e201bcdf8dfed",
+  "pins" : [
+    {
+      "identity" : "scalecodec.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tesseract-one/ScaleCodec.swift.git",
+      "state" : {
+        "revision" : "af241cfa8491ac0312ff89ff0389c09879d41a74",
+        "version" : "0.3.1"
+      }
+    },
+    {
+      "identity" : "tuples.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tesseract-one/Tuples.swift.git",
+      "state" : {
+        "revision" : "4d2cf7c64443cdf4df833d0bedd767bf9dbc49d9",
+        "version" : "0.1.3"
+      }
+    }
+  ],
+  "version" : 3
+}

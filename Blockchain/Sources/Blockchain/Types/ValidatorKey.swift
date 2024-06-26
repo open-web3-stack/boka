@@ -1,3 +1,4 @@
+import ScaleCodec
 import Utils
 
 public struct ValidatorKey {
@@ -20,12 +21,31 @@ public struct ValidatorKey {
 }
 
 extension ValidatorKey: Dummy {
-    public static var dummy: ValidatorKey {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig _: Config) -> ValidatorKey {
         ValidatorKey(
             bandersnatchKey: BandersnatchPublicKey(),
             ed25519Key: Ed25519PublicKey(),
             blsKey: BLSKey(),
             metadata: Data128()
         )
+    }
+}
+
+extension ValidatorKey: ScaleCodec.Codable {
+    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(
+            bandersnatchKey: decoder.decode(),
+            ed25519Key: decoder.decode(),
+            blsKey: decoder.decode(),
+            metadata: decoder.decode()
+        )
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(bandersnatchKey)
+        try encoder.encode(ed25519Key)
+        try encoder.encode(blsKey)
+        try encoder.encode(metadata)
     }
 }
