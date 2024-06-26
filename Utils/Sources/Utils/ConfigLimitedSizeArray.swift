@@ -117,7 +117,11 @@ extension ConfigLimitedSizeArray {
 public typealias ConfigFixedSizeArray<T, TLength: ReadInt> = ConfigLimitedSizeArray<T, TLength, TLength>
 
 extension ConfigLimitedSizeArray {
-    public init<D: ScaleCodec.Decoder>(withConfig config: TMinLength.TConfig, from decoder: inout D, decodeItem: @escaping (inout D) throws -> T) throws {
+    public init<D: ScaleCodec.Decoder>(
+        withConfig config: TMinLength.TConfig,
+        from decoder: inout D,
+        decodeItem: @escaping (inout D) throws -> T
+    ) throws {
         let minLength = TMinLength.read(config: config)
         let maxLength = TMaxLength.read(config: config)
 

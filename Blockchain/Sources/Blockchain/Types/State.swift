@@ -157,7 +157,8 @@ extension State: Dummy {
             reports: ConfigFixedSizeArray(withConfig: config, defaultValue: nil),
             timestamp: 0,
             authorizationQueue: ConfigFixedSizeArray(
-                withConfig: config, defaultValue: ConfigFixedSizeArray(withConfig: config, defaultValue: H256())
+                withConfig: config,
+                defaultValue: ConfigFixedSizeArray(withConfig: config, defaultValue: H256())
             ),
             privilegedServiceIndices: (
                 empower: ServiceIdentifier(),
