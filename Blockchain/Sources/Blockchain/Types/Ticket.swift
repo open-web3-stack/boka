@@ -7,7 +7,8 @@ public struct Ticket {
 }
 
 extension Ticket: Dummy {
-    public static var dummy: Ticket {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig _: Config) -> Ticket {
         Ticket(identifier: H256(), entryIndex: 0)
     }
 }

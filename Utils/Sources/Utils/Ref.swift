@@ -1,22 +1,21 @@
 import ScaleCodec
 
-public final class Ref<T> {
-    public let value: T
+public class Ref<T> {
+    public internal(set) var value: T
 
-    public init(_ value: T) {
+    public required init(_ value: T) {
         self.value = value
     }
 }
 
-public final class RefMut<T> {
-    public var value: T
-
-    public init(_ value: T) {
-        self.value = value
-    }
-
-    public func asRef() -> Ref<T> {
-        Ref(value)
+public class RefMut<T>: Ref<T> {
+    override public var value: T {
+        get {
+            super.value
+        }
+        set {
+            super.value = newValue
+        }
     }
 }
 
@@ -33,17 +32,8 @@ extension Ref: Hashable where T: Hashable {
 }
 
 extension Ref: Dummy where T: Dummy {
-    public static var dummy: Ref<T> {
-        Ref(T.dummy)
-    }
-}
-
-extension Ref: ScaleCodec.Codable where T: ScaleCodec.Codable {
-    public convenience init(from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(decoder.decode())
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(value)
+    public typealias Config = T.Config
+    public static func dummy(withConfig config: Config) -> Self {
+        Self(T.dummy(withConfig: config))
     }
 }

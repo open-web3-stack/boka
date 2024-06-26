@@ -2,9 +2,17 @@ disabled_rules:
     - trailing_comma
     - todo
     - large_tuple
+    - file_length
+    - nesting
+    - opening_brace
 
 excluded:
     - "**/.build"
 
 identifier_name:
     min_length: 1
+
+line_length:
+    warning: 140
+    error: 140
+    ignores_function_declarations: true

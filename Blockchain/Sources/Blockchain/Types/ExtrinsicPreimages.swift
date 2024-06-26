@@ -13,7 +13,8 @@ public struct ExtrinsicPreimages {
 }
 
 extension ExtrinsicPreimages: Dummy {
-    public static var dummy: ExtrinsicPreimages {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig _: Config) -> ExtrinsicPreimages {
         ExtrinsicPreimages(preimages: [])
     }
 }

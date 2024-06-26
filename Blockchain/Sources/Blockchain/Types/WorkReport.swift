@@ -16,10 +16,10 @@ public struct WorkReport {
     public var packageSpecification: AvailabilitySpecifications
 
     // r: the results of the evaluation of each of the items in the package
-    public var results: LimitedSizeArray<
+    public var results: ConfigLimitedSizeArray<
         WorkResult,
-        ConstInt1,
-        Constants.MaxWorkItems
+        ProtocolConfig.Int1,
+        ProtocolConfig.MaxWorkItems
     >
 
     public init(
@@ -27,10 +27,10 @@ public struct WorkReport {
         output: Data,
         refinementContext: RefinementContext,
         packageSpecification: AvailabilitySpecifications,
-        results: LimitedSizeArray<
+        results: ConfigLimitedSizeArray<
             WorkResult,
-            ConstInt1,
-            Constants.MaxWorkItems
+            ProtocolConfig.Int1,
+            ProtocolConfig.MaxWorkItems
         >
     ) {
         self.authorizerHash = authorizerHash
@@ -42,25 +42,26 @@ public struct WorkReport {
 }
 
 extension WorkReport: Dummy {
-    public static var dummy: WorkReport {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig config: Config) -> WorkReport {
         WorkReport(
             authorizerHash: H256(),
             output: Data(),
-            refinementContext: RefinementContext.dummy,
-            packageSpecification: AvailabilitySpecifications.dummy,
-            results: []
+            refinementContext: RefinementContext.dummy(withConfig: config),
+            packageSpecification: AvailabilitySpecifications.dummy(withConfig: config),
+            results: ConfigLimitedSizeArray(withConfig: config, defaultValue: WorkResult.dummy(withConfig: config))
         )
     }
 }
 
-extension WorkReport: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+extension WorkReport: ScaleCodec.Encodable {
+    public init(withConfig config: Config, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             authorizerHash: decoder.decode(),
             output: decoder.decode(),
             refinementContext: decoder.decode(),
             packageSpecification: decoder.decode(),
-            results: decoder.decode()
+            results: ConfigLimitedSizeArray(withConfig: config, from: &decoder)
         )
     }
 

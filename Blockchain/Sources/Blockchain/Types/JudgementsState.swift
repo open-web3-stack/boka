@@ -25,7 +25,8 @@ public struct JudgementsState {
 }
 
 extension JudgementsState: Dummy {
-    public static var dummy: JudgementsState {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig _: Config) -> JudgementsState {
         JudgementsState(
             allowSet: [],
             banSet: [],

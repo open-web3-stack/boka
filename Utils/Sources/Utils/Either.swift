@@ -18,7 +18,21 @@ extension Either: CustomStringConvertible where A: CustomStringConvertible, B: C
     }
 }
 
-extension Either: ScaleCodec.Codable where A: ScaleCodec.Codable, B: ScaleCodec.Codable {
+extension Either {
+    public init<D: ScaleCodec.Decoder>(from decoder: inout D, decodeLeft: (inout D) throws -> A, decodeRight: (inout D) throws -> B) throws {
+        let id = try decoder.decode(.enumCaseId)
+        switch id {
+        case 0:
+            self = try .left(decodeLeft(&decoder))
+        case 1:
+            self = try .right(decodeRight(&decoder))
+        default:
+            throw decoder.enumCaseError(for: id)
+        }
+    }
+}
+
+extension Either: ScaleCodec.Decodable where A: ScaleCodec.Decodable, B: ScaleCodec.Decodable {
     public init(from decoder: inout some ScaleCodec.Decoder) throws {
         let id = try decoder.decode(.enumCaseId)
         switch id {
@@ -30,7 +44,9 @@ extension Either: ScaleCodec.Codable where A: ScaleCodec.Codable, B: ScaleCodec.
             throw decoder.enumCaseError(for: id)
         }
     }
+}
 
+extension Either: ScaleCodec.Encodable where A: ScaleCodec.Encodable, B: ScaleCodec.Encodable {
     public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
         switch self {
         case let .left(a):
