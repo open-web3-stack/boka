@@ -2,5 +2,6 @@
 /// this is mostly used during initial development or testing
 /// should be avoided in production code
 public protocol Dummy {
-    static var dummy: Self { get }
+    associatedtype Config
+    static func dummy(withConfig config: Config) -> Self
 }

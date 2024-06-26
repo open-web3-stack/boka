@@ -19,7 +19,8 @@ public struct ExtrinsicAvailability {
 }
 
 extension ExtrinsicAvailability: Dummy {
-    public static var dummy: ExtrinsicAvailability {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig _: Config) -> ExtrinsicAvailability {
         ExtrinsicAvailability(assurances: [])
     }
 }

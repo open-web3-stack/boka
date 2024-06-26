@@ -43,9 +43,9 @@ public struct Header {
     // The winning-tickets marker Hw is either empty or,
     // if the block is the first after the end of the submission period
     // for tickets and if the ticket accumulator is saturated, then the final sequence of ticket identifiers
-    public var winningTickets: FixedSizeArray<
+    public var winningTickets: ConfigFixedSizeArray<
         Ticket,
-        Constants.EpochLength
+        ProtocolConfig.EpochLength
     >?
 
     // Hj: The judgement marker must contain exactly the sequence of report hashes judged not as
@@ -67,10 +67,9 @@ public struct Header {
         extrinsicsRoot: H256,
         timeslotIndex: TimeslotIndex,
         epoch: EpochMarker?,
-        winningTickets: LimitedSizeArray<
+        winningTickets: ConfigFixedSizeArray<
             Ticket,
-            Constants.EpochLength,
-            Constants.EpochLength
+            ProtocolConfig.EpochLength
         >?,
         judgementsMarkers: [H256],
         authorKey: BandersnatchPublicKey,
@@ -91,7 +90,8 @@ public struct Header {
 }
 
 extension Header: Dummy {
-    public static var dummy: Header {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig _: Config) -> Header {
         Header(
             parentHash: H256(),
             priorStateRoot: H256(),
@@ -107,15 +107,15 @@ extension Header: Dummy {
     }
 }
 
-extension Header: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+extension Header: ScaleCodec.Encodable {
+    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             parentHash: decoder.decode(),
             priorStateRoot: decoder.decode(),
             extrinsicsRoot: decoder.decode(),
             timeslotIndex: decoder.decode(),
             epoch: decoder.decode(),
-            winningTickets: decoder.decode(),
+            winningTickets: ConfigFixedSizeArray(withConfig: config, from: &decoder),
             judgementsMarkers: decoder.decode(),
             authorKey: decoder.decode(),
             vrfSignature: decoder.decode(),

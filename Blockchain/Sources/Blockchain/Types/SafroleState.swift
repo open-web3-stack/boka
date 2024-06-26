@@ -12,21 +12,21 @@ public struct SafroleState {
 
     // γs
     public var slotSealerSeries: Either<
-        FixedSizeArray<
+        ConfigFixedSizeArray<
             Ticket,
-            Constants.EpochLength
+            ProtocolConfig.EpochLength
         >,
-        FixedSizeArray<
+        ConfigFixedSizeArray<
             BandersnatchPublicKey,
-            Constants.EpochLength
+            ProtocolConfig.EpochLength
         >
     >
 
     // γa
-    public var ticketAccumulator: LimitedSizeArray<
+    public var ticketAccumulator: ConfigLimitedSizeArray<
         Ticket,
-        ConstInt0,
-        Constants.EpochLength
+        ProtocolConfig.Int0,
+        ProtocolConfig.EpochLength
     >
 
     public init(
@@ -35,19 +35,19 @@ public struct SafroleState {
         >,
         epochRoot: BandersnatchRingVRFRoot,
         slotSealerSeries: Either<
-            FixedSizeArray<
+            ConfigFixedSizeArray<
                 Ticket,
-                Constants.EpochLength
+                ProtocolConfig.EpochLength
             >,
-            FixedSizeArray<
+            ConfigFixedSizeArray<
                 BandersnatchPublicKey,
-                Constants.EpochLength
+                ProtocolConfig.EpochLength
             >
         >,
-        ticketAccumulator: LimitedSizeArray<
+        ticketAccumulator: ConfigLimitedSizeArray<
             Ticket,
-            ConstInt0,
-            Constants.EpochLength
+            ProtocolConfig.Int0,
+            ProtocolConfig.EpochLength
         >
     ) {
         self.pendingValidators = pendingValidators
@@ -58,23 +58,28 @@ public struct SafroleState {
 }
 
 extension SafroleState: Dummy {
-    public static var dummy: SafroleState {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig config: Config) -> SafroleState {
         SafroleState(
-            pendingValidators: FixedSizeArray(defaultValue: ValidatorKey.dummy),
+            pendingValidators: FixedSizeArray(defaultValue: ValidatorKey.dummy(withConfig: config)),
             epochRoot: BandersnatchRingVRFRoot(),
-            slotSealerSeries: .right(FixedSizeArray(defaultValue: BandersnatchPublicKey())),
-            ticketAccumulator: []
+            slotSealerSeries: .right(ConfigFixedSizeArray(withConfig: config, defaultValue: BandersnatchPublicKey())),
+            ticketAccumulator: ConfigLimitedSizeArray(withConfig: config)
         )
     }
 }
 
-extension SafroleState: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+extension SafroleState: ScaleCodec.Encodable {
+    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             pendingValidators: decoder.decode(),
             epochRoot: decoder.decode(),
-            slotSealerSeries: decoder.decode(),
-            ticketAccumulator: decoder.decode()
+            slotSealerSeries: Either(
+                from: &decoder,
+                decodeLeft: { try ConfigFixedSizeArray(withConfig: config, from: &$0) },
+                decodeRight: { try ConfigFixedSizeArray(withConfig: config, from: &$0) }
+            ),
+            ticketAccumulator: ConfigLimitedSizeArray(withConfig: config, from: &decoder)
         )
     }
 

@@ -21,7 +21,8 @@ public struct ValidatorKey {
 }
 
 extension ValidatorKey: Dummy {
-    public static var dummy: ValidatorKey {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig _: Config) -> ValidatorKey {
         ValidatorKey(
             bandersnatchKey: BandersnatchPublicKey(),
             ed25519Key: Ed25519PublicKey(),

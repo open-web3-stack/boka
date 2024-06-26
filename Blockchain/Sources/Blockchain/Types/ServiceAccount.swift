@@ -56,7 +56,8 @@ public struct ServiceAccount {
 }
 
 extension ServiceAccount: Dummy {
-    public static var dummy: ServiceAccount {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig _: Config) -> ServiceAccount {
         ServiceAccount(
             storage: [:],
             preimages: [:],

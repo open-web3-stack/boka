@@ -1,0 +1,168 @@
+import ScaleCodec
+
+// TODO: add tests
+
+public struct ConfigLimitedSizeArray<T, TMinLength: ReadInt, TMaxLength: ReadInt>
+    where TMinLength.TConfig == TMaxLength.TConfig
+{
+    private var array: [T]
+
+    public let minLength: Int
+    public let maxLength: Int
+
+    public init(withConfig config: TMinLength.TConfig, defaultValue: T) {
+        let minLength = TMinLength.read(config: config)
+        let maxLength = TMaxLength.read(config: config)
+
+        self.init(Array(repeating: defaultValue, count: minLength), minLength: minLength, maxLength: maxLength)
+    }
+
+    // require minLength to be zero
+    public init(withConfig config: TMinLength.TConfig) {
+        let minLength = TMinLength.read(config: config)
+        let maxLength = TMaxLength.read(config: config)
+
+        self.init([], minLength: minLength, maxLength: maxLength)
+    }
+
+    public init(_ array: [T], minLength: Int, maxLength: Int) {
+        assert(minLength >= 0)
+        assert(maxLength >= minLength)
+
+        self.array = array
+        self.minLength = minLength
+        self.maxLength = maxLength
+
+        validate()
+    }
+
+    private func validate() {
+        assert(array.count >= minLength)
+        assert(array.count <= maxLength)
+    }
+}
+
+extension ConfigLimitedSizeArray: RandomAccessCollection {
+    public typealias Element = T
+    public typealias Index = Int
+
+    public var startIndex: Int {
+        0
+    }
+
+    public var endIndex: Int {
+        array.count
+    }
+
+    public subscript(position: Int) -> T {
+        get {
+            array[position]
+        }
+        set {
+            array[position] = newValue
+            validate()
+        }
+    }
+
+    public func index(after i: Int) -> Int {
+        i + 1
+    }
+
+    public func index(before i: Int) -> Int {
+        i - 1
+    }
+
+    public func index(_ i: Int, offsetBy distance: Int) -> Int {
+        i + distance
+    }
+
+    public func index(_ i: Int, offsetBy distance: Int, limitedBy limit: Int) -> Int? {
+        i + distance < limit ? i + distance : nil
+    }
+
+    public func distance(from start: Int, to end: Int) -> Int {
+        end - start
+    }
+
+    public func index(from start: Int) -> Int {
+        start
+    }
+
+    public func formIndex(after i: inout Int) {
+        i += 1
+    }
+
+    public func formIndex(before i: inout Int) {
+        i -= 1
+    }
+}
+
+public extension ConfigLimitedSizeArray {
+    mutating func append(_ newElement: T) {
+        array.append(newElement)
+        validate()
+    }
+
+    mutating func insert(_ newElement: T, at i: Int) {
+        array.insert(newElement, at: i)
+        validate()
+    }
+
+    mutating func remove(at i: Int) -> T {
+        defer { validate() }
+        return array.remove(at: i)
+    }
+}
+
+public typealias ConfigFixedSizeArray<T, TLength: ReadInt> = ConfigLimitedSizeArray<T, TLength, TLength>
+
+public extension ConfigLimitedSizeArray {
+    init<D: ScaleCodec.Decoder>(withConfig config: TMinLength.TConfig, from decoder: inout D, decodeItem: @escaping (inout D) throws -> T) throws {
+        let minLength = TMinLength.read(config: config)
+        let maxLength = TMaxLength.read(config: config)
+
+        if minLength == maxLength {
+            // fixed size array
+            try self.init(decoder.decode(.fixed(UInt(minLength), decodeItem)), minLength: minLength, maxLength: maxLength)
+        } else {
+            // variable size array
+            try self.init(decoder.decode(CustomDecoderFactory {
+                let size = try $0.decode(UInt32.self, .compact)
+                var array: [T] = []
+                array.reserveCapacity(Int(size))
+                for _ in 0 ..< size {
+                    try array.append(decodeItem(&$0))
+                }
+                return array
+            }), minLength: minLength, maxLength: maxLength)
+        }
+    }
+}
+
+// not ScaleCodec.Decodable because we need to have the config to know the size limit
+public extension ConfigLimitedSizeArray where T: ScaleCodec.Decodable {
+    init(withConfig config: TMinLength.TConfig, from decoder: inout some ScaleCodec.Decoder) throws {
+        let minLength = TMinLength.read(config: config)
+        let maxLength = TMaxLength.read(config: config)
+
+        if minLength == maxLength {
+            // fixed size array
+            try self.init(decoder.decode(.fixed(UInt(minLength))), minLength: minLength, maxLength: maxLength)
+        } else {
+            // variable size array
+            try self.init(decoder.decode(), minLength: minLength, maxLength: maxLength)
+        }
+    }
+}
+
+extension ConfigLimitedSizeArray: ScaleCodec.Encodable where T: ScaleCodec.Encodable {
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        if minLength == maxLength {
+            // fixed size array
+            try encoder.encode(array, .fixed(UInt(minLength)))
+        } else {
+            // variable size array
+            try encoder.encode(array)
+        }
+    }
+}

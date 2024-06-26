@@ -14,7 +14,8 @@ public struct ExtrinsicJudgement {
 }
 
 extension ExtrinsicJudgement: Dummy {
-    public static var dummy: ExtrinsicJudgement {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig _: Config) -> ExtrinsicJudgement {
         ExtrinsicJudgement(judgements: [])
     }
 }
