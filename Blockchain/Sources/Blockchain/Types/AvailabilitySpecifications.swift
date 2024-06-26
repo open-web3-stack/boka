@@ -28,7 +28,8 @@ public struct AvailabilitySpecifications {
 }
 
 extension AvailabilitySpecifications: Dummy {
-    public static var dummy: AvailabilitySpecifications {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig _: Config) -> AvailabilitySpecifications {
         AvailabilitySpecifications(
             workPackageHash: H256(),
             length: 0,

@@ -14,19 +14,20 @@ public struct Block {
 public typealias BlockRef = Ref<Block>
 
 extension Block: Dummy {
-    public static var dummy: Block {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(withConfig config: Config) -> Block {
         Block(
-            header: Header.dummy,
-            extrinsic: Extrinsic.dummy
+            header: Header.dummy(withConfig: config),
+            extrinsic: Extrinsic.dummy(withConfig: config)
         )
     }
 }
 
-extension Block: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+extension Block: ScaleCodec.Encodable {
+    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            header: decoder.decode(),
-            extrinsic: decoder.decode()
+            header: Header(withConfig: config, from: &decoder),
+            extrinsic: Extrinsic(withConfig: config, from: &decoder)
         )
     }
 

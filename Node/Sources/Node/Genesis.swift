@@ -6,13 +6,13 @@ public enum Genesis {
     case file(path: String)
 }
 
-public extension Genesis {
-    func toState() throws -> StateRef {
+extension Genesis {
+    public func toState(withConfig config: ProtocolConfigRef) throws -> StateRef {
         switch self {
         case .file:
             fatalError("TODO: not implemented")
         case .dev:
-            StateRef.dummy
+            StateRef.dummy(withConfig: config)
         }
     }
 }
