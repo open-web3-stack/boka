@@ -1,7 +1,7 @@
 import ScaleCodec
 import Utils
 
-public struct ValidatorKey {
+public struct ValidatorKey: Sendable {
     public var bandersnatchKey: BandersnatchPublicKey
     public var ed25519Key: Ed25519PublicKey
     public var blsKey: BLSKey

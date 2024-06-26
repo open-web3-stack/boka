@@ -2,7 +2,7 @@ import Foundation
 import ScaleCodec
 import Utils
 
-public struct WorkResult {
+public struct WorkResult: Sendable {
     // s: the index of the service whose state is to be altered and thus whose refine code was already executed
     public var serviceIdentifier: ServiceIdentifier
 
