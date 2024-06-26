@@ -1,10 +1,6 @@
 import Crypto
 import Foundation
 
-public enum SigningError: Error {
-    case signatureError
-}
-
 public struct Ed25519 {
     public let secretKey: Curve25519.Signing.PrivateKey
 
@@ -28,9 +24,7 @@ public struct Ed25519 {
     }
 
     public func sign(message: Data) throws -> Data64 {
-        guard let signature = try? secretKey.signature(for: message) else {
-            throw SigningError.signatureError
-        }
+        let signature = try secretKey.signature(for: message)
         return Data64(signature)!
     }
 
