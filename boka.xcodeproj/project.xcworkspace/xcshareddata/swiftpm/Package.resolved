@@ -1,5 +1,5 @@
 {
-  "originHash" : "b578da78329a065abfa4d3423647483a61d7fc81ec6963d5b5a064c699c949c8",
+  "originHash" : "c80a60eaf06aa1bc3b9d48f7d3541282e34d308bcc613d98df75ba316c2ca443",
   "pins" : [
     {
       "identity" : "async-channels",
@@ -8,6 +8,15 @@
       "state" : {
         "branch" : "679ee7d",
         "revision" : "679ee7d35e493e181be844dadbe78636cefaace4"
+      }
+    },
+    {
+      "identity" : "blake2.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tesseract-one/Blake2.swift.git",
+      "state" : {
+        "revision" : "29c55c8fe42d6661e5a32cc5bbbad1fff64fd01e",
+        "version" : "0.2.0"
       }
     },
     {
@@ -44,6 +53,15 @@
       "state" : {
         "revision" : "94cf62b3ba8d4bed62680a282d4c25f9c63c2efb",
         "version" : "1.1.0"
+      }
+    },
+    {
+      "identity" : "swift-crypto",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-crypto.git",
+      "state" : {
+        "revision" : "bc1c29221f6dfeb0ebbfbc98eb95cd3d4967868e",
+        "version" : "3.4.0"
       }
     },
     {

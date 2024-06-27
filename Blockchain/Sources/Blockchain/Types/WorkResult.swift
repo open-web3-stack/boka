@@ -7,10 +7,10 @@ public struct WorkResult: Sendable {
     public var serviceIdentifier: ServiceIdentifier
 
     // c: the hash of the code of the service at the time of being reported
-    public var codeHash: H256
+    public var codeHash: Data32
 
     // l: the hash of the payload
-    public var payloadHash: H256
+    public var payloadHash: Data32
 
     // g: the gas prioritization ratio
     // used when determining how much gas should be allocated to execute of this item’s accumulate
@@ -22,8 +22,8 @@ public struct WorkResult: Sendable {
 
     public init(
         serviceIdentifier: ServiceIdentifier,
-        codeHash: H256,
-        payloadHash: H256,
+        codeHash: Data32,
+        payloadHash: Data32,
         gas: Gas,
         output: Result<Data, WorkResultError>
     ) {
@@ -40,8 +40,8 @@ extension WorkResult: Dummy {
     public static func dummy(withConfig _: Config) -> WorkResult {
         WorkResult(
             serviceIdentifier: ServiceIdentifier(),
-            codeHash: H256(),
-            payloadHash: H256(),
+            codeHash: Data32(),
+            payloadHash: Data32(),
             gas: 0,
             output: .success(Data())
         )

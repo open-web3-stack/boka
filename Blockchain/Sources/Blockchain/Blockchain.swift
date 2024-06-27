@@ -8,7 +8,7 @@ public class Blockchain {
     public private(set) var heads: [StateRef]
     public private(set) var finalizedHead: StateRef
 
-    private var stateByBlockHash: [H256: StateRef] = [:]
+    private var stateByBlockHash: [Data32: StateRef] = [:]
     private var stateByTimeslot: [TimeslotIndex: [StateRef]] = [:]
 
     public init(heads: [StateRef], finalizedHead: StateRef) {
@@ -40,7 +40,7 @@ public class Blockchain {
 }
 
 extension Blockchain {
-    public subscript(hash: H256) -> StateRef? {
+    public subscript(hash: Data32) -> StateRef? {
         stateByBlockHash[hash]
     }
 

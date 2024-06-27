@@ -19,14 +19,14 @@ public struct ExtrinsicJudgement: Sendable {
             }
         }
 
-        public var reportHash: H256
+        public var reportHash: Data32
         public var signatures: ConfigFixedSizeArray<
             SignatureItem,
             ProtocolConfig.TwoThirdValidatorsPlusOne
         >
 
         public init(
-            reportHash: H256,
+            reportHash: Data32,
             signatures: ConfigFixedSizeArray<
                 SignatureItem,
                 ProtocolConfig.TwoThirdValidatorsPlusOne

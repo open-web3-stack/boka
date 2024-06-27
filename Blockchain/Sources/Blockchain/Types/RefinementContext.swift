@@ -5,29 +5,29 @@ import Utils
 // at the point that the report’s corresponding work-package was evaluated.
 public struct RefinementContext: Sendable {
     public var anchor: (
-        headerHash: H256,
-        stateRoot: H256,
-        beefyRoot: H256
+        headerHash: Data32,
+        stateRoot: Data32,
+        beefyRoot: Data32
     )
 
     public var lokupAnchor: (
-        headerHash: H256,
+        headerHash: Data32,
         timeslot: TimeslotIndex
     )
 
-    public var prerequistieWorkPackage: H256?
+    public var prerequistieWorkPackage: Data32?
 
     public init(
         anchor: (
-            headerHash: H256,
-            stateRoot: H256,
-            beefyRoot: H256
+            headerHash: Data32,
+            stateRoot: Data32,
+            beefyRoot: Data32
         ),
         lokupAnchor: (
-            headerHash: H256,
+            headerHash: Data32,
             timeslot: TimeslotIndex
         ),
-        prerequistieWorkPackage: H256?
+        prerequistieWorkPackage: Data32?
     ) {
         self.anchor = anchor
         self.lokupAnchor = lokupAnchor
@@ -40,12 +40,12 @@ extension RefinementContext: Dummy {
     public static func dummy(withConfig _: Config) -> RefinementContext {
         RefinementContext(
             anchor: (
-                headerHash: H256(),
-                stateRoot: H256(),
-                beefyRoot: H256()
+                headerHash: Data32(),
+                stateRoot: Data32(),
+                beefyRoot: Data32()
             ),
             lokupAnchor: (
-                headerHash: H256(),
+                headerHash: Data32(),
                 timeslot: 0
             ),
             prerequistieWorkPackage: nil

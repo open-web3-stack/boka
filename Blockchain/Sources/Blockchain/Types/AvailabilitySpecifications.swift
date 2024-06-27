@@ -3,22 +3,22 @@ import Utils
 
 public struct AvailabilitySpecifications: Sendable {
     // h
-    public var workPackageHash: H256
+    public var workPackageHash: Data32
 
     // l
     public var length: DataLength
 
     // u
-    public var erasureRoot: H256
+    public var erasureRoot: Data32
 
     // e
-    public var segmentRoot: H256
+    public var segmentRoot: Data32
 
     public init(
-        workPackageHash: H256,
+        workPackageHash: Data32,
         length: DataLength,
-        erasureRoot: H256,
-        segmentRoot: H256
+        erasureRoot: Data32,
+        segmentRoot: Data32
     ) {
         self.workPackageHash = workPackageHash
         self.length = length
@@ -31,10 +31,10 @@ extension AvailabilitySpecifications: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(withConfig _: Config) -> AvailabilitySpecifications {
         AvailabilitySpecifications(
-            workPackageHash: H256(),
+            workPackageHash: Data32(),
             length: 0,
-            erasureRoot: H256(),
-            segmentRoot: H256()
+            erasureRoot: Data32(),
+            segmentRoot: Data32()
         )
     }
 }
