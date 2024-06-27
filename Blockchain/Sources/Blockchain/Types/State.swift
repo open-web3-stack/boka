@@ -1,8 +1,8 @@
 import ScaleCodec
 import Utils
 
-public struct State {
-    public struct ReportItem {
+public struct State: Sendable {
+    public struct ReportItem: Sendable {
         public var workReport: WorkReport
         public var guarantors: LimitedSizeArray<Ed25519PublicKey, ConstInt2, ConstInt3>
         public var timestamp: TimeslotIndex

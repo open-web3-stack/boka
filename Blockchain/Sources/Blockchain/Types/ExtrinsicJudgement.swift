@@ -1,9 +1,9 @@
 import ScaleCodec
 import Utils
 
-public struct ExtrinsicJudgement {
-    public struct JudgementItem {
-        public struct SignatureItem {
+public struct ExtrinsicJudgement: Sendable {
+    public struct JudgementItem: Sendable {
+        public struct SignatureItem: Sendable {
             public var isValid: Bool
             public var validatorIndex: ValidatorIndex
             public var signature: BandersnatchSignature

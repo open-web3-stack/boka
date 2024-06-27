@@ -1,7 +1,7 @@
 import ScaleCodec
 import Utils
 
-public struct JudgementsState {
+public struct JudgementsState: Sendable {
     // ψa: The allow-set contains the hashes of all work-reports which were disputed and judged to be accurate.
     public var allowSet: Set<H256>
 

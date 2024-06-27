@@ -1,7 +1,7 @@
 import ScaleCodec
 import Utils
 
-public struct AvailabilitySpecifications {
+public struct AvailabilitySpecifications: Sendable {
     // h
     public var workPackageHash: H256
 

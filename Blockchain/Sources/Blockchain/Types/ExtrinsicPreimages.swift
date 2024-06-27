@@ -2,7 +2,17 @@ import Foundation
 import ScaleCodec
 import Utils
 
-public struct ExtrinsicPreimages {
+public struct ExtrinsicPreimages: Sendable {
+    public struct SizeAndData: Sendable {
+        public var size: DataLength
+        public var data: Data
+
+        public init(size: DataLength, data: Data) {
+            self.size = size
+            self.data = data
+        }
+    }
+
     public var preimages: [SizeAndData]
 
     public init(
@@ -31,17 +41,7 @@ extension ExtrinsicPreimages: ScaleCodec.Codable {
     }
 }
 
-public struct SizeAndData {
-    public var size: DataLength
-    public var data: Data
-
-    public init(size: DataLength, data: Data) {
-        self.size = size
-        self.data = data
-    }
-}
-
-extension SizeAndData: ScaleCodec.Codable {
+extension ExtrinsicPreimages.SizeAndData: ScaleCodec.Codable {
     public init(from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             size: decoder.decode(),

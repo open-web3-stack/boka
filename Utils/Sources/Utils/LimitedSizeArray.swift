@@ -30,6 +30,8 @@ public struct LimitedSizeArray<T, TMinLength: ConstInt, TMaxLength: ConstInt> {
     }
 }
 
+extension LimitedSizeArray: Sendable where T: Sendable {}
+
 extension LimitedSizeArray: ExpressibleByArrayLiteral {
     public init(arrayLiteral elements: T...) {
         self.init(elements)

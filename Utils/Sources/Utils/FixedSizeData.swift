@@ -1,7 +1,7 @@
 import Foundation
 import ScaleCodec
 
-public struct FixedSizeData<T: ConstInt> {
+public struct FixedSizeData<T: ConstInt>: Sendable {
     public private(set) var data: Data
 
     public init?(_ value: Data) {

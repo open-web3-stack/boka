@@ -1,7 +1,7 @@
 import ScaleCodec
 import Utils
 
-public struct Ticket {
+public struct Ticket: Sendable {
     public var identifier: H256
     public var entryIndex: TicketIndex
 }

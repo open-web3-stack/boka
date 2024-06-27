@@ -1,7 +1,7 @@
 import Utils
 
 // constants defined in the graypaper
-public struct ProtocolConfig {
+public struct ProtocolConfig: Sendable {
     // A = 8: The period, in seconds, between audit tranches.
     public var auditTranchePeriod: Int
 
