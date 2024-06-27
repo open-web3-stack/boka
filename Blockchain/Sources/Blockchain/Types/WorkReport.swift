@@ -4,7 +4,7 @@ import Utils
 
 public struct WorkReport: Sendable {
     // a: authorizer hash
-    public var authorizerHash: H256
+    public var authorizerHash: Data32
 
     // o: output
     public var output: Data
@@ -23,7 +23,7 @@ public struct WorkReport: Sendable {
     >
 
     public init(
-        authorizerHash: H256,
+        authorizerHash: Data32,
         output: Data,
         refinementContext: RefinementContext,
         packageSpecification: AvailabilitySpecifications,
@@ -45,7 +45,7 @@ extension WorkReport: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(withConfig config: Config) -> WorkReport {
         WorkReport(
-            authorizerHash: H256(),
+            authorizerHash: Data32(),
             output: Data(),
             refinementContext: RefinementContext.dummy(withConfig: config),
             packageSpecification: AvailabilitySpecifications.dummy(withConfig: config),

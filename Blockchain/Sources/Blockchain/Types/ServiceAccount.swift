@@ -4,20 +4,20 @@ import Utils
 
 public struct ServiceAccount: Sendable {
     public struct HashAndLength: Sendable, Hashable {
-        public var hash: H256
+        public var hash: Data32
         public var length: DataLength
 
-        public init(hash: H256, length: DataLength) {
+        public init(hash: Data32, length: DataLength) {
             self.hash = hash
             self.length = length
         }
     }
 
     // s
-    public var storage: [H256: Data]
+    public var storage: [Data32: Data]
 
     // p
-    public var preimages: [H256: Data]
+    public var preimages: [Data32: Data]
 
     // l
     public var preimageInfos: [
@@ -25,7 +25,7 @@ public struct ServiceAccount: Sendable {
     ]
 
     // c
-    public var codeHash: H256
+    public var codeHash: Data32
 
     // b
     public var balance: Balances
@@ -37,10 +37,10 @@ public struct ServiceAccount: Sendable {
     public var onTransferGasLimit: Gas
 
     public init(
-        storage: [H256: Data],
-        preimages: [H256: Data],
+        storage: [Data32: Data],
+        preimages: [Data32: Data],
         preimageInfos: [HashAndLength: LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>],
-        codeHash: H256,
+        codeHash: Data32,
         balance: Balances,
         accumlateGasLimit: Gas,
         onTransferGasLimit: Gas
@@ -62,7 +62,7 @@ extension ServiceAccount: Dummy {
             storage: [:],
             preimages: [:],
             preimageInfos: [:],
-            codeHash: H256(),
+            codeHash: Data32(),
             balance: 0,
             accumlateGasLimit: 0,
             onTransferGasLimit: 0

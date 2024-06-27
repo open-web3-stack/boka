@@ -2,14 +2,14 @@ import ScaleCodec
 import Utils
 
 public struct Ticket: Sendable {
-    public var identifier: H256
+    public var identifier: Data32
     public var entryIndex: TicketIndex
 }
 
 extension Ticket: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(withConfig _: Config) -> Ticket {
-        Ticket(identifier: H256(), entryIndex: 0)
+        Ticket(identifier: Data32(), entryIndex: 0)
     }
 }
 

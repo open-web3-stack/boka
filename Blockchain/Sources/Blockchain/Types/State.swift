@@ -21,7 +21,7 @@ public struct State: Sendable {
     // α: The core αuthorizations pool.
     public var coreAuthorizationPool: ConfigFixedSizeArray<
         ConfigLimitedSizeArray<
-            H256,
+            Data32,
             ProtocolConfig.Int0,
             ProtocolConfig.MaxAuthorizationsPoolItems
         >,
@@ -38,7 +38,7 @@ public struct State: Sendable {
     public var serviceAccounts: [ServiceIdentifier: ServiceAccount]
 
     // η: The eηtropy accumulator and epochal raηdomness.
-    public var entropyPool: (H256, H256, H256, H256)
+    public var entropyPool: (Data32, Data32, Data32, Data32)
 
     // ι: The validator keys and metadata to be drawn from next.
     public var validatorQueue: ConfigFixedSizeArray<
@@ -67,7 +67,7 @@ public struct State: Sendable {
     // φ: The authorization queue.
     public var authorizationQueue: ConfigFixedSizeArray<
         ConfigFixedSizeArray<
-            H256,
+            Data32,
             ProtocolConfig.MaxAuthorizationsQueueItems
         >,
         ProtocolConfig.TotalNumberOfCores
@@ -86,7 +86,7 @@ public struct State: Sendable {
     public init(
         coreAuthorizationPool: ConfigFixedSizeArray<
             ConfigLimitedSizeArray<
-                H256,
+                Data32,
                 ProtocolConfig.Int0,
                 ProtocolConfig.MaxAuthorizationsPoolItems
             >,
@@ -95,7 +95,7 @@ public struct State: Sendable {
         lastBlock: Block,
         safroleState: SafroleState,
         serviceAccounts: [ServiceIdentifier: ServiceAccount],
-        entropyPool: (H256, H256, H256, H256),
+        entropyPool: (Data32, Data32, Data32, Data32),
         validatorQueue: ConfigFixedSizeArray<
             ValidatorKey, ProtocolConfig.TotalNumberOfValidators
         >,
@@ -112,7 +112,7 @@ public struct State: Sendable {
         timestamp: TimeslotIndex,
         authorizationQueue: ConfigFixedSizeArray<
             ConfigFixedSizeArray<
-                H256,
+                Data32,
                 ProtocolConfig.MaxAuthorizationsQueueItems
             >,
             ProtocolConfig.TotalNumberOfCores
@@ -150,7 +150,7 @@ extension State: Dummy {
             lastBlock: Block.dummy(withConfig: config),
             safroleState: SafroleState.dummy(withConfig: config),
             serviceAccounts: [:],
-            entropyPool: (H256(), H256(), H256(), H256()),
+            entropyPool: (Data32(), Data32(), Data32(), Data32()),
             validatorQueue: ConfigFixedSizeArray(withConfig: config, defaultValue: ValidatorKey.dummy(withConfig: config)),
             currentValidators: ConfigFixedSizeArray(withConfig: config, defaultValue: ValidatorKey.dummy(withConfig: config)),
             previousValidators: ConfigFixedSizeArray(withConfig: config, defaultValue: ValidatorKey.dummy(withConfig: config)),
@@ -158,7 +158,7 @@ extension State: Dummy {
             timestamp: 0,
             authorizationQueue: ConfigFixedSizeArray(
                 withConfig: config,
-                defaultValue: ConfigFixedSizeArray(withConfig: config, defaultValue: H256())
+                defaultValue: ConfigFixedSizeArray(withConfig: config, defaultValue: Data32())
             ),
             privilegedServiceIndices: (
                 empower: ServiceIdentifier(),
