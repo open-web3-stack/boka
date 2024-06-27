@@ -1,8 +1,8 @@
 import ScaleCodec
 import Utils
 
-public struct Header {
-    public struct EpochMarker {
+public struct Header: Sendable {
+    public struct EpochMarker: Sendable {
         public var randomness: H256
         public var keys: ConfigFixedSizeArray<
             BandersnatchPublicKey,

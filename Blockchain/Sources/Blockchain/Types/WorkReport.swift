@@ -2,7 +2,7 @@ import Foundation
 import ScaleCodec
 import Utils
 
-public struct WorkReport {
+public struct WorkReport: Sendable {
     // a: authorizer hash
     public var authorizerHash: H256
 

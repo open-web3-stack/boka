@@ -1,7 +1,7 @@
 import ScaleCodec
 import Utils
 
-public struct SafroleState {
+public struct SafroleState: Sendable {
     // γk
     public var pendingValidators: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators

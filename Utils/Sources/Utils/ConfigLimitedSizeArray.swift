@@ -42,6 +42,8 @@ public struct ConfigLimitedSizeArray<T, TMinLength: ReadInt, TMaxLength: ReadInt
     }
 }
 
+extension ConfigLimitedSizeArray: Sendable where T: Sendable {}
+
 extension ConfigLimitedSizeArray: RandomAccessCollection {
     public typealias Element = T
     public typealias Index = Int

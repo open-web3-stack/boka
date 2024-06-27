@@ -1,21 +1,18 @@
 import ScaleCodec
 
-public class Ref<T> {
-    public internal(set) var value: T
+public final class Ref<T: Sendable>: Sendable {
+    public let value: T
 
     public required init(_ value: T) {
         self.value = value
     }
 }
 
-public class RefMut<T>: Ref<T> {
-    override public var value: T {
-        get {
-            super.value
-        }
-        set {
-            super.value = newValue
-        }
+public final class RefMut<T> {
+    public var value: T
+
+    public required init(_ value: T) {
+        self.value = value
     }
 }
 

@@ -2,8 +2,8 @@ import Foundation
 import ScaleCodec
 import Utils
 
-public struct ServiceAccount {
-    public struct HashAndLength: Hashable {
+public struct ServiceAccount: Sendable {
+    public struct HashAndLength: Sendable, Hashable {
         public var hash: H256
         public var length: DataLength
 

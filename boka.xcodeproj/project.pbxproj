@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 73;
 	objects = {
 
 /* Begin PBXFileReference section */
@@ -36,7 +36,6 @@
 				LastUpgradeCheck = 1540;
 			};
 			buildConfigurationList = 066C92692C095CE5005DDE4F /* Build configuration list for PBXProject "boka" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -47,6 +46,7 @@
 			packageReferences = (
 				066C92772C0B2DF7005DDE4F /* XCLocalSwiftPackageReference "Blockchain" */,
 			);
+			preferredProjectObjectVersion = 73;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
