@@ -5,7 +5,7 @@ import Utils
 public struct ExtrinsicAvailability: Sendable {
     public struct AssuranceItem: Sendable {
         // a
-        public var parentHash: H256
+        public var parentHash: Data32
         // f
         public var assurance: Data // bit string with length of Constants.TotalNumberOfCores TODO: use a BitString type
         // v
@@ -14,7 +14,7 @@ public struct ExtrinsicAvailability: Sendable {
         public var signature: Ed25519Signature
 
         public init(
-            parentHash: H256,
+            parentHash: Data32,
             assurance: Data,
             validatorIndex: ValidatorIndex,
             signature: Ed25519Signature
