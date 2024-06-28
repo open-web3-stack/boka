@@ -29,11 +29,30 @@ let package = Package(
                 .product(name: "ScaleCodec", package: "ScaleCodec.swift"),
                 .product(name: "Blake2", package: "Blake2.swift"),
                 .product(name: "Crypto", package: "swift-crypto"),
+                "blst",
+            ]
+        ),
+        .target(
+            name: "blst",
+            dependencies: [],
+            path: "./Sources/blst",
+            exclude: [
+                ".github",
+                "./build",
+                "./src",
+            ],
+            sources: [],
+            publicHeadersPath: "./include",
+            cSettings: [
+                .headerSearchPath("./include"),
+            ],
+            linkerSettings: [
+                .unsafeFlags(["-L../Utils/Sources/blst/lib", "-lblst"]),
             ]
         ),
         .testTarget(
             name: "UtilsTests",
-            dependencies: ["Utils"]
+            dependencies: ["Utils", "blst"]
         ),
     ],
     swiftLanguageVersions: [.version("6")]
