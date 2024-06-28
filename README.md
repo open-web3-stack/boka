@@ -7,7 +7,7 @@ JAM built with Swift
 - SwiftLint: `brew install swiftlint`
 - SwiftFormat: `brew install swiftformat`
 - Precommit hooks: `make githooks`
-- Pull submodules: `git submodule update --init`
+- Pull submodules: `git submodule update --init --recursive`
 - Setup deps: `make deps`
 
 ## Packages

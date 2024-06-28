@@ -2,7 +2,6 @@
 
 
 # Setup blst C module
-git submodule update --init
 cd Utils/Sources/blst || { echo "Submodule directory not found"; exit 1; }
 
 ./build.sh || { echo "Build blst library failed"; exit 1; }
