@@ -43,6 +43,12 @@ public enum ConstInt32: ConstInt {
     }
 }
 
+public enum ConstInt48: ConstInt {
+    public static var value: Int {
+        48
+    }
+}
+
 public enum ConstInt64: ConstInt {
     public static var value: Int {
         64

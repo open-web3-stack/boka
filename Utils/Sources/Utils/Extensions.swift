@@ -10,8 +10,9 @@ extension Data {
         var index = hexString.startIndex
 
         while index < hexString.endIndex {
-            guard let nextIndex = hexString.index(index, offsetBy: 2, limitedBy: hexString.endIndex),
-                  let byte = UInt8(hexString[index ..< nextIndex], radix: 16)
+            guard
+                let nextIndex = hexString.index(index, offsetBy: 2, limitedBy: hexString.endIndex),
+                let byte = UInt8(hexString[index ..< nextIndex], radix: 16)
             else {
                 return nil
             }
@@ -21,5 +22,9 @@ extension Data {
         }
 
         self.init(data)
+    }
+
+    var hexString: String {
+        map { String(format: "%02hhx", $0) }.joined()
     }
 }
