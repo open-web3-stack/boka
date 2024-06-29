@@ -1,7 +1,9 @@
 import blst
 import Foundation
 
-/// A wrapper to blst C library
+/// A wrapper to blst C library.
+///
+/// `blst_p1` for public keys, and `blst_p2` for signatures
 public struct BLS {
     public let secretKey: Data32
 
@@ -14,29 +16,31 @@ public struct BLS {
 
         var pkBytes = [UInt8](repeating: 0, count: 48)
         blst_p1_compress(&pkBytes, &pk)
+
         return Data48(Data(pkBytes))!
     }
 
     public init() {
         var sk = blst_scalar()
-        let ikm = [UInt8](repeating: 0, count: 32)
-        let ikmLen = ikm.count
+        blst_keygen(&sk, nil, 0, nil, 0)
 
-        blst_keygen(&sk, ikm, ikmLen, nil, 0)
+        var out = [UInt8](repeating: 0, count: 32)
+        blst_bendian_from_scalar(&out, &sk)
 
-        let skData = withUnsafeBytes(of: &sk) { Data($0) }
-
-        secretKey = Data32(skData)!
+        secretKey = Data32(Data(out))!
     }
 
-    public init(keyInfo: Data) {
+    public init(ikm: Data) {
         var sk = blst_scalar()
-        let ikmBytes = [UInt8](keyInfo)
+        let ikmBytes = [UInt8](ikm)
         let ikmLen = ikmBytes.count
 
         blst_keygen(&sk, ikmBytes, ikmLen, nil, 0)
 
-        secretKey = withUnsafeBytes(of: &sk) { Data32(Data($0))! }
+        var out = [UInt8](repeating: 0, count: 32)
+        blst_bendian_from_scalar(&out, &sk)
+
+        secretKey = Data32(Data(out))!
     }
 
     public init?(privateKey: Data32) {
@@ -63,10 +67,10 @@ public struct BLS {
         var sigBytes = [UInt8](repeating: 0, count: 96)
         blst_p2_compress(&sigBytes, &sig)
 
-        return withUnsafeBytes(of: sigBytes) { Data96(Data($0))! }
+        return Data96(Data(sigBytes))!
     }
 
-    public static func verifySingle(signature: Data96, message: Data, publicKey: Data48) -> Bool {
+    public static func verify(signature: Data96, message: Data, publicKey: Data48) -> Bool {
         var pk = blst_p1_affine()
         var sig = blst_p2_affine()
 
@@ -84,8 +88,8 @@ public struct BLS {
         return verifyResult == BLST_SUCCESS
     }
 
-    public static func verifyAggregated(
-        aggregatedSignature: Data96, messages: [Data], publicKeys: [Data48]
+    public static func aggregateVerify(
+        signature: Data96, messages: [Data], publicKeys: [Data48]
     )
         -> Bool
     {
@@ -95,7 +99,7 @@ public struct BLS {
         blst_pairing_init(ctx, true, nil, 0)
 
         var sig = blst_p2_affine()
-        let sigResult = blst_p2_uncompress(&sig, [UInt8](aggregatedSignature.data))
+        let sigResult = blst_p2_uncompress(&sig, [UInt8](signature.data))
         guard sigResult == BLST_SUCCESS else {
             return false
         }
@@ -107,15 +111,16 @@ public struct BLS {
                 return false
             }
 
-            var aggregateResult: BLST_ERROR = if i == 1 {
-                blst_pairing_aggregate_pk_in_g1(
-                    ctx, &pk, &sig, [UInt8](messages[i]), messages[i].count, nil, 0
-                )
-            } else {
-                blst_pairing_aggregate_pk_in_g1(
-                    ctx, &pk, nil, [UInt8](messages[i]), messages[i].count, nil, 0
-                )
-            }
+            let aggregateResult: BLST_ERROR =
+                if i == 1 {
+                    blst_pairing_aggregate_pk_in_g1(
+                        ctx, &pk, &sig, [UInt8](messages[i]), messages[i].count, nil, 0
+                    )
+                } else {
+                    blst_pairing_aggregate_pk_in_g1(
+                        ctx, &pk, nil, [UInt8](messages[i]), messages[i].count, nil, 0
+                    )
+                }
             guard aggregateResult == BLST_SUCCESS else {
                 return false
             }
@@ -127,26 +132,6 @@ public struct BLS {
         free(UnsafeMutableRawPointer(ctx))
 
         return result
-    }
-
-    public static func aggregatePublicKeys(publicKeys: [Data48]) -> Data48? {
-        var aggregate = blst_p1()
-        var last = blst_p1()
-
-        for publicKey in publicKeys {
-            var pk = blst_p1_affine()
-            let pkResult = blst_p1_uncompress(&pk, [UInt8](publicKey.data))
-            guard pkResult != BLST_SUCCESS else {
-                return nil
-            }
-            blst_p1_add_or_double_affine(&aggregate, &last, &pk)
-            last = blst_p1(x: aggregate.x, y: aggregate.y, z: aggregate.z)
-        }
-
-        var pkBytes = [UInt8](repeating: 0, count: 48)
-        blst_p1_compress(&pkBytes, &aggregate)
-
-        return withUnsafeBytes(of: aggregate) { Data48(Data($0)) }
     }
 
     public static func aggregateSignatures(signatures: [Data96]) -> Data96? {
@@ -163,9 +148,9 @@ public struct BLS {
             last = blst_p2(x: aggregate.x, y: aggregate.y, z: aggregate.z)
         }
 
-        var sigBytes = [UInt8](repeating: 0, count: 96)
-        blst_p2_compress(&sigBytes, &aggregate)
+        var sigCompressed = [UInt8](repeating: 0, count: 96)
+        blst_p2_compress(&sigCompressed, &aggregate)
 
-        return withUnsafeBytes(of: aggregate) { Data96(Data($0)) }
+        return Data96(Data(sigCompressed))!
     }
 }
