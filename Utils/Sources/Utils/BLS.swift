@@ -56,7 +56,7 @@ public struct BLS {
 
     public func sign(message: Data) -> Data96 {
         var sk = blst_scalar()
-        blst_scalar_from_bendian(&sk, [UInt8](message))
+        blst_scalar_from_bendian(&sk, [UInt8](secretKey.data))
 
         var msgHash = blst_p2()
         blst_hash_to_g2(&msgHash, [UInt8](message), message.count, nil, 0, nil, 0)
@@ -77,7 +77,7 @@ public struct BLS {
         let pkResult = blst_p1_uncompress(&pk, [UInt8](publicKey.data))
         let sigResult = blst_p2_uncompress(&sig, [UInt8](signature.data))
 
-        guard pkResult != BLST_SUCCESS, sigResult != BLST_SUCCESS else {
+        guard pkResult == BLST_SUCCESS, sigResult == BLST_SUCCESS else {
             return false
         }
 
