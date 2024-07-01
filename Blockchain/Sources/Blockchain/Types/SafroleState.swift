@@ -3,15 +3,15 @@ import Utils
 
 public struct SafroleState: Sendable {
     // γk
-    public var pendingValidators: ConfigFixedSizeArray<
+    public var nextValidators: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
     >
 
     // γz
-    public var epochRoot: BandersnatchRingVRFRoot
+    public var ticketsVerifierKey: BandersnatchRingVRFRoot
 
     // γs
-    public var slotSealerSeries: Either<
+    public var ticketsOrKeys: Either<
         ConfigFixedSizeArray<
             Ticket,
             ProtocolConfig.EpochLength
@@ -23,18 +23,18 @@ public struct SafroleState: Sendable {
     >
 
     // γa
-    public var ticketAccumulator: ConfigLimitedSizeArray<
+    public var ticketsAccumulator: ConfigLimitedSizeArray<
         Ticket,
         ProtocolConfig.Int0,
         ProtocolConfig.EpochLength
     >
 
     public init(
-        pendingValidators: ConfigFixedSizeArray<
+        nextValidators: ConfigFixedSizeArray<
             ValidatorKey, ProtocolConfig.TotalNumberOfValidators
         >,
-        epochRoot: BandersnatchRingVRFRoot,
-        slotSealerSeries: Either<
+        ticketsVerifierKey: BandersnatchRingVRFRoot,
+        ticketsOrKeys: Either<
             ConfigFixedSizeArray<
                 Ticket,
                 ProtocolConfig.EpochLength
@@ -44,16 +44,16 @@ public struct SafroleState: Sendable {
                 ProtocolConfig.EpochLength
             >
         >,
-        ticketAccumulator: ConfigLimitedSizeArray<
+        ticketsAccumulator: ConfigLimitedSizeArray<
             Ticket,
             ProtocolConfig.Int0,
             ProtocolConfig.EpochLength
         >
     ) {
-        self.pendingValidators = pendingValidators
-        self.epochRoot = epochRoot
-        self.slotSealerSeries = slotSealerSeries
-        self.ticketAccumulator = ticketAccumulator
+        self.nextValidators = nextValidators
+        self.ticketsVerifierKey = ticketsVerifierKey
+        self.ticketsOrKeys = ticketsOrKeys
+        self.ticketsAccumulator = ticketsAccumulator
     }
 }
 
@@ -61,10 +61,10 @@ extension SafroleState: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(withConfig config: Config) -> SafroleState {
         SafroleState(
-            pendingValidators: ConfigFixedSizeArray(withConfig: config, defaultValue: ValidatorKey.dummy(withConfig: config)),
-            epochRoot: BandersnatchRingVRFRoot(),
-            slotSealerSeries: .right(ConfigFixedSizeArray(withConfig: config, defaultValue: BandersnatchPublicKey())),
-            ticketAccumulator: ConfigLimitedSizeArray(withConfig: config)
+            nextValidators: ConfigFixedSizeArray(withConfig: config, defaultValue: ValidatorKey.dummy(withConfig: config)),
+            ticketsVerifierKey: BandersnatchRingVRFRoot(),
+            ticketsOrKeys: .right(ConfigFixedSizeArray(withConfig: config, defaultValue: BandersnatchPublicKey())),
+            ticketsAccumulator: ConfigLimitedSizeArray(withConfig: config)
         )
     }
 }
@@ -72,21 +72,21 @@ extension SafroleState: Dummy {
 extension SafroleState: ScaleCodec.Encodable {
     public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            pendingValidators: ConfigFixedSizeArray(withConfig: config, from: &decoder),
-            epochRoot: decoder.decode(),
-            slotSealerSeries: Either(
+            nextValidators: ConfigFixedSizeArray(withConfig: config, from: &decoder),
+            ticketsVerifierKey: decoder.decode(),
+            ticketsOrKeys: Either(
                 from: &decoder,
                 decodeLeft: { try ConfigFixedSizeArray(withConfig: config, from: &$0) },
                 decodeRight: { try ConfigFixedSizeArray(withConfig: config, from: &$0) }
             ),
-            ticketAccumulator: ConfigLimitedSizeArray(withConfig: config, from: &decoder)
+            ticketsAccumulator: ConfigLimitedSizeArray(withConfig: config, from: &decoder)
         )
     }
 
     public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(pendingValidators)
-        try encoder.encode(epochRoot)
-        try encoder.encode(slotSealerSeries)
-        try encoder.encode(ticketAccumulator)
+        try encoder.encode(nextValidators)
+        try encoder.encode(ticketsVerifierKey)
+        try encoder.encode(ticketsOrKeys)
+        try encoder.encode(ticketsAccumulator)
     }
 }

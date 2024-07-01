@@ -43,4 +43,5 @@ public typealias Data64 = FixedSizeData<ConstInt64>
 public typealias Data96 = FixedSizeData<ConstUInt96>
 public typealias Data128 = FixedSizeData<ConstUInt128>
 public typealias Data144 = FixedSizeData<ConstUInt144>
+public typealias Data384 = FixedSizeData<ConstUInt384>
 public typealias Data784 = FixedSizeData<ConstUInt784>
