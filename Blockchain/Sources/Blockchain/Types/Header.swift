@@ -3,21 +3,21 @@ import Utils
 
 public struct Header: Sendable {
     public struct EpochMarker: Sendable {
-        public var randomness: Data32
-        public var keys: ConfigFixedSizeArray<
+        public var entropy: Data32
+        public var validators: ConfigFixedSizeArray<
             BandersnatchPublicKey,
             ProtocolConfig.TotalNumberOfValidators
         >
 
         public init(
-            randomness: Data32,
-            keys: ConfigFixedSizeArray<
+            entropy: Data32,
+            validators: ConfigFixedSizeArray<
                 BandersnatchPublicKey,
                 ProtocolConfig.TotalNumberOfValidators
             >
         ) {
-            self.randomness = randomness
-            self.keys = keys
+            self.entropy = entropy
+            self.validators = validators
         }
     }
 
@@ -140,14 +140,14 @@ extension Header: ScaleCodec.Encodable {
 extension Header.EpochMarker: ScaleCodec.Encodable {
     public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            randomness: decoder.decode(),
-            keys: ConfigFixedSizeArray(withConfig: config, from: &decoder)
+            entropy: decoder.decode(),
+            validators: ConfigFixedSizeArray(withConfig: config, from: &decoder)
         )
     }
 
     public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(randomness)
-        try encoder.encode(keys)
+        try encoder.encode(entropy)
+        try encoder.encode(validators)
     }
 }
 

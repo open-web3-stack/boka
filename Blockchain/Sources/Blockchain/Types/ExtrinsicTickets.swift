@@ -3,15 +3,15 @@ import Utils
 
 public struct ExtrinsicTickets: Sendable {
     public struct TicketItem: Sendable {
-        public var ticketIndex: TicketIndex
-        public var proof: BandersnatchRintVRFProof
+        public var attempt: TicketIndex
+        public var signature: BandersnatchRintVRFProof
 
         public init(
-            ticketIndex: TicketIndex,
-            proof: BandersnatchRintVRFProof
+            attempt: TicketIndex,
+            signature: BandersnatchRintVRFProof
         ) {
-            self.ticketIndex = ticketIndex
-            self.proof = proof
+            self.attempt = attempt
+            self.signature = signature
         }
     }
 
@@ -34,14 +34,14 @@ extension ExtrinsicTickets: Dummy {
 extension ExtrinsicTickets.TicketItem: ScaleCodec.Codable {
     public init(from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            ticketIndex: decoder.decode(),
-            proof: decoder.decode()
+            attempt: decoder.decode(),
+            signature: decoder.decode()
         )
     }
 
     public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(ticketIndex)
-        try encoder.encode(proof)
+        try encoder.encode(attempt)
+        try encoder.encode(signature)
     }
 }
 

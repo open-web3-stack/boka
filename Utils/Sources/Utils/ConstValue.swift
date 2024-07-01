@@ -67,6 +67,12 @@ public enum ConstUInt144: ConstInt {
     }
 }
 
+public enum ConstUInt384: ConstInt {
+    public static var value: Int {
+        384
+    }
+}
+
 public enum ConstUInt784: ConstInt {
     public static var value: Int {
         784
