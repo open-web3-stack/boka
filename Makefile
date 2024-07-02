@@ -12,6 +12,10 @@ test: githooks
 build: githooks
 	./scripts/run.sh build
 
+.PHONY: build-verbose
+build-verbose: githooks
+	./scripts/run.sh build --verbose
+
 .PHONY: clean
 clean:
 	./scripts/run.sh package clean
