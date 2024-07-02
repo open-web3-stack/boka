@@ -40,6 +40,6 @@ jobs:
       with:
         swift-version: '6.0'
     - name: Build
-      run: make build-verbose
+      run: make build
     - name: Test
       run: make test
