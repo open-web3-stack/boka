@@ -43,25 +43,25 @@ public struct WorkReport: Sendable {
 
 extension WorkReport: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig config: Config) -> WorkReport {
+    public static func dummy(config: Config) -> WorkReport {
         WorkReport(
             authorizerHash: Data32(),
             output: Data(),
-            refinementContext: RefinementContext.dummy(withConfig: config),
-            packageSpecification: AvailabilitySpecifications.dummy(withConfig: config),
-            results: ConfigLimitedSizeArray(withConfig: config, defaultValue: WorkResult.dummy(withConfig: config))
+            refinementContext: RefinementContext.dummy(config: config),
+            packageSpecification: AvailabilitySpecifications.dummy(config: config),
+            results: ConfigLimitedSizeArray(config: config, defaultValue: WorkResult.dummy(config: config))
         )
     }
 }
 
 extension WorkReport: ScaleCodec.Encodable {
-    public init(withConfig config: Config, from decoder: inout some ScaleCodec.Decoder) throws {
+    public init(config: Config, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             authorizerHash: decoder.decode(),
             output: decoder.decode(),
             refinementContext: decoder.decode(),
             packageSpecification: decoder.decode(),
-            results: ConfigLimitedSizeArray(withConfig: config, from: &decoder)
+            results: ConfigLimitedSizeArray(config: config, from: &decoder)
         )
     }
 

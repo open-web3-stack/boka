@@ -26,7 +26,7 @@ public struct JudgementsState: Sendable {
 
 extension JudgementsState: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig _: Config) -> JudgementsState {
+    public static func dummy(config _: Config) -> JudgementsState {
         JudgementsState(
             allowSet: [],
             banSet: [],

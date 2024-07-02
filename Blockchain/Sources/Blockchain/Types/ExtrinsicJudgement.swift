@@ -50,15 +50,15 @@ public struct ExtrinsicJudgement: Sendable {
 
 extension ExtrinsicJudgement: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig _: Config) -> ExtrinsicJudgement {
+    public static func dummy(config _: Config) -> ExtrinsicJudgement {
         ExtrinsicJudgement(judgements: [])
     }
 }
 
 extension ExtrinsicJudgement: ScaleCodec.Encodable {
-    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
+    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            judgements: decoder.decode(.array { try JudgementItem(withConfig: config, from: &$0) })
+            judgements: decoder.decode(.array { try JudgementItem(config: config, from: &$0) })
         )
     }
 
@@ -68,10 +68,10 @@ extension ExtrinsicJudgement: ScaleCodec.Encodable {
 }
 
 extension ExtrinsicJudgement.JudgementItem: ScaleCodec.Encodable {
-    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
+    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             reportHash: decoder.decode(),
-            signatures: ConfigFixedSizeArray(withConfig: config, from: &decoder)
+            signatures: ConfigFixedSizeArray(config: config, from: &decoder)
         )
     }
 

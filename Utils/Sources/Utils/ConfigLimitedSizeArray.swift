@@ -10,7 +10,7 @@ public struct ConfigLimitedSizeArray<T, TMinLength: ReadInt, TMaxLength: ReadInt
     public let minLength: Int
     public let maxLength: Int
 
-    public init(withConfig config: TMinLength.TConfig, defaultValue: T) {
+    public init(config: TMinLength.TConfig, defaultValue: T) {
         let minLength = TMinLength.read(config: config)
         let maxLength = TMaxLength.read(config: config)
 
@@ -18,7 +18,7 @@ public struct ConfigLimitedSizeArray<T, TMinLength: ReadInt, TMaxLength: ReadInt
     }
 
     // require minLength to be zero
-    public init(withConfig config: TMinLength.TConfig) {
+    public init(config: TMinLength.TConfig) {
         let minLength = TMinLength.read(config: config)
         let maxLength = TMaxLength.read(config: config)
 
@@ -120,7 +120,7 @@ public typealias ConfigFixedSizeArray<T, TLength: ReadInt> = ConfigLimitedSizeAr
 
 extension ConfigLimitedSizeArray {
     public init<D: ScaleCodec.Decoder>(
-        withConfig config: TMinLength.TConfig,
+        config: TMinLength.TConfig,
         from decoder: inout D,
         decodeItem: @escaping (inout D) throws -> T
     ) throws {
@@ -139,7 +139,7 @@ extension ConfigLimitedSizeArray {
 
 // not ScaleCodec.Decodable because we need to have the config to know the size limit
 extension ConfigLimitedSizeArray where T: ScaleCodec.Decodable {
-    public init(withConfig config: TMinLength.TConfig, from decoder: inout some ScaleCodec.Decoder) throws {
+    public init(config: TMinLength.TConfig, from decoder: inout some ScaleCodec.Decoder) throws {
         let minLength = TMinLength.read(config: config)
         let maxLength = TMaxLength.read(config: config)
 

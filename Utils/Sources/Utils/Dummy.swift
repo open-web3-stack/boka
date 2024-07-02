@@ -3,5 +3,5 @@
 /// should be avoided in production code
 public protocol Dummy {
     associatedtype Config
-    static func dummy(withConfig config: Config) -> Self
+    static func dummy(config: Config) -> Self
 }

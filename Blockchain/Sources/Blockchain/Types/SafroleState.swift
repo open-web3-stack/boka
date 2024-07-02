@@ -59,27 +59,27 @@ public struct SafroleState: Sendable {
 
 extension SafroleState: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig config: Config) -> SafroleState {
+    public static func dummy(config: Config) -> SafroleState {
         SafroleState(
-            nextValidators: ConfigFixedSizeArray(withConfig: config, defaultValue: ValidatorKey.dummy(withConfig: config)),
+            nextValidators: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
             ticketsVerifierKey: BandersnatchRingVRFRoot(),
-            ticketsOrKeys: .right(ConfigFixedSizeArray(withConfig: config, defaultValue: BandersnatchPublicKey())),
-            ticketsAccumulator: ConfigLimitedSizeArray(withConfig: config)
+            ticketsOrKeys: .right(ConfigFixedSizeArray(config: config, defaultValue: BandersnatchPublicKey())),
+            ticketsAccumulator: ConfigLimitedSizeArray(config: config)
         )
     }
 }
 
 extension SafroleState: ScaleCodec.Encodable {
-    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
+    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            nextValidators: ConfigFixedSizeArray(withConfig: config, from: &decoder),
+            nextValidators: ConfigFixedSizeArray(config: config, from: &decoder),
             ticketsVerifierKey: decoder.decode(),
             ticketsOrKeys: Either(
                 from: &decoder,
-                decodeLeft: { try ConfigFixedSizeArray(withConfig: config, from: &$0) },
-                decodeRight: { try ConfigFixedSizeArray(withConfig: config, from: &$0) }
+                decodeLeft: { try ConfigFixedSizeArray(config: config, from: &$0) },
+                decodeRight: { try ConfigFixedSizeArray(config: config, from: &$0) }
             ),
-            ticketsAccumulator: ConfigLimitedSizeArray(withConfig: config, from: &decoder)
+            ticketsAccumulator: ConfigLimitedSizeArray(config: config, from: &decoder)
         )
     }
 

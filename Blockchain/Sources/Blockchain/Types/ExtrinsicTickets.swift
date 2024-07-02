@@ -26,7 +26,7 @@ public struct ExtrinsicTickets: Sendable {
 
 extension ExtrinsicTickets: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig _: Config) -> ExtrinsicTickets {
+    public static func dummy(config _: Config) -> ExtrinsicTickets {
         ExtrinsicTickets(tickets: [])
     }
 }
