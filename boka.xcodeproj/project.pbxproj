@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
+		063EC59D2C33954600BF1550 /* JAMTests */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = JAMTests; sourceTree = "<group>"; };
 		066C926E2C095D67005DDE4F /* Boka */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Boka; sourceTree = "<group>"; };
 		066C926F2C095D76005DDE4F /* Blockchain */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Blockchain; sourceTree = "<group>"; };
 		066C92702C095D85005DDE4F /* Node */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Node; sourceTree = "<group>"; };
@@ -23,6 +24,7 @@
 				066C92702C095D85005DDE4F /* Node */,
 				066C926F2C095D76005DDE4F /* Blockchain */,
 				066C926E2C095D67005DDE4F /* Boka */,
+				063EC59D2C33954600BF1550 /* JAMTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -44,7 +46,6 @@
 			);
 			mainGroup = 066C92652C095CE5005DDE4F;
 			packageReferences = (
-				066C92772C0B2DF7005DDE4F /* XCLocalSwiftPackageReference "Blockchain" */,
 			);
 			preferredProjectObjectVersion = 73;
 			projectDirPath = "";
@@ -80,13 +81,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCLocalSwiftPackageReference section */
-		066C92772C0B2DF7005DDE4F /* XCLocalSwiftPackageReference "Blockchain" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Blockchain;
-		};
-/* End XCLocalSwiftPackageReference section */
 	};
 	rootObject = 066C92662C095CE5005DDE4F /* Project object */;
 }
