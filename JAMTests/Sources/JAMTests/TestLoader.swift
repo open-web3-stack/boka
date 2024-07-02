@@ -15,12 +15,12 @@ import Foundation
 #endif
 
 enum TestLoader {
-    static func discover(forPath path: String) throws {
+    static func getTestFiles(forPath path: String) throws -> [String] {
         let prefix = Bundle.module.bundlePath + "/jamtestvectors/\(path)"
         print("Discovering tests in \(prefix)")
         let files = try FileManager.default.contentsOfDirectory(atPath: prefix)
         var scaleFiles = files.filter { $0.hasSuffix(".scale") }
         scaleFiles.sort()
-        print(scaleFiles)
+        return scaleFiles.map { prefix + "/" + $0 }
     }
 }
