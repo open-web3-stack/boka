@@ -43,15 +43,15 @@ public struct ExtrinsicAvailability: Sendable {
 
 extension ExtrinsicAvailability: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig config: Config) -> ExtrinsicAvailability {
-        ExtrinsicAvailability(assurances: ConfigLimitedSizeArray(withConfig: config))
+    public static func dummy(config: Config) -> ExtrinsicAvailability {
+        ExtrinsicAvailability(assurances: ConfigLimitedSizeArray(config: config))
     }
 }
 
 extension ExtrinsicAvailability: ScaleCodec.Encodable {
-    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
+    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            assurances: ConfigLimitedSizeArray(withConfig: config, from: &decoder)
+            assurances: ConfigLimitedSizeArray(config: config, from: &decoder)
         )
     }
 

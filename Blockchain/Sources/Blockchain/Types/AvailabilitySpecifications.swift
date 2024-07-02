@@ -29,7 +29,7 @@ public struct AvailabilitySpecifications: Sendable {
 
 extension AvailabilitySpecifications: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig _: Config) -> AvailabilitySpecifications {
+    public static func dummy(config _: Config) -> AvailabilitySpecifications {
         AvailabilitySpecifications(
             workPackageHash: Data32(),
             length: 0,

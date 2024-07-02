@@ -36,25 +36,25 @@ public struct Extrinsic: Sendable {
 
 extension Extrinsic: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig config: Config) -> Extrinsic {
+    public static func dummy(config: Config) -> Extrinsic {
         Extrinsic(
-            tickets: ExtrinsicTickets.dummy(withConfig: config),
-            judgements: ExtrinsicJudgement.dummy(withConfig: config),
-            preimages: ExtrinsicPreimages.dummy(withConfig: config),
-            availability: ExtrinsicAvailability.dummy(withConfig: config),
-            reports: ExtrinsicGuarantees.dummy(withConfig: config)
+            tickets: ExtrinsicTickets.dummy(config: config),
+            judgements: ExtrinsicJudgement.dummy(config: config),
+            preimages: ExtrinsicPreimages.dummy(config: config),
+            availability: ExtrinsicAvailability.dummy(config: config),
+            reports: ExtrinsicGuarantees.dummy(config: config)
         )
     }
 }
 
 extension Extrinsic: ScaleCodec.Encodable {
-    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
+    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             tickets: decoder.decode(),
-            judgements: ExtrinsicJudgement(withConfig: config, from: &decoder),
+            judgements: ExtrinsicJudgement(config: config, from: &decoder),
             preimages: decoder.decode(),
-            availability: ExtrinsicAvailability(withConfig: config, from: &decoder),
-            reports: ExtrinsicGuarantees(withConfig: config, from: &decoder)
+            availability: ExtrinsicAvailability(config: config, from: &decoder),
+            reports: ExtrinsicGuarantees(config: config, from: &decoder)
         )
     }
 

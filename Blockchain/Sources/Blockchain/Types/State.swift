@@ -144,36 +144,36 @@ public typealias StateRef = Ref<State>
 
 extension State: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig config: Config) -> State {
+    public static func dummy(config: Config) -> State {
         State(
-            coreAuthorizationPool: ConfigFixedSizeArray(withConfig: config, defaultValue: ConfigLimitedSizeArray(withConfig: config)),
-            lastBlock: Block.dummy(withConfig: config),
-            safroleState: SafroleState.dummy(withConfig: config),
+            coreAuthorizationPool: ConfigFixedSizeArray(config: config, defaultValue: ConfigLimitedSizeArray(config: config)),
+            lastBlock: Block.dummy(config: config),
+            safroleState: SafroleState.dummy(config: config),
             serviceAccounts: [:],
             entropyPool: (Data32(), Data32(), Data32(), Data32()),
-            validatorQueue: ConfigFixedSizeArray(withConfig: config, defaultValue: ValidatorKey.dummy(withConfig: config)),
-            currentValidators: ConfigFixedSizeArray(withConfig: config, defaultValue: ValidatorKey.dummy(withConfig: config)),
-            previousValidators: ConfigFixedSizeArray(withConfig: config, defaultValue: ValidatorKey.dummy(withConfig: config)),
-            reports: ConfigFixedSizeArray(withConfig: config, defaultValue: nil),
+            validatorQueue: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
+            currentValidators: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
+            previousValidators: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
+            reports: ConfigFixedSizeArray(config: config, defaultValue: nil),
             timestamp: 0,
             authorizationQueue: ConfigFixedSizeArray(
-                withConfig: config,
-                defaultValue: ConfigFixedSizeArray(withConfig: config, defaultValue: Data32())
+                config: config,
+                defaultValue: ConfigFixedSizeArray(config: config, defaultValue: Data32())
             ),
             privilegedServiceIndices: (
                 empower: ServiceIdentifier(),
                 assign: ServiceIdentifier(),
                 designate: ServiceIdentifier()
             ),
-            judgements: JudgementsState.dummy(withConfig: config)
+            judgements: JudgementsState.dummy(config: config)
         )
     }
 }
 
 extension State.ReportItem: ScaleCodec.Encodable {
-    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
+    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            workReport: WorkReport(withConfig: config, from: &decoder),
+            workReport: WorkReport(config: config, from: &decoder),
             guarantors: decoder.decode(),
             timestamp: decoder.decode()
         )
@@ -187,22 +187,22 @@ extension State.ReportItem: ScaleCodec.Encodable {
 }
 
 extension State: ScaleCodec.Encodable {
-    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
+    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            coreAuthorizationPool: ConfigFixedSizeArray(withConfig: config, from: &decoder) {
-                try ConfigLimitedSizeArray(withConfig: config, from: &$0) { try $0.decode() }
+            coreAuthorizationPool: ConfigFixedSizeArray(config: config, from: &decoder) {
+                try ConfigLimitedSizeArray(config: config, from: &$0) { try $0.decode() }
             },
-            lastBlock: Block(withConfig: config, from: &decoder),
-            safroleState: SafroleState(withConfig: config, from: &decoder),
+            lastBlock: Block(config: config, from: &decoder),
+            safroleState: SafroleState(config: config, from: &decoder),
             serviceAccounts: decoder.decode(),
             entropyPool: decoder.decode(),
-            validatorQueue: ConfigFixedSizeArray(withConfig: config, from: &decoder),
-            currentValidators: ConfigFixedSizeArray(withConfig: config, from: &decoder),
-            previousValidators: ConfigFixedSizeArray(withConfig: config, from: &decoder),
-            reports: ConfigFixedSizeArray(withConfig: config, from: &decoder) { try ReportItem(withConfig: config, from: &$0) },
+            validatorQueue: ConfigFixedSizeArray(config: config, from: &decoder),
+            currentValidators: ConfigFixedSizeArray(config: config, from: &decoder),
+            previousValidators: ConfigFixedSizeArray(config: config, from: &decoder),
+            reports: ConfigFixedSizeArray(config: config, from: &decoder) { try ReportItem(config: config, from: &$0) },
             timestamp: decoder.decode(),
-            authorizationQueue: ConfigFixedSizeArray(withConfig: config, from: &decoder) {
-                try ConfigFixedSizeArray(withConfig: config, from: &$0)
+            authorizationQueue: ConfigFixedSizeArray(config: config, from: &decoder) {
+                try ConfigFixedSizeArray(config: config, from: &$0)
             },
             privilegedServiceIndices: decoder.decode(),
             judgements: decoder.decode()

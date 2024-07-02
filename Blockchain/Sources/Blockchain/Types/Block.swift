@@ -15,19 +15,19 @@ public typealias BlockRef = Ref<Block>
 
 extension Block: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig config: Config) -> Block {
+    public static func dummy(config: Config) -> Block {
         Block(
-            header: Header.dummy(withConfig: config),
-            extrinsic: Extrinsic.dummy(withConfig: config)
+            header: Header.dummy(config: config),
+            extrinsic: Extrinsic.dummy(config: config)
         )
     }
 }
 
 extension Block: ScaleCodec.Encodable {
-    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
+    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            header: Header(withConfig: config, from: &decoder),
-            extrinsic: Extrinsic(withConfig: config, from: &decoder)
+            header: Header(config: config, from: &decoder),
+            extrinsic: Extrinsic(config: config, from: &decoder)
         )
     }
 

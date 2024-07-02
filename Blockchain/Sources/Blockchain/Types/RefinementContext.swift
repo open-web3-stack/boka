@@ -37,7 +37,7 @@ public struct RefinementContext: Sendable {
 
 extension RefinementContext: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig _: Config) -> RefinementContext {
+    public static func dummy(config _: Config) -> RefinementContext {
         RefinementContext(
             anchor: (
                 headerHash: Data32(),
