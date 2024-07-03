@@ -1,7 +1,7 @@
 import Foundation
 
 // somehow without this the GH Actions CI fails
-// extension Foundation.Bundle: @unchecked @retroactive Sendable {}
+extension Foundation.Bundle: @unchecked @retroactive Sendable {}
 
 enum TestLoader {
     static func getTestFiles(path: String, extension ext: String) throws -> [String] {
