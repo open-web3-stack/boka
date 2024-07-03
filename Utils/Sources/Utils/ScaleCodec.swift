@@ -15,3 +15,17 @@ extension CustomDecoderFactory where T: ArrayInitializable {
         }
     }
 }
+
+extension Optional {
+    public init<D: ScaleCodec.Decoder>(from decoder: inout D, decodeItem: @escaping (inout D) throws -> Wrapped) throws {
+        let id = try decoder.decode(.enumCaseId)
+        switch id {
+        case 0:
+            self = nil
+        case 1:
+            self = try .some(decodeItem(&decoder))
+        default:
+            throw decoder.enumCaseError(for: id)
+        }
+    }
+}

@@ -4,11 +4,11 @@ import Foundation
 extension Foundation.Bundle: @unchecked @retroactive Sendable {}
 
 enum TestLoader {
-    static func getTestFiles(path: String, extension ext: String) throws -> [String] {
-        let prefix = Bundle.module.bundlePath + "/jamtestvectors/\(path)"
+    static func getTestFiles(path: String, extension ext: String) throws -> [(path: String, description: String)] {
+        let prefix = Bundle.module.resourcePath! + "/jamtestvectors/\(path)"
         let files = try FileManager.default.contentsOfDirectory(atPath: prefix)
         var filtered = files.filter { $0.hasSuffix(".\(ext)") }
         filtered.sort()
-        return filtered.map { prefix + "/" + $0 }
+        return filtered.map { (path: prefix + "/" + $0, description: $0) }
     }
 }

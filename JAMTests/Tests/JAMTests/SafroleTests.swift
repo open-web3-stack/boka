@@ -39,8 +39,8 @@ struct OutputMarks {
 extension OutputMarks: ScaleCodec.Encodable {
     init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            epochMark: Header.EpochMarker(config: config, from: &decoder),
-            ticketsMark: ConfigFixedSizeArray(config: config, from: &decoder)
+            epochMark: Optional(from: &decoder, decodeItem: { try Header.EpochMarker(config: config, from: &$0) }),
+            ticketsMark: Optional(from: &decoder, decodeItem: { try ConfigFixedSizeArray(config: config, from: &$0) })
         )
     }
 
@@ -145,7 +145,8 @@ extension SafroleState: ScaleCodec.Encodable {
     }
 }
 
-struct SafroleTestcase {
+struct SafroleTestcase: CustomStringConvertible {
+    var description: String
     var input: SafroleInput
     var preState: SafroleState
     var output: SafroleOutput
@@ -153,8 +154,9 @@ struct SafroleTestcase {
 }
 
 extension SafroleTestcase: ScaleCodec.Encodable {
-    init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
+    init(description: String, config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
+            description: description,
             input: SafroleInput(config: config, from: &decoder),
             preState: SafroleState(config: config, from: &decoder),
             output: SafroleOutput(config: config, from: &decoder),
@@ -194,12 +196,15 @@ enum SafroleTestVariants: String, CaseIterable {
 struct SafroleTests {
     static func loadTests(variant: SafroleTestVariants) throws -> [SafroleTestcase] {
         let tests = try TestLoader.getTestFiles(path: "safrole/\(variant)", extension: "scale")
-        return try tests.map { path in
-            let data = try Data(contentsOf: URL(fileURLWithPath: path))
-            var decoder = decoder(from: data)
-            return try SafroleTestcase(config: variant.config, from: &decoder)
+        return try tests.map {
+            let data = try Data(contentsOf: URL(fileURLWithPath: $0.path))
+            var decoder = LoggingDecoder(decoder: decoder(from: data), logger: NoopLogger())
+            return try SafroleTestcase(description: $0.description, config: variant.config, from: &decoder)
         }
     }
 
-    @Test func tinyTests() throws {}
+    @Test(arguments: try SafroleTests.loadTests(variant: .tiny))
+    func tinyTests(_ testcase: SafroleTestcase) throws {
+        print(String(reflecting: testcase))
+    }
 }
