@@ -1,5 +1,3 @@
-import AsyncChannels
-
 public class BlockImporter {
     private var validator: BlockValidator
     private var blockchain: Blockchain

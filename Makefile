@@ -16,6 +16,14 @@ test: githooks deps
 build: githooks deps
 	./scripts/run.sh build
 
+.PHONY: build-verbose
+build-verbose: githooks
+	./scripts/run.sh build --verbose
+
+.PHONY: resolve
+resolve: githooks
+	./scripts/run.sh package resolve
+
 .PHONY: clean
 clean:
 	./scripts/run.sh package clean

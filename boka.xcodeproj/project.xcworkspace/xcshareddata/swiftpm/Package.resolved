@@ -1,15 +1,6 @@
 {
-  "originHash" : "c80a60eaf06aa1bc3b9d48f7d3541282e34d308bcc613d98df75ba316c2ca443",
+  "originHash" : "ed66da7fc53dbb1608f852db9eddc0e27b9e4ce008bb4d6f4b19c51005638d54",
   "pins" : [
-    {
-      "identity" : "async-channels",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/gh123man/Async-Channels",
-      "state" : {
-        "branch" : "679ee7d",
-        "revision" : "679ee7d35e493e181be844dadbe78636cefaace4"
-      }
-    },
     {
       "identity" : "blake2.swift",
       "kind" : "remoteSourceControl",
@@ -22,10 +13,10 @@
     {
       "identity" : "scalecodec.swift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tesseract-one/ScaleCodec.swift.git",
+      "location" : "https://github.com/AcalaNetwork/ScaleCodec.swift.git",
       "state" : {
-        "revision" : "af241cfa8491ac0312ff89ff0389c09879d41a74",
-        "version" : "0.3.1"
+        "branch" : "main",
+        "revision" : "dac3e7161de34c60c82794d031de0231b5a5746e"
       }
     },
     {
@@ -38,30 +29,30 @@
       }
     },
     {
-      "identity" : "swift-async-algorithms",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-async-algorithms",
-      "state" : {
-        "revision" : "da4e36f86544cdf733a40d59b3a2267e3a7bbf36",
-        "version" : "1.0.0"
-      }
-    },
-    {
-      "identity" : "swift-collections",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-collections.git",
-      "state" : {
-        "revision" : "94cf62b3ba8d4bed62680a282d4c25f9c63c2efb",
-        "version" : "1.1.0"
-      }
-    },
-    {
       "identity" : "swift-crypto",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
         "revision" : "bc1c29221f6dfeb0ebbfbc98eb95cd3d4967868e",
         "version" : "3.4.0"
+      }
+    },
+    {
+      "identity" : "swift-syntax",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-syntax.git",
+      "state" : {
+        "revision" : "4c6cc0a3b9e8f14b3ae2307c5ccae4de6167ac2c",
+        "version" : "600.0.0-prerelease-2024-06-12"
+      }
+    },
+    {
+      "identity" : "swift-testing",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-testing.git",
+      "state" : {
+        "branch" : "0.10.0",
+        "revision" : "69d59cfc76e5daf498ca61f5af409f594768eef9"
       }
     },
     {

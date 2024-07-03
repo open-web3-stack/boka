@@ -43,22 +43,22 @@ public struct ExtrinsicGuarantees: Sendable {
         self.guarantees = guarantees
     }
 
-    public init(withConfig config: ProtocolConfigRef) {
-        guarantees = ConfigLimitedSizeArray(withConfig: config)
+    public init(config: ProtocolConfigRef) {
+        guarantees = ConfigLimitedSizeArray(config: config)
     }
 }
 
 extension ExtrinsicGuarantees: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig config: Config) -> ExtrinsicGuarantees {
-        ExtrinsicGuarantees(withConfig: config)
+    public static func dummy(config: Config) -> ExtrinsicGuarantees {
+        ExtrinsicGuarantees(config: config)
     }
 }
 
 extension ExtrinsicGuarantees: ScaleCodec.Encodable {
-    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
+    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            guarantees: ConfigLimitedSizeArray(withConfig: config, from: &decoder) { try GuaranteeItem(withConfig: config, from: &$0) }
+            guarantees: ConfigLimitedSizeArray(config: config, from: &decoder) { try GuaranteeItem(config: config, from: &$0) }
         )
     }
 
@@ -68,10 +68,10 @@ extension ExtrinsicGuarantees: ScaleCodec.Encodable {
 }
 
 extension ExtrinsicGuarantees.GuaranteeItem: ScaleCodec.Encodable {
-    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
+    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             coreIndex: decoder.decode(),
-            workReport: WorkReport(withConfig: config, from: &decoder),
+            workReport: WorkReport(config: config, from: &decoder),
             timeslot: decoder.decode(),
             credential: decoder.decode()
         )

@@ -91,7 +91,7 @@ public struct Header: Sendable {
 
 extension Header: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig _: Config) -> Header {
+    public static func dummy(config _: Config) -> Header {
         Header(
             parentHash: Data32(),
             priorStateRoot: Data32(),
@@ -108,14 +108,14 @@ extension Header: Dummy {
 }
 
 extension Header: ScaleCodec.Encodable {
-    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
+    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             parentHash: decoder.decode(),
             priorStateRoot: decoder.decode(),
             extrinsicsRoot: decoder.decode(),
             timeslotIndex: decoder.decode(),
-            epoch: EpochMarker(withConfig: config, from: &decoder),
-            winningTickets: ConfigFixedSizeArray(withConfig: config, from: &decoder),
+            epoch: EpochMarker(config: config, from: &decoder),
+            winningTickets: ConfigFixedSizeArray(config: config, from: &decoder),
             judgementsMarkers: decoder.decode(),
             authorKey: decoder.decode(),
             vrfSignature: decoder.decode(),
@@ -138,10 +138,10 @@ extension Header: ScaleCodec.Encodable {
 }
 
 extension Header.EpochMarker: ScaleCodec.Encodable {
-    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
+    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             entropy: decoder.decode(),
-            validators: ConfigFixedSizeArray(withConfig: config, from: &decoder)
+            validators: ConfigFixedSizeArray(config: config, from: &decoder)
         )
     }
 
