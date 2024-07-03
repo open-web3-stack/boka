@@ -1,3 +1,4 @@
+import Blockchain
 import ScaleCodec
 import Testing
 import Utils
@@ -13,6 +14,7 @@ struct SafroleInput {
 struct SafroleTests {
     @Test func works() throws {
         let tinyTests = try TestLoader.getTestFiles(path: "safrole/tiny", extension: "scale")
+        print(tinyTests)
         #expect(1 + 1 == 2)
     }
 }
