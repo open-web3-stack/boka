@@ -4,12 +4,16 @@
 .PHONY: githooks
 githooks: .git/hooks/pre-commit
 
+.PHONY: deps
+deps: githooks
+	./scripts/deps.sh
+
 .PHONY: test
-test: githooks
+test: githooks deps
 	./scripts/run.sh test
 
 .PHONY: build
-build: githooks
+build: githooks deps
 	./scripts/run.sh build
 
 .PHONY: build-verbose
