@@ -19,7 +19,7 @@ let package = Package(
         .package(path: "../Utils"),
         .package(path: "../Blockchain"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
-        .package(url: "https://github.com/tesseract-one/ScaleCodec.swift.git", from: "0.3.0"),
+        .package(url: "https://github.com/AcalaNetwork/ScaleCodec.swift.git", branch: "main"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.

@@ -5,16 +5,16 @@ public struct State: Sendable {
     public struct ReportItem: Sendable {
         public var workReport: WorkReport
         public var guarantors: LimitedSizeArray<Ed25519PublicKey, ConstInt2, ConstInt3>
-        public var timestamp: TimeslotIndex
+        public var timeslot: TimeslotIndex
 
         public init(
             workReport: WorkReport,
             guarantors: LimitedSizeArray<Ed25519PublicKey, ConstInt2, ConstInt3>,
-            timestamp: TimeslotIndex
+            timeslot: TimeslotIndex
         ) {
             self.workReport = workReport
             self.guarantors = guarantors
-            self.timestamp = timestamp
+            self.timeslot = timeslot
         }
     }
 
@@ -62,7 +62,7 @@ public struct State: Sendable {
     >
 
     // τ: The most recent block’s τimeslot.
-    public var timestamp: TimeslotIndex
+    public var timeslot: TimeslotIndex
 
     // φ: The authorization queue.
     public var authorizationQueue: ConfigFixedSizeArray<
@@ -109,7 +109,7 @@ public struct State: Sendable {
             ReportItem?,
             ProtocolConfig.TotalNumberOfCores
         >,
-        timestamp: TimeslotIndex,
+        timeslot: TimeslotIndex,
         authorizationQueue: ConfigFixedSizeArray<
             ConfigFixedSizeArray<
                 Data32,
@@ -133,7 +133,7 @@ public struct State: Sendable {
         self.currentValidators = currentValidators
         self.previousValidators = previousValidators
         self.reports = reports
-        self.timestamp = timestamp
+        self.timeslot = timeslot
         self.authorizationQueue = authorizationQueue
         self.privilegedServiceIndices = privilegedServiceIndices
         self.judgements = judgements
@@ -155,7 +155,7 @@ extension State: Dummy {
             currentValidators: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
             previousValidators: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
             reports: ConfigFixedSizeArray(config: config, defaultValue: nil),
-            timestamp: 0,
+            timeslot: 0,
             authorizationQueue: ConfigFixedSizeArray(
                 config: config,
                 defaultValue: ConfigFixedSizeArray(config: config, defaultValue: Data32())
@@ -175,14 +175,14 @@ extension State.ReportItem: ScaleCodec.Encodable {
         try self.init(
             workReport: WorkReport(config: config, from: &decoder),
             guarantors: decoder.decode(),
-            timestamp: decoder.decode()
+            timeslot: decoder.decode()
         )
     }
 
     public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
         try encoder.encode(workReport)
         try encoder.encode(guarantors)
-        try encoder.encode(timestamp)
+        try encoder.encode(timeslot)
     }
 }
 
@@ -200,7 +200,7 @@ extension State: ScaleCodec.Encodable {
             currentValidators: ConfigFixedSizeArray(config: config, from: &decoder),
             previousValidators: ConfigFixedSizeArray(config: config, from: &decoder),
             reports: ConfigFixedSizeArray(config: config, from: &decoder) { try ReportItem(config: config, from: &$0) },
-            timestamp: decoder.decode(),
+            timeslot: decoder.decode(),
             authorizationQueue: ConfigFixedSizeArray(config: config, from: &decoder) {
                 try ConfigFixedSizeArray(config: config, from: &$0)
             },
@@ -219,7 +219,7 @@ extension State: ScaleCodec.Encodable {
         try encoder.encode(currentValidators)
         try encoder.encode(previousValidators)
         try encoder.encode(reports)
-        try encoder.encode(timestamp)
+        try encoder.encode(timeslot)
         try encoder.encode(authorizationQueue)
         try encoder.encode(privilegedServiceIndices)
         try encoder.encode(judgements)
@@ -238,7 +238,7 @@ extension State {
             currentValidators: currentValidators,
             previousValidators: previousValidators,
             reports: reports,
-            timestamp: timestamp,
+            timeslot: timeslot,
             authorizationQueue: authorizationQueue,
             privilegedServiceIndices: privilegedServiceIndices,
             judgements: judgements

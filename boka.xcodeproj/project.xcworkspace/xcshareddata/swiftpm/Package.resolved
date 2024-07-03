@@ -1,5 +1,5 @@
 {
-  "originHash" : "8d5cb838cc09a6a6bc00190970a8db021b952fc8ccba1e187ef962bc6cc66278",
+  "originHash" : "ed66da7fc53dbb1608f852db9eddc0e27b9e4ce008bb4d6f4b19c51005638d54",
   "pins" : [
     {
       "identity" : "blake2.swift",
@@ -13,10 +13,10 @@
     {
       "identity" : "scalecodec.swift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tesseract-one/ScaleCodec.swift.git",
+      "location" : "https://github.com/AcalaNetwork/ScaleCodec.swift.git",
       "state" : {
-        "revision" : "af241cfa8491ac0312ff89ff0389c09879d41a74",
-        "version" : "0.3.1"
+        "branch" : "main",
+        "revision" : "dac3e7161de34c60c82794d031de0231b5a5746e"
       }
     },
     {
