@@ -5,7 +5,9 @@
 githooks: .git/hooks/pre-commit
 
 .PHONY: deps
-deps: githooks
+deps: Utils/Sources/blst/lib/libblst.a
+
+Utils/Sources/blst/lib/libblst.a:
 	./scripts/deps.sh
 
 .PHONY: test
@@ -27,6 +29,7 @@ resolve: githooks
 .PHONY: clean
 clean:
 	./scripts/run.sh package clean
+	rm Utils/Sources/blst/lib/libblst.a
 
 .PHONY: lint
 lint: githooks
