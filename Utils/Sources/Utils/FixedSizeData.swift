@@ -39,6 +39,7 @@ extension FixedSizeData: ScaleCodec.Codable {
 }
 
 public typealias Data32 = FixedSizeData<ConstInt32>
+public typealias Data48 = FixedSizeData<ConstInt48>
 public typealias Data64 = FixedSizeData<ConstInt64>
 public typealias Data96 = FixedSizeData<ConstUInt96>
 public typealias Data128 = FixedSizeData<ConstUInt128>
