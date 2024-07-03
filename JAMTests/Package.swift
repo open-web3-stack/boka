@@ -18,7 +18,7 @@ let package = Package(
     dependencies: [
         .package(path: "../Utils"),
         .package(path: "../Blockchain"),
-        .package(url: "https://github.com/apple/swift-testing.git", branch: "main"),
+        .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
         .package(url: "https://github.com/tesseract-one/ScaleCodec.swift.git", from: "0.3.0"),
     ],
     targets: [

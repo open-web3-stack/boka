@@ -14,5 +14,5 @@ public typealias Ed25519Signature = Data64
 public typealias BandersnatchPublicKey = Data32
 public typealias BandersnatchSignature = Data64
 public typealias BandersnatchRintVRFProof = Data784
-public typealias BandersnatchRingVRFRoot = Data384
+public typealias BandersnatchRingVRFRoot = Data144
 public typealias BLSKey = Data144

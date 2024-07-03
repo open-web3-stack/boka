@@ -1,5 +1,5 @@
 {
-  "originHash" : "d0ba6136ea802783642249bb2acb6f690d9aaa061248c2475c631ac2b936925b",
+  "originHash" : "1a94da3c8aaf067c6334fb57eec4e914d1b1a9aa2bef87839b818335ab3fcc54",
   "pins" : [
     {
       "identity" : "blake2.swift",
@@ -31,7 +31,7 @@
     {
       "identity" : "swift-syntax",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/swiftlang/swift-syntax.git",
+      "location" : "https://github.com/apple/swift-syntax.git",
       "state" : {
         "revision" : "4c6cc0a3b9e8f14b3ae2307c5ccae4de6167ac2c",
         "version" : "600.0.0-prerelease-2024-06-12"
@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-testing.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "0e2d9cbb553aba8b9a8acf3d56d1bf042360855f"
+        "branch" : "0.10.0",
+        "revision" : "69d59cfc76e5daf498ca61f5af409f594768eef9"
       }
     },
     {
