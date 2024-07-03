@@ -13,7 +13,7 @@ concurrency:
 jobs:
   lint:
     name: Swift Lint
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
 
     steps:
     - uses: actions/checkout@v4
@@ -24,7 +24,7 @@ jobs:
 
   test:
     name: Build and Test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
 
     steps:
     - name: Checkout Code
