@@ -50,7 +50,7 @@ extension Extrinsic: Dummy {
 extension Extrinsic: ScaleCodec.Encodable {
     public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            tickets: decoder.decode(),
+            tickets: ExtrinsicTickets(config: config, from: &decoder),
             judgements: ExtrinsicJudgement(config: config, from: &decoder),
             preimages: decoder.decode(),
             availability: ExtrinsicAvailability(config: config, from: &decoder),

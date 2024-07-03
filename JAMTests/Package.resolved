@@ -1,6 +1,33 @@
 {
-  "originHash" : "02073a96e234cf0a04b67acb19f5feffa912570969455599cd8c7ff2f6333ca5",
+  "originHash" : "d0ba6136ea802783642249bb2acb6f690d9aaa061248c2475c631ac2b936925b",
   "pins" : [
+    {
+      "identity" : "blake2.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tesseract-one/Blake2.swift.git",
+      "state" : {
+        "revision" : "29c55c8fe42d6661e5a32cc5bbbad1fff64fd01e",
+        "version" : "0.2.0"
+      }
+    },
+    {
+      "identity" : "scalecodec.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tesseract-one/ScaleCodec.swift.git",
+      "state" : {
+        "revision" : "af241cfa8491ac0312ff89ff0389c09879d41a74",
+        "version" : "0.3.1"
+      }
+    },
+    {
+      "identity" : "swift-crypto",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-crypto.git",
+      "state" : {
+        "revision" : "33f65a3cbc52f8c19295723af9cbecc2195484e1",
+        "version" : "3.5.0"
+      }
+    },
     {
       "identity" : "swift-syntax",
       "kind" : "remoteSourceControl",
@@ -17,6 +44,15 @@
       "state" : {
         "branch" : "main",
         "revision" : "0e2d9cbb553aba8b9a8acf3d56d1bf042360855f"
+      }
+    },
+    {
+      "identity" : "tuples.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tesseract-one/Tuples.swift.git",
+      "state" : {
+        "revision" : "4d2cf7c64443cdf4df833d0bedd767bf9dbc49d9",
+        "version" : "0.1.3"
       }
     }
   ],

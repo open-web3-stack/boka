@@ -15,10 +15,18 @@ public struct ExtrinsicTickets: Sendable {
         }
     }
 
-    public var tickets: [TicketItem]
+    public var tickets: ConfigLimitedSizeArray<
+        TicketItem,
+        ProtocolConfig.Int0,
+        ProtocolConfig.MaxTicketsPerExtrinsic
+    >
 
     public init(
-        tickets: [TicketItem]
+        tickets: ConfigLimitedSizeArray<
+            TicketItem,
+            ProtocolConfig.Int0,
+            ProtocolConfig.MaxTicketsPerExtrinsic
+        >
     ) {
         self.tickets = tickets
     }
@@ -26,8 +34,8 @@ public struct ExtrinsicTickets: Sendable {
 
 extension ExtrinsicTickets: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(config _: Config) -> ExtrinsicTickets {
-        ExtrinsicTickets(tickets: [])
+    public static func dummy(config: Config) -> ExtrinsicTickets {
+        ExtrinsicTickets(tickets: ConfigLimitedSizeArray(config: config))
     }
 }
 
@@ -45,10 +53,10 @@ extension ExtrinsicTickets.TicketItem: ScaleCodec.Codable {
     }
 }
 
-extension ExtrinsicTickets: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+extension ExtrinsicTickets: ScaleCodec.Encodable {
+    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            tickets: decoder.decode()
+            tickets: ConfigLimitedSizeArray(config: config, from: &decoder)
         )
     }
 

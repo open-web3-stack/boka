@@ -16,7 +16,10 @@ let package = Package(
         ),
     ],
     dependencies: [
+        .package(path: "../Utils"),
+        .package(path: "../Blockchain"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "main"),
+        .package(url: "https://github.com/tesseract-one/ScaleCodec.swift.git", from: "0.3.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -27,7 +30,13 @@ let package = Package(
         ),
         .testTarget(
             name: "JAMTestsTests",
-            dependencies: ["JAMTests", .product(name: "Testing", package: "swift-testing")]
+            dependencies: [
+                "Utils",
+                "Blockchain",
+                "JAMTests",
+                .product(name: "Testing", package: "swift-testing"),
+                .product(name: "ScaleCodec", package: "ScaleCodec.swift"),
+            ]
         ),
     ],
     swiftLanguageVersions: [.version("6")]
