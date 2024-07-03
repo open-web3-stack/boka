@@ -37,7 +37,7 @@ public struct WorkResult: Sendable {
 
 extension WorkResult: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig _: Config) -> WorkResult {
+    public static func dummy(config _: Config) -> WorkResult {
         WorkResult(
             serviceIdentifier: ServiceIdentifier(),
             codeHash: Data32(),

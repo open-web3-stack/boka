@@ -22,7 +22,7 @@ public struct ValidatorKey: Sendable {
 
 extension ValidatorKey: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig _: Config) -> ValidatorKey {
+    public static func dummy(config _: Config) -> ValidatorKey {
         ValidatorKey(
             bandersnatch: BandersnatchPublicKey(),
             ed25519: Ed25519PublicKey(),

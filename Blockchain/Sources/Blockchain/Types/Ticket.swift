@@ -8,7 +8,7 @@ public struct Ticket: Sendable {
 
 extension Ticket: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig _: Config) -> Ticket {
+    public static func dummy(config _: Config) -> Ticket {
         Ticket(id: Data32(), attempt: 0)
     }
 }

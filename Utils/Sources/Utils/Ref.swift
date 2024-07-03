@@ -30,7 +30,7 @@ extension Ref: Hashable where T: Hashable {
 
 extension Ref: Dummy where T: Dummy {
     public typealias Config = T.Config
-    public static func dummy(withConfig config: Config) -> Self {
-        Self(T.dummy(withConfig: config))
+    public static func dummy(config: Config) -> Self {
+        Self(T.dummy(config: config))
     }
 }

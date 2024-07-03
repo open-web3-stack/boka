@@ -5,16 +5,16 @@ public struct State: Sendable {
     public struct ReportItem: Sendable {
         public var workReport: WorkReport
         public var guarantors: LimitedSizeArray<Ed25519PublicKey, ConstInt2, ConstInt3>
-        public var timestamp: TimeslotIndex
+        public var timeslot: TimeslotIndex
 
         public init(
             workReport: WorkReport,
             guarantors: LimitedSizeArray<Ed25519PublicKey, ConstInt2, ConstInt3>,
-            timestamp: TimeslotIndex
+            timeslot: TimeslotIndex
         ) {
             self.workReport = workReport
             self.guarantors = guarantors
-            self.timestamp = timestamp
+            self.timeslot = timeslot
         }
     }
 
@@ -62,7 +62,7 @@ public struct State: Sendable {
     >
 
     // τ: The most recent block’s τimeslot.
-    public var timestamp: TimeslotIndex
+    public var timeslot: TimeslotIndex
 
     // φ: The authorization queue.
     public var authorizationQueue: ConfigFixedSizeArray<
@@ -109,7 +109,7 @@ public struct State: Sendable {
             ReportItem?,
             ProtocolConfig.TotalNumberOfCores
         >,
-        timestamp: TimeslotIndex,
+        timeslot: TimeslotIndex,
         authorizationQueue: ConfigFixedSizeArray<
             ConfigFixedSizeArray<
                 Data32,
@@ -133,7 +133,7 @@ public struct State: Sendable {
         self.currentValidators = currentValidators
         self.previousValidators = previousValidators
         self.reports = reports
-        self.timestamp = timestamp
+        self.timeslot = timeslot
         self.authorizationQueue = authorizationQueue
         self.privilegedServiceIndices = privilegedServiceIndices
         self.judgements = judgements
@@ -144,65 +144,65 @@ public typealias StateRef = Ref<State>
 
 extension State: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig config: Config) -> State {
+    public static func dummy(config: Config) -> State {
         State(
-            coreAuthorizationPool: ConfigFixedSizeArray(withConfig: config, defaultValue: ConfigLimitedSizeArray(withConfig: config)),
-            lastBlock: Block.dummy(withConfig: config),
-            safroleState: SafroleState.dummy(withConfig: config),
+            coreAuthorizationPool: ConfigFixedSizeArray(config: config, defaultValue: ConfigLimitedSizeArray(config: config)),
+            lastBlock: Block.dummy(config: config),
+            safroleState: SafroleState.dummy(config: config),
             serviceAccounts: [:],
             entropyPool: (Data32(), Data32(), Data32(), Data32()),
-            validatorQueue: ConfigFixedSizeArray(withConfig: config, defaultValue: ValidatorKey.dummy(withConfig: config)),
-            currentValidators: ConfigFixedSizeArray(withConfig: config, defaultValue: ValidatorKey.dummy(withConfig: config)),
-            previousValidators: ConfigFixedSizeArray(withConfig: config, defaultValue: ValidatorKey.dummy(withConfig: config)),
-            reports: ConfigFixedSizeArray(withConfig: config, defaultValue: nil),
-            timestamp: 0,
+            validatorQueue: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
+            currentValidators: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
+            previousValidators: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
+            reports: ConfigFixedSizeArray(config: config, defaultValue: nil),
+            timeslot: 0,
             authorizationQueue: ConfigFixedSizeArray(
-                withConfig: config,
-                defaultValue: ConfigFixedSizeArray(withConfig: config, defaultValue: Data32())
+                config: config,
+                defaultValue: ConfigFixedSizeArray(config: config, defaultValue: Data32())
             ),
             privilegedServiceIndices: (
                 empower: ServiceIdentifier(),
                 assign: ServiceIdentifier(),
                 designate: ServiceIdentifier()
             ),
-            judgements: JudgementsState.dummy(withConfig: config)
+            judgements: JudgementsState.dummy(config: config)
         )
     }
 }
 
 extension State.ReportItem: ScaleCodec.Encodable {
-    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
+    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            workReport: WorkReport(withConfig: config, from: &decoder),
+            workReport: WorkReport(config: config, from: &decoder),
             guarantors: decoder.decode(),
-            timestamp: decoder.decode()
+            timeslot: decoder.decode()
         )
     }
 
     public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
         try encoder.encode(workReport)
         try encoder.encode(guarantors)
-        try encoder.encode(timestamp)
+        try encoder.encode(timeslot)
     }
 }
 
 extension State: ScaleCodec.Encodable {
-    public init(withConfig config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
+    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            coreAuthorizationPool: ConfigFixedSizeArray(withConfig: config, from: &decoder) {
-                try ConfigLimitedSizeArray(withConfig: config, from: &$0) { try $0.decode() }
+            coreAuthorizationPool: ConfigFixedSizeArray(config: config, from: &decoder) {
+                try ConfigLimitedSizeArray(config: config, from: &$0) { try $0.decode() }
             },
-            lastBlock: Block(withConfig: config, from: &decoder),
-            safroleState: SafroleState(withConfig: config, from: &decoder),
+            lastBlock: Block(config: config, from: &decoder),
+            safroleState: SafroleState(config: config, from: &decoder),
             serviceAccounts: decoder.decode(),
             entropyPool: decoder.decode(),
-            validatorQueue: ConfigFixedSizeArray(withConfig: config, from: &decoder),
-            currentValidators: ConfigFixedSizeArray(withConfig: config, from: &decoder),
-            previousValidators: ConfigFixedSizeArray(withConfig: config, from: &decoder),
-            reports: ConfigFixedSizeArray(withConfig: config, from: &decoder) { try ReportItem(withConfig: config, from: &$0) },
-            timestamp: decoder.decode(),
-            authorizationQueue: ConfigFixedSizeArray(withConfig: config, from: &decoder) {
-                try ConfigFixedSizeArray(withConfig: config, from: &$0)
+            validatorQueue: ConfigFixedSizeArray(config: config, from: &decoder),
+            currentValidators: ConfigFixedSizeArray(config: config, from: &decoder),
+            previousValidators: ConfigFixedSizeArray(config: config, from: &decoder),
+            reports: ConfigFixedSizeArray(config: config, from: &decoder) { try ReportItem(config: config, from: &$0) },
+            timeslot: decoder.decode(),
+            authorizationQueue: ConfigFixedSizeArray(config: config, from: &decoder) {
+                try ConfigFixedSizeArray(config: config, from: &$0)
             },
             privilegedServiceIndices: decoder.decode(),
             judgements: decoder.decode()
@@ -219,7 +219,7 @@ extension State: ScaleCodec.Encodable {
         try encoder.encode(currentValidators)
         try encoder.encode(previousValidators)
         try encoder.encode(reports)
-        try encoder.encode(timestamp)
+        try encoder.encode(timeslot)
         try encoder.encode(authorizationQueue)
         try encoder.encode(privilegedServiceIndices)
         try encoder.encode(judgements)
@@ -238,7 +238,7 @@ extension State {
             currentValidators: currentValidators,
             previousValidators: previousValidators,
             reports: reports,
-            timestamp: timestamp,
+            timeslot: timeslot,
             authorizationQueue: authorizationQueue,
             privilegedServiceIndices: privilegedServiceIndices,
             judgements: judgements

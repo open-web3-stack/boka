@@ -57,7 +57,7 @@ public struct ServiceAccount: Sendable {
 
 extension ServiceAccount: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig _: Config) -> ServiceAccount {
+    public static func dummy(config _: Config) -> ServiceAccount {
         ServiceAccount(
             storage: [:],
             preimages: [:],

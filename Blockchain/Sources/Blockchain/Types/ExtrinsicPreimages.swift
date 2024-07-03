@@ -24,7 +24,7 @@ public struct ExtrinsicPreimages: Sendable {
 
 extension ExtrinsicPreimages: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(withConfig _: Config) -> ExtrinsicPreimages {
+    public static func dummy(config _: Config) -> ExtrinsicPreimages {
         ExtrinsicPreimages(preimages: [])
     }
 }

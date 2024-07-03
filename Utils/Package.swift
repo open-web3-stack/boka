@@ -16,7 +16,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/tesseract-one/ScaleCodec.swift.git", from: "0.3.0"),
+        .package(url: "https://github.com/AcalaNetwork/ScaleCodec.swift.git", branch: "main"),
         .package(url: "https://github.com/tesseract-one/Blake2.swift.git", from: "0.2.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0" ..< "4.0.0"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
