@@ -2,7 +2,7 @@ import ScaleCodec
 import Utils
 
 public struct State: Sendable {
-    public struct ReportItem: Sendable {
+    public struct ReportItem: Sendable, Equatable {
         public var workReport: WorkReport
         public var guarantors: LimitedSizeArray<Ed25519PublicKey, ConstInt2, ConstInt3>
         public var timeslot: TimeslotIndex
@@ -142,6 +142,24 @@ public struct State: Sendable {
 
 public typealias StateRef = Ref<State>
 
+extension State: Equatable {
+    public static func == (lhs: State, rhs: State) -> Bool {
+        lhs.coreAuthorizationPool == rhs.coreAuthorizationPool &&
+            lhs.lastBlock == rhs.lastBlock &&
+            lhs.safroleState == rhs.safroleState &&
+            lhs.serviceAccounts == rhs.serviceAccounts &&
+            lhs.entropyPool == rhs.entropyPool &&
+            lhs.validatorQueue == rhs.validatorQueue &&
+            lhs.currentValidators == rhs.currentValidators &&
+            lhs.previousValidators == rhs.previousValidators &&
+            lhs.reports == rhs.reports &&
+            lhs.timeslot == rhs.timeslot &&
+            lhs.authorizationQueue == rhs.authorizationQueue &&
+            lhs.privilegedServiceIndices == rhs.privilegedServiceIndices &&
+            lhs.judgements == rhs.judgements
+    }
+}
+
 extension State: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> State {
@@ -245,4 +263,29 @@ extension State {
         )
         return state
     }
+}
+
+extension State: Safrole {
+    public var nextValidators: ConfigFixedSizeArray<
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+    > { safroleState.nextValidators }
+
+    public var ticketsAccumulator: ConfigLimitedSizeArray<
+        Ticket,
+        ProtocolConfig.Int0,
+        ProtocolConfig.EpochLength
+    > { safroleState.ticketsAccumulator }
+
+    public var ticketsOrKeys: Either<
+        ConfigFixedSizeArray<
+            Ticket,
+            ProtocolConfig.EpochLength
+        >,
+        ConfigFixedSizeArray<
+            BandersnatchPublicKey,
+            ProtocolConfig.EpochLength
+        >
+    > { safroleState.ticketsOrKeys }
+
+    public var ticketsVerifier: BandersnatchRingVRFRoot { safroleState.ticketsVerifier }
 }

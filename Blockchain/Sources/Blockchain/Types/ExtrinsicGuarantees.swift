@@ -1,8 +1,8 @@
 import ScaleCodec
 import Utils
 
-public struct ExtrinsicGuarantees: Sendable {
-    public struct GuaranteeItem: Sendable {
+public struct ExtrinsicGuarantees: Sendable, Equatable {
+    public struct GuaranteeItem: Sendable, Equatable {
         public var coreIndex: CoreIndex
         public var workReport: WorkReport
         public var timeslot: TimeslotIndex

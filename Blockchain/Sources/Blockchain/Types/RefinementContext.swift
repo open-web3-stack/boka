@@ -35,6 +35,12 @@ public struct RefinementContext: Sendable {
     }
 }
 
+extension RefinementContext: Equatable {
+    public static func == (lhs: RefinementContext, rhs: RefinementContext) -> Bool {
+        lhs.anchor == rhs.anchor && lhs.lokupAnchor == rhs.lokupAnchor && lhs.prerequistieWorkPackage == rhs.prerequistieWorkPackage
+    }
+}
+
 extension RefinementContext: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config _: Config) -> RefinementContext {

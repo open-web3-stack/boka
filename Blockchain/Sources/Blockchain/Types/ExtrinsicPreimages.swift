@@ -2,8 +2,8 @@ import Foundation
 import ScaleCodec
 import Utils
 
-public struct ExtrinsicPreimages: Sendable {
-    public struct SizeAndData: Sendable {
+public struct ExtrinsicPreimages: Sendable, Equatable {
+    public struct SizeAndData: Sendable, Equatable {
         public var size: DataLength
         public var data: Data
 

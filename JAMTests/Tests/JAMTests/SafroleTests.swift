@@ -29,7 +29,7 @@ extension SafroleInput: ScaleCodec.Encodable {
 }
 
 struct OutputMarks {
-    var epochMark: Header.EpochMarker?
+    var epochMark: EpochMarker?
     var ticketsMark: ConfigFixedSizeArray<
         Ticket,
         ProtocolConfig.EpochLength
@@ -39,7 +39,7 @@ struct OutputMarks {
 extension OutputMarks: ScaleCodec.Encodable {
     init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            epochMark: Optional(from: &decoder, decodeItem: { try Header.EpochMarker(config: config, from: &$0) }),
+            epochMark: Optional(from: &decoder, decodeItem: { try EpochMarker(config: config, from: &$0) }),
             ticketsMark: Optional(from: &decoder, decodeItem: { try ConfigFixedSizeArray(config: config, from: &$0) })
         )
     }
@@ -80,27 +80,35 @@ extension SafroleOutput: ScaleCodec.Encodable {
     }
 }
 
-struct SafroleState {
-    var tau: UInt32
-    var eta: (Data32, Data32, Data32, Data32)
-    var lambda: ConfigFixedSizeArray<
+struct SafroleState: Safrole, Equatable {
+    // tau
+    var timeslot: UInt32
+    // eta
+    var entropyPool: (Data32, Data32, Data32, Data32)
+    // lambda
+    var previousValidators: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
     >
-    var kappa: ConfigFixedSizeArray<
+    // kappa
+    var currentValidators: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
     >
-    var gammaK: ConfigFixedSizeArray<
+    // gammaK
+    var nextValidators: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
     >
-    var iota: ConfigFixedSizeArray<
+    // iota
+    var validatorQueue: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
     >
-    var gammaA: ConfigLimitedSizeArray<
+    // gammaA
+    var ticketsAccumulator: ConfigLimitedSizeArray<
         Ticket,
         ProtocolConfig.Int0,
         ProtocolConfig.EpochLength
     >
-    var gammaS: Either<
+    // gammaS
+    var ticketsOrKeys: Either<
         ConfigFixedSizeArray<
             Ticket,
             ProtocolConfig.EpochLength
@@ -110,38 +118,51 @@ struct SafroleState {
             ProtocolConfig.EpochLength
         >
     >
-    var gammaZ: BandersnatchRingVRFRoot
+    // gammaZ
+    var ticketsVerifier: BandersnatchRingVRFRoot
+
+    public static func == (lhs: SafroleState, rhs: SafroleState) -> Bool {
+        lhs.timeslot == rhs.timeslot &&
+            lhs.entropyPool == rhs.entropyPool &&
+            lhs.previousValidators == rhs.previousValidators &&
+            lhs.currentValidators == rhs.currentValidators &&
+            lhs.nextValidators == rhs.nextValidators &&
+            lhs.validatorQueue == rhs.validatorQueue &&
+            lhs.ticketsAccumulator == rhs.ticketsAccumulator &&
+            lhs.ticketsOrKeys == rhs.ticketsOrKeys &&
+            lhs.ticketsVerifier == rhs.ticketsVerifier
+    }
 }
 
 extension SafroleState: ScaleCodec.Encodable {
     init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            tau: decoder.decode(),
-            eta: decoder.decode(),
-            lambda: ConfigFixedSizeArray(config: config, from: &decoder),
-            kappa: ConfigFixedSizeArray(config: config, from: &decoder),
-            gammaK: ConfigFixedSizeArray(config: config, from: &decoder),
-            iota: ConfigFixedSizeArray(config: config, from: &decoder),
-            gammaA: ConfigLimitedSizeArray(config: config, from: &decoder),
-            gammaS: Either(
+            timeslot: decoder.decode(),
+            entropyPool: decoder.decode(),
+            previousValidators: ConfigFixedSizeArray(config: config, from: &decoder),
+            currentValidators: ConfigFixedSizeArray(config: config, from: &decoder),
+            nextValidators: ConfigFixedSizeArray(config: config, from: &decoder),
+            validatorQueue: ConfigFixedSizeArray(config: config, from: &decoder),
+            ticketsAccumulator: ConfigLimitedSizeArray(config: config, from: &decoder),
+            ticketsOrKeys: Either(
                 from: &decoder,
                 decodeLeft: { try ConfigFixedSizeArray(config: config, from: &$0) },
                 decodeRight: { try ConfigFixedSizeArray(config: config, from: &$0) }
             ),
-            gammaZ: decoder.decode()
+            ticketsVerifier: decoder.decode()
         )
     }
 
     func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(tau)
-        try encoder.encode(eta)
-        try encoder.encode(lambda)
-        try encoder.encode(kappa)
-        try encoder.encode(gammaK)
-        try encoder.encode(iota)
-        try encoder.encode(gammaA)
-        try encoder.encode(gammaS)
-        try encoder.encode(gammaZ)
+        try encoder.encode(timeslot)
+        try encoder.encode(entropyPool)
+        try encoder.encode(previousValidators)
+        try encoder.encode(currentValidators)
+        try encoder.encode(nextValidators)
+        try encoder.encode(validatorQueue)
+        try encoder.encode(ticketsAccumulator)
+        try encoder.encode(ticketsOrKeys)
+        try encoder.encode(ticketsVerifier)
     }
 }
 
@@ -205,6 +226,31 @@ struct SafroleTests {
 
     @Test(arguments: try SafroleTests.loadTests(variant: .tiny))
     func tinyTests(_ testcase: SafroleTestcase) throws {
-        print(String(reflecting: testcase))
+        withKnownIssue("not yet implemented", isIntermittent: true) {
+            let result = testcase.preState.updateSafrole(
+                slot: testcase.input.slot,
+                entropy: testcase.input.entropy,
+                extrinsics: testcase.input.extrinsics
+            )
+            switch result {
+            case let .success((state, epochMark, ticketsMark)):
+                switch testcase.output {
+                case let .ok(marks):
+                    #expect(epochMark == marks.epochMark)
+                    #expect(ticketsMark == marks.ticketsMark)
+                    #expect(state == testcase.postState)
+                case .err:
+                    Issue.record("Expected error, got \(result)")
+                }
+            case .failure:
+                switch testcase.output {
+                case .ok:
+                    Issue.record("Expected success, got \(result)")
+                case .err:
+                    // ignore error code because it is unspecified
+                    break
+                }
+            }
+        }
     }
 }

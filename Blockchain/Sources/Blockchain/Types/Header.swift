@@ -1,26 +1,7 @@
 import ScaleCodec
 import Utils
 
-public struct Header: Sendable {
-    public struct EpochMarker: Sendable {
-        public var entropy: Data32
-        public var validators: ConfigFixedSizeArray<
-            BandersnatchPublicKey,
-            ProtocolConfig.TotalNumberOfValidators
-        >
-
-        public init(
-            entropy: Data32,
-            validators: ConfigFixedSizeArray<
-                BandersnatchPublicKey,
-                ProtocolConfig.TotalNumberOfValidators
-            >
-        ) {
-            self.entropy = entropy
-            self.validators = validators
-        }
-    }
-
+public struct Header: Sendable, Equatable {
     // Hp: parent hash
     public var parentHash: Data32
 
@@ -134,20 +115,6 @@ extension Header: ScaleCodec.Encodable {
         try encoder.encode(authorKey)
         try encoder.encode(vrfSignature)
         try encoder.encode(seal)
-    }
-}
-
-extension Header.EpochMarker: ScaleCodec.Encodable {
-    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            entropy: decoder.decode(),
-            validators: ConfigFixedSizeArray(config: config, from: &decoder)
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(entropy)
-        try encoder.encode(validators)
     }
 }
 

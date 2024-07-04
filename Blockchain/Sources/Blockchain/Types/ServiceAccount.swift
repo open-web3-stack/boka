@@ -2,7 +2,7 @@ import Foundation
 import ScaleCodec
 import Utils
 
-public struct ServiceAccount: Sendable {
+public struct ServiceAccount: Sendable, Equatable {
     public struct HashAndLength: Sendable, Hashable {
         public var hash: Data32
         public var length: DataLength

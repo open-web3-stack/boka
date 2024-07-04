@@ -42,6 +42,8 @@ public struct ConfigLimitedSizeArray<T, TMinLength: ReadInt, TMaxLength: ReadInt
     }
 }
 
+extension ConfigLimitedSizeArray: Equatable where T: Equatable {}
+
 extension ConfigLimitedSizeArray: Sendable where T: Sendable {}
 
 extension ConfigLimitedSizeArray: RandomAccessCollection {
