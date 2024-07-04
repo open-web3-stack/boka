@@ -2,8 +2,8 @@ import Foundation
 import ScaleCodec
 import Utils
 
-public struct ExtrinsicAvailability: Sendable {
-    public struct AssuranceItem: Sendable {
+public struct ExtrinsicAvailability: Sendable, Equatable {
+    public struct AssuranceItem: Sendable, Equatable {
         // a
         public var parentHash: Data32
         // f

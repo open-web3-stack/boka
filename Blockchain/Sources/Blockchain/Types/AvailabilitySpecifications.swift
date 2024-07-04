@@ -1,7 +1,7 @@
 import ScaleCodec
 import Utils
 
-public struct AvailabilitySpecifications: Sendable {
+public struct AvailabilitySpecifications: Sendable, Equatable {
     // h
     public var workPackageHash: Data32
 

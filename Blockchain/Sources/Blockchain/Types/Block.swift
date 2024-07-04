@@ -1,7 +1,7 @@
 import ScaleCodec
 import Utils
 
-public struct Block: Sendable {
+public struct Block: Sendable, Equatable {
     public var header: Header
     public var extrinsic: Extrinsic
 
