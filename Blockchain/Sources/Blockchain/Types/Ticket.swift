@@ -1,7 +1,7 @@
 import ScaleCodec
 import Utils
 
-public struct Ticket: Sendable {
+public struct Ticket: Sendable, Equatable {
     public var id: Data32
     public var attempt: TicketIndex
 }

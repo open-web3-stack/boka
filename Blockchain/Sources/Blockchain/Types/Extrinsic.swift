@@ -1,7 +1,7 @@
 import ScaleCodec
 import Utils
 
-public struct Extrinsic: Sendable {
+public struct Extrinsic: Sendable, Equatable {
     // ET: Tickets, used for the mechanism which manages the selection of validators for the
     // permissioning of block authoring
     public var tickets: ExtrinsicTickets

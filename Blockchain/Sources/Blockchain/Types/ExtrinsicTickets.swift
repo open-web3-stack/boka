@@ -1,8 +1,8 @@
 import ScaleCodec
 import Utils
 
-public struct ExtrinsicTickets: Sendable {
-    public struct TicketItem: Sendable {
+public struct ExtrinsicTickets: Sendable, Equatable {
+    public struct TicketItem: Sendable, Equatable {
         public var attempt: TicketIndex
         public var signature: BandersnatchRintVRFProof
 

@@ -1,14 +1,14 @@
 import ScaleCodec
 import Utils
 
-public struct SafroleState: Sendable {
+public struct SafroleState: Sendable, Equatable {
     // γk
     public var nextValidators: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
     >
 
     // γz
-    public var ticketsVerifierKey: BandersnatchRingVRFRoot
+    public var ticketsVerifier: BandersnatchRingVRFRoot
 
     // γs
     public var ticketsOrKeys: Either<
@@ -33,7 +33,7 @@ public struct SafroleState: Sendable {
         nextValidators: ConfigFixedSizeArray<
             ValidatorKey, ProtocolConfig.TotalNumberOfValidators
         >,
-        ticketsVerifierKey: BandersnatchRingVRFRoot,
+        ticketsVerifier: BandersnatchRingVRFRoot,
         ticketsOrKeys: Either<
             ConfigFixedSizeArray<
                 Ticket,
@@ -51,7 +51,7 @@ public struct SafroleState: Sendable {
         >
     ) {
         self.nextValidators = nextValidators
-        self.ticketsVerifierKey = ticketsVerifierKey
+        self.ticketsVerifier = ticketsVerifier
         self.ticketsOrKeys = ticketsOrKeys
         self.ticketsAccumulator = ticketsAccumulator
     }
@@ -62,7 +62,7 @@ extension SafroleState: Dummy {
     public static func dummy(config: Config) -> SafroleState {
         SafroleState(
             nextValidators: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
-            ticketsVerifierKey: BandersnatchRingVRFRoot(),
+            ticketsVerifier: BandersnatchRingVRFRoot(),
             ticketsOrKeys: .right(ConfigFixedSizeArray(config: config, defaultValue: BandersnatchPublicKey())),
             ticketsAccumulator: ConfigLimitedSizeArray(config: config)
         )
@@ -73,7 +73,7 @@ extension SafroleState: ScaleCodec.Encodable {
     public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             nextValidators: ConfigFixedSizeArray(config: config, from: &decoder),
-            ticketsVerifierKey: decoder.decode(),
+            ticketsVerifier: decoder.decode(),
             ticketsOrKeys: Either(
                 from: &decoder,
                 decodeLeft: { try ConfigFixedSizeArray(config: config, from: &$0) },
@@ -85,7 +85,7 @@ extension SafroleState: ScaleCodec.Encodable {
 
     public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
         try encoder.encode(nextValidators)
-        try encoder.encode(ticketsVerifierKey)
+        try encoder.encode(ticketsVerifier)
         try encoder.encode(ticketsOrKeys)
         try encoder.encode(ticketsAccumulator)
     }
