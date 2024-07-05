@@ -1,0 +1,20 @@
+[package]
+name = "bandersnatch-vrfs"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[build-dependencies]
+swift-bridge-build = "0.1"
+
+[dependencies]
+ark-ec-vrfs = { git = "https://github.com/davxy/ark-ec-vrfs", default-features = false, features = [
+	"bandersnatch",
+	"ring",
+	"parallel",
+	"test-vectors",
+] }
+hex = "0.4.3"
+swift-bridge = "0.1"

@@ -14,6 +14,10 @@ let package = Package(
             name: "Utils",
             targets: ["Utils"]
         ),
+        .library(
+            name: "Bandersnatch",
+            targets: ["Bandersnatch"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/AcalaNetwork/ScaleCodec.swift.git", branch: "main"),
@@ -51,9 +55,25 @@ let package = Package(
                 .unsafeFlags(["-L../Utils/Sources/blst/lib", "-lblst"]),
             ]
         ),
+        .target(
+            name: "Bandersnatch",
+            dependencies: [],
+            path: "./Sources/bandersnatch-vrfs",
+            sources: [],
+            publicHeadersPath: "./",
+            linkerSettings: [
+                .unsafeFlags([
+                    "-L../Utils/Sources/bandersnatch-vrfs/target/aarch64-apple-darwin/debug",
+                    // "-import-objc-header bridging-header.h",
+                    "-lbandersnatch_vrfs",
+                ]),
+            ]
+        ),
         .testTarget(
             name: "UtilsTests",
-            dependencies: ["Utils", .product(name: "Testing", package: "swift-testing")]
+            dependencies: [
+                "Utils", "Bandersnatch", .product(name: "Testing", package: "swift-testing"),
+            ]
         ),
     ],
     swiftLanguageVersions: [.version("6")]

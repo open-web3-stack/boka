@@ -20,3 +20,10 @@ module blst {
 EOL
 
 echo "Setup blst successfully."
+
+
+# Setup bansersnatch library
+cd Utils/Sources/bandersnatch-vrfs || { echo "directory not found"; exit 1; }
+mkdir -p generated
+
+# cargo build --target aarch64-apple-darwin
