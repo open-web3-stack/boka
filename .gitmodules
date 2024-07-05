@@ -4,3 +4,6 @@
 [submodule "blst"]
 	path = Utils/Sources/blst
 	url = https://github.com/supranational/blst.git
+[submodule "ark-ec-vrfs"]
+	path = Utils/Sources/ark-ec-vrfs
+	url = git@github.com:davxy/ark-ec-vrfs.git
