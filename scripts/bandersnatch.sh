@@ -4,7 +4,7 @@ set -e
 
 
 # Setup bandersnatch vrf c binding
-cd Utils/Sources/bandersnatch || { echo "directory not found"; exit 1; }
+cd "$(dirname "$0")/../Utils/Sources/bandersnatch" || { echo "directory not found"; exit 1; }
 
 mkdir -p include
 mkdir -p lib
