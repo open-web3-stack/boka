@@ -58,7 +58,7 @@ jobs:
       with:
         components: rustfmt
     - name: Check rust format
-      run: cargo +nightly fmt --all --manifest-path Utils/Sources/Bandersnatch/Cargo.toml -- --check
+      run: cargo +nightly fmt --all --manifest-path Utils/Sources/bandersnatch/Cargo.toml -- --check
     - name: Build
       run: make build
     - name: Test
