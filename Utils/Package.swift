@@ -14,10 +14,6 @@ let package = Package(
             name: "Utils",
             targets: ["Utils"]
         ),
-        .library(
-            name: "Bandersnatch",
-            targets: ["Bandersnatch"]
-        ),
     ],
     dependencies: [
         .package(url: "https://github.com/AcalaNetwork/ScaleCodec.swift.git", branch: "main"),
@@ -35,6 +31,7 @@ let package = Package(
                 .product(name: "Blake2", package: "Blake2.swift"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 "blst",
+                "bandersnatch_vrfs",
             ]
         ),
         .target(
@@ -56,15 +53,17 @@ let package = Package(
             ]
         ),
         .target(
-            name: "Bandersnatch",
+            name: "bandersnatch_vrfs",
             dependencies: [],
-            path: "./Sources/bandersnatch-vrfs",
+            path: "./Sources/Bandersnatch",
             sources: [],
-            publicHeadersPath: "./",
+            publicHeadersPath: "./include",
+            cSettings: [
+                .headerSearchPath("./include"),
+            ],
             linkerSettings: [
                 .unsafeFlags([
-                    "-L../Utils/Sources/bandersnatch-vrfs/target/aarch64-apple-darwin/debug",
-                    // "-import-objc-header bridging-header.h",
+                    "-L../Utils/Sources/Bandersnatch/lib",
                     "-lbandersnatch_vrfs",
                 ]),
             ]
@@ -72,7 +71,7 @@ let package = Package(
         .testTarget(
             name: "UtilsTests",
             dependencies: [
-                "Utils", "Bandersnatch", .product(name: "Testing", package: "swift-testing"),
+                "Utils", .product(name: "Testing", package: "swift-testing"),
             ]
         ),
     ],

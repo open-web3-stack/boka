@@ -1,10 +1,8 @@
 import Foundation
 import Testing
 
-@testable import Bandersnatch
+@testable import bandersnatch_vrfs
 
 @Suite struct BandersnatchTests {
-    @Test func BandersnatchRustCallWorks() throws {
-        print()
-    }
+    @Test func simpleRingVrfTest() throws {}
 }

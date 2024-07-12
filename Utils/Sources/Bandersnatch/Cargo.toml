@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["staticlib"]
 
 [build-dependencies]
-swift-bridge-build = "0.1"
+cbindgen = "0.24.0"
 
 [dependencies]
 ark-ec-vrfs = { git = "https://github.com/davxy/ark-ec-vrfs", default-features = false, features = [
@@ -17,4 +17,3 @@ ark-ec-vrfs = { git = "https://github.com/davxy/ark-ec-vrfs", default-features =
 	"test-vectors",
 ] }
 hex = "0.4.3"
-swift-bridge = "0.1"
