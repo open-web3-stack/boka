@@ -5,13 +5,13 @@
 githooks: .git/hooks/pre-commit
 
 .PHONY: deps
-deps: Utils/Sources/blst/lib/libblst.a Utils/Sources/Bandersnatch/lib/libbandersnatch_vrfs.a
+deps: Utils/Sources/blst/lib/libblst.a Utils/Sources/bandersnatch/lib/libbandersnatch_vrfs.a
 
 Utils/Sources/blst/lib/libblst.a:
-	./scripts/deps.sh
+	./scripts/blst.sh
 
-Utils/Sources/Bandersnatch/lib/libbandersnatch_vrfs.a:
-	./scripts/deps.sh
+Utils/Sources/bandersnatch/lib/libbandersnatch_vrfs.a:
+	./scripts/bandersnatch.sh
 
 .PHONY: test
 test: githooks deps

@@ -73,20 +73,6 @@ impl From<Secret> for CSecret {
     }
 }
 
-// #[no_mangle]
-// pub extern "C" fn secret_deserialize_compressed(data: *const u8, len: usize) -> *mut CSecret {
-//     if data.is_null() {
-//         std::ptr::null_mut()
-//     } else {
-//         let slice = unsafe { std::slice::from_raw_parts(data, len) };
-
-//         match Secret::deserialize_compressed(slice) {
-//             Ok(secret) => Box::into_raw(Box::new(secret.into())),
-//             Err(_) => std::ptr::null_mut(),
-//         }
-//     }
-// }
-
 #[no_mangle]
 pub extern "C" fn secret_new_from_seed(seed: *const u8, seed_len: usize) -> *mut CSecret {
     if seed.is_null() || seed_len != 32 {

@@ -55,7 +55,7 @@ let package = Package(
         .target(
             name: "bandersnatch_vrfs",
             dependencies: [],
-            path: "./Sources/Bandersnatch",
+            path: "./Sources/bandersnatch",
             sources: [],
             publicHeadersPath: "./include",
             cSettings: [
@@ -63,7 +63,7 @@ let package = Package(
             ],
             linkerSettings: [
                 .unsafeFlags([
-                    "-L../Utils/Sources/Bandersnatch/lib",
+                    "-L../Utils/Sources/bandersnatch/lib",
                     "-lbandersnatch_vrfs",
                 ]),
             ]
