@@ -173,13 +173,14 @@ func generateFallbackIndices(entropy: Data32, count: Int) throws -> [Int] {
         let hash = try blake2b256(data)
         let hash4 = hash.data[0 ..< 4]
         let idx = try decode(UInt32.self, from: hash4)
-        return Int(idx)
+        return Int(idx) % count
     }
 }
 
-func pickFallbackValidators(entropy: Data32,
-                            validators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>) throws -> [BandersnatchPublicKey]
-{
+func pickFallbackValidators(
+    entropy: Data32,
+    validators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
+) throws -> [BandersnatchPublicKey] {
     let indices = try generateFallbackIndices(entropy: entropy, count: validators.count)
     return indices.map { validators[$0].bandersnatch }
 }
