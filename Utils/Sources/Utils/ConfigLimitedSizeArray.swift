@@ -5,7 +5,7 @@ import ScaleCodec
 public struct ConfigLimitedSizeArray<T, TMinLength: ReadInt, TMaxLength: ReadInt>
     where TMinLength.TConfig == TMaxLength.TConfig
 {
-    private var array: [T]
+    public private(set) var array: [T]
 
     public let minLength: Int
     public let maxLength: Int
@@ -25,7 +25,14 @@ public struct ConfigLimitedSizeArray<T, TMinLength: ReadInt, TMaxLength: ReadInt
         self.init([], minLength: minLength, maxLength: maxLength)
     }
 
-    public init(_ array: [T], minLength: Int, maxLength: Int) {
+    public init(config: TMinLength.TConfig, array: [T]) {
+        let minLength = TMinLength.read(config: config)
+        let maxLength = TMaxLength.read(config: config)
+
+        self.init(array, minLength: minLength, maxLength: maxLength)
+    }
+
+    private init(_ array: [T], minLength: Int, maxLength: Int) {
         assert(minLength >= 0)
         assert(maxLength >= minLength)
 

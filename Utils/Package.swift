@@ -43,17 +43,24 @@ let package = Package(
                 "./src",
             ],
             sources: [],
+            resources: [
+                .copy("lib/libblst.a"),
+            ],
             publicHeadersPath: "./include",
             cSettings: [
                 .headerSearchPath("./include"),
             ],
             linkerSettings: [
-                .unsafeFlags(["-L../Utils/Sources/blst/lib", "-lblst"]),
+                .unsafeFlags(["-L../Utils/Sources/blst/lib"]),
+                .linkedLibrary("blst"),
             ]
         ),
         .testTarget(
             name: "UtilsTests",
-            dependencies: ["Utils", .product(name: "Testing", package: "swift-testing")]
+            dependencies: [
+                "Utils",
+                .product(name: "Testing", package: "swift-testing"),
+            ]
         ),
     ],
     swiftLanguageVersions: [.version("6")]
