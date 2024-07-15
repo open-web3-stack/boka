@@ -33,33 +33,18 @@ let package = Package(
                 "blst",
             ]
         ),
-        .target(
+        .systemLibrary(
             name: "blst",
-            dependencies: [],
-            path: "./Sources/blst",
-            exclude: [
-                ".github",
-                "./build",
-                "./src",
-            ],
-            sources: [],
-            resources: [
-                .copy("lib/libblst.a"),
-            ],
-            publicHeadersPath: "./include",
-            cSettings: [
-                .headerSearchPath("./include"),
-            ],
-            linkerSettings: [
-                .unsafeFlags(["-L../Utils/Sources/blst/lib"]),
-                .linkedLibrary("blst"),
-            ]
+            path: "Sources/blst/include"
         ),
         .testTarget(
             name: "UtilsTests",
             dependencies: [
                 "Utils",
                 .product(name: "Testing", package: "swift-testing"),
+            ],
+            linkerSettings: [
+                .unsafeFlags(["-L../Utils/Sources/blst/lib"]),
             ]
         ),
     ],

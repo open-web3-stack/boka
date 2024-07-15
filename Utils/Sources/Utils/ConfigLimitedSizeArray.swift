@@ -44,8 +44,8 @@ public struct ConfigLimitedSizeArray<T, TMinLength: ReadInt, TMaxLength: ReadInt
     }
 
     private func validate() {
-        assert(array.count >= minLength)
-        assert(array.count <= maxLength)
+        assert(array.count >= minLength, "count \(array.count) >= minLength \(minLength)")
+        assert(array.count <= maxLength, "count \(array.count) <= maxLength \(maxLength)")
     }
 }
 

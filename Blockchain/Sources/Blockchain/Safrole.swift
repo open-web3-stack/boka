@@ -173,16 +173,17 @@ func generateFallbackIndices(entropy: Data32, count: Int) throws -> [Int] {
         let hash = try blake2b256(data)
         let hash4 = hash.data[0 ..< 4]
         let idx = try decode(UInt32.self, from: hash4)
-        return Int(idx) % count
+        return Int(idx)
     }
 }
 
 func pickFallbackValidators(
     entropy: Data32,
-    validators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
+    validators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>,
+    count: Int
 ) throws -> [BandersnatchPublicKey] {
-    let indices = try generateFallbackIndices(entropy: entropy, count: validators.count)
-    return indices.map { validators[$0].bandersnatch }
+    let indices = try generateFallbackIndices(entropy: entropy, count: count)
+    return indices.map { validators[$0 % validators.count].bandersnatch }
 }
 
 extension Safrole {
@@ -239,7 +240,10 @@ extension Safrole {
             } else if newEpoch == currentEpoch {
                 ticketsOrKeys
             } else {
-                try .right(ConfigFixedSizeArray(config: config, array: pickFallbackValidators(entropy: entropy, validators: newCurrentValidators)))
+                try .right(ConfigFixedSizeArray(
+                    config: config,
+                    array: pickFallbackValidators(entropy: entropy, validators: newCurrentValidators, count: config.value.epochLength)
+                ))
             }
 
             let postState = SafrolePostState(
