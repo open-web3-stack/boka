@@ -20,11 +20,17 @@ let package = Package(
             dependencies: [
                 "Node",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
+            linkerSettings: [
+                .unsafeFlags(["-L../Utils/Sources/blst/lib"]),
             ]
         ),
         .testTarget(
             name: "BokaTests",
-            dependencies: ["Boka"]
+            dependencies: ["Boka"],
+            linkerSettings: [
+                .unsafeFlags(["-L../Utils/Sources/blst/lib"]),
+            ]
         ),
     ],
     swiftLanguageVersions: [.version("6")]
