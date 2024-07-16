@@ -18,6 +18,8 @@ public struct State: Sendable {
         }
     }
 
+    public let config: ProtocolConfigRef
+
     // α: The core αuthorizations pool.
     public var coreAuthorizationPool: ConfigFixedSizeArray<
         ConfigLimitedSizeArray<
@@ -84,6 +86,7 @@ public struct State: Sendable {
     public var judgements: JudgementsState
 
     public init(
+        config: ProtocolConfigRef,
         coreAuthorizationPool: ConfigFixedSizeArray<
             ConfigLimitedSizeArray<
                 Data32,
@@ -124,6 +127,7 @@ public struct State: Sendable {
         ),
         judgements: JudgementsState
     ) {
+        self.config = config
         self.coreAuthorizationPool = coreAuthorizationPool
         self.lastBlock = lastBlock
         self.safroleState = safroleState
@@ -164,6 +168,7 @@ extension State: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> State {
         State(
+            config: config,
             coreAuthorizationPool: ConfigFixedSizeArray(config: config, defaultValue: ConfigLimitedSizeArray(config: config)),
             lastBlock: Block.dummy(config: config),
             safroleState: SafroleState.dummy(config: config),
@@ -207,6 +212,7 @@ extension State.ReportItem: ScaleCodec.Encodable {
 extension State: ScaleCodec.Encodable {
     public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
+            config: config,
             coreAuthorizationPool: ConfigFixedSizeArray(config: config, from: &decoder) {
                 try ConfigLimitedSizeArray(config: config, from: &$0) { try $0.decode() }
             },
@@ -247,6 +253,7 @@ extension State: ScaleCodec.Encodable {
 extension State {
     public func update(with block: Block) -> State {
         let state = State(
+            config: config,
             coreAuthorizationPool: coreAuthorizationPool,
             lastBlock: block,
             safroleState: safroleState,
@@ -288,4 +295,28 @@ extension State: Safrole {
     > { safroleState.ticketsOrKeys }
 
     public var ticketsVerifier: BandersnatchRingVRFRoot { safroleState.ticketsVerifier }
+
+    public func mergeWith(postState: SafrolePostState) -> Self {
+        Self(
+            config: config,
+            coreAuthorizationPool: coreAuthorizationPool,
+            lastBlock: lastBlock,
+            safroleState: SafroleState(
+                nextValidators: postState.nextValidators,
+                ticketsVerifier: postState.ticketsVerifier,
+                ticketsOrKeys: postState.ticketsOrKeys,
+                ticketsAccumulator: postState.ticketsAccumulator
+            ),
+            serviceAccounts: serviceAccounts,
+            entropyPool: postState.entropyPool,
+            validatorQueue: postState.validatorQueue,
+            currentValidators: postState.currentValidators,
+            previousValidators: postState.previousValidators,
+            reports: reports,
+            timeslot: postState.timeslot,
+            authorizationQueue: authorizationQueue,
+            privilegedServiceIndices: privilegedServiceIndices,
+            judgements: judgements
+        )
+    }
 }

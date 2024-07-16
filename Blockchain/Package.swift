@@ -18,6 +18,7 @@ let package = Package(
     dependencies: [
         .package(path: "../Utils"),
         .package(url: "https://github.com/AcalaNetwork/ScaleCodec.swift.git", branch: "main"),
+        .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -31,7 +32,10 @@ let package = Package(
         ),
         .testTarget(
             name: "BlockchainTests",
-            dependencies: ["Blockchain"]
+            dependencies: [
+                "Blockchain",
+                .product(name: "Testing", package: "swift-testing"),
+            ]
         ),
     ],
     swiftLanguageVersions: [.version("6")]
