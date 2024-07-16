@@ -12,7 +12,14 @@ excluded:
 identifier_name:
     min_length: 1
 
+type_name:
+    min_length: 1
+
 line_length:
     warning: 140
     error: 140
     ignores_function_declarations: true
+
+function_body_length:
+    warning: 200
+    error: 500

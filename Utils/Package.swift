@@ -31,47 +31,20 @@ let package = Package(
                 .product(name: "Blake2", package: "Blake2.swift"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 "blst",
-                "bandersnatch_vrfs",
+            ],
+            linkerSettings: [
+                .unsafeFlags(["-L../Utils/Sources/blst/lib"]),
             ]
         ),
-        .target(
+        .systemLibrary(
             name: "blst",
-            dependencies: [],
-            path: "./Sources/blst",
-            exclude: [
-                ".github",
-                "./build",
-                "./src",
-            ],
-            sources: [],
-            publicHeadersPath: "./include",
-            cSettings: [
-                .headerSearchPath("./include"),
-            ],
-            linkerSettings: [
-                .unsafeFlags(["-L../Utils/Sources/blst/lib", "-lblst"]),
-            ]
-        ),
-        .target(
-            name: "bandersnatch_vrfs",
-            dependencies: [],
-            path: "./Sources/bandersnatch",
-            sources: [],
-            publicHeadersPath: "./include",
-            cSettings: [
-                .headerSearchPath("./include"),
-            ],
-            linkerSettings: [
-                .unsafeFlags([
-                    "-L../Utils/Sources/bandersnatch/lib",
-                    "-lbandersnatch_vrfs",
-                ]),
-            ]
+            path: "Sources/blst/include"
         ),
         .testTarget(
             name: "UtilsTests",
             dependencies: [
-                "Utils", .product(name: "Testing", package: "swift-testing"),
+                "Utils",
+                .product(name: "Testing", package: "swift-testing"),
             ]
         ),
     ],

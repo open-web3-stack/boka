@@ -1,3 +1,6 @@
+.PHONY: default
+default: build
+
 .git/hooks/pre-commit: .githooks/pre-commit
 	cp .githooks/pre-commit .git/hooks/pre-commit
 
