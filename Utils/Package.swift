@@ -31,29 +31,21 @@ let package = Package(
                 .product(name: "Blake2", package: "Blake2.swift"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 "blst",
-            ]
-        ),
-        .target(
-            name: "blst",
-            dependencies: [],
-            path: "./Sources/blst",
-            exclude: [
-                ".github",
-                "./build",
-                "./src",
-            ],
-            sources: [],
-            publicHeadersPath: "./include",
-            cSettings: [
-                .headerSearchPath("./include"),
             ],
             linkerSettings: [
-                .unsafeFlags(["-L../Utils/Sources/blst/lib", "-lblst"]),
+                .unsafeFlags(["-L../Utils/Sources/blst/lib"]),
             ]
+        ),
+        .systemLibrary(
+            name: "blst",
+            path: "Sources/blst/include"
         ),
         .testTarget(
             name: "UtilsTests",
-            dependencies: ["Utils", .product(name: "Testing", package: "swift-testing")]
+            dependencies: [
+                "Utils",
+                .product(name: "Testing", package: "swift-testing"),
+            ]
         ),
     ],
     swiftLanguageVersions: [.version("6")]

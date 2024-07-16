@@ -3,7 +3,7 @@ import ScaleCodec
 // TODO: add tests
 
 public struct LimitedSizeArray<T, TMinLength: ConstInt, TMaxLength: ConstInt> {
-    private var array: [T]
+    public private(set) var array: [T]
     public static var minLength: Int {
         TMinLength.value
     }

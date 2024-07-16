@@ -80,7 +80,9 @@ extension SafroleOutput: ScaleCodec.Encodable {
     }
 }
 
-struct SafroleState: Safrole, Equatable {
+struct SafroleState: Equatable, Safrole {
+    let config: ProtocolConfigRef
+
     // tau
     var timeslot: UInt32
     // eta
@@ -132,11 +134,27 @@ struct SafroleState: Safrole, Equatable {
             lhs.ticketsOrKeys == rhs.ticketsOrKeys &&
             lhs.ticketsVerifier == rhs.ticketsVerifier
     }
+
+    public func mergeWith(postState: SafrolePostState) -> Self {
+        Self(
+            config: config,
+            timeslot: postState.timeslot,
+            entropyPool: postState.entropyPool,
+            previousValidators: postState.previousValidators,
+            currentValidators: postState.currentValidators,
+            nextValidators: postState.nextValidators,
+            validatorQueue: postState.validatorQueue,
+            ticketsAccumulator: postState.ticketsAccumulator,
+            ticketsOrKeys: postState.ticketsOrKeys,
+            ticketsVerifier: postState.ticketsVerifier
+        )
+    }
 }
 
 extension SafroleState: ScaleCodec.Encodable {
     init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
+            config: config,
             timeslot: decoder.decode(),
             entropyPool: decoder.decode(),
             previousValidators: ConfigFixedSizeArray(config: config, from: &decoder),
@@ -238,7 +256,7 @@ struct SafroleTests {
                 case let .ok(marks):
                     #expect(epochMark == marks.epochMark)
                     #expect(ticketsMark == marks.ticketsMark)
-                    #expect(state == testcase.postState)
+                    #expect(testcase.preState.mergeWith(postState: state) == testcase.postState)
                 case .err:
                     Issue.record("Expected error, got \(result)")
                 }
