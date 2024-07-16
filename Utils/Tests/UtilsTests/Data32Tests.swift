@@ -3,7 +3,7 @@ import Testing
 
 @testable import Utils
 
-@Suite struct Data32Tests {
+struct Data32Tests {
     @Test func testZero() throws {
         let value = Data32()
         #expect(value.data == Data(repeating: 0, count: 32))
@@ -29,5 +29,25 @@ import Testing
     @Test func testInitWithInvalidData() throws {
         #expect(Data32(Data(repeating: 0, count: 31)) == nil)
         #expect(Data32(Data(repeating: 0, count: 33)) == nil)
+    }
+
+    @Test func testComparable() throws {
+        let data1 = Data(repeating: 0, count: 32)
+        var data2 = data1
+        data2[31] = 1
+        var data3 = data1
+        data3[1] = 1
+
+        let a = Data32(data1)!
+        let b = Data32(data2)!
+        let c = Data32(data3)!
+
+        #expect(a < b)
+        #expect(b < c)
+        #expect(a < c)
+
+        var arr = [c, b, a]
+        arr.sort()
+        #expect(arr == [a, b, c])
     }
 }

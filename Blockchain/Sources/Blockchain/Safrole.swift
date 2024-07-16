@@ -5,6 +5,9 @@ import Utils
 
 public enum SafroleError: Error {
     case invalidTimeslot
+    case tooManyExtrinsics
+    case extrinsicsNotAllowed
+    case extrinsicsNotSorted
     case hashingError
     case decodingError
     case unspecified
@@ -187,7 +190,7 @@ func pickFallbackValidators(
 }
 
 extension Safrole {
-    public func updateSafrole(slot: TimeslotIndex, entropy: Data32, extrinsics _: ExtrinsicTickets)
+    public func updateSafrole(slot: TimeslotIndex, entropy: Data32, extrinsics: ExtrinsicTickets)
         -> Result<
             (
                 state: SafrolePostState,
@@ -197,20 +200,35 @@ extension Safrole {
             SafroleError
         >
     {
+        // E
+        let epochLength = UInt32(config.value.epochLength)
+        // Y
+        let ticketSubmissionEndSlot = UInt32(config.value.ticketSubmissionEndSlot)
+        // e
+        let currentEpoch = timeslot / epochLength
+        // m
+        let currentPhase = timeslot % epochLength
+        // e'
+        let newEpoch = slot / epochLength
+        // m'
+        let newPhase = slot % epochLength
+        let isEpochChange = currentEpoch != newEpoch
+
         guard slot > timeslot else {
             return .failure(.invalidTimeslot)
         }
 
+        if newPhase < ticketSubmissionEndSlot {
+            guard extrinsics.tickets.count <= config.value.maxTicketsPerExtrinsic else {
+                return .failure(.tooManyExtrinsics)
+            }
+        } else {
+            guard extrinsics.tickets.isEmpty else {
+                return .failure(.extrinsicsNotAllowed)
+            }
+        }
+
         do {
-            let epochLength = UInt32(config.value.epochLength)
-            let currentEpoch = timeslot / epochLength
-            // let currentPhase = timeslot % epochLength
-            let newEpoch = slot / epochLength
-            let newPhase = slot % epochLength
-            let isEpochChange = currentEpoch != newEpoch
-
-            let isClosingPeriod = newPhase >= UInt32(config.value.ticketSubmissionEndSlot)
-
             let (newNextValidators, newCurrentValidators, newPreviousValidators, newTicketsVerifier) = isEpochChange
                 ? (
                     validatorQueue, // TODO: Φ filter out the one in the punishment set
@@ -235,7 +253,7 @@ extension Safrole {
                     BandersnatchPublicKey,
                     ProtocolConfig.EpochLength
                 >
-            > = if newEpoch == currentEpoch + 1, isClosingPeriod, ticketsAccumulator.count == config.value.epochLength {
+            > = if newEpoch == currentEpoch + 1, newPhase >= ticketSubmissionEndSlot, ticketsAccumulator.count == config.value.epochLength {
                 .left(ConfigFixedSizeArray(config: config, array: outsideInReorder(ticketsAccumulator.array)))
             } else if newEpoch == currentEpoch {
                 ticketsOrKeys
@@ -246,6 +264,44 @@ extension Safrole {
                 ))
             }
 
+            let epochMark = isEpochChange ? EpochMarker(
+                entropy: entropy,
+                validators: ConfigFixedSizeArray(config: config, array: newCurrentValidators.map(\.bandersnatch))
+            ) : nil
+
+            let ticketsMark: ConfigFixedSizeArray<Ticket, ProtocolConfig.EpochLength>? =
+                if currentEpoch == newEpoch,
+                currentPhase < ticketSubmissionEndSlot,
+                ticketSubmissionEndSlot <= newPhase,
+                ticketsAccumulator.count == config.value.epochLength {
+                    ConfigFixedSizeArray(
+                        config: config, array: outsideInReorder(ticketsAccumulator.array)
+                    )
+                } else {
+                    nil
+                }
+
+            let newTickets = extrinsics.getTickets()
+            guard newTickets.isSorted() else {
+                return .failure(.extrinsicsNotSorted)
+            }
+
+            var newTicketsAccumulatorArr = if isEpochChange {
+                [Ticket]()
+            } else {
+                ticketsAccumulator.array
+            }
+
+            newTicketsAccumulatorArr.insertSorted(newTickets)
+            if newTicketsAccumulatorArr.count > config.value.epochLength {
+                newTicketsAccumulatorArr.removeLast(newTicketsAccumulatorArr.count - config.value.epochLength)
+            }
+
+            let newTicketsAccumulator = ConfigLimitedSizeArray<Ticket, ProtocolConfig.Int0, ProtocolConfig.EpochLength>(
+                config: config,
+                array: newTicketsAccumulatorArr
+            )
+
             let postState = SafrolePostState(
                 timeslot: slot,
                 entropyPool: newEntropyPool,
@@ -253,11 +309,11 @@ extension Safrole {
                 currentValidators: newCurrentValidators,
                 nextValidators: newNextValidators,
                 validatorQueue: validatorQueue,
-                ticketsAccumulator: ticketsAccumulator,
+                ticketsAccumulator: newTicketsAccumulator,
                 ticketsOrKeys: newTicketsOrKeys,
                 ticketsVerifier: newTicketsVerifier
             )
-            return .success((postState, nil, nil))
+            return .success((state: postState, epochMark: epochMark, ticketsMark: ticketsMark))
         } catch let e as SafroleError {
             return .failure(e)
         } catch Blake2Error.hashingError {

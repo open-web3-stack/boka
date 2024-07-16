@@ -5,6 +5,7 @@ disabled_rules:
     - file_length
     - nesting
     - opening_brace
+    - cyclomatic_complexity
 
 excluded:
     - "**/.build"
