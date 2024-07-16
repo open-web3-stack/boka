@@ -20,7 +20,10 @@ let package = Package(
         ),
         .testTarget(
             name: "DatabaseTests",
-            dependencies: ["Database"]
+            dependencies: ["Database"],
+            linkerSettings: [
+                .unsafeFlags(["-L../Utils/Sources/blst/lib"]),
+            ]
         ),
     ],
     swiftLanguageVersions: [.version("6")]

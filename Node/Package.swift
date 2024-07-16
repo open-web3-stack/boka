@@ -30,7 +30,10 @@ let package = Package(
         ),
         .testTarget(
             name: "NodeTests",
-            dependencies: ["Node"]
+            dependencies: ["Node"],
+            linkerSettings: [
+                .unsafeFlags(["-L../Utils/Sources/blst/lib"]),
+            ]
         ),
     ],
     swiftLanguageVersions: [.version("6")]
