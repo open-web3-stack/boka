@@ -35,9 +35,6 @@ let package = Package(
             dependencies: [
                 "Blockchain",
                 .product(name: "Testing", package: "swift-testing"),
-            ],
-            linkerSettings: [
-                .unsafeFlags(["-L../Utils/Sources/blst/lib"]),
             ]
         ),
     ],

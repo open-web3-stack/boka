@@ -36,9 +36,6 @@ let package = Package(
                 "JAMTests",
                 .product(name: "Testing", package: "swift-testing"),
                 .product(name: "ScaleCodec", package: "ScaleCodec.swift"),
-            ],
-            linkerSettings: [
-                .unsafeFlags(["-L../Utils/Sources/blst/lib"]),
             ]
         ),
     ],

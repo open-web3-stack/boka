@@ -31,6 +31,9 @@ let package = Package(
                 .product(name: "Blake2", package: "Blake2.swift"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 "blst",
+            ],
+            linkerSettings: [
+                .unsafeFlags(["-L../Utils/Sources/blst/lib"]),
             ]
         ),
         .systemLibrary(
@@ -42,9 +45,6 @@ let package = Package(
             dependencies: [
                 "Utils",
                 .product(name: "Testing", package: "swift-testing"),
-            ],
-            linkerSettings: [
-                .unsafeFlags(["-L../Utils/Sources/blst/lib"]),
             ]
         ),
     ],
