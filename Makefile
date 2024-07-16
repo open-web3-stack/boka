@@ -8,10 +8,10 @@ default: build
 githooks: .git/hooks/pre-commit
 
 .PHONY: deps
-deps: Utils/Sources/blst/lib/libblst.a
+deps: .lib/libblst.a
 
-Utils/Sources/blst/lib/libblst.a:
-	./scripts/deps.sh
+.lib/libblst.a:
+	./scripts/blst.sh
 
 .PHONY: test
 test: githooks deps
