@@ -8,6 +8,8 @@ public enum SafroleError: Error {
     case tooManyExtrinsics
     case extrinsicsNotAllowed
     case extrinsicsNotSorted
+    case extrinsicsTooLow
+    case extrinsicsNotUnique
     case hashingError
     case decodingError
     case unspecified
@@ -293,7 +295,9 @@ extension Safrole {
             }
 
             newTicketsAccumulatorArr.insertSorted(newTickets)
+            // TODO: check for extrinsicsNotUnique
             if newTicketsAccumulatorArr.count > config.value.epochLength {
+                // TODO: check for extrinsicsTooLow
                 newTicketsAccumulatorArr.removeLast(newTicketsAccumulatorArr.count - config.value.epochLength)
             }
 
