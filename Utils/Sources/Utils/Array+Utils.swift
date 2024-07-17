@@ -20,11 +20,11 @@ extension Array where Element: Comparable {
     ///
     /// - Note: The elements of the sequence must be comparable.
     /// - Invariant: The array and elements must be sorted according to the given comparison function.
-    public mutating func insertSorted(_ elements: any Sequence<Element>, by comparer: (Element, Element) -> Bool = { $0 < $1 }) {
+    public mutating func insertSorted(_ elements: any Sequence<Element>, by comparer: (Element, Element) throws -> Bool = { $0 < $1 }) rethrows {
         reserveCapacity(count + elements.underestimatedCount)
         var startIdx = 0
         for element in elements {
-            if let idx = self[startIdx...].firstIndex(where: { !comparer($0, element) }) {
+            if let idx = try self[startIdx...].firstIndex(where: { try !comparer($0, element) }) {
                 insert(element, at: idx)
                 startIdx = idx + 1
             } else {

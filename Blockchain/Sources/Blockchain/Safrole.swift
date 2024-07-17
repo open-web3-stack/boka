@@ -294,10 +294,21 @@ extension Safrole {
                 ticketsAccumulator.array
             }
 
-            newTicketsAccumulatorArr.insertSorted(newTickets)
-            // TODO: check for extrinsicsNotUnique
+            try newTicketsAccumulatorArr.insertSorted(newTickets) {
+                if $0 == $1 {
+                    throw SafroleError.extrinsicsNotUnique
+                }
+                return $0 < $1
+            }
+
             if newTicketsAccumulatorArr.count > config.value.epochLength {
-                // TODO: check for extrinsicsTooLow
+                let firstToBeRemoved = newTicketsAccumulatorArr[config.value.epochLength]
+                let highestTicket = newTickets.last! // newTickets must not be empty, otherwise we won't need to remove anything
+                guard highestTicket < firstToBeRemoved else {
+                    // every tickets must be valid or this is an invalid block
+                    // i.e. the block producer must not include invalid tickets
+                    throw SafroleError.extrinsicsTooLow
+                }
                 newTicketsAccumulatorArr.removeLast(newTicketsAccumulatorArr.count - config.value.epochLength)
             }
 
