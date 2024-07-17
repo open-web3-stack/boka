@@ -119,7 +119,11 @@ extension Header: ScaleCodec.Encodable {
 }
 
 extension Header {
-    public func hash() throws -> Data32 {
-        try blake2b256(ScaleCodec.encode(self))
+    public func hash() -> Data32 {
+        do {
+            return try blake2b256(ScaleCodec.encode(self))
+        } catch let e {
+            fatalError("Failed to hash header: \(e)")
+        }
     }
 }
