@@ -1,0 +1,4 @@
+module blst {
+  header "blst/bindings/blst.h"
+  link "blst"
+}
