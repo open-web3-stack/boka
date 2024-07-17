@@ -64,3 +64,14 @@ extension ExtrinsicTickets: ScaleCodec.Encodable {
         try encoder.encode(tickets)
     }
 }
+
+extension ExtrinsicTickets {
+    public func getTickets() -> [Ticket] {
+        tickets.array.map {
+            // TODO: fix this
+            // this should be the Bandersnatch VRF output
+            let ticketId = Data32($0.signature.data[0 ..< 32])!
+            return Ticket(id: ticketId, attempt: $0.attempt)
+        }
+    }
+}

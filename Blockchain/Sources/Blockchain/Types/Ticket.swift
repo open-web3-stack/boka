@@ -26,3 +26,9 @@ extension Ticket: ScaleCodec.Codable {
         try encoder.encode(attempt)
     }
 }
+
+extension Ticket: Comparable {
+    public static func < (lhs: Ticket, rhs: Ticket) -> Bool {
+        (lhs.id, lhs.attempt) < (rhs.id, rhs.attempt)
+    }
+}
