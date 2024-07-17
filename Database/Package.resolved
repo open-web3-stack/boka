@@ -1,0 +1,15 @@
+{
+  "originHash" : "3d98e183a568a5accbc0c0c5599a833ac3f72dcbc6225970d7263ed1570547d8",
+  "pins" : [
+    {
+      "identity" : "rocksdb.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/TapeIt/rocksdb.swift.git",
+      "state" : {
+        "revision" : "7eae85eb67d8225efd7e313d3900820032ae51fe",
+        "version" : "6.29.5"
+      }
+    }
+  ],
+  "version" : 3
+}
