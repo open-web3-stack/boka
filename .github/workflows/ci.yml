@@ -31,6 +31,10 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
+    - name: Get blst submodule commit hash
+      id: blst-commit-hash
+      run: |
+        echo "::set-output name=commit-hash::$(git submodule status Utils/Sources/blst/ | cut -c2-41)"
     - name: Cache SPM
       uses: actions/cache@v4
       with:
@@ -42,7 +46,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: .lib
-        key: ${{ runner.os }}-libs-${{ hashFiles('.lib/*.a') }}
+        key: ${{ runner.os }}-libs-${{ steps.blst-commit-hash.outputs.commit-hash }}
         restore-keys: |
             ${{ runner.os }}-libs-
     - name: Setup Swift
