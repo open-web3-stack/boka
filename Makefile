@@ -14,7 +14,7 @@ deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a
 	./scripts/blst.sh
 
 .lib/libbandersnatch_vrfs.a:
-    ./scripts/bandersnatch.sh
+	./scripts/bandersnatch.sh
 
 .PHONY: test
 test: githooks deps
@@ -35,7 +35,7 @@ resolve: githooks
 .PHONY: clean
 clean:
 	./scripts/run.sh package clean
-	rm Utils/Sources/blst/lib/libblst.a
+	rm -f .lib/*.a
 
 .PHONY: lint
 lint: githooks
