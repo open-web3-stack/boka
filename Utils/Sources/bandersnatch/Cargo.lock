@@ -47,7 +47,7 @@ dependencies = [
 [[package]]
 name = "ark-ec-vrfs"
 version = "0.1.0"
-source = "git+https://github.com/davxy/ark-ec-vrfs#e868d1281d936716b84eb133960ecd51ff1e6633"
+source = "git+https://github.com/davxy/ark-ec-vrfs#ced8b9ccdb6f67de2c2cbacf92b0515f9d359ba4"
 dependencies = [
  "ark-bls12-381",
  "ark-ec",
@@ -306,7 +306,7 @@ dependencies = [
 [[package]]
 name = "common"
 version = "0.1.0"
-source = "git+https://github.com/davxy/ring-proof?branch=extended#4d866a4fd933eab3acd7797937ab256d936da949"
+source = "git+https://github.com/davxy/ring-proof?branch=extended#1d89434da560faec43dd27a2f94947f3ebd07d4d"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -683,14 +683,13 @@ dependencies = [
 [[package]]
 name = "ring"
 version = "0.1.0"
-source = "git+https://github.com/davxy/ring-proof?branch=extended#4d866a4fd933eab3acd7797937ab256d936da949"
+source = "git+https://github.com/davxy/ring-proof?branch=extended#1d89434da560faec43dd27a2f94947f3ebd07d4d"
 dependencies = [
  "ark-ec",
  "ark-ff",
  "ark-poly",
  "ark-serialize",
  "ark-std",
- "arrayvec",
  "blake2",
  "common",
  "fflonk",
@@ -749,7 +748,7 @@ checksum = "e0cd7e117be63d3c3678776753929474f3b04a43a080c744d6b0ae2a8c28e222"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.70",
+ "syn 2.0.69",
 ]
 
 [[package]]
@@ -799,9 +798,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.70"
+version = "2.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f0209b68b3613b093e0ec905354eccaedcfe83b8cb37cbdeae64026c3064c16"
+checksum = "201fcda3845c23e8212cd466bfebf0bd20694490fc0356ae8e428e0824a915a6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -989,7 +988,7 @@ checksum = "fa4f8080344d4671fb4e831a13ad1e68092748387dfc4f55e356242fae12ce3e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.70",
+ "syn 2.0.69",
 ]
 
 [[package]]
@@ -1009,5 +1008,5 @@ checksum = "ce36e65b0d2999d2aafac989fb249189a141aee1f53c612c1f37d72631959f69"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.70",
+ "syn 2.0.69",
 ]

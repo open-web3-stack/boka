@@ -15,3 +15,4 @@ cd Utils/Sources/blst || { echo "Submodule directory not found"; exit 1; }
 cp libblst.a ${CWD}/.lib
 
 echo "Setup blst successfully."
+echo ""
