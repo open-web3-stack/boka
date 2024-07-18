@@ -28,6 +28,18 @@ extension FixedSizeData: CustomStringConvertible, CustomDebugStringConvertible {
     }
 }
 
+extension FixedSizeData: Comparable {
+    public static func < (lhs: Self, rhs: Self) -> Bool {
+        guard lhs.data.count == rhs.data.count else {
+            return lhs.data.count < rhs.data.count
+        }
+        for (l, r) in zip(lhs.data, rhs.data) where l != r {
+            return l < r
+        }
+        return false
+    }
+}
+
 extension FixedSizeData: ScaleCodec.Codable {
     public init(from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(decoder.decode(Data.self, .fixed(UInt(T.value))))!

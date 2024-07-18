@@ -8,5 +8,8 @@ DerivedData/
 .netrc
 .vscode/settings.json
 
+# rust build
 target
-generated
+
+# static lib files
+.lib/

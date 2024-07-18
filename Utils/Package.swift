@@ -33,12 +33,12 @@ let package = Package(
                 "blst",
             ],
             linkerSettings: [
-                .unsafeFlags(["-L../Utils/Sources/blst/lib"]),
+                .unsafeFlags(["-L../.lib"]),
             ]
         ),
         .systemLibrary(
             name: "blst",
-            path: "Sources/blst/include"
+            path: "Sources"
         ),
         .testTarget(
             name: "UtilsTests",
