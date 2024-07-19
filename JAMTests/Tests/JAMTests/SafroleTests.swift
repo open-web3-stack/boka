@@ -237,7 +237,7 @@ struct SafroleTests {
         let tests = try TestLoader.getTestFiles(path: "safrole/\(variant)", extension: "scale")
         return try tests.map {
             let data = try Data(contentsOf: URL(fileURLWithPath: $0.path))
-            var decoder = LoggingDecoder(decoder: decoder(from: data), logger: NoopLogger())
+            var decoder = LoggingDecoder(decoder: decoder(from: data), logger: Noop Logger())
             return try SafroleTestcase(description: $0.description, config: variant.config, from: &decoder)
         }
     }
