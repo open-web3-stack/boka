@@ -73,9 +73,33 @@ import Testing
         UInt64.max - 1,
         UInt64.max,
     ] as[UInt64])
-    func variableWidthTest(testCase: UInt64) {
+    func variableWidth(testCase: UInt64) {
         let array = Array(testCase.encode(method: .variableWidth))
-        var iter = array.makeIterator()
-        #expect(iter.decode() == testCase)
+        var slice = array[...]
+        #expect(slice.decode() == testCase)
+    }
+
+    @Test(arguments: [
+        UInt64(0),
+        UInt64(1),
+        UInt64(2),
+        UInt64(1) << 32 - 2,
+        UInt64(1) << 32 - 1,
+        UInt64(1) << 32,
+        UInt64(1) << 32 + 2,
+        UInt64.max - 2,
+        UInt64.max - 1,
+        UInt64.max,
+    ])
+    func fixedWidth(testCase: UInt64) {
+        let array = Array(testCase.encode(method: .fixedWidth(8)))
+        var slice = array[...]
+        #expect(slice.decode(length: 8) == testCase)
+
+        var slice2 = array[...]
+        #expect(slice2.decode(length: 4) == testCase & 0xFFFF_FFFF)
+
+        var slice3 = array[...]
+        #expect(slice3.decode(length: 2) == testCase & 0xFFFF)
     }
 }
