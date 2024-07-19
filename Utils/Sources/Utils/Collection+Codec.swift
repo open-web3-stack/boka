@@ -19,9 +19,14 @@ extension Collection<UInt8> where SubSequence == Self {
             return 0
         }
         let byteLengh = (~firstByte).leadingZeroBitCount
-        guard let res = decode(length: byteLengh) else {
-            return nil
+        var res: UInt64 = 0
+        if byteLengh > 0 {
+            guard let rest = decode(length: byteLengh) else {
+                return nil
+            }
+            res = rest
         }
+
         let mask = UInt8(UInt(1) << (8 - byteLengh) - 1)
         let topBits = firstByte & mask
 

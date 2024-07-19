@@ -21,7 +21,7 @@ public class Program {
     private let code: Slice<Data>
     private let bitmask: Slice<Data>
 
-    public init?(blob: Data) throws {
+    public init(_ blob: Data) throws {
         self.blob = blob
 
         var slice = Slice(base: blob, bounds: blob.startIndex ..< blob.endIndex)
@@ -40,14 +40,14 @@ public class Program {
         let jumpTableSize = Int(jumpTableEntriesCount * UInt64(jumpTableEntrySize))
         let jumpTableEndIndex = slice.startIndex + jumpTableSize
 
-        guard jumpTableEndIndex < slice.endIndex else {
+        guard jumpTableEndIndex <= slice.endIndex else {
             throw Error.invalidDataLength
         }
 
         jumpTable = Slice(base: blob, bounds: slice.startIndex ..< jumpTableEndIndex)
 
         let codeEndIndex = jumpTableEndIndex + Int(codeLength)
-        guard codeEndIndex < slice.endIndex else {
+        guard codeEndIndex <= slice.endIndex else {
             throw Error.invalidDataLength
         }
 
