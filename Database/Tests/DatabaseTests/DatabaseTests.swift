@@ -74,49 +74,49 @@ final class DatabaseTests: XCTestCase {
             for (k, v) in orderedKeysAndValues {
                 try database.put(key: k, value: v)
             }
+
+            var i = 0
+            for (key, val) in try database.iterate(keyType: String.self, valueType: String.self) {
+                XCTAssertEqual(key, orderedKeysAndValues[i].key)
+                XCTAssertEqual(val, orderedKeysAndValues[i].value)
+                i += 1
+            }
+            XCTAssertEqual(i, 4)
+
+            i = 1
+            for (key, val) in try database.iterate(keyType: String.self, valueType: String.self, gte: "testMultipleEmoji") {
+                XCTAssertEqual(key, orderedKeysAndValues[i].key)
+                XCTAssertEqual(val, orderedKeysAndValues[i].value)
+                i += 1
+            }
+            XCTAssertEqual(i, 4)
+
+            i = 2
+            for (key, val) in try database.iterate(keyType: String.self, valueType: String.self, gte: "testText") {
+                XCTAssertEqual(key, orderedKeysAndValues[i].key)
+                XCTAssertEqual(val, orderedKeysAndValues[i].value)
+                i += 1
+            }
+            XCTAssertEqual(i, 4)
+
+            i = 3
+            for (key, val) in try database.iterate(keyType: String.self, valueType: String.self, lte: "testTextEmoji") {
+                XCTAssertEqual(key, orderedKeysAndValues[i].key)
+                XCTAssertEqual(val, orderedKeysAndValues[i].value)
+                i -= 1
+            }
+            XCTAssertEqual(i, -1)
+
+            i = 2
+            for (key, val) in try database.iterate(keyType: String.self, valueType: String.self, lte: "testText") {
+                XCTAssertEqual(key, orderedKeysAndValues[i].key)
+                XCTAssertEqual(val, orderedKeysAndValues[i].value)
+                i -= 1
+            }
+            XCTAssertEqual(i, -1)
         } catch {
             XCTFail("An error occurred during simple iterator test: \(error)")
         }
-
-        var i = 0
-        for (key, val) in try! database.iterate(keyType: String.self, valueType: String.self) {
-            XCTAssertEqual(key, orderedKeysAndValues[i].key)
-            XCTAssertEqual(val, orderedKeysAndValues[i].value)
-            i += 1
-        }
-        XCTAssertEqual(i, 4)
-
-        i = 1
-        for (key, val) in try! database.iterate(keyType: String.self, valueType: String.self, gte: "testMultipleEmoji") {
-            XCTAssertEqual(key, orderedKeysAndValues[i].key)
-            XCTAssertEqual(val, orderedKeysAndValues[i].value)
-            i += 1
-        }
-        XCTAssertEqual(i, 4)
-
-        i = 2
-        for (key, val) in try! database.iterate(keyType: String.self, valueType: String.self, gte: "testText") {
-            XCTAssertEqual(key, orderedKeysAndValues[i].key)
-            XCTAssertEqual(val, orderedKeysAndValues[i].value)
-            i += 1
-        }
-        XCTAssertEqual(i, 4)
-
-        i = 3
-        for (key, val) in try! database.iterate(keyType: String.self, valueType: String.self, lte: "testTextEmoji") {
-            XCTAssertEqual(key, orderedKeysAndValues[i].key)
-            XCTAssertEqual(val, orderedKeysAndValues[i].value)
-            i -= 1
-        }
-        XCTAssertEqual(i, -1)
-
-        i = 2
-        for (key, val) in try! database.iterate(keyType: String.self, valueType: String.self, lte: "testText") {
-            XCTAssertEqual(key, orderedKeysAndValues[i].key)
-            XCTAssertEqual(val, orderedKeysAndValues[i].value)
-            i -= 1
-        }
-        XCTAssertEqual(i, -1)
 
         do {
             try FileManager.default.removeItem(at: database.path)
@@ -153,6 +153,11 @@ final class DatabaseTests: XCTestCase {
         } catch {
             XCTFail("An error occurred during batch test: \(error)")
         }
-        try! FileManager.default.removeItem(at: prefixedDB.path)
+
+        do {
+            try FileManager.default.removeItem(at: prefixedDB.path)
+        } catch {
+            XCTFail("Failed to remove RocksDB path: \(error)")
+        }
     }
 }
