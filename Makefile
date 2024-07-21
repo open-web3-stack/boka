@@ -13,7 +13,7 @@ deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a
 .lib/libblst.a:
 	./scripts/blst.sh
 
-.lib/libbandersnatch_vrfs.a:
+.lib/libbandersnatch_vrfs.a: $(wildcard Utils/Sources/bandersnatch/src/*)
 	./scripts/bandersnatch.sh
 
 .PHONY: test

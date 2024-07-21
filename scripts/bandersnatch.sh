@@ -15,4 +15,3 @@ cargo build --lib
 cp target/debug/libbandersnatch_vrfs.a ${CWD}/.lib
 
 echo "Setup bandersnatch successfully."
-echo ""
