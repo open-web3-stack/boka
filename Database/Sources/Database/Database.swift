@@ -8,16 +8,22 @@ public class Database {
     public let prefix: String?
     private var db: RocksDB?
 
-    public init(path: URL, prefix: String? = nil) {
+    private static let errorDomain = "DatabaseErrorDomain"
+
+    public init(path: URL, prefix: String? = nil) throws {
         self.path = path
         self.prefix = prefix
 
-        db = try! RocksDB(path: path, prefix: prefix)
+        do {
+            db = try RocksDB(path: path, prefix: prefix)
+        } catch {
+            throw NSError(domain: Database.errorDomain, code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to initialize RocksDB: \(error)"])
+        }
     }
 
     public func put(key: String, value: some RocksDBValueRepresentable) throws {
         guard let db else {
-            throw NSError(domain: "DatabaseErrorDomain", code: 1, userInfo: [NSLocalizedDescriptionKey: "Database is not opened"])
+            throw NSError(domain: Database.errorDomain, code: 1, userInfo: [NSLocalizedDescriptionKey: "Database is not opened"])
         }
         do {
             try db.put(key: key, value: value)
@@ -28,7 +34,7 @@ public class Database {
 
     public func get<T: RocksDBValueInitializable>(type: T.Type, key: String) throws -> T? {
         guard let db else {
-            throw NSError(domain: "DatabaseErrorDomain", code: 1, userInfo: [NSLocalizedDescriptionKey: "Database is not opened"])
+            throw NSError(domain: Database.errorDomain, code: 1, userInfo: [NSLocalizedDescriptionKey: "Database is not opened"])
         }
         do {
             return try type.init(data: db.get(key: key))
@@ -39,7 +45,7 @@ public class Database {
 
     public func delete(key: String) throws {
         guard let db else {
-            throw NSError(domain: "DatabaseErrorDomain", code: 1, userInfo: [NSLocalizedDescriptionKey: "Database is not opened"])
+            throw NSError(domain: Database.errorDomain, code: 1, userInfo: [NSLocalizedDescriptionKey: "Database is not opened"])
         }
         do {
             try db.delete(key: key)
@@ -54,7 +60,7 @@ public class Database {
         gte: String? = nil
     ) throws -> RocksDBSequence<Key, Value> {
         guard let db else {
-            throw NSError(domain: "DatabaseErrorDomain", code: 1, userInfo: [NSLocalizedDescriptionKey: "Database is not opened"])
+            throw NSError(domain: Database.errorDomain, code: 1, userInfo: [NSLocalizedDescriptionKey: "Database is not opened"])
         }
 
         return db.sequence(gte: gte)
@@ -64,7 +70,7 @@ public class Database {
                                                                                           lte: String) throws -> RocksDBSequence<Key, Value>
     {
         guard let db else {
-            throw NSError(domain: "DatabaseErrorDomain", code: 1, userInfo: [NSLocalizedDescriptionKey: "Database is not opened"])
+            throw NSError(domain: Database.errorDomain, code: 1, userInfo: [NSLocalizedDescriptionKey: "Database is not opened"])
         }
 
         return db.sequence(lte: lte)
@@ -72,7 +78,7 @@ public class Database {
 
     public func batch(operations: [RocksDBBatchOperation<String>]) throws {
         guard let db else {
-            throw NSError(domain: "DatabaseErrorDomain", code: 1, userInfo: [NSLocalizedDescriptionKey: "Database is not opened"])
+            throw NSError(domain: Database.errorDomain, code: 1, userInfo: [NSLocalizedDescriptionKey: "Database is not opened"])
         }
 
         do {

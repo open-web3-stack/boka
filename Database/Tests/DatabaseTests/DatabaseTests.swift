@@ -16,31 +16,47 @@ final class DatabaseTests: XCTestCase {
         let path = URL(fileURLWithPath: "/tmp/\(UUID().uuidString)")
         database = Database(path: path)
 
-        try! database.put(key: "testText", value: "lolamkhaha")
-        try! database.put(key: "testEmoji", value: "😂")
-        try! database.put(key: "testTextEmoji", value: "emojitext 😂")
-        try! database.put(key: "testMultipleEmoji", value: "😂😂😂")
+        do {
+            try database.put(key: "testText", value: "lolamkhaha")
+            try database.put(key: "testEmoji", value: "😂")
+            try database.put(key: "testTextEmoji", value: "emojitext 😂")
+            try database.put(key: "testMultipleEmoji", value: "😂😂😂")
 
-        XCTAssertEqual(try! database.get(type: String.self, key: "testText"), "lolamkhaha")
-        XCTAssertEqual(try! database.get(type: String.self, key: "testEmoji"), "😂")
-        XCTAssertEqual(try! database.get(type: String.self, key: "testTextEmoji"), "emojitext 😂")
-        XCTAssertEqual(try! database.get(type: String.self, key: "testMultipleEmoji"), "😂😂😂")
+            XCTAssertEqual(try database.get(type: String.self, key: "testText"), "lolamkhaha")
+            XCTAssertEqual(try database.get(type: String.self, key: "testEmoji"), "😂")
+            XCTAssertEqual(try database.get(type: String.self, key: "testTextEmoji"), "emojitext 😂")
+            XCTAssertEqual(try database.get(type: String.self, key: "testMultipleEmoji"), "😂😂😂")
+        } catch {
+            XCTFail("An error occurred during simple put test: \(error)")
+        }
 
-        try! FileManager.default.removeItem(at: database.path)
-        database = nil
+        do {
+            try FileManager.default.removeItem(at: database.path)
+            database = nil
+        } catch {
+            XCTFail("Failed to remove RocksDB path: \(error)")
+        }
     }
 
     func testSimpleDelete() {
         let path = URL(fileURLWithPath: "/tmp/\(UUID().uuidString)")
         database = Database(path: path)
 
-        try! database.put(key: "testDeleteKey", value: "this is a simple value 😘")
-        try! database.delete(key: "testDeleteKey")
+        do {
+            try database.put(key: "testDeleteKey", value: "this is a simple value 😘")
+            try database.delete(key: "testDeleteKey")
 
-        XCTAssertEqual(try! database.get(type: String.self, key: "testDeleteKey"), "")
+            XCTAssertEqual(try database.get(type: String.self, key: "testDeleteKey"), "")
 
-        try! FileManager.default.removeItem(at: database.path)
-        database = nil
+        } catch {
+            XCTFail("An error occurred during simple delete test: \(error)")
+        }
+        do {
+            try FileManager.default.removeItem(at: database.path)
+            database = nil
+        } catch {
+            XCTFail("Failed to remove RocksDB path: \(error)")
+        }
     }
 
     func testSimpleIterator() {
@@ -54,8 +70,12 @@ final class DatabaseTests: XCTestCase {
             (key: "testTextEmoji", value: "emojitext 😂"),
         ]
 
-        for (k, v) in orderedKeysAndValues {
-            try! database.put(key: k, value: v)
+        do {
+            for (k, v) in orderedKeysAndValues {
+                try database.put(key: k, value: v)
+            }
+        } catch {
+            XCTFail("An error occurred during simple iterator test: \(error)")
         }
 
         var i = 0
@@ -98,8 +118,12 @@ final class DatabaseTests: XCTestCase {
         }
         XCTAssertEqual(i, -1)
 
-        try! FileManager.default.removeItem(at: database.path)
-        database = nil
+        do {
+            try FileManager.default.removeItem(at: database.path)
+            database = nil
+        } catch {
+            XCTFail("Failed to remove RocksDB path: \(error)")
+        }
     }
 
     func testBatchOperations() {
@@ -107,24 +131,28 @@ final class DatabaseTests: XCTestCase {
 
         let prefixedDB = Database(path: URL(fileURLWithPath: prefixedPath), prefix: "correctprefix")
 
-        try! prefixedDB.put(key: "testText", value: "lolamkhaha")
-        try! prefixedDB.put(key: "testEmoji", value: "😂")
-        try! prefixedDB.put(key: "testTextEmoji", value: "emojitext 😂")
-        try! prefixedDB.put(key: "testMultipleEmoji", value: "😂😂😂")
+        do {
+            try prefixedDB.put(key: "testText", value: "lolamkhaha")
+            try prefixedDB.put(key: "testEmoji", value: "😂")
+            try prefixedDB.put(key: "testTextEmoji", value: "emojitext 😂")
+            try prefixedDB.put(key: "testMultipleEmoji", value: "😂😂😂")
 
-        try! prefixedDB.batch(operations: [
-            .delete(key: "testText"),
-            .put(key: "someThing", value: "someValue"),
-            .delete(key: "someThing"),
-            .put(key: "secondKey", value: "anotherValue"),
-            .put(key: "testText", value: "textTextValue"),
-        ])
+            try prefixedDB.batch(operations: [
+                .delete(key: "testText"),
+                .put(key: "someThing", value: "someValue"),
+                .delete(key: "someThing"),
+                .put(key: "secondKey", value: "anotherValue"),
+                .put(key: "testText", value: "textTextValue"),
+            ])
 
-        XCTAssertEqual(try! prefixedDB.get(type: String.self, key: "testEmoji"), "😂")
-        XCTAssertEqual(try! prefixedDB.get(type: String.self, key: "someThing"), "")
-        XCTAssertEqual(try! prefixedDB.get(type: String.self, key: "secondKey"), "anotherValue")
-        XCTAssertEqual(try! prefixedDB.get(type: String.self, key: "testText"), "textTextValue")
+            XCTAssertEqual(try prefixedDB.get(type: String.self, key: "testEmoji"), "😂")
+            XCTAssertEqual(try prefixedDB.get(type: String.self, key: "someThing"), "")
+            XCTAssertEqual(try prefixedDB.get(type: String.self, key: "secondKey"), "anotherValue")
+            XCTAssertEqual(try prefixedDB.get(type: String.self, key: "testText"), "textTextValue")
 
+        } catch {
+            XCTFail("An error occurred during batch test: \(error)")
+        }
         try! FileManager.default.removeItem(at: prefixedDB.path)
     }
 }
