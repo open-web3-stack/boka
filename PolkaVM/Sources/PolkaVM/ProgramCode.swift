@@ -1,7 +1,7 @@
 import Foundation
 import Utils
 
-public class Program {
+public class ProgramCode {
     public enum Error: Swift.Error {
         case invalidJumpTableEntriesCount
         case invalidJumpTableEncodeSize
@@ -13,6 +13,7 @@ public class Program {
         public static let maxJumpTableEntriesCount: UInt64 = 0x100000
         public static let maxEncodeSize: UInt8 = 8
         public static let maxCodeLength: UInt64 = 0x400000
+        public static let maxInstructionLength: UInt = 24
     }
 
     public let blob: Data
@@ -61,10 +62,43 @@ public class Program {
 
         bitmask = Slice(base: blob, bounds: codeEndIndex ..< slice.endIndex)
     }
+
+    public static func skipOffset<D>(start: UInt, bitmask: D) -> UInt? where D: Collection, D.Element == UInt8, D.Index == Int, D: ContiguousBytes {
+        let start = start + 1
+        let beginIndex = Int(start / 8)
+        guard beginIndex < bitmask.endIndex else {
+            return nil
+        }
+
+        var value: UInt32 = 0
+        if (beginIndex + 4) < bitmask.endIndex { // if enough bytes
+            value = bitmask.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: beginIndex, as: UInt32.self) }
+        } else {
+            let byte1 = UInt32(bitmask[beginIndex])
+            let byte2 = UInt32(bitmask[safe: beginIndex + 1] ?? 0)
+            let byte3 = UInt32(bitmask[safe: beginIndex + 2] ?? 0)
+            let byte4 = UInt32(bitmask[safe: beginIndex + 3] ?? 0)
+            value = byte1 | (byte2 << 8) | (byte3 << 16) | (byte4 << 24)
+        }
+
+        let offsetBits = start % 8
+
+        let idx = min(UInt((value >> offsetBits).trailingZeroBitCount), Constants.maxInstructionLength)
+
+        return idx
+    }
+
+    public func skip(start: UInt) -> UInt? {
+        if let val = ProgramCode.skipOffset(start: start, bitmask: bitmask) {
+            val + start + 1
+        } else {
+            nil
+        }
+    }
 }
 
-extension Program: Equatable {
-    public static func == (lhs: Program, rhs: Program) -> Bool {
+extension ProgramCode: Equatable {
+    public static func == (lhs: ProgramCode, rhs: ProgramCode) -> Bool {
         lhs.blob == rhs.blob
     }
 }
