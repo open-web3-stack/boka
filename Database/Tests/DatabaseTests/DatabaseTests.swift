@@ -1,14 +1,14 @@
-@testable import Database
+@testable import RocksDB
 import XCTest
 
-final class DatabaseTests: XCTestCase, @unchecked Sendable {
-    var database: Database!
+final class DatabaseTests: XCTestCase {
+    var database: RocksDB!
 
     func testSimplePut() {
         let path = URL(fileURLWithPath: "/tmp/\(UUID().uuidString)")
 
         do {
-            database = try Database(path: path)
+            database = try RocksDB(path: path)
 
             try database.put(key: "testText", value: "lolamkhaha")
             try database.put(key: "testEmoji", value: "😂")
@@ -35,7 +35,7 @@ final class DatabaseTests: XCTestCase, @unchecked Sendable {
         let path = URL(fileURLWithPath: "/tmp/\(UUID().uuidString)")
 
         do {
-            database = try Database(path: path)
+            database = try RocksDB(path: path)
 
             try database.put(key: "testDeleteKey", value: "this is a simple value 😘")
             try database.delete(key: "testDeleteKey")
@@ -63,14 +63,14 @@ final class DatabaseTests: XCTestCase, @unchecked Sendable {
 
         do {
             let path = URL(fileURLWithPath: "/tmp/\(UUID().uuidString)")
-            database = try Database(path: path)
+            database = try RocksDB(path: path)
 
             for (k, v) in orderedKeysAndValues {
                 try database.put(key: k, value: v)
             }
 
             var i = 0
-            for (key, val) in try database.iterate(keyType: String.self, valueType: String.self) {
+            for (key, val) in database.sequence(keyType: String.self, valueType: String.self) {
                 XCTAssertEqual(key, orderedKeysAndValues[i].key)
                 XCTAssertEqual(val, orderedKeysAndValues[i].value)
                 i += 1
@@ -78,7 +78,7 @@ final class DatabaseTests: XCTestCase, @unchecked Sendable {
             XCTAssertEqual(i, 4)
 
             i = 1
-            for (key, val) in try database.iterate(keyType: String.self, valueType: String.self, gte: "testMultipleEmoji") {
+            for (key, val) in database.sequence(keyType: String.self, valueType: String.self, gte: "testMultipleEmoji") {
                 XCTAssertEqual(key, orderedKeysAndValues[i].key)
                 XCTAssertEqual(val, orderedKeysAndValues[i].value)
                 i += 1
@@ -86,7 +86,7 @@ final class DatabaseTests: XCTestCase, @unchecked Sendable {
             XCTAssertEqual(i, 4)
 
             i = 2
-            for (key, val) in try database.iterate(keyType: String.self, valueType: String.self, gte: "testText") {
+            for (key, val) in database.sequence(keyType: String.self, valueType: String.self, gte: "testText") {
                 XCTAssertEqual(key, orderedKeysAndValues[i].key)
                 XCTAssertEqual(val, orderedKeysAndValues[i].value)
                 i += 1
@@ -94,7 +94,7 @@ final class DatabaseTests: XCTestCase, @unchecked Sendable {
             XCTAssertEqual(i, 4)
 
             i = 3
-            for (key, val) in try database.iterate(keyType: String.self, valueType: String.self, lte: "testTextEmoji") {
+            for (key, val) in database.sequence(keyType: String.self, valueType: String.self, lte: "testTextEmoji") {
                 XCTAssertEqual(key, orderedKeysAndValues[i].key)
                 XCTAssertEqual(val, orderedKeysAndValues[i].value)
                 i -= 1
@@ -102,7 +102,7 @@ final class DatabaseTests: XCTestCase, @unchecked Sendable {
             XCTAssertEqual(i, -1)
 
             i = 2
-            for (key, val) in try database.iterate(keyType: String.self, valueType: String.self, lte: "testText") {
+            for (key, val) in database.sequence(keyType: String.self, valueType: String.self, lte: "testText") {
                 XCTAssertEqual(key, orderedKeysAndValues[i].key)
                 XCTAssertEqual(val, orderedKeysAndValues[i].value)
                 i -= 1
@@ -123,7 +123,7 @@ final class DatabaseTests: XCTestCase, @unchecked Sendable {
     func testBatchOperations() {
         do {
             let prefixedPath = "/tmp/\(UUID().uuidString)"
-            let prefixedDB = try Database(path: URL(fileURLWithPath: prefixedPath), prefix: "correctprefix")
+            let prefixedDB = try RocksDB(path: URL(fileURLWithPath: prefixedPath), prefix: "correctprefix")
             try prefixedDB.put(key: "testText", value: "lolamkhaha")
             try prefixedDB.put(key: "testEmoji", value: "😂")
             try prefixedDB.put(key: "testTextEmoji", value: "emojitext 😂")
@@ -148,11 +148,4 @@ final class DatabaseTests: XCTestCase, @unchecked Sendable {
             XCTFail("An error occurred during batch test: \(error)")
         }
     }
-
-    static let allTests = [
-        ("testSimplePut", testSimplePut),
-        ("testSimpleDelete", testSimpleDelete),
-        ("testSimpleIterator", testSimpleIterator),
-        ("testBatchOperations", testBatchOperations),
-    ]
 }
