@@ -17,7 +17,7 @@ public class Database {
         do {
             db = try RocksDB(path: path, prefix: prefix)
         } catch {
-            throw NSError(domain: Database.errorDomain, code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to initialize RocksDB: \(error)"])
+            throw NSError(domain: Database.errorDomain, code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to init RocksDB: \(error)"])
         }
     }
 
@@ -66,9 +66,11 @@ public class Database {
         return db.sequence(gte: gte)
     }
 
-    public func iterate<Key: RocksDBValueInitializable, Value: RocksDBValueInitializable>(keyType _: Key.Type, valueType _: Value.Type,
-                                                                                          lte: String) throws -> RocksDBSequence<Key, Value>
-    {
+    public func iterate<Key: RocksDBValueInitializable, Value: RocksDBValueInitializable>(
+        keyType _: Key.Type,
+        valueType _: Value.Type,
+        lte: String
+    ) throws -> RocksDBSequence<Key, Value> {
         guard let db else {
             throw NSError(domain: Database.errorDomain, code: 1, userInfo: [NSLocalizedDescriptionKey: "Database is not opened"])
         }

@@ -4,19 +4,12 @@ import XCTest
 final class DatabaseTests: XCTestCase {
     var database: Database!
 
-    override func setUp() {
-        super.setUp()
-    }
-
-    override func tearDown() {
-        super.tearDown()
-    }
-
     func testSimplePut() {
         let path = URL(fileURLWithPath: "/tmp/\(UUID().uuidString)")
-        database = Database(path: path)
 
         do {
+            database = try Database(path: path)
+
             try database.put(key: "testText", value: "lolamkhaha")
             try database.put(key: "testEmoji", value: "😂")
             try database.put(key: "testTextEmoji", value: "emojitext 😂")
@@ -40,9 +33,10 @@ final class DatabaseTests: XCTestCase {
 
     func testSimpleDelete() {
         let path = URL(fileURLWithPath: "/tmp/\(UUID().uuidString)")
-        database = Database(path: path)
 
         do {
+            database = try Database(path: path)
+
             try database.put(key: "testDeleteKey", value: "this is a simple value 😘")
             try database.delete(key: "testDeleteKey")
 
@@ -60,9 +54,6 @@ final class DatabaseTests: XCTestCase {
     }
 
     func testSimpleIterator() {
-        let path = "/tmp/\(UUID().uuidString)"
-        database = Database(path: URL(fileURLWithPath: path))
-
         let orderedKeysAndValues = [
             (key: "testEmoji", value: "😂"),
             (key: "testMultipleEmoji", value: "😂😂😂"),
@@ -71,6 +62,9 @@ final class DatabaseTests: XCTestCase {
         ]
 
         do {
+            let path = URL(fileURLWithPath: "/tmp/\(UUID().uuidString)")
+            database = try Database(path: path)
+
             for (k, v) in orderedKeysAndValues {
                 try database.put(key: k, value: v)
             }
@@ -127,11 +121,9 @@ final class DatabaseTests: XCTestCase {
     }
 
     func testBatchOperations() {
-        let prefixedPath = "/tmp/\(UUID().uuidString)"
-
-        let prefixedDB = Database(path: URL(fileURLWithPath: prefixedPath), prefix: "correctprefix")
-
         do {
+            let prefixedPath = "/tmp/\(UUID().uuidString)"
+            let prefixedDB = try Database(path: URL(fileURLWithPath: prefixedPath), prefix: "correctprefix")
             try prefixedDB.put(key: "testText", value: "lolamkhaha")
             try prefixedDB.put(key: "testEmoji", value: "😂")
             try prefixedDB.put(key: "testTextEmoji", value: "emojitext 😂")
@@ -150,14 +142,10 @@ final class DatabaseTests: XCTestCase {
             XCTAssertEqual(try prefixedDB.get(type: String.self, key: "secondKey"), "anotherValue")
             XCTAssertEqual(try prefixedDB.get(type: String.self, key: "testText"), "textTextValue")
 
+            try FileManager.default.removeItem(at: prefixedDB.path)
+
         } catch {
             XCTFail("An error occurred during batch test: \(error)")
-        }
-
-        do {
-            try FileManager.default.removeItem(at: prefixedDB.path)
-        } catch {
-            XCTFail("Failed to remove RocksDB path: \(error)")
         }
     }
 }
