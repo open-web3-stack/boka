@@ -75,7 +75,7 @@ impl From<Secret> for CSecret {
 
 #[no_mangle]
 pub extern "C" fn secret_new_from_seed(seed: *const u8, seed_len: usize) -> *mut CSecret {
-    if seed.is_null() || seed_len != 32 {
+    if seed.is_null() {
         std::ptr::null_mut()
     } else {
         let seed_bytes = unsafe { std::slice::from_raw_parts(seed, seed_len) };
@@ -121,6 +121,16 @@ pub extern "C" fn prover_new(
     }
 }
 
+#[no_mangle]
+pub extern "C" fn prover_free(prover: *mut Prover) {
+    if !prover.is_null() {
+        // drop the `Prover` and deallocate the memory
+        unsafe {
+            let _ = Box::from_raw(prover);
+        };
+    }
+}
+
 /// out is 784 bytes
 #[no_mangle]
 pub extern "C" fn prover_ring_vrf_sign(
@@ -135,7 +145,6 @@ pub extern "C" fn prover_ring_vrf_sign(
         || vrf_input_data.is_null()
         || aux_data.is_null()
         || vrf_input_len == 0
-        || aux_data_len == 0
         || out.is_null()
     {
         return false;
@@ -169,7 +178,6 @@ pub extern "C" fn prover_ietf_vrf_sign(
         || vrf_input_data.is_null()
         || aux_data.is_null()
         || vrf_input_len == 0
-        || aux_data_len == 0
         || out.is_null()
     {
         return false;
@@ -207,6 +215,16 @@ pub extern "C" fn verifier_new(
         unsafe { *success = true };
         let boxed_verifier = Box::new(verifier);
         Box::into_raw(boxed_verifier)
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn verifier_free(verifier: *mut Verifier) {
+    if !verifier.is_null() {
+        // drop the `Verifier` and deallocate the memory
+        unsafe {
+            let _ = Box::from_raw(verifier);
+        };
     }
 }
 

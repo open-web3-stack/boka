@@ -1,4 +1,4 @@
-// Code copied and modified based on: https://github.com/davxy/bandersnatch-vrfs-spec/blob/main/example/src/main.rs
+// Code copied and modified based on: https://github.com/davxy/bandersnatch-vrfs-spec/blob/470d836ae5c8ee9509892f90cf3eebf21ddf55c2/example/src/main.rs
 // Changes: made RING_SIZE configurable, and add attributes for cbindgen
 
 use ark_ec_vrfs::suites::bandersnatch::edwards as bandersnatch;
@@ -36,7 +36,7 @@ fn ring_context() -> &'static RingContext {
     RING_CTX.get_or_init(|| {
         use bandersnatch::PcsParams;
         use std::{fs::File, io::Read};
-        let manifest_dir = "../";
+        let manifest_dir = "../Utils/Sources/bandersnatch";
         let filename = format!("{}/data/zcash-srs-2-11-uncompressed.bin", manifest_dir);
         let mut file = File::open(filename).unwrap();
         let mut buf = Vec::new();

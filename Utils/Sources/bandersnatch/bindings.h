@@ -32,6 +32,8 @@ struct Prover *prover_new(const struct CPublic *ring,
                           uintptr_t prover_idx,
                           bool *success);
 
+void prover_free(struct Prover *prover);
+
 /**
  * out is 784 bytes
  */
@@ -53,6 +55,8 @@ bool prover_ietf_vrf_sign(uint8_t *out,
                           uintptr_t aux_data_len);
 
 struct Verifier *verifier_new(const struct CPublic *ring, uintptr_t ring_len, bool *success);
+
+void verifier_free(struct Verifier *verifier);
 
 /**
  * out is 32 bytes
