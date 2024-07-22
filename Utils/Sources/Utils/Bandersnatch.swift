@@ -1,7 +1,7 @@
 import bandersnatch_vrfs
 import Foundation
 
-enum BandersnatchError: Error {
+public enum BandersnatchError: Error {
     case createSecretFailed
     case deserializePubKeyFailed
     case generatePubKeyFailed
@@ -50,11 +50,11 @@ extension CPublic {
     }
 }
 
-struct Bandersnatch {
+public struct Bandersnatch {
     public let secret: Data96
     public let publicKey: Data32
 
-    init(seed: Data) throws {
+    public init(seed: Data) throws {
         let seedBytes = [UInt8](seed)
         let secretPtr = secret_new_from_seed(seedBytes, UInt(seed.count))
         guard let secretPtr else {
@@ -72,11 +72,11 @@ struct Bandersnatch {
     }
 }
 
-class Prover {
+public class Prover {
     private var prover: OpaquePointer
 
     /// init with a set of bandersnatch public keys and provider index
-    init(ring: [Data32], proverIdx: UInt) throws {
+    public init(ring: [Data32], proverIdx: UInt) throws {
         var success = false
         let cPublicArr = try ring.map { try CPublic(data32: $0) }
         prover = prover_new(cPublicArr, UInt(ring.count), proverIdx, &success)
@@ -92,7 +92,7 @@ class Prover {
     /// Anonymous VRF signature.
     ///
     /// Used for tickets submission.
-    func ringVRFSign(vrfInputData: Data, auxData: Data) throws -> Data784 {
+    public func ringVRFSign(vrfInputData: Data, auxData: Data) throws -> Data784 {
         var output = [UInt8](repeating: 0, count: 784)
         let success = prover_ring_vrf_sign(
             &output, prover, [UInt8](vrfInputData), UInt(vrfInputData.count), [UInt8](auxData),
@@ -108,7 +108,7 @@ class Prover {
     ///
     /// Used for ticket claiming during block production.
     /// Not used with Safrole test vectors.
-    func ietfVRFSign(vrfInputData: Data, auxData: Data) throws -> Data96 {
+    public func ietfVRFSign(vrfInputData: Data, auxData: Data) throws -> Data96 {
         var output = [UInt8](repeating: 0, count: 96)
         let success = prover_ietf_vrf_sign(
             &output, prover, [UInt8](vrfInputData), UInt(vrfInputData.count), [UInt8](auxData),
@@ -121,10 +121,10 @@ class Prover {
     }
 }
 
-class Verifier {
+public class Verifier {
     private var verifier: OpaquePointer
 
-    init(ring: [Data32]) throws {
+    public init(ring: [Data32]) throws {
         var success = false
         let cPublicArr = try ring.map { try CPublic(data32: $0) }
         verifier = verifier_new(cPublicArr, UInt(ring.count), &success)
@@ -142,7 +142,7 @@ class Verifier {
     /// Used for tickets verification.
     ///
     /// On success returns the VRF output hash.
-    func ringVRFVerify(vrfInputData: Data, auxData: Data, signature: Data) -> Result<
+    public func ringVRFVerify(vrfInputData: Data, auxData: Data, signature: Data) -> Result<
         Data32, BandersnatchError
     > {
         var output = [UInt8](repeating: 0, count: 32)
@@ -162,7 +162,9 @@ class Verifier {
     /// Not used with Safrole test vectors.
     ///
     /// On success returns the VRF output hash.
-    func ietfVRFVerify(vrfInputData: Data, auxData: Data, signature: Data, signerKeyIndex: UInt)
+    public func ietfVRFVerify(
+        vrfInputData: Data, auxData: Data, signature: Data, signerKeyIndex: UInt
+    )
         -> Result<Data32, BandersnatchError>
     {
         var output = [UInt8](repeating: 0, count: 32)
