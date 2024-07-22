@@ -1,7 +1,7 @@
 @testable import Database
 import XCTest
 
-final class DatabaseTests: XCTestCase {
+final class DatabaseTests: XCTestCase, @unchecked Sendable {
     var database: Database!
 
     func testSimplePut() {
@@ -148,4 +148,11 @@ final class DatabaseTests: XCTestCase {
             XCTFail("An error occurred during batch test: \(error)")
         }
     }
+
+    static let allTests = [
+        ("testSimplePut", testSimplePut),
+        ("testSimpleDelete", testSimpleDelete),
+        ("testSimpleIterator", testSimpleIterator),
+        ("testBatchOperations", testBatchOperations),
+    ]
 }
