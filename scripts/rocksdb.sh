@@ -10,7 +10,7 @@ mkdir -p .lib
 
 cd Database/Sources/rocksdb || { echo "directory not found"; exit 1; }
 
-make shared_lib
+make static_lib
 
 cp librocksdb.a ${CWD}/.lib
 
