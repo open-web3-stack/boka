@@ -8,13 +8,16 @@ default: build
 githooks: .git/hooks/pre-commit
 
 .PHONY: deps
-deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a
+deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a .lib/librocksdb.a
 
 .lib/libblst.a:
 	./scripts/blst.sh
 
 .lib/libbandersnatch_vrfs.a: $(wildcard Utils/Sources/bandersnatch/src/*)
 	./scripts/bandersnatch.sh
+
+.lib/librocksdb.a:
+	./scripts/rocksdb.sh
 
 .PHONY: test
 test: githooks deps

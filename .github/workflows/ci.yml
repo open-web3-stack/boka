@@ -13,7 +13,7 @@ concurrency:
 jobs:
   lint:
     name: Swift Lint
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
@@ -34,7 +34,11 @@ jobs:
     - name: Get blst submodule commit hash
       id: blst-commit-hash
       run: |
-        echo "::set-output name=commit-hash::$(git submodule status Utils/Sources/blst/ | cut -c2-41)"
+        echo "commit-hash=$(git submodule status Utils/Sources/blst/ | cut -c2-41)" >> $GITHUB_OUTPUT
+    - name: Get rocksdb submodule commit hash
+      id: rocksdb-commit-hash
+      run: |
+        echo "commit-hash=$(git submodule status Database/Sources/rocksdb/ | cut -c2-41)" >> $GITHUB_OUTPUT
     - name: Cache SPM
       uses: actions/cache@v4
       with:
@@ -66,6 +70,13 @@ jobs:
         key: ${{ runner.os }}-libs-libbandersnatch-${{ hashFiles('Utils/Sources/bandersnatch/**') }}
         restore-keys: |
             ${{ runner.os }}-libs-libbandersnatch
+    - name: Cache rocksdb static lib
+      uses: actions/cache@v4
+      with:
+        path: .lib/librocksdb.a
+        key: ${{ runner.os }}-libs-librocksdb-${{ steps.rocksdb-commit-hash.outputs.commit-hash }}
+        restore-keys: |
+            ${{ runner.os }}-libs-librocksdb
     - name: Setup Swift
       uses: SwiftyLab/setup-swift@latest
       with:
