@@ -34,11 +34,11 @@ jobs:
     - name: Get blst submodule commit hash
       id: blst-commit-hash
       run: |
-        echo "::set-output name=commit-hash::$(git submodule status Utils/Sources/blst/ | cut -c2-41)"
+        echo "commit-hash::$(git submodule status Utils/Sources/blst/ | cut -c2-41)" >> $GITHUB_OUTPUT
     - name: Get rocksdb submodule commit hash
       id: rocksdb-commit-hash
       run: |
-        echo "::set-output name=commit-hash::$(git submodule status Database/Sources/rocksdb/ | cut -c2-41)"
+        echo "commit-hash::$(git submodule status Database/Sources/rocksdb/ | cut -c2-41)" >> $GITHUB_OUTPUT
     - name: Cache SPM
       uses: actions/cache@v4
       with:
