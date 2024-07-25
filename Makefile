@@ -8,10 +8,16 @@ default: build
 githooks: .git/hooks/pre-commit
 
 .PHONY: deps
-deps: Utils/Sources/blst/lib/libblst.a
+deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a .lib/librocksdb.a
 
-Utils/Sources/blst/lib/libblst.a:
-	./scripts/deps.sh
+.lib/libblst.a:
+	./scripts/blst.sh
+
+.lib/libbandersnatch_vrfs.a: $(wildcard Utils/Sources/bandersnatch/src/*)
+	./scripts/bandersnatch.sh
+
+.lib/librocksdb.a:
+	./scripts/rocksdb.sh
 
 .PHONY: test
 test: githooks deps
@@ -32,7 +38,7 @@ resolve: githooks
 .PHONY: clean
 clean:
 	./scripts/run.sh package clean
-	rm Utils/Sources/blst/lib/libblst.a
+	rm -f .lib/*.a
 
 .PHONY: lint
 lint: githooks

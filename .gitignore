@@ -7,3 +7,9 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 .vscode/settings.json
+
+# rust build
+target
+
+# static lib files
+.lib/

@@ -31,14 +31,19 @@ let package = Package(
                 .product(name: "Blake2", package: "Blake2.swift"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 "blst",
+                "bandersnatch_vrfs",
             ],
             linkerSettings: [
-                .unsafeFlags(["-L../Utils/Sources/blst/lib"]),
+                .unsafeFlags(["-L../.lib"]),
             ]
         ),
         .systemLibrary(
             name: "blst",
-            path: "Sources/blst/include"
+            path: "Sources"
+        ),
+        .systemLibrary(
+            name: "bandersnatch_vrfs",
+            path: "Sources"
         ),
         .testTarget(
             name: "UtilsTests",

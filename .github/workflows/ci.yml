@@ -13,7 +13,7 @@ concurrency:
 jobs:
   lint:
     name: Swift Lint
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
@@ -31,17 +31,63 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
-    - uses: actions/cache@v4
+    - name: Get blst submodule commit hash
+      id: blst-commit-hash
+      run: |
+        echo "commit-hash=$(git submodule status Utils/Sources/blst/ | cut -c2-41)" >> $GITHUB_OUTPUT
+    - name: Get rocksdb submodule commit hash
+      id: rocksdb-commit-hash
+      run: |
+        echo "commit-hash=$(git submodule status Database/Sources/rocksdb/ | cut -c2-41)" >> $GITHUB_OUTPUT
+    - name: Cache SPM
+      uses: actions/cache@v4
       with:
         path: '**/.build'
         key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
         restore-keys: |
           ${{ runner.os }}-spm-
+    - name: Cache Cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          Utils/Sources/bandersnatch/target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - name: Cache blst static lib
+      uses: actions/cache@v4
+      with:
+        path: .lib/libblst.a
+        key: ${{ runner.os }}-libs-blst-${{ steps.blst-commit-hash.outputs.commit-hash }}
+        restore-keys: |
+            ${{ runner.os }}-libs-blst
+    - name: Cache bandersnatch_vrfs static lib
+      uses: actions/cache@v4
+      with:
+        path: .lib/libbandersnatch_vrfs.a
+        key: ${{ runner.os }}-libs-libbandersnatch-${{ hashFiles('Utils/Sources/bandersnatch/**') }}
+        restore-keys: |
+            ${{ runner.os }}-libs-libbandersnatch
+    - name: Cache rocksdb static lib
+      uses: actions/cache@v4
+      with:
+        path: .lib/librocksdb.a
+        key: ${{ runner.os }}-libs-librocksdb-${{ steps.rocksdb-commit-hash.outputs.commit-hash }}
+        restore-keys: |
+            ${{ runner.os }}-libs-librocksdb
     - name: Setup Swift
       uses: SwiftyLab/setup-swift@latest
       with:
         swift-version: '6.0'
         development: true
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@nightly
+      with:
+        components: rustfmt
+    - name: Check rust format
+      run: cargo +nightly fmt --all --manifest-path Utils/Sources/bandersnatch/Cargo.toml -- --check
     - name: Build
       run: make build
     - name: Test

@@ -4,3 +4,6 @@
 [submodule "blst"]
 	path = Utils/Sources/blst
 	url = https://github.com/supranational/blst.git
+[submodule "Database/Sources/rocksdb"]
+	path = Database/Sources/rocksdb
+	url = https://github.com/facebook/rocksdb.git
