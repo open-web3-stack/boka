@@ -6,6 +6,7 @@ disabled_rules:
     - nesting
     - opening_brace
     - cyclomatic_complexity
+    - blanket_disable_command
 
 excluded:
     - "**/.build"
