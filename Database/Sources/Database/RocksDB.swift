@@ -60,6 +60,8 @@ extension RocksDB {
     private static func call<R>(
         _ data: [Data],
         fn: (inout UnsafeMutablePointer<Int8>?, [(ptr: UnsafeRawPointer, count: Int)]) -> R,
+        // need new swiftlint version https://github.com/realm/SwiftLint/issues/5631
+        // swiftlint:disable:next identifier_name
         onErr: (String) throws(Error) -> Void
     ) throws(Error) -> R {
         var err: UnsafeMutablePointer<Int8>?
