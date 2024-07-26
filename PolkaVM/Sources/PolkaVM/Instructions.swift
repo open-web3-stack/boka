@@ -85,7 +85,7 @@ public enum Instructions {
         }
 
         public func executeImpl(state: VMState) -> ExitReason? {
-            if let _ = try? state.memory.write(address: address, value: value) {
+            if (try? state.memory.write(address: address, value: value)) != nil {
                 return nil
             }
             return .pageFault(address)
@@ -105,7 +105,7 @@ public enum Instructions {
         }
 
         public func executeImpl(state: VMState) -> ExitReason? {
-            if let _ = try? state.memory.write(address: address, values: value.encode(method: .fixedWidth(2))) {
+            if (try? state.memory.write(address: address, values: value.encode(method: .fixedWidth(2)))) != nil {
                 return nil
             }
             return .pageFault(address)
@@ -125,7 +125,7 @@ public enum Instructions {
         }
 
         public func executeImpl(state: VMState) -> ExitReason? {
-            if let _ = try? state.memory.write(address: address, values: value.encode(method: .fixedWidth(4))) {
+            if (try? state.memory.write(address: address, values: value.encode(method: .fixedWidth(4)))) != nil {
                 return nil
             }
             return .pageFault(address)
