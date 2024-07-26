@@ -62,8 +62,8 @@ struct ProgramTests {
         (Data([0, 0, 0b0010_0000, 0b0000_0010]), 10, 10),
         (Data([0, 0, 0b0010_0000, 0b0000_0010]), 22, 2),
         (Data([0, 0, 0, 0b0000_0010]), 5, 19),
-    ] as[(Data, UInt, UInt?)])
-    func skip(testCase: (Data, UInt, UInt?)) {
+    ] as[(Data, UInt32, UInt32?)])
+    func skip(testCase: (Data, UInt32, UInt32?)) {
         #expect(ProgramCode.skip(start: testCase.1, bitmask: testCase.0) == testCase.2)
     }
 }
