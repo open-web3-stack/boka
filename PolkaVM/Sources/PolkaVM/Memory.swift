@@ -14,7 +14,7 @@ public class Memory {
         self.chunks = chunks
     }
 
-    public func read(_ address: UInt32) throws(Memory.Error) -> UInt8 {
+    public func read(_ address: UInt32) throws(Error) -> UInt8 {
         // TODO: optimize this
         // check for chunks
         for chunk in chunks {
@@ -31,7 +31,7 @@ public class Memory {
         throw Error.pageFault
     }
 
-    public func write(address: UInt32, value: UInt8) throws(Memory.Error) {
+    public func write(address: UInt32, value: UInt8) throws(Error) {
         // TODO: optimize this
         // check for chunks
         for i in 0 ..< chunks.count {
@@ -47,6 +47,45 @@ public class Memory {
             if page.address <= address, address < page.address + page.length {
                 var newChunk = (address: address, data: Data(repeating: 0, count: Int(page.length)))
                 newChunk.data[Int(address - page.address)] = value
+                chunks.append(newChunk)
+                return
+            }
+        }
+        throw Error.notWritable
+    }
+
+    public func write(address: UInt32, values: some Sequence<UInt8>) throws(Error) {
+        // TODO: optimize this
+        // check for chunks
+        for i in 0 ..< chunks.count {
+            var chunk = chunks[i]
+            if chunk.address <= address, address < chunk.address + UInt32(chunk.data.count) {
+                var idx = Int(address - chunk.address)
+                for v in values {
+                    if idx == chunk.data.endIndex {
+                        chunk.data.append(v)
+                    } else {
+                        chunk.data[idx] = v
+                    }
+                    idx += 1
+                }
+                chunks[i] = chunk
+                return
+            }
+        }
+        // check for page map
+        for page in pageMap {
+            if page.address <= address, address < page.address + page.length {
+                var newChunk = (address: address, data: Data(repeating: 0, count: Int(page.length)))
+                var idx = Int(address - page.address)
+                for v in values {
+                    if idx == newChunk.data.endIndex {
+                        newChunk.data.append(v)
+                    } else {
+                        newChunk.data[idx] = v
+                    }
+                    idx += 1
+                }
                 chunks.append(newChunk)
                 return
             }

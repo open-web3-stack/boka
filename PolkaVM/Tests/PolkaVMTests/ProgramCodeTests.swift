@@ -64,6 +64,6 @@ struct ProgramTests {
         (Data([0, 0, 0, 0b0000_0010]), 5, 19),
     ] as[(Data, UInt, UInt?)])
     func skip(testCase: (Data, UInt, UInt?)) {
-        #expect(ProgramCode.skipOffset(start: testCase.1, bitmask: testCase.0) == testCase.2)
+        #expect(ProgramCode.skip(start: testCase.1, bitmask: testCase.0) == testCase.2)
     }
 }

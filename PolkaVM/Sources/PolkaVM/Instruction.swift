@@ -5,15 +5,28 @@ public protocol Instruction {
 
     init?(data: Data)
 
-    func execute(state: inout VMState) -> ExitReason?
-    func executeImpl(state: inout VMState) -> ExitReason?
+    func execute(state: VMState, skip: UInt32) -> ExitReason?
+    func executeImpl(state: VMState) -> ExitReason?
 
     func gasCost() -> UInt64
+    func updatePC(state: VMState, skip: UInt32)
 }
 
 extension Instruction {
-    public func execute(state: inout VMState) -> ExitReason? {
+    public func execute(state: VMState, skip: UInt32) -> ExitReason? {
         state.consumeGas(gasCost())
-        return executeImpl(state: &state)
+        let res = executeImpl(state: state)
+        if res == nil {
+            state.updatePC(state.pc + skip + 1)
+        }
+        return res
+    }
+
+    public func gasCost() -> UInt64 {
+        1
+    }
+
+    public func updatePC(state: VMState, skip: UInt32) {
+        state.increasePC(skip + 1)
     }
 }

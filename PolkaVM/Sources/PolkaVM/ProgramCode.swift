@@ -13,14 +13,14 @@ public class ProgramCode {
         public static let maxJumpTableEntriesCount: UInt64 = 0x100000
         public static let maxEncodeSize: UInt8 = 8
         public static let maxCodeLength: UInt64 = 0x400000
-        public static let maxInstructionLength: UInt = 24
+        public static let maxInstructionLength: UInt32 = 24
     }
 
     public let blob: Data
-    private let jumpTableEntrySize: UInt8
-    private let jumpTable: Slice<Data>
-    private let code: Slice<Data>
-    private let bitmask: Slice<Data>
+    public let jumpTableEntrySize: UInt8
+    public let jumpTable: Data
+    public let code: Data
+    private let bitmask: Data
 
     public init(_ blob: Data) throws {
         self.blob = blob
@@ -45,14 +45,14 @@ public class ProgramCode {
             throw Error.invalidDataLength
         }
 
-        jumpTable = Slice(base: blob, bounds: slice.startIndex ..< jumpTableEndIndex)
+        jumpTable = blob[slice.startIndex ..< jumpTableEndIndex]
 
         let codeEndIndex = jumpTableEndIndex + Int(codeLength)
         guard codeEndIndex <= slice.endIndex else {
             throw Error.invalidDataLength
         }
 
-        code = Slice(base: blob, bounds: jumpTableEndIndex ..< codeEndIndex)
+        code = blob[jumpTableEndIndex ..< codeEndIndex]
 
         let expectedBitmaskSize = (codeLength + 7) / 8
 
@@ -60,10 +60,10 @@ public class ProgramCode {
             throw Error.invalidDataLength
         }
 
-        bitmask = Slice(base: blob, bounds: codeEndIndex ..< slice.endIndex)
+        bitmask = blob[codeEndIndex ..< slice.endIndex]
     }
 
-    public static func skipOffset<D>(start: UInt, bitmask: D) -> UInt? where D: Collection, D.Element == UInt8, D.Index == Int, D: ContiguousBytes {
+    public static func skip(start: UInt32, bitmask: Data) -> UInt32? {
         let start = start + 1
         let beginIndex = Int(start / 8)
         guard beginIndex < bitmask.endIndex else {
@@ -83,17 +83,13 @@ public class ProgramCode {
 
         let offsetBits = start % 8
 
-        let idx = min(UInt((value >> offsetBits).trailingZeroBitCount), Constants.maxInstructionLength)
+        let idx = min(UInt32((value >> offsetBits).trailingZeroBitCount), Constants.maxInstructionLength)
 
         return idx
     }
 
-    public func skip(start: UInt) -> UInt? {
-        if let val = ProgramCode.skipOffset(start: start, bitmask: bitmask) {
-            val + start + 1
-        } else {
-            nil
-        }
+    public func skip(_ start: UInt32) -> UInt32? {
+        ProgramCode.skip(start: start, bitmask: bitmask)
     }
 }
 
