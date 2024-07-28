@@ -4,11 +4,11 @@ import Utils
 public struct ExtrinsicTickets: Sendable, Equatable {
     public struct TicketItem: Sendable, Equatable {
         public var attempt: TicketIndex
-        public var signature: BandersnatchRintVRFProof
+        public var signature: BandersnatchRingVRFProof
 
         public init(
             attempt: TicketIndex,
-            signature: BandersnatchRintVRFProof
+            signature: BandersnatchRingVRFProof
         ) {
             self.attempt = attempt
             self.signature = signature
