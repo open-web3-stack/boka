@@ -22,7 +22,7 @@ public class ProgramCode {
     public let code: Data
     private let bitmask: Data
 
-    public init(_ blob: Data) throws {
+    public init(_ blob: Data) throws(Error) {
         self.blob = blob
 
         var slice = Slice(base: blob, bounds: blob.startIndex ..< blob.endIndex)
@@ -65,7 +65,7 @@ public class ProgramCode {
 
     public static func skip(start: UInt32, bitmask: Data) -> UInt32? {
         let start = start + 1
-        let beginIndex = Int(start / 8)
+        let beginIndex = Int(start / 8) + bitmask.startIndex
         guard beginIndex < bitmask.endIndex else {
             return nil
         }

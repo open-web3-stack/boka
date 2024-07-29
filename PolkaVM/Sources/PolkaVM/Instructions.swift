@@ -40,12 +40,12 @@ public enum Instructions {
         public init(data _: Data) {}
 
         public func executeImpl(state _: VMState) -> ExitReason? {
-            .halt(.trap)
+            .panic(.trap)
         }
     }
 
     public struct Fallthrough: Instruction {
-        public static var opcode: UInt8 { 1 }
+        public static var opcode: UInt8 { 17 }
 
         public init(data _: Data) {}
 
