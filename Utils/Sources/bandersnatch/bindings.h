@@ -59,6 +59,13 @@ struct Verifier *verifier_new(const struct CPublic *ring, uintptr_t ring_len, bo
 void verifier_free(struct Verifier *verifier);
 
 /**
+ * Ring Commitment: the Bandersnatch ring root in GP
+ *
+ * out is 144 bytes
+ */
+bool verifier_commitment(uint8_t *out, struct Verifier *verifier);
+
+/**
  * out is 32 bytes
  */
 bool verifier_ring_vrf_verify(uint8_t *out,

@@ -123,6 +123,8 @@ public class Prover {
 
 public class Verifier {
     private var verifier: OpaquePointer
+    /// Bandersnatch ring root
+    public var ringRoot: Data144
 
     public init(ring: [Data32]) throws {
         var success = false
@@ -131,6 +133,15 @@ public class Verifier {
         if !success {
             throw BandersnatchError.createVerifierFailed
         }
+
+        var output = [UInt8](repeating: 0, count: 144)
+        success = verifier_commitment(&output, verifier)
+        if !success {
+            throw BandersnatchError.createVerifierFailed
+        }
+        ringRoot = Data144(Data(output))!
+
+        print(ringRoot)
     }
 
     deinit {

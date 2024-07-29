@@ -228,6 +228,29 @@ pub extern "C" fn verifier_free(verifier: *mut Verifier) {
     }
 }
 
+/// Ring Commitment: the Bandersnatch ring root in GP
+///
+/// out is 144 bytes
+#[no_mangle]
+pub extern "C" fn verifier_commitment(out: *mut u8, verifier: *mut Verifier) -> bool {
+    if verifier.is_null() {
+        return false;
+    }
+
+    let verifier = unsafe { &*verifier };
+
+    let mut buf = Vec::new();
+    verifier.commitment.serialize_compressed(&mut buf).unwrap();
+
+    if buf.len() != 144 {
+        return false;
+    }
+    unsafe {
+        ptr::copy_nonoverlapping(buf.as_ptr(), out, buf.len());
+    }
+    true
+}
+
 /// out is 32 bytes
 #[no_mangle]
 pub extern "C" fn verifier_ring_vrf_verify(
