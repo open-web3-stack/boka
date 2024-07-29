@@ -1,11 +1,11 @@
 public enum ExitReason {
-    public enum HaltReason {
+    public enum PanicReason {
         case trap
         case invalidInstruction
     }
 
-    case halt(HaltReason)
-    case panic
+    case halt
+    case panic(PanicReason)
     case outOfGas
     case hostCall(UInt32)
     case pageFault(UInt32)

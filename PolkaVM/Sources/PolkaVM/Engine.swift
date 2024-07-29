@@ -1,3 +1,5 @@
+import Foundation
+
 public class Engine {
     public init() {}
 
@@ -15,10 +17,17 @@ public class Engine {
     public func step(program: ProgramCode, state: VMState) -> ExitReason? {
         let pc = state.pc
         guard let skip = program.skip(state.pc) else {
-            return .halt(.invalidInstruction)
+            return .panic(.invalidInstruction)
         }
-        guard let inst = InstructionTable.parse(program.code[Int(pc) ..< Int(pc + 1 + skip)]) else {
-            return .halt(.invalidInstruction)
+        let startIndex = program.code.startIndex + Int(pc)
+        let endIndex = startIndex + 1 + Int(skip)
+        let data = if endIndex <= program.code.endIndex {
+            program.code[startIndex ..< endIndex]
+        } else {
+            program.code[startIndex ..< min(program.code.endIndex, endIndex)] + Data(repeating: 0, count: endIndex - program.code.endIndex)
+        }
+        guard let inst = InstructionTable.parse(data) else {
+            return .panic(.invalidInstruction)
         }
 
         return inst.execute(state: state, skip: skip)
