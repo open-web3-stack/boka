@@ -17,7 +17,7 @@ extension Instruction {
         state.consumeGas(gasCost())
         let res = executeImpl(state: state)
         if res == nil {
-            state.updatePC(state.pc + skip + 1)
+            updatePC(state: state, skip: skip)
         }
         return res
     }

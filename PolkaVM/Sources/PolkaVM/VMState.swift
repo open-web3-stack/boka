@@ -18,14 +18,13 @@ public class VMState {
     }
 
     public func consumeGas(_ amount: UInt64) {
+        // TODO: use saturating subtraction
         gas -= Int64(amount)
     }
 
-    public func updatePC(_ pc: UInt32) {
-        self.pc = pc
-    }
-
     public func increasePC(_ amount: UInt32) {
-        pc += amount
+        // using wrapped add
+        // so that it can also be used for jumps which are negative
+        pc &+= amount
     }
 }
