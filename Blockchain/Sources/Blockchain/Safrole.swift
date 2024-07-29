@@ -231,12 +231,13 @@ extension Safrole {
         }
 
         do {
-            let (newNextValidators, newCurrentValidators, newPreviousValidators, newTicketsVerifier) = isEpochChange
+            let (newNextValidators, newCurrentValidators, newPreviousValidators, newTicketsVerifier) = try isEpochChange
                 ? (
                     validatorQueue, // TODO: Φ filter out the one in the punishment set
                     nextValidators,
                     currentValidators,
-                    ticketsVerifier // TODO: calculate the new ring root from the new validators
+                    Verifier(ring: nextValidators.map(\.bandersnatch))
+                        .ringRoot
                 )
                 : (nextValidators, currentValidators, previousValidators, ticketsVerifier)
 
