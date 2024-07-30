@@ -1,11 +1,15 @@
 import Foundation
 
 public class Engine {
+    public enum Constants {
+        public static let exitAddress: UInt32 = 0xFFFF_0000
+    }
+
     public init() {}
 
     public func execute(program: ProgramCode, state: VMState) -> ExitReason {
         while true {
-            guard state.gas > 0 else {
+            guard state.getGas() > 0 else {
                 return .outOfGas
             }
             if let exitReason = step(program: program, state: state) {
@@ -30,6 +34,14 @@ public class Engine {
             return .panic(.invalidInstruction)
         }
 
-        return inst.execute(state: state, skip: skip)
+        let res = inst.execute(state: state, skip: skip)
+
+        if state.pc == Constants.exitAddress {
+            // TODO: GP only defined this for `djump` but not `branch`
+            // so need to confirm this is correct
+            return .halt
+        }
+
+        return res
     }
 }
