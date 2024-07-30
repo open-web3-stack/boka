@@ -25,8 +25,8 @@ final class RPCController: RouteCollection {
                 let responseData = try JSONEncoder().encode(rpcResponse)
                 return req.eventLoop.makeSucceededFuture(Response(status: .badRequest, body: .init(data: responseData)))
             } catch {
-                // Handle the error appropriately, e.g., log it
-                print("Failed to send WebSocket error response: \(error)")
+                print("Failed to encode error response: \(error)")
+                return req.eventLoop.makeSucceededFuture(Response(status: .badRequest, body: .init(data: Data())))
             }
         }
     }
@@ -54,7 +54,6 @@ final class RPCController: RouteCollection {
                 let responseData = try JSONEncoder().encode(rpcResponse)
                 try await ws.send(String(decoding: responseData, as: UTF8.self))
             } catch {
-                // Handle the error appropriately, e.g., log it
                 print("Failed to send WebSocket error response: \(error)")
             }
         }
