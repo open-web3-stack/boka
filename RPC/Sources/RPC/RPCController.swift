@@ -20,7 +20,14 @@ final class RPCController: RouteCollection {
         } catch {
             let rpcError = RPCError(code: -32600, message: "Invalid Request")
             let rpcResponse = RPCResponse<RPCError>(jsonrpc: "2.0", result: nil, error: rpcError, id: nil)
-            return req.eventLoop.makeSucceededFuture(Response(status: .badRequest, body: .init(data: try! JSONEncoder().encode(rpcResponse))))
+
+            do {
+                let responseData = try JSONEncoder().encode(rpcResponse)
+                return req.eventLoop.makeSucceededFuture(Response(status: .badRequest, body: .init(data: responseData)))
+            } catch {
+                // Handle the error appropriately, e.g., log it
+                print("Failed to send WebSocket error response: \(error)")
+            }
         }
     }
 
@@ -38,14 +45,14 @@ final class RPCController: RouteCollection {
             let result = try handleMethod(rpcRequest.method, params: rpcRequest.params?.value)
             let rpcResponse = RPCResponse(jsonrpc: "2.0", result: AnyContent(result ?? ""), error: nil, id: rpcRequest.id)
             let responseData = try JSONEncoder().encode(rpcResponse)
-            try await ws.send(String(data: responseData, encoding: .utf8)!)
+            try await ws.send(String(decoding: responseData, as: UTF8.self))
         } catch {
             let rpcError = RPCError(code: -32600, message: "Invalid Request")
             let rpcResponse = RPCResponse<RPCError>(jsonrpc: "2.0", result: nil, error: rpcError, id: nil)
 
             do {
                 let responseData = try JSONEncoder().encode(rpcResponse)
-                try await ws.send(String(data: responseData, encoding: .utf8)!)
+                try await ws.send(String(decoding: responseData, as: UTF8.self))
             } catch {
                 // Handle the error appropriately, e.g., log it
                 print("Failed to send WebSocket error response: \(error)")
