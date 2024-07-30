@@ -21,7 +21,7 @@ extension Collection<UInt8> where SubSequence == Self {
         let byteLengh = (~firstByte).leadingZeroBitCount
         var res: UInt64 = 0
         if byteLengh > 0 {
-            guard let rest = decode(length: byteLengh) else {
+            guard let rest: UInt64 = decode(length: byteLengh) else {
                 return nil
             }
             res = rest
@@ -33,16 +33,18 @@ extension Collection<UInt8> where SubSequence == Self {
         return res + UInt64(topBits) << (8 * byteLengh)
     }
 
-    public mutating func decode(length: Int) -> UInt64? {
+    // TODO: this is pretty inefficient
+    // so need to ensure the usage of this is minimal
+    public mutating func decode<T: UnsignedInteger>(length: Int) -> T? {
         guard length > 0 else {
             return nil
         }
-        var res: UInt64 = 0
+        var res: T = 0
         for l in 0 ..< length {
             guard let byte = next() else {
                 return nil
             }
-            res = res | UInt64(byte) << (8 * l)
+            res = res | T(byte) << (8 * l)
         }
         return res
     }

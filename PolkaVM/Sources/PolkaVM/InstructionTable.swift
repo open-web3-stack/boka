@@ -1,4 +1,5 @@
 import Foundation
+import Utils
 
 public class InstructionTable {
     public static let table: [Instruction.Type?] = {
@@ -9,6 +10,16 @@ public class InstructionTable {
             Instructions.StoreImmU8.self,
             Instructions.StoreImmU16.self,
             Instructions.StoreImmU32.self,
+            Instructions.JumpInd.self,
+            Instructions.LoadImm.self,
+            Instructions.LoadU8.self,
+            Instructions.LoadI8.self,
+            Instructions.LoadU16.self,
+            Instructions.LoadI16.self,
+            Instructions.LoadU32.self,
+            Instructions.StoreU8.self,
+            Instructions.StoreU16.self,
+            Instructions.StoreU32.self,
         ]
         var table: [Instruction.Type?] = Array(repeating: nil, count: 256)
         for i in 0 ..< insts.count {
@@ -25,6 +36,7 @@ public class InstructionTable {
         guard let instType = table[Int(opcode)] else {
             return nil
         }
-        return instType.init(data: data)
+        // TODO: log errors
+        return try? instType.init(data: data[relative: 1...])
     }
 }

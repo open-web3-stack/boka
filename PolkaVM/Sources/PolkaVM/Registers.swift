@@ -1,4 +1,11 @@
 public struct Registers: Equatable {
+    public struct Index {
+        public let value: UInt8
+        public init(_ value: UInt8) {
+            self.value = min(value & 0b1111, 12)
+        }
+    }
+
     public var reg1: UInt32 = 0
     public var reg2: UInt32 = 0
     public var reg3: UInt32 = 0
@@ -30,5 +37,72 @@ public struct Registers: Equatable {
         reg11 = values[10]
         reg12 = values[11]
         reg13 = values[12]
+    }
+
+    public subscript(index: Index) -> UInt32 {
+        get {
+            switch index.value {
+            case 0:
+                reg1
+            case 1:
+                reg2
+            case 2:
+                reg3
+            case 3:
+                reg4
+            case 4:
+                reg5
+            case 5:
+                reg6
+            case 6:
+                reg7
+            case 7:
+                reg8
+            case 8:
+                reg9
+            case 9:
+                reg10
+            case 10:
+                reg11
+            case 11:
+                reg12
+            case 12:
+                reg13
+            default:
+                fatalError("unreachable: index out of bounds \(index.value)")
+            }
+        }
+        set {
+            switch index.value {
+            case 0:
+                reg1 = newValue
+            case 1:
+                reg2 = newValue
+            case 2:
+                reg3 = newValue
+            case 3:
+                reg4 = newValue
+            case 4:
+                reg5 = newValue
+            case 5:
+                reg6 = newValue
+            case 6:
+                reg7 = newValue
+            case 7:
+                reg8 = newValue
+            case 8:
+                reg9 = newValue
+            case 9:
+                reg10 = newValue
+            case 10:
+                reg11 = newValue
+            case 11:
+                reg12 = newValue
+            case 12:
+                reg13 = newValue
+            default:
+                fatalError("unreachable: index out of bounds \(index.value)")
+            }
+        }
     }
 }
