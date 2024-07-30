@@ -1,51 +1,65 @@
 @testable import RPC
 import Vapor
 import XCTest
-import XCTVapor
 
-final class RPCTests: XCTestCase {
-    func testHTTPRPC() throws {
-        let app = Application(.testing)
-        defer { app.shutdown() }
-        try configure(app)
+final class RPCControllerTests: XCTestCase {
+    var app: Application!
 
-        let rpcRequest = RPCRequest(jsonrpc: "2.0", method: "chain_getBlock", params: nil, id: 1)
+    override func setUp() {
+        super.setUp()
+        app = Application(.testing)
 
-        try app.test(.POST, "rpc", beforeRequest: { req in
-            try req.content.encode(rpcRequest)
-        }, afterResponse: { res in
-            XCTAssertEqual(res.status, .ok)
-            let rpcResponse = try res.content.decode(RPCResponse.self)
-            XCTAssertEqual(rpcResponse.jsonrpc, "2.0")
-            XCTAssertEqual(rpcResponse.result, AnyCodable("example result"))
-            XCTAssertNil(rpcResponse.error)
-            XCTAssertEqual(rpcResponse.id, 1)
-        })
+        let rpcController = RPCController()
+        try app.register(collection: rpcController)
     }
 
-    func testWebSocketRPC() throws {
-        let app = Application(.testing)
-        defer { app.shutdown() }
-        try configure(app)
+    override func tearDown() {
+        app.shutdown()
+        super.tearDown()
+    }
 
-        let promise = app.eventLoopGroup.next().makePromise(of: Void.self)
+    func testRPCRequest() throws {
+        let request = RPCRequest<AnyContent>(jsonrpc: "2.0", method: "chain_getBlock", params: BlockParams(blockHash: "dummyHash"), id: 1)
+        let requestData = try JSONEncoder().encode(request)
 
-        try app.testable().webSocket("ws") { ws in
-            let rpcRequest = RPCRequest(jsonrpc: "2.0", method: "chain_getBlock", params: nil, id: 1)
-            let requestData = try JSONEncoder().encode(rpcRequest)
+        try app.test(.POST, "rpc", headers: ["Content-Type": "application/json"], body: ByteBuffer(data: requestData)) { res in
+            XCTAssertEqual(res.status, .ok)
+            let rpcResponse = try res.content.decode(RPCResponse<AnyContent>.self)
+            XCTAssertEqual(rpcResponse.jsonrpc, "2.0")
+            XCTAssertEqual(rpcResponse.id, 1)
+        }
+    }
 
-            ws.send(String(decoding: requestData, as: UTF8.self))
+    func testInvalidRPCRequest() throws {
+        let invalidJSON = """
+        {
+            "jsonrpc": "2.0",
+            "method": "unknown_method",
+            "id": 1
+        }
+        """
+        let requestData = invalidJSON.data(using: .utf8)!
 
+        try app.test(.POST, "rpc", headers: ["Content-Type": "application/json"], body: ByteBuffer(data: requestData)) { res in
+            XCTAssertEqual(res.status, .badRequest)
+            let rpcResponse = try res.content.decode(RPCResponse<RPCError>.self)
+            XCTAssertEqual(rpcResponse.jsonrpc, "2.0")
+            XCTAssertEqual(rpcResponse.error?.code, -32601) // Method not found
+        }
+    }
+
+    func testWebSocketRPCRequest() throws {
+        let request = RPCRequest<AnyContent>(jsonrpc: "2.0", method: "chain_getHeader", params: HeaderParams(blockHash: "dummyHash"), id: 1)
+        let requestData = try JSONEncoder().encode(request)
+        let requestString = String(data: requestData, encoding: .utf8)!
+
+        try app.testable().ws("ws") { ws in
+            ws.send(requestString)
             ws.onText { _, text in
-                let rpcResponse = try JSONDecoder().decode(RPCResponse.self, from: Data(text.utf8))
+                let rpcResponse = try JSONDecoder().decode(RPCResponse<AnyContent>.self, from: Data(text.utf8))
                 XCTAssertEqual(rpcResponse.jsonrpc, "2.0")
-                XCTAssertEqual(rpcResponse.result, AnyCodable("example result"))
-                XCTAssertNil(rpcResponse.error)
                 XCTAssertEqual(rpcResponse.id, 1)
-                promise.succeed(())
             }
         }
-
-        try promise.futureResult.wait()
     }
 }

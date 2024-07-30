@@ -1,5 +1,5 @@
 {
-  "originHash" : "fcf25dc9b4931a1d81f53cd6efcf7914dd698adfbfd85aebcc2589b96787a187",
+  "originHash" : "578b4235fc63d6f32a70e82110043079db15ba9921a36647d6cb00bc95db9eb4",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/async-kit.git",
       "state" : {
-        "revision" : "7ece208cd401687641c88367a00e3ea2b04311f1",
-        "version" : "1.19.0"
+        "revision" : "15b3fb7b2437f9db11f6ddcf365c5b5db8c3a346",
+        "version" : "1.19.1"
       }
     },
     {
