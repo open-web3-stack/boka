@@ -51,7 +51,7 @@ final class RPCControllerTests: XCTestCase {
     func testWebSocketRPCRequest() throws {
         let request = RPCRequest<AnyContent>(jsonrpc: "2.0", method: "chain_getHeader", params: HeaderParams(blockHash: "dummyHash"), id: 1)
         let requestData = try JSONEncoder().encode(request)
-        let requestString = String(data: requestData, encoding: .utf8)!
+        let requestString = String(decoding: responseData, as: UTF8.self)
 
         try app.testable().ws("ws") { ws in
             ws.send(requestString)
