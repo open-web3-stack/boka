@@ -2,8 +2,17 @@ import Foundation
 
 public class Memory {
     public enum Error: Swift.Error {
-        case pageFault
-        case notWritable
+        case pageFault(UInt32)
+        case notWritable(UInt32)
+
+        public var address: UInt32 {
+            switch self {
+            case let .pageFault(address):
+                address
+            case let .notWritable(address):
+                address
+            }
+        }
     }
 
     private let pageMap: [(address: UInt32, length: UInt32, writable: Bool)]
@@ -14,7 +23,7 @@ public class Memory {
         self.chunks = chunks
     }
 
-    public func read(_ address: UInt32) throws(Error) -> UInt8 {
+    public func read(address: UInt32) throws(Error) -> UInt8 {
         // TODO: optimize this
         // check for chunks
         for chunk in chunks {
@@ -28,7 +37,35 @@ public class Memory {
                 return 0
             }
         }
-        throw Error.pageFault
+        throw Error.pageFault(address)
+    }
+
+    public func read(address: UInt32, length: Int) throws -> Data {
+        // TODO: optimize this
+        // check for chunks
+        for chunk in chunks {
+            if chunk.address <= address, address < chunk.address + UInt32(chunk.data.count) {
+                let startIndex = Int(address - chunk.address)
+                let endIndex = min(startIndex + length, chunk.data.endIndex)
+                let res = chunk.data[startIndex ..< endIndex]
+                let remaining = length - res.count
+                if remaining == 0 {
+                    return res
+                } else {
+                    let startAddress = chunk.address &+ UInt32(chunk.data.count) // wrapped add
+                    let remainingData = try read(address: startAddress, length: remaining)
+                    return res + remainingData
+                }
+            }
+        }
+        // check for page map
+        for page in pageMap {
+            if page.address <= address, address < page.address + page.length {
+                // TODO: handle reads that cross page boundaries
+                return Data(repeating: 0, count: length)
+            }
+        }
+        throw Error.pageFault(address)
     }
 
     public func write(address: UInt32, value: UInt8) throws(Error) {
@@ -51,7 +88,7 @@ public class Memory {
                 return
             }
         }
-        throw Error.notWritable
+        throw Error.notWritable(address)
     }
 
     public func write(address: UInt32, values: some Sequence<UInt8>) throws(Error) {
@@ -90,6 +127,24 @@ public class Memory {
                 return
             }
         }
-        throw Error.notWritable
+        throw Error.notWritable(address)
+    }
+}
+
+extension Memory {
+    public class Readonly {
+        private let memory: Memory
+
+        public init(_ memory: Memory) {
+            self.memory = memory
+        }
+
+        public func read(address: UInt32) throws -> UInt8 {
+            try memory.read(address: address)
+        }
+
+        public func read(address: UInt32, length: Int) throws -> Data {
+            try memory.read(address: address, length: length)
+        }
     }
 }
