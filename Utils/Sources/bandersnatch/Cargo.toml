@@ -10,7 +10,7 @@ crate-type = ["staticlib"]
 cbindgen = "0.24.0"
 
 [dependencies]
-ark-ec-vrfs = { git = "https://github.com/davxy/ark-ec-vrfs", default-features = false, features = [
+ark-ec-vrfs = { git = "https://github.com/davxy/ark-ec-vrfs", rev = "8cef209", features = [
 	"bandersnatch",
 	"ring",
 	"parallel",
