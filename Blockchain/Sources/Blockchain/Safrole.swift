@@ -231,13 +231,14 @@ extension Safrole {
         }
 
         do {
-            let (newNextValidators, newCurrentValidators, newPreviousValidators, newTicketsVerifier) = try isEpochChange
+            let verifier = try Verifier(ring: nextValidators.map(\.bandersnatch))
+
+            let (newNextValidators, newCurrentValidators, newPreviousValidators, newTicketsVerifier) = isEpochChange
                 ? (
                     validatorQueue, // TODO: Φ filter out the one in the punishment set
                     nextValidators,
                     currentValidators,
-                    Verifier(ring: nextValidators.map(\.bandersnatch))
-                        .ringRoot
+                    verifier.ringRoot
                 )
                 : (nextValidators, currentValidators, previousValidators, ticketsVerifier)
 
@@ -284,7 +285,7 @@ extension Safrole {
                     nil
                 }
 
-            let newTickets = extrinsics.getTickets()
+            let newTickets = try extrinsics.getTickets(verifier, newEntropyPool.2)
             guard newTickets.isSorted() else {
                 return .failure(.extrinsicsNotSorted)
             }

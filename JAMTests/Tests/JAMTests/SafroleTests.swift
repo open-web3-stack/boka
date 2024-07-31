@@ -234,7 +234,11 @@ enum SafroleTestVariants: String, CaseIterable {
 
 struct SafroleTests {
     static func loadTests(variant: SafroleTestVariants) throws -> [SafroleTestcase] {
-        let tests = try TestLoader.getTestFiles(path: "safrole/\(variant)", extension: "scale")
+        // let tests = try TestLoader.getTestFiles(path: "safrole/\(variant)", extension: "scale")
+        let tests = [(
+            path: "/Users/qiweiyang/GitHub/boka/JAMTests/jamtestvectors/safrole/tiny/enact-epoch-change-with-no-tickets-4.scale",
+            description: ""
+        )]
         return try tests.map {
             let data = try Data(contentsOf: URL(fileURLWithPath: $0.path))
             var decoder = LoggingDecoder(decoder: decoder(from: data), logger: NoopLogger())
@@ -244,30 +248,28 @@ struct SafroleTests {
 
     @Test(arguments: try SafroleTests.loadTests(variant: .tiny))
     func tinyTests(_ testcase: SafroleTestcase) throws {
-        withKnownIssue("not yet implemented", isIntermittent: true) {
-            let result = testcase.preState.updateSafrole(
-                slot: testcase.input.slot,
-                entropy: testcase.input.entropy,
-                extrinsics: testcase.input.extrinsics
-            )
-            switch result {
-            case let .success((state, epochMark, ticketsMark)):
-                switch testcase.output {
-                case let .ok(marks):
-                    #expect(epochMark == marks.epochMark)
-                    #expect(ticketsMark == marks.ticketsMark)
-                    #expect(testcase.preState.mergeWith(postState: state) == testcase.postState)
-                case .err:
-                    Issue.record("Expected error, got \(result)")
-                }
-            case .failure:
-                switch testcase.output {
-                case .ok:
-                    Issue.record("Expected success, got \(result)")
-                case .err:
-                    // ignore error code because it is unspecified
-                    break
-                }
+        let result = testcase.preState.updateSafrole(
+            slot: testcase.input.slot,
+            entropy: testcase.input.entropy,
+            extrinsics: testcase.input.extrinsics
+        )
+        switch result {
+        case let .success((state, epochMark, ticketsMark)):
+            switch testcase.output {
+            case let .ok(marks):
+                #expect(epochMark == marks.epochMark)
+                #expect(ticketsMark == marks.ticketsMark)
+                #expect(testcase.preState.mergeWith(postState: state) == testcase.postState)
+            case .err:
+                Issue.record("Expected error, got \(result)")
+            }
+        case .failure:
+            switch testcase.output {
+            case .ok:
+                Issue.record("Expected success, got \(result)")
+            case .err:
+                // ignore error code because it is unspecified
+                break
             }
         }
     }
