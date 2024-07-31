@@ -231,7 +231,7 @@ extension Safrole {
         }
 
         do {
-            let verifier = try Verifier(ring: nextValidators.map(\.bandersnatch))
+            let verifier = try Verifier(ring: validatorQueue.map(\.bandersnatch))
 
             let (newNextValidators, newCurrentValidators, newPreviousValidators, newTicketsVerifier) = isEpochChange
                 ? (
