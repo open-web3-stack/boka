@@ -250,28 +250,6 @@ extension State: ScaleCodec.Encodable {
     }
 }
 
-extension State {
-    public func update(with block: Block) -> State {
-        let state = State(
-            config: config,
-            coreAuthorizationPool: coreAuthorizationPool,
-            lastBlock: block,
-            safroleState: safroleState,
-            serviceAccounts: serviceAccounts,
-            entropyPool: entropyPool,
-            validatorQueue: validatorQueue,
-            currentValidators: currentValidators,
-            previousValidators: previousValidators,
-            reports: reports,
-            timeslot: timeslot,
-            authorizationQueue: authorizationQueue,
-            privilegedServiceIndices: privilegedServiceIndices,
-            judgements: judgements
-        )
-        return state
-    }
-}
-
 extension State: Safrole {
     public var nextValidators: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
@@ -296,27 +274,15 @@ extension State: Safrole {
 
     public var ticketsVerifier: BandersnatchRingVRFRoot { safroleState.ticketsVerifier }
 
-    public func mergeWith(postState: SafrolePostState) -> Self {
-        Self(
-            config: config,
-            coreAuthorizationPool: coreAuthorizationPool,
-            lastBlock: lastBlock,
-            safroleState: SafroleState(
-                nextValidators: postState.nextValidators,
-                ticketsVerifier: postState.ticketsVerifier,
-                ticketsOrKeys: postState.ticketsOrKeys,
-                ticketsAccumulator: postState.ticketsAccumulator
-            ),
-            serviceAccounts: serviceAccounts,
-            entropyPool: postState.entropyPool,
-            validatorQueue: postState.validatorQueue,
-            currentValidators: postState.currentValidators,
-            previousValidators: postState.previousValidators,
-            reports: reports,
-            timeslot: postState.timeslot,
-            authorizationQueue: authorizationQueue,
-            privilegedServiceIndices: privilegedServiceIndices,
-            judgements: judgements
-        )
+    public mutating func mergeWith(postState: SafrolePostState) {
+        safroleState.nextValidators = postState.nextValidators
+        safroleState.ticketsVerifier = postState.ticketsVerifier
+        safroleState.ticketsOrKeys = postState.ticketsOrKeys
+        safroleState.ticketsAccumulator = postState.ticketsAccumulator
+        entropyPool = postState.entropyPool
+        validatorQueue = postState.validatorQueue
+        currentValidators = postState.currentValidators
+        previousValidators = postState.previousValidators
+        timeslot = postState.timeslot
     }
 }

@@ -4,14 +4,17 @@ import Utils
 /// Holds the state of the blockchain.
 /// Includes the canonical chain as well as pending forks.
 /// Assume all blocks and states are valid and have been validated.
-public class Blockchain {
+public actor Blockchain {
+    public let config: ProtocolConfigRef
+
     public private(set) var heads: [StateRef]
     public private(set) var finalizedHead: StateRef
 
     private var stateByBlockHash: [Data32: StateRef] = [:]
     private var stateByTimeslot: [TimeslotIndex: [StateRef]] = [:]
 
-    public init(heads: [StateRef], finalizedHead: StateRef) {
+    public init(config: ProtocolConfigRef, heads: [StateRef], finalizedHead: StateRef) async {
+        self.config = config
         assert(heads.contains(where: { $0 === finalizedHead }))
 
         self.heads = heads

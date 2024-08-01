@@ -3,9 +3,9 @@ import Blockchain
 public class Node {
     public private(set) var blockchain: Blockchain
 
-    public init(genesis: Genesis, config: ProtocolConfigRef) throws {
+    public init(genesis: Genesis, config: ProtocolConfigRef) async throws {
         let genesisState = try genesis.toState(config: config)
-        blockchain = Blockchain(heads: [genesisState], finalizedHead: genesisState)
+        blockchain = await Blockchain(config: config, heads: [genesisState], finalizedHead: genesisState)
     }
 
     public func sayHello() {

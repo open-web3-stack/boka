@@ -11,6 +11,12 @@ public struct Block: Sendable, Equatable {
     }
 }
 
+extension Block {
+    public func asRef() -> BlockRef {
+        BlockRef(self)
+    }
+}
+
 public typealias BlockRef = Ref<Block>
 
 extension Block: Dummy {

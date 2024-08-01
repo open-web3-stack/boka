@@ -1,25 +1,14 @@
-public class BlockImporter {
-    private var validator: BlockValidator
+public final class BlockImporter {
     private var blockchain: Blockchain
 
-    public init(validator: BlockValidator, blockchain: Blockchain) {
-        self.validator = validator
+    public init(blockchain: Blockchain) {
         self.blockchain = blockchain
     }
 
-    public func importBlock(_ block: PendingBlock) async {
-        let result = await validator.validate(block: block, chain: blockchain)
+    public func importBlock(_ block: PendingBlock) async throws {
+        let runtime = Runtime(config: blockchain.config)
+        let state = try await runtime.apply(block: block.block, state: blockchain.heads.last!)
 
-        switch result {
-        case let .success(state):
-            blockchain.newHead(state)
-
-        case .failure(.future):
-            // TODO: save this somewhere else and import it later
-            break
-
-        case .failure(.invalid):
-            break
-        }
+        await blockchain.newHead(state)
     }
 }

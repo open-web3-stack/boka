@@ -135,19 +135,16 @@ struct SafroleState: Equatable, Safrole {
             lhs.ticketsVerifier == rhs.ticketsVerifier
     }
 
-    public func mergeWith(postState: SafrolePostState) -> Self {
-        Self(
-            config: config,
-            timeslot: postState.timeslot,
-            entropyPool: postState.entropyPool,
-            previousValidators: postState.previousValidators,
-            currentValidators: postState.currentValidators,
-            nextValidators: postState.nextValidators,
-            validatorQueue: postState.validatorQueue,
-            ticketsAccumulator: postState.ticketsAccumulator,
-            ticketsOrKeys: postState.ticketsOrKeys,
-            ticketsVerifier: postState.ticketsVerifier
-        )
+    public mutating func mergeWith(postState: SafrolePostState) {
+        timeslot = postState.timeslot
+        entropyPool = postState.entropyPool
+        previousValidators = postState.previousValidators
+        currentValidators = postState.currentValidators
+        nextValidators = postState.nextValidators
+        validatorQueue = postState.validatorQueue
+        ticketsAccumulator = postState.ticketsAccumulator
+        ticketsOrKeys = postState.ticketsOrKeys
+        ticketsVerifier = postState.ticketsVerifier
     }
 }
 
@@ -254,9 +251,11 @@ struct SafroleTests {
             case let .success((state, epochMark, ticketsMark)):
                 switch testcase.output {
                 case let .ok(marks):
+                    var postState = testcase.preState
+                    postState.mergeWith(postState: state)
                     #expect(epochMark == marks.epochMark)
                     #expect(ticketsMark == marks.ticketsMark)
-                    #expect(testcase.preState.mergeWith(postState: state) == testcase.postState)
+                    #expect(postState == testcase.postState)
                 case .err:
                     Issue.record("Expected error, got \(result)")
                 }
