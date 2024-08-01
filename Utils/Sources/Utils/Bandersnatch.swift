@@ -140,8 +140,6 @@ public class Verifier {
             throw BandersnatchError.createVerifierFailed
         }
         ringRoot = Data144(Data(output))!
-
-        print(ringRoot)
     }
 
     deinit {

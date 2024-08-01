@@ -192,7 +192,7 @@ impl Verifier {
             .verify(input, output, aux_data, &signature.proof)
             .is_err()
         {
-            println!("Ring signature verification failure");
+            println!("Ietf signature verification failure");
             return Err(());
         }
         println!("Ietf signature verified");
