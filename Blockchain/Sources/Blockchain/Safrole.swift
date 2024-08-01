@@ -264,7 +264,7 @@ extension Safrole {
             } else {
                 try .right(ConfigFixedSizeArray(
                     config: config,
-                    array: pickFallbackValidators(entropy: entropy, validators: newCurrentValidators, count: config.value.epochLength)
+                    array: pickFallbackValidators(entropy: newEntropyPool.2, validators: newCurrentValidators, count: config.value.epochLength)
                 ))
             }
 
