@@ -11,6 +11,7 @@ public enum SafroleError: Error {
     case extrinsicsTooLow
     case extrinsicsNotUnique
     case hashingError
+    case bandersnatchError
     case decodingError
     case unspecified
 }
@@ -231,14 +232,15 @@ extension Safrole {
         }
 
         do {
-            let verifier = try Verifier(ring: validatorQueue.map(\.bandersnatch))
+            let verifier = try Verifier(ring: nextValidators.map(\.bandersnatch))
+            let newVerifier = try Verifier(ring: validatorQueue.map(\.bandersnatch))
 
             let (newNextValidators, newCurrentValidators, newPreviousValidators, newTicketsVerifier) = isEpochChange
                 ? (
                     validatorQueue, // TODO: Φ filter out the one in the punishment set
                     nextValidators,
                     currentValidators,
-                    verifier.ringRoot
+                    newVerifier.ringRoot
                 )
                 : (nextValidators, currentValidators, previousValidators, ticketsVerifier)
 
@@ -264,7 +266,11 @@ extension Safrole {
             } else {
                 try .right(ConfigFixedSizeArray(
                     config: config,
-                    array: pickFallbackValidators(entropy: newEntropyPool.2, validators: newCurrentValidators, count: config.value.epochLength)
+                    array: pickFallbackValidators(
+                        entropy: newEntropyPool.2,
+                        validators: newCurrentValidators,
+                        count: config.value.epochLength
+                    )
                 ))
             }
 
@@ -335,6 +341,8 @@ extension Safrole {
             return .failure(e)
         } catch Blake2Error.hashingError {
             return .failure(.hashingError)
+        } catch is BandersnatchError {
+            return .failure(.bandersnatchError)
         } catch is DecodingError {
             // TODO: log details
             return .failure(.decodingError)

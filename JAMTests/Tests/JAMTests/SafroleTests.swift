@@ -236,7 +236,11 @@ struct SafroleTests {
     static func loadTests(variant: SafroleTestVariants) throws -> [SafroleTestcase] {
         // let tests = try TestLoader.getTestFiles(path: "safrole/\(variant)", extension: "scale")
         let tests = [(
-            path: "/Users/qiweiyang/GitHub/boka/JAMTests/jamtestvectors/safrole/tiny/enact-epoch-change-with-no-tickets-4.scale",
+            // path: "/Users/qiweiyang/GitHub/boka/JAMTests/jamtestvectors/safrole/tiny/enact-epoch-change-with-no-tickets-4.scale",
+            path: "/Users/qiweiyang/GitHub/boka/JAMTests/jamtestvectors/safrole/tiny/publish-tickets-no-mark-7.scale",
+            // path: "/Users/qiweiyang/GitHub/boka/JAMTests/jamtestvectors/safrole/tiny/publish-tickets-with-mark-1.scale",
+            // path: "/Users/qiweiyang/GitHub/boka/JAMTests/jamtestvectors/safrole/tiny/skip-epoch-tail-1.scale",
+            // path: "/Users/qiweiyang/GitHub/boka/JAMTests/jamtestvectors/safrole/tiny/skip-epochs-1.scale",
             description: ""
         )]
         return try tests.map {
