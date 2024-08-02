@@ -31,6 +31,9 @@ public final class BlockRef: Ref<Block>, @unchecked Sendable {
     public var hash: Data32 {
         lazy.value.value
     }
+
+    public var header: Header { value.header }
+    public var extrinsic: Extrinsic { value.extrinsic }
 }
 
 extension Block: Dummy {

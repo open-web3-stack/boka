@@ -31,7 +31,7 @@ public struct State: Sendable {
     >
 
     // β: Information on the most recent βlocks.
-    public var lastBlock: Block
+    public var lastBlock: BlockRef
 
     // γ: State concerning Safrole.
     public var safroleState: SafroleState
@@ -95,7 +95,7 @@ public struct State: Sendable {
             >,
             ProtocolConfig.TotalNumberOfCores
         >,
-        lastBlock: Block,
+        lastBlock: BlockRef,
         safroleState: SafroleState,
         serviceAccounts: [ServiceIdentifier: ServiceAccount],
         entropyPool: (Data32, Data32, Data32, Data32),
@@ -170,7 +170,7 @@ extension State: Dummy {
         State(
             config: config,
             coreAuthorizationPool: ConfigFixedSizeArray(config: config, defaultValue: ConfigLimitedSizeArray(config: config)),
-            lastBlock: Block.dummy(config: config),
+            lastBlock: BlockRef.dummy(config: config),
             safroleState: SafroleState.dummy(config: config),
             serviceAccounts: [:],
             entropyPool: (Data32(), Data32(), Data32(), Data32()),
@@ -216,7 +216,7 @@ extension State: ScaleCodec.Encodable {
             coreAuthorizationPool: ConfigFixedSizeArray(config: config, from: &decoder) {
                 try ConfigLimitedSizeArray(config: config, from: &$0) { try $0.decode() }
             },
-            lastBlock: Block(config: config, from: &decoder),
+            lastBlock: Block(config: config, from: &decoder).asRef(),
             safroleState: SafroleState(config: config, from: &decoder),
             serviceAccounts: decoder.decode(),
             entropyPool: decoder.decode(),
@@ -235,7 +235,7 @@ extension State: ScaleCodec.Encodable {
 
     public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
         try encoder.encode(coreAuthorizationPool)
-        try encoder.encode(lastBlock)
+        try encoder.encode(lastBlock.value)
         try encoder.encode(safroleState)
         try encoder.encode(serviceAccounts)
         try encoder.encode(entropyPool)

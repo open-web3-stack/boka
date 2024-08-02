@@ -12,9 +12,9 @@ public final class Runtime {
 
     public func apply(block: BlockRef, state prevState: StateRef) throws(Error) -> StateRef {
         var newState = prevState.value
-        newState.lastBlock = block.value
+        newState.lastBlock = block
         let res = newState.updateSafrole(
-            slot: block.value.header.timeslotIndex, entropy: newState.entropyPool.0, extrinsics: block.value.extrinsic.tickets
+            slot: block.header.timeslotIndex, entropy: newState.entropyPool.0, extrinsics: block.extrinsic.tickets
         )
         switch res {
         case let .success((state: postState, epochMark: _, ticketsMark: _)):

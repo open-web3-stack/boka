@@ -37,7 +37,7 @@ public actor Blockchain {
     }
 
     private func addState(_ state: StateRef) {
-        stateByBlockHash[state.value.lastBlock.header.hash()] = state
+        stateByBlockHash[state.value.lastBlock.hash] = state
         stateByTimeslot[state.value.lastBlock.header.timeslotIndex, default: []].append(state)
     }
 }
