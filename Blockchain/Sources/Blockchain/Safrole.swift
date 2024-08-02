@@ -10,7 +10,9 @@ public enum SafroleError: Error {
     case extrinsicsNotSorted
     case extrinsicsTooLow
     case extrinsicsNotUnique
+    case extrinsicsTooManyEntry
     case hashingError
+    case bandersnatchError(BandersnatchError)
     case decodingError
     case unspecified
 }
@@ -231,12 +233,15 @@ extension Safrole {
         }
 
         do {
+            let verifier = try Verifier(ring: nextValidators.map(\.bandersnatch))
+            let newVerifier = try Verifier(ring: validatorQueue.map(\.bandersnatch))
+
             let (newNextValidators, newCurrentValidators, newPreviousValidators, newTicketsVerifier) = isEpochChange
                 ? (
                     validatorQueue, // TODO: Φ filter out the one in the punishment set
                     nextValidators,
                     currentValidators,
-                    ticketsVerifier // TODO: calculate the new ring root from the new validators
+                    newVerifier.ringRoot
                 )
                 : (nextValidators, currentValidators, previousValidators, ticketsVerifier)
 
@@ -255,20 +260,27 @@ extension Safrole {
                     BandersnatchPublicKey,
                     ProtocolConfig.EpochLength
                 >
-            > = if newEpoch == currentEpoch + 1, newPhase >= ticketSubmissionEndSlot, ticketsAccumulator.count == config.value.epochLength {
+            > = if newEpoch == currentEpoch + 1,
+                   currentPhase >= ticketSubmissionEndSlot,
+                   ticketsAccumulator.count == config.value.epochLength
+            {
                 .left(ConfigFixedSizeArray(config: config, array: outsideInReorder(ticketsAccumulator.array)))
             } else if newEpoch == currentEpoch {
                 ticketsOrKeys
             } else {
                 try .right(ConfigFixedSizeArray(
                     config: config,
-                    array: pickFallbackValidators(entropy: entropy, validators: newCurrentValidators, count: config.value.epochLength)
+                    array: pickFallbackValidators(
+                        entropy: newEntropyPool.2,
+                        validators: newCurrentValidators,
+                        count: config.value.epochLength
+                    )
                 ))
             }
 
             let epochMark = isEpochChange ? EpochMarker(
-                entropy: entropy,
-                validators: ConfigFixedSizeArray(config: config, array: newCurrentValidators.map(\.bandersnatch))
+                entropy: newEntropyPool.1,
+                validators: ConfigFixedSizeArray(config: config, array: newNextValidators.map(\.bandersnatch))
             ) : nil
 
             let ticketsMark: ConfigFixedSizeArray<Ticket, ProtocolConfig.EpochLength>? =
@@ -283,9 +295,15 @@ extension Safrole {
                     nil
                 }
 
-            let newTickets = extrinsics.getTickets()
+            let newTickets = try extrinsics.getTickets(verifier: verifier, entropy: newEntropyPool.2)
             guard newTickets.isSorted() else {
                 return .failure(.extrinsicsNotSorted)
+            }
+
+            for ticket in newTickets {
+                guard ticket.attempt < config.value.ticketEntriesPerValidator else {
+                    return .failure(.extrinsicsTooManyEntry)
+                }
             }
 
             var newTicketsAccumulatorArr = if isEpochChange {
@@ -331,6 +349,8 @@ extension Safrole {
             return .success((state: postState, epochMark: epochMark, ticketsMark: ticketsMark))
         } catch let e as SafroleError {
             return .failure(e)
+        } catch let e as BandersnatchError {
+            return .failure(.bandersnatchError(e))
         } catch Blake2Error.hashingError {
             return .failure(.hashingError)
         } catch is DecodingError {

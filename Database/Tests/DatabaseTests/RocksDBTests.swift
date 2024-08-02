@@ -1,4 +1,5 @@
 // swiftlint:disable force_try
+// swiftformat:disable hoistTry
 import Foundation
 import Testing
 
