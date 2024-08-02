@@ -10,8 +10,9 @@ public enum SafroleError: Error {
     case extrinsicsNotSorted
     case extrinsicsTooLow
     case extrinsicsNotUnique
+    case extrinsicsTooManyEntry
     case hashingError
-    case bandersnatchError
+    case bandersnatchError(BandersnatchError)
     case decodingError
     case unspecified
 }
@@ -259,7 +260,10 @@ extension Safrole {
                     BandersnatchPublicKey,
                     ProtocolConfig.EpochLength
                 >
-            > = if newEpoch == currentEpoch + 1, newPhase >= ticketSubmissionEndSlot, ticketsAccumulator.count == config.value.epochLength {
+            > = if newEpoch == currentEpoch + 1,
+                   currentPhase >= ticketSubmissionEndSlot,
+                   ticketsAccumulator.count == config.value.epochLength
+            {
                 .left(ConfigFixedSizeArray(config: config, array: outsideInReorder(ticketsAccumulator.array)))
             } else if newEpoch == currentEpoch {
                 ticketsOrKeys
@@ -294,6 +298,12 @@ extension Safrole {
             let newTickets = try extrinsics.getTickets(verifier, newEntropyPool.2)
             guard newTickets.isSorted() else {
                 return .failure(.extrinsicsNotSorted)
+            }
+
+            for ticket in newTickets {
+                guard ticket.attempt < config.value.ticketEntriesPerValidator else {
+                    return .failure(.extrinsicsTooManyEntry)
+                }
             }
 
             var newTicketsAccumulatorArr = if isEpochChange {
@@ -339,10 +349,10 @@ extension Safrole {
             return .success((state: postState, epochMark: epochMark, ticketsMark: ticketsMark))
         } catch let e as SafroleError {
             return .failure(e)
+        } catch let e as BandersnatchError {
+            return .failure(.bandersnatchError(e))
         } catch Blake2Error.hashingError {
             return .failure(.hashingError)
-        } catch is BandersnatchError {
-            return .failure(.bandersnatchError)
         } catch is DecodingError {
             // TODO: log details
             return .failure(.decodingError)

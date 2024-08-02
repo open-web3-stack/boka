@@ -1,7 +1,7 @@
 import Blockchain
 import Foundation
 import ScaleCodec
-import Testing
+@_spi(Experimental) import Testing
 import Utils
 
 @testable import JAMTests
@@ -219,6 +219,8 @@ enum SafroleTestVariants: String, CaseIterable {
         var config = ProtocolConfigRef.mainnet.value
         config.totalNumberOfValidators = 6
         config.epochLength = 12
+        // 10 = 12 * 500/600, not sure what this should be for tiny, but this passes tests
+        config.ticketSubmissionEndSlot = 10
         return Ref(config)
     }()
 
@@ -234,15 +236,7 @@ enum SafroleTestVariants: String, CaseIterable {
 
 struct SafroleTests {
     static func loadTests(variant: SafroleTestVariants) throws -> [SafroleTestcase] {
-        // let tests = try TestLoader.getTestFiles(path: "safrole/\(variant)", extension: "scale")
-        let tests = [(
-            // path: "/Users/qiweiyang/GitHub/boka/JAMTests/jamtestvectors/safrole/tiny/enact-epoch-change-with-no-tickets-4.scale",
-            path: "/Users/qiweiyang/GitHub/boka/JAMTests/jamtestvectors/safrole/tiny/publish-tickets-no-mark-7.scale",
-            // path: "/Users/qiweiyang/GitHub/boka/JAMTests/jamtestvectors/safrole/tiny/publish-tickets-with-mark-1.scale",
-            // path: "/Users/qiweiyang/GitHub/boka/JAMTests/jamtestvectors/safrole/tiny/skip-epoch-tail-1.scale",
-            // path: "/Users/qiweiyang/GitHub/boka/JAMTests/jamtestvectors/safrole/tiny/skip-epochs-1.scale",
-            description: ""
-        )]
+        let tests = try TestLoader.getTestFiles(path: "safrole/\(variant)", extension: "scale")
         return try tests.map {
             let data = try Data(contentsOf: URL(fileURLWithPath: $0.path))
             var decoder = LoggingDecoder(decoder: decoder(from: data), logger: NoopLogger())
@@ -250,8 +244,7 @@ struct SafroleTests {
         }
     }
 
-    @Test(arguments: try SafroleTests.loadTests(variant: .tiny))
-    func tinyTests(_ testcase: SafroleTestcase) throws {
+    func safroleTests(_ testcase: SafroleTestcase) throws {
         let result = testcase.preState.updateSafrole(
             slot: testcase.input.slot,
             entropy: testcase.input.entropy,
@@ -276,5 +269,15 @@ struct SafroleTests {
                 break
             }
         }
+    }
+
+    @Test(.serialized, arguments: try SafroleTests.loadTests(variant: .tiny))
+    func tinyTests(_ testcase: SafroleTestcase) throws {
+        try safroleTests(testcase)
+    }
+
+    @Test(.serialized, arguments: try SafroleTests.loadTests(variant: .full))
+    func fullTests(_ testcase: SafroleTestcase) throws {
+        try safroleTests(testcase)
     }
 }

@@ -11,6 +11,7 @@ public enum BandersnatchError: Error {
     case ietfVRFSignFailed
     case verifyRingVrfFailed
     case verifyIetfVrfFailed
+    case wrongRingSize
 }
 
 extension Data {
@@ -50,6 +51,15 @@ extension CPublic {
     }
 }
 
+extension RingSize {
+    init(_ size: UInt) throws {
+        guard size == 6 || size == 1023 else {
+            throw BandersnatchError.wrongRingSize
+        }
+        self = size == 6 ? Tiny : Full
+    }
+}
+
 public struct Bandersnatch {
     public let secret: Data96
     public let publicKey: Data32
@@ -76,10 +86,10 @@ public class Prover {
     private var prover: OpaquePointer
 
     /// init with a set of bandersnatch public keys and provider index
-    public init(ring: [Data32], proverIdx: UInt) throws {
+    public init(ring: [Data32], proverIdx: UInt, ringSize: UInt? = nil) throws {
         var success = false
         let cPublicArr = try ring.map { try CPublic(data32: $0) }
-        prover = prover_new(cPublicArr, UInt(ring.count), proverIdx, &success)
+        prover = try prover_new(cPublicArr, UInt(ring.count), RingSize(ringSize ?? UInt(ring.count)), proverIdx, &success)
         if !success {
             throw BandersnatchError.createProverFailed
         }
@@ -126,10 +136,10 @@ public class Verifier {
     /// Bandersnatch ring root
     public var ringRoot: Data144
 
-    public init(ring: [Data32]) throws {
+    public init(ring: [Data32], ringSize: UInt? = nil) throws {
         var success = false
         let cPublicArr = try ring.map { try CPublic(data32: $0) }
-        verifier = verifier_new(cPublicArr, UInt(ring.count), &success)
+        verifier = try verifier_new(cPublicArr, UInt(ring.count), RingSize(ringSize ?? UInt(ring.count)), &success)
         if !success {
             throw BandersnatchError.createVerifierFailed
         }

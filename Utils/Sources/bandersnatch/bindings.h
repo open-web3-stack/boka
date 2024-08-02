@@ -9,6 +9,11 @@ typedef struct Public Public;
 typedef struct Secret Secret;
 
 
+typedef enum RingSize {
+  Tiny,
+  Full,
+} RingSize;
+
 typedef struct Prover Prover;
 
 typedef struct Verifier Verifier;
@@ -29,6 +34,7 @@ const struct CPublic *secret_get_public(const struct CSecret *secret);
 
 struct Prover *prover_new(const struct CPublic *ring,
                           uintptr_t ring_len,
+                          enum RingSize ring_size,
                           uintptr_t prover_idx,
                           bool *success);
 
@@ -54,7 +60,10 @@ bool prover_ietf_vrf_sign(uint8_t *out,
                           const uint8_t *aux_data,
                           uintptr_t aux_data_len);
 
-struct Verifier *verifier_new(const struct CPublic *ring, uintptr_t ring_len, bool *success);
+struct Verifier *verifier_new(const struct CPublic *ring,
+                              uintptr_t ring_len,
+                              enum RingSize ring_size,
+                              bool *success);
 
 void verifier_free(struct Verifier *verifier);
 
