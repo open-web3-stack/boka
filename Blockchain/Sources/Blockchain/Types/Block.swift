@@ -17,7 +17,21 @@ extension Block {
     }
 }
 
-public typealias BlockRef = Ref<Block>
+public final class BlockRef: Ref<Block>, @unchecked Sendable {
+    public required init(_ value: Block) {
+        lazy = Lazy {
+            Ref(value.header.hash())
+        }
+
+        super.init(value)
+    }
+
+    private let lazy: Lazy<Ref<Data32>>
+
+    public var hash: Data32 {
+        lazy.value.value
+    }
+}
 
 extension Block: Dummy {
     public typealias Config = ProtocolConfigRef

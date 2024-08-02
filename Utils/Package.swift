@@ -20,6 +20,7 @@ let package = Package(
         .package(url: "https://github.com/tesseract-one/Blake2.swift.git", from: "0.2.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0" ..< "4.0.0"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
+        .package(url: "https://github.com/apple/swift-atomics.git", from: "1.2.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -30,6 +31,7 @@ let package = Package(
                 .product(name: "ScaleCodec", package: "ScaleCodec.swift"),
                 .product(name: "Blake2", package: "Blake2.swift"),
                 .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "Atomics", package: "swift-atomics"),
                 "blst",
                 "bandersnatch_vrfs",
             ],
