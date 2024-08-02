@@ -5,7 +5,7 @@ use ark_ec_vrfs::{prelude::ark_serialize, suites::bandersnatch::edwards as bande
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use bandersnatch::{Public, Secret};
 
-use crate::bandersnatch_vrfs::{Prover, Verifier};
+use crate::bandersnatch_vrfs::{Prover, RingSize, Verifier};
 
 // MARK: Public
 
@@ -105,6 +105,7 @@ pub extern "C" fn secret_get_public(secret: *const CSecret) -> *const CPublic {
 pub extern "C" fn prover_new(
     ring: *const CPublic,
     ring_len: usize,
+    ring_size: RingSize,
     prover_idx: usize,
     success: *mut bool,
 ) -> *mut Prover {
@@ -114,7 +115,7 @@ pub extern "C" fn prover_new(
     } else {
         let ring_slice_c = unsafe { std::slice::from_raw_parts(ring, ring_len) };
         let ring_vec = ring_slice_c.iter().map(|&cp| cp.into()).collect();
-        let prover = Prover::new(ring_vec, prover_idx);
+        let prover = Prover::new(ring_vec, prover_idx, ring_size);
         let boxed_prover = Box::new(prover);
         unsafe { *success = true };
         Box::into_raw(boxed_prover)
@@ -203,6 +204,7 @@ pub extern "C" fn prover_ietf_vrf_sign(
 pub extern "C" fn verifier_new(
     ring: *const CPublic,
     ring_len: usize,
+    ring_size: RingSize,
     success: *mut bool,
 ) -> *mut Verifier {
     if ring.is_null() || success.is_null() {
@@ -211,7 +213,7 @@ pub extern "C" fn verifier_new(
     } else {
         let ring_slice_c = unsafe { std::slice::from_raw_parts(ring, ring_len) };
         let ring_vec = ring_slice_c.iter().map(|&cp| cp.into()).collect();
-        let verifier = Verifier::new(ring_vec);
+        let verifier = Verifier::new(ring_vec, ring_size);
         unsafe { *success = true };
         let boxed_verifier = Box::new(verifier);
         Box::into_raw(boxed_verifier)
@@ -226,6 +228,29 @@ pub extern "C" fn verifier_free(verifier: *mut Verifier) {
             let _ = Box::from_raw(verifier);
         };
     }
+}
+
+/// Ring Commitment: the Bandersnatch ring root in GP
+///
+/// out is 144 bytes
+#[no_mangle]
+pub extern "C" fn verifier_commitment(out: *mut u8, verifier: *mut Verifier) -> bool {
+    if verifier.is_null() {
+        return false;
+    }
+
+    let verifier = unsafe { &*verifier };
+
+    let mut buf = Vec::new();
+    verifier.commitment.serialize_compressed(&mut buf).unwrap();
+
+    if buf.len() != 144 {
+        return false;
+    }
+    unsafe {
+        ptr::copy_nonoverlapping(buf.as_ptr(), out, buf.len());
+    }
+    true
 }
 
 /// out is 32 bytes
