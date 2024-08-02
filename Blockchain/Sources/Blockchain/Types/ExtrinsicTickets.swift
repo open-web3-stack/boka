@@ -69,7 +69,7 @@ extension ExtrinsicTickets: ScaleCodec.Encodable {
 extension ExtrinsicTickets {
     public func getTickets(verifier: Verifier, entropy: Data32) throws -> [Ticket] {
         try tickets.array.map {
-            var vrfInputData = Data(SigningContext.ticketSeal.utf8)
+            var vrfInputData = SigningContext.ticketSeal
             vrfInputData.append(entropy.data)
             vrfInputData.append($0.attempt)
             let ticketId = verifier.ringVRFVerify(vrfInputData: vrfInputData, auxData: Data(), signature: $0.signature.data)
