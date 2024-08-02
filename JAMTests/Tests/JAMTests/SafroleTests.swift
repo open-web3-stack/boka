@@ -1,7 +1,7 @@
 import Blockchain
 import Foundation
 import ScaleCodec
-@_spi(Experimental) import Testing
+import Testing
 import Utils
 
 @testable import JAMTests
@@ -271,12 +271,12 @@ struct SafroleTests {
         }
     }
 
-    @Test(.serialized, arguments: try SafroleTests.loadTests(variant: .tiny))
+    @Test(arguments: try SafroleTests.loadTests(variant: .tiny))
     func tinyTests(_ testcase: SafroleTestcase) throws {
         try safroleTests(testcase)
     }
 
-    @Test(.serialized, arguments: try SafroleTests.loadTests(variant: .full))
+    @Test(arguments: try SafroleTests.loadTests(variant: .full))
     func fullTests(_ testcase: SafroleTestcase) throws {
         try safroleTests(testcase)
     }
