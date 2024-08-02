@@ -219,6 +219,8 @@ enum SafroleTestVariants: String, CaseIterable {
         var config = ProtocolConfigRef.mainnet.value
         config.totalNumberOfValidators = 6
         config.epochLength = 12
+        // 10 = 12 * 500/600, not sure what this should be for tiny, but this passes tests
+        config.ticketSubmissionEndSlot = 10
         return Ref(config)
     }()
 
@@ -242,33 +244,40 @@ struct SafroleTests {
         }
     }
 
-    @Test(arguments: try SafroleTests.loadTests(variant: .tiny))
-    func tinyTests(_ testcase: SafroleTestcase) throws {
-        withKnownIssue("not yet implemented", isIntermittent: true) {
-            let result = testcase.preState.updateSafrole(
-                slot: testcase.input.slot,
-                entropy: testcase.input.entropy,
-                extrinsics: testcase.input.extrinsics
-            )
-            switch result {
-            case let .success((state, epochMark, ticketsMark)):
-                switch testcase.output {
-                case let .ok(marks):
-                    #expect(epochMark == marks.epochMark)
-                    #expect(ticketsMark == marks.ticketsMark)
-                    #expect(testcase.preState.mergeWith(postState: state) == testcase.postState)
-                case .err:
-                    Issue.record("Expected error, got \(result)")
-                }
-            case .failure:
-                switch testcase.output {
-                case .ok:
-                    Issue.record("Expected success, got \(result)")
-                case .err:
-                    // ignore error code because it is unspecified
-                    break
-                }
+    func safroleTests(_ testcase: SafroleTestcase) throws {
+        let result = testcase.preState.updateSafrole(
+            slot: testcase.input.slot,
+            entropy: testcase.input.entropy,
+            extrinsics: testcase.input.extrinsics
+        )
+        switch result {
+        case let .success((state, epochMark, ticketsMark)):
+            switch testcase.output {
+            case let .ok(marks):
+                #expect(epochMark == marks.epochMark)
+                #expect(ticketsMark == marks.ticketsMark)
+                #expect(testcase.preState.mergeWith(postState: state) == testcase.postState)
+            case .err:
+                Issue.record("Expected error, got \(result)")
+            }
+        case .failure:
+            switch testcase.output {
+            case .ok:
+                Issue.record("Expected success, got \(result)")
+            case .err:
+                // ignore error code because it is unspecified
+                break
             }
         }
+    }
+
+    @Test(arguments: try SafroleTests.loadTests(variant: .tiny))
+    func tinyTests(_ testcase: SafroleTestcase) throws {
+        try safroleTests(testcase)
+    }
+
+    @Test(arguments: try SafroleTests.loadTests(variant: .full))
+    func fullTests(_ testcase: SafroleTestcase) throws {
+        try safroleTests(testcase)
     }
 }
