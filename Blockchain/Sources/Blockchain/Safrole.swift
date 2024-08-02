@@ -295,7 +295,7 @@ extension Safrole {
                     nil
                 }
 
-            let newTickets = try extrinsics.getTickets(verifier, newEntropyPool.2)
+            let newTickets = try extrinsics.getTickets(verifier: verifier, entropy: newEntropyPool.2)
             guard newTickets.isSorted() else {
                 return .failure(.extrinsicsNotSorted)
             }
