@@ -33,16 +33,36 @@ public struct ValidatorActivityStatistics: Sendable, Equatable {
         }
     }
 
-    public var accumulator: ConfigFixedSizeArray<StatisticsItem, ProtocolConfig.TotalNumberOfValidators>
-    public var current: ConfigFixedSizeArray<StatisticsItem, ProtocolConfig.TotalNumberOfValidators>
+    public var accumulator:
+        ConfigFixedSizeArray<StatisticsItem, ProtocolConfig.TotalNumberOfValidators>
+    public var previous:
+        ConfigFixedSizeArray<StatisticsItem, ProtocolConfig.TotalNumberOfValidators>
 }
 
 extension ValidatorActivityStatistics: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> ValidatorActivityStatistics {
         ValidatorActivityStatistics(
-            accumulator: ConfigFixedSizeArray(config: config),
-            current: ConfigFixedSizeArray(config: config)
+            accumulator: ConfigFixedSizeArray(
+                config: config, defaultValue: StatisticsItem.dummy(config: config)
+            ),
+            previous: ConfigFixedSizeArray(
+                config: config, defaultValue: StatisticsItem.dummy(config: config)
+            )
+        )
+    }
+}
+
+extension ValidatorActivityStatistics.StatisticsItem: Dummy {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(config _: Config) -> ValidatorActivityStatistics.StatisticsItem {
+        ValidatorActivityStatistics.StatisticsItem(
+            blocks: 0,
+            tickets: 0,
+            preimages: 0,
+            preimagesBytes: 0,
+            guarantees: 0,
+            assurances: 0
         )
     }
 }
@@ -51,13 +71,13 @@ extension ValidatorActivityStatistics: ScaleCodec.Encodable {
     public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             accumulator: ConfigFixedSizeArray(config: config, from: &decoder),
-            current: ConfigFixedSizeArray(config: config, from: &decoder)
+            previous: ConfigFixedSizeArray(config: config, from: &decoder)
         )
     }
 
     public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
         try encoder.encode(accumulator)
-        try encoder.encode(current)
+        try encoder.encode(previous)
     }
 }
 

@@ -2,12 +2,25 @@ import ScaleCodec
 import Utils
 
 public struct ExtrinsicGuarantees: Sendable, Equatable {
+    public struct IndexAndSignature: Sendable, Equatable {
+        public var index: UInt32
+        public var signature: Ed25519Signature
+
+        public init(
+            index: UInt32,
+            signature: Ed25519Signature
+        ) {
+            self.index = index
+            self.signature = signature
+        }
+    }
+
     public struct GuaranteeItem: Sendable, Equatable {
         public var coreIndex: CoreIndex
         public var workReport: WorkReport
         public var timeslot: TimeslotIndex
         public var credential: LimitedSizeArray<
-            Ed25519Signature,
+            IndexAndSignature,
             ConstInt2,
             ConstInt3
         >
@@ -17,7 +30,7 @@ public struct ExtrinsicGuarantees: Sendable, Equatable {
             workReport: WorkReport,
             timeslot: TimeslotIndex,
             credential: LimitedSizeArray<
-                Ed25519Signature,
+                IndexAndSignature,
                 ConstInt2,
                 ConstInt3
             >
@@ -42,16 +55,12 @@ public struct ExtrinsicGuarantees: Sendable, Equatable {
     ) {
         self.guarantees = guarantees
     }
-
-    public init(config: ProtocolConfigRef) {
-        guarantees = ConfigLimitedSizeArray(config: config)
-    }
 }
 
 extension ExtrinsicGuarantees: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> ExtrinsicGuarantees {
-        ExtrinsicGuarantees(config: config)
+        ExtrinsicGuarantees(guarantees: ConfigLimitedSizeArray(config: config))
     }
 }
 
@@ -82,5 +91,19 @@ extension ExtrinsicGuarantees.GuaranteeItem: ScaleCodec.Encodable {
         try encoder.encode(workReport)
         try encoder.encode(timeslot)
         try encoder.encode(credential)
+    }
+}
+
+extension ExtrinsicGuarantees.IndexAndSignature: ScaleCodec.Codable {
+    public init(from decoder: inout some ScaleCodec.Decoder) throws {
+        try self.init(
+            index: decoder.decode(),
+            signature: decoder.decode()
+        )
+    }
+
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(index)
+        try encoder.encode(signature)
     }
 }

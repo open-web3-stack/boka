@@ -36,8 +36,8 @@ public struct Header: Sendable, Equatable {
     // Ho: offenders markers
     public var offendersMarkers: [Ed25519PublicKey]
 
-    // Hi: a Bandersnatch block author index
-    public var authorKey: ValidatorIndex
+    // Hi: block author index
+    public var authorIndex: ValidatorIndex
 
     // Hv: the entropy-yielding vrf signature
     public var vrfSignature: BandersnatchSignature
@@ -57,7 +57,7 @@ public struct Header: Sendable, Equatable {
         >?,
         judgementsMarkers: [Data32],
         offendersMarkers: [Ed25519PublicKey],
-        authorKey: UInt32,
+        authorIndex: UInt32,
         vrfSignature: BandersnatchSignature,
         seal: BandersnatchSignature
     ) {
@@ -69,7 +69,7 @@ public struct Header: Sendable, Equatable {
         self.winningTickets = winningTickets
         self.judgementsMarkers = judgementsMarkers
         self.offendersMarkers = offendersMarkers
-        self.authorKey = authorKey
+        self.authorIndex = authorIndex
         self.vrfSignature = vrfSignature
         self.seal = seal
     }
@@ -95,7 +95,7 @@ extension Header: Dummy {
             winningTickets: nil,
             judgementsMarkers: [],
             offendersMarkers: [],
-            authorKey: 0,
+            authorIndex: 0,
             vrfSignature: BandersnatchSignature(),
             seal: BandersnatchSignature()
         )
@@ -113,7 +113,7 @@ extension Header: ScaleCodec.Encodable {
             winningTickets: ConfigFixedSizeArray(config: config, from: &decoder),
             judgementsMarkers: decoder.decode(),
             offendersMarkers: decoder.decode(),
-            authorKey: decoder.decode(),
+            authorIndex: decoder.decode(),
             vrfSignature: decoder.decode(),
             seal: decoder.decode()
         )
@@ -128,7 +128,7 @@ extension Header: ScaleCodec.Encodable {
         try encoder.encode(winningTickets)
         try encoder.encode(judgementsMarkers)
         try encoder.encode(offendersMarkers)
-        try encoder.encode(authorKey)
+        try encoder.encode(authorIndex)
         try encoder.encode(vrfSignature)
         try encoder.encode(seal)
     }
