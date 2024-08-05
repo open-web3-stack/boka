@@ -26,8 +26,8 @@ public protocol BlockchainDataProvider {
 
 extension BlockchainDataProvider {
     public func updateHead(hash: Data32, parent: Data32) async throws {
-        try await debugCheck(hasHeader(hash: hash))
-        try await debugCheck(hasHeader(hash: parent))
+        try await debugCheck(await hasHeader(hash: hash))
+        try await debugCheck(await hasHeader(hash: parent))
 
         try await _updateHeadNoCheck(hash: hash, parent: parent)
     }
