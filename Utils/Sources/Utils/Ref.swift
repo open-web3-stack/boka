@@ -1,6 +1,7 @@
+import Atomics
 import ScaleCodec
 
-public final class Ref<T: Sendable>: Sendable {
+open class Ref<T: Sendable>: @unchecked Sendable, AtomicReference {
     public let value: T
 
     public required init(_ value: T) {

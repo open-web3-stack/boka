@@ -39,7 +39,7 @@ public enum Instructions {
 
         public init(data _: Data) {}
 
-        public func executeImpl(state _: VMState) -> ExitReason? {
+        public func _executeImpl(state _: VMState) -> ExitReason? {
             .panic(.trap)
         }
     }
@@ -49,7 +49,7 @@ public enum Instructions {
 
         public init(data _: Data) {}
 
-        public func executeImpl(state _: VMState) -> ExitReason? {
+        public func _executeImpl(state _: VMState) -> ExitReason? {
             nil
         }
     }
@@ -65,7 +65,7 @@ public enum Instructions {
             callIndex = Instructions.decodeImmediate(data)
         }
 
-        public func executeImpl(state _: VMState) -> ExitReason? {
+        public func _executeImpl(state _: VMState) -> ExitReason? {
             .hostCall(callIndex)
         }
     }
@@ -84,7 +84,7 @@ public enum Instructions {
             value = UInt8(truncatingIfNeeded: y)
         }
 
-        public func executeImpl(state: VMState) throws -> ExitReason? {
+        public func _executeImpl(state: VMState) throws -> ExitReason? {
             try state.writeMemory(address: address, value: value)
             return nil
         }
@@ -102,7 +102,7 @@ public enum Instructions {
             value = UInt16(truncatingIfNeeded: y)
         }
 
-        public func executeImpl(state: VMState) throws -> ExitReason? {
+        public func _executeImpl(state: VMState) throws -> ExitReason? {
             try state.writeMemory(address: address, values: value.encode(method: .fixedWidth(2)))
             return nil
         }
@@ -120,7 +120,7 @@ public enum Instructions {
             value = y
         }
 
-        public func executeImpl(state: VMState) -> ExitReason? {
+        public func _executeImpl(state: VMState) -> ExitReason? {
             if (try? state.writeMemory(
                 address: address, values: value.encode(method: .fixedWidth(4))
             )) != nil {
@@ -143,7 +143,7 @@ public enum Instructions {
             offset = Instructions.decodeImmediate(data)
         }
 
-        public func executeImpl(state _: VMState) -> ExitReason? {
+        public func _executeImpl(state _: VMState) -> ExitReason? {
             nil
         }
 
@@ -166,7 +166,7 @@ public enum Instructions {
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func executeImpl(state _: VMState) -> ExitReason? {
+        public func _executeImpl(state _: VMState) -> ExitReason? {
             nil
         }
 
@@ -187,7 +187,7 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func executeImpl(state: VMState) -> ExitReason? {
+        public func _executeImpl(state: VMState) -> ExitReason? {
             state.writeRegister(register, value)
             return nil
         }
@@ -204,7 +204,7 @@ public enum Instructions {
             address = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func executeImpl(state: VMState) throws -> ExitReason? {
+        public func _executeImpl(state: VMState) throws -> ExitReason? {
             let value = try state.readMemory(address: address)
             state.writeRegister(register, UInt32(value))
             return nil
@@ -222,7 +222,7 @@ public enum Instructions {
             address = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func executeImpl(state: VMState) throws -> ExitReason? {
+        public func _executeImpl(state: VMState) throws -> ExitReason? {
             let value = try state.readMemory(address: address)
             state.writeRegister(register, UInt32(bitPattern: Int32(Int8(bitPattern: value))))
             return nil
@@ -240,7 +240,7 @@ public enum Instructions {
             address = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func executeImpl(state: VMState) throws -> ExitReason? {
+        public func _executeImpl(state: VMState) throws -> ExitReason? {
             var data = try state.readMemory(address: address, length: 2)
             guard let value: UInt16 = data.decode(length: 2) else {
                 fatalError("unreachable: value should be valid")
@@ -261,7 +261,7 @@ public enum Instructions {
             address = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func executeImpl(state: VMState) throws -> ExitReason? {
+        public func _executeImpl(state: VMState) throws -> ExitReason? {
             var data = try state.readMemory(address: address, length: 2)
             guard let value: UInt16 = data.decode(length: 2) else {
                 fatalError("unreachable: value should be valid")
@@ -282,7 +282,7 @@ public enum Instructions {
             address = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func executeImpl(state: VMState) throws -> ExitReason? {
+        public func _executeImpl(state: VMState) throws -> ExitReason? {
             var data = try state.readMemory(address: address, length: 4)
             guard let value: UInt32 = data.decode(length: 4) else {
                 fatalError("unreachable: value should be valid")
@@ -303,7 +303,7 @@ public enum Instructions {
             address = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func executeImpl(state: VMState) throws -> ExitReason? {
+        public func _executeImpl(state: VMState) throws -> ExitReason? {
             let value = UInt8(truncatingIfNeeded: state.readRegister(register))
             try state.writeMemory(address: address, value: value)
             return nil
@@ -321,7 +321,7 @@ public enum Instructions {
             address = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func executeImpl(state: VMState) throws -> ExitReason? {
+        public func _executeImpl(state: VMState) throws -> ExitReason? {
             let value = UInt16(truncatingIfNeeded: state.readRegister(register))
             try state.writeMemory(address: address, values: value.encode(method: .fixedWidth(2)))
             return nil
@@ -339,7 +339,7 @@ public enum Instructions {
             address = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func executeImpl(state: VMState) throws -> ExitReason? {
+        public func _executeImpl(state: VMState) throws -> ExitReason? {
             let value = state.readRegister(register)
             try state.writeMemory(address: address, values: value.encode(method: .fixedWidth(4)))
             return nil
