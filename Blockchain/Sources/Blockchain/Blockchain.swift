@@ -4,50 +4,25 @@ import Utils
 /// Holds the state of the blockchain.
 /// Includes the canonical chain as well as pending forks.
 /// Assume all blocks and states are valid and have been validated.
-public actor Blockchain {
+public class Blockchain {
     public let config: ProtocolConfigRef
 
-    public private(set) var heads: [StateRef]
-    public private(set) var finalizedHead: StateRef
+    private let dataProvider: BlockchainDataProvider
 
-    private var stateByBlockHash: [Data32: StateRef] = [:]
-    private var stateByTimeslot: [TimeslotIndex: [StateRef]] = [:]
-
-    public init(config: ProtocolConfigRef, heads: [StateRef], finalizedHead: StateRef) async {
+    public init(config: ProtocolConfigRef, dataProvider: BlockchainDataProvider) async {
         self.config = config
-        assert(heads.contains(where: { $0 === finalizedHead }))
-
-        self.heads = heads
-        self.finalizedHead = finalizedHead
-
-        for head in heads {
-            addState(head)
-        }
+        self.dataProvider = dataProvider
     }
 
-    public var bestHead: StateRef {
-        // heads with the highest timestamp / latest block
-        heads.max(by: { $0.value.lastBlock.header.timeslotIndex < $1.value.lastBlock.header.timeslotIndex })!
+    public func importBlock(_ block: BlockRef) async throws {
+        let runtime = Runtime(config: config)
+        let parent = try await dataProvider.getState(hash: block.header.parentHash)
+        let state = try runtime.apply(block: block, state: parent)
+        try await dataProvider.add(state: state)
     }
 
-    public func newHead(_ head: StateRef) {
-        // TODO: check if the parent is known
-        // TODO: Update heads, by either extending an existing one or adding a new fork
-        addState(head)
-    }
-
-    private func addState(_ state: StateRef) {
-        stateByBlockHash[state.value.lastBlock.hash] = state
-        stateByTimeslot[state.value.lastBlock.header.timeslotIndex, default: []].append(state)
-    }
-}
-
-extension Blockchain {
-    public subscript(hash: Data32) -> StateRef? {
-        stateByBlockHash[hash]
-    }
-
-    public subscript(index: TimeslotIndex) -> [StateRef]? {
-        stateByTimeslot[index]
+    public func finalize(hash: Data32) async throws {
+        // TODO: purge forks
+        try await dataProvider.setFinalizedHead(hash: hash)
     }
 }

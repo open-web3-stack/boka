@@ -70,6 +70,14 @@ public struct Header: Sendable, Equatable {
     }
 }
 
+extension Header {
+    public func asRef() -> HeaderRef {
+        HeaderRef(self)
+    }
+}
+
+public typealias HeaderRef = Ref<Header>
+
 extension Header: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config _: Config) -> Header {

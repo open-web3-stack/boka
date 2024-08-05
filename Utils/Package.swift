@@ -35,6 +35,9 @@ let package = Package(
                 "blst",
                 "bandersnatch_vrfs",
             ],
+            swiftSettings: [
+                .define("DEBUG_ASSERT", .when(configuration: .debug)),
+            ],
             linkerSettings: [
                 .unsafeFlags(["-L../.lib"]),
             ]

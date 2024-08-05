@@ -5,7 +5,8 @@ public class Node {
 
     public init(genesis: Genesis, config: ProtocolConfigRef) async throws {
         let genesisState = try genesis.toState(config: config)
-        blockchain = await Blockchain(config: config, heads: [genesisState], finalizedHead: genesisState)
+        let dataProvider = await InMemoryDataProvider(genesis: genesisState)
+        blockchain = await Blockchain(config: config, dataProvider: dataProvider)
     }
 
     public func sayHello() {
