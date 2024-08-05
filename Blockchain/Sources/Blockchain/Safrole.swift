@@ -148,7 +148,7 @@ public protocol Safrole {
             SafroleError
         >
 
-    func mergeWith(postState: SafrolePostState) -> Self
+    mutating func mergeWith(postState: SafrolePostState)
 }
 
 func outsideInReorder<T>(_ array: [T]) -> [T] {

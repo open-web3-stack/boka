@@ -9,8 +9,8 @@ import Node
 
 @main
 struct Boka: ParsableCommand {
-    mutating func run() throws {
-        let node = try Node(genesis: .dev, config: .dev)
+    mutating func run() async throws {
+        let node = try await Node(genesis: .dev, config: .dev)
         node.sayHello()
     }
 }
