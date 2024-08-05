@@ -75,6 +75,16 @@ extension ConfigLimitedSizeArray: RandomAccessCollection {
         }
     }
 
+    public subscript(position: UInt32) -> T {
+        get {
+            array[Int(position)]
+        }
+        set {
+            array[Int(position)] = newValue
+            validate()
+        }
+    }
+
     public func index(after i: Int) -> Int {
         i + 1
     }

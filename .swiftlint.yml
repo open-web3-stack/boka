@@ -9,6 +9,7 @@ disabled_rules:
     - blanket_disable_command
     - type_body_length
     - identifier_name
+    - function_parameter_count
 
 excluded:
     - "**/.build"

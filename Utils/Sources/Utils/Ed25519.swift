@@ -32,6 +32,7 @@ public struct Ed25519 {
         guard let publicKey = try? Curve25519.Signing.PublicKey(rawRepresentation: publicKey.data) else {
             return false
         }
+
         return publicKey.isValidSignature(signature.data, for: message)
     }
 }
