@@ -2,24 +2,27 @@ import ScaleCodec
 import Utils
 
 public struct JudgementsState: Sendable, Equatable {
-    // ψa: The allow-set contains the hashes of all work-reports which were disputed and judged to be accurate.
-    public var allowSet: Set<Data32>
+    // ψg: Work-reports judged to be correct
+    public var goodSet: Set<Data32>
 
-    // ψb: The ban-set contains the hashes of all work-reports which were disputed and whose accuracy
-    // could not be confidently confirmed.
+    // ψb: Work-reports judged to be incorrect
     public var banSet: Set<Data32>
 
-    // ψp; he punish-set is a set of keys of Bandersnatch keys which were found to have guaranteed
-    // a report which was confidently found to be invalid.
-    public var punishSet: Set<BandersnatchPublicKey>
+    // ψw: Work-reports whose validity is judged to be unknowable
+    public var wonkySet: Set<Data32>
+
+    // ψo: Validators who made a judgement found to be incorrect
+    public var punishSet: Set<Ed25519PublicKey>
 
     public init(
-        allowSet: Set<Data32>,
+        goodSet: Set<Data32>,
         banSet: Set<Data32>,
-        punishSet: Set<BandersnatchPublicKey>
+        wonkySet: Set<Data32>,
+        punishSet: Set<Ed25519PublicKey>
     ) {
-        self.allowSet = allowSet
+        self.goodSet = goodSet
         self.banSet = banSet
+        self.wonkySet = wonkySet
         self.punishSet = punishSet
     }
 }
@@ -28,8 +31,9 @@ extension JudgementsState: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config _: Config) -> JudgementsState {
         JudgementsState(
-            allowSet: [],
+            goodSet: [],
             banSet: [],
+            wonkySet: [],
             punishSet: []
         )
     }
@@ -38,15 +42,17 @@ extension JudgementsState: Dummy {
 extension JudgementsState: ScaleCodec.Codable {
     public init(from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            allowSet: decoder.decode(),
+            goodSet: decoder.decode(),
             banSet: decoder.decode(),
+            wonkySet: decoder.decode(),
             punishSet: decoder.decode()
         )
     }
 
     public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(allowSet)
+        try encoder.encode(goodSet)
         try encoder.encode(banSet)
+        try encoder.encode(wonkySet)
         try encoder.encode(punishSet)
     }
 }

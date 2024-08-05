@@ -6,8 +6,8 @@ public struct Extrinsic: Sendable, Equatable {
     // permissioning of block authoring
     public var tickets: ExtrinsicTickets
 
-    // EJ: Votes, by validators, on dispute(s) arising between them presently taking place
-    public var judgements: ExtrinsicJudgement
+    // ED: Votes, by validators, on dispute(s) arising between them presently taking place
+    public var judgements: ExtrinsicDisputes
 
     // EP: Static data which is presently being requested to be available for workloads to be able to fetch on demand
     public var preimages: ExtrinsicPreimages
@@ -21,7 +21,7 @@ public struct Extrinsic: Sendable, Equatable {
 
     public init(
         tickets: ExtrinsicTickets,
-        judgements: ExtrinsicJudgement,
+        judgements: ExtrinsicDisputes,
         preimages: ExtrinsicPreimages,
         availability: ExtrinsicAvailability,
         reports: ExtrinsicGuarantees
@@ -39,7 +39,7 @@ extension Extrinsic: Dummy {
     public static func dummy(config: Config) -> Extrinsic {
         Extrinsic(
             tickets: ExtrinsicTickets.dummy(config: config),
-            judgements: ExtrinsicJudgement.dummy(config: config),
+            judgements: ExtrinsicDisputes.dummy(config: config),
             preimages: ExtrinsicPreimages.dummy(config: config),
             availability: ExtrinsicAvailability.dummy(config: config),
             reports: ExtrinsicGuarantees.dummy(config: config)
@@ -51,7 +51,7 @@ extension Extrinsic: ScaleCodec.Encodable {
     public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             tickets: ExtrinsicTickets(config: config, from: &decoder),
-            judgements: ExtrinsicJudgement(config: config, from: &decoder),
+            judgements: ExtrinsicDisputes(config: config, from: &decoder),
             preimages: decoder.decode(),
             availability: ExtrinsicAvailability(config: config, from: &decoder),
             reports: ExtrinsicGuarantees(config: config, from: &decoder)

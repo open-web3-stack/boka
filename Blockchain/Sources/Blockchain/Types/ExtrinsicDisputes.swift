@@ -1,17 +1,17 @@
 import ScaleCodec
 import Utils
 
-public struct ExtrinsicJudgement: Sendable, Equatable {
-    public struct JudgementItem: Sendable, Equatable {
+public struct ExtrinsicDisputes: Sendable, Equatable {
+    public struct VerdictItem: Sendable, Equatable {
         public struct SignatureItem: Sendable, Equatable {
             public var isValid: Bool
             public var validatorIndex: ValidatorIndex
-            public var signature: BandersnatchSignature
+            public var signature: Ed25519Signature
 
             public init(
                 isValid: Bool,
                 validatorIndex: ValidatorIndex,
-                signature: BandersnatchSignature
+                signature: Ed25519Signature
             ) {
                 self.isValid = isValid
                 self.validatorIndex = validatorIndex
@@ -37,37 +37,35 @@ public struct ExtrinsicJudgement: Sendable, Equatable {
         }
     }
 
-    public typealias JudgementsList = [JudgementItem]
-
-    public var judgements: JudgementsList
+    public var verdicts: [VerdictItem]
 
     public init(
-        judgements: JudgementsList
+        verdicts: [VerdictItem]
     ) {
-        self.judgements = judgements
+        self.verdicts = verdicts
     }
 }
 
-extension ExtrinsicJudgement: Dummy {
+extension ExtrinsicDisputes: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(config _: Config) -> ExtrinsicJudgement {
-        ExtrinsicJudgement(judgements: [])
+    public static func dummy(config _: Config) -> ExtrinsicDisputes {
+        ExtrinsicDisputes(verdicts: [])
     }
 }
 
-extension ExtrinsicJudgement: ScaleCodec.Encodable {
+extension ExtrinsicDisputes: ScaleCodec.Encodable {
     public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            judgements: decoder.decode(.array { try JudgementItem(config: config, from: &$0) })
+            verdicts: decoder.decode(.array { try VerdictItem(config: config, from: &$0) })
         )
     }
 
     public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(judgements)
+        try encoder.encode(verdicts)
     }
 }
 
-extension ExtrinsicJudgement.JudgementItem: ScaleCodec.Encodable {
+extension ExtrinsicDisputes.VerdictItem: ScaleCodec.Encodable {
     public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             reportHash: decoder.decode(),
@@ -81,7 +79,7 @@ extension ExtrinsicJudgement.JudgementItem: ScaleCodec.Encodable {
     }
 }
 
-extension ExtrinsicJudgement.JudgementItem.SignatureItem: ScaleCodec.Codable {
+extension ExtrinsicDisputes.VerdictItem.SignatureItem: ScaleCodec.Codable {
     public init(from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             isValid: decoder.decode(),

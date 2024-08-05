@@ -31,7 +31,7 @@ public struct State: Sendable {
     >
 
     // β: Information on the most recent βlocks.
-    public var lastBlock: BlockRef
+    public var lastBlock: Block
 
     // γ: State concerning Safrole.
     public var safroleState: SafroleState
@@ -85,9 +85,6 @@ public struct State: Sendable {
     // ψ: past judgements
     public var judgements: JudgementsState
 
-    // π: The activity statistics for the validators.
-    public var activityStatistics: ValidatorActivityStatistics
-
     public init(
         config: ProtocolConfigRef,
         coreAuthorizationPool: ConfigFixedSizeArray<
@@ -98,7 +95,7 @@ public struct State: Sendable {
             >,
             ProtocolConfig.TotalNumberOfCores
         >,
-        lastBlock: BlockRef,
+        lastBlock: Block,
         safroleState: SafroleState,
         serviceAccounts: [ServiceIdentifier: ServiceAccount],
         entropyPool: (Data32, Data32, Data32, Data32),
@@ -128,8 +125,7 @@ public struct State: Sendable {
             assign: ServiceIdentifier,
             designate: ServiceIdentifier
         ),
-        judgements: JudgementsState,
-        activityStatistics: ValidatorActivityStatistics
+        judgements: JudgementsState
     ) {
         self.config = config
         self.coreAuthorizationPool = coreAuthorizationPool
@@ -145,7 +141,6 @@ public struct State: Sendable {
         self.authorizationQueue = authorizationQueue
         self.privilegedServiceIndices = privilegedServiceIndices
         self.judgements = judgements
-        self.activityStatistics = activityStatistics
     }
 }
 
@@ -165,8 +160,7 @@ extension State: Equatable {
             lhs.timeslot == rhs.timeslot &&
             lhs.authorizationQueue == rhs.authorizationQueue &&
             lhs.privilegedServiceIndices == rhs.privilegedServiceIndices &&
-            lhs.judgements == rhs.judgements &&
-            lhs.activityStatistics == rhs.activityStatistics
+            lhs.judgements == rhs.judgements
     }
 }
 
@@ -176,7 +170,7 @@ extension State: Dummy {
         State(
             config: config,
             coreAuthorizationPool: ConfigFixedSizeArray(config: config, defaultValue: ConfigLimitedSizeArray(config: config)),
-            lastBlock: BlockRef.dummy(config: config),
+            lastBlock: Block.dummy(config: config),
             safroleState: SafroleState.dummy(config: config),
             serviceAccounts: [:],
             entropyPool: (Data32(), Data32(), Data32(), Data32()),
@@ -194,8 +188,7 @@ extension State: Dummy {
                 assign: ServiceIdentifier(),
                 designate: ServiceIdentifier()
             ),
-            judgements: JudgementsState.dummy(config: config),
-            activityStatistics: ValidatorActivityStatistics.dummy(config: config)
+            judgements: JudgementsState.dummy(config: config)
         )
     }
 }
@@ -223,7 +216,7 @@ extension State: ScaleCodec.Encodable {
             coreAuthorizationPool: ConfigFixedSizeArray(config: config, from: &decoder) {
                 try ConfigLimitedSizeArray(config: config, from: &$0) { try $0.decode() }
             },
-            lastBlock: Block(config: config, from: &decoder).asRef(),
+            lastBlock: Block(config: config, from: &decoder),
             safroleState: SafroleState(config: config, from: &decoder),
             serviceAccounts: decoder.decode(),
             entropyPool: decoder.decode(),
@@ -236,14 +229,13 @@ extension State: ScaleCodec.Encodable {
                 try ConfigFixedSizeArray(config: config, from: &$0)
             },
             privilegedServiceIndices: decoder.decode(),
-            judgements: decoder.decode(),
-            activityStatistics: ValidatorActivityStatistics(config: config, from: &decoder)
+            judgements: decoder.decode()
         )
     }
 
     public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
         try encoder.encode(coreAuthorizationPool)
-        try encoder.encode(lastBlock.value)
+        try encoder.encode(lastBlock)
         try encoder.encode(safroleState)
         try encoder.encode(serviceAccounts)
         try encoder.encode(entropyPool)
@@ -255,7 +247,28 @@ extension State: ScaleCodec.Encodable {
         try encoder.encode(authorizationQueue)
         try encoder.encode(privilegedServiceIndices)
         try encoder.encode(judgements)
-        try encoder.encode(activityStatistics)
+    }
+}
+
+extension State {
+    public func update(with block: Block) -> State {
+        let state = State(
+            config: config,
+            coreAuthorizationPool: coreAuthorizationPool,
+            lastBlock: block,
+            safroleState: safroleState,
+            serviceAccounts: serviceAccounts,
+            entropyPool: entropyPool,
+            validatorQueue: validatorQueue,
+            currentValidators: currentValidators,
+            previousValidators: previousValidators,
+            reports: reports,
+            timeslot: timeslot,
+            authorizationQueue: authorizationQueue,
+            privilegedServiceIndices: privilegedServiceIndices,
+            judgements: judgements
+        )
+        return state
     }
 }
 
@@ -283,15 +296,27 @@ extension State: Safrole {
 
     public var ticketsVerifier: BandersnatchRingVRFRoot { safroleState.ticketsVerifier }
 
-    public mutating func mergeWith(postState: SafrolePostState) {
-        safroleState.nextValidators = postState.nextValidators
-        safroleState.ticketsVerifier = postState.ticketsVerifier
-        safroleState.ticketsOrKeys = postState.ticketsOrKeys
-        safroleState.ticketsAccumulator = postState.ticketsAccumulator
-        entropyPool = postState.entropyPool
-        validatorQueue = postState.validatorQueue
-        currentValidators = postState.currentValidators
-        previousValidators = postState.previousValidators
-        timeslot = postState.timeslot
+    public func mergeWith(postState: SafrolePostState) -> Self {
+        Self(
+            config: config,
+            coreAuthorizationPool: coreAuthorizationPool,
+            lastBlock: lastBlock,
+            safroleState: SafroleState(
+                nextValidators: postState.nextValidators,
+                ticketsVerifier: postState.ticketsVerifier,
+                ticketsOrKeys: postState.ticketsOrKeys,
+                ticketsAccumulator: postState.ticketsAccumulator
+            ),
+            serviceAccounts: serviceAccounts,
+            entropyPool: postState.entropyPool,
+            validatorQueue: postState.validatorQueue,
+            currentValidators: postState.currentValidators,
+            previousValidators: postState.previousValidators,
+            reports: reports,
+            timeslot: postState.timeslot,
+            authorizationQueue: authorizationQueue,
+            privilegedServiceIndices: privilegedServiceIndices,
+            judgements: judgements
+        )
     }
 }
