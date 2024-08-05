@@ -85,6 +85,9 @@ public struct State: Sendable {
     // ψ: past judgements
     public var judgements: JudgementsState
 
+    // π: The activity statistics for the validators.
+    public var activityStatistics: ValidatorActivityStatistics
+
     public init(
         config: ProtocolConfigRef,
         coreAuthorizationPool: ConfigFixedSizeArray<
@@ -125,7 +128,8 @@ public struct State: Sendable {
             assign: ServiceIdentifier,
             designate: ServiceIdentifier
         ),
-        judgements: JudgementsState
+        judgements: JudgementsState,
+        activityStatistics: ValidatorActivityStatistics
     ) {
         self.config = config
         self.coreAuthorizationPool = coreAuthorizationPool
@@ -141,6 +145,7 @@ public struct State: Sendable {
         self.authorizationQueue = authorizationQueue
         self.privilegedServiceIndices = privilegedServiceIndices
         self.judgements = judgements
+        self.activityStatistics = activityStatistics
     }
 }
 
@@ -160,7 +165,8 @@ extension State: Equatable {
             lhs.timeslot == rhs.timeslot &&
             lhs.authorizationQueue == rhs.authorizationQueue &&
             lhs.privilegedServiceIndices == rhs.privilegedServiceIndices &&
-            lhs.judgements == rhs.judgements
+            lhs.judgements == rhs.judgements &&
+            lhs.activityStatistics == rhs.activityStatistics
     }
 }
 
@@ -188,7 +194,8 @@ extension State: Dummy {
                 assign: ServiceIdentifier(),
                 designate: ServiceIdentifier()
             ),
-            judgements: JudgementsState.dummy(config: config)
+            judgements: JudgementsState.dummy(config: config),
+            activityStatistics: ValidatorActivityStatistics.dummy(config: config)
         )
     }
 }
@@ -229,7 +236,8 @@ extension State: ScaleCodec.Encodable {
                 try ConfigFixedSizeArray(config: config, from: &$0)
             },
             privilegedServiceIndices: decoder.decode(),
-            judgements: decoder.decode()
+            judgements: decoder.decode(),
+            activityStatistics: ValidatorActivityStatistics(config: config, from: &decoder)
         )
     }
 
@@ -247,6 +255,7 @@ extension State: ScaleCodec.Encodable {
         try encoder.encode(authorizationQueue)
         try encoder.encode(privilegedServiceIndices)
         try encoder.encode(judgements)
+        try encoder.encode(activityStatistics)
     }
 }
 
