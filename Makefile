@@ -21,7 +21,7 @@ deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a .lib/librocksdb.a
 
 .PHONY: test
 test: githooks deps
-	./scripts/run.sh test
+	./scripts/runTests.sh test
 
 .PHONY: build
 build: githooks deps

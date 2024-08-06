@@ -6,6 +6,7 @@
 
 import ArgumentParser
 import Node
+import ServiceLifecycle
 import TracingUtils
 
 @main
