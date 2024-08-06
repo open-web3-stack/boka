@@ -7,3 +7,8 @@ module bandersnatch_vrfs {
   header "bandersnatch/bindings.h"
   link "bandersnatch_vrfs"
 }
+
+module erasure_coding {
+  header "erasure-coding/bindings.h"
+  link "ec"
+}
