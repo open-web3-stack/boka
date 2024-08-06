@@ -1,4 +1,5 @@
 import Foundation
+import TracingUtils
 import Utils
 
 /// Holds the state of the blockchain.
@@ -15,10 +16,14 @@ public class Blockchain {
     }
 
     public func importBlock(_ block: BlockRef) async throws {
-        let runtime = Runtime(config: config)
-        let parent = try await dataProvider.getState(hash: block.header.parentHash)
-        let state = try runtime.apply(block: block, state: parent)
-        try await dataProvider.add(state: state)
+        try await withSpan("importBlock") { span in
+            span.attributes["hash"] = block.hash.description
+
+            let runtime = Runtime(config: config)
+            let parent = try await dataProvider.getState(hash: block.header.parentHash)
+            let state = try runtime.apply(block: block, state: parent)
+            try await dataProvider.add(state: state)
+        }
     }
 
     public func finalize(hash: Data32) async throws {
