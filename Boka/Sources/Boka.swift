@@ -9,7 +9,7 @@ import Node
 import TracingUtils
 
 @main
-struct Boka: ParsableCommand {
+struct Boka: AsyncParsableCommand {
     mutating func run() async throws {
         let services = try await Tracing.bootstrap("Boka")
         let node = try await Node(genesis: .dev, config: .dev)
