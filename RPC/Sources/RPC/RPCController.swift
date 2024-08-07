@@ -80,3 +80,5 @@ final class RPCController: RouteCollection {
         }
     }
 }
+
+extension RPCController: @unchecked Sendable {}
