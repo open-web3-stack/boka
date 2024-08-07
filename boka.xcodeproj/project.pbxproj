@@ -8,6 +8,7 @@
 
 /* Begin PBXFileReference section */
 		063EC59D2C33954600BF1550 /* JAMTests */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = JAMTests; sourceTree = "<group>"; };
+		064D330E2C632ACC001A5F36 /* RPC */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = RPC; sourceTree = "<group>"; };
 		066C926E2C095D67005DDE4F /* Boka */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Boka; sourceTree = "<group>"; };
 		066C926F2C095D76005DDE4F /* Blockchain */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Blockchain; sourceTree = "<group>"; };
 		066C92702C095D85005DDE4F /* Node */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Node; sourceTree = "<group>"; };
@@ -21,6 +22,7 @@
 		066C92652C095CE5005DDE4F = {
 			isa = PBXGroup;
 			children = (
+				064D330E2C632ACC001A5F36 /* RPC */,
 				0674602A2C61BF63008FD993 /* TracingUtils */,
 				06AAEF0C2C47746C0064995D /* PolkaVM */,
 				06F233602C0C69F100A5E2E0 /* Utils */,
