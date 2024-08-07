@@ -20,7 +20,7 @@ jobs:
     - name: Check swift codestyle
       uses: cirruslabs/swiftlint-action@v1
       with:
-        args: lint --config .swiftlint.yml --strict
+        args: --config .swiftlint.yml --strict
 
   test:
     name: Build and Test
