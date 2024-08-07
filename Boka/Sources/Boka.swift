@@ -6,11 +6,19 @@
 
 import ArgumentParser
 import Node
+import ServiceLifecycle
+import TracingUtils
 
 @main
-struct Boka: ParsableCommand {
-    mutating func run() throws {
-        let node = try Node(genesis: .dev, config: .dev)
+struct Boka: AsyncParsableCommand {
+    mutating func run() async throws {
+        let services = try await Tracing.bootstrap("Boka")
+        let node = try await Node(genesis: .dev, config: .dev)
         node.sayHello()
+
+        let config = ServiceGroupConfiguration(services: services, logger: Logger(label: "boka"))
+        let serviceGroup = ServiceGroup(configuration: config)
+
+        try await serviceGroup.run()
     }
 }

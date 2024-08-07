@@ -33,8 +33,11 @@ public struct Header: Sendable, Equatable {
     // confidently valid (i.e. either controversial or invalid).
     public var judgementsMarkers: [Data32]
 
-    // Hk: a Bandersnatch block author key Hk
-    public var authorKey: BandersnatchPublicKey
+    // Ho: offenders markers
+    public var offendersMarkers: [Ed25519PublicKey]
+
+    // Hi: block author index
+    public var authorIndex: ValidatorIndex
 
     // Hv: the entropy-yielding vrf signature
     public var vrfSignature: BandersnatchSignature
@@ -53,7 +56,8 @@ public struct Header: Sendable, Equatable {
             ProtocolConfig.EpochLength
         >?,
         judgementsMarkers: [Data32],
-        authorKey: BandersnatchPublicKey,
+        offendersMarkers: [Ed25519PublicKey],
+        authorIndex: UInt32,
         vrfSignature: BandersnatchSignature,
         seal: BandersnatchSignature
     ) {
@@ -64,11 +68,20 @@ public struct Header: Sendable, Equatable {
         self.epoch = epoch
         self.winningTickets = winningTickets
         self.judgementsMarkers = judgementsMarkers
-        self.authorKey = authorKey
+        self.offendersMarkers = offendersMarkers
+        self.authorIndex = authorIndex
         self.vrfSignature = vrfSignature
         self.seal = seal
     }
 }
+
+extension Header {
+    public func asRef() -> HeaderRef {
+        HeaderRef(self)
+    }
+}
+
+public typealias HeaderRef = Ref<Header>
 
 extension Header: Dummy {
     public typealias Config = ProtocolConfigRef
@@ -81,7 +94,8 @@ extension Header: Dummy {
             epoch: nil,
             winningTickets: nil,
             judgementsMarkers: [],
-            authorKey: BandersnatchPublicKey(),
+            offendersMarkers: [],
+            authorIndex: 0,
             vrfSignature: BandersnatchSignature(),
             seal: BandersnatchSignature()
         )
@@ -98,7 +112,8 @@ extension Header: ScaleCodec.Encodable {
             epoch: EpochMarker(config: config, from: &decoder),
             winningTickets: ConfigFixedSizeArray(config: config, from: &decoder),
             judgementsMarkers: decoder.decode(),
-            authorKey: decoder.decode(),
+            offendersMarkers: decoder.decode(),
+            authorIndex: decoder.decode(),
             vrfSignature: decoder.decode(),
             seal: decoder.decode()
         )
@@ -112,7 +127,8 @@ extension Header: ScaleCodec.Encodable {
         try encoder.encode(epoch)
         try encoder.encode(winningTickets)
         try encoder.encode(judgementsMarkers)
-        try encoder.encode(authorKey)
+        try encoder.encode(offendersMarkers)
+        try encoder.encode(authorIndex)
         try encoder.encode(vrfSignature)
         try encoder.encode(seal)
     }

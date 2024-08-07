@@ -11,7 +11,30 @@ public struct Block: Sendable, Equatable {
     }
 }
 
-public typealias BlockRef = Ref<Block>
+extension Block {
+    public func asRef() -> BlockRef {
+        BlockRef(self)
+    }
+}
+
+public final class BlockRef: Ref<Block>, @unchecked Sendable {
+    public required init(_ value: Block) {
+        lazy = Lazy {
+            Ref(value.header.hash())
+        }
+
+        super.init(value)
+    }
+
+    private let lazy: Lazy<Ref<Data32>>
+
+    public var hash: Data32 {
+        lazy.value.value
+    }
+
+    public var header: Header { value.header }
+    public var extrinsic: Extrinsic { value.extrinsic }
+}
 
 extension Block: Dummy {
     public typealias Config = ProtocolConfigRef

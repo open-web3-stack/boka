@@ -10,8 +10,8 @@ mkdir -p .lib
 
 cd Utils/Sources/bandersnatch || { echo "directory not found"; exit 1; }
 
-cargo build --lib
+cargo build --release --lib
 
-cp target/debug/libbandersnatch_vrfs.a ${CWD}/.lib
+cp target/release/libbandersnatch_vrfs.a ${CWD}/.lib
 
 echo "Setup bandersnatch successfully."

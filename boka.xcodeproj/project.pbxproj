@@ -11,6 +11,8 @@
 		066C926E2C095D67005DDE4F /* Boka */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Boka; sourceTree = "<group>"; };
 		066C926F2C095D76005DDE4F /* Blockchain */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Blockchain; sourceTree = "<group>"; };
 		066C92702C095D85005DDE4F /* Node */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Node; sourceTree = "<group>"; };
+		0674602A2C61BF63008FD993 /* TracingUtils */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = TracingUtils; sourceTree = "<group>"; };
+		06AAEF0C2C47746C0064995D /* PolkaVM */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = PolkaVM; sourceTree = "<group>"; };
 		06F2335F2C0B306000A5E2E0 /* Database */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Database; sourceTree = "<group>"; };
 		06F233602C0C69F100A5E2E0 /* Utils */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Utils; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -19,6 +21,8 @@
 		066C92652C095CE5005DDE4F = {
 			isa = PBXGroup;
 			children = (
+				0674602A2C61BF63008FD993 /* TracingUtils */,
+				06AAEF0C2C47746C0064995D /* PolkaVM */,
 				06F233602C0C69F100A5E2E0 /* Utils */,
 				06F2335F2C0B306000A5E2E0 /* Database */,
 				066C92702C095D85005DDE4F /* Node */,

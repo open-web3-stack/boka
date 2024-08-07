@@ -6,12 +6,13 @@ disabled_rules:
     - nesting
     - opening_brace
     - cyclomatic_complexity
+    - blanket_disable_command
+    - type_body_length
+    - identifier_name
+    - function_parameter_count
 
 excluded:
     - "**/.build"
-
-identifier_name:
-    min_length: 1
 
 type_name:
     min_length: 1

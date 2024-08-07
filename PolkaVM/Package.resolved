@@ -1,0 +1,78 @@
+{
+  "originHash" : "bdb8f4e8d924c572bbda33ae7f676b3bf0a09be9486e8feb5227190470ee030d",
+  "pins" : [
+    {
+      "identity" : "blake2.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tesseract-one/Blake2.swift.git",
+      "state" : {
+        "revision" : "29c55c8fe42d6661e5a32cc5bbbad1fff64fd01e",
+        "version" : "0.2.0"
+      }
+    },
+    {
+      "identity" : "scalecodec.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/AcalaNetwork/ScaleCodec.swift.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "dac3e7161de34c60c82794d031de0231b5a5746e"
+      }
+    },
+    {
+      "identity" : "swift-atomics",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-atomics.git",
+      "state" : {
+        "revision" : "cd142fd2f64be2100422d658e7411e39489da985",
+        "version" : "1.2.0"
+      }
+    },
+    {
+      "identity" : "swift-crypto",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-crypto.git",
+      "state" : {
+        "revision" : "46072478ca365fe48370993833cb22de9b41567f",
+        "version" : "3.5.2"
+      }
+    },
+    {
+      "identity" : "swift-log",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-log.git",
+      "state" : {
+        "revision" : "9cb486020ebf03bfa5b5df985387a14a98744537",
+        "version" : "1.6.1"
+      }
+    },
+    {
+      "identity" : "swift-syntax",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-syntax.git",
+      "state" : {
+        "revision" : "4c6cc0a3b9e8f14b3ae2307c5ccae4de6167ac2c",
+        "version" : "600.0.0-prerelease-2024-06-12"
+      }
+    },
+    {
+      "identity" : "swift-testing",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-testing.git",
+      "state" : {
+        "branch" : "0.10.0",
+        "revision" : "69d59cfc76e5daf498ca61f5af409f594768eef9"
+      }
+    },
+    {
+      "identity" : "tuples.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tesseract-one/Tuples.swift.git",
+      "state" : {
+        "revision" : "4d2cf7c64443cdf4df833d0bedd767bf9dbc49d9",
+        "version" : "0.1.3"
+      }
+    }
+  ],
+  "version" : 3
+}

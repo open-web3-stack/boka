@@ -18,6 +18,7 @@ let package = Package(
     dependencies: [
         .package(path: "../Utils"),
         .package(path: "../Blockchain"),
+        .package(path: "../TracingUtils"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -26,6 +27,7 @@ let package = Package(
             name: "Node", dependencies: [
                 "Utils",
                 "Blockchain",
+                "TracingUtils",
             ]
         ),
         .testTarget(

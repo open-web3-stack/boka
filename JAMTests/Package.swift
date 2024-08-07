@@ -18,6 +18,7 @@ let package = Package(
     dependencies: [
         .package(path: "../Utils"),
         .package(path: "../Blockchain"),
+        .package(path: "../PolkaVM"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
         .package(url: "https://github.com/AcalaNetwork/ScaleCodec.swift.git", branch: "main"),
     ],
@@ -33,6 +34,7 @@ let package = Package(
             dependencies: [
                 "Utils",
                 "Blockchain",
+                "PolkaVM",
                 "JAMTests",
                 .product(name: "Testing", package: "swift-testing"),
                 .product(name: "ScaleCodec", package: "ScaleCodec.swift"),
