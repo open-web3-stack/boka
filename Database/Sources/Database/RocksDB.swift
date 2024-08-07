@@ -77,8 +77,7 @@ extension RocksDB {
             }
             let rest = data.dropFirst()
             let first = data.first!
-            return first.withUnsafeBytes {
-                (bufferPtr: UnsafeRawBufferPointer) -> Result<R, Error> in
+            return first.withUnsafeBytes { (bufferPtr: UnsafeRawBufferPointer) -> Result<R, Error> in
                 guard let bufferAddress = bufferPtr.baseAddress else {
                     return .failure(.noData)
                 }
