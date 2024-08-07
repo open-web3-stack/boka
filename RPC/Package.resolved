@@ -1,5 +1,5 @@
 {
-  "originHash" : "578b4235fc63d6f32a70e82110043079db15ba9921a36647d6cb00bc95db9eb4",
+  "originHash" : "1aed214a0a5d0d530c79b9bc5db498e5b5d1f6e03ff214c901e317c1ecb9eb1b",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -101,6 +101,15 @@
       }
     },
     {
+      "identity" : "swift-distributed-tracing",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-distributed-tracing.git",
+      "state" : {
+        "revision" : "11c756c5c4d7de0eeed8595695cadd7fa107aa19",
+        "version" : "1.1.1"
+      }
+    },
+    {
       "identity" : "swift-http-types",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-http-types",
@@ -182,12 +191,39 @@
       }
     },
     {
+      "identity" : "swift-service-context",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-service-context.git",
+      "state" : {
+        "revision" : "0c62c5b4601d6c125050b5c3a97f20cce881d32b",
+        "version" : "1.1.0"
+      }
+    },
+    {
+      "identity" : "swift-syntax",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-syntax.git",
+      "state" : {
+        "revision" : "06b5cdc432e93b60e3bdf53aff2857c6b312991a",
+        "version" : "600.0.0-prerelease-2024-07-30"
+      }
+    },
+    {
       "identity" : "swift-system",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-system.git",
       "state" : {
         "revision" : "6a9e38e7bd22a3b8ba80bddf395623cf68f57807",
         "version" : "1.3.1"
+      }
+    },
+    {
+      "identity" : "swift-testing",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-testing.git",
+      "state" : {
+        "branch" : "0.10.0",
+        "revision" : "69d59cfc76e5daf498ca61f5af409f594768eef9"
       }
     },
     {

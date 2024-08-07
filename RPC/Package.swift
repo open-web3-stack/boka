@@ -19,6 +19,7 @@ let package = Package(
         .package(path: "../Blockchain"),
         .package(url: "https://github.com/vapor/vapor.git", from: "4.102.1"),
         .package(url: "https://github.com/vapor/async-kit.git", from: "1.19.1"),
+        .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -36,6 +37,7 @@ let package = Package(
             dependencies: [
                 .target(name: "RPC"),
                 .product(name: "XCTVapor", package: "vapor"),
+                .product(name: "Testing", package: "swift-testing"),
             ]
         ),
     ]
