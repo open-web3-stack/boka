@@ -1,19 +1,25 @@
 @testable import RPC
 import Testing
 import Vapor
+import XCTVapor
 
 final class RPCControllerTests: @unchecked Sendable {
-    var app: Application!
+    var app: Application
 
-    init() async throws {
-        app = try await Application.make()
+    init() throws {
+        app = Application(.testing)
 
-        let rpcController = RPCController()
-        try app.register(collection: rpcController)
-        try await app.execute()
+        try configure(app)
     }
 
-    @Test func serviceInited() {
-        #expect(app != nil)
+    deinit {
+        app.shutdown()
+    }
+
+    @Test func serviceInited() throws {
+        try app.test(.GET, "health") { res in
+            XCTAssertEqual(res.status, .ok)
+            XCTAssertEqual(res.body.string, "true")
+        }
     }
 }

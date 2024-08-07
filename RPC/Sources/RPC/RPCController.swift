@@ -71,6 +71,8 @@ final class RPCController: RouteCollection {
 
     static func handleMethod(_ method: String, params: Any?) throws -> Any? {
         switch method {
+        case "health":
+            return true
         case "chain_getBlock":
             return handleChainGetBlock(params: params as? BlockParams)
         case "chain_getHeader":
