@@ -18,9 +18,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Check swift codestyle
-      uses: norio-nomura/action-swiftlint@3.2.1
+      uses: cirruslabs/swiftlint-action@v1
       with:
-        args: lint --config .swiftlint.yml --strict
+        args: --config .swiftlint.yml --strict
 
   test:
     name: Build and Test
