@@ -1,11 +1,7 @@
 // swift-tools-version: 6.0
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
-import Foundation
 import PackageDescription
-
-// somehow without this the GH Actions CI fails
-extension Foundation.Bundle: @unchecked @retroactive Sendable {}
 
 let package = Package(
     name: "Utils",
