@@ -1,32 +1,39 @@
 import Blockchain
+import Utils
 import Vapor
 
-final class RPCController: RouteCollection {
-    func boot(routes: RoutesBuilder) throws {
-        // HTTP JSON-RPC route
-        routes.post("rpc", use: handleRPCRequest)
+final class RPCController: RouteCollection, Sendable {
+    let source: DataSource
 
-        // WebSocket JSON-RPC route
-        routes.webSocket("ws", onUpgrade: handleWebSocket)
+    init(source: DataSource) {
+        self.source = source
     }
 
-    func handleRPCRequest(_ req: Request) -> EventLoopFuture<Response> {
+    func boot(routes: RoutesBuilder) throws {
+        // HTTP JSON-RPC route
+        routes.post("", use: handleRPCRequest)
+
+        // WebSocket JSON-RPC route
+        routes.webSocket("", onUpgrade: handleWebSocket)
+    }
+
+    func handleRPCRequest(_ req: Request) async throws -> Response {
         do {
             let rpcRequest = try req.content.decode(RPCRequest<AnyContent>.self)
             // Handle the JSON-RPC request
-            let result = try RPCController.handleMethod(rpcRequest.method, params: rpcRequest.params)
+            let result = try await handleMethod(rpcRequest.method, params: rpcRequest.params)
             let rpcResponse = RPCResponse(jsonrpc: "2.0", result: AnyContent(result ?? ""), error: nil, id: rpcRequest.id)
-            return try req.eventLoop.makeSucceededFuture(Response(status: .ok, body: .init(data: JSONEncoder().encode(rpcResponse))))
+            return try Response(status: .ok, body: .init(data: JSONEncoder().encode(rpcResponse)))
         } catch {
             let rpcError = RPCError(code: -32600, message: "Invalid Request")
             let rpcResponse = RPCResponse<RPCError>(jsonrpc: "2.0", result: nil, error: rpcError, id: nil)
 
             do {
                 let responseData = try JSONEncoder().encode(rpcResponse)
-                return req.eventLoop.makeSucceededFuture(Response(status: .badRequest, body: .init(data: responseData)))
+                return Response(status: .badRequest, body: .init(data: responseData))
             } catch {
                 print("Failed to encode error response: \(error)")
-                return req.eventLoop.makeSucceededFuture(Response(status: .badRequest, body: .init(data: Data())))
+                return Response(status: .badRequest, body: .init(data: Data()))
             }
         }
     }
@@ -34,15 +41,15 @@ final class RPCController: RouteCollection {
     func handleWebSocket(req _: Request, ws: WebSocket) {
         ws.onText { ws, text in
             Task {
-                await RPCController.processWebSocketRequest(ws, text: text)
+                await self.processWebSocketRequest(ws, text: text)
             }
         }
     }
 
-    private static func processWebSocketRequest(_ ws: WebSocket, text: String) async {
+    private func processWebSocketRequest(_ ws: WebSocket, text: String) async {
         do {
             let rpcRequest = try JSONDecoder().decode(RPCRequest<AnyContent>.self, from: Data(text.utf8))
-            let result = try handleMethod(rpcRequest.method, params: rpcRequest.params?.value)
+            let result = try await handleMethod(rpcRequest.method, params: rpcRequest.params?.value)
             let rpcResponse = RPCResponse(jsonrpc: "2.0", result: AnyContent(result ?? ""), error: nil, id: rpcRequest.id)
             let responseData = try JSONEncoder().encode(rpcResponse)
             try await ws.send(String(decoding: responseData, as: UTF8.self))
@@ -59,28 +66,35 @@ final class RPCController: RouteCollection {
         }
     }
 
-    static func handleChainGetBlock(params _: BlockParams?) -> CodableBlock? {
+    func handleChainGetBlock(params: BlockParams?) async throws -> CodableBlock? {
         // Fetch the block by hash or number
-        nil
+        if let hash = params?.blockHash {
+            guard let data = Data(fromHexString: hash), let data32 = Data32(data) else {
+                throw RPCError(code: -32602, message: "Invalid block hash")
+            }
+            let block = try await source.getBlock(hash: data32)
+            return block.map { CodableBlock(from: $0) }
+        } else {
+            let block = try await source.getBestBlock()
+            return CodableBlock(from: block)
+        }
     }
 
-    static func handleChainGetHeader(params _: HeaderParams?) -> CodableHeader? {
+    func handleChainGetHeader(params _: HeaderParams?) async throws -> CodableHeader? {
         // Fetch the header by hash or number
         nil
     }
 
-    static func handleMethod(_ method: String, params: Any?) throws -> Any? {
+    func handleMethod(_ method: String, params: Any?) async throws -> Any? {
         switch method {
         case "health":
             return true
         case "chain_getBlock":
-            return handleChainGetBlock(params: params as? BlockParams)
+            return try await handleChainGetBlock(params: params as? BlockParams)
         case "chain_getHeader":
-            return handleChainGetHeader(params: params as? HeaderParams)
+            return try await handleChainGetHeader(params: params as? HeaderParams)
         default:
             throw RPCError(code: -32601, message: "Method not found")
         }
     }
 }
-
-extension RPCController: @unchecked Sendable {}

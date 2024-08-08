@@ -42,7 +42,7 @@ public struct CodableBlock: Codable {
     let property2: String
     // Add all properties from the original Block type
 
-    init(from block: Block) {
+    init(from block: BlockRef) {
         property1 = block.header.parentHash.description
         property2 = block.header.extrinsicsRoot.description
         // Initialize all properties from the original Block type
