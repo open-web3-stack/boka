@@ -1,5 +1,41 @@
-use erasure_coding::{ChunkIndex, Segment, SubShardDecoder, SubShardEncoder, TOTAL_SHARDS};
+use erasure_coding::{
+    ChunkIndex, Segment, SubShardDecoder, SubShardEncoder, SEGMENT_SIZE, TOTAL_SHARDS,
+};
 use std::slice;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CSegment {
+    data: *mut u8, // Pointer to the data, length is SEGMENT_SIZE
+    index: u32,
+}
+
+impl From<Segment> for CSegment {
+    fn from(segment: Segment) -> Self {
+        let mut vec_data = Vec::from(*segment.data);
+
+        let c_segment = CSegment {
+            data: vec_data.as_mut_ptr(),
+            index: segment.index,
+        };
+
+        // prevent Rust from freeing the Vec while CSegment is in use
+        std::mem::forget(vec_data);
+
+        c_segment
+    }
+}
+
+impl From<CSegment> for Segment {
+    fn from(c_segment: CSegment) -> Self {
+        let vec_data = unsafe { Vec::from_raw_parts(c_segment.data, SEGMENT_SIZE, SEGMENT_SIZE) };
+
+        Segment {
+            data: Box::new(vec_data.try_into().unwrap()),
+            index: c_segment.index,
+        }
+    }
+}
 
 /// Initializes a new SubShardEncoder.
 #[no_mangle]
@@ -22,7 +58,7 @@ pub extern "C" fn subshard_encoder_free(encoder: *mut SubShardEncoder) {
 #[no_mangle]
 pub extern "C" fn subshard_encoder_construct(
     encoder: *mut SubShardEncoder,
-    segments: *const Segment,
+    segments: *const CSegment,
     num_segments: usize,
     success: *mut bool,
     out_chunks: *mut *mut *mut [u8; 12],
@@ -34,9 +70,15 @@ pub extern "C" fn subshard_encoder_construct(
     }
 
     let encoder = unsafe { &mut *encoder };
-    let segments = unsafe { slice::from_raw_parts(segments, num_segments) };
+    let segments_vec: Vec<Segment> = unsafe {
+        slice::from_raw_parts(segments, num_segments)
+            .iter()
+            .map(|segment| Segment::from(*segment))
+            .collect()
+    };
+    let r_segments: &[Segment] = &segments_vec;
 
-    match encoder.construct_chunks(segments) {
+    match encoder.construct_chunks(r_segments) {
         Ok(result) => {
             let total_chunks = result.len() * TOTAL_SHARDS;
             let mut chunk_ptrs: Vec<*mut [u8; 12]> = Vec::with_capacity(total_chunks);
@@ -77,47 +119,69 @@ pub extern "C" fn subshard_decoder_free(decoder: *mut SubShardDecoder) {
     }
 }
 
+#[repr(C)]
+pub struct SegmentTuple {
+    pub index: u8,
+    pub segment: CSegment,
+}
+
 /// Result of the reconstruct.
 #[repr(C)]
 pub struct ReconstructResult {
-    pub segments: *mut (u8, Segment),
+    pub segments: *mut SegmentTuple,
     pub num_segments: usize,
     pub num_decodes: usize,
 }
 
-#[no_mangle]
-pub extern "C" fn reconstruct_result_get_segments(
-    result: *const ReconstructResult,
-) -> *const (u8, Segment) {
-    if result.is_null() {
-        return std::ptr::null();
-    }
-    unsafe { (*result).segments }
-}
+// #[no_mangle]
+// pub extern "C" fn reconstruct_result_get_segments(
+//     result: *const ReconstructResult,
+// ) -> *const SegmentTuple {
+//     if result.is_null() {
+//         return std::ptr::null();
+//     }
+//     unsafe { (*result).segments }
+// }
 
-#[no_mangle]
-pub extern "C" fn reconstruct_result_get_num_decodes(result: *const ReconstructResult) -> usize {
-    if result.is_null() {
-        return 0;
-    }
-    unsafe { (*result).num_decodes }
-}
+// #[no_mangle]
+// pub extern "C" fn reconstruct_result_get_num_segments(result: *const ReconstructResult) -> usize {
+//     if result.is_null() {
+//         return 0;
+//     }
+//     unsafe { (*result).num_segments }
+// }
 
-#[no_mangle]
-pub extern "C" fn reconstruct_result_free(result: *mut ReconstructResult) {
-    if !result.is_null() {
-        unsafe {
-            let boxed_result = Box::from_raw(result);
-            drop(Box::from_raw(boxed_result.segments));
-        }
-    }
+// #[no_mangle]
+// pub extern "C" fn reconstruct_result_get_num_decodes(result: *const ReconstructResult) -> usize {
+//     if result.is_null() {
+//         return 0;
+//     }
+//     unsafe { (*result).num_decodes }
+// }
+
+// #[no_mangle]
+// pub extern "C" fn reconstruct_result_free(result: *mut ReconstructResult) {
+//     if !result.is_null() {
+//         unsafe {
+//             let boxed_result = Box::from_raw(result);
+//             drop(Box::from_raw(boxed_result.segments));
+//             drop(boxed_result);
+//         }
+//     }
+// }
+
+#[repr(C)]
+pub struct SubShardTuple {
+    pub seg_index: u8,
+    pub chunk_index: ChunkIndex,
+    pub shard: [u8; 12],
 }
 
 /// Reconstructs data from a list of subshards.
 #[no_mangle]
 pub extern "C" fn subshard_decoder_reconstruct(
     decoder: *mut SubShardDecoder,
-    subshards: *const (u8, ChunkIndex, [u8; 12]),
+    subshards: *const SubShardTuple,
     num_subshards: usize,
     success: *mut bool,
 ) -> *mut ReconstructResult {
@@ -131,12 +195,18 @@ pub extern "C" fn subshard_decoder_reconstruct(
 
     let cloned_subshards: Vec<(u8, ChunkIndex, &[u8; 12])> = subshards_slice
         .iter()
-        .map(|&(a, b, ref c)| (a, b, c))
+        .map(|t| (t.seg_index, t.chunk_index, &t.shard))
         .collect();
 
     match decoder.reconstruct(&mut cloned_subshards.iter().cloned()) {
         Ok((segments, num_decodes)) => {
-            let mut segments_vec: Vec<(u8, Segment)> = segments.into_iter().collect();
+            let mut segments_vec: Vec<SegmentTuple> = segments
+                .into_iter()
+                .map(|(index, segment)| SegmentTuple {
+                    index,
+                    segment: segment.into(),
+                })
+                .collect();
             let segments_len = segments_vec.len();
             let segments_ptr = segments_vec.as_mut_ptr();
 

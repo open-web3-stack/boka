@@ -60,7 +60,8 @@ let package = Package(
             dependencies: [
                 "Utils",
                 .product(name: "Testing", package: "swift-testing"),
-            ]
+            ],
+            resources: [.copy("Resources")]
         ),
     ],
     swiftLanguageVersions: [.version("6")]

@@ -8,6 +8,8 @@
 #define POINT_SIZE 2
 #define SUBSHARD_POINTS 6
 
+typedef uint16_t ChunkIndex;
+
 
 
 #define MAX_CHUNKS 16384
@@ -38,23 +40,6 @@
 #define SUBSHARD_SIZE (POINT_SIZE * SUBSHARD_POINTS)
 
 /**
- * The index of an erasure chunk.
- */
-typedef struct ChunkIndex ChunkIndex;
-
-/**
- * Result of the reconstruct.
- */
-typedef struct ReconstructResult ReconstructResult;
-
-/**
- * Fix size segment of a larger data.
- * Data is padded when unaligned with
- * the segment size.
- */
-typedef struct Segment Segment;
-
-/**
  * Subshard uses some temp memory, so these should be used multiple time instead of allocating.
  */
 typedef struct SubShardDecoder SubShardDecoder;
@@ -63,6 +48,31 @@ typedef struct SubShardDecoder SubShardDecoder;
  * Subshard uses some temp memory, so these should be used multiple time instead of allocating.
  */
 typedef struct SubShardEncoder SubShardEncoder;
+
+typedef struct CSegment {
+  uint8_t *data;
+  uint32_t index;
+} CSegment;
+
+typedef struct SegmentTuple {
+  uint8_t index;
+  struct CSegment segment;
+} SegmentTuple;
+
+/**
+ * Result of the reconstruct.
+ */
+typedef struct ReconstructResult {
+  struct SegmentTuple *segments;
+  uintptr_t num_segments;
+  uintptr_t num_decodes;
+} ReconstructResult;
+
+typedef struct SubShardTuple {
+  uint8_t seg_index;
+  ChunkIndex chunk_index;
+  uint8_t shard[12];
+} SubShardTuple;
 
 /**
  * Subshard (points in sequential orders).
@@ -86,7 +96,7 @@ void subshard_encoder_free(struct SubShardEncoder *encoder);
  * out_len is N * TOTAL_SHARDS
  */
 void subshard_encoder_construct(struct SubShardEncoder *encoder,
-                                const struct Segment *segments,
+                                const struct CSegment *segments,
                                 uintptr_t num_segments,
                                 bool *success,
                                 uint8_t (***out_chunks)[12],
@@ -102,6 +112,10 @@ struct SubShardDecoder *subshard_decoder_new(void);
  */
 void subshard_decoder_free(struct SubShardDecoder *decoder);
 
-uintptr_t reconstruct_result_get_num_decodes(const struct ReconstructResult *result);
-
-void reconstruct_result_free(struct ReconstructResult *result);
+/**
+ * Reconstructs data from a list of subshards.
+ */
+struct ReconstructResult *subshard_decoder_reconstruct(struct SubShardDecoder *decoder,
+                                                       const struct SubShardTuple *subshards,
+                                                       uintptr_t num_subshards,
+                                                       bool *success);
