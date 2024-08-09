@@ -1,7 +1,7 @@
 import Foundation
 
 extension Data {
-    init?(fromHexString hexString: String) {
+    public init?(fromHexString hexString: String) {
         guard !hexString.isEmpty else {
             return nil
         }

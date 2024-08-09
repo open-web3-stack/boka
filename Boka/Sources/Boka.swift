@@ -13,12 +13,24 @@ import TracingUtils
 struct Boka: AsyncParsableCommand {
     mutating func run() async throws {
         let services = try await Tracing.bootstrap("Boka")
-        let node = try await Node(genesis: .dev, config: .dev)
+        let logger = Logger(label: "boka")
+
+        logger.info("Starting Boka...")
+
+        let config = Node.Config(rpc: RPCConfig(listenAddress: "127.0.0.1", port: 9955), protocol: .dev)
+        var node: Node! = try await Node(genesis: .dev, config: config)
         node.sayHello()
 
-        let config = ServiceGroupConfiguration(services: services, logger: Logger(label: "boka"))
-        let serviceGroup = ServiceGroup(configuration: config)
+        for service in services {
+            Task {
+                try await service.run()
+            }
+        }
 
-        try await serviceGroup.run()
+        try await node.wait()
+
+        node = nil
+
+        logger.info("Exiting...")
     }
 }

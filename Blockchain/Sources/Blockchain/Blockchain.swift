@@ -5,7 +5,7 @@ import Utils
 /// Holds the state of the blockchain.
 /// Includes the canonical chain as well as pending forks.
 /// Assume all blocks and states are valid and have been validated.
-public class Blockchain {
+public final class Blockchain: Sendable {
     public let config: ProtocolConfigRef
 
     private let dataProvider: BlockchainDataProvider
@@ -29,5 +29,16 @@ public class Blockchain {
     public func finalize(hash: Data32) async throws {
         // TODO: purge forks
         try await dataProvider.setFinalizedHead(hash: hash)
+    }
+
+    public func getBestBlock() async throws -> BlockRef {
+        guard let hash = try await dataProvider.getHeads().first else {
+            try throwUnreachable("no head")
+        }
+        return try await dataProvider.getBlock(hash: hash)
+    }
+
+    public func getBlock(hash: Data32) async throws -> BlockRef? {
+        try await dataProvider.getBlock(hash: hash)
     }
 }
