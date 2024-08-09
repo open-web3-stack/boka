@@ -97,8 +97,8 @@ void subshard_encoder_free(struct SubShardEncoder *encoder);
  *
  * A chunk is a group of subshards `[[u8; 12]; TOTAL_SHARDS]`.
  *
+ * out_chunks is N chunks `[[u8; 12]; TOTAL_SHARDS]` flattened to 1 dimensional u8 array.
  * out_len is N * TOTAL_SHARDS
- * out_chunks is `Vec<[[u8; 12]; TOTAL_SHARDS]>` flattened to 1 dimensional u8 array.
  */
 void subshard_encoder_construct(struct SubShardEncoder *encoder,
                                 const struct CSegment *segments,

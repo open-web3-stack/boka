@@ -20,5 +20,5 @@ include = ["erasure-coding"]
 extra_bindings = ["erasure-coding"]
 
 [export]
-include = ["SubShard", "POINT_SIZE"]
+include = ["SubShard"]
 exclude = ["ChunkIndex", "TOTAL_SHARDS", "SUBSHARD_SIZE"]
