@@ -1,7 +1,7 @@
 import Foundation
 import Vapor
 
-public class RPCServer {
+public class Server {
     public enum Error: Swift.Error {
         case invalidListenAddress(address: String)
     }
@@ -27,8 +27,11 @@ public class RPCServer {
         let env = try Environment.detect()
         app = Application(env)
 
+        var handlers: [String: JSONRPCHandler] = SystemHandler.getHandlers()
+        handlers.merge(ChainHandler.getHandlers(source: source)) { _, new in new }
+
         // Register routes
-        let rpcController = RPCController(source: source)
+        let rpcController = JSONRPCController(handlers: handlers)
         try app.register(collection: rpcController)
 
         app.http.server.configuration.address = .hostname(config.listenAddress, port: config.port)
