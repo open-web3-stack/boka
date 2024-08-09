@@ -4,21 +4,21 @@ import TracingUtils
 
 let logger = Logger(label: "node")
 
-public typealias RPCConfig = RPCServer.Config
+public typealias RPCConfig = Server.Config
 
 public class Node {
     public class Config {
-        public let rpc: RPCServer.Config
+        public let rpc: Server.Config
         public let protcol: ProtocolConfigRef
 
-        public init(rpc: RPCServer.Config, protocol: ProtocolConfigRef) {
+        public init(rpc: Server.Config, protocol: ProtocolConfigRef) {
             self.rpc = rpc
             protcol = `protocol`
         }
     }
 
     public private(set) var blockchain: Blockchain
-    public private(set) var rpcServer: RPCServer
+    public private(set) var rpcServer: Server
 
     public init(genesis: Genesis, config: Config) async throws {
         logger.debug("Initializing node")
@@ -27,7 +27,7 @@ public class Node {
         let dataProvider = await InMemoryDataProvider(genesis: genesisState)
         blockchain = await Blockchain(config: config.protcol, dataProvider: dataProvider)
 
-        rpcServer = try RPCServer(config: config.rpc, source: blockchain)
+        rpcServer = try Server(config: config.rpc, source: blockchain)
     }
 
     public func sayHello() {
