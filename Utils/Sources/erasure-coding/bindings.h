@@ -7,6 +7,8 @@
 
 #define POINT_SIZE 2
 #define SUBSHARD_POINTS 6
+#define TOTAL_SHARDS 1026
+#define SUBSHARD_SIZE 12
 
 typedef uint16_t ChunkIndex;
 
@@ -30,16 +32,6 @@ typedef uint16_t ChunkIndex;
 #define N_REDUNDANCY 2
 
 /**
- * The total number of shards, both original and ec one.
- */
-#define TOTAL_SHARDS ((1 + N_REDUNDANCY) * N_SHARDS)
-
-/**
- * Size of a subshard in bytes.
- */
-#define SUBSHARD_SIZE (POINT_SIZE * SUBSHARD_POINTS)
-
-/**
  * Subshard uses some temp memory, so these should be used multiple time instead of allocating.
  */
 typedef struct SubShardDecoder SubShardDecoder;
@@ -49,8 +41,19 @@ typedef struct SubShardDecoder SubShardDecoder;
  */
 typedef struct SubShardEncoder SubShardEncoder;
 
+/**
+ * Fixed size segment of a larger data.
+ * Data is padded when unaligned with
+ * the segment size.
+ */
 typedef struct CSegment {
+  /**
+   * Fix size chunk of data. Length is `SEGMENT_SIZE``
+   */
   uint8_t *data;
+  /**
+   * The index of this segment against its full data.
+   */
   uint32_t index;
 } CSegment;
 
@@ -71,7 +74,7 @@ typedef struct ReconstructResult {
 typedef struct SubShardTuple {
   uint8_t seg_index;
   ChunkIndex chunk_index;
-  uint8_t shard[12];
+  uint8_t subshard[12];
 } SubShardTuple;
 
 /**
@@ -92,14 +95,16 @@ void subshard_encoder_free(struct SubShardEncoder *encoder);
 /**
  * Constructs erasure-coded chunks from segments.
  *
- * out_chunks is N chunks: `Vec<[[u8; 12]; TOTAL_SHARDS]>`
+ * A chunk is a group of subshards `[[u8; 12]; TOTAL_SHARDS]`.
+ *
  * out_len is N * TOTAL_SHARDS
+ * out_chunks is `Vec<[[u8; 12]; TOTAL_SHARDS]>` flattened to 1 dimensional u8 array.
  */
 void subshard_encoder_construct(struct SubShardEncoder *encoder,
                                 const struct CSegment *segments,
                                 uintptr_t num_segments,
                                 bool *success,
-                                uint8_t (***out_chunks)[12],
+                                uint8_t *out_chunks,
                                 uintptr_t *out_len);
 
 /**

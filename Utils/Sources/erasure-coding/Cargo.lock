@@ -160,7 +160,7 @@ checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 [[package]]
 name = "erasure-coding"
 version = "0.1.0"
-source = "git+https://github.com/paritytech/erasure-coding?branch=main#512e77472beb877fe0881a857623d54d97b82bc4"
+source = "git+https://github.com/paritytech/erasure-coding?rev=512e774#512e77472beb877fe0881a857623d54d97b82bc4"
 dependencies = [
  "blake2b_simd",
  "bounded-collections",

@@ -1,12 +1,17 @@
 use erasure_coding::{
     ChunkIndex, Segment, SubShardDecoder, SubShardEncoder, SEGMENT_SIZE, TOTAL_SHARDS,
 };
-use std::slice;
+use std::{ptr, slice};
 
+/// Fixed size segment of a larger data.
+/// Data is padded when unaligned with
+/// the segment size.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct CSegment {
-    data: *mut u8, // Pointer to the data, length is SEGMENT_SIZE
+    /// Fix size chunk of data. Length is `SEGMENT_SIZE``
+    data: *mut u8,
+    /// The index of this segment against its full data.
     index: u32,
 }
 
@@ -53,15 +58,17 @@ pub extern "C" fn subshard_encoder_free(encoder: *mut SubShardEncoder) {
 
 /// Constructs erasure-coded chunks from segments.
 ///
-/// out_chunks is N chunks: `Vec<[[u8; 12]; TOTAL_SHARDS]>`
+/// A chunk is a group of subshards `[[u8; 12]; TOTAL_SHARDS]`.
+///
 /// out_len is N * TOTAL_SHARDS
+/// out_chunks is `Vec<[[u8; 12]; TOTAL_SHARDS]>` flattened to 1 dimensional u8 array.
 #[no_mangle]
 pub extern "C" fn subshard_encoder_construct(
     encoder: *mut SubShardEncoder,
     segments: *const CSegment,
     num_segments: usize,
     success: *mut bool,
-    out_chunks: *mut *mut *mut [u8; 12],
+    out_chunks: *mut u8,
     out_len: *mut usize,
 ) {
     if encoder.is_null() || segments.is_null() || out_chunks.is_null() || out_len.is_null() {
@@ -81,20 +88,20 @@ pub extern "C" fn subshard_encoder_construct(
     match encoder.construct_chunks(r_segments) {
         Ok(result) => {
             let total_chunks = result.len() * TOTAL_SHARDS;
-            let mut chunk_ptrs: Vec<*mut [u8; 12]> = Vec::with_capacity(total_chunks);
+            let mut data: Vec<u8> = Vec::with_capacity(total_chunks);
 
             for boxed_array in result {
                 for chunk in boxed_array.iter() {
-                    chunk_ptrs.push(Box::into_raw(Box::new(*chunk)));
+                    data.extend_from_slice(chunk);
                 }
             }
 
             unsafe {
-                *out_chunks = chunk_ptrs.as_mut_ptr();
+                ptr::copy_nonoverlapping(data.as_ptr(), out_chunks, data.len());
                 *out_len = total_chunks;
             }
 
-            std::mem::forget(chunk_ptrs);
+            std::mem::forget(data);
             unsafe { *success = true };
         }
         Err(_) => {
@@ -133,48 +140,11 @@ pub struct ReconstructResult {
     pub num_decodes: usize,
 }
 
-// #[no_mangle]
-// pub extern "C" fn reconstruct_result_get_segments(
-//     result: *const ReconstructResult,
-// ) -> *const SegmentTuple {
-//     if result.is_null() {
-//         return std::ptr::null();
-//     }
-//     unsafe { (*result).segments }
-// }
-
-// #[no_mangle]
-// pub extern "C" fn reconstruct_result_get_num_segments(result: *const ReconstructResult) -> usize {
-//     if result.is_null() {
-//         return 0;
-//     }
-//     unsafe { (*result).num_segments }
-// }
-
-// #[no_mangle]
-// pub extern "C" fn reconstruct_result_get_num_decodes(result: *const ReconstructResult) -> usize {
-//     if result.is_null() {
-//         return 0;
-//     }
-//     unsafe { (*result).num_decodes }
-// }
-
-// #[no_mangle]
-// pub extern "C" fn reconstruct_result_free(result: *mut ReconstructResult) {
-//     if !result.is_null() {
-//         unsafe {
-//             let boxed_result = Box::from_raw(result);
-//             drop(Box::from_raw(boxed_result.segments));
-//             drop(boxed_result);
-//         }
-//     }
-// }
-
 #[repr(C)]
 pub struct SubShardTuple {
     pub seg_index: u8,
     pub chunk_index: ChunkIndex,
-    pub shard: [u8; 12],
+    pub subshard: [u8; 12],
 }
 
 /// Reconstructs data from a list of subshards.
@@ -187,7 +157,7 @@ pub extern "C" fn subshard_decoder_reconstruct(
 ) -> *mut ReconstructResult {
     if decoder.is_null() || subshards.is_null() {
         unsafe { *success = false };
-        return std::ptr::null_mut();
+        return ptr::null_mut();
     }
 
     let decoder = unsafe { &mut *decoder };
@@ -195,7 +165,7 @@ pub extern "C" fn subshard_decoder_reconstruct(
 
     let cloned_subshards: Vec<(u8, ChunkIndex, &[u8; 12])> = subshards_slice
         .iter()
-        .map(|t| (t.seg_index, t.chunk_index, &t.shard))
+        .map(|t| (t.seg_index, t.chunk_index, &t.subshard))
         .collect();
 
     match decoder.reconstruct(&mut cloned_subshards.iter().cloned()) {

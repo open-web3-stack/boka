@@ -10,4 +10,4 @@ crate-type = ["staticlib"]
 cbindgen = "0.24.0"
 
 [dependencies]
-erasure-coding = { git = "https://github.com/paritytech/erasure-coding", branch = "main" }
+erasure-coding = { git = "https://github.com/paritytech/erasure-coding", rev = "512e774" }
