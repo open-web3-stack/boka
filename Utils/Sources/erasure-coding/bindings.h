@@ -117,6 +117,8 @@ struct SubShardDecoder *subshard_decoder_new(void);
  */
 void subshard_decoder_free(struct SubShardDecoder *decoder);
 
+void reconstruct_result_free(struct ReconstructResult *result);
+
 /**
  * Reconstructs data from a list of subshards.
  */

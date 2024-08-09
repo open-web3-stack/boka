@@ -127,6 +127,7 @@ pub extern "C" fn subshard_decoder_free(decoder: *mut SubShardDecoder) {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct SegmentTuple {
     pub index: u8,
     pub segment: CSegment,
@@ -140,7 +141,28 @@ pub struct ReconstructResult {
     pub num_decodes: usize,
 }
 
+#[no_mangle]
+pub extern "C" fn reconstruct_result_free(result: *mut ReconstructResult) {
+    if !result.is_null() {
+        unsafe {
+            let boxed_result = Box::from_raw(result);
+
+            // free each CSegment's data pointer
+            for i in 0..boxed_result.num_segments {
+                let segment = &*boxed_result.segments.add(i);
+                if !segment.segment.data.is_null() {
+                    drop(Box::from_raw(segment.segment.data));
+                }
+            }
+
+            drop(Box::from_raw(boxed_result.segments));
+            drop(boxed_result);
+        }
+    }
+}
+
 #[repr(C)]
+#[derive(Debug)]
 pub struct SubShardTuple {
     pub seg_index: u8,
     pub chunk_index: ChunkIndex,
@@ -163,12 +185,12 @@ pub extern "C" fn subshard_decoder_reconstruct(
     let decoder = unsafe { &mut *decoder };
     let subshards_slice = unsafe { slice::from_raw_parts(subshards, num_subshards) };
 
-    let cloned_subshards: Vec<(u8, ChunkIndex, &[u8; 12])> = subshards_slice
+    let subshards_vec: Vec<(u8, ChunkIndex, &[u8; 12])> = subshards_slice
         .iter()
         .map(|t| (t.seg_index, t.chunk_index, &t.subshard))
         .collect();
 
-    match decoder.reconstruct(&mut cloned_subshards.iter().cloned()) {
+    match decoder.reconstruct(&mut subshards_vec.iter().cloned()) {
         Ok((segments, num_decodes)) => {
             let mut segments_vec: Vec<SegmentTuple> = segments
                 .into_iter()
@@ -193,6 +215,83 @@ pub extern "C" fn subshard_decoder_reconstruct(
         Err(_) => {
             unsafe { *success = false };
             std::ptr::null_mut()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::*;
+    use erasure_coding::{SubShard, SUBSHARD_SIZE};
+    use serde::{Deserialize, Serialize};
+    use serde_json;
+
+    #[derive(Serialize, Deserialize, Debug)]
+    struct JsonData {
+        data: String,
+        segment: SegmentData,
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    struct SegmentData {
+        segments: Vec<Segment>,
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    struct Segment {
+        segment_ec: Vec<String>,
+    }
+
+    #[test]
+    fn test_reconstruct_from_json() {
+        let file =
+            fs::File::open("../../Tests/UtilsTests/TestData/ec/erasure-coding-test-data.json")
+                .expect("file should open read only");
+        let json_data: JsonData =
+            serde_json::from_reader(file).expect("file should be proper JSON");
+
+        // Convert segment_ec data back to bytes and prepare subshards
+        let mut subshards: Vec<(u8, ChunkIndex, SubShard)> = Vec::new();
+        for (segment_idx, segment) in json_data.segment.segments.iter().enumerate() {
+            for (chunk_idx, chunk) in segment.segment_ec.iter().enumerate() {
+                let chunk_bytes: Vec<u8> = hex::decode(chunk).expect("Failed to decode hex string");
+                if chunk_idx >= 684 {
+                    let mut subshard = [0u8; SUBSHARD_SIZE];
+                    subshard[..chunk_bytes.len()].copy_from_slice(&chunk_bytes);
+                    subshards.push((segment_idx as u8, ChunkIndex(chunk_idx as u16), subshard));
+                }
+            }
+        }
+
+        // Initialize decoder, call reconstruct!
+        let mut decoder = SubShardDecoder::new().unwrap();
+
+        let cloned_subshards: Vec<(u8, ChunkIndex, &[u8; 12])> =
+            subshards.iter().map(|t| (t.0, t.1, &t.2)).collect();
+
+        let (reconstructed_segments, _nb_decode) = decoder
+            .reconstruct(&mut cloned_subshards.iter().cloned())
+            .unwrap();
+
+        // Check the result
+        // println!("Reconstructed Segments: {:x?}", reconstructed_segments);
+        // println!("Number of Decodes: {}", nb_decode);
+
+        assert_eq!(reconstructed_segments.len(), 1);
+        let original_data_bytes =
+            hex::decode(&json_data.data).expect("Failed to decode hex string");
+        // Verify that the data attribute matches the first 342 bytes of the reconstructed data in the first segment
+        if let Some((_, first_segment)) = reconstructed_segments.get(0) {
+            assert_eq!(
+                &first_segment.data[..342],
+                &original_data_bytes[..342],
+                "The first 342 bytes of the reconstructed data do not match the original data."
+            );
+            println!("Reconstructed successfully! YAY");
+        } else {
+            panic!("No reconstructed segments found.");
         }
     }
 }

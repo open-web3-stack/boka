@@ -1,6 +1,8 @@
 import erasure_coding
 import Foundation
 
+// TODO: note the underlying rust lib is not compatible with GP yet, so these will be changed
+
 public enum ErasureCodeError: Error {
     case constructFailed
     case reconstructFailed
@@ -11,9 +13,16 @@ public func split(data: Data) -> [CSegment] {
     var segments: [CSegment] = []
     let segmentSize = Int(SEGMENT_SIZE)
 
-    for i in stride(from: 0, to: data.count, by: segmentSize) {
+    // Create a new data with padding
+    var paddedData = data
+    let remainder = data.count % segmentSize
+    if remainder != 0 {
+        paddedData.append(Data(repeating: 0, count: segmentSize - remainder))
+    }
+
+    for i in stride(from: 0, to: paddedData.count, by: segmentSize) {
         let end = min(i + segmentSize, data.count)
-        let segmentData = data[i ..< end]
+        let segmentData = paddedData[i ..< end]
         let index = UInt32(i / segmentSize)
 
         let segment = CSegment(
@@ -23,30 +32,10 @@ public func split(data: Data) -> [CSegment] {
         segments.append(segment)
     }
 
-    // Check and pad the last segment if needed
-    let remainder = data.count % segmentSize
-    if remainder > 0 {
-        // Create a padded segment
-        var paddedData = Data(count: segmentSize)
-        let start = data.count - remainder
-        let segmentData = data[start ..< data.count]
-
-        // Copy data and pad
-        paddedData.replaceSubrange(0 ..< remainder, with: segmentData)
-
-        let index = UInt32(segments.count)
-
-        let segment = CSegment(
-            data: UnsafeMutablePointer(mutating: paddedData.withUnsafeBytes { $0.baseAddress!.assumingMemoryBound(to: UInt8.self) }),
-            index: index
-        )
-        segments[segments.count - 1] = segment
-    }
-
     return segments
 }
 
-/// Join segments into original data (with padding)
+/// Join segments into original data (padding not removed)
 private func join(segments: [CSegment]) -> Data {
     var data = Data()
     let sortedSegments = segments.sorted { $0.index < $1.index }
@@ -71,8 +60,6 @@ public class SubShardEncoder {
     }
 
     /// Construct erasure-coded chunks from segments
-    ///
-    /// TODO: note the underlying rust lib is not compatible to GP yet, so this will be changed
     public func construct(segments: [CSegment]) -> Result<[UInt8], ErasureCodeError> {
         var success = false
         var out_len: UInt = 0
@@ -103,8 +90,31 @@ public class SubShardDecoder {
         subshard_decoder_free(decoder)
     }
 
+    public class Decoded {
+        private var result: UnsafeMutablePointer<ReconstructResult>
+
+        public let segments: [SegmentTuple]
+        public let numDecoded: UInt
+
+        init(_ res: UnsafeMutablePointer<ReconstructResult>) {
+            result = res
+            let numSegments = Int(result.pointee.num_segments)
+            let segmentTuplesPtr = result.pointee.segments
+
+            // Safely access the segments array
+            let bufferPtr = UnsafeMutableBufferPointer<SegmentTuple>(start: segmentTuplesPtr, count: numSegments)
+            segments = Array(bufferPtr)
+
+            numDecoded = result.pointee.num_decodes
+        }
+
+        deinit {
+            reconstruct_result_free(result)
+        }
+    }
+
     /// Reconstruct erasure-coded chunks to segments
-    public func reconstruct(subshards: [SubShardTuple]) -> Result<ReconstructResult, ErasureCodeError> {
+    public func reconstruct(subshards: [SubShardTuple]) -> Result<Decoded, ErasureCodeError> {
         var success = false
 
         let reconstructResult = subshards.withUnsafeBufferPointer { subshardsPtr in
@@ -116,6 +126,6 @@ public class SubShardDecoder {
             return .failure(.reconstructFailed)
         }
 
-        return .success(result.pointee)
+        return .success(Decoded(result))
     }
 }
