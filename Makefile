@@ -47,3 +47,7 @@ lint: githooks
 .PHONY: format
 format: githooks
 	swiftformat .
+
+.PHONY: run
+run: githooks
+	swift run --package-path Boka

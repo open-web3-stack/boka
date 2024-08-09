@@ -4,7 +4,7 @@ public enum BlockchainDataProviderError: Error {
     case unknownHash
 }
 
-public protocol BlockchainDataProvider {
+public protocol BlockchainDataProvider: Sendable {
     func hasHeader(hash: Data32) async throws -> Bool
     func isHead(hash: Data32) async throws -> Bool
 

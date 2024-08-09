@@ -14,6 +14,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.4.0"),
         .package(url: "https://github.com/slashmo/swift-otel.git", from: "0.9.0"),
         .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.6.0"),
+        .package(url: "https://github.com/vapor/console-kit.git", from: "4.14.3"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -27,6 +28,7 @@ let package = Package(
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
                 .product(name: "OTel", package: "swift-otel"),
                 .product(name: "OTLPGRPC", package: "swift-otel"),
+                .product(name: "ConsoleKit", package: "console-kit"),
             ]
         ),
         .testTarget(

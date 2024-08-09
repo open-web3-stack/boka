@@ -17,6 +17,7 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../Blockchain"),
+        .package(path: "../Utils"),
         .package(url: "https://github.com/vapor/vapor.git", from: "4.102.1"),
         .package(url: "https://github.com/vapor/async-kit.git", from: "1.19.1"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
@@ -28,6 +29,7 @@ let package = Package(
             name: "RPC",
             dependencies: [
                 "Blockchain",
+                "Utils",
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "AsyncKit", package: "async-kit"),
             ]

@@ -1,3 +1,4 @@
+import ConsoleKit
 import OTel
 import OTLPGRPC
 import ServiceLifecycle
@@ -6,11 +7,12 @@ import TracingUtils
 public enum Tracing {
     public static func bootstrap(_ serviceName: String) async throws -> [Service] {
         // Bootstrap the logging backend with the OTel metadata provider which includes span IDs in logging messages.
-        LoggingSystem.bootstrap { label in
-            var handler = StreamLogHandler.standardError(label: label, metadataProvider: .otel)
-            handler.logLevel = .trace
-            return handler
-        }
+        LoggingSystem.bootstrap(
+            fragment: timestampDefaultLoggerFragment(),
+            console: Terminal(),
+            level: .trace,
+            metadataProvider: .otel
+        )
 
         // Configure OTel resource detection to automatically apply helpful attributes to events.
         let environment = OTelEnvironment.detected()
