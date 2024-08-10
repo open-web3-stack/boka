@@ -54,7 +54,7 @@ struct ErasureCodeTests {
 
                 if chunkIdx >= 684 {
                     var subshard: [UInt8] = Array(repeating: 0, count: Int(SUBSHARD_SIZE))
-                    subshard[0 ..< chunkBytes.count].append(contentsOf: chunkBytes)
+                    subshard[0 ..< chunkBytes.count] = [UInt8](chunkBytes)[...]
                     subshards.append(SubShardTuple(
                         seg_index: UInt8(segmentIdx),
                         chunk_index: ChunkIndex(chunkIdx),
@@ -85,12 +85,11 @@ struct ErasureCodeTests {
         case let .success(decoded):
             #expect(decoded.numDecoded == 1)
             let segmentTuples = decoded.segments
+            #expect(segmentTuples.count == 1)
             let segment = segmentTuples[0].segment
-
             let originalDataBytes = Data(fromHexString: testCase.data)!
             let segmentData = Data(UnsafeBufferPointer(start: segment.data, count: Int(SEGMENT_SIZE)))
-            // #expect(segmentData[0 ..< 342] == originalDataBytes[0 ..< 342])
-            #expect(segmentData[0 ..< 2] == originalDataBytes[0 ..< 2])
+            #expect(segmentData[0 ..< 342] == originalDataBytes[0 ..< 342])
         case let .failure(error):
             Issue.record("Expected success, got \(error)")
         }

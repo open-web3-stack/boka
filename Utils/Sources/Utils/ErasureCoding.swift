@@ -90,6 +90,7 @@ public class SubShardDecoder {
         subshard_decoder_free(decoder)
     }
 
+    /// Decoded reconstruct result
     public class Decoded {
         private var result: UnsafeMutablePointer<ReconstructResult>
 
@@ -101,7 +102,6 @@ public class SubShardDecoder {
             let numSegments = Int(result.pointee.num_segments)
             let segmentTuplesPtr = result.pointee.segments
 
-            // Safely access the segments array
             let bufferPtr = UnsafeMutableBufferPointer<SegmentTuple>(start: segmentTuplesPtr, count: numSegments)
             segments = Array(bufferPtr)
 
