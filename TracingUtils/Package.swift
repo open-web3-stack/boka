@@ -4,38 +4,32 @@
 import PackageDescription
 
 let package = Package(
-    name: "Node",
+    name: "TracingUtils",
     platforms: [
         .macOS(.v14),
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
-            name: "Node",
-            targets: ["Node"]
+            name: "TracingUtils",
+            targets: ["TracingUtils"]
         ),
     ],
     dependencies: [
-        .package(path: "../Utils"),
-        .package(path: "../Blockchain"),
-        .package(path: "../TracingUtils"),
-        .package(path: "../RPC"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.6.0"),
+        .package(url: "https://github.com/apple/swift-metrics.git", from: "2.5.0"),
+        .package(url: "https://github.com/apple/swift-distributed-tracing.git", from: "1.1.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "Node", dependencies: [
-                "Utils",
-                "Blockchain",
-                "TracingUtils",
-                "RPC",
+            name: "TracingUtils",
+            dependencies: [
+                .product(name: "Logging", package: "swift-log"),
+                .product(name: "Metrics", package: "swift-metrics"),
+                .product(name: "Tracing", package: "swift-distributed-tracing"),
             ]
         ),
-        .testTarget(
-            name: "NodeTests",
-            dependencies: ["Node"]
-        ),
-    ],
-    swiftLanguageVersions: [.version("6")]
+    ]
 )

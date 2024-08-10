@@ -24,7 +24,7 @@ deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a .lib/librocksdb.a .lib/libec.a
 
 .PHONY: test
 test: githooks deps
-	./scripts/run.sh test
+	./scripts/runTests.sh test
 
 .PHONY: build
 build: githooks deps
@@ -50,3 +50,7 @@ lint: githooks
 .PHONY: format
 format: githooks
 	swiftformat .
+
+.PHONY: run
+run: githooks
+	swift run --package-path Boka
