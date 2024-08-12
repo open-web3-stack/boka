@@ -77,6 +77,13 @@ jobs:
         key: ${{ runner.os }}-libs-librocksdb-${{ steps.rocksdb-commit-hash.outputs.commit-hash }}
         restore-keys: |
             ${{ runner.os }}-libs-librocksdb
+    - name: Cache erasure-coding static lib
+      uses: actions/cache@v4
+      with:
+        path: .lib/libec.a
+        key: ${{ runner.os }}-libs-libec-${{ hashFiles('Utils/Sources/erasure-coding/**') }}
+        restore-keys: |
+            ${{ runner.os }}-libs-libec
     - name: Setup Swift
       uses: SwiftyLab/setup-swift@latest
       with:

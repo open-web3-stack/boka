@@ -34,6 +34,7 @@ let package = Package(
                 .product(name: "Atomics", package: "swift-atomics"),
                 "blst",
                 "bandersnatch_vrfs",
+                "erasure_coding",
             ],
             swiftSettings: [
                 .define("DEBUG_ASSERT", .when(configuration: .debug)),
@@ -50,12 +51,17 @@ let package = Package(
             name: "bandersnatch_vrfs",
             path: "Sources"
         ),
+        .systemLibrary(
+            name: "erasure_coding",
+            path: "Sources"
+        ),
         .testTarget(
             name: "UtilsTests",
             dependencies: [
                 "Utils",
                 .product(name: "Testing", package: "swift-testing"),
-            ]
+            ],
+            resources: [.copy("TestData")]
         ),
     ],
     swiftLanguageVersions: [.version("6")]
