@@ -41,21 +41,6 @@ impl From<CSegment> for Segment {
     }
 }
 
-/// Frees CSegment's data.
-#[no_mangle]
-pub extern "C" fn csegment_data_free(c_segment: *mut CSegment) {
-    if !c_segment.is_null() {
-        let csegment = unsafe { &*c_segment };
-
-        if !csegment.data.is_null() {
-            unsafe {
-                let vec_data = Vec::from_raw_parts(csegment.data, SEGMENT_SIZE, SEGMENT_SIZE);
-                drop(vec_data);
-            }
-        }
-    }
-}
-
 /// Initializes a new SubShardEncoder.
 #[no_mangle]
 pub extern "C" fn subshard_encoder_new() -> *mut SubShardEncoder {

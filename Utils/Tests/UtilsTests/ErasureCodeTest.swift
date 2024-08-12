@@ -94,4 +94,14 @@ struct ErasureCodeTests {
             Issue.record("Expected success, got \(error)")
         }
     }
+
+    @Test func testSplitJoin() {
+        let testData = Data("Hello, world!".utf8)
+        let paddedTestData = testData + Data(repeating: 0, count: Int(SEGMENT_SIZE) - (testData.count % Int(SEGMENT_SIZE)))
+
+        let splited = split(data: testData)
+        let joined = join(segments: splited)
+
+        #expect(joined == paddedTestData)
+    }
 }

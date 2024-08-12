@@ -8,7 +8,7 @@ public enum ErasureCodeError: Error {
     case reconstructFailed
 }
 
-public class Segment {
+public struct Segment {
     public var csegment: CSegment
 
     public let data: Data
@@ -25,26 +25,23 @@ public class Segment {
         self.data = Data(bytes: csegment.data, count: Int(SEGMENT_SIZE))
         self.index = Int(csegment.index)
     }
-
-    deinit {
-        csegment_data_free(&csegment)
-    }
 }
 
 /// Split original data into segments
 public func split(data: Data) -> [Segment] {
     var segments: [Segment] = []
     let segmentSize = Int(SEGMENT_SIZE)
+    let remainder = data.count % segmentSize
+    segments.reserveCapacity((data.count / segmentSize) + (remainder > 0 ? 1 : 0))
 
     // Create a new data with padding
     var paddedData = data
-    let remainder = data.count % segmentSize
     if remainder != 0 {
         paddedData.append(Data(repeating: 0, count: segmentSize - remainder))
     }
 
     for i in stride(from: 0, to: paddedData.count, by: segmentSize) {
-        let end = min(i + segmentSize, data.count)
+        let end = min(i + segmentSize, paddedData.count)
         let segmentData = paddedData[i ..< end]
         let index = UInt32(i / segmentSize)
 
@@ -57,7 +54,7 @@ public func split(data: Data) -> [Segment] {
 
 /// Join segments into original data (padding not removed)
 public func join(segments: [Segment]) -> Data {
-    var data = Data()
+    var data = Data(capacity: segments.count * Int(SEGMENT_SIZE))
     let sortedSegments = segments.sorted { $0.index < $1.index }
 
     for segment in sortedSegments {
