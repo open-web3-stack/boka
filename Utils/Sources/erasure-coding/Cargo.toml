@@ -1,0 +1,16 @@
+[package]
+name = "ec"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[build-dependencies]
+cbindgen = "0.24.0"
+
+[dependencies]
+erasure-coding = { git = "https://github.com/paritytech/erasure-coding", rev = "512e774" }
+hex = "0.4.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
