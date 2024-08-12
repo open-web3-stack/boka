@@ -24,7 +24,6 @@ impl From<Segment> for CSegment {
             index: segment.index,
         };
 
-        // prevent Rust from freeing the Vec while CSegment is in use
         std::mem::forget(vec_data);
 
         c_segment
@@ -38,6 +37,21 @@ impl From<CSegment> for Segment {
         Segment {
             data: Box::new(vec_data.try_into().unwrap()),
             index: c_segment.index,
+        }
+    }
+}
+
+/// Frees CSegment's data.
+#[no_mangle]
+pub extern "C" fn csegment_data_free(c_segment: *mut CSegment) {
+    if !c_segment.is_null() {
+        let csegment = unsafe { &*c_segment };
+
+        if !csegment.data.is_null() {
+            unsafe {
+                let vec_data = Vec::from_raw_parts(csegment.data, SEGMENT_SIZE, SEGMENT_SIZE);
+                drop(vec_data);
+            }
         }
     }
 }
@@ -101,7 +115,6 @@ pub extern "C" fn subshard_encoder_construct(
                 *out_len = total_subshards;
             }
 
-            std::mem::forget(data);
             unsafe { *success = true };
         }
         Err(_) => {
@@ -202,7 +215,8 @@ pub extern "C" fn subshard_decoder_reconstruct(
             let segments_len = segments_vec.len();
             let segments_ptr = segments_vec.as_mut_ptr();
 
-            std::mem::forget(segments_vec); // prevent the Vec from being deallocated
+            // prevent the Vec from being deallocated, will be freed in reconstruct_result_free
+            std::mem::forget(segments_vec);
 
             let result = ReconstructResult {
                 segments: segments_ptr,

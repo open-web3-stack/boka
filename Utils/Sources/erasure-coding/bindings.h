@@ -83,6 +83,11 @@ typedef struct SubShardTuple {
 typedef uint8_t SubShard[SUBSHARD_SIZE];
 
 /**
+ * Frees CSegment's data.
+ */
+void csegment_data_free(struct CSegment *c_segment);
+
+/**
  * Initializes a new SubShardEncoder.
  */
 struct SubShardEncoder *subshard_encoder_new(void);

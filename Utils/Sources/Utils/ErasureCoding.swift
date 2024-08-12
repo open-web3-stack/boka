@@ -8,9 +8,32 @@ public enum ErasureCodeError: Error {
     case reconstructFailed
 }
 
+public class Segment {
+    public var csegment: CSegment
+
+    public let data: Data
+    public let index: Int
+
+    public init?(data: Data, index: UInt32) {
+        guard data.count == SEGMENT_SIZE else {
+            return nil
+        }
+        csegment = CSegment(
+            data: UnsafeMutablePointer(mutating: data.withUnsafeBytes { $0.baseAddress!.assumingMemoryBound(to: UInt8.self) }),
+            index: index
+        )
+        self.data = Data(bytes: csegment.data, count: Int(SEGMENT_SIZE))
+        self.index = Int(csegment.index)
+    }
+
+    deinit {
+        csegment_data_free(&csegment)
+    }
+}
+
 /// Split original data into segments
-public func split(data: Data) -> [CSegment] {
-    var segments: [CSegment] = []
+public func split(data: Data) -> [Segment] {
+    var segments: [Segment] = []
     let segmentSize = Int(SEGMENT_SIZE)
 
     // Create a new data with padding
@@ -25,10 +48,7 @@ public func split(data: Data) -> [CSegment] {
         let segmentData = paddedData[i ..< end]
         let index = UInt32(i / segmentSize)
 
-        let segment = CSegment(
-            data: UnsafeMutablePointer(mutating: segmentData.withUnsafeBytes { $0.baseAddress!.assumingMemoryBound(to: UInt8.self) }),
-            index: index
-        )
+        let segment = Segment(data: segmentData, index: index)!
         segments.append(segment)
     }
 
@@ -36,13 +56,12 @@ public func split(data: Data) -> [CSegment] {
 }
 
 /// Join segments into original data (padding not removed)
-private func join(segments: [CSegment]) -> Data {
+public func join(segments: [Segment]) -> Data {
     var data = Data()
     let sortedSegments = segments.sorted { $0.index < $1.index }
 
     for segment in sortedSegments {
-        let segmentData = UnsafeBufferPointer(start: segment.data, count: Int(SEGMENT_SIZE))
-        data.append(segmentData)
+        data.append(segment.data)
     }
 
     return data
@@ -60,14 +79,14 @@ public class SubShardEncoder {
     }
 
     /// Construct erasure-coded chunks from segments
-    public func construct(segments: [CSegment]) -> Result<[UInt8], ErasureCodeError> {
+    public func construct(segments: [Segment]) -> Result<[UInt8], ErasureCodeError> {
         var success = false
         var out_len: UInt = 0
 
         let expectedOutLen = Int(SUBSHARD_SIZE) * Int(TOTAL_SHARDS) * segments.count
         var out_chunks = [UInt8](repeating: 0, count: expectedOutLen)
 
-        segments.withUnsafeBufferPointer { segmentsPtr in
+        segments.map(\.csegment).withUnsafeBufferPointer { segmentsPtr in
             subshard_encoder_construct(encoder, segmentsPtr.baseAddress, UInt(segments.count), &success, &out_chunks, &out_len)
         }
 
