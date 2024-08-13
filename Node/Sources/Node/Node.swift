@@ -25,7 +25,8 @@ public class Node {
 
         let genesisState = try genesis.toState(config: config.protcol)
         let dataProvider = await InMemoryDataProvider(genesis: genesisState)
-        blockchain = await Blockchain(config: config.protcol, dataProvider: dataProvider)
+        let timeProvider = SystemTimeProvider()
+        blockchain = await Blockchain(config: config.protcol, dataProvider: dataProvider, timeProvider: timeProvider)
 
         rpcServer = try Server(config: config.rpc, source: blockchain)
     }
