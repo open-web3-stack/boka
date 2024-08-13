@@ -9,10 +9,12 @@ public final class Blockchain: Sendable {
     public let config: ProtocolConfigRef
 
     private let dataProvider: BlockchainDataProvider
+    private let timeProvider: TimeProvider
 
-    public init(config: ProtocolConfigRef, dataProvider: BlockchainDataProvider) async {
+    public init(config: ProtocolConfigRef, dataProvider: BlockchainDataProvider, timeProvider: TimeProvider) async {
         self.config = config
         self.dataProvider = dataProvider
+        self.timeProvider = timeProvider
     }
 
     public func importBlock(_ block: BlockRef) async throws {
@@ -21,7 +23,8 @@ public final class Blockchain: Sendable {
 
             let runtime = Runtime(config: config)
             let parent = try await dataProvider.getState(hash: block.header.parentHash)
-            let state = try runtime.apply(block: block, state: parent)
+            let timeslot = timeProvider.getTime() / UInt32(config.value.slotPeriodSeconds)
+            let state = try runtime.apply(block: block, state: parent, context: .init(timeslot: timeslot))
             try await dataProvider.add(state: state)
         }
     }
