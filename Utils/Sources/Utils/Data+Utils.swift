@@ -3,7 +3,8 @@ import Foundation
 extension Data {
     public init?(fromHexString hexString: String) {
         guard !hexString.isEmpty else {
-            return nil
+            self.init()
+            return
         }
 
         var data = Data()
@@ -22,5 +23,9 @@ extension Data {
         }
 
         self.init(data)
+    }
+
+    public func toHexString() -> String {
+        map { String(format: "%02x", $0) }.joined()
     }
 }
