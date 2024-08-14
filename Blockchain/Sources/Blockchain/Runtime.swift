@@ -5,6 +5,15 @@ public final class Runtime {
     public enum Error: Swift.Error {
         case safroleError(SafroleError)
         case invalidValidatorEd25519Key
+        case invalidTimeslot
+    }
+
+    public struct ApplyContext {
+        public let timeslot: TimeslotIndex
+
+        public init(timeslot: TimeslotIndex) {
+            self.timeslot = timeslot
+        }
     }
 
     public let config: ProtocolConfigRef
@@ -13,7 +22,18 @@ public final class Runtime {
         self.config = config
     }
 
-    public func apply(block: BlockRef, state prevState: StateRef) throws(Error) -> StateRef {
+    public func validate(block: BlockRef, state _: StateRef, context: ApplyContext) throws(Error) {
+        guard context.timeslot >= block.header.timeslotIndex else {
+            throw Error.invalidTimeslot
+        }
+
+        // TODO: validate block.header.seal
+        // TODO: abstract input validation logic from Safrole state update function and call it here
+    }
+
+    public func apply(block: BlockRef, state prevState: StateRef, context: ApplyContext) throws(Error) -> StateRef {
+        try validate(block: block, state: prevState, context: context)
+
         var newState = prevState.value
         newState.lastBlock = block
 
