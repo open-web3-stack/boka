@@ -31,7 +31,7 @@ struct TrieTests {
             }
 
             let result = try stateMerklize(kv: kv)
-            #expect(result.data == Data(fromHexString: element.output))
+            #expect(result.data.toHexString() == element.output)
         }
     }
 }
