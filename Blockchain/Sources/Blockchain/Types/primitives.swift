@@ -8,6 +8,7 @@ public typealias DataLength = UInt32
 public typealias ValidatorIndex = UInt32 // TODO: confirm this
 public typealias CoreIndex = UInt32 // TODO: confirm this
 public typealias TicketIndex = UInt8
+public typealias EpochIndex = UInt32
 
 public typealias Ed25519PublicKey = Data32
 public typealias Ed25519Signature = Data64
