@@ -13,8 +13,8 @@ public enum SafroleError: Error {
     case extrinsicsTooManyEntry
     case hashingError
     case bandersnatchError(BandersnatchError)
-    case decodingError
-    case unspecified
+    case decodingError(DecodingError)
+    case other(any Swift.Error)
 }
 
 public struct SafrolePostState: Sendable, Equatable {
@@ -264,7 +264,7 @@ extension Safrole {
                    currentPhase >= ticketSubmissionEndSlot,
                    ticketsAccumulator.count == config.value.epochLength
             {
-                .left(ConfigFixedSizeArray(config: config, array: outsideInReorder(ticketsAccumulator.array)))
+                try .left(ConfigFixedSizeArray(config: config, array: outsideInReorder(ticketsAccumulator.array)))
             } else if newEpoch == currentEpoch {
                 ticketsOrKeys
             } else {
@@ -278,7 +278,7 @@ extension Safrole {
                 ))
             }
 
-            let epochMark = isEpochChange ? EpochMarker(
+            let epochMark = try isEpochChange ? EpochMarker(
                 entropy: newEntropyPool.1,
                 validators: ConfigFixedSizeArray(config: config, array: newNextValidators.map(\.bandersnatch))
             ) : nil
@@ -288,7 +288,7 @@ extension Safrole {
                 currentPhase < ticketSubmissionEndSlot,
                 ticketSubmissionEndSlot <= newPhase,
                 ticketsAccumulator.count == config.value.epochLength {
-                    ConfigFixedSizeArray(
+                    try ConfigFixedSizeArray(
                         config: config, array: outsideInReorder(ticketsAccumulator.array)
                     )
                 } else {
@@ -330,7 +330,9 @@ extension Safrole {
                 newTicketsAccumulatorArr.removeLast(newTicketsAccumulatorArr.count - config.value.epochLength)
             }
 
-            let newTicketsAccumulator = ConfigLimitedSizeArray<Ticket, ProtocolConfig.Int0, ProtocolConfig.EpochLength>(
+            let newTicketsAccumulator = try ConfigLimitedSizeArray<
+                Ticket, ProtocolConfig.Int0, ProtocolConfig.EpochLength
+            >(
                 config: config,
                 array: newTicketsAccumulatorArr
             )
@@ -353,12 +355,10 @@ extension Safrole {
             return .failure(.bandersnatchError(e))
         } catch Blake2Error.hashingError {
             return .failure(.hashingError)
-        } catch is DecodingError {
-            // TODO: log details
-            return .failure(.decodingError)
+        } catch let e as DecodingError {
+            return .failure(.decodingError(e))
         } catch {
-            // TODO: log details
-            return .failure(.unspecified)
+            return .failure(.other(error))
         }
     }
 }

@@ -36,7 +36,7 @@ public struct ExtrinsicTickets: Sendable, Equatable {
 extension ExtrinsicTickets: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> ExtrinsicTickets {
-        ExtrinsicTickets(tickets: ConfigLimitedSizeArray(config: config))
+        ExtrinsicTickets(tickets: try! ConfigLimitedSizeArray(config: config))
     }
 }
 

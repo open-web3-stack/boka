@@ -44,7 +44,7 @@ public struct ExtrinsicAvailability: Sendable, Equatable {
 extension ExtrinsicAvailability: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> ExtrinsicAvailability {
-        ExtrinsicAvailability(assurances: ConfigLimitedSizeArray(config: config))
+        try! ExtrinsicAvailability(assurances: ConfigLimitedSizeArray(config: config))
     }
 }
 
