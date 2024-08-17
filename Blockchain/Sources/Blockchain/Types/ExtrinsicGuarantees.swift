@@ -60,7 +60,7 @@ public struct ExtrinsicGuarantees: Sendable, Equatable {
 extension ExtrinsicGuarantees: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> ExtrinsicGuarantees {
-        ExtrinsicGuarantees(guarantees: ConfigLimitedSizeArray(config: config))
+        try! ExtrinsicGuarantees(guarantees: ConfigLimitedSizeArray(config: config))
     }
 }
 
