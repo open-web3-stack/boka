@@ -21,7 +21,7 @@ public struct ExtrinsicDisputes: Sendable, Equatable {
 
         public var reportHash: Data32
         public var epoch: EpochIndex
-        public var signatures: ConfigFixedSizeArray<
+        public var judgements: ConfigFixedSizeArray<
             SignatureItem,
             ProtocolConfig.TwoThirdValidatorsPlusOne
         >
@@ -29,14 +29,14 @@ public struct ExtrinsicDisputes: Sendable, Equatable {
         public init(
             reportHash: Data32,
             epoch: EpochIndex,
-            signatures: ConfigFixedSizeArray<
+            judgements: ConfigFixedSizeArray<
                 SignatureItem,
                 ProtocolConfig.TwoThirdValidatorsPlusOne
             >
         ) {
             self.reportHash = reportHash
             self.epoch = epoch
-            self.signatures = signatures
+            self.judgements = judgements
         }
     }
 
@@ -116,14 +116,14 @@ extension ExtrinsicDisputes.VerdictItem: ScaleCodec.Encodable {
         try self.init(
             reportHash: decoder.decode(),
             epoch: decoder.decode(),
-            signatures: ConfigFixedSizeArray(config: config, from: &decoder)
+            judgements: ConfigFixedSizeArray(config: config, from: &decoder)
         )
     }
 
     public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
         try encoder.encode(reportHash)
         try encoder.encode(epoch)
-        try encoder.encode(signatures)
+        try encoder.encode(judgements)
     }
 }
 
