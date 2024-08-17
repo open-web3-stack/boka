@@ -35,9 +35,9 @@ public func stateMerklize(kv: [Data32: Data], i: Int = 0) throws -> Data32 {
 
     func leaf(key: Data32, value: Data) throws -> Data64 {
         if value.count <= 32 {
-            return embeddedLeaf(key: key, value: value, size: UInt8(value.count))
+            embeddedLeaf(key: key, value: value, size: UInt8(value.count))
         } else {
-            return try regularLeaf(key: key, value: value)
+            try regularLeaf(key: key, value: value)
         }
     }
 

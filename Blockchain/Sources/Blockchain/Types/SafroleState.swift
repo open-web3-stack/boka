@@ -60,7 +60,7 @@ public struct SafroleState: Sendable, Equatable {
 extension SafroleState: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> SafroleState {
-        SafroleState(
+        try! SafroleState(
             nextValidators: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
             ticketsVerifier: BandersnatchRingVRFRoot(),
             ticketsOrKeys: .right(ConfigFixedSizeArray(config: config, defaultValue: BandersnatchPublicKey())),

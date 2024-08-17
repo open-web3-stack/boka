@@ -2,6 +2,14 @@ import ScaleCodec
 
 // TODO: add tests
 
+public enum ConfigLimitedSizeArrayError: Swift.Error {
+    case tooManyElements
+    case tooFewElements
+    case invalidMinLength
+    case invalidMaxLength
+    case invalidIndex
+}
+
 public struct ConfigLimitedSizeArray<T, TMinLength: ReadInt, TMaxLength: ReadInt>
     where TMinLength.TConfig == TMaxLength.TConfig
 {
@@ -10,42 +18,55 @@ public struct ConfigLimitedSizeArray<T, TMinLength: ReadInt, TMaxLength: ReadInt
     public let minLength: Int
     public let maxLength: Int
 
-    public init(config: TMinLength.TConfig, defaultValue: T) {
+    public init(config: TMinLength.TConfig, defaultValue: T) throws(ConfigLimitedSizeArrayError) {
         let minLength = TMinLength.read(config: config)
         let maxLength = TMaxLength.read(config: config)
 
-        self.init(Array(repeating: defaultValue, count: minLength), minLength: minLength, maxLength: maxLength)
+        try self.init(Array(repeating: defaultValue, count: minLength), minLength: minLength, maxLength: maxLength)
     }
 
     // require minLength to be zero
-    public init(config: TMinLength.TConfig) {
+    public init(config: TMinLength.TConfig) throws(ConfigLimitedSizeArrayError) {
         let minLength = TMinLength.read(config: config)
         let maxLength = TMaxLength.read(config: config)
 
-        self.init([], minLength: minLength, maxLength: maxLength)
+        try self.init([], minLength: minLength, maxLength: maxLength)
     }
 
-    public init(config: TMinLength.TConfig, array: [T]) {
+    public init(config: TMinLength.TConfig, array: [T]) throws(ConfigLimitedSizeArrayError) {
         let minLength = TMinLength.read(config: config)
         let maxLength = TMaxLength.read(config: config)
 
-        self.init(array, minLength: minLength, maxLength: maxLength)
+        try self.init(array, minLength: minLength, maxLength: maxLength)
     }
 
-    private init(_ array: [T], minLength: Int, maxLength: Int) {
-        assert(minLength >= 0)
-        assert(maxLength >= minLength)
+    private init(_ array: [T], minLength: Int, maxLength: Int) throws(ConfigLimitedSizeArrayError) {
+        guard minLength >= 0 else {
+            throw ConfigLimitedSizeArrayError.invalidMinLength
+        }
+        guard maxLength >= minLength else {
+            throw ConfigLimitedSizeArrayError.invalidMaxLength
+        }
 
         self.array = array
         self.minLength = minLength
         self.maxLength = maxLength
 
-        validate()
+        try validateThrowing()
     }
 
     private func validate() {
         assert(array.count >= minLength, "count \(array.count) >= minLength \(minLength)")
         assert(array.count <= maxLength, "count \(array.count) <= maxLength \(maxLength)")
+    }
+
+    private func validateThrowing() throws(ConfigLimitedSizeArrayError) {
+        guard array.count >= minLength else {
+            throw ConfigLimitedSizeArrayError.tooFewElements
+        }
+        guard array.count <= maxLength else {
+            throw ConfigLimitedSizeArrayError.tooManyElements
+        }
     }
 }
 
@@ -119,19 +140,32 @@ extension ConfigLimitedSizeArray: RandomAccessCollection {
 }
 
 extension ConfigLimitedSizeArray {
-    public mutating func append(_ newElement: T) {
+    public mutating func append(_ newElement: T) throws(ConfigLimitedSizeArrayError) {
         array.append(newElement)
-        validate()
+        try validateThrowing()
     }
 
-    public mutating func insert(_ newElement: T, at i: Int) {
+    public mutating func insert(_ newElement: T, at i: Int) throws(ConfigLimitedSizeArrayError) {
+        if i < 0 || i > array.count {
+            throw ConfigLimitedSizeArrayError.invalidIndex
+        }
         array.insert(newElement, at: i)
-        validate()
+        try validateThrowing()
     }
 
-    public mutating func remove(at i: Int) -> T {
-        defer { validate() }
-        return array.remove(at: i)
+    public mutating func remove(at i: Int) throws -> T {
+        if i < 0 || i >= array.count {
+            throw ConfigLimitedSizeArrayError.invalidIndex
+        }
+        let res = array.remove(at: i)
+        try validateThrowing()
+        return res
+    }
+
+    public mutating func mutate<R>(_ fn: (inout [T]) -> R) throws(ConfigLimitedSizeArrayError) -> R {
+        let ret = fn(&array)
+        try validateThrowing()
+        return ret
     }
 }
 

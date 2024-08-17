@@ -49,7 +49,7 @@ extension WorkReport: Dummy {
             output: Data(),
             refinementContext: RefinementContext.dummy(config: config),
             packageSpecification: AvailabilitySpecifications.dummy(config: config),
-            results: ConfigLimitedSizeArray(config: config, defaultValue: WorkResult.dummy(config: config))
+            results: try! ConfigLimitedSizeArray(config: config, defaultValue: WorkResult.dummy(config: config))
         )
     }
 }

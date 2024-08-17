@@ -6,6 +6,8 @@ public final class Runtime {
         case safroleError(SafroleError)
         case invalidValidatorEd25519Key
         case invalidTimeslot
+        case invalidReportAuthorizer
+        case other(any Swift.Error)
     }
 
     public struct ApplyContext {
@@ -47,21 +49,79 @@ public final class Runtime {
             throw .safroleError(err)
         }
 
-        newState.activityStatistics = updateValidatorActivityStatistics(block: block, state: prevState)
+        do {
+            newState.coreAuthorizationPool = try updateAuthorizationPool(
+                block: block, state: prevState
+            )
+
+            newState.activityStatistics = try updateValidatorActivityStatistics(
+                block: block, state: prevState
+            )
+        } catch let error as Error {
+            throw error
+        } catch {
+            throw .other(error)
+        }
 
         return StateRef(newState)
     }
 
     // TODO: add tests
-    public func updateValidatorActivityStatistics(block: BlockRef, state: StateRef) -> ValidatorActivityStatistics {
+    public func updateAuthorizationPool(block: BlockRef, state: StateRef) throws -> ConfigFixedSizeArray<
+        ConfigLimitedSizeArray<
+            Data32,
+            ProtocolConfig.Int0,
+            ProtocolConfig.MaxAuthorizationsPoolItems
+        >,
+        ProtocolConfig.TotalNumberOfCores
+    > {
+        var pool = state.value.coreAuthorizationPool
+
+        for coreIndex in 0 ..< pool.count {
+            var corePool = pool[coreIndex]
+            let coreQueue = state.value.authorizationQueue[coreIndex]
+            if coreQueue.count == 0 {
+                continue
+            }
+            let newItem = coreQueue[Int(block.header.timeslotIndex) % coreQueue.count]
+
+            // remove used authorizers from pool
+            for report in block.extrinsic.reports.guarantees {
+                let authorizer = report.workReport.authorizerHash
+                if let idx = corePool.firstIndex(of: authorizer) {
+                    _ = try corePool.remove(at: idx)
+                } else {
+                    throw Error.invalidReportAuthorizer
+                }
+            }
+
+            // add new item from queue
+            if corePool.count < corePool.maxLength {
+                try corePool.append(newItem)
+            } else {
+                try corePool.mutate {
+                    $0.remove(at: 0)
+                    $0.append(newItem)
+                }
+            }
+            pool[coreIndex] = corePool
+        }
+
+        return pool
+    }
+
+    // TODO: add tests
+    public func updateValidatorActivityStatistics(block: BlockRef, state: StateRef) throws -> ValidatorActivityStatistics {
         let epochLength = UInt32(config.value.epochLength)
         let currentEpoch = state.value.timeslot / epochLength
         let newEpoch = block.header.timeslotIndex / epochLength
         let isEpochChange = currentEpoch != newEpoch
 
-        var acc = isEpochChange ? ConfigFixedSizeArray<_, ProtocolConfig.TotalNumberOfValidators>(
-            config: config, defaultValue: ValidatorActivityStatistics.StatisticsItem.dummy(config: config)
-        ) : state.value.activityStatistics.accumulator
+        var acc = try isEpochChange
+            ? ConfigFixedSizeArray<_, ProtocolConfig.TotalNumberOfValidators>(
+                config: config,
+                defaultValue: ValidatorActivityStatistics.StatisticsItem.dummy(config: config)
+            ) : state.value.activityStatistics.accumulator
 
         let prev = isEpochChange ? state.value.activityStatistics.accumulator : state.value.activityStatistics.previous
 

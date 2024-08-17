@@ -43,10 +43,10 @@ extension ValidatorActivityStatistics: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> ValidatorActivityStatistics {
         ValidatorActivityStatistics(
-            accumulator: ConfigFixedSizeArray(
+            accumulator: try! ConfigFixedSizeArray(
                 config: config, defaultValue: StatisticsItem.dummy(config: config)
             ),
-            previous: ConfigFixedSizeArray(
+            previous: try! ConfigFixedSizeArray(
                 config: config, defaultValue: StatisticsItem.dummy(config: config)
             )
         )

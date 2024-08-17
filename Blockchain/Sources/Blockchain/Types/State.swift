@@ -173,7 +173,7 @@ extension State: Equatable {
 extension State: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> State {
-        State(
+        try! State(
             config: config,
             coreAuthorizationPool: ConfigFixedSizeArray(config: config, defaultValue: ConfigLimitedSizeArray(config: config)),
             lastBlock: BlockRef.dummy(config: config),
