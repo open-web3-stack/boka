@@ -29,11 +29,11 @@ public struct Header: Sendable, Equatable {
         ProtocolConfig.EpochLength
     >?
 
-    // Hj: The judgement marker must contain exactly the sequence of report hashes judged not as
-    // confidently valid (i.e. either controversial or invalid).
+    // Hj: The verdicts markers must contain exactly the sequence of report hashes of all new
+    // bad & wonky verdicts.
     public var judgementsMarkers: [Data32]
 
-    // Ho: offenders markers
+    // Ho: The offenders markers must contain exactly the sequence of keys of all new offenders.
     public var offendersMarkers: [Ed25519PublicKey]
 
     // Hi: block author index
