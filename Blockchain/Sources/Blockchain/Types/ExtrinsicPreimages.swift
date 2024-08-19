@@ -4,11 +4,11 @@ import Utils
 
 public struct ExtrinsicPreimages: Sendable, Equatable {
     public struct SizeAndData: Sendable, Equatable {
-        public var size: DataLength
+        public var serviceIndices: ServiceIdentifier
         public var data: Data
 
-        public init(size: DataLength, data: Data) {
-            self.size = size
+        public init(serviceIndices: ServiceIdentifier, data: Data) {
+            self.serviceIndices = serviceIndices
             self.data = data
         }
     }
@@ -44,13 +44,13 @@ extension ExtrinsicPreimages: ScaleCodec.Codable {
 extension ExtrinsicPreimages.SizeAndData: ScaleCodec.Codable {
     public init(from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
-            size: decoder.decode(),
+            serviceIndices: decoder.decode(),
             data: decoder.decode()
         )
     }
 
     public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(size)
+        try encoder.encode(serviceIndices)
         try encoder.encode(data)
     }
 }

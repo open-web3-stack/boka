@@ -14,6 +14,10 @@ public struct FixedSizeData<T: ConstInt>: Sendable {
     public init() {
         data = Data(repeating: 0, count: T.value)
     }
+    
+    public func getCount() -> Int {
+        return data.count;
+    }
 }
 
 extension FixedSizeData: Equatable, Hashable {}

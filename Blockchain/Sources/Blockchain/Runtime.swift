@@ -129,8 +129,8 @@ public final class Runtime {
         item.blocks += 1
         item.tickets += UInt32(block.extrinsic.tickets.tickets.count)
         item.preimages += UInt32(block.extrinsic.preimages.preimages.count)
-        item.preimagesBytes += UInt32(block.extrinsic.preimages.preimages.reduce(into: 0) { $0 += $1.size })
-
+        // try to  change  preimage size to preimage data or serviceIndices
+        item.preimagesBytes += UInt32(block.extrinsic.preimages.preimages.reduce(into: 0) { $0 += $1.serviceIndices.getCount() })
         acc[block.header.authorIndex] = item
 
         for report in block.extrinsic.reports.guarantees {
