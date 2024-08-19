@@ -4,16 +4,13 @@ import Utils
 public struct State: Sendable {
     public struct ReportItem: Sendable, Equatable {
         public var workReport: WorkReport
-        public var guarantors: LimitedSizeArray<Ed25519PublicKey, ConstInt2, ConstInt3>
         public var timeslot: TimeslotIndex
 
         public init(
             workReport: WorkReport,
-            guarantors: LimitedSizeArray<Ed25519PublicKey, ConstInt2, ConstInt3>,
             timeslot: TimeslotIndex
         ) {
             self.workReport = workReport
-            self.guarantors = guarantors
             self.timeslot = timeslot
         }
     }
@@ -204,14 +201,12 @@ extension State.ReportItem: ScaleCodec.Encodable {
     public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
         try self.init(
             workReport: WorkReport(config: config, from: &decoder),
-            guarantors: decoder.decode(),
             timeslot: decoder.decode()
         )
     }
 
     public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
         try encoder.encode(workReport)
-        try encoder.encode(guarantors)
         try encoder.encode(timeslot)
     }
 }
