@@ -4,10 +4,10 @@ import Utils
 
 public struct ExtrinsicPreimages: Sendable, Equatable {
     public struct SizeAndData: Sendable, Equatable {
-        public var serviceIndices: ServiceIdentifier
+        public var serviceIndices: ServiceIndices
         public var data: Data
 
-        public init(serviceIndices: ServiceIdentifier, data: Data) {
+        public init(serviceIndices: ServiceIndices, data: Data) {
             self.serviceIndices = serviceIndices
             self.data = data
         }
