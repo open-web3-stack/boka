@@ -15,7 +15,7 @@ public struct FixedSizeData<T: ConstInt>: Sendable {
         data = Data(repeating: 0, count: T.value)
     }
     
-    public func getCount() -> Int {
+    public var getCount:Int {
         return data.count;
     }
 }
