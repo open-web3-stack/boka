@@ -1,5 +1,5 @@
 {
-  "originHash" : "d44a34d27cdf843dfd5fd974c50708433c35c018deebcbd82351493add9f3621",
+  "originHash" : "bc8542745aa76e3f2d31527ea654063fe387b25f6ecbfc727421e22131adb7e3",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -20,12 +20,30 @@
       }
     },
     {
+      "identity" : "bigint",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/attaswift/BigInt.git",
+      "state" : {
+        "revision" : "19f5e8a48be155e34abb98a2bcf4a343316f0343",
+        "version" : "5.0.0"
+      }
+    },
+    {
       "identity" : "blake2.swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/tesseract-one/Blake2.swift.git",
       "state" : {
         "revision" : "29c55c8fe42d6661e5a32cc5bbbad1fff64fd01e",
         "version" : "0.2.0"
+      }
+    },
+    {
+      "identity" : "common-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sublabdev/common-swift.git",
+      "state" : {
+        "revision" : "28234aeec57ce2ae96faa19afa5c8264abf69afd",
+        "version" : "1.0.0"
       }
     },
     {
@@ -65,12 +83,12 @@
       }
     },
     {
-      "identity" : "scalecodec.swift",
+      "identity" : "scale-codec-swift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/AcalaNetwork/ScaleCodec.swift.git",
+      "location" : "https://github.com/sublabdev/scale-codec-swift.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "dac3e7161de34c60c82794d031de0231b5a5746e"
+        "revision" : "3a45c082ee10ecd5f213436c64212353bcd6b883",
+        "version" : "1.0.0"
       }
     },
     {
@@ -278,15 +296,6 @@
       "state" : {
         "branch" : "0.10.0",
         "revision" : "69d59cfc76e5daf498ca61f5af409f594768eef9"
-      }
-    },
-    {
-      "identity" : "tuples.swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tesseract-one/Tuples.swift.git",
-      "state" : {
-        "revision" : "4d2cf7c64443cdf4df833d0bedd767bf9dbc49d9",
-        "version" : "0.1.3"
       }
     },
     {

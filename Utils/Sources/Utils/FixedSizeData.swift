@@ -1,7 +1,7 @@
 import Foundation
-import ScaleCodec
 
-public struct FixedSizeData<T: ConstInt>: Sendable {
+// TODO: use fixed length format for Codable
+public struct FixedSizeData<T: ConstInt>: Sendable, Codable {
     public private(set) var data: Data
 
     public init?(_ value: Data) {
@@ -37,16 +37,6 @@ extension FixedSizeData: Comparable {
             return l < r
         }
         return false
-    }
-}
-
-extension FixedSizeData: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(decoder.decode(Data.self, .fixed(UInt(T.value))))!
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(data, .fixed(UInt(T.value)))
     }
 }
 

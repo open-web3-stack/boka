@@ -16,9 +16,9 @@ let package = Package(
         ),
     ],
     dependencies: [
+        .package(path: "../Codec"),
         .package(path: "../Utils"),
         .package(path: "../TracingUtils"),
-        .package(url: "https://github.com/AcalaNetwork/ScaleCodec.swift.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
     ],
     targets: [
@@ -27,9 +27,9 @@ let package = Package(
         .target(
             name: "Blockchain",
             dependencies: [
+                "Codec",
                 "Utils",
                 "TracingUtils",
-                .product(name: "ScaleCodec", package: "ScaleCodec.swift"),
             ]
         ),
         .testTarget(

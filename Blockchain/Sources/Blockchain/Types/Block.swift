@@ -1,7 +1,6 @@
-import ScaleCodec
 import Utils
 
-public struct Block: Sendable, Equatable {
+public struct Block: Sendable, Equatable, Codable {
     public var header: Header
     public var extrinsic: Extrinsic
 
@@ -14,6 +13,16 @@ public struct Block: Sendable, Equatable {
 extension Block {
     public func asRef() -> BlockRef {
         BlockRef(self)
+    }
+}
+
+extension Block: Dummy {
+    public typealias Config = ProtocolConfigRef
+    public static func dummy(config: Config) -> Block {
+        Block(
+            header: Header.dummy(config: config),
+            extrinsic: Extrinsic.dummy(config: config)
+        )
     }
 }
 
@@ -36,26 +45,12 @@ public final class BlockRef: Ref<Block>, @unchecked Sendable {
     public var extrinsic: Extrinsic { value.extrinsic }
 }
 
-extension Block: Dummy {
-    public typealias Config = ProtocolConfigRef
-    public static func dummy(config: Config) -> Block {
-        Block(
-            header: Header.dummy(config: config),
-            extrinsic: Extrinsic.dummy(config: config)
-        )
-    }
-}
-
-extension Block: ScaleCodec.Encodable {
-    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            header: Header(config: config, from: &decoder),
-            extrinsic: Extrinsic(config: config, from: &decoder)
-        )
+extension BlockRef: Codable {
+    public convenience init(from decoder: Decoder) throws {
+        try self.init(.init(from: decoder))
     }
 
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(header)
-        try encoder.encode(extrinsic)
+    public func encode(to encoder: Encoder) throws {
+        try value.encode(to: encoder)
     }
 }

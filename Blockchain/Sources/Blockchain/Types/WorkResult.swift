@@ -1,8 +1,8 @@
+import Codec
 import Foundation
-import ScaleCodec
 import Utils
 
-public struct WorkResult: Sendable, Equatable {
+public struct WorkResult: Sendable, Equatable, Codable {
     // s: the index of the service whose state is to be altered and thus whose refine code was already executed
     public var serviceIdentifier: ServiceIdentifier
 
@@ -45,25 +45,5 @@ extension WorkResult: Dummy {
             gas: 0,
             output: .success(Data())
         )
-    }
-}
-
-extension WorkResult: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            serviceIdentifier: decoder.decode(),
-            codeHash: decoder.decode(),
-            payloadHash: decoder.decode(),
-            gas: decoder.decode(),
-            output: decoder.decode()
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(serviceIdentifier)
-        try encoder.encode(codeHash)
-        try encoder.encode(payloadHash)
-        try encoder.encode(gas)
-        try encoder.encode(output)
     }
 }

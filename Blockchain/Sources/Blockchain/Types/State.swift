@@ -1,8 +1,7 @@
-import ScaleCodec
 import Utils
 
 public struct State: Sendable {
-    public struct ReportItem: Sendable, Equatable {
+    public struct ReportItem: Sendable, Equatable, Codable {
         public var workReport: WorkReport
         public var timeslot: TimeslotIndex
 
@@ -12,6 +11,18 @@ public struct State: Sendable {
         ) {
             self.workReport = workReport
             self.timeslot = timeslot
+        }
+    }
+
+    public struct PrivilegedServiceIndices: Sendable, Equatable, Codable {
+        public var empower: ServiceIdentifier
+        public var assign: ServiceIdentifier
+        public var designate: ServiceIdentifier
+
+        public init(empower: ServiceIdentifier, assign: ServiceIdentifier, designate: ServiceIdentifier) {
+            self.empower = empower
+            self.assign = assign
+            self.designate = designate
         }
     }
 
@@ -37,7 +48,7 @@ public struct State: Sendable {
     public var serviceAccounts: [ServiceIdentifier: ServiceAccount]
 
     // η: The eηtropy accumulator and epochal raηdomness.
-    public var entropyPool: (Data32, Data32, Data32, Data32)
+    public var entropyPool: EntropyPool
 
     // ι: The validator keys and metadata to be drawn from next.
     public var validatorQueue: ConfigFixedSizeArray<
@@ -73,11 +84,7 @@ public struct State: Sendable {
     >
 
     // χ: The privileged service indices.
-    public var privilegedServiceIndices: (
-        empower: ServiceIdentifier,
-        assign: ServiceIdentifier,
-        designate: ServiceIdentifier
-    )
+    public var privilegedServiceIndices: PrivilegedServiceIndices
 
     // ψ: past judgements
     public var judgements: JudgementsState
@@ -98,7 +105,7 @@ public struct State: Sendable {
         lastBlock: BlockRef,
         safroleState: SafroleState,
         serviceAccounts: [ServiceIdentifier: ServiceAccount],
-        entropyPool: (Data32, Data32, Data32, Data32),
+        entropyPool: EntropyPool,
         validatorQueue: ConfigFixedSizeArray<
             ValidatorKey, ProtocolConfig.TotalNumberOfValidators
         >,
@@ -120,11 +127,7 @@ public struct State: Sendable {
             >,
             ProtocolConfig.TotalNumberOfCores
         >,
-        privilegedServiceIndices: (
-            empower: ServiceIdentifier,
-            assign: ServiceIdentifier,
-            designate: ServiceIdentifier
-        ),
+        privilegedServiceIndices: PrivilegedServiceIndices,
         judgements: JudgementsState,
         activityStatistics: ValidatorActivityStatistics
     ) {
@@ -143,6 +146,111 @@ public struct State: Sendable {
         self.privilegedServiceIndices = privilegedServiceIndices
         self.judgements = judgements
         self.activityStatistics = activityStatistics
+    }
+}
+
+extension State: Codable {
+    enum CodingKeys: String, CodingKey {
+        case coreAuthorizationPool
+        case lastBlock
+        case safroleState
+        case serviceAccounts
+        case entropyPool
+        case validatorQueue
+        case currentValidators
+        case previousValidators
+        case reports
+        case timeslot
+        case authorizationQueue
+        case privilegedServiceIndices
+        case judgements
+        case activityStatistics
+    }
+
+    enum CodingError: Error {
+        case missingConfig
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        guard let config = decoder.userInfo[.config] as? ProtocolConfigRef else {
+            throw CodingError.missingConfig
+        }
+        try self.init(
+            config: config,
+            coreAuthorizationPool: container.decode(
+                ConfigFixedSizeArray<
+                    ConfigLimitedSizeArray<
+                        Data32,
+                        ProtocolConfig.Int0,
+                        ProtocolConfig.MaxAuthorizationsPoolItems
+                    >,
+                    ProtocolConfig.TotalNumberOfCores
+                >.self,
+                forKey: .coreAuthorizationPool
+            ),
+            lastBlock: container.decode(BlockRef.self, forKey: .lastBlock),
+            safroleState: container.decode(SafroleState.self, forKey: .safroleState),
+            serviceAccounts: container.decode([ServiceIdentifier: ServiceAccount].self, forKey: .serviceAccounts),
+            entropyPool: container.decode(EntropyPool.self, forKey: .entropyPool),
+            validatorQueue: container.decode(
+                ConfigFixedSizeArray<
+                    ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+                >.self,
+                forKey: .validatorQueue
+            ),
+            currentValidators: container.decode(
+                ConfigFixedSizeArray<
+                    ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+                >.self,
+                forKey: .currentValidators
+            ),
+            previousValidators: container.decode(
+                ConfigFixedSizeArray<
+                    ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+                >.self,
+                forKey: .previousValidators
+            ),
+            reports: container.decode(
+                ConfigFixedSizeArray<
+                    ReportItem?,
+                    ProtocolConfig.TotalNumberOfCores
+                >.self,
+                forKey: .reports
+            ),
+            timeslot: container.decode(TimeslotIndex.self, forKey: .timeslot),
+            authorizationQueue: container.decode(
+                ConfigFixedSizeArray<
+                    ConfigFixedSizeArray<
+                        Data32,
+                        ProtocolConfig.MaxAuthorizationsQueueItems
+                    >,
+                    ProtocolConfig.TotalNumberOfCores
+                >.self,
+                forKey: .authorizationQueue
+            ),
+            privilegedServiceIndices: container.decode(PrivilegedServiceIndices.self, forKey: .privilegedServiceIndices),
+            judgements: container.decode(JudgementsState.self, forKey: .judgements),
+            activityStatistics: container.decode(ValidatorActivityStatistics.self, forKey: .activityStatistics)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(coreAuthorizationPool, forKey: .coreAuthorizationPool)
+        try container.encode(lastBlock, forKey: .lastBlock)
+        try container.encode(safroleState, forKey: .safroleState)
+        try container.encode(serviceAccounts, forKey: .serviceAccounts)
+        try container.encode(entropyPool, forKey: .entropyPool)
+        try container.encode(validatorQueue, forKey: .validatorQueue)
+        try container.encode(currentValidators, forKey: .currentValidators)
+        try container.encode(previousValidators, forKey: .previousValidators)
+        try container.encode(reports, forKey: .reports)
+        try container.encode(timeslot, forKey: .timeslot)
+        try container.encode(authorizationQueue, forKey: .authorizationQueue)
+        try container.encode(privilegedServiceIndices, forKey: .privilegedServiceIndices)
+        try container.encode(judgements, forKey: .judgements)
+        try container.encode(activityStatistics, forKey: .activityStatistics)
     }
 }
 
@@ -176,7 +284,7 @@ extension State: Dummy {
             lastBlock: BlockRef.dummy(config: config),
             safroleState: SafroleState.dummy(config: config),
             serviceAccounts: [:],
-            entropyPool: (Data32(), Data32(), Data32(), Data32()),
+            entropyPool: EntropyPool((Data32(), Data32(), Data32(), Data32())),
             validatorQueue: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
             currentValidators: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
             previousValidators: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
@@ -186,7 +294,7 @@ extension State: Dummy {
                 config: config,
                 defaultValue: ConfigFixedSizeArray(config: config, defaultValue: Data32())
             ),
-            privilegedServiceIndices: (
+            privilegedServiceIndices: PrivilegedServiceIndices(
                 empower: ServiceIdentifier(),
                 assign: ServiceIdentifier(),
                 designate: ServiceIdentifier()
@@ -194,63 +302,6 @@ extension State: Dummy {
             judgements: JudgementsState.dummy(config: config),
             activityStatistics: ValidatorActivityStatistics.dummy(config: config)
         )
-    }
-}
-
-extension State.ReportItem: ScaleCodec.Encodable {
-    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            workReport: WorkReport(config: config, from: &decoder),
-            timeslot: decoder.decode()
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(workReport)
-        try encoder.encode(timeslot)
-    }
-}
-
-extension State: ScaleCodec.Encodable {
-    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            config: config,
-            coreAuthorizationPool: ConfigFixedSizeArray(config: config, from: &decoder) {
-                try ConfigLimitedSizeArray(config: config, from: &$0) { try $0.decode() }
-            },
-            lastBlock: Block(config: config, from: &decoder).asRef(),
-            safroleState: SafroleState(config: config, from: &decoder),
-            serviceAccounts: decoder.decode(),
-            entropyPool: decoder.decode(),
-            validatorQueue: ConfigFixedSizeArray(config: config, from: &decoder),
-            currentValidators: ConfigFixedSizeArray(config: config, from: &decoder),
-            previousValidators: ConfigFixedSizeArray(config: config, from: &decoder),
-            reports: ConfigFixedSizeArray(config: config, from: &decoder) { try ReportItem(config: config, from: &$0) },
-            timeslot: decoder.decode(),
-            authorizationQueue: ConfigFixedSizeArray(config: config, from: &decoder) {
-                try ConfigFixedSizeArray(config: config, from: &$0)
-            },
-            privilegedServiceIndices: decoder.decode(),
-            judgements: decoder.decode(),
-            activityStatistics: ValidatorActivityStatistics(config: config, from: &decoder)
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(coreAuthorizationPool)
-        try encoder.encode(lastBlock.value)
-        try encoder.encode(safroleState)
-        try encoder.encode(serviceAccounts)
-        try encoder.encode(entropyPool)
-        try encoder.encode(validatorQueue)
-        try encoder.encode(currentValidators)
-        try encoder.encode(previousValidators)
-        try encoder.encode(reports)
-        try encoder.encode(timeslot)
-        try encoder.encode(authorizationQueue)
-        try encoder.encode(privilegedServiceIndices)
-        try encoder.encode(judgements)
-        try encoder.encode(activityStatistics)
     }
 }
 

@@ -1,6 +1,4 @@
-import ScaleCodec
-
-public enum WorkResultError: Error, CaseIterable, ScaleCodec.Codable {
+public enum WorkResultError: Error, CaseIterable, Codable {
     case outofGas
     case panic
     case invalidCode

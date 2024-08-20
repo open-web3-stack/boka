@@ -20,7 +20,7 @@ let package = Package(
         .package(path: "../Blockchain"),
         .package(path: "../PolkaVM"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
-        .package(url: "https://github.com/AcalaNetwork/ScaleCodec.swift.git", branch: "main"),
+        .package(url: "https://github.com/sublabdev/scale-codec-swift.git", from: "1.0.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -37,7 +37,7 @@ let package = Package(
                 "PolkaVM",
                 "JAMTests",
                 .product(name: "Testing", package: "swift-testing"),
-                .product(name: "ScaleCodec", package: "ScaleCodec.swift"),
+                .product(name: "ScaleCodecSwift", package: "scale-codec-swift"),
             ]
         ),
     ],
