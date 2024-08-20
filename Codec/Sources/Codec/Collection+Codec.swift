@@ -2,11 +2,10 @@ import Foundation
 
 extension Collection<UInt8> where SubSequence == Self {
     public mutating func next() -> UInt8? {
-        guard let byte = self[safe: startIndex] else {
+        guard let byte = first else {
             return nil
         }
-        let nextIndex = index(after: startIndex)
-        self = self[nextIndex ..< endIndex]
+        self = dropFirst()
         return byte
     }
 

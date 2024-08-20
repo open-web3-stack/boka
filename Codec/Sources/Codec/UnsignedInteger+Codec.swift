@@ -75,4 +75,14 @@ extension UnsignedInteger {
     public func encode(method: EncodeMethod) -> some Sequence<UInt8> {
         IntegerEncoder(value: self, method: method)
     }
+
+    public func encode() -> Data {
+        var data = Data()
+        data.reserveCapacity(MemoryLayout<Self>.size)
+        // use withUnsafeBytes to avoid the overhead of creating a copy of the data
+        withUnsafeBytes(of: self) { bytes in
+            data.append(contentsOf: bytes)
+        }
+        return data
+    }
 }

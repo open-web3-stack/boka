@@ -1,4 +1,5 @@
 import Blake2
+import Codec
 import Foundation
 import Utils
 
@@ -188,8 +189,9 @@ func outsideInReorder<T>(_ array: [T]) -> [T] {
 func generateFallbackIndices(entropy: Data32, count: Int, length: Int) throws -> [Int] {
     try (0 ..< count).map { i throws in
         // convert i to little endian
-        let bytes = UInt32(i).encode(method: .fixedWidth(4))
+        let bytes = UInt32(i).encode()
         let data = entropy.data + Data(bytes)
+        // TODO: use blake256 update directly to be more efficient
         let hash = try blake2b256(data)
         var hash4 = hash.data[0 ..< 4]
         let idx: UInt32 = hash4.decode(length: 4)!
