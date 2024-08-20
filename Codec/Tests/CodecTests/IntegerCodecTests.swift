@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import Utils
+@testable import Codec
 
 @Suite struct IntegerCodecTests {
     static func fixedWidthTestCasesSimple() -> [(UInt8, EncodeMethod, [UInt8])] {

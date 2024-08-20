@@ -5,12 +5,18 @@ import PackageDescription
 
 let package = Package(
     name: "Codec",
+    platforms: [
+        .macOS(.v14),
+    ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "Codec",
             targets: ["Codec"]
         ),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -20,7 +26,10 @@ let package = Package(
         ),
         .testTarget(
             name: "CodecTests",
-            dependencies: ["Codec"]
+            dependencies: [
+                "Codec",
+                .product(name: "Testing", package: "swift-testing"),
+            ]
         ),
     ]
 )
