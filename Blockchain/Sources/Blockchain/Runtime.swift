@@ -129,7 +129,6 @@ public final class Runtime {
         item.blocks += 1
         item.tickets += UInt32(block.extrinsic.tickets.tickets.count)
         item.preimages += UInt32(block.extrinsic.preimages.preimages.count)
-        // try to  change  preimage size to data count
         item.preimagesBytes += UInt32(block.extrinsic.preimages.preimages.reduce(into: 0) { $0 += $1.data.count })
         acc[block.header.authorIndex] = item
 
