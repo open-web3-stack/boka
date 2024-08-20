@@ -4,36 +4,34 @@ import Testing
 @testable import Utils
 
 @Suite struct BitStringTests {
-    @Test func testBitString_01() throws {
+    @Test func testBitString_01() {
         let binaryString = "01"
         let expectedLength = 2
-        let expectedBytes = Data([0b01000000]) // "01" -> 0b01000000 in a single byte
-        let bitString = try Bitstring(binaryString)
-        #expect(expectedBytes == bitString.bytes)
-        #expect(expectedLength == bitString.length)
+        let expectedBytes = Data([0b0100_0000]) // "01" -> 0b01000000 in a single byte
+        let bitString = Bitstring(binaryString)
+        #expect(expectedBytes == bitString!.bytes)
+        #expect(expectedLength == bitString!.length)
     }
-    @Test func testBitString_100000001() throws {
-        let binaryString: String = "100000001"
+
+    @Test func testBitString_100000001() {
+        let binaryString = "100000001"
         let expectedLength = 9
-        let expectedBytes = Data([0b10000000, 0b10000000]) // "100000001" -> 0b10000000 0b10000000 in two bytes
-        let bitstring = try Bitstring(binaryString) 
-        #expect(bitstring.length == expectedLength)
-        #expect(bitstring.bytes == expectedBytes)
-        #expect(bitstring.binaryString == binaryString)
-}
-    @Test func testInvalidBinaryString() throws {
+        let expectedBytes = Data([0b1000_0000, 0b1000_0000]) // "100000001" -> 0b10000000 0b10000000 in two bytes
+        let bitstring = Bitstring(binaryString)
+        #expect(bitstring!.length == expectedLength)
+        #expect(bitstring!.bytes == expectedBytes)
+        #expect(bitstring!.binaryString == binaryString)
+    }
+
+    @Test func testInvalidBinaryString() {
         let invalidBinaryString = "02"
-        do {
-            _ = try Bitstring(invalidBinaryString)
-        } catch {
-            print(error)
-            #expect(true)
-        }
+        let bitstring = Bitstring(invalidBinaryString)
+        #expect(bitstring == nil)
+        #expect(bitstring?.bitSquences == nil)
     }
-    @Test func testinitBinaryStringWithLength() throws {
-        let bitstring = Bitstring(length: 341)
-        print(bitstring.bitString)
-        print(bitstring.binaryString)
+
+    @Test func testinitBinaryStringWithLength() {
+        let bitstring = Bitstring(length: 0)
+        #expect(bitstring.length == 0)
     }
-    
 }
