@@ -55,10 +55,7 @@ extension FixSizeBitstring: Equatable {
      - returns true if the bitstrings are equal, false otherwise
       */
     public static func == (lhs: FixSizeBitstring, rhs: FixSizeBitstring) -> Bool {
-        guard lhs.bytes.count == rhs.bytes.count else {
-            return false
-        }
-        return lhs.bytes == rhs.bytes
+        return lhs.length == rhs.length && lhs.bytes == rhs.bytes
     }
 }
 
