@@ -5,12 +5,12 @@ import ScaleCodec
 public struct FixSizeBitstring<TByteLength: ReadInt>: Hashable, Sendable {
     /// Byte storage for bits.
     public private(set) var bytes: Data
+    /// length of the bitstring
     public private(set) var length: Int
-    /// Initialize with byte data storage.
+    /// Initialize with byte data storage and length.
     /// - Parameter bytes: Byte storage for bits.
-    public init?(config: T.TConfig, bytes: Data) {
-        let length = T.read(config: config)
-        guard length == bytes.count else {
+    public init?(bytes: Data, length: Int) {
+        guard bytes.count * 8 >= length else {
             return nil
         }
         self.bytes = bytes
@@ -55,14 +55,20 @@ extension FixSizeBitstring: Equatable {
      - returns true if the bitstrings are equal, false otherwise
       */
     public static func == (lhs: FixSizeBitstring, rhs: FixSizeBitstring) -> Bool {
-        return lhs.length == rhs.length && lhs.bytes == rhs.bytes
+        lhs.length == rhs.length && lhs.bytes == rhs.bytes
     }
 }
 
+extension FixSizeBitstring: ScaleCodec.Encodable {
+    public init(config: TByteLength.TConfig, from decoder: inout some ScaleCodec.Decoder) throws {
+        let length = TByteLength.read(config: config)
+        try self.init(
+            bytes: decoder.decode(Data.self),
+            length: length
+        )!
+    }
 
-extension FixSizeBitstring where T: ScaleCodec.Decodable {
-    public init(config: T.TConfig, from decoder: inout some ScaleCodec.Decoder) throws {
-        let length = T.read(config: config)
-        try self.init(bytes: decoder.decode(Data.self, .fixed(UInt(length))), length: length)
+    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
+        try encoder.encode(bytes)
     }
 }
