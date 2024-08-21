@@ -21,6 +21,11 @@ public struct FixSizeBitstring<TByteLength: ReadInt>: Hashable, Sendable {
         self.length = length
     }
 
+    public init(config: TByteLength.TConfig, data: Data) throws(ConfigBitstringError) {
+        let length = TByteLength.read(config: config)
+        try self.init(bytes: data, length: length)
+    }
+
     private func at(unchecked index: Int) -> Bool {
         let byteIndex = index >> 3
         let bitIndex = 7 - index % 8
