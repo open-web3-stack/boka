@@ -26,7 +26,6 @@ public struct FixSizeBitstring<T: ReadInt>: Hashable, Sendable {
     /// Formats the bitstring in binary digits.
     public var binaryString: String {
         var s = ""
-        let length: Int = bytes.count * 8
         for i in 0 ..< length {
             s.append(at(unchecked: i) ? "1" : "0")
         }
