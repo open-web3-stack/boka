@@ -1,7 +1,6 @@
-import ScaleCodec
 import Utils
 
-public struct Extrinsic: Sendable, Equatable {
+public struct Extrinsic: Sendable, Equatable, Codable {
     // ET: Tickets, used for the mechanism which manages the selection of validators for the
     // permissioning of block authoring
     public var tickets: ExtrinsicTickets
@@ -44,25 +43,5 @@ extension Extrinsic: Dummy {
             availability: ExtrinsicAvailability.dummy(config: config),
             reports: ExtrinsicGuarantees.dummy(config: config)
         )
-    }
-}
-
-extension Extrinsic: ScaleCodec.Encodable {
-    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            tickets: ExtrinsicTickets(config: config, from: &decoder),
-            judgements: ExtrinsicDisputes(config: config, from: &decoder),
-            preimages: decoder.decode(),
-            availability: ExtrinsicAvailability(config: config, from: &decoder),
-            reports: ExtrinsicGuarantees(config: config, from: &decoder)
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(tickets)
-        try encoder.encode(judgements)
-        try encoder.encode(preimages)
-        try encoder.encode(availability)
-        try encoder.encode(reports)
     }
 }

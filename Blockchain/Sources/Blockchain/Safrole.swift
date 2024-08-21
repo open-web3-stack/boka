@@ -1,6 +1,6 @@
 import Blake2
+import Codec
 import Foundation
-import ScaleCodec
 import Utils
 
 public enum SafroleError: Error {
@@ -17,9 +17,23 @@ public enum SafroleError: Error {
     case other(any Swift.Error)
 }
 
+public struct EntropyPool: Sendable, Equatable, Codable {
+    public var t0: Data32
+    public var t1: Data32
+    public var t2: Data32
+    public var t3: Data32
+
+    public init(_ entropyPool: (Data32, Data32, Data32, Data32)) {
+        t0 = entropyPool.0
+        t1 = entropyPool.1
+        t2 = entropyPool.2
+        t3 = entropyPool.3
+    }
+}
+
 public struct SafrolePostState: Sendable, Equatable {
     public var timeslot: TimeslotIndex
-    public var entropyPool: (Data32, Data32, Data32, Data32)
+    public var entropyPool: EntropyPool
     public var previousValidators: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
     >
@@ -51,7 +65,7 @@ public struct SafrolePostState: Sendable, Equatable {
 
     public init(
         timeslot: TimeslotIndex,
-        entropyPool: (Data32, Data32, Data32, Data32),
+        entropyPool: EntropyPool,
         previousValidators: ConfigFixedSizeArray<
             ValidatorKey, ProtocolConfig.TotalNumberOfValidators
         >,
@@ -108,7 +122,7 @@ public struct SafrolePostState: Sendable, Equatable {
 public protocol Safrole {
     var config: ProtocolConfigRef { get }
     var timeslot: TimeslotIndex { get }
-    var entropyPool: (Data32, Data32, Data32, Data32) { get }
+    var entropyPool: EntropyPool { get }
     var previousValidators: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
     > { get }
@@ -172,15 +186,18 @@ func outsideInReorder<T>(_ array: [T]) -> [T] {
     return reordered
 }
 
-func generateFallbackIndices(entropy: Data32, count: Int) throws -> [Int] {
+func generateFallbackIndices(entropy: Data32, count: Int, length: Int) throws -> [Int] {
     try (0 ..< count).map { i throws in
         // convert i to little endian
-        let bytes = UInt32(i).data(littleEndian: true, trimmed: false)
+        let bytes = UInt32(i).encode()
         let data = entropy.data + Data(bytes)
+        // TODO: use blake256 update directly to be more efficient
         let hash = try blake2b256(data)
         let hash4 = hash.data[0 ..< 4]
-        let idx = try decode(UInt32.self, from: hash4)
-        return Int(idx)
+        let idx: UInt32 = hash4.withUnsafeBytes { ptr in
+            ptr.loadUnaligned(as: UInt32.self)
+        }
+        return Int(idx % UInt32(length))
     }
 }
 
@@ -189,8 +206,8 @@ func pickFallbackValidators(
     validators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>,
     count: Int
 ) throws -> [BandersnatchPublicKey] {
-    let indices = try generateFallbackIndices(entropy: entropy, count: count)
-    return indices.map { validators[$0 % validators.count].bandersnatch }
+    let indices = try generateFallbackIndices(entropy: entropy, count: count, length: validators.count)
+    return indices.map { validators[$0].bandersnatch }
 }
 
 extension Safrole {
@@ -245,11 +262,11 @@ extension Safrole {
                 )
                 : (nextValidators, currentValidators, previousValidators, ticketsVerifier)
 
-            let newRandomness = try blake2b256(entropyPool.0.data + entropy.data)
+            let newRandomness = try blake2b256(entropyPool.t0.data + entropy.data)
 
             let newEntropyPool = isEpochChange
-                ? (newRandomness, entropyPool.0, entropyPool.1, entropyPool.2)
-                : (newRandomness, entropyPool.1, entropyPool.2, entropyPool.3)
+                ? (newRandomness, entropyPool.t0, entropyPool.t1, entropyPool.t2)
+                : (newRandomness, entropyPool.t1, entropyPool.t2, entropyPool.t3)
 
             let newTicketsOrKeys: Either<
                 ConfigFixedSizeArray<
@@ -339,7 +356,7 @@ extension Safrole {
 
             let postState = SafrolePostState(
                 timeslot: slot,
-                entropyPool: newEntropyPool,
+                entropyPool: EntropyPool(newEntropyPool),
                 previousValidators: newPreviousValidators,
                 currentValidators: newCurrentValidators,
                 nextValidators: newNextValidators,

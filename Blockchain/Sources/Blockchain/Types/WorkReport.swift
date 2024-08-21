@@ -1,8 +1,7 @@
 import Foundation
-import ScaleCodec
 import Utils
 
-public struct WorkReport: Sendable, Equatable {
+public struct WorkReport: Sendable, Equatable, Codable {
     // a: authorizer hash
     public var authorizerHash: Data32
 
@@ -51,25 +50,5 @@ extension WorkReport: Dummy {
             packageSpecification: AvailabilitySpecifications.dummy(config: config),
             results: try! ConfigLimitedSizeArray(config: config, defaultValue: WorkResult.dummy(config: config))
         )
-    }
-}
-
-extension WorkReport: ScaleCodec.Encodable {
-    public init(config: Config, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            authorizerHash: decoder.decode(),
-            output: decoder.decode(),
-            refinementContext: decoder.decode(),
-            packageSpecification: decoder.decode(),
-            results: ConfigLimitedSizeArray(config: config, from: &decoder)
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(authorizerHash)
-        try encoder.encode(output)
-        try encoder.encode(refinementContext)
-        try encoder.encode(packageSpecification)
-        try encoder.encode(results)
     }
 }
