@@ -1,6 +1,6 @@
+import Codec
 import Foundation
 
-// TODO: use fixed length format for Codable
 public struct FixedSizeData<T: ConstInt>: Sendable, Codable {
     public private(set) var data: Data
 
@@ -37,6 +37,24 @@ extension FixedSizeData: Comparable {
             return l < r
         }
         return false
+    }
+}
+
+extension FixedSizeData: FixedLengthData {
+    public static func length(decoder _: Decoder) -> Int {
+        T.value
+    }
+
+    public init(decoder: Decoder, data: Data) throws {
+        guard data.count == T.value else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Not enough data to decode \(T.self)"
+                )
+            )
+        }
+        self.data = data
     }
 }
 

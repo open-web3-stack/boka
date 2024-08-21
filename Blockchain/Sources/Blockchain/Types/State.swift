@@ -1,3 +1,4 @@
+import Codec
 import Utils
 
 public struct State: Sendable {
@@ -173,7 +174,7 @@ extension State: Codable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        guard let config = decoder.userInfo[.config] as? ProtocolConfigRef else {
+        guard let config = decoder.getConfig(ProtocolConfigRef.self) else {
             throw CodingError.missingConfig
         }
         try self.init(

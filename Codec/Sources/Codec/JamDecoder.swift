@@ -1,15 +1,30 @@
 import Foundation
 
 public class JamDecoder {
-    func decode<T: Decodable>(_: T.Type, from data: Data) throws -> T {
+    public init() {}
+
+    public func decode<T: Decodable>(_ type: T.Type, from data: Data, withConfig config: some Any) throws -> T {
         let context = DecodeContext(data: data)
-        return try context.decode(codingPath: [])
+        context.userInfo[.config] = config
+        return try context.decode(type, codingPath: [])
+    }
+}
+
+protocol ArrayWrapper: Collection where Element: Decodable {
+    static func from(array: [Element]) -> Self
+}
+
+extension Array: ArrayWrapper where Element: Decodable {
+    static func from(array: [Element]) -> Self {
+        array
     }
 }
 
 private class DecodeContext: Decoder {
     var codingPath: [CodingKey] = []
-    var userInfo: [CodingUserInfoKey: Any] = [:]
+    var userInfo: [CodingUserInfoKey: Any] = [
+        .isJamCodec: true,
+    ]
 
     var data: Data
 
@@ -91,7 +106,7 @@ private class DecodeContext: Decoder {
         return res
     }
 
-    fileprivate func decodeArray<T: Decodable>(codingPath: [CodingKey]) throws -> [T] {
+    fileprivate func decodeArray<T: ArrayWrapper>(_ type: T.Type, codingPath: [CodingKey]) throws -> T {
         guard let length = data.decode() else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
@@ -100,19 +115,37 @@ private class DecodeContext: Decoder {
                 )
             )
         }
-        var array: [T] = []
+        var array = [T.Element]()
         array.reserveCapacity(Int(length))
         for _ in 0 ..< length {
-            try array.append(decode(codingPath: codingPath))
+            try array.append(decode(type.Element.self, codingPath: codingPath))
         }
-        return array
+        return type.from(array: array)
     }
 
-    fileprivate func decode<T: Decodable>(codingPath: [CodingKey]) throws -> T {
-        if T.self == Data.self {
+    fileprivate func decodeFixedLengthData<T: FixedLengthData>(_ type: T.Type, codingPath: [CodingKey]) throws -> T {
+        let decoder = DecodeContext(data: data, codingPath: codingPath, userInfo: userInfo)
+        let length = type.length(decoder: decoder)
+        guard data.count >= length else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: codingPath,
+                    debugDescription: "Not enough data to decode \(T.self)"
+                )
+            )
+        }
+        return try type.init(decoder: decoder, data: data[data.startIndex ..< data.startIndex + length])
+    }
+
+    fileprivate func decode<T: Decodable>(_ type: T.Type, codingPath: [CodingKey]) throws -> T {
+        if type == Data.self {
             try decodeData(codingPath: codingPath) as Data as! T
-        } else if T.self == [UInt8].self {
+        } else if type == [UInt8].self {
             try decodeData(codingPath: codingPath) as [UInt8] as! T
+        } else if let type = type as? any FixedLengthData.Type {
+            try decodeFixedLengthData(type, codingPath: codingPath) as! T
+        } else if let type = type as? any ArrayWrapper.Type {
+            try decodeArray(type, codingPath: codingPath) as! T
         } else {
             try .init(from: DecodeContext(data: data, codingPath: codingPath, userInfo: userInfo))
         }
@@ -219,8 +252,8 @@ private struct JamKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPr
         try decoder.decodeInt(codingPath: codingPath + [key])
     }
 
-    func decode<T: Decodable>(_: T.Type, forKey key: K) throws -> T {
-        try decoder.decode(codingPath: codingPath + [key])
+    func decode<T: Decodable>(_ type: T.Type, forKey key: K) throws -> T {
+        try decoder.decode(type, codingPath: codingPath + [key])
     }
 
     func nestedContainer<NestedKey>(keyedBy _: NestedKey.Type, forKey _: K) throws -> KeyedDecodingContainer<NestedKey>
@@ -345,9 +378,9 @@ private struct JamUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         return try decoder.decodeInt(codingPath: codingPath)
     }
 
-    mutating func decode<T: Decodable>(_: T.Type) throws -> T {
+    mutating func decode<T: Decodable>(_ type: T.Type) throws -> T {
         defer { currentIndex += 1 }
-        return try decoder.decode(codingPath: codingPath)
+        return try decoder.decode(type, codingPath: codingPath)
     }
 
     mutating func nestedContainer<NestedKey>(keyedBy _: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey>
@@ -449,8 +482,8 @@ private struct JamSingleValueDecodingContainer: SingleValueDecodingContainer {
         try decoder.decodeInt(codingPath: codingPath)
     }
 
-    func decode<T: Decodable>(_: T.Type) throws -> T {
-        try decoder.decode(codingPath: codingPath)
+    func decode<T: Decodable>(_ type: T.Type) throws -> T {
+        try decoder.decode(type, codingPath: codingPath)
     }
 
     func nestedContainer<NestedKey>(keyedBy _: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey>

@@ -193,8 +193,10 @@ func generateFallbackIndices(entropy: Data32, count: Int, length: Int) throws ->
         let data = entropy.data + Data(bytes)
         // TODO: use blake256 update directly to be more efficient
         let hash = try blake2b256(data)
-        var hash4 = hash.data[0 ..< 4]
-        let idx: UInt32 = hash4.decode(length: 4)!
+        let hash4 = hash.data[0 ..< 4]
+        let idx: UInt32 = hash4.withUnsafeBytes { ptr in
+            ptr.loadUnaligned(as: UInt32.self)
+        }
         return Int(idx % UInt32(length))
     }
 }

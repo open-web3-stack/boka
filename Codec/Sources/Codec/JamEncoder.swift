@@ -1,7 +1,9 @@
 import Foundation
 
 public class JamEncoder {
-    func encode(_ value: some Encodable) throws -> Data {
+    public init() {}
+
+    public func encode(_ value: some Encodable) throws -> Data {
         let context = EncodeContext()
         try context.encode(value)
         return context.data
@@ -10,7 +12,9 @@ public class JamEncoder {
 
 private class EncodeContext: Encoder {
     var codingPath: [CodingKey] = []
-    var userInfo: [CodingUserInfoKey: Any] = [:]
+    var userInfo: [CodingUserInfoKey: Any] = [
+        .isJamCodec: true,
+    ]
 
     var data = Data()
 
@@ -34,12 +38,14 @@ private class EncodeContext: Encoder {
         }
     }
 
-    fileprivate func encodeData(_ value: Data) {
+    fileprivate func encodeData(_ value: Data, lengthPrefix: Bool) {
         // reserve capacity for the length
         // length is variable size but very unlikely to be larger than 4 bytes
-        data.reserveCapacity(data.count + value.count + 4)
+        data.reserveCapacity(data.count + value.count + (lengthPrefix ? 4 : 0))
         let length = UInt32(value.count)
-        data.append(contentsOf: length.encode(method: .variableWidth))
+        if lengthPrefix {
+            data.append(contentsOf: length.encode(method: .variableWidth))
+        }
         data.append(value)
     }
 
@@ -63,9 +69,11 @@ private class EncodeContext: Encoder {
 
     fileprivate func encode(_ value: some Encodable) throws {
         if let value = value as? Data {
-            encodeData(value)
+            encodeData(value, lengthPrefix: true)
         } else if let value = value as? [UInt8] {
             encodeData(value)
+        } else if let value = value as? any FixedLengthData {
+            encodeData(value.data, lengthPrefix: false)
         } else if let value = value as? [Encodable] {
             try encodeArray(value)
         } else {
@@ -88,7 +96,7 @@ private struct JamKeyedEncodingContainer<K: CodingKey>: KeyedEncodingContainerPr
     }
 
     mutating func encode(_ value: String, forKey _: K) throws {
-        encoder.encodeData(value.data(using: .utf8)!)
+        encoder.encodeData(Data(value.utf8), lengthPrefix: true)
     }
 
     mutating func encode(_: Double, forKey _: K) throws {
@@ -318,7 +326,7 @@ private struct JamUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     }
 
     mutating func encode(_ value: String) throws {
-        encoder.encodeData(value.data(using: .utf8)!)
+        encoder.encodeData(Data(value.utf8), lengthPrefix: true)
         count += 1
     }
 
@@ -413,6 +421,14 @@ private struct JamSingleValueEncodingContainer: SingleValueEncodingContainer {
 
     mutating func encodeNil() throws {
         encoder.data.append(0)
+    }
+
+    mutating func encode(_ value: Bool) throws {
+        encoder.data.append(value ? 1 : 0)
+    }
+
+    mutating func encode(_ value: String) throws {
+        encoder.encodeData(Data(value.utf8), lengthPrefix: true)
     }
 
     mutating func encode(_ value: UInt8) throws {

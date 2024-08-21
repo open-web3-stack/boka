@@ -102,4 +102,14 @@ import Testing
         var slice3 = array[...]
         #expect(slice3.decode(length: 2) == testCase & 0xFFFF)
     }
+
+    @Test func multipleDecodes() throws {
+        var data = Data([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+        #expect(data.decode(length: 8) as UInt64? == 0x0706050403020100)
+        #expect(data.decode(length: 4) as UInt32? == 0x0B0A0908)
+        #expect(data.decode(length: 2) as UInt16? == 0x0D0C)
+        #expect(data.decode() == 0x0E)
+        #expect(data.decode() == 0x0F)
+        #expect(data.decode() == nil)
+    }
 }

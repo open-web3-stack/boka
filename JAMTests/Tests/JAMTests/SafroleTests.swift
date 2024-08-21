@@ -1,34 +1,18 @@
 import Blockchain
+import Codec
 import Foundation
-import ScaleCodec
 import Testing
 import Utils
 
 @testable import JAMTests
 
-struct SafroleInput {
+struct SafroleInput: Codable {
     var slot: UInt32
     var entropy: Data32
     var extrinsics: ExtrinsicTickets
 }
 
-extension SafroleInput: ScaleCodec.Encodable {
-    init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            slot: decoder.decode(),
-            entropy: decoder.decode(),
-            extrinsics: ExtrinsicTickets(config: config, from: &decoder)
-        )
-    }
-
-    func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(slot)
-        try encoder.encode(entropy)
-        try encoder.encode(extrinsics)
-    }
-}
-
-struct OutputMarks {
+struct OutputMarks: Codable {
     var epochMark: EpochMarker?
     var ticketsMark: ConfigFixedSizeArray<
         Ticket,
@@ -36,57 +20,30 @@ struct OutputMarks {
     >?
 }
 
-extension OutputMarks: ScaleCodec.Encodable {
-    init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            epochMark: Optional(from: &decoder, decodeItem: { try EpochMarker(config: config, from: &$0) }),
-            ticketsMark: Optional(from: &decoder, decodeItem: { try ConfigFixedSizeArray(config: config, from: &$0) })
-        )
-    }
-
-    func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(epochMark)
-        try encoder.encode(ticketsMark)
-    }
-}
-
-enum SafroleOutput {
+enum SafroleOutput: Codable {
     case ok(OutputMarks)
     case err(UInt8)
 }
 
-extension SafroleOutput: ScaleCodec.Encodable {
-    init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
-        let id = try decoder.decode(.enumCaseId)
-        switch id {
-        case 0:
-            self = try .ok(OutputMarks(config: config, from: &decoder))
-        case 1:
-            self = try .err(decoder.decode())
-        default:
-            throw decoder.enumCaseError(for: id)
-        }
+struct SafroleState: Equatable, Safrole, Codable {
+    enum CodingKeys: String, CodingKey {
+        case timeslot
+        case entropyPool
+        case previousValidators
+        case currentValidators
+        case nextValidators
+        case validatorQueue
+        case ticketsAccumulator
+        case ticketsOrKeys
+        case ticketsVerifier
     }
 
-    func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        switch self {
-        case let .ok(marks):
-            try encoder.encode(0, .enumCaseId)
-            try marks.encode(in: &encoder)
-        case let .err(error):
-            try encoder.encode(1, .enumCaseId)
-            try encoder.encode(error)
-        }
-    }
-}
-
-struct SafroleState: Equatable, Safrole {
-    let config: ProtocolConfigRef
+    let config: ProtocolConfigRef = .dev
 
     // tau
     var timeslot: UInt32
     // eta
-    var entropyPool: (Data32, Data32, Data32, Data32)
+    var entropyPool: EntropyPool
     // lambda
     var previousValidators: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
@@ -148,64 +105,19 @@ struct SafroleState: Equatable, Safrole {
     }
 }
 
-extension SafroleState: ScaleCodec.Encodable {
-    init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            config: config,
-            timeslot: decoder.decode(),
-            entropyPool: decoder.decode(),
-            previousValidators: ConfigFixedSizeArray(config: config, from: &decoder),
-            currentValidators: ConfigFixedSizeArray(config: config, from: &decoder),
-            nextValidators: ConfigFixedSizeArray(config: config, from: &decoder),
-            validatorQueue: ConfigFixedSizeArray(config: config, from: &decoder),
-            ticketsAccumulator: ConfigLimitedSizeArray(config: config, from: &decoder),
-            ticketsOrKeys: Either(
-                from: &decoder,
-                decodeLeft: { try ConfigFixedSizeArray(config: config, from: &$0) },
-                decodeRight: { try ConfigFixedSizeArray(config: config, from: &$0) }
-            ),
-            ticketsVerifier: decoder.decode()
-        )
+struct SafroleTestcase: CustomStringConvertible, Codable {
+    enum CodingKeys: String, CodingKey {
+        case input
+        case preState
+        case output
+        case postState
     }
 
-    func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(timeslot)
-        try encoder.encode(entropyPool)
-        try encoder.encode(previousValidators)
-        try encoder.encode(currentValidators)
-        try encoder.encode(nextValidators)
-        try encoder.encode(validatorQueue)
-        try encoder.encode(ticketsAccumulator)
-        try encoder.encode(ticketsOrKeys)
-        try encoder.encode(ticketsVerifier)
-    }
-}
-
-struct SafroleTestcase: CustomStringConvertible {
-    var description: String
+    var description: String = ""
     var input: SafroleInput
     var preState: SafroleState
     var output: SafroleOutput
     var postState: SafroleState
-}
-
-extension SafroleTestcase: ScaleCodec.Encodable {
-    init(description: String, config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            description: description,
-            input: SafroleInput(config: config, from: &decoder),
-            preState: SafroleState(config: config, from: &decoder),
-            output: SafroleOutput(config: config, from: &decoder),
-            postState: SafroleState(config: config, from: &decoder)
-        )
-    }
-
-    func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(input)
-        try encoder.encode(preState)
-        try encoder.encode(output)
-        try encoder.encode(postState)
-    }
 }
 
 enum SafroleTestVariants: String, CaseIterable {
@@ -236,8 +148,8 @@ struct SafroleTests {
         let tests = try TestLoader.getTestFiles(path: "safrole/\(variant)", extension: "scale")
         return try tests.map {
             let data = try Data(contentsOf: URL(fileURLWithPath: $0.path))
-            var decoder = LoggingDecoder(decoder: decoder(from: data), logger: NoopLogger())
-            return try SafroleTestcase(description: $0.description, config: variant.config, from: &decoder)
+            let decoder = JamDecoder()
+            return try decoder.decode(SafroleTestcase.self, from: data, withConfig: variant.config)
         }
     }
 

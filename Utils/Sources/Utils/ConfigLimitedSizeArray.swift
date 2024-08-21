@@ -175,14 +175,14 @@ extension ConfigLimitedSizeArray: Decodable where T: Decodable {
     }
 
     public init(from decoder: any Decoder) throws {
-        guard let config = decoder.userInfo[.config] as? TMinLength.TConfig else {
+        guard let config = decoder.getConfig(TMinLength.TConfig.self) else {
             throw DecodeError.missingConfig
         }
 
         let minLength = TMinLength.read(config: config)
         let maxLength = TMaxLength.read(config: config)
 
-        if minLength == maxLength {
+        if TMinLength.self == TMaxLength.self {
             // fixed size array
             var container = try decoder.unkeyedContainer()
 
@@ -201,7 +201,7 @@ extension ConfigLimitedSizeArray: Decodable where T: Decodable {
 
 extension ConfigLimitedSizeArray: Encodable where T: Encodable {
     public func encode(to encoder: any Encoder) throws {
-        if minLength == maxLength {
+        if TMinLength.self == TMaxLength.self {
             // fixed size array
             var container = encoder.unkeyedContainer()
             try container.encode(minLength)

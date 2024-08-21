@@ -1,3 +1,5 @@
+import Codec
+
 // TODO: add tests
 public struct LimitedSizeArray<T, TMinLength: ConstInt, TMaxLength: ConstInt> {
     public private(set) var array: [T]
@@ -117,5 +119,42 @@ extension LimitedSizeArray {
 
 public typealias FixedSizeArray<T, TLength: ConstInt> = LimitedSizeArray<T, TLength, TLength>
 
-// TODO: use fixed length format for Codable
-extension LimitedSizeArray: Codable where T: Codable {}
+extension LimitedSizeArray: Encodable where T: Encodable {
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.unkeyedContainer()
+        // add length prefix for variable size array
+        if TMinLength.self != TMaxLength.self, encoder.isJamCodec {
+            let length = UInt32(array.count)
+            try container.encode(contentsOf: length.encode(method: .variableWidth))
+        }
+        for item in array {
+            try container.encode(item)
+        }
+    }
+}
+
+extension LimitedSizeArray: Decodable where T: Decodable {
+    public init(from decoder: any Decoder) throws {
+        array = []
+        var container = try decoder.unkeyedContainer()
+        var length = TMaxLength.value
+
+        if TMinLength.self != TMaxLength.self, decoder.isJamCodec {
+            // read length prefix for variable size array
+            let value = try IntegerCodec.decode { try container.decode(UInt8.self) }
+            guard let value, let intValue = Int(exactly: value) else {
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(
+                        codingPath: container.codingPath,
+                        debugDescription: "Unable to decode length"
+                    )
+                )
+            }
+            length = intValue
+        }
+
+        for _ in 0 ..< length {
+            try array.append(container.decode(T.self))
+        }
+    }
+}
