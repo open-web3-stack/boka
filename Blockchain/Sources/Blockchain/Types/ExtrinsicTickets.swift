@@ -1,9 +1,8 @@
 import Foundation
-import ScaleCodec
 import Utils
 
-public struct ExtrinsicTickets: Sendable, Equatable {
-    public struct TicketItem: Sendable, Equatable {
+public struct ExtrinsicTickets: Sendable, Equatable, Codable {
+    public struct TicketItem: Sendable, Equatable, Codable {
         public var attempt: TicketIndex
         public var signature: BandersnatchRingVRFProof
 
@@ -37,32 +36,6 @@ extension ExtrinsicTickets: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> ExtrinsicTickets {
         ExtrinsicTickets(tickets: try! ConfigLimitedSizeArray(config: config))
-    }
-}
-
-extension ExtrinsicTickets.TicketItem: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            attempt: decoder.decode(),
-            signature: decoder.decode()
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(attempt)
-        try encoder.encode(signature)
-    }
-}
-
-extension ExtrinsicTickets: ScaleCodec.Encodable {
-    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            tickets: ConfigLimitedSizeArray(config: config, from: &decoder)
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(tickets)
     }
 }
 

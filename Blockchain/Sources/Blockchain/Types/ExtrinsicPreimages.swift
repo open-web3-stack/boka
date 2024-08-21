@@ -1,9 +1,8 @@
 import Foundation
-import ScaleCodec
 import Utils
 
-public struct ExtrinsicPreimages: Sendable, Equatable {
-    public struct SizeAndData: Sendable, Equatable {
+public struct ExtrinsicPreimages: Sendable, Equatable, Codable {
+    public struct PreimageItem: Sendable, Equatable, Codable {
         public var serviceIndices: ServiceIndices
         public var data: Data
 
@@ -13,10 +12,10 @@ public struct ExtrinsicPreimages: Sendable, Equatable {
         }
     }
 
-    public var preimages: [SizeAndData]
+    public var preimages: [PreimageItem]
 
     public init(
-        preimages: [SizeAndData]
+        preimages: [PreimageItem]
     ) {
         self.preimages = preimages
     }
@@ -26,31 +25,5 @@ extension ExtrinsicPreimages: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config _: Config) -> ExtrinsicPreimages {
         ExtrinsicPreimages(preimages: [])
-    }
-}
-
-extension ExtrinsicPreimages: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            preimages: decoder.decode()
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(preimages)
-    }
-}
-
-extension ExtrinsicPreimages.SizeAndData: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            serviceIndices: decoder.decode(),
-            data: decoder.decode()
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(serviceIndices)
-        try encoder.encode(data)
     }
 }

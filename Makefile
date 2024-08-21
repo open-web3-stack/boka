@@ -41,7 +41,13 @@ resolve: githooks
 .PHONY: clean
 clean:
 	./scripts/run.sh package clean
+
+.PHONY: clean-lib
+clean-lib:
 	rm -f .lib/*.a
+
+.PHONY: clean-all
+clean-all: clean clean-lib
 
 .PHONY: lint
 lint: githooks

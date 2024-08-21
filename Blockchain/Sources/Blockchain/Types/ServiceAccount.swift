@@ -1,9 +1,8 @@
 import Foundation
-import ScaleCodec
 import Utils
 
-public struct ServiceAccount: Sendable, Equatable {
-    public struct HashAndLength: Sendable, Hashable {
+public struct ServiceAccount: Sendable, Equatable, Codable {
+    public struct HashAndLength: Sendable, Hashable, Codable {
         public var hash: Data32
         public var length: DataLength
 
@@ -67,43 +66,5 @@ extension ServiceAccount: Dummy {
             accumlateGasLimit: 0,
             onTransferGasLimit: 0
         )
-    }
-}
-
-extension ServiceAccount.HashAndLength: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            hash: decoder.decode(),
-            length: decoder.decode()
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(hash)
-        try encoder.encode(length)
-    }
-}
-
-extension ServiceAccount: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            storage: decoder.decode(),
-            preimages: decoder.decode(),
-            preimageInfos: decoder.decode(),
-            codeHash: decoder.decode(),
-            balance: decoder.decode(),
-            accumlateGasLimit: decoder.decode(),
-            onTransferGasLimit: decoder.decode()
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(storage)
-        try encoder.encode(preimages)
-        try encoder.encode(preimageInfos)
-        try encoder.encode(codeHash)
-        try encoder.encode(balance)
-        try encoder.encode(accumlateGasLimit)
-        try encoder.encode(onTransferGasLimit)
     }
 }

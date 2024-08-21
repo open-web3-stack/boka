@@ -1,9 +1,8 @@
 import Foundation
-import ScaleCodec
 import Utils
 
-public struct ExtrinsicAvailability: Sendable, Equatable {
-    public struct AssuranceItem: Sendable, Equatable {
+public struct ExtrinsicAvailability: Sendable, Equatable, Codable {
+    public struct AssuranceItem: Sendable, Equatable, Codable {
         // a
         public var parentHash: Data32
         // f
@@ -45,35 +44,5 @@ extension ExtrinsicAvailability: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> ExtrinsicAvailability {
         try! ExtrinsicAvailability(assurances: ConfigLimitedSizeArray(config: config))
-    }
-}
-
-extension ExtrinsicAvailability: ScaleCodec.Encodable {
-    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            assurances: ConfigLimitedSizeArray(config: config, from: &decoder)
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(assurances)
-    }
-}
-
-extension ExtrinsicAvailability.AssuranceItem: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            parentHash: decoder.decode(),
-            assurance: decoder.decode(),
-            validatorIndex: decoder.decode(),
-            signature: decoder.decode()
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(parentHash)
-        try encoder.encode(assurance)
-        try encoder.encode(validatorIndex)
-        try encoder.encode(signature)
     }
 }
