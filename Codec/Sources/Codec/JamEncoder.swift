@@ -1,9 +1,7 @@
 import Foundation
 
 public class JamEncoder {
-    public init() {}
-
-    public func encode(_ value: some Encodable) throws -> Data {
+    public static func encode(_ value: some Encodable) throws -> Data {
         let context = EncodeContext()
         try context.encode(value)
         return context.data

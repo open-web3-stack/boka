@@ -1,3 +1,4 @@
+import Codec
 import Utils
 
 public struct Header: Sendable, Equatable, Codable {
@@ -103,11 +104,10 @@ extension Header: Dummy {
 
 extension Header {
     public func hash() -> Data32 {
-        // do {
-        //     return try blake2b256(ScaleCodec.encode(self))
-        // } catch let e {
-        //     fatalError("Failed to hash header: \(e)")
-        // }
-        fatalError("TODO: not implemented")
+        do {
+            return try blake2b256(JamEncoder.encode(self))
+        } catch let e {
+            fatalError("Failed to hash header: \(e)")
+        }
     }
 }
