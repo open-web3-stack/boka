@@ -1,5 +1,9 @@
 import Foundation
-import ScaleCodec
+
+public enum ConfigBitstringError: Swift.Error {
+    case missingConfig
+    case notEnoughData
+}
 
 // TODO: add tests
 public struct FixSizeBitstring<TByteLength: ReadInt>: Hashable, Sendable {
@@ -9,9 +13,9 @@ public struct FixSizeBitstring<TByteLength: ReadInt>: Hashable, Sendable {
     public private(set) var length: Int
     /// Initialize with byte data storage and length.
     /// - Parameter bytes: Byte storage for bits.
-    public init?(bytes: Data, length: Int) {
+    public init(bytes: Data, length: Int) throws(ConfigBitstringError) {
         guard bytes.count * 8 >= length else {
-            return nil
+            throw ConfigBitstringError.notEnoughData
         }
         self.bytes = bytes
         self.length = length
@@ -59,16 +63,22 @@ extension FixSizeBitstring: Equatable {
     }
 }
 
-extension FixSizeBitstring: ScaleCodec.Encodable {
-    public init(config: TByteLength.TConfig, from decoder: inout some ScaleCodec.Decoder) throws {
+extension FixSizeBitstring: Decodable {
+    public init(from decoder: any Decoder) throws {
+        guard let config = decoder.getConfig(TByteLength.TConfig.self) else {
+            throw ConfigBitstringError.missingConfig
+        }
         let length = TByteLength.read(config: config)
-        try self.init(
-            bytes: decoder.decode(Data.self),
-            length: length
-        )!
+        var container = try decoder.unkeyedContainer()
+        let bytes = try container.decode(Data.self)
+        try self.init(bytes: bytes, length: length)
     }
+}
 
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(bytes)
+extension FixSizeBitstring: Encodable {
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.unkeyedContainer()
+        try container.encode(length)
+        try container.encode(bytes)
     }
 }
