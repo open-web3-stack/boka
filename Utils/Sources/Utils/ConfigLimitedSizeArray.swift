@@ -194,7 +194,9 @@ extension ConfigLimitedSizeArray: Decodable where T: Decodable {
             try self.init(arr, minLength: minLength, maxLength: maxLength)
         } else {
             // variable size array
-            try self.init(.init(from: decoder), minLength: minLength, maxLength: maxLength)
+            var container = try decoder.unkeyedContainer()
+            let array = try container.decode([T].self)
+            try self.init(array, minLength: minLength, maxLength: maxLength)
         }
     }
 }

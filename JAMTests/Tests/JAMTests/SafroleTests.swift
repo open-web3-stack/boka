@@ -20,11 +20,6 @@ struct OutputMarks: Codable {
     >?
 }
 
-enum SafroleOutput: Codable {
-    case ok(OutputMarks)
-    case err(UInt8)
-}
-
 struct SafroleState: Equatable, Safrole, Codable {
     enum CodingKeys: String, CodingKey {
         case timeslot
@@ -38,7 +33,7 @@ struct SafroleState: Equatable, Safrole, Codable {
         case ticketsVerifier
     }
 
-    let config: ProtocolConfigRef = .dev
+    let config: ProtocolConfigRef
 
     // tau
     var timeslot: UInt32
@@ -103,6 +98,41 @@ struct SafroleState: Equatable, Safrole, Codable {
         ticketsOrKeys = postState.ticketsOrKeys
         ticketsVerifier = postState.ticketsVerifier
     }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        config = decoder.getConfig(ProtocolConfigRef.self)!
+        timeslot = try container.decode(UInt32.self, forKey: .timeslot)
+        entropyPool = try container.decode(EntropyPool.self, forKey: .entropyPool)
+        previousValidators = try container.decode(ConfigFixedSizeArray<
+            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        >.self, forKey: .previousValidators)
+        currentValidators = try container.decode(ConfigFixedSizeArray<
+            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        >.self, forKey: .currentValidators)
+        nextValidators = try container.decode(ConfigFixedSizeArray<
+            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        >.self, forKey: .nextValidators)
+        validatorQueue = try container.decode(ConfigFixedSizeArray<
+            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        >.self, forKey: .validatorQueue)
+        ticketsAccumulator = try container.decode(ConfigLimitedSizeArray<
+            Ticket,
+            ProtocolConfig.Int0,
+            ProtocolConfig.EpochLength
+        >.self, forKey: .ticketsAccumulator)
+        ticketsOrKeys = try container.decode(Either<
+            ConfigFixedSizeArray<
+                Ticket,
+                ProtocolConfig.EpochLength
+            >,
+            ConfigFixedSizeArray<
+                BandersnatchPublicKey,
+                ProtocolConfig.EpochLength
+            >
+        >.self, forKey: .ticketsOrKeys)
+        ticketsVerifier = try container.decode(BandersnatchRingVRFRoot.self, forKey: .ticketsVerifier)
+    }
 }
 
 struct SafroleTestcase: CustomStringConvertible, Codable {
@@ -116,7 +146,7 @@ struct SafroleTestcase: CustomStringConvertible, Codable {
     var description: String = ""
     var input: SafroleInput
     var preState: SafroleState
-    var output: SafroleOutput
+    var output: Either<OutputMarks, UInt8>
     var postState: SafroleState
 }
 
@@ -148,8 +178,9 @@ struct SafroleTests {
         let tests = try TestLoader.getTestFiles(path: "safrole/\(variant)", extension: "scale")
         return try tests.map {
             let data = try Data(contentsOf: URL(fileURLWithPath: $0.path))
-            let decoder = JamDecoder()
-            return try decoder.decode(SafroleTestcase.self, from: data, withConfig: variant.config)
+            var testcase = try JamDecoder.decode(SafroleTestcase.self, from: data, withConfig: variant.config)
+            testcase.description = $0.description
+            return testcase
         }
     }
 
@@ -162,20 +193,20 @@ struct SafroleTests {
         switch result {
         case let .success((state, epochMark, ticketsMark)):
             switch testcase.output {
-            case let .ok(marks):
+            case let .left(marks):
                 #expect(epochMark == marks.epochMark)
                 #expect(ticketsMark == marks.ticketsMark)
                 var postState = testcase.preState
                 postState.mergeWith(postState: state)
                 #expect(postState == testcase.postState)
-            case .err:
+            case .right:
                 Issue.record("Expected error, got \(result)")
             }
         case .failure:
             switch testcase.output {
-            case .ok:
+            case .left:
                 Issue.record("Expected success, got \(result)")
-            case .err:
+            case .right:
                 // ignore error code because it is unspecified
                 break
             }
