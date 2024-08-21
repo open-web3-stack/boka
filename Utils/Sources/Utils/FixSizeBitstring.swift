@@ -2,7 +2,7 @@ import Foundation
 import ScaleCodec
 
 // TODO: add tests
-public struct FixSizeBitstring<T: ReadInt>: Hashable, Sendable {
+public struct FixSizeBitstring<TByteLength: ReadInt>: Hashable, Sendable {
     /// Byte storage for bits.
     public private(set) var bytes: Data
     public private(set) var length: Int
