@@ -1,5 +1,4 @@
 import Atomics
-import ScaleCodec
 
 open class Ref<T: Sendable>: @unchecked Sendable, AtomicReference {
     public let value: T
