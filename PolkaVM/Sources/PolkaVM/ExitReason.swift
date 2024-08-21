@@ -2,6 +2,8 @@ public enum ExitReason {
     public enum PanicReason {
         case trap
         case invalidInstruction
+        case invalidDynamicJump
+        case invalidBranch
     }
 
     case halt
