@@ -1,7 +1,6 @@
-import ScaleCodec
 import Utils
 
-public struct AvailabilitySpecifications: Sendable, Equatable {
+public struct AvailabilitySpecifications: Sendable, Equatable, Codable {
     // h
     public var workPackageHash: Data32
 
@@ -36,23 +35,5 @@ extension AvailabilitySpecifications: Dummy {
             erasureRoot: Data32(),
             segmentRoot: Data32()
         )
-    }
-}
-
-extension AvailabilitySpecifications: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            workPackageHash: decoder.decode(),
-            length: decoder.decode(),
-            erasureRoot: decoder.decode(),
-            segmentRoot: decoder.decode()
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(workPackageHash)
-        try encoder.encode(length)
-        try encoder.encode(erasureRoot)
-        try encoder.encode(segmentRoot)
     }
 }

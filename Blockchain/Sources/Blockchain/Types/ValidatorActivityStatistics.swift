@@ -1,8 +1,7 @@
-import ScaleCodec
 import Utils
 
-public struct ValidatorActivityStatistics: Sendable, Equatable {
-    public struct StatisticsItem: Sendable, Equatable {
+public struct ValidatorActivityStatistics: Sendable, Equatable, Codable {
+    public struct StatisticsItem: Sendable, Equatable, Codable {
         // b: The number of blocks produced by the validator.
         public var blocks: UInt32
         // t: The number of tickets introduced by the validator.
@@ -64,41 +63,5 @@ extension ValidatorActivityStatistics.StatisticsItem: Dummy {
             guarantees: 0,
             assurances: 0
         )
-    }
-}
-
-extension ValidatorActivityStatistics: ScaleCodec.Encodable {
-    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            accumulator: ConfigFixedSizeArray(config: config, from: &decoder),
-            previous: ConfigFixedSizeArray(config: config, from: &decoder)
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(accumulator)
-        try encoder.encode(previous)
-    }
-}
-
-extension ValidatorActivityStatistics.StatisticsItem: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            blocks: decoder.decode(),
-            tickets: decoder.decode(),
-            preimages: decoder.decode(),
-            preimagesBytes: decoder.decode(),
-            guarantees: decoder.decode(),
-            assurances: decoder.decode()
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(blocks)
-        try encoder.encode(tickets)
-        try encoder.encode(preimages)
-        try encoder.encode(preimagesBytes)
-        try encoder.encode(guarantees)
-        try encoder.encode(assurances)
     }
 }
