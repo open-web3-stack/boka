@@ -59,16 +59,6 @@ extension FixSizeBitstring: Equatable {
     }
 }
 
-extension FixSizeBitstring {
-    public init<D: ScaleCodec.Decoder>(
-        config: T.TConfig,
-        from decoder: inout D,
-        decodeItem _: @escaping (inout D) throws -> T
-    ) throws {
-        let length = T.read(config: config)
-        try self.init(bytes: decoder.decode(Data.self, .fixed(UInt(length))), length: length)
-    }
-}
 
 extension FixSizeBitstring where T: ScaleCodec.Decodable {
     public init(config: T.TConfig, from decoder: inout some ScaleCodec.Decoder) throws {
