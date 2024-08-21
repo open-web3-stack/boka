@@ -1,7 +1,7 @@
-import ScaleCodec
+import Codec
 import Utils
 
-public struct Header: Sendable, Equatable {
+public struct Header: Sendable, Equatable, Codable {
     // Hp: parent hash
     public var parentHash: Data32
 
@@ -102,42 +102,10 @@ extension Header: Dummy {
     }
 }
 
-extension Header: ScaleCodec.Encodable {
-    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            parentHash: decoder.decode(),
-            priorStateRoot: decoder.decode(),
-            extrinsicsRoot: decoder.decode(),
-            timeslotIndex: decoder.decode(),
-            epoch: EpochMarker(config: config, from: &decoder),
-            winningTickets: ConfigFixedSizeArray(config: config, from: &decoder),
-            judgementsMarkers: decoder.decode(),
-            offendersMarkers: decoder.decode(),
-            authorIndex: decoder.decode(),
-            vrfSignature: decoder.decode(),
-            seal: decoder.decode()
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(parentHash)
-        try encoder.encode(priorStateRoot)
-        try encoder.encode(extrinsicsRoot)
-        try encoder.encode(timeslotIndex)
-        try encoder.encode(epoch)
-        try encoder.encode(winningTickets)
-        try encoder.encode(judgementsMarkers)
-        try encoder.encode(offendersMarkers)
-        try encoder.encode(authorIndex)
-        try encoder.encode(vrfSignature)
-        try encoder.encode(seal)
-    }
-}
-
 extension Header {
     public func hash() -> Data32 {
         do {
-            return try blake2b256(ScaleCodec.encode(self))
+            return try blake2b256(JamEncoder.encode(self))
         } catch let e {
             fatalError("Failed to hash header: \(e)")
         }

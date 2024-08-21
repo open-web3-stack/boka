@@ -1,7 +1,6 @@
-import ScaleCodec
 import Utils
 
-public struct ValidatorKey: Sendable, Equatable {
+public struct ValidatorKey: Sendable, Equatable, Codable {
     public var bandersnatch: BandersnatchPublicKey
     public var ed25519: Ed25519PublicKey
     public var bls: BLSKey
@@ -29,23 +28,5 @@ extension ValidatorKey: Dummy {
             bls: BLSKey(),
             metadata: Data128()
         )
-    }
-}
-
-extension ValidatorKey: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            bandersnatch: decoder.decode(),
-            ed25519: decoder.decode(),
-            bls: decoder.decode(),
-            metadata: decoder.decode()
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(bandersnatch)
-        try encoder.encode(ed25519)
-        try encoder.encode(bls)
-        try encoder.encode(metadata)
     }
 }

@@ -1,7 +1,6 @@
-import ScaleCodec
 import Utils
 
-public struct JudgementsState: Sendable, Equatable {
+public struct JudgementsState: Sendable, Equatable, Codable {
     // ψg: Work-reports judged to be correct
     public var goodSet: Set<Data32>
 
@@ -36,23 +35,5 @@ extension JudgementsState: Dummy {
             wonkySet: [],
             punishSet: []
         )
-    }
-}
-
-extension JudgementsState: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            goodSet: decoder.decode(),
-            banSet: decoder.decode(),
-            wonkySet: decoder.decode(),
-            punishSet: decoder.decode()
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(goodSet)
-        try encoder.encode(banSet)
-        try encoder.encode(wonkySet)
-        try encoder.encode(punishSet)
     }
 }

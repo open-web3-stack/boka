@@ -1,5 +1,5 @@
 {
-  "originHash" : "1aed214a0a5d0d530c79b9bc5db498e5b5d1f6e03ff214c901e317c1ecb9eb1b",
+  "originHash" : "b321ce09e4e6d9d71a2e200de7c83616493e740a9be4805f0d13a7caba7a8086",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -53,15 +53,6 @@
       "state" : {
         "revision" : "8c9a227476555c55837e569be71944e02a056b72",
         "version" : "4.9.1"
-      }
-    },
-    {
-      "identity" : "scalecodec.swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/AcalaNetwork/ScaleCodec.swift.git",
-      "state" : {
-        "branch" : "main",
-        "revision" : "dac3e7161de34c60c82794d031de0231b5a5746e"
       }
     },
     {
@@ -224,15 +215,6 @@
       "state" : {
         "branch" : "0.10.0",
         "revision" : "69d59cfc76e5daf498ca61f5af409f594768eef9"
-      }
-    },
-    {
-      "identity" : "tuples.swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tesseract-one/Tuples.swift.git",
-      "state" : {
-        "revision" : "4d2cf7c64443cdf4df833d0bedd767bf9dbc49d9",
-        "version" : "0.1.3"
       }
     },
     {

@@ -1,7 +1,7 @@
+import Codec
 import Foundation
-import ScaleCodec
 
-public struct FixedSizeData<T: ConstInt>: Sendable {
+public struct FixedSizeData<T: ConstInt>: Sendable, Codable {
     public private(set) var data: Data
 
     public init?(_ value: Data) {
@@ -40,13 +40,21 @@ extension FixedSizeData: Comparable {
     }
 }
 
-extension FixedSizeData: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(decoder.decode(Data.self, .fixed(UInt(T.value))))!
+extension FixedSizeData: FixedLengthData {
+    public static func length(decoder _: Decoder) -> Int {
+        T.value
     }
 
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(data, .fixed(UInt(T.value)))
+    public init(decoder: Decoder, data: Data) throws {
+        guard data.count == T.value else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Not enough data to decode \(T.self)"
+                )
+            )
+        }
+        self.data = data
     }
 }
 
