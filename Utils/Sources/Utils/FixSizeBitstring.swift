@@ -17,13 +17,6 @@ public struct FixSizeBitstring<T: ReadInt>: Hashable, Sendable {
         self.length = length
     }
 
-    /// Initialize with byte data storage.
-    /// - Parameter bytes: Byte storage for bits.
-    public init(bytes: Data, length: Int) {
-        self.length = length
-        self.bytes = bytes
-    }
-
     private func at(unchecked index: Int) -> Bool {
         let byteIndex = index >> 3
         let bitIndex = 7 - index % 8
