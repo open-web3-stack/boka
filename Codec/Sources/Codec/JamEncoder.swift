@@ -40,8 +40,8 @@ private class EncodeContext: Encoder {
         // reserve capacity for the length
         // length is variable size but very unlikely to be larger than 4 bytes
         data.reserveCapacity(data.count + value.count + (lengthPrefix ? 4 : 0))
-        let length = UInt32(value.count)
         if lengthPrefix {
+            let length = UInt32(value.count)
             data.append(contentsOf: length.encode(method: .variableWidth))
         }
         data.append(value)
