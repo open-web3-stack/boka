@@ -45,12 +45,12 @@ public enum Instructions {
     }
 
     static func decodeImmediate2(_ data: Data, divideBy: UInt8 = 1) throws -> (UInt32, UInt32) {
-        let lA = try Int((data.at(relative: 0) / divideBy) & 0b111)
-        let lX = min(4, lA)
-        let lY1 = min(4, max(0, data.count - Int(lA) - 1))
-        let lY2 = min(lY1, 8 - lA)
+        let lX1 = try Int((data.at(relative: 0) / divideBy) & 0b111)
+        let lX = min(4, lX1)
+        let lY = min(4, max(0, data.count - Int(lX) - 1))
+
         let vX = try decodeImmediate(data.at(relative: 1 ..< lX))
-        let vY = try decodeImmediate(data.at(relative: (1 + lA) ..< lY2))
+        let vY = try decodeImmediate(data.at(relative: (1 + lX) ..< (1 + lX + lY)))
         return (vX, vY)
     }
 
