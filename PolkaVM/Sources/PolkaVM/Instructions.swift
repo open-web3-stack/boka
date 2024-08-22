@@ -27,29 +27,6 @@ public let BASIC_BLOCK_INSTRUCTIONS: Set<UInt8> = [
     Instructions.BranchGtSImm.opcode,
 ]
 
-protocol BranchInstruction: Instruction {
-    var offset: UInt32 { get }
-    func comparison(state: VMState, skip: UInt32) -> Bool
-}
-
-extension BranchInstruction {
-    public func _executeImpl(state _: VMState) -> ExitReason? {
-        nil
-    }
-
-    public func updatePC(state: VMState, skip: UInt32) -> ExitReason? {
-        guard Instructions.isBranchValid(state: state, offset: offset) else {
-            return .panic(.invalidBranch)
-        }
-        if comparison(state: state, skip: skip) {
-            state.increasePC(offset)
-        } else {
-            state.increasePC(skip + 1)
-        }
-        return nil
-    }
-}
-
 public enum Instructions {
     static func decodeImmediate(_ data: Data) -> UInt32 {
         let len = min(data.count, 4)
@@ -487,177 +464,200 @@ public enum Instructions {
         }
     }
 
-    public struct BranchEqImm: BranchInstruction {
+    public struct BranchEqImm: BranchInstructionBase {
+        typealias Compare = CompareEq
         public static var opcode: UInt8 { 7 }
 
-        public let register: Registers.Index
-        public let value: UInt32
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        }
-
-        func comparison(state: VMState, skip _: UInt32) -> Bool {
-            state.readRegister(register) == value
-        }
+        var register: Registers.Index
+        var value: UInt32
+        var offset: UInt32
     }
 
-    public struct BranchNeImm: BranchInstruction {
+    public struct BranchNeImm: BranchInstructionBase {
         public static var opcode: UInt8 { 15 }
+        typealias Compare = CompareNe
 
-        public let register: Registers.Index
-        public let value: UInt32
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        }
-
-        func comparison(state: VMState, skip _: UInt32) -> Bool {
-            state.readRegister(register) != value
-        }
+        var register: Registers.Index
+        var value: UInt32
+        var offset: UInt32
     }
 
-    public struct BranchLtUImm: BranchInstruction {
+    public struct BranchLtUImm: BranchInstructionBase {
         public static var opcode: UInt8 { 44 }
+        typealias Compare = CompareLtUnsigned
 
-        public let register: Registers.Index
-        public let value: UInt32
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        }
-
-        func comparison(state: VMState, skip _: UInt32) -> Bool {
-            state.readRegister(register) < value
-        }
+        var register: Registers.Index
+        var value: UInt32
+        var offset: UInt32
     }
 
-    public struct BranchLeUImm: BranchInstruction {
+    public struct BranchLeUImm: BranchInstructionBase {
         public static var opcode: UInt8 { 59 }
+        typealias Compare = CompareLeUnsigned
 
-        public let register: Registers.Index
-        public let value: UInt32
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        }
-
-        func comparison(state: VMState, skip _: UInt32) -> Bool {
-            state.readRegister(register) <= value
-        }
+        var register: Registers.Index
+        var value: UInt32
+        var offset: UInt32
     }
 
-    public struct BranchGeUImm: BranchInstruction {
+    public struct BranchGeUImm: BranchInstructionBase {
         public static var opcode: UInt8 { 52 }
+        typealias Compare = CompareGeUnsigned
 
-        public let register: Registers.Index
-        public let value: UInt32
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        }
-
-        func comparison(state: VMState, skip _: UInt32) -> Bool {
-            state.readRegister(register) >= value
-        }
+        var register: Registers.Index
+        var value: UInt32
+        var offset: UInt32
     }
 
-    public struct BranchGtUImm: BranchInstruction {
+    public struct BranchGtUImm: BranchInstructionBase {
         public static var opcode: UInt8 { 50 }
+        typealias Compare = CompareGtUnsigned
 
-        public let register: Registers.Index
-        public let value: UInt32
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        }
-
-        func comparison(state: VMState, skip _: UInt32) -> Bool {
-            state.readRegister(register) > value
-        }
+        var register: Registers.Index
+        var value: UInt32
+        var offset: UInt32
     }
 
-    public struct BranchLtSImm: BranchInstruction {
+    public struct BranchLtSImm: BranchInstructionBase {
         public static var opcode: UInt8 { 32 }
+        typealias Compare = CompareLtSigned
 
-        public let register: Registers.Index
-        public let value: UInt32
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        }
-
-        func comparison(state: VMState, skip _: UInt32) -> Bool {
-            let regVal = state.readRegister(register)
-            return Int32(bitPattern: regVal) < Int32(bitPattern: value)
-        }
+        var register: Registers.Index
+        var value: UInt32
+        var offset: UInt32
     }
 
-    public struct BranchLeSImm: BranchInstruction {
+    public struct BranchLeSImm: BranchInstructionBase {
         public static var opcode: UInt8 { 46 }
+        typealias Compare = CompareLeSigned
 
-        public let register: Registers.Index
-        public let value: UInt32
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        }
-
-        func comparison(state: VMState, skip _: UInt32) -> Bool {
-            let regVal = state.readRegister(register)
-            return Int32(bitPattern: regVal) <= Int32(bitPattern: value)
-        }
+        var register: Registers.Index
+        var value: UInt32
+        var offset: UInt32
     }
 
-    public struct BranchGeSImm: BranchInstruction {
+    public struct BranchGeSImm: BranchInstructionBase {
         public static var opcode: UInt8 { 45 }
+        typealias Compare = CompareGeSigned
 
-        public let register: Registers.Index
-        public let value: UInt32
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        }
-
-        func comparison(state: VMState, skip _: UInt32) -> Bool {
-            let regVal = state.readRegister(register)
-            return Int32(bitPattern: regVal) >= Int32(bitPattern: value)
-        }
+        var register: Registers.Index
+        var value: UInt32
+        var offset: UInt32
     }
 
-    public struct BranchGtSImm: BranchInstruction {
+    public struct BranchGtSImm: BranchInstructionBase {
         public static var opcode: UInt8 { 53 }
+        typealias Compare = CompareGtSigned
 
-        public let register: Registers.Index
-        public let value: UInt32
-        public let offset: UInt32
+        var register: Registers.Index
+        var value: UInt32
+        var offset: UInt32
+    }
+}
 
-        public init(data: Data) throws {
-            register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
+// MARK: Branch Helpers
+
+protocol BranchCompare {
+    static func compare(a: UInt32, b: UInt32) -> Bool
+}
+
+// for branch in A.5.7
+protocol BranchInstructionBase<Compare>: Instruction {
+    associatedtype Compare: BranchCompare
+
+    var register: Registers.Index { get set }
+    var value: UInt32 { get set }
+    var offset: UInt32 { get set }
+
+    func _executeImpl(state _: VMState) throws -> ExitReason?
+
+    func updatePC(state: VMState, skip: UInt32) -> ExitReason?
+
+    func condition(state: VMState, skip: UInt32) -> Bool
+}
+
+extension BranchInstructionBase {
+    public init(data: Data) throws {
+        register = try Registers.Index(data.at(relative: 0))
+        (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
+    }
+
+    public func _executeImpl(state _: VMState) throws -> ExitReason? { nil }
+
+    public func updatePC(state: VMState, skip: UInt32) -> ExitReason? {
+        guard Instructions.isBranchValid(state: state, offset: offset) else {
+            return .panic(.invalidBranch)
         }
-
-        func comparison(state: VMState, skip _: UInt32) -> Bool {
-            let regVal = state.readRegister(register)
-            return Int32(bitPattern: regVal) > Int32(bitPattern: value)
+        if condition(state: state, skip: skip) {
+            state.increasePC(offset)
+        } else {
+            state.increasePC(skip + 1)
         }
+        return nil
+    }
+
+    public func condition(state: VMState, skip _: UInt32) -> Bool {
+        let regVal = state.readRegister(register)
+        return Compare.compare(a: regVal, b: value)
+    }
+}
+
+public struct CompareGeSigned: BranchCompare {
+    public static func compare(a: UInt32, b: UInt32) -> Bool {
+        Int32(bitPattern: a) >= Int32(bitPattern: b)
+    }
+}
+
+public struct CompareGtSigned: BranchCompare {
+    public static func compare(a: UInt32, b: UInt32) -> Bool {
+        Int32(bitPattern: a) > Int32(bitPattern: b)
+    }
+}
+
+public struct CompareLtSigned: BranchCompare {
+    public static func compare(a: UInt32, b: UInt32) -> Bool {
+        Int32(bitPattern: a) < Int32(bitPattern: b)
+    }
+}
+
+public struct CompareLeSigned: BranchCompare {
+    public static func compare(a: UInt32, b: UInt32) -> Bool {
+        Int32(bitPattern: a) <= Int32(bitPattern: b)
+    }
+}
+
+public struct CompareEq: BranchCompare {
+    public static func compare(a: UInt32, b: UInt32) -> Bool {
+        Int32(bitPattern: a) == Int32(bitPattern: b)
+    }
+}
+
+public struct CompareNe: BranchCompare {
+    public static func compare(a: UInt32, b: UInt32) -> Bool {
+        Int32(bitPattern: a) != Int32(bitPattern: b)
+    }
+}
+
+public struct CompareLtUnsigned: BranchCompare {
+    public static func compare(a: UInt32, b: UInt32) -> Bool {
+        a < b
+    }
+}
+
+public struct CompareLeUnsigned: BranchCompare {
+    public static func compare(a: UInt32, b: UInt32) -> Bool {
+        a <= b
+    }
+}
+
+public struct CompareGeUnsigned: BranchCompare {
+    public static func compare(a: UInt32, b: UInt32) -> Bool {
+        a >= b
+    }
+}
+
+public struct CompareGtUnsigned: BranchCompare {
+    public static func compare(a: UInt32, b: UInt32) -> Bool {
+        a > b
     }
 }
