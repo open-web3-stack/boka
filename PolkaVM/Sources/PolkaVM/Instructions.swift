@@ -33,16 +33,20 @@ protocol BranchInstruction: Instruction {
 }
 
 extension BranchInstruction {
-    public func _executeImpl(state: VMState) -> ExitReason? {
-        Instructions.checkBranch(state: state, offset: offset)
+    public func _executeImpl(state _: VMState) -> ExitReason? {
+        nil
     }
 
-    public func updatePC(state: VMState, skip: UInt32) {
+    public func updatePC(state: VMState, skip: UInt32) -> ExitReason? {
+        guard Instructions.isBranchValid(state: state, offset: offset) else {
+            return .panic(.invalidBranch)
+        }
         if comparison(state: state, skip: skip) {
             state.increasePC(offset)
         } else {
             state.increasePC(skip + 1)
         }
+        return nil
     }
 }
 
@@ -77,11 +81,11 @@ public enum Instructions {
         }
     }
 
-    static func checkBranch(state: VMState, offset: UInt32) -> ExitReason? {
+    static func isBranchValid(state: VMState, offset: UInt32) -> Bool {
         if state.program.basicBlockIndices.contains(state.pc &+ offset) {
-            return nil
+            return true
         }
-        return .panic(.invalidBranch)
+        return false
     }
 
     // MARK: Instructions without Arguments (5.1)
@@ -195,12 +199,14 @@ public enum Instructions {
             offset = Instructions.decodeImmediate(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExitReason? {
-            Instructions.checkBranch(state: state, offset: offset)
-        }
+        public func _executeImpl(state _: VMState) -> ExitReason? { nil }
 
-        public func updatePC(state: VMState, skip _: UInt32) {
+        public func updatePC(state: VMState, skip _: UInt32) -> ExitReason? {
+            guard Instructions.isBranchValid(state: state, offset: offset) else {
+                return .panic(.invalidBranch)
+            }
             state.increasePC(offset)
+            return nil
         }
     }
 
@@ -221,9 +227,10 @@ public enum Instructions {
             nil
         }
 
-        public func updatePC(state: VMState, skip _: UInt32) {
+        public func updatePC(state: VMState, skip _: UInt32) -> ExitReason? {
             let regVal = state.readRegister(register)
             state.updatePC(regVal &+ offset) // wrapped add
+            return nil
         }
     }
 
@@ -475,11 +482,15 @@ public enum Instructions {
 
         public func _executeImpl(state: VMState) throws -> ExitReason? {
             state.writeRegister(register, value)
-            return Instructions.checkBranch(state: state, offset: offset)
+            return nil
         }
 
-        public func updatePC(state: VMState, skip _: UInt32) {
+        public func updatePC(state: VMState, skip _: UInt32) -> ExitReason? {
+            guard Instructions.isBranchValid(state: state, offset: offset) else {
+                return .panic(.invalidBranch)
+            }
             state.increasePC(offset)
+            return nil
         }
     }
 

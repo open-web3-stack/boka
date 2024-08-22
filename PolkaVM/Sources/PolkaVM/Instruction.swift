@@ -6,7 +6,7 @@ public protocol Instruction {
     init(data: Data) throws
 
     func gasCost() -> UInt64
-    func updatePC(state: VMState, skip: UInt32)
+    func updatePC(state: VMState, skip: UInt32) -> ExitReason?
 
     // protected method
     func _executeImpl(state: VMState) throws -> ExitReason?
@@ -16,11 +16,12 @@ extension Instruction {
     public func execute(state: VMState, skip: UInt32) -> ExitReason? {
         state.consumeGas(gasCost())
         do {
-            let res = try _executeImpl(state: state)
-            if res == nil {
-                updatePC(state: state, skip: skip)
+            let execRes = try _executeImpl(state: state)
+            if execRes != nil {
+                return execRes
             }
-            return res
+            let updatePcRes = updatePC(state: state, skip: skip)
+            return updatePcRes
         } catch let e as Memory.Error {
             return .pageFault(e.address)
         } catch {
@@ -34,7 +35,8 @@ extension Instruction {
         1
     }
 
-    public func updatePC(state: VMState, skip: UInt32) {
+    public func updatePC(state: VMState, skip: UInt32) -> ExitReason? {
         state.increasePC(skip + 1)
+        return nil
     }
 }
