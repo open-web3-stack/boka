@@ -43,7 +43,7 @@ extension State {
 
         res[Self.constructKey(1)] = try JamEncoder.encode(coreAuthorizationPool)
         res[Self.constructKey(2)] = try JamEncoder.encode(authorizationQueue)
-        res[Self.constructKey(3)] = try JamEncoder.encode(lastBlock)
+        res[Self.constructKey(3)] = try JamEncoder.encode(recentHistory)
 
         return res
     }

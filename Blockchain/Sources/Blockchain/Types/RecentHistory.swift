@@ -28,12 +28,12 @@ public struct RecentHistory: Sendable, Equatable, Codable {
         }
     }
 
-    public var blocks: ConfigLimitedSizeArray<HistoryItem, ProtocolConfig.Int0, ProtocolConfig.RecentHistorySize>
+    public var items: ConfigLimitedSizeArray<HistoryItem, ProtocolConfig.Int0, ProtocolConfig.RecentHistorySize>
 }
 
 extension RecentHistory: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> RecentHistory {
-        RecentHistory(blocks: try! ConfigLimitedSizeArray(config: config))
+        RecentHistory(items: try! ConfigLimitedSizeArray(config: config))
     }
 }

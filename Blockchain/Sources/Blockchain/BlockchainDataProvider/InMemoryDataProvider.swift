@@ -2,95 +2,94 @@ import Utils
 
 // TODO: add tests
 public actor InMemoryDataProvider: Sendable {
-    public private(set) var heads: [StateRef]
-    public private(set) var finalizedHead: StateRef
-    public private(set) var blocksByHash: [Data32: BlockRef] = [:]
+    public private(set) var heads: Set<Data32>
+    public private(set) var finalizedHead: Data32
 
+    private var blockByHash: [Data32: BlockRef] = [:]
     private var stateByBlockHash: [Data32: StateRef] = [:]
-    private var hashByTimeslot: [TimeslotIndex: [Data32]] = [:]
+    private var hashByTimeslot: [TimeslotIndex: Set<Data32>] = [:]
 
     public init(genesis: StateRef) async {
-        heads = [genesis]
-        finalizedHead = genesis
+        heads = [Data32()]
+        finalizedHead = Data32()
 
-        addState(genesis)
-    }
-
-    private func addState(_ state: StateRef) {
-        stateByBlockHash[state.value.lastBlock.hash] = state
-        hashByTimeslot[state.value.lastBlock.header.timeslotIndex, default: []].append(state.value.lastBlock.hash)
+        add(state: genesis)
     }
 }
 
 extension InMemoryDataProvider: BlockchainDataProvider {
-    public func hasHeader(hash: Data32) async throws -> Bool {
+    public func hasBlock(hash: Data32) -> Bool {
+        blockByHash[hash] != nil
+    }
+
+    public func hasState(hash: Data32) -> Bool {
         stateByBlockHash[hash] != nil
     }
 
-    public func isHead(hash: Data32) async throws -> Bool {
-        heads.contains(where: { $0.value.lastBlock.hash == hash })
+    public func isHead(hash: Data32) -> Bool {
+        heads.contains(hash)
     }
 
-    public func getHeader(hash: Data32) async throws -> HeaderRef {
-        guard let header = stateByBlockHash[hash]?.value.lastBlock.header.asRef() else {
-            throw BlockchainDataProviderError.unknownHash
+    public func getHeader(hash: Data32) throws -> HeaderRef {
+        guard let header = blockByHash[hash]?.header.asRef() else {
+            throw BlockchainDataProviderError.noData
         }
         return header
     }
 
-    public func getBlock(hash: Data32) async throws -> BlockRef {
-        guard let block = stateByBlockHash[hash]?.value.lastBlock else {
-            throw BlockchainDataProviderError.unknownHash
+    public func getBlock(hash: Data32) throws -> BlockRef {
+        guard let block = blockByHash[hash] else {
+            throw BlockchainDataProviderError.noData
         }
         return block
     }
 
-    public func getState(hash: Data32) async throws -> StateRef {
+    public func getState(hash: Data32) throws -> StateRef {
         guard let state = stateByBlockHash[hash] else {
-            throw BlockchainDataProviderError.unknownHash
+            throw BlockchainDataProviderError.noData
         }
         return state
     }
 
-    public func getFinalizedHead() async throws -> Data32 {
-        finalizedHead.value.lastBlock.hash
+    public func getFinalizedHead() -> Data32 {
+        finalizedHead
     }
 
-    public func getHeads() async throws -> [Data32] {
-        heads.map(\.value.lastBlock.hash)
+    public func getHeads() -> Set<Data32> {
+        heads
     }
 
-    public func getBlockHash(index: TimeslotIndex) async throws -> [Data32] {
-        hashByTimeslot[index] ?? []
+    public func getBlockHash(byTimeslot timeslot: TimeslotIndex) -> Set<Data32> {
+        hashByTimeslot[timeslot] ?? Set()
     }
 
-    public func add(state: StateRef, isHead: Bool) async throws {
-        addState(state)
-        if isHead {
-            try await updateHead(hash: state.value.lastBlock.hash, parent: state.value.lastBlock.header.parentHash)
+    public func add(state: StateRef) {
+        stateByBlockHash[state.value.lastBlockHash] = state
+        hashByTimeslot[state.value.timeslot, default: Set()].insert(state.value.lastBlockHash)
+    }
+
+    public func add(block: BlockRef) {
+        blockByHash[block.hash] = block
+        hashByTimeslot[block.header.timeslotIndex, default: Set()].insert(block.hash)
+    }
+
+    public func setFinalizedHead(hash: Data32) {
+        finalizedHead = hash
+    }
+
+    public func updateHead(hash: Data32, parent: Data32) throws {
+        guard heads.remove(parent) != nil else {
+            throw BlockchainDataProviderError.noData
         }
+        heads.insert(hash)
     }
 
-    public func setFinalizedHead(hash: Data32) async throws {
-        guard let state = stateByBlockHash[hash] else {
-            throw BlockchainDataProviderError.unknownHash
-        }
-        finalizedHead = state
-    }
-
-    public func _updateHeadNoCheck(hash: Data32, parent: Data32) async throws {
-        for i in 0 ..< heads.count where heads[i].value.lastBlock.hash == parent {
-            assert(stateByBlockHash[hash] != nil)
-            heads[i] = stateByBlockHash[hash]!
-            return
-        }
-    }
-
-    public func remove(hash: Data32) async throws {
-        guard let state = stateByBlockHash[hash] else {
-            return
-        }
+    public func remove(hash: Data32) {
+        let timeslot = blockByHash[hash]?.header.timeslotIndex ?? stateByBlockHash[hash]?.value.timeslot
         stateByBlockHash.removeValue(forKey: hash)
-        hashByTimeslot.removeValue(forKey: state.value.lastBlock.header.timeslotIndex)
+
+        if let timeslot {
+            hashByTimeslot[timeslot]?.remove(hash)
+        }
     }
 }
