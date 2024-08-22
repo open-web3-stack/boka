@@ -120,7 +120,6 @@ public struct SafrolePostState: Sendable, Equatable {
 }
 
 public protocol Safrole {
-    var config: ProtocolConfigRef { get }
     var timeslot: TimeslotIndex { get }
     var entropyPool: EntropyPool { get }
     var previousValidators: ConfigFixedSizeArray<
@@ -152,7 +151,7 @@ public protocol Safrole {
     > { get }
     var ticketsVerifier: BandersnatchRingVRFRoot { get }
 
-    func updateSafrole(slot: TimeslotIndex, entropy: Data32, extrinsics: ExtrinsicTickets)
+    func updateSafrole(config: ProtocolConfigRef, slot: TimeslotIndex, entropy: Data32, extrinsics: ExtrinsicTickets)
         -> Result<
             (
                 state: SafrolePostState,
@@ -211,7 +210,7 @@ func pickFallbackValidators(
 }
 
 extension Safrole {
-    public func updateSafrole(slot: TimeslotIndex, entropy: Data32, extrinsics: ExtrinsicTickets)
+    public func updateSafrole(config: ProtocolConfigRef, slot: TimeslotIndex, entropy: Data32, extrinsics: ExtrinsicTickets)
         -> Result<
             (
                 state: SafrolePostState,

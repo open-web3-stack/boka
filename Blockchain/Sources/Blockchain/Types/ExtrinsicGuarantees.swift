@@ -2,11 +2,11 @@ import Utils
 
 public struct ExtrinsicGuarantees: Sendable, Equatable, Codable {
     public struct IndexAndSignature: Sendable, Equatable, Codable {
-        public var index: UInt32
+        public var index: ValidatorIndex
         public var signature: Ed25519Signature
 
         public init(
-            index: UInt32,
+            index: ValidatorIndex,
             signature: Ed25519Signature
         ) {
             self.index = index
@@ -15,7 +15,6 @@ public struct ExtrinsicGuarantees: Sendable, Equatable, Codable {
     }
 
     public struct GuaranteeItem: Sendable, Equatable, Codable {
-        public var coreIndex: CoreIndex
         public var workReport: WorkReport
         public var timeslot: TimeslotIndex
         public var credential: LimitedSizeArray<
@@ -25,7 +24,6 @@ public struct ExtrinsicGuarantees: Sendable, Equatable, Codable {
         >
 
         public init(
-            coreIndex: CoreIndex,
             workReport: WorkReport,
             timeslot: TimeslotIndex,
             credential: LimitedSizeArray<
@@ -34,7 +32,6 @@ public struct ExtrinsicGuarantees: Sendable, Equatable, Codable {
                 ConstInt3
             >
         ) {
-            self.coreIndex = coreIndex
             self.workReport = workReport
             self.timeslot = timeslot
             self.credential = credential

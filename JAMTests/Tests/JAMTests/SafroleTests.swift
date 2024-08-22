@@ -33,8 +33,6 @@ struct SafroleState: Equatable, Safrole, Codable {
         case ticketsVerifier
     }
 
-    let config: ProtocolConfigRef
-
     // tau
     var timeslot: UInt32
     // eta
@@ -75,18 +73,6 @@ struct SafroleState: Equatable, Safrole, Codable {
     // gammaZ
     var ticketsVerifier: BandersnatchRingVRFRoot
 
-    public static func == (lhs: SafroleState, rhs: SafroleState) -> Bool {
-        lhs.timeslot == rhs.timeslot &&
-            lhs.entropyPool == rhs.entropyPool &&
-            lhs.previousValidators == rhs.previousValidators &&
-            lhs.currentValidators == rhs.currentValidators &&
-            lhs.nextValidators == rhs.nextValidators &&
-            lhs.validatorQueue == rhs.validatorQueue &&
-            lhs.ticketsAccumulator == rhs.ticketsAccumulator &&
-            lhs.ticketsOrKeys == rhs.ticketsOrKeys &&
-            lhs.ticketsVerifier == rhs.ticketsVerifier
-    }
-
     public mutating func mergeWith(postState: SafrolePostState) {
         timeslot = postState.timeslot
         entropyPool = postState.entropyPool
@@ -98,56 +84,18 @@ struct SafroleState: Equatable, Safrole, Codable {
         ticketsOrKeys = postState.ticketsOrKeys
         ticketsVerifier = postState.ticketsVerifier
     }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        config = decoder.getConfig(ProtocolConfigRef.self)!
-        timeslot = try container.decode(UInt32.self, forKey: .timeslot)
-        entropyPool = try container.decode(EntropyPool.self, forKey: .entropyPool)
-        previousValidators = try container.decode(ConfigFixedSizeArray<
-            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
-        >.self, forKey: .previousValidators)
-        currentValidators = try container.decode(ConfigFixedSizeArray<
-            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
-        >.self, forKey: .currentValidators)
-        nextValidators = try container.decode(ConfigFixedSizeArray<
-            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
-        >.self, forKey: .nextValidators)
-        validatorQueue = try container.decode(ConfigFixedSizeArray<
-            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
-        >.self, forKey: .validatorQueue)
-        ticketsAccumulator = try container.decode(ConfigLimitedSizeArray<
-            Ticket,
-            ProtocolConfig.Int0,
-            ProtocolConfig.EpochLength
-        >.self, forKey: .ticketsAccumulator)
-        ticketsOrKeys = try container.decode(Either<
-            ConfigFixedSizeArray<
-                Ticket,
-                ProtocolConfig.EpochLength
-            >,
-            ConfigFixedSizeArray<
-                BandersnatchPublicKey,
-                ProtocolConfig.EpochLength
-            >
-        >.self, forKey: .ticketsOrKeys)
-        ticketsVerifier = try container.decode(BandersnatchRingVRFRoot.self, forKey: .ticketsVerifier)
-    }
 }
 
-struct SafroleTestcase: CustomStringConvertible, Codable {
-    enum CodingKeys: String, CodingKey {
-        case input
-        case preState
-        case output
-        case postState
-    }
-
-    var description: String = ""
+struct SafroleTestcase: Codable {
     var input: SafroleInput
     var preState: SafroleState
     var output: Either<OutputMarks, UInt8>
     var postState: SafroleState
+}
+
+struct Testcase: CustomStringConvertible {
+    var description: String
+    var data: Data
 }
 
 enum SafroleTestVariants: String, CaseIterable {
@@ -174,18 +122,20 @@ enum SafroleTestVariants: String, CaseIterable {
 }
 
 struct SafroleTests {
-    static func loadTests(variant: SafroleTestVariants) throws -> [SafroleTestcase] {
+    static func loadTests(variant: SafroleTestVariants) throws -> [Testcase] {
         let tests = try TestLoader.getTestFiles(path: "safrole/\(variant)", extension: "scale")
-        return try tests.map {
-            let data = try Data(contentsOf: URL(fileURLWithPath: $0.path))
-            var testcase = try JamDecoder.decode(SafroleTestcase.self, from: data, withConfig: variant.config)
-            testcase.description = $0.description
-            return testcase
+        return try tests.map { path, description in
+            let data = try Data(contentsOf: URL(fileURLWithPath: path))
+            return Testcase(description: description, data: data)
         }
     }
 
-    func safroleTests(_ testcase: SafroleTestcase) throws {
+    func safroleTests(_ input: Testcase, variant: SafroleTestVariants) throws {
+        let config = variant.config
+        let testcase = try JamDecoder.decode(SafroleTestcase.self, from: input.data, withConfig: config)
+
         let result = testcase.preState.updateSafrole(
+            config: config,
             slot: testcase.input.slot,
             entropy: testcase.input.entropy,
             extrinsics: testcase.input.extrinsics
@@ -213,13 +163,17 @@ struct SafroleTests {
         }
     }
 
-    // @Test(arguments: try SafroleTests.loadTests(variant: .tiny))
-    // func tinyTests(_ testcase: SafroleTestcase) throws {
-    //     try safroleTests(testcase)
-    // }
+    @Test(arguments: try SafroleTests.loadTests(variant: .tiny))
+    func tinyTests(_ testcase: Testcase) throws {
+        withKnownIssue("wait for test vectors to be updated", isIntermittent: true) {
+            try safroleTests(testcase, variant: .tiny)
+        }
+    }
 
-    // @Test(arguments: try SafroleTests.loadTests(variant: .full))
-    // func fullTests(_ testcase: SafroleTestcase) throws {
-    //     try safroleTests(testcase)
-    // }
+    @Test(arguments: try SafroleTests.loadTests(variant: .full))
+    func fullTests(_ testcase: Testcase) throws {
+        withKnownIssue("wait for test vectors to be updated", isIntermittent: true) {
+            try safroleTests(testcase, variant: .full)
+        }
+    }
 }
