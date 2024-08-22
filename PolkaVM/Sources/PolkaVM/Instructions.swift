@@ -49,7 +49,7 @@ public enum Instructions {
         let lX = min(4, lX1)
         let lY = min(4, max(0, data.count - Int(lX) - 1))
 
-        let vX = try decodeImmediate(data.at(relative: 1 ..< lX))
+        let vX = try decodeImmediate(data.at(relative: 1 ..< 1 + lX))
         let vY = try decodeImmediate(data.at(relative: (1 + lX) ..< (1 + lX + lY)))
         return (vX, vY)
     }
