@@ -471,7 +471,7 @@ public enum Instructions {
         var register: Registers.Index
         var value: UInt32
         var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.initFn(data: data) }
+        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
     }
 
     public struct BranchNeImm: BranchInstructionBase {
@@ -481,7 +481,7 @@ public enum Instructions {
         var register: Registers.Index
         var value: UInt32
         var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.initFn(data: data) }
+        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
     }
 
     public struct BranchLtUImm: BranchInstructionBase {
@@ -491,7 +491,7 @@ public enum Instructions {
         var register: Registers.Index
         var value: UInt32
         var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.initFn(data: data) }
+        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
     }
 
     public struct BranchLeUImm: BranchInstructionBase {
@@ -501,7 +501,7 @@ public enum Instructions {
         var register: Registers.Index
         var value: UInt32
         var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.initFn(data: data) }
+        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
     }
 
     public struct BranchGeUImm: BranchInstructionBase {
@@ -511,7 +511,7 @@ public enum Instructions {
         var register: Registers.Index
         var value: UInt32
         var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.initFn(data: data) }
+        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
     }
 
     public struct BranchGtUImm: BranchInstructionBase {
@@ -521,7 +521,7 @@ public enum Instructions {
         var register: Registers.Index
         var value: UInt32
         var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.initFn(data: data) }
+        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
     }
 
     public struct BranchLtSImm: BranchInstructionBase {
@@ -531,7 +531,7 @@ public enum Instructions {
         var register: Registers.Index
         var value: UInt32
         var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.initFn(data: data) }
+        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
     }
 
     public struct BranchLeSImm: BranchInstructionBase {
@@ -541,7 +541,7 @@ public enum Instructions {
         var register: Registers.Index
         var value: UInt32
         var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.initFn(data: data) }
+        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
     }
 
     public struct BranchGeSImm: BranchInstructionBase {
@@ -551,7 +551,7 @@ public enum Instructions {
         var register: Registers.Index
         var value: UInt32
         var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.initFn(data: data) }
+        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
     }
 
     public struct BranchGtSImm: BranchInstructionBase {
@@ -561,7 +561,7 @@ public enum Instructions {
         var register: Registers.Index
         var value: UInt32
         var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.initFn(data: data) }
+        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
     }
 }
 
@@ -587,7 +587,7 @@ protocol BranchInstructionBase<Compare>: Instruction {
 }
 
 extension BranchInstructionBase {
-    public static func initFn(data: Data) throws -> (Registers.Index, UInt32, UInt32) {
+    public static func parse(data: Data) throws -> (Registers.Index, UInt32, UInt32) {
         let register = try Registers.Index(data.at(relative: 0))
         let (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
         return (register, value, offset)
