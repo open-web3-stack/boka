@@ -20,6 +20,20 @@ public class InstructionTable {
             Instructions.StoreU8.self,
             Instructions.StoreU16.self,
             Instructions.StoreU32.self,
+            Instructions.StoreImmIndU8.self,
+            Instructions.StoreImmIndU16.self,
+            Instructions.StoreImmIndU32.self,
+            Instructions.LoadImmJump.self,
+            Instructions.BranchEqImm.self,
+            Instructions.BranchNeImm.self,
+            Instructions.BranchLtUImm.self,
+            Instructions.BranchLeUImm.self,
+            Instructions.BranchGeUImm.self,
+            Instructions.BranchGtUImm.self,
+            Instructions.BranchLtSImm.self,
+            Instructions.BranchLeSImm.self,
+            Instructions.BranchGeSImm.self,
+            Instructions.BranchGtSImm.self,
         ]
         var table: [Instruction.Type?] = Array(repeating: nil, count: 256)
         for i in 0 ..< insts.count {

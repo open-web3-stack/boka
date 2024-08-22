@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import Utils
 
 @testable import PolkaVM
 
@@ -18,8 +19,8 @@ struct InstructionTests {
         #expect(Instructions.decodeImmediate(Data([0x12, 0x34, 0x56, 0xFA])) == 0xFA56_3412)
     }
 
-    @Test func decodeImmiate2() {
-        #expect(Instructions.decodeImmediate2(Data()) == nil)
+    @Test func decodeImmiate2() throws {
+        #expect(throws: IndexOutOfBounds.self) { try Instructions.decodeImmediate2(Data()) }
         // TODO: add more tests
     }
 }

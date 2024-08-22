@@ -2,6 +2,8 @@ public enum ExitReason {
     public enum PanicReason {
         case trap
         case invalidInstruction
+        case invalidDynamicJump
+        case invalidBranch
     }
 
     case halt
@@ -9,4 +11,9 @@ public enum ExitReason {
     case outOfGas
     case hostCall(UInt32)
     case pageFault(UInt32)
+}
+
+public enum ExecOutcome {
+    case continued // continue is a reserved keyword
+    case exit(ExitReason)
 }
