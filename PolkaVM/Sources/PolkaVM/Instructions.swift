@@ -484,7 +484,7 @@ public enum Instructions {
 
     public struct BranchLtUImm: BranchInstructionBase {
         public static var opcode: UInt8 { 44 }
-        typealias Compare = CompareLtUnsigned
+        typealias Compare = CompareLt
 
         var register: Registers.Index
         var value: UInt32
@@ -493,7 +493,7 @@ public enum Instructions {
 
     public struct BranchLeUImm: BranchInstructionBase {
         public static var opcode: UInt8 { 59 }
-        typealias Compare = CompareLeUnsigned
+        typealias Compare = CompareLe
 
         var register: Registers.Index
         var value: UInt32
@@ -502,7 +502,7 @@ public enum Instructions {
 
     public struct BranchGeUImm: BranchInstructionBase {
         public static var opcode: UInt8 { 52 }
-        typealias Compare = CompareGeUnsigned
+        typealias Compare = CompareGe
 
         var register: Registers.Index
         var value: UInt32
@@ -511,7 +511,7 @@ public enum Instructions {
 
     public struct BranchGtUImm: BranchInstructionBase {
         public static var opcode: UInt8 { 50 }
-        typealias Compare = CompareGtUnsigned
+        typealias Compare = CompareGt
 
         var register: Registers.Index
         var value: UInt32
@@ -520,7 +520,7 @@ public enum Instructions {
 
     public struct BranchLtSImm: BranchInstructionBase {
         public static var opcode: UInt8 { 32 }
-        typealias Compare = CompareLtSigned
+        typealias Compare = CompareLt
 
         var register: Registers.Index
         var value: UInt32
@@ -529,7 +529,7 @@ public enum Instructions {
 
     public struct BranchLeSImm: BranchInstructionBase {
         public static var opcode: UInt8 { 46 }
-        typealias Compare = CompareLeSigned
+        typealias Compare = CompareLe
 
         var register: Registers.Index
         var value: UInt32
@@ -538,7 +538,7 @@ public enum Instructions {
 
     public struct BranchGeSImm: BranchInstructionBase {
         public static var opcode: UInt8 { 45 }
-        typealias Compare = CompareGeSigned
+        typealias Compare = CompareGe
 
         var register: Registers.Index
         var value: UInt32
@@ -547,7 +547,7 @@ public enum Instructions {
 
     public struct BranchGtSImm: BranchInstructionBase {
         public static var opcode: UInt8 { 53 }
-        typealias Compare = CompareGtSigned
+        typealias Compare = CompareGt
 
         var register: Registers.Index
         var value: UInt32
@@ -602,30 +602,6 @@ extension BranchInstructionBase {
     }
 }
 
-public struct CompareGeSigned: BranchCompare {
-    public static func compare(a: UInt32, b: UInt32) -> Bool {
-        Int32(bitPattern: a) >= Int32(bitPattern: b)
-    }
-}
-
-public struct CompareGtSigned: BranchCompare {
-    public static func compare(a: UInt32, b: UInt32) -> Bool {
-        Int32(bitPattern: a) > Int32(bitPattern: b)
-    }
-}
-
-public struct CompareLtSigned: BranchCompare {
-    public static func compare(a: UInt32, b: UInt32) -> Bool {
-        Int32(bitPattern: a) < Int32(bitPattern: b)
-    }
-}
-
-public struct CompareLeSigned: BranchCompare {
-    public static func compare(a: UInt32, b: UInt32) -> Bool {
-        Int32(bitPattern: a) <= Int32(bitPattern: b)
-    }
-}
-
 public struct CompareEq: BranchCompare {
     public static func compare(a: UInt32, b: UInt32) -> Bool {
         Int32(bitPattern: a) == Int32(bitPattern: b)
@@ -638,25 +614,25 @@ public struct CompareNe: BranchCompare {
     }
 }
 
-public struct CompareLtUnsigned: BranchCompare {
+public struct CompareLt: BranchCompare {
     public static func compare(a: UInt32, b: UInt32) -> Bool {
         a < b
     }
 }
 
-public struct CompareLeUnsigned: BranchCompare {
+public struct CompareLe: BranchCompare {
     public static func compare(a: UInt32, b: UInt32) -> Bool {
         a <= b
     }
 }
 
-public struct CompareGeUnsigned: BranchCompare {
+public struct CompareGe: BranchCompare {
     public static func compare(a: UInt32, b: UInt32) -> Bool {
         a >= b
     }
 }
 
-public struct CompareGtUnsigned: BranchCompare {
+public struct CompareGt: BranchCompare {
     public static func compare(a: UInt32, b: UInt32) -> Bool {
         a > b
     }

@@ -20,8 +20,7 @@ extension Instruction {
             if execRes != nil {
                 return execRes
             }
-            let updatePcRes = updatePC(state: state, skip: skip)
-            return updatePcRes
+            return updatePC(state: state, skip: skip)
         } catch let e as Memory.Error {
             return .pageFault(e.address)
         } catch {
