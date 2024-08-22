@@ -2,16 +2,6 @@ import Foundation
 import Utils
 
 public struct ServiceAccount: Sendable, Equatable, Codable {
-    public struct HashAndLength: Sendable, Hashable, Codable {
-        public var hash: Data32
-        public var length: DataLength
-
-        public init(hash: Data32, length: DataLength) {
-            self.hash = hash
-            self.length = length
-        }
-    }
-
     // s
     public var storage: [Data32: Data]
 
