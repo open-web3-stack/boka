@@ -78,10 +78,7 @@ public enum Instructions {
     }
 
     static func checkBranch(state: VMState, offset: UInt32) -> ExitReason? {
-        let pc = state.pc
-        let code = state.program.code
-        let opcode = code[code.startIndex + Int(pc &+ offset)]
-        if BASIC_BLOCK_INSTRUCTIONS.contains(opcode) {
+        if state.program.basicBlockIndices.contains(state.pc &+ offset) {
             return nil
         }
         return .panic(.invalidBranch)
