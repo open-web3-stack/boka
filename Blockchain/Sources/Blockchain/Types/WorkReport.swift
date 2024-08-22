@@ -1,10 +1,14 @@
 import Foundation
-import ScaleCodec
 import Utils
 
-public struct WorkReport: Sendable, Equatable {
+public struct WorkReport: Sendable, Equatable, Codable {
+    // the order is based on the Block Serialization section
+
     // a: authorizer hash
     public var authorizerHash: Data32
+
+    // c: the core-index
+    public var coreIndex: CoreIndex
 
     // o: output
     public var output: Data
@@ -24,16 +28,14 @@ public struct WorkReport: Sendable, Equatable {
 
     public init(
         authorizerHash: Data32,
+        coreIndex: CoreIndex,
         output: Data,
         refinementContext: RefinementContext,
         packageSpecification: AvailabilitySpecifications,
-        results: ConfigLimitedSizeArray<
-            WorkResult,
-            ProtocolConfig.Int1,
-            ProtocolConfig.MaxWorkItems
-        >
+        results: ConfigLimitedSizeArray<WorkResult, ProtocolConfig.Int1, ProtocolConfig.MaxWorkItems>
     ) {
         self.authorizerHash = authorizerHash
+        self.coreIndex = coreIndex
         self.output = output
         self.refinementContext = refinementContext
         self.packageSpecification = packageSpecification
@@ -46,30 +48,11 @@ extension WorkReport: Dummy {
     public static func dummy(config: Config) -> WorkReport {
         WorkReport(
             authorizerHash: Data32(),
+            coreIndex: 0,
             output: Data(),
             refinementContext: RefinementContext.dummy(config: config),
             packageSpecification: AvailabilitySpecifications.dummy(config: config),
             results: try! ConfigLimitedSizeArray(config: config, defaultValue: WorkResult.dummy(config: config))
         )
-    }
-}
-
-extension WorkReport: ScaleCodec.Encodable {
-    public init(config: Config, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            authorizerHash: decoder.decode(),
-            output: decoder.decode(),
-            refinementContext: decoder.decode(),
-            packageSpecification: decoder.decode(),
-            results: ConfigLimitedSizeArray(config: config, from: &decoder)
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(authorizerHash)
-        try encoder.encode(output)
-        try encoder.encode(refinementContext)
-        try encoder.encode(packageSpecification)
-        try encoder.encode(results)
     }
 }

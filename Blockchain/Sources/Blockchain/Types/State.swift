@@ -1,8 +1,8 @@
-import ScaleCodec
+import Codec
 import Utils
 
-public struct State: Sendable {
-    public struct ReportItem: Sendable, Equatable {
+public struct State: Sendable, Equatable, Codable {
+    public struct ReportItem: Sendable, Equatable, Codable {
         public var workReport: WorkReport
         public var timeslot: TimeslotIndex
 
@@ -15,7 +15,17 @@ public struct State: Sendable {
         }
     }
 
-    public let config: ProtocolConfigRef
+    public struct PrivilegedServiceIndices: Sendable, Equatable, Codable {
+        public var empower: ServiceIndex
+        public var assign: ServiceIndex
+        public var designate: ServiceIndex
+
+        public init(empower: ServiceIndex, assign: ServiceIndex, designate: ServiceIndex) {
+            self.empower = empower
+            self.assign = assign
+            self.designate = designate
+        }
+    }
 
     // α: The core αuthorizations pool.
     public var coreAuthorizationPool: ConfigFixedSizeArray<
@@ -34,10 +44,10 @@ public struct State: Sendable {
     public var safroleState: SafroleState
 
     // δ: The (prior) state of the service accounts.
-    public var serviceAccounts: [ServiceIdentifier: ServiceAccount]
+    public var serviceAccounts: [ServiceIndex: ServiceAccount]
 
     // η: The eηtropy accumulator and epochal raηdomness.
-    public var entropyPool: (Data32, Data32, Data32, Data32)
+    public var entropyPool: EntropyPool
 
     // ι: The validator keys and metadata to be drawn from next.
     public var validatorQueue: ConfigFixedSizeArray<
@@ -73,11 +83,7 @@ public struct State: Sendable {
     >
 
     // χ: The privileged service indices.
-    public var privilegedServiceIndices: (
-        empower: ServiceIdentifier,
-        assign: ServiceIdentifier,
-        designate: ServiceIdentifier
-    )
+    public var privilegedServiceIndices: PrivilegedServiceIndices
 
     // ψ: past judgements
     public var judgements: JudgementsState
@@ -86,7 +92,6 @@ public struct State: Sendable {
     public var activityStatistics: ValidatorActivityStatistics
 
     public init(
-        config: ProtocolConfigRef,
         coreAuthorizationPool: ConfigFixedSizeArray<
             ConfigLimitedSizeArray<
                 Data32,
@@ -97,8 +102,8 @@ public struct State: Sendable {
         >,
         lastBlock: BlockRef,
         safroleState: SafroleState,
-        serviceAccounts: [ServiceIdentifier: ServiceAccount],
-        entropyPool: (Data32, Data32, Data32, Data32),
+        serviceAccounts: [ServiceIndex: ServiceAccount],
+        entropyPool: EntropyPool,
         validatorQueue: ConfigFixedSizeArray<
             ValidatorKey, ProtocolConfig.TotalNumberOfValidators
         >,
@@ -120,15 +125,10 @@ public struct State: Sendable {
             >,
             ProtocolConfig.TotalNumberOfCores
         >,
-        privilegedServiceIndices: (
-            empower: ServiceIdentifier,
-            assign: ServiceIdentifier,
-            designate: ServiceIdentifier
-        ),
+        privilegedServiceIndices: PrivilegedServiceIndices,
         judgements: JudgementsState,
         activityStatistics: ValidatorActivityStatistics
     ) {
-        self.config = config
         self.coreAuthorizationPool = coreAuthorizationPool
         self.lastBlock = lastBlock
         self.safroleState = safroleState
@@ -148,35 +148,15 @@ public struct State: Sendable {
 
 public typealias StateRef = Ref<State>
 
-extension State: Equatable {
-    public static func == (lhs: State, rhs: State) -> Bool {
-        lhs.coreAuthorizationPool == rhs.coreAuthorizationPool &&
-            lhs.lastBlock == rhs.lastBlock &&
-            lhs.safroleState == rhs.safroleState &&
-            lhs.serviceAccounts == rhs.serviceAccounts &&
-            lhs.entropyPool == rhs.entropyPool &&
-            lhs.validatorQueue == rhs.validatorQueue &&
-            lhs.currentValidators == rhs.currentValidators &&
-            lhs.previousValidators == rhs.previousValidators &&
-            lhs.reports == rhs.reports &&
-            lhs.timeslot == rhs.timeslot &&
-            lhs.authorizationQueue == rhs.authorizationQueue &&
-            lhs.privilegedServiceIndices == rhs.privilegedServiceIndices &&
-            lhs.judgements == rhs.judgements &&
-            lhs.activityStatistics == rhs.activityStatistics
-    }
-}
-
 extension State: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> State {
         try! State(
-            config: config,
             coreAuthorizationPool: ConfigFixedSizeArray(config: config, defaultValue: ConfigLimitedSizeArray(config: config)),
             lastBlock: BlockRef.dummy(config: config),
             safroleState: SafroleState.dummy(config: config),
             serviceAccounts: [:],
-            entropyPool: (Data32(), Data32(), Data32(), Data32()),
+            entropyPool: EntropyPool((Data32(), Data32(), Data32(), Data32())),
             validatorQueue: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
             currentValidators: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
             previousValidators: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
@@ -186,71 +166,14 @@ extension State: Dummy {
                 config: config,
                 defaultValue: ConfigFixedSizeArray(config: config, defaultValue: Data32())
             ),
-            privilegedServiceIndices: (
-                empower: ServiceIdentifier(),
-                assign: ServiceIdentifier(),
-                designate: ServiceIdentifier()
+            privilegedServiceIndices: PrivilegedServiceIndices(
+                empower: ServiceIndex(),
+                assign: ServiceIndex(),
+                designate: ServiceIndex()
             ),
             judgements: JudgementsState.dummy(config: config),
             activityStatistics: ValidatorActivityStatistics.dummy(config: config)
         )
-    }
-}
-
-extension State.ReportItem: ScaleCodec.Encodable {
-    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            workReport: WorkReport(config: config, from: &decoder),
-            timeslot: decoder.decode()
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(workReport)
-        try encoder.encode(timeslot)
-    }
-}
-
-extension State: ScaleCodec.Encodable {
-    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            config: config,
-            coreAuthorizationPool: ConfigFixedSizeArray(config: config, from: &decoder) {
-                try ConfigLimitedSizeArray(config: config, from: &$0) { try $0.decode() }
-            },
-            lastBlock: Block(config: config, from: &decoder).asRef(),
-            safroleState: SafroleState(config: config, from: &decoder),
-            serviceAccounts: decoder.decode(),
-            entropyPool: decoder.decode(),
-            validatorQueue: ConfigFixedSizeArray(config: config, from: &decoder),
-            currentValidators: ConfigFixedSizeArray(config: config, from: &decoder),
-            previousValidators: ConfigFixedSizeArray(config: config, from: &decoder),
-            reports: ConfigFixedSizeArray(config: config, from: &decoder) { try ReportItem(config: config, from: &$0) },
-            timeslot: decoder.decode(),
-            authorizationQueue: ConfigFixedSizeArray(config: config, from: &decoder) {
-                try ConfigFixedSizeArray(config: config, from: &$0)
-            },
-            privilegedServiceIndices: decoder.decode(),
-            judgements: decoder.decode(),
-            activityStatistics: ValidatorActivityStatistics(config: config, from: &decoder)
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(coreAuthorizationPool)
-        try encoder.encode(lastBlock.value)
-        try encoder.encode(safroleState)
-        try encoder.encode(serviceAccounts)
-        try encoder.encode(entropyPool)
-        try encoder.encode(validatorQueue)
-        try encoder.encode(currentValidators)
-        try encoder.encode(previousValidators)
-        try encoder.encode(reports)
-        try encoder.encode(timeslot)
-        try encoder.encode(authorizationQueue)
-        try encoder.encode(privilegedServiceIndices)
-        try encoder.encode(judgements)
-        try encoder.encode(activityStatistics)
     }
 }
 

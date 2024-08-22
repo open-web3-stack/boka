@@ -40,7 +40,7 @@ public final class Runtime {
         newState.lastBlock = block
 
         let res = newState.updateSafrole(
-            slot: block.header.timeslotIndex, entropy: newState.entropyPool.0, extrinsics: block.extrinsic.tickets
+            config: config, slot: block.header.timeslotIndex, entropy: newState.entropyPool.t0, extrinsics: block.extrinsic.tickets
         )
         switch res {
         case let .success((state: postState, epochMark: _, ticketsMark: _)):

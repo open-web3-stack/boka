@@ -1,7 +1,6 @@
-import ScaleCodec
 import Utils
 
-public struct SafroleState: Sendable, Equatable {
+public struct SafroleState: Sendable, Equatable, Codable {
     // γk
     public var nextValidators: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
@@ -66,27 +65,5 @@ extension SafroleState: Dummy {
             ticketsOrKeys: .right(ConfigFixedSizeArray(config: config, defaultValue: BandersnatchPublicKey())),
             ticketsAccumulator: ConfigLimitedSizeArray(config: config)
         )
-    }
-}
-
-extension SafroleState: ScaleCodec.Encodable {
-    public init(config: ProtocolConfigRef, from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            nextValidators: ConfigFixedSizeArray(config: config, from: &decoder),
-            ticketsVerifier: decoder.decode(),
-            ticketsOrKeys: Either(
-                from: &decoder,
-                decodeLeft: { try ConfigFixedSizeArray(config: config, from: &$0) },
-                decodeRight: { try ConfigFixedSizeArray(config: config, from: &$0) }
-            ),
-            ticketsAccumulator: ConfigLimitedSizeArray(config: config, from: &decoder)
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(nextValidators)
-        try encoder.encode(ticketsVerifier)
-        try encoder.encode(ticketsOrKeys)
-        try encoder.encode(ticketsAccumulator)
     }
 }

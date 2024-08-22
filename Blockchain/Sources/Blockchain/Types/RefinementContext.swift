@@ -1,43 +1,53 @@
-import ScaleCodec
 import Utils
 
 // A refinement context, denoted by the set X, describes the context of the chain
 // at the point that the report’s corresponding work-package was evaluated.
-public struct RefinementContext: Sendable {
-    public var anchor: (
-        headerHash: Data32,
-        stateRoot: Data32,
-        beefyRoot: Data32
-    )
+public struct RefinementContext: Sendable, Equatable, Codable {
+    public struct Anchor: Sendable, Equatable, Codable {
+        // a
+        public var headerHash: Data32
+        // s
+        public var stateRoot: Data32
+        // b
+        public var beefyRoot: Data32
 
-    public var lokupAnchor: (
-        headerHash: Data32,
-        timeslot: TimeslotIndex
-    )
-
-    public var prerequistieWorkPackage: Data32?
-
-    public init(
-        anchor: (
+        public init(
             headerHash: Data32,
             stateRoot: Data32,
             beefyRoot: Data32
-        ),
-        lokupAnchor: (
+        ) {
+            self.headerHash = headerHash
+            self.stateRoot = stateRoot
+            self.beefyRoot = beefyRoot
+        }
+    }
+
+    public struct LokupAnchor: Sendable, Equatable, Codable {
+        // l
+        public var headerHash: Data32
+        // t
+        public var timeslot: TimeslotIndex
+
+        public init(
             headerHash: Data32,
             timeslot: TimeslotIndex
-        ),
-        prerequistieWorkPackage: Data32?
-    ) {
+        ) {
+            self.headerHash = headerHash
+            self.timeslot = timeslot
+        }
+    }
+
+    public var anchor: Anchor
+
+    public var lokupAnchor: LokupAnchor
+
+    // p
+    public var prerequistieWorkPackage: Data32?
+
+    public init(anchor: Anchor, lokupAnchor: LokupAnchor, prerequistieWorkPackage: Data32?) {
         self.anchor = anchor
         self.lokupAnchor = lokupAnchor
         self.prerequistieWorkPackage = prerequistieWorkPackage
-    }
-}
-
-extension RefinementContext: Equatable {
-    public static func == (lhs: RefinementContext, rhs: RefinementContext) -> Bool {
-        lhs.anchor == rhs.anchor && lhs.lokupAnchor == rhs.lokupAnchor && lhs.prerequistieWorkPackage == rhs.prerequistieWorkPackage
     }
 }
 
@@ -45,32 +55,16 @@ extension RefinementContext: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config _: Config) -> RefinementContext {
         RefinementContext(
-            anchor: (
+            anchor: Anchor(
                 headerHash: Data32(),
                 stateRoot: Data32(),
                 beefyRoot: Data32()
             ),
-            lokupAnchor: (
+            lokupAnchor: LokupAnchor(
                 headerHash: Data32(),
                 timeslot: 0
             ),
             prerequistieWorkPackage: nil
         )
-    }
-}
-
-extension RefinementContext: ScaleCodec.Codable {
-    public init(from decoder: inout some ScaleCodec.Decoder) throws {
-        try self.init(
-            anchor: decoder.decode(),
-            lokupAnchor: decoder.decode(),
-            prerequistieWorkPackage: decoder.decode()
-        )
-    }
-
-    public func encode(in encoder: inout some ScaleCodec.Encoder) throws {
-        try encoder.encode(anchor)
-        try encoder.encode(lokupAnchor)
-        try encoder.encode(prerequistieWorkPackage)
     }
 }
