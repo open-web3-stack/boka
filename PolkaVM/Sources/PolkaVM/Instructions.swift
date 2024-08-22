@@ -465,8 +465,8 @@ public enum Instructions {
     }
 
     public struct BranchEqImm: BranchInstructionBase {
-        typealias Compare = CompareEq
         public static var opcode: UInt8 { 7 }
+        typealias Compare = CompareEq
 
         var register: Registers.Index
         var value: UInt32
