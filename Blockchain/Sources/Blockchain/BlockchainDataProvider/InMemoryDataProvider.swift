@@ -4,6 +4,7 @@ import Utils
 public actor InMemoryDataProvider: Sendable {
     public private(set) var heads: [StateRef]
     public private(set) var finalizedHead: StateRef
+    public private(set) var blocksByHash: [Data32: BlockRef] = [:]
 
     private var stateByBlockHash: [Data32: StateRef] = [:]
     private var hashByTimeslot: [TimeslotIndex: [Data32]] = [:]

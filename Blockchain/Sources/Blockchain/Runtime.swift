@@ -37,7 +37,8 @@ public final class Runtime {
         try validate(block: block, state: prevState, context: context)
 
         var newState = prevState.value
-        newState.lastBlock = block
+
+        // TODO: update recent history
 
         let res = newState.updateSafrole(
             config: config, slot: block.header.timeslotIndex, entropy: newState.entropyPool.t0, extrinsics: block.extrinsic.tickets
