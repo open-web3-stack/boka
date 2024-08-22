@@ -67,25 +67,18 @@ public enum Instructions {
         return UInt32(bitPattern: Int32(bitPattern: value << shift) >> shift)
     }
 
-    static func decodeImmediate2(_ data: Data, divideBy: UInt8 = 1) -> (UInt32, UInt32)? {
-        do {
-            let lA = try Int((data.at(relative: 0) / divideBy) & 0b111)
-            let lX = min(4, lA)
-            let lY1 = min(4, max(0, data.count - Int(lA) - 1))
-            let lY2 = min(lY1, 8 - lA)
-            let vX = try decodeImmediate(data.at(relative: 1 ..< lX))
-            let vY = try decodeImmediate(data.at(relative: (1 + lA) ..< lY2))
-            return (vX, vY)
-        } catch {
-            return nil
-        }
+    static func decodeImmediate2(_ data: Data, divideBy: UInt8 = 1) throws -> (UInt32, UInt32) {
+        let lA = try Int((data.at(relative: 0) / divideBy) & 0b111)
+        let lX = min(4, lA)
+        let lY1 = min(4, max(0, data.count - Int(lA) - 1))
+        let lY2 = min(lY1, 8 - lA)
+        let vX = try decodeImmediate(data.at(relative: 1 ..< lX))
+        let vY = try decodeImmediate(data.at(relative: (1 + lA) ..< lY2))
+        return (vX, vY)
     }
 
     static func isBranchValid(state: VMState, offset: UInt32) -> Bool {
-        if state.program.basicBlockIndices.contains(state.pc &+ offset) {
-            return true
-        }
-        return false
+        state.program.basicBlockIndices.contains(state.pc &+ offset)
     }
 
     // MARK: Instructions without Arguments (5.1)
@@ -134,8 +127,8 @@ public enum Instructions {
         public let address: UInt32
         public let value: UInt8
 
-        public init(data: Data) {
-            let (x, y) = Instructions.decodeImmediate2(data)!
+        public init(data: Data) throws {
+            let (x, y) = try Instructions.decodeImmediate2(data)
             address = x
             value = UInt8(truncatingIfNeeded: y)
         }
@@ -152,8 +145,8 @@ public enum Instructions {
         public let address: UInt32
         public let value: UInt16
 
-        public init(data: Data) {
-            let (x, y) = Instructions.decodeImmediate2(data)!
+        public init(data: Data) throws {
+            let (x, y) = try Instructions.decodeImmediate2(data)
             address = x
             value = UInt16(truncatingIfNeeded: y)
         }
@@ -170,8 +163,8 @@ public enum Instructions {
         public let address: UInt32
         public let value: UInt32
 
-        public init(data: Data) {
-            let (x, y) = Instructions.decodeImmediate2(data)!
+        public init(data: Data) throws {
+            let (x, y) = try Instructions.decodeImmediate2(data)
             address = x
             value = y
         }
@@ -415,7 +408,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(data.at(relative: 0))
-            let (x, y) = Instructions.decodeImmediate2(data, divideBy: 16)!
+            let (x, y) = try Instructions.decodeImmediate2(data, divideBy: 16)
             address = x
             value = UInt8(truncatingIfNeeded: y)
         }
@@ -435,7 +428,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(data.at(relative: 0))
-            let (x, y) = Instructions.decodeImmediate2(data, divideBy: 16)!
+            let (x, y) = try Instructions.decodeImmediate2(data, divideBy: 16)
             address = x
             value = UInt16(truncatingIfNeeded: y)
         }
@@ -455,7 +448,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(data.at(relative: 0))
-            let (x, y) = Instructions.decodeImmediate2(data, divideBy: 16)!
+            let (x, y) = try Instructions.decodeImmediate2(data, divideBy: 16)
             address = x
             value = y
         }
@@ -477,7 +470,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = Instructions.decodeImmediate2(data, divideBy: 16)!
+            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
         }
 
         public func _executeImpl(state: VMState) throws -> ExitReason? {
@@ -503,7 +496,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = Instructions.decodeImmediate2(data, divideBy: 16)!
+            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
         }
 
         func comparison(state: VMState, skip _: UInt32) -> Bool {
@@ -520,7 +513,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = Instructions.decodeImmediate2(data, divideBy: 16)!
+            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
         }
 
         func comparison(state: VMState, skip _: UInt32) -> Bool {
@@ -537,7 +530,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = Instructions.decodeImmediate2(data, divideBy: 16)!
+            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
         }
 
         func comparison(state: VMState, skip _: UInt32) -> Bool {
@@ -554,7 +547,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = Instructions.decodeImmediate2(data, divideBy: 16)!
+            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
         }
 
         func comparison(state: VMState, skip _: UInt32) -> Bool {
@@ -571,7 +564,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = Instructions.decodeImmediate2(data, divideBy: 16)!
+            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
         }
 
         func comparison(state: VMState, skip _: UInt32) -> Bool {
@@ -588,7 +581,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = Instructions.decodeImmediate2(data, divideBy: 16)!
+            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
         }
 
         func comparison(state: VMState, skip _: UInt32) -> Bool {
@@ -605,7 +598,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = Instructions.decodeImmediate2(data, divideBy: 16)!
+            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
         }
 
         func comparison(state: VMState, skip _: UInt32) -> Bool {
@@ -623,7 +616,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = Instructions.decodeImmediate2(data, divideBy: 16)!
+            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
         }
 
         func comparison(state: VMState, skip _: UInt32) -> Bool {
@@ -641,7 +634,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = Instructions.decodeImmediate2(data, divideBy: 16)!
+            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
         }
 
         func comparison(state: VMState, skip _: UInt32) -> Bool {
@@ -659,7 +652,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(data.at(relative: 0))
-            (value, offset) = Instructions.decodeImmediate2(data, divideBy: 16)!
+            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
         }
 
         func comparison(state: VMState, skip _: UInt32) -> Bool {
