@@ -3,11 +3,11 @@ import Utils
 
 public struct ExtrinsicPreimages: Sendable, Equatable, Codable {
     public struct PreimageItem: Sendable, Equatable, Codable {
-        public var serviceIndices: ServiceIndices
+        public var serviceIndex: ServiceIndex
         public var data: Data
 
-        public init(serviceIndices: ServiceIndices, data: Data) {
-            self.serviceIndices = serviceIndices
+        public init(serviceIndex: ServiceIndex, data: Data) {
+            self.serviceIndex = serviceIndex
             self.data = data
         }
     }

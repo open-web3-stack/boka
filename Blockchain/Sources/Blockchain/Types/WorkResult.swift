@@ -2,9 +2,10 @@ import Codec
 import Foundation
 import Utils
 
+// L
 public struct WorkResult: Sendable, Equatable, Codable {
     // s: the index of the service whose state is to be altered and thus whose refine code was already executed
-    public var serviceIdentifier: ServiceIdentifier
+    public var serviceIndex: ServiceIndex
 
     // c: the hash of the code of the service at the time of being reported
     public var codeHash: Data32
@@ -18,16 +19,16 @@ public struct WorkResult: Sendable, Equatable, Codable {
 
     // o: there is the output or error of the execution of the code o
     // which may be either an octet sequence in case it was successful, or a member of the set J, if not
-    public var output: Result<Data, WorkResultError>
+    public var output: WorkOutput
 
     public init(
-        serviceIdentifier: ServiceIdentifier,
+        serviceIndex: ServiceIndex,
         codeHash: Data32,
         payloadHash: Data32,
         gas: Gas,
-        output: Result<Data, WorkResultError>
+        output: WorkOutput
     ) {
-        self.serviceIdentifier = serviceIdentifier
+        self.serviceIndex = serviceIndex
         self.codeHash = codeHash
         self.payloadHash = payloadHash
         self.gas = gas
@@ -39,11 +40,11 @@ extension WorkResult: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config _: Config) -> WorkResult {
         WorkResult(
-            serviceIdentifier: ServiceIdentifier(),
+            serviceIndex: 0,
             codeHash: Data32(),
             payloadHash: Data32(),
             gas: 0,
-            output: .success(Data())
+            output: .init(.success(Data()))
         )
     }
 }
