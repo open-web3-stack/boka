@@ -13,7 +13,7 @@ public struct FixSizeBitstring<TByteLength: ReadInt>: Hashable, Sendable {
     public private(set) var length: Int
     /// Initialize with byte data storage and length.
     /// - Parameter bytes: Byte storage for bits.
-    public init(bytes: Data, length: Int) throws(ConfigBitstringError) {
+    private init(bytes: Data, length: Int) throws(ConfigBitstringError) {
         guard bytes.count * 8 >= length else {
             throw ConfigBitstringError.notEnoughData
         }

@@ -6,7 +6,7 @@ public struct ExtrinsicAvailability: Sendable, Equatable, Codable {
         // a
         public var parentHash: Data32
         // f
-        public var assurance: Data // bit string with length of Constants.TotalNumberOfCores TODO: use a BitString type
+        public var assurance: FixSizeBitstring<ProtocolConfig.TotalNumberOfCores>
         // v
         public var validatorIndex: ValidatorIndex
         // s
@@ -14,7 +14,7 @@ public struct ExtrinsicAvailability: Sendable, Equatable, Codable {
 
         public init(
             parentHash: Data32,
-            assurance: Data,
+            assurance: FixSizeBitstring<ProtocolConfig.TotalNumberOfCores>,
             validatorIndex: ValidatorIndex,
             signature: Ed25519Signature
         ) {
