@@ -160,7 +160,7 @@ private class DecodeContext: Decoder {
 
     fileprivate func decodeFixedLengthData<T: FixedLengthData>(_ type: T.Type, key: CodingKey?) throws -> T {
         try withExtendedLifetime(PushCodingPath(decoder: self, key: key)) {
-            let length = type.length(decoder: self)
+            let length = try type.length(decoder: self)
             guard data.count >= length else {
                 throw DecodingError.dataCorrupted(
                     DecodingError.Context(

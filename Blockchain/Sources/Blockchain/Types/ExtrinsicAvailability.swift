@@ -6,7 +6,7 @@ public struct ExtrinsicAvailability: Sendable, Equatable, Codable {
         // a
         public var parentHash: Data32
         // f
-        public var assurance: FixSizeBitstring<ProtocolConfig.TotalNumberOfCores>
+        public var assurance: ConfigSizeBitString<ProtocolConfig.TotalNumberOfCores>
         // v
         public var validatorIndex: ValidatorIndex
         // s
@@ -14,7 +14,7 @@ public struct ExtrinsicAvailability: Sendable, Equatable, Codable {
 
         public init(
             parentHash: Data32,
-            assurance: FixSizeBitstring<ProtocolConfig.TotalNumberOfCores>,
+            assurance: ConfigSizeBitString<ProtocolConfig.TotalNumberOfCores>,
             validatorIndex: ValidatorIndex,
             signature: Ed25519Signature
         ) {
