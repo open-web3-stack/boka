@@ -16,11 +16,11 @@ public struct State: Sendable {
     }
 
     public struct PrivilegedServiceIndices: Sendable, Equatable, Codable {
-        public var empower: ServiceIdentifier
-        public var assign: ServiceIdentifier
-        public var designate: ServiceIdentifier
+        public var empower: ServiceIndex
+        public var assign: ServiceIndex
+        public var designate: ServiceIndex
 
-        public init(empower: ServiceIdentifier, assign: ServiceIdentifier, designate: ServiceIdentifier) {
+        public init(empower: ServiceIndex, assign: ServiceIndex, designate: ServiceIndex) {
             self.empower = empower
             self.assign = assign
             self.designate = designate
@@ -46,7 +46,7 @@ public struct State: Sendable {
     public var safroleState: SafroleState
 
     // δ: The (prior) state of the service accounts.
-    public var serviceAccounts: [ServiceIdentifier: ServiceAccount]
+    public var serviceAccounts: [ServiceIndex: ServiceAccount]
 
     // η: The eηtropy accumulator and epochal raηdomness.
     public var entropyPool: EntropyPool
@@ -105,7 +105,7 @@ public struct State: Sendable {
         >,
         lastBlock: BlockRef,
         safroleState: SafroleState,
-        serviceAccounts: [ServiceIdentifier: ServiceAccount],
+        serviceAccounts: [ServiceIndex: ServiceAccount],
         entropyPool: EntropyPool,
         validatorQueue: ConfigFixedSizeArray<
             ValidatorKey, ProtocolConfig.TotalNumberOfValidators
@@ -192,7 +192,7 @@ extension State: Codable {
             ),
             lastBlock: container.decode(BlockRef.self, forKey: .lastBlock),
             safroleState: container.decode(SafroleState.self, forKey: .safroleState),
-            serviceAccounts: container.decode([ServiceIdentifier: ServiceAccount].self, forKey: .serviceAccounts),
+            serviceAccounts: container.decode([ServiceIndex: ServiceAccount].self, forKey: .serviceAccounts),
             entropyPool: container.decode(EntropyPool.self, forKey: .entropyPool),
             validatorQueue: container.decode(
                 ConfigFixedSizeArray<
@@ -296,9 +296,9 @@ extension State: Dummy {
                 defaultValue: ConfigFixedSizeArray(config: config, defaultValue: Data32())
             ),
             privilegedServiceIndices: PrivilegedServiceIndices(
-                empower: ServiceIdentifier(),
-                assign: ServiceIdentifier(),
-                designate: ServiceIdentifier()
+                empower: ServiceIndex(),
+                assign: ServiceIndex(),
+                designate: ServiceIndex()
             ),
             judgements: JudgementsState.dummy(config: config),
             activityStatistics: ValidatorActivityStatistics.dummy(config: config)

@@ -4,8 +4,11 @@ import Utils
 // at the point that the report’s corresponding work-package was evaluated.
 public struct RefinementContext: Sendable, Equatable, Codable {
     public struct Anchor: Sendable, Equatable, Codable {
+        // a
         public var headerHash: Data32
+        // s
         public var stateRoot: Data32
+        // b
         public var beefyRoot: Data32
 
         public init(
@@ -20,7 +23,9 @@ public struct RefinementContext: Sendable, Equatable, Codable {
     }
 
     public struct LokupAnchor: Sendable, Equatable, Codable {
+        // l
         public var headerHash: Data32
+        // t
         public var timeslot: TimeslotIndex
 
         public init(
@@ -36,6 +41,7 @@ public struct RefinementContext: Sendable, Equatable, Codable {
 
     public var lokupAnchor: LokupAnchor
 
+    // p
     public var prerequistieWorkPackage: Data32?
 
     public init(anchor: Anchor, lokupAnchor: LokupAnchor, prerequistieWorkPackage: Data32?) {

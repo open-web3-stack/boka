@@ -1,11 +1,11 @@
-public enum WorkResultError: Error, CaseIterable {
+public enum WorkResultError1: Error, CaseIterable {
     case outofGas
     case panic
     case invalidCode
     case codeTooLarge // code larger than MaxServiceCodeSize
 }
 
-extension WorkResultError: Codable {
+extension WorkResultError1: Codable {
     enum CodingKeys: String, CodingKey {
         case outofGas
         case panic

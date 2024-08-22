@@ -74,8 +74,11 @@ public struct ExtrinsicDisputes: Sendable, Equatable, Codable {
         }
     }
 
+    // v
     public var verdicts: [VerdictItem]
+    // c
     public var culprits: [CulpritItem]
+    // f
     public var faults: [FaultItem]
 
     public init(
