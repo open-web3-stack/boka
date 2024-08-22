@@ -12,3 +12,8 @@ public enum ExitReason {
     case hostCall(UInt32)
     case pageFault(UInt32)
 }
+
+public enum ExecOutcome {
+    case continued // continue is a reserved keyword
+    case exit(ExitReason)
+}

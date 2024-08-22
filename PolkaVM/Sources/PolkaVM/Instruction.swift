@@ -6,27 +6,27 @@ public protocol Instruction {
     init(data: Data) throws
 
     func gasCost() -> UInt64
-    func updatePC(state: VMState, skip: UInt32) -> ExitReason?
+    func updatePC(state: VMState, skip: UInt32) -> ExecOutcome
 
     // protected method
-    func _executeImpl(state: VMState) throws -> ExitReason?
+    func _executeImpl(state: VMState) throws -> ExecOutcome
 }
 
 extension Instruction {
-    public func execute(state: VMState, skip: UInt32) -> ExitReason? {
+    public func execute(state: VMState, skip: UInt32) -> ExecOutcome {
         state.consumeGas(gasCost())
         do {
             let execRes = try _executeImpl(state: state)
-            if execRes != nil {
+            if case .exit = execRes {
                 return execRes
             }
             return updatePC(state: state, skip: skip)
         } catch let e as Memory.Error {
-            return .pageFault(e.address)
+            return .exit(.pageFault(e.address))
         } catch {
             // other unknown errors
             // TODO: log details
-            return .panic(.trap)
+            return .exit(.panic(.trap))
         }
     }
 
@@ -34,8 +34,8 @@ extension Instruction {
         1
     }
 
-    public func updatePC(state: VMState, skip: UInt32) -> ExitReason? {
+    public func updatePC(state: VMState, skip: UInt32) -> ExecOutcome {
         state.increasePC(skip + 1)
-        return nil
+        return .continued
     }
 }
