@@ -22,6 +22,8 @@ public class ProgramCode {
     public let code: Data
     private let bitmask: Data
 
+    public let basicBlockIndices: Set<UInt32>
+
     public init(_ blob: Data) throws(Error) {
         self.blob = blob
 
@@ -61,6 +63,8 @@ public class ProgramCode {
         }
 
         bitmask = blob[codeEndIndex ..< slice.endIndex]
+
+        basicBlockIndices = ProgramCode.getBasicBlockIndices(code: code, bitmask: bitmask)
     }
 
     public static func skip(start: UInt32, bitmask: Data) -> UInt32? {
@@ -90,6 +94,23 @@ public class ProgramCode {
 
     public func skip(_ start: UInt32) -> UInt32? {
         ProgramCode.skip(start: start, bitmask: bitmask)
+    }
+
+    /// traverse the program code and collect basic block indices
+    private static func getBasicBlockIndices(code: Data, bitmask: Data) -> Set<UInt32> {
+        var res: Set<UInt32> = []
+        var i = UInt32(code.startIndex)
+        while i < code.endIndex {
+            let opcode = code[Int(i)]
+            if BASIC_BLOCK_INSTRUCTIONS.contains(opcode) {
+                res.insert(i)
+            }
+            guard let skip = ProgramCode.skip(start: i, bitmask: bitmask) else {
+                break
+            }
+            i += skip + 1
+        }
+        return res
     }
 }
 
