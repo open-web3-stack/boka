@@ -1,4 +1,5 @@
 // TODO: add tests
+// TODO: consider using a circular buffer instead of a regular array to reduce memory usage
 
 public enum ConfigLimitedSizeArrayError: Swift.Error {
     case tooManyElements
@@ -151,6 +152,14 @@ extension ConfigLimitedSizeArray {
     public mutating func append(_ newElement: T) throws(ConfigLimitedSizeArrayError) {
         array.append(newElement)
         try validateThrowing()
+    }
+
+    // append element and pop the first element if needed
+    public mutating func safeAppend(_ newElement: T) {
+        if array.count == maxLength {
+            array.removeFirst()
+        }
+        array.append(newElement)
     }
 
     public mutating func insert(_ newElement: T, at i: Int) throws(ConfigLimitedSizeArrayError) {

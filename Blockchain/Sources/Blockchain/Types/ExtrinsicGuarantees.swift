@@ -1,8 +1,11 @@
 import Utils
 
+// EG
 public struct ExtrinsicGuarantees: Sendable, Equatable, Codable {
     public struct IndexAndSignature: Sendable, Equatable, Codable {
+        // v
         public var index: ValidatorIndex
+        // s
         public var signature: Ed25519Signature
 
         public init(
@@ -15,8 +18,11 @@ public struct ExtrinsicGuarantees: Sendable, Equatable, Codable {
     }
 
     public struct GuaranteeItem: Sendable, Equatable, Codable {
+        // w
         public var workReport: WorkReport
+        // t
         public var timeslot: TimeslotIndex
+        // a
         public var credential: LimitedSizeArray<
             IndexAndSignature,
             ConstInt2,
