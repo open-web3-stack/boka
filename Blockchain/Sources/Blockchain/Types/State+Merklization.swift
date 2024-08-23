@@ -98,12 +98,12 @@ extension State {
         let encoder = JamEncoder(data)
         for item in recentHistory.items {
             try encoder.encode(item.headerHash)
-            try encoder.encode(blake2b256(JamEncoder.encode(item.mmrRoots)))
+            try encoder.encode(JamEncoder.encode(item.mmrRoots).blake2b256hash())
             try encoder.encode(item.stateRoot)
             try encoder.encode(item.workReportHashes)
         }
 
-        return try blake2b256(encoder.data).data
+        return encoder.data.blake2b256hash().data
     }
 
     private func encode(_ account: ServiceAccount) throws -> Data {

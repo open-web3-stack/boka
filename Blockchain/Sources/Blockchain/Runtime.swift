@@ -7,7 +7,7 @@ public final class Runtime {
         case safroleError(SafroleError)
         case invalidTimeslot
         case invalidReportAuthorizer
-        case unableToComputeExtrinsicHash(any Swift.Error)
+        case encodeError(any Swift.Error)
         case invalidExtrinsicHash
         case invalidParentHash
         case invalidHeaderStateRoot
@@ -39,8 +39,8 @@ public final class Runtime {
             throw Error.invalidHeaderStateRoot
         }
 
-        let expectedExtrinsicHash = try Result { try blake2b256(JamEncoder.encode(block.extrinsic)) }
-            .mapError(Error.unableToComputeExtrinsicHash).get()
+        let expectedExtrinsicHash = try Result { try JamEncoder.encode(block.extrinsic).blake2b256hash() }
+            .mapError(Error.encodeError).get()
 
         guard block.header.extrinsicsHash == expectedExtrinsicHash else {
             throw Error.invalidExtrinsicHash

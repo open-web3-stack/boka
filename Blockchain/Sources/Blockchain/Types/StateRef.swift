@@ -1,7 +1,7 @@
 import TracingUtils
 import Utils
 
-let logger = Logger(label: "StateRef")
+private let logger = Logger(label: "StateRef")
 
 public final class StateRef: Ref<State>, @unchecked Sendable {
     public required init(_ value: State) {
