@@ -43,7 +43,7 @@ extension State {
 
         res[Self.constructKey(1)] = try JamEncoder.encode(coreAuthorizationPool)
         res[Self.constructKey(2)] = try JamEncoder.encode(authorizationQueue)
-        res[Self.constructKey(3)] = try encode(recentHistory)
+        res[Self.constructKey(3)] = try JamEncoder.encode(recentHistory)
         res[Self.constructKey(4)] = try JamEncoder.encode(safroleState)
         res[Self.constructKey(5)] = try JamEncoder.encode(judgements)
         res[Self.constructKey(6)] = try JamEncoder.encode(entropyPool)
@@ -78,32 +78,6 @@ extension State {
         }
 
         return res
-    }
-
-    private func encode(_ recentHistory: RecentHistory) throws -> Data {
-        // can't just encode RecentHistory directly because the MMR root is hashed
-        // modify the default Encodable means it won't be able to decode the encoded data, which is not what we want
-
-        var data = Data()
-        let capacity = 2 + // length prefix
-            recentHistory.items.count * (32 * 3 + 2) + // headerHash, mmrRoots, stateRoot + workReportHashes length prefix
-            recentHistory.items.reduce(into: 0) { res, item in
-                res += item.workReportHashes.count * 32
-            }
-        data.reserveCapacity(capacity)
-
-        // length prefix
-        data.append(contentsOf: UInt(recentHistory.items.count).encode(method: .variableWidth))
-
-        let encoder = JamEncoder(data)
-        for item in recentHistory.items {
-            try encoder.encode(item.headerHash)
-            try encoder.encode(JamEncoder.encode(item.mmrRoots).blake2b256hash())
-            try encoder.encode(item.stateRoot)
-            try encoder.encode(item.workReportHashes)
-        }
-
-        return encoder.data.blake2b256hash().data
     }
 
     private func encode(_ account: ServiceAccount) throws -> Data {
