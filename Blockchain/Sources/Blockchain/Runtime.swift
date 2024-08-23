@@ -4,7 +4,6 @@ import Utils
 public final class Runtime {
     public enum Error: Swift.Error {
         case safroleError(SafroleError)
-        case invalidValidatorEd25519Key
         case invalidTimeslot
         case invalidReportAuthorizer
         case other(any Swift.Error)
@@ -39,19 +38,14 @@ public final class Runtime {
 
         var newState = prevState.value
 
-        // TODO: update recent history
-
-        let res = newState.updateSafrole(
-            config: config, slot: block.header.timeslotIndex, entropy: newState.entropyPool.t0, extrinsics: block.extrinsic.tickets
-        )
-        switch res {
-        case let .success((state: postState, epochMark: _, ticketsMark: _)):
-            newState.mergeWith(postState: postState)
-        case let .failure(err):
-            throw .safroleError(err)
-        }
-
         do {
+            newState.recentHistory = try updateRecentHistory(block: block, state: prevState)
+
+            let res = try newState.updateSafrole(
+                config: config, slot: block.header.timeslotIndex, entropy: newState.entropyPool.t0, extrinsics: block.extrinsic.tickets
+            )
+            newState.mergeWith(postState: res.state)
+
             newState.coreAuthorizationPool = try updateAuthorizationPool(
                 block: block, state: prevState
             )
@@ -61,6 +55,8 @@ public final class Runtime {
             )
         } catch let error as Error {
             throw error
+        } catch let error as SafroleError {
+            throw .safroleError(error)
         } catch {
             throw .other(error)
         }

@@ -151,15 +151,12 @@ public protocol Safrole {
     > { get }
     var ticketsVerifier: BandersnatchRingVRFRoot { get }
 
-    func updateSafrole(config: ProtocolConfigRef, slot: TimeslotIndex, entropy: Data32, extrinsics: ExtrinsicTickets)
-        -> Result<
-            (
-                state: SafrolePostState,
-                epochMark: EpochMarker?,
-                ticketsMark: ConfigFixedSizeArray<Ticket, ProtocolConfig.EpochLength>?
-            ),
-            SafroleError
-        >
+    func updateSafrole(config: ProtocolConfigRef, slot: TimeslotIndex, entropy: Data32, extrinsics: ExtrinsicTickets) throws(SafroleError)
+        -> (
+            state: SafrolePostState,
+            epochMark: EpochMarker?,
+            ticketsMark: ConfigFixedSizeArray<Ticket, ProtocolConfig.EpochLength>?
+        )
 
     mutating func mergeWith(postState: SafrolePostState)
 }
@@ -210,15 +207,13 @@ func pickFallbackValidators(
 }
 
 extension Safrole {
-    public func updateSafrole(config: ProtocolConfigRef, slot: TimeslotIndex, entropy: Data32, extrinsics: ExtrinsicTickets)
-        -> Result<
-            (
-                state: SafrolePostState,
-                epochMark: EpochMarker?,
-                ticketsMark: ConfigFixedSizeArray<Ticket, ProtocolConfig.EpochLength>?
-            ),
-            SafroleError
-        >
+    public func updateSafrole(config: ProtocolConfigRef, slot: TimeslotIndex, entropy: Data32,
+                              extrinsics: ExtrinsicTickets) throws(SafroleError)
+        -> (
+            state: SafrolePostState,
+            epochMark: EpochMarker?,
+            ticketsMark: ConfigFixedSizeArray<Ticket, ProtocolConfig.EpochLength>?
+        )
     {
         // E
         let epochLength = UInt32(config.value.epochLength)
@@ -235,16 +230,16 @@ extension Safrole {
         let isEpochChange = currentEpoch != newEpoch
 
         guard slot > timeslot else {
-            return .failure(.invalidTimeslot)
+            throw .invalidTimeslot
         }
 
         if newPhase < ticketSubmissionEndSlot {
             guard extrinsics.tickets.count <= config.value.maxTicketsPerExtrinsic else {
-                return .failure(.tooManyExtrinsics)
+                throw .tooManyExtrinsics
             }
         } else {
             guard extrinsics.tickets.isEmpty else {
-                return .failure(.extrinsicsNotAllowed)
+                throw .extrinsicsNotAllowed
             }
         }
 
@@ -313,12 +308,12 @@ extension Safrole {
 
             let newTickets = try extrinsics.getTickets(verifier: verifier, entropy: newEntropyPool.2)
             guard newTickets.isSorted() else {
-                return .failure(.extrinsicsNotSorted)
+                throw SafroleError.extrinsicsNotSorted
             }
 
             for ticket in newTickets {
                 guard ticket.attempt < config.value.ticketEntriesPerValidator else {
-                    return .failure(.extrinsicsTooManyEntry)
+                    throw SafroleError.extrinsicsTooManyEntry
                 }
             }
 
@@ -364,17 +359,17 @@ extension Safrole {
                 ticketsOrKeys: newTicketsOrKeys,
                 ticketsVerifier: newTicketsVerifier
             )
-            return .success((state: postState, epochMark: epochMark, ticketsMark: ticketsMark))
+            return (state: postState, epochMark: epochMark, ticketsMark: ticketsMark)
         } catch let e as SafroleError {
-            return .failure(e)
+            throw e
         } catch let e as BandersnatchError {
-            return .failure(.bandersnatchError(e))
+            throw .bandersnatchError(e)
         } catch Blake2Error.hashingError {
-            return .failure(.hashingError)
+            throw .hashingError
         } catch let e as DecodingError {
-            return .failure(.decodingError(e))
+            throw .decodingError(e)
         } catch {
-            return .failure(.other(error))
+            throw .other(error)
         }
     }
 }
