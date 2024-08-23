@@ -186,9 +186,10 @@ func generateFallbackIndices(entropy: Data32, count: Int, length: Int) throws ->
     try (0 ..< count).map { i throws in
         // convert i to little endian
         let bytes = UInt32(i).encode()
-        let data = entropy.data + Data(bytes)
-        // TODO: use blake256 update directly to be more efficient
-        let hash = try blake2b256(data)
+        var hasher = Blake2b256()
+        hasher.update(entropy.data)
+        hasher.update(Data(bytes))
+        let hash = hasher.finalize()
         let hash4 = hash.data[0 ..< 4]
         let idx: UInt32 = hash4.withUnsafeBytes { ptr in
             ptr.loadUnaligned(as: UInt32.self)
@@ -256,7 +257,10 @@ extension Safrole {
                 )
                 : (nextValidators, currentValidators, previousValidators, ticketsVerifier)
 
-            let newRandomness = try blake2b256(entropyPool.t0.data + entropy.data)
+            var hasher = Blake2b256()
+            hasher.update(entropyPool.t0.data)
+            hasher.update(entropy.data)
+            let newRandomness = hasher.finalize()
 
             let newEntropyPool = isEpochChange
                 ? (newRandomness, entropyPool.t0, entropyPool.t1, entropyPool.t2)

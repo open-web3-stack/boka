@@ -1,5 +1,8 @@
 import Codec
+import TracingUtils
 import Utils
+
+private let logger = Logger(label: "Header")
 
 public struct Header: Sendable, Equatable, Codable {
     public struct Unsigned: Sendable, Equatable, Codable {
@@ -122,9 +125,10 @@ extension Header: Dummy {
 extension Header {
     public func hash() -> Data32 {
         do {
-            return try blake2b256(JamEncoder.encode(self))
-        } catch let e {
-            fatalError("Failed to hash header: \(e)")
+            return try JamEncoder.encode(self).blake2b256hash()
+        } catch {
+            logger.error("Failed to encode header, returning empty hash", metadata: ["error": "\(error)"])
+            return Data32()
         }
     }
 
