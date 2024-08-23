@@ -9,7 +9,7 @@ import Testing
         let expected = Data(
             fromHexString: "928b20366943e2afd11ebc0eae2e53a93bf177a4fcf35bcc64d503704e65e202"
         )
-        let actual = testData.hash(using: Blake2b256.self)
+        let actual = testData.blake2b256hash()
         #expect(expected == actual.data)
     }
 }
