@@ -70,7 +70,7 @@ extension InMemoryDataProvider: BlockchainDataProvider {
 
     public func add(block: BlockRef) {
         blockByHash[block.hash] = block
-        hashByTimeslot[block.header.timeslotIndex, default: Set()].insert(block.hash)
+        hashByTimeslot[block.header.timeslot, default: Set()].insert(block.hash)
     }
 
     public func setFinalizedHead(hash: Data32) {
@@ -85,7 +85,7 @@ extension InMemoryDataProvider: BlockchainDataProvider {
     }
 
     public func remove(hash: Data32) {
-        let timeslot = blockByHash[hash]?.header.timeslotIndex ?? stateByBlockHash[hash]?.value.timeslot
+        let timeslot = blockByHash[hash]?.header.timeslot ?? stateByBlockHash[hash]?.value.timeslot
         stateByBlockHash.removeValue(forKey: hash)
 
         if let timeslot {
