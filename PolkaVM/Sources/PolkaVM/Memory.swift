@@ -6,7 +6,7 @@ public class Memory {
         case notWritable(UInt32)
         case outOfMemory(UInt32)
 
-        public var address: UInt32? {
+        public var address: UInt32 {
             switch self {
             case let .pageFault(address):
                 address
