@@ -134,12 +134,14 @@ struct SafroleTests {
         let config = variant.config
         let testcase = try JamDecoder.decode(SafroleTestcase.self, from: input.data, withConfig: config)
 
-        let result = testcase.preState.updateSafrole(
-            config: config,
-            slot: testcase.input.slot,
-            entropy: testcase.input.entropy,
-            extrinsics: testcase.input.extrinsics
-        )
+        let result = Result {
+            try testcase.preState.updateSafrole(
+                config: config,
+                slot: testcase.input.slot,
+                entropy: testcase.input.entropy,
+                extrinsics: testcase.input.extrinsics
+            )
+        }
         switch result {
         case let .success((state, epochMark, ticketsMark)):
             switch testcase.output {

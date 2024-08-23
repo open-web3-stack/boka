@@ -1,10 +1,24 @@
 import Foundation
 
 public class JamEncoder {
+    private let encoder: EncodeContext
+
+    public init(_ data: Data = Data()) {
+        encoder = EncodeContext(data)
+    }
+
+    public func encode(_ value: some Encodable) throws {
+        try encoder.encode(value)
+    }
+
     public static func encode(_ value: some Encodable) throws -> Data {
-        let context = EncodeContext()
-        try context.encode(value)
-        return context.data
+        let encoder = JamEncoder()
+        try encoder.encode(value)
+        return encoder.data
+    }
+
+    public var data: Data {
+        encoder.data
     }
 }
 
@@ -14,7 +28,11 @@ private class EncodeContext: Encoder {
         .isJamCodec: true,
     ]
 
-    var data = Data()
+    var data: Data
+
+    init(_ data: Data) {
+        self.data = data
+    }
 
     func container<Key>(keyedBy _: Key.Type) -> KeyedEncodingContainer<Key> where Key: CodingKey {
         KeyedEncodingContainer(JamKeyedEncodingContainer<Key>(codingPath: codingPath, encoder: self))

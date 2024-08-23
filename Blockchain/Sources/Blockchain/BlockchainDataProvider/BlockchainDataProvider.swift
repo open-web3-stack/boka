@@ -1,38 +1,37 @@
 import Utils
 
 public enum BlockchainDataProviderError: Error {
-    case unknownHash
+    case noData
 }
 
 public protocol BlockchainDataProvider: Sendable {
-    func hasHeader(hash: Data32) async throws -> Bool
+    func hasBlock(hash: Data32) async throws -> Bool
+    func hasState(hash: Data32) async throws -> Bool
     func isHead(hash: Data32) async throws -> Bool
 
+    /// throw BlockchainDataProviderError.noData if not found
     func getHeader(hash: Data32) async throws -> HeaderRef
+
+    /// throw BlockchainDataProviderError.noData if not found
     func getBlock(hash: Data32) async throws -> BlockRef
+
+    /// throw BlockchainDataProviderError.noData if not found
     func getState(hash: Data32) async throws -> StateRef
+
+    /// throw BlockchainDataProviderError.noData if not found
     func getFinalizedHead() async throws -> Data32
-    func getHeads() async throws -> [Data32]
-    func getBlockHash(index: TimeslotIndex) async throws -> [Data32]
+    func getHeads() async throws -> Set<Data32>
 
-    func add(state: StateRef, isHead: Bool) async throws
+    /// return empty set if not found
+    func getBlockHash(byTimeslot timeslot: TimeslotIndex) async throws -> Set<Data32>
+
+    func add(block: BlockRef) async throws
+    func add(state: StateRef) async throws
     func setFinalizedHead(hash: Data32) async throws
-    // remove header, block and state
+
+    /// throw BlockchainDataProviderError.noData if parent is not a head
+    func updateHead(hash: Data32, parent: Data32) async throws
+
+    /// remove header, block and state
     func remove(hash: Data32) async throws
-
-    // protected method
-    func _updateHeadNoCheck(hash: Data32, parent: Data32) async throws
-}
-
-extension BlockchainDataProvider {
-    public func updateHead(hash: Data32, parent: Data32) async throws {
-        try await debugCheck(await hasHeader(hash: hash))
-        try await debugCheck(await hasHeader(hash: parent))
-
-        try await _updateHeadNoCheck(hash: hash, parent: parent)
-    }
-
-    public func add(state: StateRef) async throws {
-        try await add(state: state, isHead: false)
-    }
 }
