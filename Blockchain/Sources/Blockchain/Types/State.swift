@@ -152,8 +152,6 @@ extension State {
     }
 }
 
-public typealias StateRef = Ref<State>
-
 extension State: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> State {
