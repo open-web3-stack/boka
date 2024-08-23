@@ -31,6 +31,7 @@ public final class Runtime {
 
         // TODO: validate block.header.seal
         // TODO: abstract input validation logic from Safrole state update function and call it here
+        // TODO: validate other things
     }
 
     public func apply(block: BlockRef, state prevState: StateRef, context: ApplyContext) throws(Error) -> StateRef {
@@ -67,6 +68,27 @@ public final class Runtime {
         return StateRef(newState)
     }
 
+    public func updateRecentHistory(block: BlockRef, state: StateRef) throws -> RecentHistory {
+        var history = state.value.recentHistory
+        if history.items.count >= 0 { // if this is not block #0
+            // write the state root of last block
+            history.items[history.items.endIndex - 1].stateRoot = state.stateRoot
+        }
+
+        let workReportHashes = block.extrinsic.reports.guarantees.map(\.workReport.packageSpecification.workPackageHash)
+
+        let newItem = try RecentHistory.HistoryItem(
+            headerHash: block.header.parentHash,
+            mmrRoots: [], // TODO: update MMR roots
+            stateRoot: Data32(), // empty and will be updated upon next block
+            workReportHashes: ConfigLimitedSizeArray(config: config, array: workReportHashes)
+        )
+
+        history.items.safeAppend(newItem)
+
+        return history
+    }
+
     // TODO: add tests
     public func updateAuthorizationPool(block: BlockRef, state: StateRef) throws -> ConfigFixedSizeArray<
         ConfigLimitedSizeArray<
@@ -97,14 +119,7 @@ public final class Runtime {
             }
 
             // add new item from queue
-            if corePool.count < corePool.maxLength {
-                try corePool.append(newItem)
-            } else {
-                try corePool.mutate {
-                    $0.remove(at: 0)
-                    $0.append(newItem)
-                }
-            }
+            corePool.safeAppend(newItem)
             pool[coreIndex] = corePool
         }
 
