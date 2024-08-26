@@ -1,8 +1,12 @@
 public struct Registers: Equatable {
     public struct Index {
         public let value: UInt8
-        public init(_ value: UInt8) {
-            self.value = min(value & 0b1111, 12)
+        public init(ra: UInt8) {
+            value = min(ra & 0b1111, 12)
+        }
+
+        public init(rb: UInt8) {
+            value = min(rb >> 4, 12)
         }
     }
 

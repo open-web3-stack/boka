@@ -4,12 +4,15 @@ public class Memory {
     public enum Error: Swift.Error {
         case pageFault(UInt32)
         case notWritable(UInt32)
+        case outOfMemory(UInt32)
 
         public var address: UInt32 {
             switch self {
             case let .pageFault(address):
                 address
             case let .notWritable(address):
+                address
+            case let .outOfMemory(address):
                 address
             }
         }
@@ -128,6 +131,27 @@ public class Memory {
             }
         }
         throw Error.notWritable(address)
+    }
+
+    public func sbrk(_ increment: UInt32) throws -> UInt32 {
+        // TODO: update after memory layout details are implemented
+        var curHeapEnd: UInt32 = 0
+
+        if let lastChunk = chunks.last {
+            curHeapEnd = lastChunk.address + UInt32(lastChunk.data.count)
+        }
+
+        for page in pageMap {
+            let pageEnd = page.address + page.length
+            if page.writable, curHeapEnd >= page.address, curHeapEnd + increment < pageEnd {
+                let newChunk = (address: curHeapEnd, data: Data(repeating: 0, count: Int(increment)))
+                chunks.append(newChunk)
+
+                return curHeapEnd
+            }
+        }
+
+        throw Error.outOfMemory(curHeapEnd)
     }
 }
 
