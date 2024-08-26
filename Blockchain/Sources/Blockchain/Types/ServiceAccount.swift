@@ -72,8 +72,9 @@ extension ServiceAccount {
 
     // t: the minimum, or threshold, balance needed for any given service account in terms of its storage footprint
     public func thresholdBalance(config: ProtocolConfigRef) -> Balance {
-        Balance(config.value.serviceMinBalance) +
-            Balance(config.value.additionalMinBalancePerStateItem) * Balance(itemsCount) +
-            Balance(config.value.additionalMinBalancePerStateByte) * Balance(totalByteLength)
+        let base = Balance(config.value.serviceMinBalance)
+        let items = Balance(config.value.additionalMinBalancePerStateItem) * Balance(itemsCount)
+        let bytes = Balance(config.value.additionalMinBalancePerStateByte) * Balance(totalByteLength)
+        return base + items + bytes
     }
 }
