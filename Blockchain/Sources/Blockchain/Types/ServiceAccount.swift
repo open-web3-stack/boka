@@ -58,3 +58,22 @@ extension ServiceAccount: Dummy {
         )
     }
 }
+
+extension ServiceAccount {
+    // i: number of items in storage
+    public var itemsCount: UInt32 {
+        UInt32(2 * preimageInfos.count + storage.count)
+    }
+
+    // l: the total number of octets used in storage
+    public var totalByteLength: UInt64 {
+        preimageInfos.keys.reduce(into: 0) { $0 += 81 + $1.length } + storage.values.reduce(into: 0) { $0 += 32 + $1.count }
+    }
+
+    // t: the minimum, or threshold, balance needed for any given service account in terms of its storage footprint
+    public func thresholdBalance(config: ProtocolConfigRef) -> Balances {
+        Balance(config.value.serviceMinBalance) +
+            Balance(config.value.additionalMinBalancePerStateItem) * Balance(itemsCount) +
+            Balance(config.value.additionalMinBalancePerStateByte) * Balance(totalByteLength)
+    }
+}
