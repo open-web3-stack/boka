@@ -69,7 +69,7 @@ extension ServiceAccount {
     public var totalByteLength: UInt64 {
         let preimageInfosBytes = preimageInfos.keys.reduce(into: 0) { $0 += 81 + $1.length }
         let storageBytes = storage.values.reduce(into: 0) { $0 += 32 + $1.count }
-        return preimageInfosBytes + storageBytes
+        return UInt64(preimageInfosBytes) + UInt64(storageBytes)
     }
 
     // t: the minimum, or threshold, balance needed for any given service account in terms of its storage footprint
