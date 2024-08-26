@@ -38,7 +38,7 @@ public struct State: Sendable, Equatable, Codable {
     >
 
     // β: Information on the most recent βlocks.
-    public var lastBlock: BlockRef
+    public var recentHistory: RecentHistory
 
     // γ: State concerning Safrole.
     public var safroleState: SafroleState
@@ -100,7 +100,7 @@ public struct State: Sendable, Equatable, Codable {
             >,
             ProtocolConfig.TotalNumberOfCores
         >,
-        lastBlock: BlockRef,
+        recentHistory: RecentHistory,
         safroleState: SafroleState,
         serviceAccounts: [ServiceIndex: ServiceAccount],
         entropyPool: EntropyPool,
@@ -130,7 +130,7 @@ public struct State: Sendable, Equatable, Codable {
         activityStatistics: ValidatorActivityStatistics
     ) {
         self.coreAuthorizationPool = coreAuthorizationPool
-        self.lastBlock = lastBlock
+        self.recentHistory = recentHistory
         self.safroleState = safroleState
         self.serviceAccounts = serviceAccounts
         self.entropyPool = entropyPool
@@ -146,14 +146,18 @@ public struct State: Sendable, Equatable, Codable {
     }
 }
 
-public typealias StateRef = Ref<State>
+extension State {
+    public var lastBlockHash: Data32 {
+        recentHistory.items.last.map(\.headerHash) ?? Data32()
+    }
+}
 
 extension State: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> State {
         try! State(
             coreAuthorizationPool: ConfigFixedSizeArray(config: config, defaultValue: ConfigLimitedSizeArray(config: config)),
-            lastBlock: BlockRef.dummy(config: config),
+            recentHistory: RecentHistory.dummy(config: config),
             safroleState: SafroleState.dummy(config: config),
             serviceAccounts: [:],
             entropyPool: EntropyPool((Data32(), Data32(), Data32(), Data32())),

@@ -1,5 +1,6 @@
 import Utils
 
+// TODO: figure out how to deal with orders for items in Set
 public struct JudgementsState: Sendable, Equatable, Codable {
     // ψg: Work-reports judged to be correct
     public var goodSet: Set<Data32>

@@ -1,5 +1,8 @@
 import Codec
+import TracingUtils
 import Utils
+
+private let logger = Logger(label: "Header")
 
 public struct Header: Sendable, Equatable, Codable {
     public struct Unsigned: Sendable, Equatable, Codable {
@@ -10,10 +13,10 @@ public struct Header: Sendable, Equatable, Codable {
         public var priorStateRoot: Data32 // state root of the after parent block execution
 
         // Hx: extrinsic hash
-        public var extrinsicsRoot: Data32
+        public var extrinsicsHash: Data32
 
         // Ht: timeslot index
-        public var timeslotIndex: TimeslotIndex
+        public var timeslot: TimeslotIndex
 
         // He: the epoch
         // the header’s epoch marker He is either empty or, if the block is the first in a new epoch,
@@ -47,8 +50,8 @@ public struct Header: Sendable, Equatable, Codable {
         public init(
             parentHash: Data32,
             priorStateRoot: Data32,
-            extrinsicsRoot: Data32,
-            timeslotIndex: TimeslotIndex,
+            extrinsicsHash: Data32,
+            timeslot: TimeslotIndex,
             epoch: EpochMarker?,
             winningTickets: ConfigFixedSizeArray<
                 Ticket,
@@ -61,8 +64,8 @@ public struct Header: Sendable, Equatable, Codable {
         ) {
             self.parentHash = parentHash
             self.priorStateRoot = priorStateRoot
-            self.extrinsicsRoot = extrinsicsRoot
-            self.timeslotIndex = timeslotIndex
+            self.extrinsicsHash = extrinsicsHash
+            self.timeslot = timeslot
             self.epoch = epoch
             self.winningTickets = winningTickets
             self.judgementsMarkers = judgementsMarkers
@@ -97,8 +100,8 @@ extension Header.Unsigned: Dummy {
         Header.Unsigned(
             parentHash: Data32(),
             priorStateRoot: Data32(),
-            extrinsicsRoot: Data32(),
-            timeslotIndex: 0,
+            extrinsicsHash: Data32(),
+            timeslot: 0,
             epoch: nil,
             winningTickets: nil,
             judgementsMarkers: [],
@@ -122,16 +125,17 @@ extension Header: Dummy {
 extension Header {
     public func hash() -> Data32 {
         do {
-            return try blake2b256(JamEncoder.encode(self))
-        } catch let e {
-            fatalError("Failed to hash header: \(e)")
+            return try JamEncoder.encode(self).blake2b256hash()
+        } catch {
+            logger.error("Failed to encode header, returning empty hash", metadata: ["error": "\(error)"])
+            return Data32()
         }
     }
 
     public var parentHash: Data32 { unsigned.parentHash }
     public var priorStateRoot: Data32 { unsigned.priorStateRoot }
-    public var extrinsicsRoot: Data32 { unsigned.extrinsicsRoot }
-    public var timeslotIndex: TimeslotIndex { unsigned.timeslotIndex }
+    public var extrinsicsHash: Data32 { unsigned.extrinsicsHash }
+    public var timeslot: TimeslotIndex { unsigned.timeslot }
     public var epoch: EpochMarker? { unsigned.epoch }
     public var winningTickets: ConfigFixedSizeArray<Ticket, ProtocolConfig.EpochLength>? { unsigned.winningTickets }
     public var judgementsMarkers: [Data32] { unsigned.judgementsMarkers }

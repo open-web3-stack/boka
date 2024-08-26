@@ -1,12 +1,18 @@
+import Codec
 import Utils
 
 // the STF
 public final class Runtime {
     public enum Error: Swift.Error {
         case safroleError(SafroleError)
-        case invalidValidatorEd25519Key
         case invalidTimeslot
         case invalidReportAuthorizer
+        case encodeError(any Swift.Error)
+        case invalidExtrinsicHash
+        case invalidParentHash
+        case invalidHeaderStateRoot
+        case invalidHeaderEpochMarker
+        case invalidHeaderWinningTickets
         case other(any Swift.Error)
     }
 
@@ -24,32 +30,64 @@ public final class Runtime {
         self.config = config
     }
 
-    public func validate(block: BlockRef, state _: StateRef, context: ApplyContext) throws(Error) {
-        guard context.timeslot >= block.header.timeslotIndex else {
+    public func validateHeader(block: BlockRef, state: StateRef, context: ApplyContext) throws(Error) {
+        guard block.header.parentHash == state.value.lastBlockHash else {
+            throw Error.invalidParentHash
+        }
+
+        guard block.header.priorStateRoot == state.stateRoot else {
+            throw Error.invalidHeaderStateRoot
+        }
+
+        let expectedExtrinsicHash = try Result { try JamEncoder.encode(block.extrinsic).blake2b256hash() }
+            .mapError(Error.encodeError).get()
+
+        guard block.header.extrinsicsHash == expectedExtrinsicHash else {
+            throw Error.invalidExtrinsicHash
+        }
+
+        guard block.header.timeslot <= context.timeslot else {
             throw Error.invalidTimeslot
         }
 
+        // epoch is validated at apply time
+
+        // winning tickets is validated at apply time
+
+        // TODO: validate judgementsMarkers
+        // TODO: validate offendersMarkers
+
         // TODO: validate block.header.seal
+    }
+
+    public func validate(block: BlockRef, state: StateRef, context: ApplyContext) throws(Error) {
+        try validateHeader(block: block, state: state, context: context)
+
         // TODO: abstract input validation logic from Safrole state update function and call it here
+        // TODO: validate other things
     }
 
     public func apply(block: BlockRef, state prevState: StateRef, context: ApplyContext) throws(Error) -> StateRef {
         try validate(block: block, state: prevState, context: context)
 
         var newState = prevState.value
-        newState.lastBlock = block
-
-        let res = newState.updateSafrole(
-            config: config, slot: block.header.timeslotIndex, entropy: newState.entropyPool.t0, extrinsics: block.extrinsic.tickets
-        )
-        switch res {
-        case let .success((state: postState, epochMark: _, ticketsMark: _)):
-            newState.mergeWith(postState: postState)
-        case let .failure(err):
-            throw .safroleError(err)
-        }
 
         do {
+            newState.recentHistory = try updateRecentHistory(block: block, state: prevState)
+
+            let safroleResult = try newState.updateSafrole(
+                config: config, slot: block.header.timeslot, entropy: newState.entropyPool.t0, extrinsics: block.extrinsic.tickets
+            )
+            newState.mergeWith(postState: safroleResult.state)
+
+            guard safroleResult.epochMark == block.header.epoch else {
+                throw Error.invalidHeaderEpochMarker
+            }
+
+            guard safroleResult.ticketsMark == block.header.winningTickets else {
+                throw Error.invalidHeaderWinningTickets
+            }
+
             newState.coreAuthorizationPool = try updateAuthorizationPool(
                 block: block, state: prevState
             )
@@ -59,11 +97,34 @@ public final class Runtime {
             )
         } catch let error as Error {
             throw error
+        } catch let error as SafroleError {
+            throw .safroleError(error)
         } catch {
             throw .other(error)
         }
 
         return StateRef(newState)
+    }
+
+    public func updateRecentHistory(block: BlockRef, state: StateRef) throws -> RecentHistory {
+        var history = state.value.recentHistory
+        if history.items.count >= 0 { // if this is not block #0
+            // write the state root of last block
+            history.items[history.items.endIndex - 1].stateRoot = state.stateRoot
+        }
+
+        let workReportHashes = block.extrinsic.reports.guarantees.map(\.workReport.packageSpecification.workPackageHash)
+
+        let newItem = try RecentHistory.HistoryItem(
+            headerHash: block.header.parentHash,
+            mmrRoots: [], // TODO: update MMR roots
+            stateRoot: Data32(), // empty and will be updated upon next block
+            workReportHashes: ConfigLimitedSizeArray(config: config, array: workReportHashes)
+        )
+
+        history.items.safeAppend(newItem)
+
+        return history
     }
 
     // TODO: add tests
@@ -83,7 +144,7 @@ public final class Runtime {
             if coreQueue.count == 0 {
                 continue
             }
-            let newItem = coreQueue[Int(block.header.timeslotIndex) % coreQueue.count]
+            let newItem = coreQueue[Int(block.header.timeslot) % coreQueue.count]
 
             // remove used authorizers from pool
             for report in block.extrinsic.reports.guarantees {
@@ -96,14 +157,7 @@ public final class Runtime {
             }
 
             // add new item from queue
-            if corePool.count < corePool.maxLength {
-                try corePool.append(newItem)
-            } else {
-                try corePool.mutate {
-                    $0.remove(at: 0)
-                    $0.append(newItem)
-                }
-            }
+            corePool.safeAppend(newItem)
             pool[coreIndex] = corePool
         }
 
@@ -114,7 +168,7 @@ public final class Runtime {
     public func updateValidatorActivityStatistics(block: BlockRef, state: StateRef) throws -> ValidatorActivityStatistics {
         let epochLength = UInt32(config.value.epochLength)
         let currentEpoch = state.value.timeslot / epochLength
-        let newEpoch = block.header.timeslotIndex / epochLength
+        let newEpoch = block.header.timeslot / epochLength
         let isEpochChange = currentEpoch != newEpoch
 
         var acc = try isEpochChange
