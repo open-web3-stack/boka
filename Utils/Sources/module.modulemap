@@ -15,5 +15,4 @@ module erasure_coding {
 
 module sha3_iuf {
   header "SHA3IUF/sha3.h"
-  link "SHA3IUF"
 }
