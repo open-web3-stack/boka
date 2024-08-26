@@ -17,7 +17,7 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
     public var codeHash: Data32
 
     // b
-    public var balance: Balances
+    public var balance: Balance
 
     // g
     public var accumlateGasLimit: Gas
@@ -30,7 +30,7 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
         preimages: [Data32: Data],
         preimageInfos: [HashAndLength: LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>],
         codeHash: Data32,
-        balance: Balances,
+        balance: Balance,
         accumlateGasLimit: Gas,
         onTransferGasLimit: Gas
     ) {
@@ -71,7 +71,7 @@ extension ServiceAccount {
     }
 
     // t: the minimum, or threshold, balance needed for any given service account in terms of its storage footprint
-    public func thresholdBalance(config: ProtocolConfigRef) -> Balances {
+    public func thresholdBalance(config: ProtocolConfigRef) -> Balance {
         Balance(config.value.serviceMinBalance) +
             Balance(config.value.additionalMinBalancePerStateItem) * Balance(itemsCount) +
             Balance(config.value.additionalMinBalancePerStateByte) * Balance(totalByteLength)
