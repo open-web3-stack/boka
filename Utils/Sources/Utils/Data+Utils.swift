@@ -29,3 +29,16 @@ extension Data {
         map { String(format: "%02x", $0) }.joined()
     }
 }
+
+extension FixedSizeData {
+    public init?(fromHexString hexString: String) {
+        guard let data = Data(fromHexString: hexString) else {
+            return nil
+        }
+        self.init(data)
+    }
+
+    public func toHexString() -> String {
+        data.toHexString()
+    }
+}
