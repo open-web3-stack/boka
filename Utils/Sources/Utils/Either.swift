@@ -1,13 +1,13 @@
-public enum Either<A, B> {
-    case left(A)
-    case right(B)
+public enum Either<Left, Right> {
+    case left(Left)
+    case right(Right)
 }
 
-extension Either: Equatable where A: Equatable, B: Equatable {}
+extension Either: Equatable where Left: Equatable, Right: Equatable {}
 
-extension Either: Sendable where A: Sendable, B: Sendable {}
+extension Either: Sendable where Left: Sendable, Right: Sendable {}
 
-extension Either: CustomStringConvertible where A: CustomStringConvertible, B: CustomStringConvertible {
+extension Either: CustomStringConvertible where Left: CustomStringConvertible, Right: CustomStringConvertible {
     public var description: String {
         switch self {
         case let .left(a):
@@ -18,7 +18,7 @@ extension Either: CustomStringConvertible where A: CustomStringConvertible, B: C
     }
 }
 
-extension Either: Codable where A: Codable, B: Codable {
+extension Either: Codable where Left: Codable, Right: Codable {
     enum CodingKeys: String, CodingKey {
         case left
         case right
@@ -52,10 +52,10 @@ extension Either: Codable where A: Codable, B: Codable {
             let variant = try container.decode(UInt8.self)
             switch variant {
             case 0:
-                let a = try container.decode(A.self)
+                let a = try container.decode(Left.self)
                 self = .left(a)
             case 1:
-                let b = try container.decode(B.self)
+                let b = try container.decode(Right.self)
                 self = .right(b)
             default:
                 throw DecodingError.dataCorrupted(
@@ -68,10 +68,10 @@ extension Either: Codable where A: Codable, B: Codable {
         } else {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             if container.contains(.left) {
-                let a = try container.decode(A.self, forKey: .left)
+                let a = try container.decode(Left.self, forKey: .left)
                 self = .left(a)
             } else if container.contains(.right) {
-                let b = try container.decode(B.self, forKey: .right)
+                let b = try container.decode(Right.self, forKey: .right)
                 self = .right(b)
             } else {
                 throw DecodingError.dataCorrupted(
