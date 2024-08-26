@@ -85,15 +85,17 @@ public enum Merklization {
     }
 
     // return type should be [Data32] but binaryMerklizeHelper requires [Data]
-    private static func constancyPreprocessor<T: RandomAccessCollection<Data>>(_ nodes: T, hasher: Hashing.Type = Blake2b256.self) -> [Data] {
+    private static func constancyPreprocessor(_ nodes: some RandomAccessCollection<Data>,
+                                              hasher: Hashing.Type = Blake2b256.self) -> [Data]
+    {
         let length = UInt32(nodes.count)
         // find the next power of two using bitwise logic
-        let nextPowerOfTwo = 1 << (32 - length.leadingZeroBitCount)
-        let newLength = nextPowerOfTwo  == length ? length : nextPowerOfTwo * 2
-        var res: [Data32] = []
+        let nextPowerOfTwo = UInt32(1 << (32 - length.leadingZeroBitCount))
+        let newLength = Int(nextPowerOfTwo == length ? length : nextPowerOfTwo * 2)
+        var res: [Data] = []
         res.reserveCapacity(newLength)
         for node in nodes {
-            var hash = hahser.init()
+            var hash = hasher.init()
             hash.update("leaf")
             hash.update(node)
             res.append(hash.finalize().data)
@@ -107,10 +109,11 @@ public enum Merklization {
 
     // constant-depth binary merkle function defined in GP E.1.2
     public static func constantDepthMerklize<T: RandomAccessCollection<Data>>(_ nodes: T, hasher: Hashing.Type = Blake2b256.self) -> Data32
-        where T.Index == Int {
+        where T.Index == Int
+    {
         switch binaryMerklizeHelper(constancyPreprocessor(nodes, hasher: hasher)) {
         case let .left(data):
-            Data32(data)! // TODO somehow improve the typing so force unwrap is not needed
+            Data32(data)! // TODO: somehow improve the typing so force unwrap is not needed
         case let .right(data):
             data
         }
