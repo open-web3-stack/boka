@@ -1,6 +1,6 @@
 import Utils
 
-public typealias Balances = UInt64
+public typealias Balance = UInt64
 public typealias ServiceIndex = UInt32
 public typealias TimeslotIndex = UInt32
 public typealias Gas = UInt64
