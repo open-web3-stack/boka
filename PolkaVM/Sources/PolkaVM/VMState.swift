@@ -45,6 +45,10 @@ public class VMState {
         try memory.write(address: address, values: values)
     }
 
+    public func sbrk(_ increment: UInt32) throws -> UInt32 {
+        try memory.sbrk(increment)
+    }
+
     public func consumeGas(_ amount: UInt64) {
         // TODO: use saturating subtraction
         gas -= Int64(amount)
