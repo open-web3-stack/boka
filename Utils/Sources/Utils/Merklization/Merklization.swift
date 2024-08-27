@@ -7,9 +7,10 @@ public enum Merklization {
         (i + 1) / 2
     }
 
-    private static func binaryMerklizeHelper<T, U>(_ nodes: T,
-                                                   hasher: Hashing.Type = Blake2b256
-                                                       .self) -> MaybeEither<U, Data32>
+    private static func binaryMerklizeHelper<T, U>(
+        _ nodes: T,
+        hasher: Hashing.Type = Blake2b256.self
+    ) -> MaybeEither<U, Data32>
         where T: RandomAccessCollection<U>, T.Index == Int, U: DataPtrRepresentable
     {
         switch nodes.count {
@@ -41,8 +42,12 @@ public enum Merklization {
         }
     }
 
-    private static func traceImpl<T, U>(_ nodes: T, index: T.Index,
-                                        hasher: Hashing.Type, output: (MaybeEither<U, Data32>) -> Void)
+    private static func traceImpl<T, U>(
+        _ nodes: T,
+        index: T.Index,
+        hasher: Hashing.Type,
+        output: (MaybeEither<U, Data32>) -> Void
+    )
         where T: RandomAccessCollection<U>, T.Index == Int, U: DataPtrRepresentable
     {
         if nodes.count == 0 {
@@ -76,8 +81,11 @@ public enum Merklization {
         )
     }
 
-    public static func trace<T, U>(_ nodes: T, index: T.Index,
-                                   hasher: Hashing.Type = Blake2b256.self) -> [Either<U, Data32>]
+    public static func trace<T, U>(
+        _ nodes: T,
+        index: T.Index,
+        hasher: Hashing.Type = Blake2b256.self
+    ) -> [Either<U, Data32>]
         where T: RandomAccessCollection<U>, T.Index == Int, U: DataPtrRepresentable
     {
         var res: [Either<U, Data32>] = []
@@ -85,9 +93,10 @@ public enum Merklization {
         return res
     }
 
-    private static func constancyPreprocessor(_ nodes: some RandomAccessCollection<Data>,
-                                              hasher: Hashing.Type = Blake2b256.self) -> [Data32]
-    {
+    private static func constancyPreprocessor(
+        _ nodes: some RandomAccessCollection<Data>,
+        hasher: Hashing.Type = Blake2b256.self
+    ) -> [Data32] {
         let length = UInt32(nodes.count)
         let newLength = Int(length.nextPowerOfTwo ?? 0)
         var res: [Data32] = []
