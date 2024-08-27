@@ -131,6 +131,8 @@ struct SafroleTests {
     }
 
     func safroleTests(_ input: Testcase, variant: SafroleTestVariants) throws {
+        IntegerCodec.decodeMode = .scale // TODO: remove after JAM test vectors are updated
+
         let config = variant.config
         let testcase = try JamDecoder.decode(SafroleTestcase.self, from: input.data, withConfig: config)
 
@@ -167,15 +169,11 @@ struct SafroleTests {
 
     @Test(arguments: try SafroleTests.loadTests(variant: .tiny))
     func tinyTests(_ testcase: Testcase) throws {
-        withKnownIssue("wait for test vectors to be updated", isIntermittent: true) {
-            try safroleTests(testcase, variant: .tiny)
-        }
+        try safroleTests(testcase, variant: .tiny)
     }
 
     @Test(arguments: try SafroleTests.loadTests(variant: .full))
     func fullTests(_ testcase: Testcase) throws {
-        withKnownIssue("wait for test vectors to be updated", isIntermittent: true) {
-            try safroleTests(testcase, variant: .full)
-        }
+        try safroleTests(testcase, variant: .full)
     }
 }
