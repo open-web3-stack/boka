@@ -115,9 +115,14 @@ public final class Runtime {
 
         let workReportHashes = block.extrinsic.reports.guarantees.map(\.workReport.packageSpecification.workPackageHash)
 
+        let accumulationResult = Data32() // TODO: calculate accumulation result
+
+        var mmr = history.items.last?.mmr ?? .init([])
+        mmr.append(accumulationResult)
+
         let newItem = try RecentHistory.HistoryItem(
             headerHash: block.header.parentHash,
-            mmrRoots: [], // TODO: update MMR roots
+            mmr: mmr,
             stateRoot: Data32(), // empty and will be updated upon next block
             workReportHashes: ConfigLimitedSizeArray(config: config, array: workReportHashes)
         )
