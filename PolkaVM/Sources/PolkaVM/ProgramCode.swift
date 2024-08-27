@@ -67,11 +67,11 @@ public class ProgramCode {
         basicBlockIndices = ProgramCode.getBasicBlockIndices(code: code, bitmask: bitmask)
     }
 
-    public static func skip(start: UInt32, bitmask: Data) -> UInt32? {
+    public static func skip(start: UInt32, bitmask: Data) -> UInt32 {
         let start = start + 1
         let beginIndex = Int(start / 8) + bitmask.startIndex
         guard beginIndex < bitmask.endIndex else {
-            return nil
+            return 0
         }
 
         var value: UInt32 = 0
@@ -79,9 +79,9 @@ public class ProgramCode {
             value = bitmask.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: beginIndex, as: UInt32.self) }
         } else {
             let byte1 = UInt32(bitmask[beginIndex])
-            let byte2 = UInt32(bitmask[safe: beginIndex + 1] ?? 0)
-            let byte3 = UInt32(bitmask[safe: beginIndex + 2] ?? 0)
-            let byte4 = UInt32(bitmask[safe: beginIndex + 3] ?? 0)
+            let byte2 = UInt32(bitmask[safe: beginIndex + 1] ?? 0xFF)
+            let byte3 = UInt32(bitmask[safe: beginIndex + 2] ?? 0xFF)
+            let byte4 = UInt32(bitmask[safe: beginIndex + 3] ?? 0xFF)
             value = byte1 | (byte2 << 8) | (byte3 << 16) | (byte4 << 24)
         }
 
@@ -92,21 +92,20 @@ public class ProgramCode {
         return idx
     }
 
-    public func skip(_ start: UInt32) -> UInt32? {
+    public func skip(_ start: UInt32) -> UInt32 {
         ProgramCode.skip(start: start, bitmask: bitmask)
     }
 
     /// traverse the program code and collect basic block indices
     private static func getBasicBlockIndices(code: Data, bitmask: Data) -> Set<UInt32> {
-        var res: Set<UInt32> = []
-        var i = UInt32(code.startIndex)
-        while i < code.endIndex {
-            let opcode = code[Int(i)]
+        // TODO: parse the instructions here and so we don't need to do skip calculation twice
+        var res: Set<UInt32> = [0]
+        var i = UInt32(0)
+        while i < code.count {
+            let opcode = code[relative: Int(i)]
+            let skip = ProgramCode.skip(start: i, bitmask: bitmask)
             if BASIC_BLOCK_INSTRUCTIONS.contains(opcode) {
-                res.insert(i)
-            }
-            guard let skip = ProgramCode.skip(start: i, bitmask: bitmask) else {
-                break
+                res.insert(i + skip + 1)
             }
             i += skip + 1
         }
