@@ -35,6 +35,7 @@ let package = Package(
                 "blst",
                 "bandersnatch_vrfs",
                 "erasure_coding",
+                "SHA3IUF",
             ],
             swiftSettings: [
                 .define("DEBUG_ASSERT", .when(configuration: .debug)),
@@ -42,6 +43,11 @@ let package = Package(
             linkerSettings: [
                 .unsafeFlags(["-L../.lib"]),
             ]
+        ),
+        .target(
+            name: "SHA3IUF",
+            sources: ["sha3.h", "sha3.c"],
+            publicHeadersPath: "."
         ),
         .systemLibrary(
             name: "blst",

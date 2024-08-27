@@ -12,3 +12,7 @@ module erasure_coding {
   header "erasure-coding/bindings.h"
   link "ec"
 }
+
+module sha3_iuf {
+  header "SHA3IUF/sha3.h"
+}
