@@ -122,14 +122,6 @@ enum SafroleTestVariants: String, CaseIterable {
 }
 
 final class SafroleTests {
-    init() {
-        IntegerCodec.decodeMode = .scale // TODO: remove after JAM test vectors are updated
-    }
-
-    deinit {
-        IntegerCodec.decodeMode = .jam
-    }
-
     static func loadTests(variant: SafroleTestVariants) throws -> [Testcase] {
         let tests = try TestLoader.getTestFiles(path: "safrole/\(variant)", extension: "scale")
         return try tests.map { path, description in
