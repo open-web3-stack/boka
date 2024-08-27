@@ -1,7 +1,7 @@
 import Blake2
 import Foundation
 
-public struct Blake2b256: ~Copyable, Hashing {
+public struct Blake2b256: /* ~Copyable, */ Hashing {
     private var hasher: Blake2b
 
     public init() {
