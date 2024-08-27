@@ -118,7 +118,7 @@ public final class Runtime {
         let accumulationResult = Data32() // TODO: calculate accumulation result
 
         var mmr = history.items.last?.mmr ?? .init([])
-        mmr.append(accumulationResult)
+        mmr.append(accumulationResult, hasher: Keccak.self)
 
         let newItem = try RecentHistory.HistoryItem(
             headerHash: block.header.parentHash,
