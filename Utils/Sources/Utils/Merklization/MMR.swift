@@ -1,3 +1,4 @@
+// TODO: add tests
 // Merkle Mountain Range
 public struct MMR: Sendable, Equatable, Codable {
     public var peaks: [Data32?]
