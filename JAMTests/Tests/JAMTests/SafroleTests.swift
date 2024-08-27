@@ -121,7 +121,7 @@ enum SafroleTestVariants: String, CaseIterable {
     }
 }
 
-class SafroleTests {
+final class SafroleTests {
     init() {
         IntegerCodec.decodeMode = .scale // TODO: remove after JAM test vectors are updated
     }
