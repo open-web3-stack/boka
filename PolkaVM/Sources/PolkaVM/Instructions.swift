@@ -7,14 +7,13 @@ public let BASIC_BLOCK_INSTRUCTIONS: Set<UInt8> = [
     Instructions.Jump.opcode,
     Instructions.JumpInd.opcode,
     Instructions.LoadImmJump.opcode,
-    // TODO: uncomment after add more
-    // Instructions.LoadImmJumpInd.opcode,
-    // Instructions.BranchEq.opcode,
-    // Instructions.BranchNe.opcode,
-    // Instructions.BranchGeU.opcode,
-    // Instructions.BranchGeS.opcode,
-    // Instructions.BranchLtU.opcode,
-    // Instructions.BranchLtS.opcode,
+    Instructions.LoadImmJumpInd.opcode,
+    Instructions.BranchEq.opcode,
+    Instructions.BranchNe.opcode,
+    Instructions.BranchGeU.opcode,
+    Instructions.BranchGeS.opcode,
+    Instructions.BranchLtU.opcode,
+    Instructions.BranchLtS.opcode,
     Instructions.BranchEqImm.opcode,
     Instructions.BranchNeImm.opcode,
     Instructions.BranchLtUImm.opcode,
@@ -28,6 +27,11 @@ public let BASIC_BLOCK_INSTRUCTIONS: Set<UInt8> = [
 ]
 
 public enum Instructions {
+    public enum Constants {
+        public static let djumpHaltAddress: UInt32 = 0xFFFF_0000
+        public static let djumpAddressAlignmentFactor: Int = 2
+    }
+
     static func decodeImmediate(_ data: Data) -> UInt32 {
         let len = min(data.count, 4)
         if len == 0 {
@@ -44,10 +48,10 @@ public enum Instructions {
         return UInt32(bitPattern: Int32(bitPattern: value << shift) >> shift)
     }
 
-    static func decodeImmediate2(_ data: Data, divideBy: UInt8 = 1) throws -> (UInt32, UInt32) {
+    static func decodeImmediate2(_ data: Data, divideBy: UInt8 = 1, minus: Int = 1) throws -> (UInt32, UInt32) {
         let lX1 = try Int((data.at(relative: 0) / divideBy) & 0b111)
         let lX = min(4, lX1)
-        let lY = min(4, max(0, data.count - Int(lX) - 1))
+        let lY = min(4, max(0, data.count - Int(lX) - minus))
 
         let vX = try decodeImmediate(data.at(relative: 1 ..< 1 + lX))
         let vY = try decodeImmediate(data.at(relative: (1 + lX) ..< (1 + lX + lY)))
@@ -56,6 +60,35 @@ public enum Instructions {
 
     static func isBranchValid(state: VMState, offset: UInt32) -> Bool {
         state.program.basicBlockIndices.contains(state.pc &+ offset)
+    }
+
+    static func isDjumpValid(state: VMState, target a: UInt32, targetAligned: UInt32) -> Bool {
+        let za = Constants.djumpAddressAlignmentFactor
+        return a == 0 &&
+            a > state.program.jumpTable.count * za &&
+            Int(a) % za != 0 &&
+            state.program.basicBlockIndices.contains(targetAligned)
+    }
+
+    static func djump(state: VMState, target: UInt32) -> ExecOutcome {
+        guard target != Constants.djumpHaltAddress else {
+            return .exit(.halt)
+        }
+
+        let entrySize = Int(state.program.jumpTableEntrySize)
+        let start = ((Int(target) / Constants.djumpAddressAlignmentFactor) - 1) * entrySize
+        let end = start + entrySize
+        var targetAlignedData = state.program.jumpTable[relative: start ..< end]
+        guard let targetAligned = targetAlignedData.decode() else {
+            fatalError("unreachable: jump table entry should be valid")
+        }
+
+        guard isDjumpValid(state: state, target: target, targetAligned: UInt32(targetAligned)) else {
+            return .exit(.panic(.invalidDynamicJump))
+        }
+
+        state.updatePC(UInt32(targetAligned))
+        return .continued
     }
 
     // MARK: Instructions without Arguments (5.1)
@@ -195,8 +228,7 @@ public enum Instructions {
 
         public func updatePC(state: VMState, skip _: UInt32) -> ExecOutcome {
             let regVal = state.readRegister(register)
-            state.updatePC(regVal &+ offset) // wrapped add
-            return .continued
+            return Instructions.djump(state: state, target: regVal &+ offset)
         }
     }
 
@@ -1175,6 +1207,95 @@ public enum Instructions {
             return .continued
         }
     }
+
+    // MARK: Instructions with Arguments of Two Registers & One Offset (5.10)
+
+    public struct BranchEq: BranchInstructionBase2 {
+        public static var opcode: UInt8 { 24 }
+        typealias Compare = CompareEq
+
+        var r1: Registers.Index
+        var r2: Registers.Index
+        var offset: UInt32
+        public init(data: Data) throws { (r1, r2, offset) = try Self.parse(data: data) }
+    }
+
+    public struct BranchNe: BranchInstructionBase2 {
+        public static var opcode: UInt8 { 30 }
+        typealias Compare = CompareNe
+
+        var r1: Registers.Index
+        var r2: Registers.Index
+        var offset: UInt32
+        public init(data: Data) throws { (r1, r2, offset) = try Self.parse(data: data) }
+    }
+
+    public struct BranchLtU: BranchInstructionBase2 {
+        public static var opcode: UInt8 { 47 }
+        typealias Compare = CompareLt
+
+        var r1: Registers.Index
+        var r2: Registers.Index
+        var offset: UInt32
+        public init(data: Data) throws { (r1, r2, offset) = try Self.parse(data: data) }
+    }
+
+    public struct BranchLtS: BranchInstructionBase2 {
+        public static var opcode: UInt8 { 48 }
+        typealias Compare = CompareLt
+
+        var r1: Registers.Index
+        var r2: Registers.Index
+        var offset: UInt32
+        public init(data: Data) throws { (r1, r2, offset) = try Self.parse(data: data) }
+    }
+
+    public struct BranchGeU: BranchInstructionBase2 {
+        public static var opcode: UInt8 { 41 }
+        typealias Compare = CompareGe
+
+        var r1: Registers.Index
+        var r2: Registers.Index
+        var offset: UInt32
+        public init(data: Data) throws { (r1, r2, offset) = try Self.parse(data: data) }
+    }
+
+    public struct BranchGeS: BranchInstructionBase2 {
+        public static var opcode: UInt8 { 43 }
+        typealias Compare = CompareGe
+
+        var r1: Registers.Index
+        var r2: Registers.Index
+        var offset: UInt32
+        public init(data: Data) throws { (r1, r2, offset) = try Self.parse(data: data) }
+    }
+
+    // MARK: Instruction with Arguments of Two Registers and Two Immediates (5.11)
+
+    public struct LoadImmJumpInd: Instruction {
+        public static var opcode: UInt8 { 10 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let value: UInt32
+        public let offset: UInt32
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            (value, offset) = try Instructions.decodeImmediate2(data[relative: 1...], divideBy: 1, minus: 2)
+        }
+
+        public func _executeImpl(state: VMState) throws -> ExecOutcome {
+            state.writeRegister(ra, value)
+            return .continued
+        }
+
+        public func updatePC(state: VMState, skip _: UInt32) -> ExecOutcome {
+            let rbVal = state.readRegister(rb)
+            return Instructions.djump(state: state, target: rbVal &+ offset)
+        }
+    }
 }
 
 // MARK: Branch Helpers
@@ -1192,9 +1313,7 @@ protocol BranchInstructionBase<Compare>: Instruction {
     var offset: UInt32 { get set }
 
     func _executeImpl(state _: VMState) throws -> ExecOutcome
-
     func updatePC(state: VMState, skip: UInt32) -> ExecOutcome
-
     func condition(state: VMState) -> Bool
 }
 
@@ -1222,6 +1341,48 @@ extension BranchInstructionBase {
     public func condition(state: VMState) -> Bool {
         let regVal = state.readRegister(register)
         return Compare.compare(a: regVal, b: value)
+    }
+}
+
+// for branch in A.5.10
+protocol BranchInstructionBase2<Compare>: Instruction {
+    associatedtype Compare: BranchCompare
+
+    var r1: Registers.Index { get set }
+    var r2: Registers.Index { get set }
+    var offset: UInt32 { get set }
+
+    func _executeImpl(state _: VMState) throws -> ExecOutcome
+    func updatePC(state: VMState, skip: UInt32) -> ExecOutcome
+    func condition(state: VMState) -> Bool
+}
+
+extension BranchInstructionBase2 {
+    public static func parse(data: Data) throws -> (Registers.Index, Registers.Index, UInt32) {
+        let offset = try Instructions.decodeImmediate(data.at(relative: 1...))
+        let r1 = try Registers.Index(ra: data.at(relative: 0))
+        let r2 = try Registers.Index(rb: data.at(relative: 0))
+        return (r1, r2, offset)
+    }
+
+    public func _executeImpl(state _: VMState) throws -> ExecOutcome { .continued }
+
+    public func updatePC(state: VMState, skip: UInt32) -> ExecOutcome {
+        guard Instructions.isBranchValid(state: state, offset: offset) else {
+            return .exit(.panic(.invalidBranch))
+        }
+        if condition(state: state) {
+            state.increasePC(offset)
+        } else {
+            state.increasePC(skip + 1)
+        }
+        return .continued
+    }
+
+    public func condition(state: VMState) -> Bool {
+        let r1Val = state.readRegister(r1)
+        let r2Val = state.readRegister(r2)
+        return Compare.compare(a: r1Val, b: r2Val)
     }
 }
 

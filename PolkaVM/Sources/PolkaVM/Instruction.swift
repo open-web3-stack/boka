@@ -31,7 +31,7 @@ extension Instruction {
     }
 
     public func gasCost() -> UInt64 {
-        1
+        0
     }
 
     public func updatePC(state: VMState, skip: UInt32) -> ExecOutcome {

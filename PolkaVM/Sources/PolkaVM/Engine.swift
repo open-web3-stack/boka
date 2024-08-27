@@ -36,12 +36,6 @@ public class Engine {
 
         let res = inst.execute(state: state, skip: skip)
 
-        if state.pc == Constants.exitAddress {
-            // TODO: GP only defined this for `djump` but not `branch`
-            // so need to confirm this is correct
-            return .exit(.halt)
-        }
-
         return res
     }
 }
