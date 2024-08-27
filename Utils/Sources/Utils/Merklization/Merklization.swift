@@ -7,25 +7,25 @@ public enum Merklization {
         (i + 1) / 2
     }
 
-    private static func binaryMerklizeHelper<T: RandomAccessCollection<Data>>(_ nodes: T,
-                                                                              hasher: Hashing.Type = Blake2b256
-                                                                                  .self) -> Either<Data, Data32>
-        where T.Index == Int
+    private static func binaryMerklizeHelper<T, U>(_ nodes: T,
+                                                   hasher: Hashing.Type = Blake2b256
+                                                       .self) -> MaybeEither<U, Data32>
+        where T: RandomAccessCollection<U>, T.Index == Int, U: DataPtrRepresentable
     {
         switch nodes.count {
         case 0:
-            return .right(Data32())
+            return .init(right: Data32())
         case 1:
-            return .left(nodes.first!)
+            return .init(left: nodes.first!)
         default:
             let midIndex = nodes.startIndex + half(nodes.count)
             let l = nodes[nodes.startIndex ..< midIndex]
             let r = nodes[midIndex ..< nodes.endIndex]
             var hash = hasher.init()
             hash.update("node")
-            hash.update(binaryMerklizeHelper(l))
-            hash.update(binaryMerklizeHelper(r))
-            return .right(hash.finalize())
+            hash.update(binaryMerklizeHelper(l).value)
+            hash.update(binaryMerklizeHelper(r).value)
+            return .init(right: hash.finalize())
         }
     }
 
@@ -33,7 +33,7 @@ public enum Merklization {
     public static func binaryMerklize<T: RandomAccessCollection<Data>>(_ nodes: T, hasher: Hashing.Type = Blake2b256.self) -> Data32
         where T.Index == Int
     {
-        switch binaryMerklizeHelper(nodes, hasher: hasher) {
+        switch binaryMerklizeHelper(nodes, hasher: hasher).value {
         case let .left(data):
             hasher.hash(data: data)
         case let .right(data):
@@ -41,9 +41,9 @@ public enum Merklization {
         }
     }
 
-    private static func traceImpl<T: RandomAccessCollection<Data>>(_ nodes: T, index: T.Index,
-                                                                   hasher: Hashing.Type, output: (Either<Data, Data32>) -> Void)
-        where T.Index == Int
+    private static func traceImpl<T, U>(_ nodes: T, index: T.Index,
+                                        hasher: Hashing.Type, output: (MaybeEither<U, Data32>) -> Void)
+        where T: RandomAccessCollection<U>, T.Index == Int, U: DataPtrRepresentable
     {
         if nodes.count == 0 {
             return
@@ -76,33 +76,31 @@ public enum Merklization {
         )
     }
 
-    public static func trace<T: RandomAccessCollection<Data>>(_ nodes: T, hasher: Hashing.Type = Blake2b256.self) -> [Either<Data, Data32>]
-        where T.Index == Int
+    public static func trace<T, U>(_ nodes: T, index: T.Index,
+                                   hasher: Hashing.Type = Blake2b256.self) -> [Either<U, Data32>]
+        where T: RandomAccessCollection<U>, T.Index == Int, U: DataPtrRepresentable
     {
-        var res: [Either<Data, Data32>] = []
-        traceImpl(nodes, index: nodes.count, hasher: hasher) { res.append($0) }
+        var res: [Either<U, Data32>] = []
+        traceImpl(nodes, index: index, hasher: hasher) { res.append($0.value) }
         return res
     }
 
-    // return type should be [Data32] but binaryMerklizeHelper requires [Data]
     private static func constancyPreprocessor(_ nodes: some RandomAccessCollection<Data>,
-                                              hasher: Hashing.Type = Blake2b256.self) -> [Data]
+                                              hasher: Hashing.Type = Blake2b256.self) -> [Data32]
     {
         let length = UInt32(nodes.count)
-        // find the next power of two using bitwise logic
-        let nextPowerOfTwo = UInt32(1 << (32 - length.leadingZeroBitCount))
-        let newLength = Int(nextPowerOfTwo == length ? length : nextPowerOfTwo * 2)
-        var res: [Data] = []
+        let newLength = Int(length.nextPowerOfTwo ?? 0)
+        var res: [Data32] = []
         res.reserveCapacity(newLength)
         for node in nodes {
             var hash = hasher.init()
             hash.update("leaf")
             hash.update(node)
-            res.append(hash.finalize().data)
+            res.append(hash.finalize())
         }
         // fill the rest with zeros
         for _ in nodes.count ..< newLength {
-            res.append(Data32().data)
+            res.append(Data32())
         }
         return res
     }
@@ -111,11 +109,18 @@ public enum Merklization {
     public static func constantDepthMerklize<T: RandomAccessCollection<Data>>(_ nodes: T, hasher: Hashing.Type = Blake2b256.self) -> Data32
         where T.Index == Int
     {
-        switch binaryMerklizeHelper(constancyPreprocessor(nodes, hasher: hasher)) {
-        case let .left(data):
-            Data32(data)! // TODO: somehow improve the typing so force unwrap is not needed
-        case let .right(data):
-            data
-        }
+        binaryMerklizeHelper(constancyPreprocessor(nodes, hasher: hasher)).unwrapped
+    }
+
+    public static func generateJustification<T>(
+        _ nodes: T,
+        index: T.Index,
+        hasher: Hashing.Type = Blake2b256.self
+    ) -> [Data32]
+        where T: RandomAccessCollection<Data>, T.Index == Int
+    {
+        var res: [Data32] = []
+        traceImpl(constancyPreprocessor(nodes, hasher: hasher), index: index, hasher: hasher) { res.append($0.unwrapped) }
+        return res
     }
 }

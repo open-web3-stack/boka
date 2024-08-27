@@ -1,6 +1,8 @@
 import Blake2
 import Foundation
 
+public typealias DataPtrRepresentable = Blake2.DataPtrRepresentable
+
 // Waiting for NoncopyableGenerics to be available
 public protocol Hashing /*: ~Copyable */ {
     init()
