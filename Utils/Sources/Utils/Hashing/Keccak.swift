@@ -2,7 +2,7 @@ import Blake2
 import Foundation
 import sha3_iuf
 
-public struct Keccak: ~Copyable, Hashing {
+public struct Keccak: /* ~Copyable, */ Hashing {
     private var ctx: sha3_context = .init()
 
     public init() {
