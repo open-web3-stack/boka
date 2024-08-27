@@ -7,7 +7,7 @@ public struct RecentHistory: Sendable, Equatable, Codable {
         public var headerHash: Data32
 
         // b: accumulation-result mmr
-        public var mmrRoots: [Data32]
+        public var mmr: MMR
 
         // s
         public var stateRoot: Data32
@@ -17,12 +17,12 @@ public struct RecentHistory: Sendable, Equatable, Codable {
 
         public init(
             headerHash: Data32,
-            mmrRoots: [Data32],
+            mmr: MMR,
             stateRoot: Data32,
             workReportHashes: ConfigLimitedSizeArray<Data32, ProtocolConfig.Int0, ProtocolConfig.TotalNumberOfCores>
         ) {
             self.headerHash = headerHash
-            self.mmrRoots = mmrRoots
+            self.mmr = mmr
             self.stateRoot = stateRoot
             self.workReportHashes = workReportHashes
         }
