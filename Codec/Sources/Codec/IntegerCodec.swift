@@ -41,6 +41,7 @@ public enum IntegerCodec {
         if firstByte == 0 {
             return 0
         }
+
         let byteLengh = (~firstByte).leadingZeroBitCount
         var res: UInt64 = 0
         if byteLengh > 0 {

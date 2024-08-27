@@ -121,7 +121,7 @@ enum SafroleTestVariants: String, CaseIterable {
     }
 }
 
-struct SafroleTests {
+final class SafroleTests {
     static func loadTests(variant: SafroleTestVariants) throws -> [Testcase] {
         let tests = try TestLoader.getTestFiles(path: "safrole/\(variant)", extension: "scale")
         return try tests.map { path, description in
@@ -167,15 +167,11 @@ struct SafroleTests {
 
     @Test(arguments: try SafroleTests.loadTests(variant: .tiny))
     func tinyTests(_ testcase: Testcase) throws {
-        withKnownIssue("wait for test vectors to be updated", isIntermittent: true) {
-            try safroleTests(testcase, variant: .tiny)
-        }
+        try safroleTests(testcase, variant: .tiny)
     }
 
     @Test(arguments: try SafroleTests.loadTests(variant: .full))
     func fullTests(_ testcase: Testcase) throws {
-        withKnownIssue("wait for test vectors to be updated", isIntermittent: true) {
-            try safroleTests(testcase, variant: .full)
-        }
+        try safroleTests(testcase, variant: .full)
     }
 }

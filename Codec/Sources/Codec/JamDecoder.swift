@@ -97,7 +97,7 @@ private class DecodeContext: Decoder {
     }
 
     fileprivate func decodeData(codingPath: @autoclosure () -> [CodingKey]) throws -> Data {
-        guard let length = data.decode() else {
+        guard let length = data.decodeScale() else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: codingPath(),
@@ -119,7 +119,7 @@ private class DecodeContext: Decoder {
     }
 
     fileprivate func decodeData(codingPath: @autoclosure () -> [CodingKey]) throws -> [UInt8] {
-        guard let length = data.decode() else {
+        guard let length = data.decodeScale() else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: codingPath(),
@@ -141,7 +141,7 @@ private class DecodeContext: Decoder {
     }
 
     fileprivate func decodeArray<T: ArrayWrapper>(_ type: T.Type, key: CodingKey?) throws -> T {
-        guard let length = data.decode() else {
+        guard let length = data.decodeScale() else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: codingPath,
