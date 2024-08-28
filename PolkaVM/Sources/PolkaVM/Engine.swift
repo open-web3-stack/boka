@@ -20,9 +20,7 @@ public class Engine {
 
     public func step(program: ProgramCode, state: VMState) -> ExecOutcome {
         let pc = state.pc
-        guard let skip = program.skip(state.pc) else {
-            return .exit(.panic(.invalidInstruction))
-        }
+        let skip = program.skip(state.pc)
         let startIndex = program.code.startIndex + Int(pc)
         let endIndex = startIndex + 1 + Int(skip)
         let data = if endIndex <= program.code.endIndex {
