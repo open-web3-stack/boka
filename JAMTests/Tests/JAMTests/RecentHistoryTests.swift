@@ -37,8 +37,6 @@ struct RecentHistoryTests {
             workReportHashes: ConfigLimitedSizeArray(config: config, array: testcase.input.workPackages)
         )
 
-        withKnownIssue("need to figure out why the hash generation doesn't match", isIntermittent: true) {
-            #expect(state == testcase.postState)
-        }
+        #expect(state == testcase.postState)
     }
 }
