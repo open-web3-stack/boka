@@ -997,8 +997,8 @@ public enum Instructions {
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
             let regVal = state.readRegister(rb)
-            let shift = value & 0x1F
-            state.writeRegister(ra, regVal << shift)
+            let shift = value & 0x20
+            state.writeRegister(ra, UInt32(truncatingIfNeeded: regVal << shift))
             return .continued
         }
     }
@@ -1018,7 +1018,7 @@ public enum Instructions {
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
             let regVal = state.readRegister(rb)
-            let shift = value & 0x1F
+            let shift = value & 0x20
             state.writeRegister(ra, regVal >> shift)
             return .continued
         }
@@ -1039,7 +1039,7 @@ public enum Instructions {
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
             let regVal = state.readRegister(rb)
-            let shift = value & 0x1F
+            let shift = value & 0x20
             state.writeRegister(ra, UInt32(bitPattern: Int32(bitPattern: regVal) >> shift))
             return .continued
         }
@@ -1120,8 +1120,8 @@ public enum Instructions {
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
             let regVal = state.readRegister(rb)
-            let shift = regVal & 0x1F
-            state.writeRegister(ra, value << shift)
+            let shift = regVal & 0x20
+            state.writeRegister(ra, UInt32(truncatingIfNeeded: value << shift))
             return .continued
         }
     }
@@ -1141,7 +1141,7 @@ public enum Instructions {
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
             let regVal = state.readRegister(rb)
-            let shift = regVal & 0x1F
+            let shift = regVal & 0x20
             state.writeRegister(ra, value >> shift)
             return .continued
         }
@@ -1162,7 +1162,7 @@ public enum Instructions {
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
             let regVal = state.readRegister(rb)
-            let shift = regVal & 0x1F
+            let shift = regVal & 0x20
             state.writeRegister(ra, UInt32(bitPattern: Int32(bitPattern: value) >> shift))
             return .continued
         }
@@ -1294,6 +1294,455 @@ public enum Instructions {
         public func updatePC(state: VMState, skip _: UInt32) -> ExecOutcome {
             let rbVal = state.readRegister(rb)
             return Instructions.djump(state: state, target: rbVal &+ offset)
+        }
+    }
+
+    // MARK: Instructions with Arguments of Three Registers (5.12)
+
+    public struct Add: Instruction {
+        public static var opcode: UInt8 { 8 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            state.writeRegister(rd, raVal &+ rbVal)
+            return .continued
+        }
+    }
+
+    public struct Sub: Instruction {
+        public static var opcode: UInt8 { 20 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            state.writeRegister(rd, raVal &- rbVal)
+            return .continued
+        }
+    }
+
+    public struct And: Instruction {
+        public static var opcode: UInt8 { 23 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            state.writeRegister(rd, raVal & rbVal)
+            return .continued
+        }
+    }
+
+    public struct Xor: Instruction {
+        public static var opcode: UInt8 { 28 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            state.writeRegister(rd, raVal ^ rbVal)
+            return .continued
+        }
+    }
+
+    public struct Or: Instruction {
+        public static var opcode: UInt8 { 12 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            state.writeRegister(rd, raVal | rbVal)
+            return .continued
+        }
+    }
+
+    public struct Mul: Instruction {
+        public static var opcode: UInt8 { 34 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            state.writeRegister(rd, raVal &* rbVal)
+            return .continued
+        }
+    }
+
+    public struct MulUpperSS: Instruction {
+        public static var opcode: UInt8 { 67 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            state.writeRegister(rd, UInt32(bitPattern: Int32((Int64(Int32(bitPattern: raVal)) * Int64(Int32(bitPattern: rbVal))) >> 32)))
+            return .continued
+        }
+    }
+
+    public struct MulUpperUU: Instruction {
+        public static var opcode: UInt8 { 57 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            state.writeRegister(rd, UInt32((UInt64(raVal) * UInt64(rbVal)) >> 32))
+            return .continued
+        }
+    }
+
+    public struct MulUpperSU: Instruction {
+        public static var opcode: UInt8 { 81 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            state.writeRegister(rd, UInt32(bitPattern: Int32((Int64(Int32(bitPattern: raVal)) * Int64(Int32(bitPattern: rbVal))) >> 32)))
+            return .continued
+        }
+    }
+
+    public struct DivU: Instruction {
+        public static var opcode: UInt8 { 68 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            if rbVal == 0 {
+                state.writeRegister(rd, UInt32.max)
+            } else {
+                state.writeRegister(rd, raVal / rbVal)
+            }
+            return .continued
+        }
+    }
+
+    public struct DivS: Instruction {
+        public static var opcode: UInt8 { 64 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            if rbVal == 0 {
+                state.writeRegister(rd, UInt32.max)
+            } else if Int32(bitPattern: raVal) == Int32.min, Int32(bitPattern: rbVal) == -1 {
+                state.writeRegister(rd, raVal)
+            } else {
+                state.writeRegister(rd, UInt32(bitPattern: Int32(bitPattern: raVal) / Int32(bitPattern: rbVal)))
+            }
+            return .continued
+        }
+    }
+
+    public struct RemU: Instruction {
+        public static var opcode: UInt8 { 73 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            if rbVal == 0 {
+                state.writeRegister(rd, raVal)
+            } else {
+                state.writeRegister(rd, raVal % rbVal)
+            }
+            return .continued
+        }
+    }
+
+    public struct RemS: Instruction {
+        public static var opcode: UInt8 { 70 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            if rbVal == 0 {
+                state.writeRegister(rd, raVal)
+            } else if Int32(bitPattern: raVal) == Int32.min, Int32(bitPattern: rbVal) == -1 {
+                state.writeRegister(rd, 0)
+            } else {
+                state.writeRegister(rd, UInt32(bitPattern: Int32(bitPattern: raVal) % Int32(bitPattern: rbVal)))
+            }
+            return .continued
+        }
+    }
+
+    public struct SetLtU: Instruction {
+        public static var opcode: UInt8 { 36 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            state.writeRegister(rd, raVal < rbVal ? 1 : 0)
+            return .continued
+        }
+    }
+
+    public struct SetLtS: Instruction {
+        public static var opcode: UInt8 { 58 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            state.writeRegister(rd, Int32(bitPattern: raVal) < Int32(bitPattern: rbVal) ? 1 : 0)
+            return .continued
+        }
+    }
+
+    public struct ShloL: Instruction {
+        public static var opcode: UInt8 { 55 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            let shift = rbVal & 0x20
+            state.writeRegister(rd, UInt32(truncatingIfNeeded: raVal << shift))
+            return .continued
+        }
+    }
+
+    public struct ShloR: Instruction {
+        public static var opcode: UInt8 { 51 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            let shift = rbVal & 0x20
+            state.writeRegister(rd, raVal >> shift)
+            return .continued
+        }
+    }
+
+    public struct SharR: Instruction {
+        public static var opcode: UInt8 { 77 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            let shift = rbVal & 0x20
+            state.writeRegister(rd, UInt32(bitPattern: Int32(bitPattern: raVal) >> shift))
+            return .continued
+        }
+    }
+
+    public struct CmovIz: Instruction {
+        public static var opcode: UInt8 { 81 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            if rbVal == 0 {
+                state.writeRegister(rd, raVal)
+            }
+            return .continued
+        }
+    }
+
+    public struct CmovNz: Instruction {
+        public static var opcode: UInt8 { 82 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            ra = try Registers.Index(ra: data.at(relative: 0))
+            rb = try Registers.Index(rb: data.at(relative: 0))
+            rd = try Registers.Index(rd: data.at(relative: 1))
+        }
+
+        public func _executeImpl(state: VMState) -> ExecOutcome {
+            let raVal = state.readRegister(ra)
+            let rbVal = state.readRegister(rb)
+            if rbVal != 0 {
+                state.writeRegister(rd, raVal)
+            }
+            return .continued
         }
     }
 }
