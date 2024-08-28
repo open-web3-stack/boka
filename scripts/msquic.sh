@@ -16,6 +16,8 @@ arch=$(uname -m)
 
 cd Networking/Sources/msquic || { echo "Submodule directory not found"; exit 1; }
 
+rm -rf build
+
 mkdir build && cd build
 
 if [ $system = "Darwin" ]; then
