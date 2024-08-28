@@ -64,10 +64,10 @@ public enum Instructions {
 
     static func isDjumpValid(state: VMState, target a: UInt32, targetAligned: UInt32) -> Bool {
         let za = Constants.djumpAddressAlignmentFactor
-        return a == 0 &&
-            a > state.program.jumpTable.count * za &&
-            Int(a) % za != 0 &&
-            state.program.basicBlockIndices.contains(targetAligned)
+        return !(a == 0 ||
+            a > state.program.jumpTable.count * za ||
+            Int(a) % za != 0 ||
+            state.program.basicBlockIndices.contains(targetAligned))
     }
 
     static func djump(state: VMState, target: UInt32) -> ExecOutcome {
