@@ -1701,7 +1701,7 @@ public enum Instructions {
     }
 
     public struct CmovIz: Instruction {
-        public static var opcode: UInt8 { 81 }
+        public static var opcode: UInt8 { 83 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1724,7 +1724,7 @@ public enum Instructions {
     }
 
     public struct CmovNz: Instruction {
-        public static var opcode: UInt8 { 82 }
+        public static var opcode: UInt8 { 84 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
