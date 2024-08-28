@@ -3,12 +3,20 @@ import Foundation
 // somehow without this the GH Actions CI fails
 extension Foundation.Bundle: @unchecked @retroactive Sendable {}
 
+struct Testcase: CustomStringConvertible {
+    var description: String
+    var data: Data
+}
+
 enum TestLoader {
-    static func getTestFiles(path: String, extension ext: String) throws -> [(path: String, description: String)] {
+    static func getTestcases(path: String, extension ext: String) throws -> [Testcase] {
         let prefix = Bundle.module.resourcePath! + "/jamtestvectors/\(path)"
         let files = try FileManager.default.contentsOfDirectory(atPath: prefix)
         var filtered = files.filter { $0.hasSuffix(".\(ext)") }
         filtered.sort()
-        return filtered.map { (path: prefix + "/" + $0, description: $0) }
+        return try filtered.map {
+            let data = try Data(contentsOf: URL(fileURLWithPath: prefix + "/" + $0))
+            return Testcase(description: $0, data: data)
+        }
     }
 }
