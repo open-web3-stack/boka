@@ -1,6 +1,5 @@
 import Codec
 
-// TODO: add tests
 public struct LimitedSizeArray<T, TMinLength: ConstInt, TMaxLength: ConstInt> {
     public private(set) var array: [T]
     public static var minLength: Int {
