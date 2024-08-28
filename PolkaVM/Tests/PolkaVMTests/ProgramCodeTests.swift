@@ -50,20 +50,20 @@ struct ProgramTests {
     // TODO: add more Program parsing tests
 
     @Test(arguments: [
-        (Data(), 0, nil),
-        (Data([0]), 0, 24),
-        (Data([0]), 8, nil),
+        (Data(), 0, 0),
+        (Data([0]), 0, 7),
+        (Data([0]), 8, 0),
         (Data([0b0010_0000]), 0, 4),
         (Data([0b0010_0000]), 3, 1),
-        (Data([0b0010_0000]), 6, 24),
-        (Data([0b0010_0000]), 7, nil),
+        (Data([0b0010_0000]), 6, 1),
+        (Data([0b0010_0000]), 7, 0),
         (Data([0, 0, 0b0010_0000, 0b0000_0010]), 0, 20),
         (Data([0, 0, 0b0010_0000, 0b0000_0010]), 2, 18),
         (Data([0, 0, 0b0010_0000, 0b0000_0010]), 10, 10),
         (Data([0, 0, 0b0010_0000, 0b0000_0010]), 22, 2),
         (Data([0, 0, 0, 0b0000_0010]), 5, 19),
-    ] as[(Data, UInt32, UInt32?)])
-    func skip(testCase: (Data, UInt32, UInt32?)) {
+    ] as[(Data, UInt32, UInt32)])
+    func skip(testCase: (Data, UInt32, UInt32)) {
         #expect(ProgramCode.skip(start: testCase.1, bitmask: testCase.0) == testCase.2)
     }
 }
