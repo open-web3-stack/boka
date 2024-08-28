@@ -12,17 +12,14 @@ struct TrieElement: Codable {
 typealias TrieTestCase = [TrieElement]
 
 struct TrieTests {
-    static func loadTests() throws -> [TrieTestCase] {
-        let tests = try TestLoader.getTestFiles(path: "trie", extension: "json")
-        return try tests.map {
-            let data = try Data(contentsOf: URL(fileURLWithPath: $0.path))
-            let decoder = JSONDecoder()
-            return try decoder.decode(TrieTestCase.self, from: data)
-        }
+    static func loadTests() throws -> [Testcase] {
+        try TestLoader.getTestcases(path: "trie", extension: "json")
     }
 
     @Test(arguments: try loadTests())
-    func trieTests(_ testcase: TrieTestCase) throws {
+    func trieTests(_ testcase: Testcase) throws {
+        let decoder = JSONDecoder()
+        let testcase = try decoder.decode(TrieTestCase.self, from: testcase.data)
         for element in testcase {
             let kv = element.input.reduce(into: [Data32: Data]()) { result, entry in
                 let keyData = Data(fromHexString: entry.key)

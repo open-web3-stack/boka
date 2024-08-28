@@ -73,20 +73,9 @@ public final class Runtime {
         var newState = prevState.value
 
         do {
-            newState.recentHistory = try updateRecentHistory(block: block, state: prevState)
+            try updateRecentHistory(block: block, state: &newState)
 
-            let safroleResult = try newState.updateSafrole(
-                config: config, slot: block.header.timeslot, entropy: newState.entropyPool.t0, extrinsics: block.extrinsic.tickets
-            )
-            newState.mergeWith(postState: safroleResult.state)
-
-            guard safroleResult.epochMark == block.header.epoch else {
-                throw Error.invalidHeaderEpochMarker
-            }
-
-            guard safroleResult.ticketsMark == block.header.winningTickets else {
-                throw Error.invalidHeaderWinningTickets
-            }
+            try updateSafrole(block: block, state: &newState)
 
             newState.coreAuthorizationPool = try updateAuthorizationPool(
                 block: block, state: prevState
@@ -106,25 +95,29 @@ public final class Runtime {
         return StateRef(newState)
     }
 
-    public func updateRecentHistory(block: BlockRef, state: StateRef) throws -> RecentHistory {
-        var history = state.value.recentHistory
-        if history.items.count >= 0 { // if this is not block #0
-            // write the state root of last block
-            history.items[history.items.endIndex - 1].stateRoot = state.stateRoot
+    public func updateSafrole(block: BlockRef, state newState: inout State) throws {
+        let safroleResult = try newState.updateSafrole(
+            config: config, slot: block.header.timeslot, entropy: newState.entropyPool.t0, extrinsics: block.extrinsic.tickets
+        )
+        newState.mergeWith(postState: safroleResult.state)
+
+        guard safroleResult.epochMark == block.header.epoch else {
+            throw Error.invalidHeaderEpochMarker
         }
 
-        let workReportHashes = block.extrinsic.reports.guarantees.map(\.workReport.packageSpecification.workPackageHash)
+        guard safroleResult.ticketsMark == block.header.winningTickets else {
+            throw Error.invalidHeaderWinningTickets
+        }
+    }
 
-        let newItem = try RecentHistory.HistoryItem(
+    public func updateRecentHistory(block: BlockRef, state newState: inout State) throws {
+        let workReportHashes = block.extrinsic.reports.guarantees.map(\.workReport.packageSpecification.workPackageHash)
+        try newState.recentHistory.update(
             headerHash: block.header.parentHash,
-            mmrRoots: [], // TODO: update MMR roots
-            stateRoot: Data32(), // empty and will be updated upon next block
+            parentStateRoot: block.header.priorStateRoot,
+            accumulateRoot: Data32(), // TODO: calculate accumulation result
             workReportHashes: ConfigLimitedSizeArray(config: config, array: workReportHashes)
         )
-
-        history.items.safeAppend(newItem)
-
-        return history
     }
 
     // TODO: add tests

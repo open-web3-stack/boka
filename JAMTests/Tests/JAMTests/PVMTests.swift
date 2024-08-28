@@ -62,17 +62,14 @@ struct PolkaVMTestcase: Codable, CustomStringConvertible {
 }
 
 struct PVMTests {
-    static func loadTests() throws -> [PolkaVMTestcase] {
-        let tests = try TestLoader.getTestFiles(path: "pvm/programs", extension: "json")
-        return try tests.map {
-            let data = try Data(contentsOf: URL(fileURLWithPath: $0.path))
-            let decoder = JSONDecoder()
-            return try decoder.decode(PolkaVMTestcase.self, from: data)
-        }
+    static func loadTests() throws -> [Testcase] {
+        try TestLoader.getTestcases(path: "pvm/programs", extension: "json")
     }
 
     @Test(arguments: try loadTests())
-    func testPVM(testCase: PolkaVMTestcase) throws {
+    func testPVM(testCase: Testcase) throws {
+        let decoder = JSONDecoder()
+        let testCase = try decoder.decode(PolkaVMTestcase.self, from: testCase.data)
         let program = try ProgramCode(Data(testCase.program))
         let memory = Memory(
             pageMap: testCase.initialPageMap.map { (address: $0.address, length: $0.length, writable: $0.isWritable) },

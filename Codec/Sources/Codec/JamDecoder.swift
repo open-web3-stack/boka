@@ -97,7 +97,7 @@ private class DecodeContext: Decoder {
     }
 
     fileprivate func decodeData(codingPath: @autoclosure () -> [CodingKey]) throws -> Data {
-        guard let length = data.decode() else {
+        guard let length = data.decodeScale() else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: codingPath(),
@@ -119,7 +119,7 @@ private class DecodeContext: Decoder {
     }
 
     fileprivate func decodeData(codingPath: @autoclosure () -> [CodingKey]) throws -> [UInt8] {
-        guard let length = data.decode() else {
+        guard let length = data.decodeScale() else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: codingPath(),
@@ -141,7 +141,7 @@ private class DecodeContext: Decoder {
     }
 
     fileprivate func decodeArray<T: ArrayWrapper>(_ type: T.Type, key: CodingKey?) throws -> T {
-        guard let length = data.decode() else {
+        guard let length = data.decodeScale() else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: codingPath,
@@ -324,8 +324,11 @@ private struct JamUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     let decoder: DecodeContext
 
     mutating func decodeNil() throws -> Bool {
+        guard let byte = decoder.data.next() else {
+            throw DecodingError.dataCorruptedError(in: self, debugDescription: "Unexpected end of data")
+        }
         currentIndex += 1
-        return decoder.data.count > 0
+        return byte == 0
     }
 
     mutating func decode(_: Bool.Type) throws -> Bool {
@@ -439,7 +442,7 @@ private struct JamSingleValueDecodingContainer: SingleValueDecodingContainer {
     let decoder: DecodeContext
 
     func decodeNil() -> Bool {
-        decoder.data.count > 0
+        decoder.data.next() == 0
     }
 
     func decode(_: Bool.Type) throws -> Bool {
