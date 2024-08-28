@@ -9,6 +9,7 @@ import Utils
 struct SafroleInput: Codable {
     var slot: UInt32
     var entropy: Data32
+    var offenders: [Ed25519PublicKey]
     var extrinsics: ExtrinsicTickets
 }
 
@@ -130,6 +131,7 @@ struct SafroleTests {
                 config: config,
                 slot: testcase.input.slot,
                 entropy: testcase.input.entropy,
+                offenders: Set(testcase.input.offenders),
                 extrinsics: testcase.input.extrinsics
             )
         }

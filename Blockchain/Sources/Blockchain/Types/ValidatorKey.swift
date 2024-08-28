@@ -17,16 +17,18 @@ public struct ValidatorKey: Sendable, Equatable, Codable {
         self.bls = bls
         self.metadata = metadata
     }
+
+    public init() {
+        bandersnatch = BandersnatchPublicKey()
+        ed25519 = Ed25519PublicKey()
+        bls = BLSKey()
+        metadata = Data128()
+    }
 }
 
 extension ValidatorKey: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config _: Config) -> ValidatorKey {
-        ValidatorKey(
-            bandersnatch: BandersnatchPublicKey(),
-            ed25519: Ed25519PublicKey(),
-            bls: BLSKey(),
-            metadata: Data128()
-        )
+        ValidatorKey()
     }
 }
