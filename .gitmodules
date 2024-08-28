@@ -7,3 +7,6 @@
 [submodule "Database/Sources/rocksdb"]
 	path = Database/Sources/rocksdb
 	url = https://github.com/facebook/rocksdb.git
+[submodule "Networking/Sources/msquic"]
+	path = Networking/Sources/msquic
+	url = https://github.com/microsoft/msquic.git

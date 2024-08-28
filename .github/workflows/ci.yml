@@ -31,6 +31,10 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
+    - name: Get msquic submodule commit hash
+      id: msquic-commit-hash
+      run: |
+        echo "commit-hash=$(git submodule status Networking/Sources/msquic/ | cut -c2-41)" >> $GITHUB_OUTPUT
     - name: Get blst submodule commit hash
       id: blst-commit-hash
       run: |
@@ -56,6 +60,13 @@ jobs:
           ~/.cargo/git/db/
           Utils/Sources/bandersnatch/target/
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - name: Cache msquic static lib
+      uses: actions/cache@v4
+      with:
+        path: .lib/libmsquic.a
+        key: ${{ runner.os }}-libs-msquic-${{ steps.msquic-commit-hash.outputs.commit-hash }}
+        restore-keys: |
+            ${{ runner.os }}-libs-msquic
     - name: Cache blst static lib
       uses: actions/cache@v4
       with:
