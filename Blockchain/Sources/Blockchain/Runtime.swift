@@ -97,7 +97,11 @@ public final class Runtime {
 
     public func updateSafrole(block: BlockRef, state newState: inout State) throws {
         let safroleResult = try newState.updateSafrole(
-            config: config, slot: block.header.timeslot, entropy: newState.entropyPool.t0, extrinsics: block.extrinsic.tickets
+            config: config,
+            slot: block.header.timeslot,
+            entropy: newState.entropyPool.t0,
+            offenders: newState.judgements.punishSet,
+            extrinsics: block.extrinsic.tickets
         )
         newState.mergeWith(postState: safroleResult.state)
 
