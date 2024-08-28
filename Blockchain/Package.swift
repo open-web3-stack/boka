@@ -19,6 +19,7 @@ let package = Package(
         .package(path: "../Codec"),
         .package(path: "../Utils"),
         .package(path: "../TracingUtils"),
+        .package(path: "../PolkaVM"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
     ],
     targets: [
@@ -29,6 +30,7 @@ let package = Package(
             dependencies: [
                 "Codec",
                 "Utils",
+                "PolkaVM",
                 "TracingUtils",
             ]
         ),
