@@ -83,7 +83,7 @@ public enum Instructions {
             fatalError("unreachable: jump table entry should be valid")
         }
 
-        guard isDjumpValid(state: state, target: target, targetAligned: UInt32(targetAligned)) else {
+        guard isDjumpValid(state: state, target: target, targetAligned: UInt32(truncatingIfNeeded: targetAligned)) else {
             return .exit(.panic(.invalidDynamicJump))
         }
 
