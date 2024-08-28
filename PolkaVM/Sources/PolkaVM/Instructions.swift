@@ -71,7 +71,7 @@ public enum Instructions {
     }
 
     static func djump(state: VMState, target: UInt32) -> ExecOutcome {
-        guard target != Constants.djumpHaltAddress else {
+        if target == Constants.djumpHaltAddress {
             return .exit(.halt)
         }
 
