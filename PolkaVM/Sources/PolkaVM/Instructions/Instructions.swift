@@ -910,7 +910,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal = context.state.readRegister(rb)
-            let shift = value & 0x20
+            let shift = value & 0x1F
             context.state.writeRegister(ra, UInt32(truncatingIfNeeded: regVal << shift))
             return .continued
         }
@@ -930,7 +930,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal = context.state.readRegister(rb)
-            let shift = value & 0x20
+            let shift = value & 0x1F
             context.state.writeRegister(ra, regVal >> shift)
             return .continued
         }
@@ -950,7 +950,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal = context.state.readRegister(rb)
-            let shift = value & 0x20
+            let shift = value & 0x1F
             context.state.writeRegister(ra, UInt32(bitPattern: Int32(bitPattern: regVal) >> shift))
             return .continued
         }
@@ -970,7 +970,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal = context.state.readRegister(rb)
-            context.state.writeRegister(ra, regVal &- value)
+            context.state.writeRegister(ra, value &- regVal)
             return .continued
         }
     }
@@ -1027,7 +1027,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal = context.state.readRegister(rb)
-            let shift = regVal & 0x20
+            let shift = regVal & 0x1F
             context.state.writeRegister(ra, UInt32(truncatingIfNeeded: value << shift))
             return .continued
         }
@@ -1047,7 +1047,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal = context.state.readRegister(rb)
-            let shift = regVal & 0x20
+            let shift = regVal & 0x1F
             context.state.writeRegister(ra, value >> shift)
             return .continued
         }
@@ -1067,14 +1067,14 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal = context.state.readRegister(rb)
-            let shift = regVal & 0x20
+            let shift = regVal & 0x1F
             context.state.writeRegister(ra, UInt32(bitPattern: Int32(bitPattern: value) >> shift))
             return .continued
         }
     }
 
     public struct CmovIzImm: Instruction {
-        public static var opcode: UInt8 { 81 }
+        public static var opcode: UInt8 { 85 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1093,7 +1093,7 @@ public enum Instructions {
     }
 
     public struct CmovNzImm: Instruction {
-        public static var opcode: UInt8 { 82 }
+        public static var opcode: UInt8 { 86 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1510,7 +1510,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let (raVal, rbVal) = context.state.readRegister(ra, rb)
-            let shift = rbVal & 0x20
+            let shift = rbVal & 0x1F
             context.state.writeRegister(rd, UInt32(truncatingIfNeeded: raVal << shift))
             return .continued
         }
@@ -1529,7 +1529,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let (raVal, rbVal) = context.state.readRegister(ra, rb)
-            let shift = rbVal & 0x20
+            let shift = rbVal & 0x1F
             context.state.writeRegister(rd, raVal >> shift)
             return .continued
         }
@@ -1548,7 +1548,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let (raVal, rbVal) = context.state.readRegister(ra, rb)
-            let shift = rbVal & 0x20
+            let shift = rbVal & 0x1F
             context.state.writeRegister(rd, UInt32(bitPattern: Int32(bitPattern: raVal) >> shift))
             return .continued
         }
