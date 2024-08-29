@@ -151,7 +151,13 @@ public protocol Safrole {
     > { get }
     var ticketsVerifier: BandersnatchRingVRFRoot { get }
 
-    func updateSafrole(config: ProtocolConfigRef, slot: TimeslotIndex, entropy: Data32, extrinsics: ExtrinsicTickets) throws(SafroleError)
+    func updateSafrole(
+        config: ProtocolConfigRef,
+        slot: TimeslotIndex,
+        entropy: Data32,
+        offenders: Set<Ed25519PublicKey>,
+        extrinsics: ExtrinsicTickets
+    ) throws(SafroleError)
         -> (
             state: SafrolePostState,
             epochMark: EpochMarker?,
@@ -207,9 +213,30 @@ func pickFallbackValidators(
     return indices.map { validators[$0].bandersnatch }
 }
 
+func withoutOffenders(
+    offenders: Set<Ed25519PublicKey>,
+    validators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
+) -> ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators> {
+    var validators = validators
+
+    for i in validators.indices {
+        let validator = validators[i]
+        if offenders.contains(validator.ed25519) {
+            validators[i] = ValidatorKey() // replace to empty key
+        }
+    }
+
+    return validators
+}
+
 extension Safrole {
-    public func updateSafrole(config: ProtocolConfigRef, slot: TimeslotIndex, entropy: Data32,
-                              extrinsics: ExtrinsicTickets) throws(SafroleError)
+    public func updateSafrole(
+        config: ProtocolConfigRef,
+        slot: TimeslotIndex,
+        entropy: Data32,
+        offenders: Set<Ed25519PublicKey>,
+        extrinsics: ExtrinsicTickets
+    ) throws(SafroleError)
         -> (
             state: SafrolePostState,
             epochMark: EpochMarker?,
@@ -250,7 +277,7 @@ extension Safrole {
 
             let (newNextValidators, newCurrentValidators, newPreviousValidators, newTicketsVerifier) = isEpochChange
                 ? (
-                    validatorQueue, // TODO: Φ filter out the one in the punishment set
+                    withoutOffenders(offenders: offenders, validators: validatorQueue),
                     nextValidators,
                     currentValidators,
                     newVerifier.ringRoot

@@ -33,7 +33,7 @@ extension Ref where T == ProtocolConfig {
         maxEncodedWorkReportSize: 96 * 1 << 10,
         erasureCodedSegmentSize: 6,
         ticketSubmissionEndSlot: 500,
-        pvmDynamicAddressAlignmentFactor: 4,
+        pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
         pvmProgramInitPageSize: 1 << 14,
         pvmProgramInitSegmentSize: 1 << 16
@@ -70,7 +70,7 @@ extension Ref where T == ProtocolConfig {
         maxEncodedWorkReportSize: 96 * 1 << 10,
         erasureCodedSegmentSize: 6,
         ticketSubmissionEndSlot: 500,
-        pvmDynamicAddressAlignmentFactor: 4,
+        pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
         pvmProgramInitPageSize: 1 << 14,
         pvmProgramInitSegmentSize: 1 << 16
