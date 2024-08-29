@@ -6,4 +6,8 @@ import Testing
     import CoreFoundation
     import Security
 #endif
-@Test func example() async throws {}
+
+@Test func initialize() throws {
+    let quicApi = try QuicApi()
+    #expect(quicApi.api != nil)
+}
