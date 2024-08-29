@@ -34,7 +34,8 @@ jobs:
     - name: MsQuic Install Dependencies
       id: msquic-install-dependencies
       run: |
-        yes | sudo apt-add-repository ppa:lttng/stable-2.13
+        export DEBIAN_FRONTEND=noninteractive
+        sudo apt-add-repository ppa:lttng/stable-2.13 -y
         sudo apt-get update
         sudo apt-get install cmake
         sudo apt-get install build-essential
