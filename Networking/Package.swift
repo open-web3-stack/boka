@@ -36,7 +36,10 @@ let package = Package(
         ),
         .testTarget(
             name: "NetworkingTests",
-            dependencies: ["Networking"]
+            dependencies: [
+                "Networking",
+                .product(name: "Testing", package: "swift-testing"),
+            ]
         ),
     ]
 )
