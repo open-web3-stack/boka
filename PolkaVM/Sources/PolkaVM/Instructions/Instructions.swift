@@ -27,70 +27,6 @@ public let BASIC_BLOCK_INSTRUCTIONS: Set<UInt8> = [
 ]
 
 public enum Instructions {
-    public enum Constants {
-        public static let djumpHaltAddress: UInt32 = 0xFFFF_0000
-        public static let djumpAddressAlignmentFactor: Int = 2
-    }
-
-    static func decodeImmediate(_ data: Data) -> UInt32 {
-        let len = min(data.count, 4)
-        if len == 0 {
-            return 0
-        }
-        var value: UInt32 = 0
-        for i in 0 ..< len {
-            value = value | (UInt32(data[relative: i]) << (8 * i))
-        }
-        let shift = (4 - len) * 8
-        // shift left so that the MSB is the sign bit
-        // and then do signed shift right to fill the empty bits using the sign bit
-        // and then convert back to UInt32
-        return UInt32(bitPattern: Int32(bitPattern: value << shift) >> shift)
-    }
-
-    static func decodeImmediate2(_ data: Data, divideBy: UInt8 = 1, minus: Int = 1) throws -> (UInt32, UInt32) {
-        let lX1 = try Int((data.at(relative: 0) / divideBy) & 0b111)
-        let lX = min(4, lX1)
-        let lY = min(4, max(0, data.count - Int(lX) - minus))
-
-        let vX = try decodeImmediate(data.at(relative: 1 ..< 1 + lX))
-        let vY = try decodeImmediate(data.at(relative: (1 + lX) ..< (1 + lX + lY)))
-        return (vX, vY)
-    }
-
-    static func isBranchValid(state: VMState, offset: UInt32) -> Bool {
-        state.program.basicBlockIndices.contains(state.pc &+ offset)
-    }
-
-    static func isDjumpValid(state: VMState, target a: UInt32, targetAligned: UInt32) -> Bool {
-        let za = Constants.djumpAddressAlignmentFactor
-        return !(a == 0 ||
-            a > state.program.jumpTable.count * za ||
-            Int(a) % za != 0 ||
-            state.program.basicBlockIndices.contains(targetAligned))
-    }
-
-    static func djump(state: VMState, target: UInt32) -> ExecOutcome {
-        if target == Constants.djumpHaltAddress {
-            return .exit(.halt)
-        }
-
-        let entrySize = Int(state.program.jumpTableEntrySize)
-        let start = ((Int(target) / Constants.djumpAddressAlignmentFactor) - 1) * entrySize
-        let end = start + entrySize
-        var targetAlignedData = state.program.jumpTable[relative: start ..< end]
-        guard let targetAligned = targetAlignedData.decode() else {
-            fatalError("unreachable: jump table entry should be valid")
-        }
-
-        guard isDjumpValid(state: state, target: target, targetAligned: UInt32(truncatingIfNeeded: targetAligned)) else {
-            return .exit(.panic(.invalidDynamicJump))
-        }
-
-        state.updatePC(UInt32(targetAligned))
-        return .continued
-    }
-
     // MARK: Instructions without Arguments (5.1)
 
     public struct Trap: Instruction {
@@ -297,10 +233,8 @@ public enum Instructions {
         }
 
         public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            var data = try state.readMemory(address: address, length: 2)
-            guard let value: UInt16 = data.decode(length: 2) else {
-                fatalError("unreachable: value should be valid")
-            }
+            let data = try state.readMemory(address: address, length: 2)
+            let value = data.decode(UInt16.self)
             state.writeRegister(register, UInt32(value))
             return .continued
         }
@@ -318,10 +252,8 @@ public enum Instructions {
         }
 
         public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            var data = try state.readMemory(address: address, length: 2)
-            guard let value: UInt16 = data.decode(length: 2) else {
-                fatalError("unreachable: value should be valid")
-            }
+            let data = try state.readMemory(address: address, length: 2)
+            let value = data.decode(UInt16.self)
             state.writeRegister(register, UInt32(bitPattern: Int32(Int16(bitPattern: value))))
             return .continued
         }
@@ -339,10 +271,8 @@ public enum Instructions {
         }
 
         public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            var data = try state.readMemory(address: address, length: 4)
-            guard let value: UInt32 = data.decode(length: 4) else {
-                fatalError("unreachable: value should be valid")
-            }
+            let data = try state.readMemory(address: address, length: 4)
+            let value = data.decode(UInt32.self)
             state.writeRegister(register, value)
             return .continued
         }
@@ -601,8 +531,7 @@ public enum Instructions {
         public let dest: Registers.Index
 
         public init(data: Data) throws {
-            dest = try Registers.Index(ra: data.at(relative: 0))
-            src = try Registers.Index(rb: data.at(relative: 0))
+            (dest, src) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
@@ -618,8 +547,7 @@ public enum Instructions {
         public let dest: Registers.Index
 
         public init(data: Data) throws {
-            dest = try Registers.Index(ra: data.at(relative: 0))
-            src = try Registers.Index(rb: data.at(relative: 0))
+            (dest, src) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) throws -> ExecOutcome {
@@ -641,8 +569,7 @@ public enum Instructions {
         public let offset: UInt32
 
         public init(data: Data) throws {
-            src = try Registers.Index(ra: data.at(relative: 0))
-            dest = try Registers.Index(rb: data.at(relative: 0))
+            (src, dest) = try Instructions.deocdeRegisters(data)
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -661,8 +588,7 @@ public enum Instructions {
         public let offset: UInt32
 
         public init(data: Data) throws {
-            src = try Registers.Index(ra: data.at(relative: 0))
-            dest = try Registers.Index(rb: data.at(relative: 0))
+            (src, dest) = try Instructions.deocdeRegisters(data)
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -681,8 +607,7 @@ public enum Instructions {
         public let offset: UInt32
 
         public init(data: Data) throws {
-            src = try Registers.Index(ra: data.at(relative: 0))
-            dest = try Registers.Index(rb: data.at(relative: 0))
+            (src, dest) = try Instructions.deocdeRegisters(data)
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -701,8 +626,7 @@ public enum Instructions {
         public let offset: UInt32
 
         public init(data: Data) throws {
-            dest = try Registers.Index(ra: data.at(relative: 0))
-            src = try Registers.Index(rb: data.at(relative: 0))
+            (dest, src) = try Instructions.deocdeRegisters(data)
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -721,8 +645,7 @@ public enum Instructions {
         public let offset: UInt32
 
         public init(data: Data) throws {
-            dest = try Registers.Index(ra: data.at(relative: 0))
-            src = try Registers.Index(rb: data.at(relative: 0))
+            (dest, src) = try Instructions.deocdeRegisters(data)
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -741,16 +664,13 @@ public enum Instructions {
         public let offset: UInt32
 
         public init(data: Data) throws {
-            dest = try Registers.Index(ra: data.at(relative: 0))
-            src = try Registers.Index(rb: data.at(relative: 0))
+            (dest, src) = try Instructions.deocdeRegisters(data)
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
         public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            var data = try state.readMemory(address: state.readRegister(src) &+ offset, length: 2)
-            guard let value: UInt16 = data.decode(length: 2) else {
-                fatalError("unreachable: value should be valid")
-            }
+            let data = try state.readMemory(address: state.readRegister(src) &+ offset, length: 2)
+            let value = data.decode(UInt16.self)
             state.writeRegister(dest, UInt32(value))
             return .continued
         }
@@ -764,16 +684,13 @@ public enum Instructions {
         public let offset: UInt32
 
         public init(data: Data) throws {
-            dest = try Registers.Index(ra: data.at(relative: 0))
-            src = try Registers.Index(rb: data.at(relative: 0))
+            (dest, src) = try Instructions.deocdeRegisters(data)
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
         public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            var data = try state.readMemory(address: state.readRegister(src) &+ offset, length: 2)
-            guard let value: UInt16 = data.decode(length: 2) else {
-                fatalError("unreachable: value should be valid")
-            }
+            let data = try state.readMemory(address: state.readRegister(src) &+ offset, length: 2)
+            let value = data.decode(UInt16.self)
             state.writeRegister(dest, UInt32(bitPattern: Int32(Int16(bitPattern: value))))
             return .continued
         }
@@ -787,16 +704,13 @@ public enum Instructions {
         public let offset: UInt32
 
         public init(data: Data) throws {
-            dest = try Registers.Index(ra: data.at(relative: 0))
-            src = try Registers.Index(rb: data.at(relative: 0))
+            (dest, src) = try Instructions.deocdeRegisters(data)
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
         public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            var data = try state.readMemory(address: state.readRegister(src) &+ offset, length: 4)
-            guard let value: UInt32 = data.decode(length: 4) else {
-                fatalError("unreachable: value should be valid")
-            }
+            let data = try state.readMemory(address: state.readRegister(src) &+ offset, length: 4)
+            let value = data.decode(UInt32.self)
             state.writeRegister(dest, value)
             return .continued
         }
@@ -810,8 +724,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -830,8 +743,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -850,8 +762,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -870,8 +781,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -890,8 +800,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -910,8 +819,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -930,8 +838,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -950,8 +857,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -970,8 +876,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -990,8 +895,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -1011,8 +915,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -1032,8 +935,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -1053,8 +955,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -1073,8 +974,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -1093,8 +993,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -1113,8 +1012,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -1134,8 +1032,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -1155,8 +1052,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -1176,8 +1072,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -1196,8 +1091,7 @@ public enum Instructions {
         public let value: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
@@ -1281,8 +1175,7 @@ public enum Instructions {
         public let offset: UInt32
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
+            (ra, rb) = try Instructions.deocdeRegisters(data)
             (value, offset) = try Instructions.decodeImmediate2(data[relative: 1...], divideBy: 1, minus: 2)
         }
 
@@ -1307,14 +1200,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             state.writeRegister(rd, raVal &+ rbVal)
             return .continued
         }
@@ -1328,14 +1218,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             state.writeRegister(rd, raVal &- rbVal)
             return .continued
         }
@@ -1349,14 +1236,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             state.writeRegister(rd, raVal & rbVal)
             return .continued
         }
@@ -1370,14 +1254,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             state.writeRegister(rd, raVal ^ rbVal)
             return .continued
         }
@@ -1391,14 +1272,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             state.writeRegister(rd, raVal | rbVal)
             return .continued
         }
@@ -1412,14 +1290,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             state.writeRegister(rd, raVal &* rbVal)
             return .continued
         }
@@ -1433,14 +1308,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             state.writeRegister(rd, UInt32(bitPattern: Int32((Int64(Int32(bitPattern: raVal)) * Int64(Int32(bitPattern: rbVal))) >> 32)))
             return .continued
         }
@@ -1454,14 +1326,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             state.writeRegister(rd, UInt32((UInt64(raVal) * UInt64(rbVal)) >> 32))
             return .continued
         }
@@ -1475,14 +1344,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             state.writeRegister(rd, UInt32(bitPattern: Int32((Int64(Int32(bitPattern: raVal)) * Int64(Int32(bitPattern: rbVal))) >> 32)))
             return .continued
         }
@@ -1496,14 +1362,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             if rbVal == 0 {
                 state.writeRegister(rd, UInt32.max)
             } else {
@@ -1521,14 +1384,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             if rbVal == 0 {
                 state.writeRegister(rd, UInt32.max)
             } else if Int32(bitPattern: raVal) == Int32.min, Int32(bitPattern: rbVal) == -1 {
@@ -1548,14 +1408,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             if rbVal == 0 {
                 state.writeRegister(rd, raVal)
             } else {
@@ -1573,14 +1430,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             if rbVal == 0 {
                 state.writeRegister(rd, raVal)
             } else if Int32(bitPattern: raVal) == Int32.min, Int32(bitPattern: rbVal) == -1 {
@@ -1600,14 +1454,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             state.writeRegister(rd, raVal < rbVal ? 1 : 0)
             return .continued
         }
@@ -1621,14 +1472,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             state.writeRegister(rd, Int32(bitPattern: raVal) < Int32(bitPattern: rbVal) ? 1 : 0)
             return .continued
         }
@@ -1642,14 +1490,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             let shift = rbVal & 0x20
             state.writeRegister(rd, UInt32(truncatingIfNeeded: raVal << shift))
             return .continued
@@ -1664,14 +1509,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             let shift = rbVal & 0x20
             state.writeRegister(rd, raVal >> shift)
             return .continued
@@ -1686,14 +1528,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             let shift = rbVal & 0x20
             state.writeRegister(rd, UInt32(bitPattern: Int32(bitPattern: raVal) >> shift))
             return .continued
@@ -1708,14 +1547,11 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             if rbVal == 0 {
                 state.writeRegister(rd, raVal)
             }
@@ -1731,142 +1567,15 @@ public enum Instructions {
         public let rd: Registers.Index
 
         public init(data: Data) throws {
-            ra = try Registers.Index(ra: data.at(relative: 0))
-            rb = try Registers.Index(rb: data.at(relative: 0))
-            rd = try Registers.Index(rd: data.at(relative: 1))
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(state: VMState) -> ExecOutcome {
-            let raVal = state.readRegister(ra)
-            let rbVal = state.readRegister(rb)
+            let (raVal, rbVal) = state.readRegister(ra, rb)
             if rbVal != 0 {
                 state.writeRegister(rd, raVal)
             }
             return .continued
         }
-    }
-}
-
-// MARK: Branch Helpers
-
-protocol BranchCompare {
-    static func compare(a: UInt32, b: UInt32) -> Bool
-}
-
-// for branch in A.5.7
-protocol BranchInstructionBase<Compare>: Instruction {
-    associatedtype Compare: BranchCompare
-
-    var register: Registers.Index { get set }
-    var value: UInt32 { get set }
-    var offset: UInt32 { get set }
-
-    func _executeImpl(state _: VMState) throws -> ExecOutcome
-    func updatePC(state: VMState, skip: UInt32) -> ExecOutcome
-    func condition(state: VMState) -> Bool
-}
-
-extension BranchInstructionBase {
-    public static func parse(data: Data) throws -> (Registers.Index, UInt32, UInt32) {
-        let register = try Registers.Index(ra: data.at(relative: 0))
-        let (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        return (register, value, offset)
-    }
-
-    public func _executeImpl(state _: VMState) throws -> ExecOutcome { .continued }
-
-    public func updatePC(state: VMState, skip: UInt32) -> ExecOutcome {
-        guard Instructions.isBranchValid(state: state, offset: offset) else {
-            return .exit(.panic(.invalidBranch))
-        }
-        if condition(state: state) {
-            state.increasePC(offset)
-        } else {
-            state.increasePC(skip + 1)
-        }
-        return .continued
-    }
-
-    public func condition(state: VMState) -> Bool {
-        let regVal = state.readRegister(register)
-        return Compare.compare(a: regVal, b: value)
-    }
-}
-
-// for branch in A.5.10
-protocol BranchInstructionBase2<Compare>: Instruction {
-    associatedtype Compare: BranchCompare
-
-    var r1: Registers.Index { get set }
-    var r2: Registers.Index { get set }
-    var offset: UInt32 { get set }
-
-    func _executeImpl(state _: VMState) throws -> ExecOutcome
-    func updatePC(state: VMState, skip: UInt32) -> ExecOutcome
-    func condition(state: VMState) -> Bool
-}
-
-extension BranchInstructionBase2 {
-    public static func parse(data: Data) throws -> (Registers.Index, Registers.Index, UInt32) {
-        let offset = try Instructions.decodeImmediate(data.at(relative: 1...))
-        let r1 = try Registers.Index(ra: data.at(relative: 0))
-        let r2 = try Registers.Index(rb: data.at(relative: 0))
-        return (r1, r2, offset)
-    }
-
-    public func _executeImpl(state _: VMState) throws -> ExecOutcome { .continued }
-
-    public func updatePC(state: VMState, skip: UInt32) -> ExecOutcome {
-        guard Instructions.isBranchValid(state: state, offset: offset) else {
-            return .exit(.panic(.invalidBranch))
-        }
-        if condition(state: state) {
-            state.increasePC(offset)
-        } else {
-            state.increasePC(skip + 1)
-        }
-        return .continued
-    }
-
-    public func condition(state: VMState) -> Bool {
-        let r1Val = state.readRegister(r1)
-        let r2Val = state.readRegister(r2)
-        return Compare.compare(a: r1Val, b: r2Val)
-    }
-}
-
-public struct CompareEq: BranchCompare {
-    public static func compare(a: UInt32, b: UInt32) -> Bool {
-        Int32(bitPattern: a) == Int32(bitPattern: b)
-    }
-}
-
-public struct CompareNe: BranchCompare {
-    public static func compare(a: UInt32, b: UInt32) -> Bool {
-        Int32(bitPattern: a) != Int32(bitPattern: b)
-    }
-}
-
-public struct CompareLt: BranchCompare {
-    public static func compare(a: UInt32, b: UInt32) -> Bool {
-        a < b
-    }
-}
-
-public struct CompareLe: BranchCompare {
-    public static func compare(a: UInt32, b: UInt32) -> Bool {
-        a <= b
-    }
-}
-
-public struct CompareGe: BranchCompare {
-    public static func compare(a: UInt32, b: UInt32) -> Bool {
-        a >= b
-    }
-}
-
-public struct CompareGt: BranchCompare {
-    public static func compare(a: UInt32, b: UInt32) -> Bool {
-        a > b
     }
 }
