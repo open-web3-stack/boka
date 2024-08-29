@@ -1086,8 +1086,10 @@ public enum Instructions {
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal = context.state.readRegister(rb)
-            context.state.writeRegister(ra, regVal == 0 ? value : regVal)
+            let rbVal = context.state.readRegister(rb)
+            if rbVal == 0 {
+                context.state.writeRegister(ra, value)
+            }
             return .continued
         }
     }
