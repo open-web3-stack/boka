@@ -12,8 +12,6 @@ system=$(uname -s)
 
 arch=$(uname -m)
 
-
-
 cd Networking/Sources/msquic || { echo "Submodule directory not found"; exit 1; }
 
 rm -rf build

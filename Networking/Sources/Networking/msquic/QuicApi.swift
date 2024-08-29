@@ -1,19 +1,23 @@
 import Foundation
 import msquic
 
-struct QuicApi {
-    public let api: UnsafePointer<QuicApiTable>
-    public let registration: HQuic
+public final class QuicApi {
+    public private(set) var api: UnsafePointer<QuicApiTable>
+    public private(set) var registration: HQuic
 
     init() throws {
         var rawPointer: UnsafeRawPointer?
         let status = MsQuicOpenVersion(2, &rawPointer)
 
         if QuicStatus(status).isFailed {
-            throw QuicError.invalidStatus(status: status.statusCode)
+            throw QuicError.invalidStatus(status: status.code)
         }
 
-        guard let boundPointer = rawPointer?.assumingMemoryBound(to: QUIC_API_TABLE.self) else {
+        guard
+            let boundPointer: UnsafePointer<QuicApiTable> = rawPointer?.assumingMemoryBound(
+                to: QuicApiTable.self
+            )
+        else {
             throw QuicError.getApiFailed
         }
 
@@ -24,7 +28,7 @@ struct QuicApi {
 
         if QuicStatus(registrationStatus).isFailed {
             MsQuicClose(api)
-            throw QuicError.invalidStatus(status: registrationStatus.statusCode)
+            throw QuicError.invalidStatus(status: registrationStatus.code)
         }
 
         guard let regHandle = registrationHandle else {
@@ -35,8 +39,12 @@ struct QuicApi {
         registration = regHandle
     }
 
-    mutating func release() {
+    func release() {
         api.pointee.RegistrationClose(registration)
         MsQuicClose(api)
+    }
+
+    deinit {
+        release()
     }
 }

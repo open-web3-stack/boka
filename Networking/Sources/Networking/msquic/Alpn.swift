@@ -23,25 +23,28 @@ struct Alpn {
         return "\(protocolString)/\(version)/\(headerPrefix)"
     }
 
-    func data2String(data: Data) -> String {
+    private func data2String(data: Data) -> String {
         let uint8Array = [UInt8](data)
         let characters = uint8Array.map { Character(UnicodeScalar($0)) }
         return String(characters)
     }
 
-    var rawValue: QUIC_BUFFER {
+    var rawValue: QuicBuffer {
         let alpnData = alpnString.data(using: .utf8)!
-        var buffer = QUIC_BUFFER()
-        buffer.Length = UInt32(alpnData.count)
-        alpnData.withUnsafeBytes { rawBufferPointer in
-            buffer.Buffer = UnsafeMutablePointer<UInt8>(
-                mutating: rawBufferPointer.bindMemory(to: UInt8.self).baseAddress!
-            )
-        }
-        return buffer
+        let count = alpnData.count
+        return QuicBuffer(
+            Length: UInt32(count),
+            Buffer: alpnData.withUnsafeBytes { bytes -> UnsafeMutablePointer<UInt8> in
+                let pointer = UnsafeMutablePointer<UInt8>.allocate(capacity: count)
+                pointer.initialize(
+                    from: bytes.bindMemory(to: UInt8.self).baseAddress!, count: count
+                )
+                return pointer
+            }
+        )
     }
 
-    var rawValuePointer: UnsafePointer<QUIC_BUFFER> {
+    var rawValuePointer: UnsafePointer<QuicBuffer> {
         withUnsafePointer(to: rawValue) { $0 }
     }
 }

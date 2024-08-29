@@ -31,6 +31,15 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
+    - name: MsQuic Install Dependencies
+      id: msquic-install-dependencies
+      run: |
+        sudo apt-add-repository ppa:lttng/stable-2.13
+        sudo apt-get update
+        sudo apt-get install cmake
+        sudo apt-get install build-essential
+        sudo apt-get install liblttng-ust-dev
+        sudo apt-get install lttng-tools
     - name: Get msquic submodule commit hash
       id: msquic-commit-hash
       run: |

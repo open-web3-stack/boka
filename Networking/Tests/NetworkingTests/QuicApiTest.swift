@@ -8,7 +8,7 @@ import Testing
 
 @testable import Networking
 
-struct QuicApiTests {
+final class QuicApiTests {
     @Test func initialize() throws {
         #expect(try QuicApi() != nil)
     }

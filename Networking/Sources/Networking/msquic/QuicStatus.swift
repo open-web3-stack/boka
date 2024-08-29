@@ -1,5 +1,4 @@
 import Foundation
-import msquic
 
 extension QuicStatus {
     var isFailed: Bool {
@@ -10,7 +9,7 @@ extension QuicStatus {
         self <= 0
     }
 
-    var statusCode: QuicStatusCode {
+    var code: QuicStatusCode {
         QuicStatusCode.from(rawValue: self)
     }
 }
