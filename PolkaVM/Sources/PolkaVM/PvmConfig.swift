@@ -11,3 +11,17 @@ public protocol PvmConfig {
     // ZQ = 2^16: The standard pvm program initialization segment size.
     var pvmProgramInitSegmentSize: Int { get }
 }
+
+public struct DefaultPvmConfig: PvmConfig {
+    public let pvmDynamicAddressAlignmentFactor: Int
+    public let pvmProgramInitInputDataSize: Int
+    public let pvmProgramInitPageSize: Int
+    public let pvmProgramInitSegmentSize: Int
+
+    public init() {
+        pvmDynamicAddressAlignmentFactor = 2
+        pvmProgramInitInputDataSize = 1 << 24
+        pvmProgramInitPageSize = 1 << 14
+        pvmProgramInitSegmentSize = 1 << 16
+    }
+}

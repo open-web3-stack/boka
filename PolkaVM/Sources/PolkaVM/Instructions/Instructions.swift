@@ -34,7 +34,7 @@ public enum Instructions {
 
         public init(data _: Data) {}
 
-        public func _executeImpl(state _: VMState) -> ExecOutcome {
+        public func _executeImpl(context _: ExecutionContext) -> ExecOutcome {
             .exit(.panic(.trap))
         }
     }
@@ -44,7 +44,7 @@ public enum Instructions {
 
         public init(data _: Data) {}
 
-        public func _executeImpl(state _: VMState) -> ExecOutcome { .continued }
+        public func _executeImpl(context _: ExecutionContext) -> ExecOutcome { .continued }
     }
 
     // MARK: Instructions with Arguments of One Immediate (5.2)
@@ -58,7 +58,7 @@ public enum Instructions {
             callIndex = Instructions.decodeImmediate(data)
         }
 
-        public func _executeImpl(state _: VMState) -> ExecOutcome {
+        public func _executeImpl(context _: ExecutionContext) -> ExecOutcome {
             .exit(.hostCall(callIndex))
         }
     }
@@ -77,8 +77,8 @@ public enum Instructions {
             value = UInt8(truncatingIfNeeded: y)
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            try state.writeMemory(address: address, value: value)
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            try context.state.writeMemory(address: address, value: value)
             return .continued
         }
     }
@@ -95,8 +95,8 @@ public enum Instructions {
             value = UInt16(truncatingIfNeeded: y)
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            try state.writeMemory(address: address, values: value.encode(method: .fixedWidth(2)))
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(2)))
             return .continued
         }
     }
@@ -113,8 +113,8 @@ public enum Instructions {
             value = y
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            if (try? state.writeMemory(
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            if (try? context.state.writeMemory(
                 address: address, values: value.encode(method: .fixedWidth(4))
             )) != nil {
                 return .continued
@@ -136,13 +136,13 @@ public enum Instructions {
             offset = Instructions.decodeImmediate(data)
         }
 
-        public func _executeImpl(state _: VMState) -> ExecOutcome { .continued }
+        public func _executeImpl(context _: ExecutionContext) -> ExecOutcome { .continued }
 
-        public func updatePC(state: VMState, skip _: UInt32) -> ExecOutcome {
-            guard Instructions.isBranchValid(state: state, offset: offset) else {
+        public func updatePC(context: ExecutionContext, skip _: UInt32) -> ExecOutcome {
+            guard Instructions.isBranchValid(context: context, offset: offset) else {
                 return .exit(.panic(.invalidBranch))
             }
-            state.increasePC(offset)
+            context.state.increasePC(offset)
             return .continued
         }
     }
@@ -160,11 +160,11 @@ public enum Instructions {
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state _: VMState) -> ExecOutcome { .continued }
+        public func _executeImpl(context _: ExecutionContext) -> ExecOutcome { .continued }
 
-        public func updatePC(state: VMState, skip _: UInt32) -> ExecOutcome {
-            let regVal = state.readRegister(register)
-            return Instructions.djump(state: state, target: regVal &+ offset)
+        public func updatePC(context: ExecutionContext, skip _: UInt32) -> ExecOutcome {
+            let regVal = context.state.readRegister(register)
+            return Instructions.djump(context: context, target: regVal &+ offset)
         }
     }
 
@@ -179,8 +179,8 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            state.writeRegister(register, value)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            context.state.writeRegister(register, value)
             return .continued
         }
     }
@@ -196,9 +196,9 @@ public enum Instructions {
             address = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            let value = try state.readMemory(address: address)
-            state.writeRegister(register, UInt32(value))
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let value = try context.state.readMemory(address: address)
+            context.state.writeRegister(register, UInt32(value))
             return .continued
         }
     }
@@ -214,9 +214,9 @@ public enum Instructions {
             address = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            let value = try state.readMemory(address: address)
-            state.writeRegister(register, UInt32(bitPattern: Int32(Int8(bitPattern: value))))
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let value = try context.state.readMemory(address: address)
+            context.state.writeRegister(register, UInt32(bitPattern: Int32(Int8(bitPattern: value))))
             return .continued
         }
     }
@@ -232,10 +232,10 @@ public enum Instructions {
             address = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            let data = try state.readMemory(address: address, length: 2)
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let data = try context.state.readMemory(address: address, length: 2)
             let value = data.decode(UInt16.self)
-            state.writeRegister(register, UInt32(value))
+            context.state.writeRegister(register, UInt32(value))
             return .continued
         }
     }
@@ -251,10 +251,10 @@ public enum Instructions {
             address = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            let data = try state.readMemory(address: address, length: 2)
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let data = try context.state.readMemory(address: address, length: 2)
             let value = data.decode(UInt16.self)
-            state.writeRegister(register, UInt32(bitPattern: Int32(Int16(bitPattern: value))))
+            context.state.writeRegister(register, UInt32(bitPattern: Int32(Int16(bitPattern: value))))
             return .continued
         }
     }
@@ -270,10 +270,10 @@ public enum Instructions {
             address = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            let data = try state.readMemory(address: address, length: 4)
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let data = try context.state.readMemory(address: address, length: 4)
             let value = data.decode(UInt32.self)
-            state.writeRegister(register, value)
+            context.state.writeRegister(register, value)
             return .continued
         }
     }
@@ -289,9 +289,9 @@ public enum Instructions {
             address = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            let value = UInt8(truncatingIfNeeded: state.readRegister(register))
-            try state.writeMemory(address: address, value: value)
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let value = UInt8(truncatingIfNeeded: context.state.readRegister(register))
+            try context.state.writeMemory(address: address, value: value)
             return .continued
         }
     }
@@ -307,9 +307,9 @@ public enum Instructions {
             address = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            let value = UInt16(truncatingIfNeeded: state.readRegister(register))
-            try state.writeMemory(address: address, values: value.encode(method: .fixedWidth(2)))
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let value = UInt16(truncatingIfNeeded: context.state.readRegister(register))
+            try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(2)))
             return .continued
         }
     }
@@ -325,9 +325,9 @@ public enum Instructions {
             address = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            let value = state.readRegister(register)
-            try state.writeMemory(address: address, values: value.encode(method: .fixedWidth(4)))
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let value = context.state.readRegister(register)
+            try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(4)))
             return .continued
         }
     }
@@ -348,8 +348,8 @@ public enum Instructions {
             value = UInt8(truncatingIfNeeded: y)
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            try state.writeMemory(address: state.readRegister(register) &+ address, value: value)
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            try context.state.writeMemory(address: context.state.readRegister(register) &+ address, value: value)
             return .continued
         }
     }
@@ -368,8 +368,11 @@ public enum Instructions {
             value = UInt16(truncatingIfNeeded: y)
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            try state.writeMemory(address: state.readRegister(register) &+ address, values: value.encode(method: .fixedWidth(2)))
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            try context.state.writeMemory(
+                address: context.state.readRegister(register) &+ address,
+                values: value.encode(method: .fixedWidth(2))
+            )
             return .continued
         }
     }
@@ -388,8 +391,11 @@ public enum Instructions {
             value = y
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            try state.writeMemory(address: state.readRegister(register) &+ address, values: value.encode(method: .fixedWidth(4)))
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            try context.state.writeMemory(
+                address: context.state.readRegister(register) &+ address,
+                values: value.encode(method: .fixedWidth(4))
+            )
             return .continued
         }
     }
@@ -408,16 +414,16 @@ public enum Instructions {
             (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            state.writeRegister(register, value)
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            context.state.writeRegister(register, value)
             return .continued
         }
 
-        public func updatePC(state: VMState, skip _: UInt32) -> ExecOutcome {
-            guard Instructions.isBranchValid(state: state, offset: offset) else {
+        public func updatePC(context: ExecutionContext, skip _: UInt32) -> ExecOutcome {
+            guard Instructions.isBranchValid(context: context, offset: offset) else {
                 return .exit(.panic(.invalidBranch))
             }
-            state.increasePC(offset)
+            context.state.increasePC(offset)
             return .continued
         }
     }
@@ -534,8 +540,8 @@ public enum Instructions {
             (dest, src) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            state.writeRegister(dest, state.readRegister(src))
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            context.state.writeRegister(dest, context.state.readRegister(src))
             return .continued
         }
     }
@@ -550,10 +556,10 @@ public enum Instructions {
             (dest, src) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            let increment = state.readRegister(src)
-            let startAddr = try state.sbrk(increment)
-            state.writeRegister(dest, startAddr)
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let increment = context.state.readRegister(src)
+            let startAddr = try context.state.sbrk(increment)
+            context.state.writeRegister(dest, startAddr)
 
             return .continued
         }
@@ -573,9 +579,9 @@ public enum Instructions {
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            let value = UInt8(truncatingIfNeeded: state.readRegister(src))
-            try state.writeMemory(address: state.readRegister(dest) &+ offset, value: value)
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let value = UInt8(truncatingIfNeeded: context.state.readRegister(src))
+            try context.state.writeMemory(address: context.state.readRegister(dest) &+ offset, value: value)
             return .continued
         }
     }
@@ -592,9 +598,9 @@ public enum Instructions {
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            let value = UInt16(truncatingIfNeeded: state.readRegister(src))
-            try state.writeMemory(address: state.readRegister(dest) &+ offset, values: value.encode(method: .fixedWidth(2)))
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let value = UInt16(truncatingIfNeeded: context.state.readRegister(src))
+            try context.state.writeMemory(address: context.state.readRegister(dest) &+ offset, values: value.encode(method: .fixedWidth(2)))
             return .continued
         }
     }
@@ -611,9 +617,9 @@ public enum Instructions {
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            let value = state.readRegister(src)
-            try state.writeMemory(address: state.readRegister(dest) &+ offset, values: value.encode(method: .fixedWidth(4)))
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let value = context.state.readRegister(src)
+            try context.state.writeMemory(address: context.state.readRegister(dest) &+ offset, values: value.encode(method: .fixedWidth(4)))
             return .continued
         }
     }
@@ -630,9 +636,9 @@ public enum Instructions {
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            let value = try state.readMemory(address: state.readRegister(src) + offset)
-            state.writeRegister(dest, UInt32(value))
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let value = try context.state.readMemory(address: context.state.readRegister(src) + offset)
+            context.state.writeRegister(dest, UInt32(value))
             return .continued
         }
     }
@@ -649,9 +655,9 @@ public enum Instructions {
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            let value = try state.readMemory(address: state.readRegister(src) + offset)
-            state.writeRegister(dest, UInt32(bitPattern: Int32(Int8(bitPattern: value))))
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let value = try context.state.readMemory(address: context.state.readRegister(src) + offset)
+            context.state.writeRegister(dest, UInt32(bitPattern: Int32(Int8(bitPattern: value))))
             return .continued
         }
     }
@@ -668,10 +674,10 @@ public enum Instructions {
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            let data = try state.readMemory(address: state.readRegister(src) &+ offset, length: 2)
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let data = try context.state.readMemory(address: context.state.readRegister(src) &+ offset, length: 2)
             let value = data.decode(UInt16.self)
-            state.writeRegister(dest, UInt32(value))
+            context.state.writeRegister(dest, UInt32(value))
             return .continued
         }
     }
@@ -688,10 +694,10 @@ public enum Instructions {
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            let data = try state.readMemory(address: state.readRegister(src) &+ offset, length: 2)
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let data = try context.state.readMemory(address: context.state.readRegister(src) &+ offset, length: 2)
             let value = data.decode(UInt16.self)
-            state.writeRegister(dest, UInt32(bitPattern: Int32(Int16(bitPattern: value))))
+            context.state.writeRegister(dest, UInt32(bitPattern: Int32(Int16(bitPattern: value))))
             return .continued
         }
     }
@@ -708,10 +714,10 @@ public enum Instructions {
             offset = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            let data = try state.readMemory(address: state.readRegister(src) &+ offset, length: 4)
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let data = try context.state.readMemory(address: context.state.readRegister(src) &+ offset, length: 4)
             let value = data.decode(UInt32.self)
-            state.writeRegister(dest, value)
+            context.state.writeRegister(dest, value)
             return .continued
         }
     }
@@ -728,9 +734,9 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
-            state.writeRegister(ra, regVal &+ value)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
+            context.state.writeRegister(ra, regVal &+ value)
             return .continued
         }
     }
@@ -747,9 +753,9 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
-            state.writeRegister(ra, regVal & value)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
+            context.state.writeRegister(ra, regVal & value)
             return .continued
         }
     }
@@ -766,9 +772,9 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
-            state.writeRegister(ra, regVal ^ value)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
+            context.state.writeRegister(ra, regVal ^ value)
             return .continued
         }
     }
@@ -785,9 +791,9 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
-            state.writeRegister(ra, regVal | value)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
+            context.state.writeRegister(ra, regVal | value)
             return .continued
         }
     }
@@ -804,9 +810,9 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
-            state.writeRegister(ra, regVal &* value)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
+            context.state.writeRegister(ra, regVal &* value)
             return .continued
         }
     }
@@ -823,9 +829,12 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
-            state.writeRegister(ra, UInt32(bitPattern: Int32((Int64(Int32(bitPattern: regVal)) * Int64(Int32(bitPattern: value))) >> 32)))
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
+            context.state.writeRegister(
+                ra,
+                UInt32(bitPattern: Int32((Int64(Int32(bitPattern: regVal)) * Int64(Int32(bitPattern: value))) >> 32))
+            )
             return .continued
         }
     }
@@ -842,9 +851,9 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
-            state.writeRegister(ra, UInt32((UInt64(regVal) * UInt64(value)) >> 32))
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
+            context.state.writeRegister(ra, UInt32((UInt64(regVal) * UInt64(value)) >> 32))
             return .continued
         }
     }
@@ -861,9 +870,9 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
-            state.writeRegister(ra, regVal < value ? 1 : 0)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
+            context.state.writeRegister(ra, regVal < value ? 1 : 0)
             return .continued
         }
     }
@@ -880,9 +889,9 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
-            state.writeRegister(ra, Int32(bitPattern: regVal) < Int32(bitPattern: value) ? 1 : 0)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
+            context.state.writeRegister(ra, Int32(bitPattern: regVal) < Int32(bitPattern: value) ? 1 : 0)
             return .continued
         }
     }
@@ -899,10 +908,10 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
             let shift = value & 0x20
-            state.writeRegister(ra, UInt32(truncatingIfNeeded: regVal << shift))
+            context.state.writeRegister(ra, UInt32(truncatingIfNeeded: regVal << shift))
             return .continued
         }
     }
@@ -919,10 +928,10 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
             let shift = value & 0x20
-            state.writeRegister(ra, regVal >> shift)
+            context.state.writeRegister(ra, regVal >> shift)
             return .continued
         }
     }
@@ -939,10 +948,10 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
             let shift = value & 0x20
-            state.writeRegister(ra, UInt32(bitPattern: Int32(bitPattern: regVal) >> shift))
+            context.state.writeRegister(ra, UInt32(bitPattern: Int32(bitPattern: regVal) >> shift))
             return .continued
         }
     }
@@ -959,9 +968,9 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
-            state.writeRegister(ra, regVal &- value)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
+            context.state.writeRegister(ra, regVal &- value)
             return .continued
         }
     }
@@ -978,9 +987,9 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
-            state.writeRegister(ra, regVal > value ? 1 : 0)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
+            context.state.writeRegister(ra, regVal > value ? 1 : 0)
             return .continued
         }
     }
@@ -997,9 +1006,9 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
-            state.writeRegister(ra, Int32(bitPattern: regVal) > Int32(bitPattern: value) ? 1 : 0)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
+            context.state.writeRegister(ra, Int32(bitPattern: regVal) > Int32(bitPattern: value) ? 1 : 0)
             return .continued
         }
     }
@@ -1016,10 +1025,10 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
             let shift = regVal & 0x20
-            state.writeRegister(ra, UInt32(truncatingIfNeeded: value << shift))
+            context.state.writeRegister(ra, UInt32(truncatingIfNeeded: value << shift))
             return .continued
         }
     }
@@ -1036,10 +1045,10 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
             let shift = regVal & 0x20
-            state.writeRegister(ra, value >> shift)
+            context.state.writeRegister(ra, value >> shift)
             return .continued
         }
     }
@@ -1056,10 +1065,10 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
             let shift = regVal & 0x20
-            state.writeRegister(ra, UInt32(bitPattern: Int32(bitPattern: value) >> shift))
+            context.state.writeRegister(ra, UInt32(bitPattern: Int32(bitPattern: value) >> shift))
             return .continued
         }
     }
@@ -1076,9 +1085,9 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
-            state.writeRegister(ra, regVal == 0 ? value : regVal)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
+            context.state.writeRegister(ra, regVal == 0 ? value : regVal)
             return .continued
         }
     }
@@ -1095,9 +1104,9 @@ public enum Instructions {
             value = try Instructions.decodeImmediate(data.at(relative: 1...))
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let regVal = state.readRegister(rb)
-            state.writeRegister(ra, regVal != 0 ? value : regVal)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let regVal = context.state.readRegister(rb)
+            context.state.writeRegister(ra, regVal != 0 ? value : regVal)
             return .continued
         }
     }
@@ -1179,14 +1188,14 @@ public enum Instructions {
             (value, offset) = try Instructions.decodeImmediate2(data[relative: 1...], divideBy: 1, minus: 2)
         }
 
-        public func _executeImpl(state: VMState) throws -> ExecOutcome {
-            state.writeRegister(ra, value)
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            context.state.writeRegister(ra, value)
             return .continued
         }
 
-        public func updatePC(state: VMState, skip _: UInt32) -> ExecOutcome {
-            let rbVal = state.readRegister(rb)
-            return Instructions.djump(state: state, target: rbVal &+ offset)
+        public func updatePC(context: ExecutionContext, skip _: UInt32) -> ExecOutcome {
+            let rbVal = context.state.readRegister(rb)
+            return Instructions.djump(context: context, target: rbVal &+ offset)
         }
     }
 
@@ -1203,9 +1212,9 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
-            state.writeRegister(rd, raVal &+ rbVal)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, raVal &+ rbVal)
             return .continued
         }
     }
@@ -1221,9 +1230,9 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
-            state.writeRegister(rd, raVal &- rbVal)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, raVal &- rbVal)
             return .continued
         }
     }
@@ -1239,9 +1248,9 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
-            state.writeRegister(rd, raVal & rbVal)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, raVal & rbVal)
             return .continued
         }
     }
@@ -1257,9 +1266,9 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
-            state.writeRegister(rd, raVal ^ rbVal)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, raVal ^ rbVal)
             return .continued
         }
     }
@@ -1275,9 +1284,9 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
-            state.writeRegister(rd, raVal | rbVal)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, raVal | rbVal)
             return .continued
         }
     }
@@ -1293,9 +1302,9 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
-            state.writeRegister(rd, raVal &* rbVal)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, raVal &* rbVal)
             return .continued
         }
     }
@@ -1311,9 +1320,12 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
-            state.writeRegister(rd, UInt32(bitPattern: Int32((Int64(Int32(bitPattern: raVal)) * Int64(Int32(bitPattern: rbVal))) >> 32)))
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(
+                rd,
+                UInt32(bitPattern: Int32((Int64(Int32(bitPattern: raVal)) * Int64(Int32(bitPattern: rbVal))) >> 32))
+            )
             return .continued
         }
     }
@@ -1329,9 +1341,9 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
-            state.writeRegister(rd, UInt32((UInt64(raVal) * UInt64(rbVal)) >> 32))
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, UInt32((UInt64(raVal) * UInt64(rbVal)) >> 32))
             return .continued
         }
     }
@@ -1347,9 +1359,12 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
-            state.writeRegister(rd, UInt32(bitPattern: Int32((Int64(Int32(bitPattern: raVal)) * Int64(Int32(bitPattern: rbVal))) >> 32)))
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(
+                rd,
+                UInt32(bitPattern: Int32((Int64(Int32(bitPattern: raVal)) * Int64(Int32(bitPattern: rbVal))) >> 32))
+            )
             return .continued
         }
     }
@@ -1365,12 +1380,12 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
             if rbVal == 0 {
-                state.writeRegister(rd, UInt32.max)
+                context.state.writeRegister(rd, UInt32.max)
             } else {
-                state.writeRegister(rd, raVal / rbVal)
+                context.state.writeRegister(rd, raVal / rbVal)
             }
             return .continued
         }
@@ -1387,14 +1402,14 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
             if rbVal == 0 {
-                state.writeRegister(rd, UInt32.max)
+                context.state.writeRegister(rd, UInt32.max)
             } else if Int32(bitPattern: raVal) == Int32.min, Int32(bitPattern: rbVal) == -1 {
-                state.writeRegister(rd, raVal)
+                context.state.writeRegister(rd, raVal)
             } else {
-                state.writeRegister(rd, UInt32(bitPattern: Int32(bitPattern: raVal) / Int32(bitPattern: rbVal)))
+                context.state.writeRegister(rd, UInt32(bitPattern: Int32(bitPattern: raVal) / Int32(bitPattern: rbVal)))
             }
             return .continued
         }
@@ -1411,12 +1426,12 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
             if rbVal == 0 {
-                state.writeRegister(rd, raVal)
+                context.state.writeRegister(rd, raVal)
             } else {
-                state.writeRegister(rd, raVal % rbVal)
+                context.state.writeRegister(rd, raVal % rbVal)
             }
             return .continued
         }
@@ -1433,14 +1448,14 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
             if rbVal == 0 {
-                state.writeRegister(rd, raVal)
+                context.state.writeRegister(rd, raVal)
             } else if Int32(bitPattern: raVal) == Int32.min, Int32(bitPattern: rbVal) == -1 {
-                state.writeRegister(rd, 0)
+                context.state.writeRegister(rd, 0)
             } else {
-                state.writeRegister(rd, UInt32(bitPattern: Int32(bitPattern: raVal) % Int32(bitPattern: rbVal)))
+                context.state.writeRegister(rd, UInt32(bitPattern: Int32(bitPattern: raVal) % Int32(bitPattern: rbVal)))
             }
             return .continued
         }
@@ -1457,9 +1472,9 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
-            state.writeRegister(rd, raVal < rbVal ? 1 : 0)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, raVal < rbVal ? 1 : 0)
             return .continued
         }
     }
@@ -1475,9 +1490,9 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
-            state.writeRegister(rd, Int32(bitPattern: raVal) < Int32(bitPattern: rbVal) ? 1 : 0)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, Int32(bitPattern: raVal) < Int32(bitPattern: rbVal) ? 1 : 0)
             return .continued
         }
     }
@@ -1493,10 +1508,10 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
             let shift = rbVal & 0x20
-            state.writeRegister(rd, UInt32(truncatingIfNeeded: raVal << shift))
+            context.state.writeRegister(rd, UInt32(truncatingIfNeeded: raVal << shift))
             return .continued
         }
     }
@@ -1512,10 +1527,10 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
             let shift = rbVal & 0x20
-            state.writeRegister(rd, raVal >> shift)
+            context.state.writeRegister(rd, raVal >> shift)
             return .continued
         }
     }
@@ -1531,10 +1546,10 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
             let shift = rbVal & 0x20
-            state.writeRegister(rd, UInt32(bitPattern: Int32(bitPattern: raVal) >> shift))
+            context.state.writeRegister(rd, UInt32(bitPattern: Int32(bitPattern: raVal) >> shift))
             return .continued
         }
     }
@@ -1550,10 +1565,10 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
             if rbVal == 0 {
-                state.writeRegister(rd, raVal)
+                context.state.writeRegister(rd, raVal)
             }
             return .continued
         }
@@ -1570,10 +1585,10 @@ public enum Instructions {
             (ra, rb, rd) = try Instructions.deocdeRegisters(data)
         }
 
-        public func _executeImpl(state: VMState) -> ExecOutcome {
-            let (raVal, rbVal) = state.readRegister(ra, rb)
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal) = context.state.readRegister(ra, rb)
             if rbVal != 0 {
-                state.writeRegister(rd, raVal)
+                context.state.writeRegister(rd, raVal)
             }
             return .continued
         }

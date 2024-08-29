@@ -3,7 +3,6 @@ import Foundation
 extension Instructions {
     enum Constants {
         static let djumpHaltAddress: UInt32 = 0xFFFF_0000
-        static let djumpAddressAlignmentFactor: Int = 2
     }
 
     static func decodeImmediate(_ data: Data) -> UInt32 {
@@ -32,36 +31,36 @@ extension Instructions {
         return (vX, vY)
     }
 
-    static func isBranchValid(state: VMState, offset: UInt32) -> Bool {
-        state.program.basicBlockIndices.contains(state.pc &+ offset)
+    static func isBranchValid(context: ExecutionContext, offset: UInt32) -> Bool {
+        context.state.program.basicBlockIndices.contains(context.state.pc &+ offset)
     }
 
-    static func isDjumpValid(state: VMState, target a: UInt32, targetAligned: UInt32) -> Bool {
-        let za = Constants.djumpAddressAlignmentFactor
+    static func isDjumpValid(context: ExecutionContext, target a: UInt32, targetAligned: UInt32) -> Bool {
+        let za = context.config.pvmDynamicAddressAlignmentFactor
         return !(a == 0 ||
-            a > state.program.jumpTable.count * za ||
+            a > context.state.program.jumpTable.count * za ||
             Int(a) % za != 0 ||
-            state.program.basicBlockIndices.contains(targetAligned))
+            context.state.program.basicBlockIndices.contains(targetAligned))
     }
 
-    static func djump(state: VMState, target: UInt32) -> ExecOutcome {
+    static func djump(context: ExecutionContext, target: UInt32) -> ExecOutcome {
         if target == Constants.djumpHaltAddress {
             return .exit(.halt)
         }
 
-        let entrySize = Int(state.program.jumpTableEntrySize)
-        let start = ((Int(target) / Constants.djumpAddressAlignmentFactor) - 1) * entrySize
+        let entrySize = Int(context.state.program.jumpTableEntrySize)
+        let start = ((Int(target) / context.config.pvmDynamicAddressAlignmentFactor) - 1) * entrySize
         let end = start + entrySize
-        var targetAlignedData = state.program.jumpTable[relative: start ..< end]
+        var targetAlignedData = context.state.program.jumpTable[relative: start ..< end]
         guard let targetAligned = targetAlignedData.decode() else {
             fatalError("unreachable: jump table entry should be valid")
         }
 
-        guard isDjumpValid(state: state, target: target, targetAligned: UInt32(truncatingIfNeeded: targetAligned)) else {
+        guard isDjumpValid(context: context, target: target, targetAligned: UInt32(truncatingIfNeeded: targetAligned)) else {
             return .exit(.panic(.invalidDynamicJump))
         }
 
-        state.updatePC(UInt32(targetAligned))
+        context.state.updatePC(UInt32(targetAligned))
         return .continued
     }
 

@@ -8,8 +8,6 @@ protocol BranchInstructionBase<Compare>: Instruction {
     var value: UInt32 { get set }
     var offset: UInt32 { get set }
 
-    func _executeImpl(state _: VMState) throws -> ExecOutcome
-    func updatePC(state: VMState, skip: UInt32) -> ExecOutcome
     func condition(state: VMState) -> Bool
 }
 
@@ -20,16 +18,16 @@ extension BranchInstructionBase {
         return (register, value, offset)
     }
 
-    public func _executeImpl(state _: VMState) throws -> ExecOutcome { .continued }
+    public func _executeImpl(context _: ExecutionContext) throws -> ExecOutcome { .continued }
 
-    public func updatePC(state: VMState, skip: UInt32) -> ExecOutcome {
-        guard Instructions.isBranchValid(state: state, offset: offset) else {
+    public func updatePC(context: ExecutionContext, skip: UInt32) -> ExecOutcome {
+        guard Instructions.isBranchValid(context: context, offset: offset) else {
             return .exit(.panic(.invalidBranch))
         }
-        if condition(state: state) {
-            state.increasePC(offset)
+        if condition(state: context.state) {
+            context.state.increasePC(offset)
         } else {
-            state.increasePC(skip + 1)
+            context.state.increasePC(skip + 1)
         }
         return .continued
     }
@@ -48,8 +46,6 @@ protocol BranchInstructionBase2<Compare>: Instruction {
     var r2: Registers.Index { get set }
     var offset: UInt32 { get set }
 
-    func _executeImpl(state _: VMState) throws -> ExecOutcome
-    func updatePC(state: VMState, skip: UInt32) -> ExecOutcome
     func condition(state: VMState) -> Bool
 }
 
@@ -61,16 +57,16 @@ extension BranchInstructionBase2 {
         return (r1, r2, offset)
     }
 
-    public func _executeImpl(state _: VMState) throws -> ExecOutcome { .continued }
+    public func _executeImpl(context _: ExecutionContext) throws -> ExecOutcome { .continued }
 
-    public func updatePC(state: VMState, skip: UInt32) -> ExecOutcome {
-        guard Instructions.isBranchValid(state: state, offset: offset) else {
+    public func updatePC(context: ExecutionContext, skip: UInt32) -> ExecOutcome {
+        guard Instructions.isBranchValid(context: context, offset: offset) else {
             return .exit(.panic(.invalidBranch))
         }
-        if condition(state: state) {
-            state.increasePC(offset)
+        if condition(state: context.state) {
+            context.state.increasePC(offset)
         } else {
-            state.increasePC(skip + 1)
+            context.state.increasePC(skip + 1)
         }
         return .continued
     }
