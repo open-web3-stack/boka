@@ -1,3 +1,4 @@
+import PolkaVM
 import Utils
 
 // constants defined in the graypaper
@@ -94,7 +95,7 @@ public struct ProtocolConfig: Sendable {
     // Y = 500: The number of slots into an epoch at which ticket-submission ends.
     public var ticketSubmissionEndSlot: Int
 
-    // ZA = 4: The pvm dynamic address alignment factor.
+    // ZA = 2: The pvm dynamic address alignment factor.
     public var pvmDynamicAddressAlignmentFactor: Int
 
     // ZI = 2^24: The standard pvm program initialization input data size.
@@ -180,6 +181,8 @@ public struct ProtocolConfig: Sendable {
 }
 
 public typealias ProtocolConfigRef = Ref<ProtocolConfig>
+
+extension ProtocolConfig: PvmConfig {}
 
 extension ProtocolConfig {
     public enum AuditTranchePeriod: ReadInt {

@@ -9,6 +9,7 @@ import Utils
 struct SafroleInput: Codable {
     var slot: UInt32
     var entropy: Data32
+    var offenders: [Ed25519PublicKey]
     var extrinsics: ExtrinsicTickets
 }
 
@@ -93,11 +94,6 @@ struct SafroleTestcase: Codable {
     var postState: SafroleState
 }
 
-struct Testcase: CustomStringConvertible {
-    var description: String
-    var data: Data
-}
-
 enum SafroleTestVariants: String, CaseIterable {
     case tiny
     case full
@@ -121,13 +117,9 @@ enum SafroleTestVariants: String, CaseIterable {
     }
 }
 
-final class SafroleTests {
+struct SafroleTests {
     static func loadTests(variant: SafroleTestVariants) throws -> [Testcase] {
-        let tests = try TestLoader.getTestFiles(path: "safrole/\(variant)", extension: "scale")
-        return try tests.map { path, description in
-            let data = try Data(contentsOf: URL(fileURLWithPath: path))
-            return Testcase(description: description, data: data)
-        }
+        try TestLoader.getTestcases(path: "safrole/\(variant)", extension: "scale")
     }
 
     func safroleTests(_ input: Testcase, variant: SafroleTestVariants) throws {
@@ -139,6 +131,7 @@ final class SafroleTests {
                 config: config,
                 slot: testcase.input.slot,
                 entropy: testcase.input.entropy,
+                offenders: Set(testcase.input.offenders),
                 extrinsics: testcase.input.extrinsics
             )
         }
