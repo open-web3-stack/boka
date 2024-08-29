@@ -2,8 +2,8 @@ import Foundation
 import msquic
 
 struct QuicApi {
-    private public let api: UnsafePointer<QuicApiTable>
-    private public let registration: HQuic
+    public let api: UnsafePointer<QuicApiTable>
+    public let registration: HQuic
 
     init() throws {
         var rawPointer: UnsafeRawPointer?

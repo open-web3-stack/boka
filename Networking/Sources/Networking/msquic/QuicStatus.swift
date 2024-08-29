@@ -15,7 +15,7 @@ extension QuicStatus {
     }
 }
 
-enum QuicStatusCode: QuicStatus {
+enum QuicStatusCode: QuicStatus, Equatable {
     case success = 0
     case notFound = 2
     case outOfMemory = 12

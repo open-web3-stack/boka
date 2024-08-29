@@ -1,5 +1,7 @@
-@testable import Networking
 import Testing
+
+@testable import Networking
+
 #if os(Linux)
 // need to check
 #elseif os(macOS)
@@ -7,7 +9,8 @@ import Testing
     import Security
 #endif
 
-@Test func initialize() throws {
-    let quicApi = try QuicApi()
-    #expect(quicApi.api != nil)
+struct QuicApiTests {
+    @Test func initialize() throws {
+        #expect(try QuicApi() != nil)
+    }
 }
