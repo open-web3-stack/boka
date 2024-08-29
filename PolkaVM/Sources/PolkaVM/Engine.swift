@@ -1,26 +1,27 @@
 import Foundation
 
 public class Engine {
-    public enum Constants {
-        public static let exitAddress: UInt32 = 0xFFFF_0000
+    let config: PvmConfig
+
+    public init(config: PvmConfig) {
+        self.config = config
     }
 
-    public init() {}
-
     public func execute(program: ProgramCode, state: VMState) -> ExitReason {
+        let context = ExecutionContext(state: state, config: config)
         while true {
             guard state.getGas() > 0 else {
                 return .outOfGas
             }
-            if case let .exit(reason) = step(program: program, state: state) {
+            if case let .exit(reason) = step(program: program, context: context) {
                 return reason
             }
         }
     }
 
-    public func step(program: ProgramCode, state: VMState) -> ExecOutcome {
-        let pc = state.pc
-        let skip = program.skip(state.pc)
+    public func step(program: ProgramCode, context: ExecutionContext) -> ExecOutcome {
+        let pc = context.state.pc
+        let skip = program.skip(pc)
         let startIndex = program.code.startIndex + Int(pc)
         let endIndex = startIndex + 1 + Int(skip)
         let data = if endIndex <= program.code.endIndex {
@@ -32,8 +33,6 @@ public class Engine {
             return .exit(.panic(.invalidInstruction))
         }
 
-        let res = inst.execute(state: state, skip: skip)
-
-        return res
+        return inst.execute(context: context, skip: skip)
     }
 }
