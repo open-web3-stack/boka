@@ -35,12 +35,11 @@ jobs:
       id: msquic-install-dependencies
       run: |
         export DEBIAN_FRONTEND=noninteractive
-        sudo apt-add-repository ppa:lttng/stable-2.13 -y
+        sudo apt-add-repository -y ppa:lttng/stable-2.13
         sudo apt-get update
-        sudo apt-get install cmake
-        sudo apt-get install build-essential
-        sudo apt-get install liblttng-ust-dev
-        sudo apt-get install lttng-tools
+        sudo apt-get install -y lttng-tools lttng-modules-dkms babeltrace2 liblttng-ust-dev python3-babeltrace
+        sudo apt-get install -y cmake
+        sudo apt-get install -y build-essential
     - name: Get msquic submodule commit hash
       id: msquic-commit-hash
       run: |
