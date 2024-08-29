@@ -82,7 +82,7 @@ struct PVMTests {
             gas: UInt64(testCase.initialGas),
             memory: memory
         )
-        let engine = Engine()
+        let engine = Engine(config: DefaultPvmConfig())
         let exitReason = engine.execute(program: program, state: vmState)
         let exitReason2: Status = switch exitReason {
         case .halt:
