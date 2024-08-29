@@ -34,7 +34,7 @@ jobs:
     - name: MsQuic Install Dependencies
       id: msquic-install-dependencies
       run: |
-        sudo apt-add-repository ppa:lttng/stable-2.13
+        yes | sudo apt-add-repository ppa:lttng/stable-2.13
         sudo apt-get update
         sudo apt-get install cmake
         sudo apt-get install build-essential
