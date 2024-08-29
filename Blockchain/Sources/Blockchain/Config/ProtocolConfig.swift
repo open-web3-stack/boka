@@ -183,6 +183,13 @@ public struct ProtocolConfig: Sendable {
 public typealias ProtocolConfigRef = Ref<ProtocolConfig>
 
 extension ProtocolConfig: PvmConfig {}
+// silence the warning about cross module conformances as we owns all the code
+extension Ref: @retroactive PvmConfig where T == ProtocolConfig {
+    public var pvmDynamicAddressAlignmentFactor: Int { value.pvmDynamicAddressAlignmentFactor }
+    public var pvmProgramInitInputDataSize: Int { value.pvmProgramInitInputDataSize }
+    public var pvmProgramInitPageSize: Int { value.pvmProgramInitPageSize }
+    public var pvmProgramInitSegmentSize: Int { value.pvmProgramInitSegmentSize }
+}
 
 extension ProtocolConfig {
     public enum AuditTranchePeriod: ReadInt {

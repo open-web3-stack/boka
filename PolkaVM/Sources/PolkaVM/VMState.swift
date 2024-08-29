@@ -68,6 +68,10 @@ public class VMState {
         registers[index]
     }
 
+    public func readRegister(_ index: Registers.Index, _ index2: Registers.Index) -> (UInt32, UInt32) {
+        (registers[index], registers[index2])
+    }
+
     public func writeRegister(_ index: Registers.Index, _ value: UInt32) {
         registers[index] = value
     }

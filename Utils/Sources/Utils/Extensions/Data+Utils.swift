@@ -28,6 +28,13 @@ extension Data {
     public func toHexString() -> String {
         map { String(format: "%02x", $0) }.joined()
     }
+
+    public func decode<T: FixedWidthInteger>(_: T.Type) -> T {
+        assert(MemoryLayout<T>.size <= count)
+        return withUnsafeBytes { ptr in
+            ptr.loadUnaligned(as: T.self)
+        }
+    }
 }
 
 extension FixedSizeData {
