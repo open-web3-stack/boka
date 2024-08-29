@@ -15,6 +15,9 @@ let package = Package(
             targets: ["Networking"]
         ),
     ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
+    ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
@@ -41,5 +44,6 @@ let package = Package(
                 .product(name: "Testing", package: "swift-testing"),
             ]
         ),
-    ]
+    ],
+    swiftLanguageVersions: [.version("6")]
 )
