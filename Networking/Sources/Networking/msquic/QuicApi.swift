@@ -39,12 +39,8 @@ public final class QuicApi {
         registration = regHandle
     }
 
-    func release() {
+    deinit {
         api.pointee.RegistrationClose(registration)
         MsQuicClose(api)
-    }
-
-    deinit {
-        release()
     }
 }
