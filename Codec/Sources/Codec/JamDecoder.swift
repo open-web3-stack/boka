@@ -17,10 +17,22 @@ public class JamDecoder {
         return res
     }
 
-    public static func decode<T: Decodable>(_ type: T.Type, from data: Data, withConfig config: some Any) throws -> T {
-        let context = DecodeContext(data: data)
-        context.userInfo[.config] = config
-        return try context.decode(type, key: nil)
+    public static func decode<T: Decodable>(_ type: T.Type, from data: Data, withConfig config: Any? = nil) throws -> T {
+        let decoder = JamDecoder(data: data, config: config)
+        let val = try decoder.decode(type)
+        try decoder.finalize()
+        return val
+    }
+
+    public func finalize() throws {
+        guard data.isEmpty else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: [],
+                    debugDescription: "Not all data was consumed"
+                )
+            )
+        }
     }
 }
 
