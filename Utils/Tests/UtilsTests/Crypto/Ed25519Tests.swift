@@ -10,17 +10,17 @@ import Testing
 
         let message = Data("test".utf8)
         let signature = try ed25519.sign(message: message)
-        #expect(ed25519.verify(signature: signature, message: message, publicKey: publicKey))
+        #expect(Ed25519.verify(signature: signature, message: message, publicKey: publicKey))
 
         let invalidMessage = Data("tests".utf8)
         #expect(
-            !ed25519.verify(signature: signature, message: invalidMessage, publicKey: publicKey)
+            !Ed25519.verify(signature: signature, message: invalidMessage, publicKey: publicKey)
         )
 
         var invalidSignature = signature.data
         invalidSignature.replaceSubrange(0 ... 1, with: [10, 12])
         #expect(
-            !ed25519.verify(
+            !Ed25519.verify(
                 signature: Data64(invalidSignature)!, message: message, publicKey: publicKey
             )
         )
