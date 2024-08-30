@@ -2,19 +2,6 @@ import Codec
 import Utils
 
 public struct State: Sendable, Equatable, Codable {
-    public struct ReportItem: Sendable, Equatable, Codable {
-        public var workReport: WorkReport
-        public var timeslot: TimeslotIndex
-
-        public init(
-            workReport: WorkReport,
-            timeslot: TimeslotIndex
-        ) {
-            self.workReport = workReport
-            self.timeslot = timeslot
-        }
-    }
-
     public struct PrivilegedServiceIndices: Sendable, Equatable, Codable {
         public var empower: ServiceIndex
         public var assign: ServiceIndex
@@ -215,5 +202,12 @@ extension State: Safrole {
         currentValidators = postState.currentValidators
         previousValidators = postState.previousValidators
         timeslot = postState.timeslot
+    }
+}
+
+extension State: Disputes {
+    public mutating func mergeWith(postState: DisputePostState) {
+        judgements = postState.judgements
+        reports = postState.reports
     }
 }
