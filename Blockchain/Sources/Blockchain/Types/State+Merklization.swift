@@ -22,8 +22,7 @@ extension State {
     }
 
     private static func constructKey(_ service: ServiceIndex, _ codeHash: Data32) -> Data32 {
-        var data = Data()
-        data.reserveCapacity(32)
+        var data = Data(capacity: 32)
         withUnsafeBytes(of: service) { ptr in
             data.append(ptr.load(as: UInt8.self))
             data.append(codeHash.data[0])
@@ -81,10 +80,9 @@ extension State {
     }
 
     private func encode(_ account: ServiceAccount) throws -> Data {
-        var data = Data()
-        data.reserveCapacity(32 + 8 * 4 + 4) // codeHash, balance, accumlateGasLimit, onTransferGasLimit, totalByteLength, itemsCount
+        let capacity = 32 + 8 * 4 + 4 // codeHash, balance, accumlateGasLimit, onTransferGasLimit, totalByteLength, itemsCount
 
-        let encoder = JamEncoder(data)
+        let encoder = JamEncoder(Data(capacity: capacity))
 
         try encoder.encode(account.codeHash)
         try encoder.encode(account.balance)

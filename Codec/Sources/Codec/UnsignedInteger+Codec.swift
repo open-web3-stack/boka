@@ -77,8 +77,7 @@ extension UnsignedInteger {
     }
 
     public func encode() -> Data {
-        var data = Data()
-        data.reserveCapacity(MemoryLayout<Self>.size)
+        var data = Data(capacity: MemoryLayout<Self>.size)
         // use withUnsafeBytes to avoid the overhead of creating a copy of the data
         withUnsafeBytes(of: self) { bytes in
             data.append(contentsOf: bytes)
