@@ -1,18 +1,18 @@
+import Codec
 import Utils
 
-// TODO: figure out how to deal with orders for items in Set
 public struct JudgementsState: Sendable, Equatable, Codable {
     // ψg: Work-reports judged to be correct
-    public var goodSet: Set<Data32>
+    @CodingAs<SortedSet<Data32>> public var goodSet: Set<Data32>
 
     // ψb: Work-reports judged to be incorrect
-    public var banSet: Set<Data32>
+    @CodingAs<SortedSet<Data32>> public var banSet: Set<Data32>
 
     // ψw: Work-reports whose validity is judged to be unknowable
-    public var wonkySet: Set<Data32>
+    @CodingAs<SortedSet<Data32>> public var wonkySet: Set<Data32>
 
     // ψo: Validators who made a judgement found to be incorrect
-    public var punishSet: Set<Ed25519PublicKey>
+    @CodingAs<SortedSet<Data32>> public var punishSet: Set<Ed25519PublicKey>
 
     public init(
         goodSet: Set<Data32>,
