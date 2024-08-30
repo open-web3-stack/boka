@@ -15,3 +15,4 @@ target
 .lib/
 tasks.json
 contents.xcworkspacedata
+Package.resolved
