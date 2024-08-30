@@ -1,3 +1,4 @@
+import Codec
 import Foundation
 import Utils
 
@@ -54,5 +55,11 @@ extension WorkReport: Dummy {
             packageSpecification: AvailabilitySpecifications.dummy(config: config),
             results: try! ConfigLimitedSizeArray(config: config, defaultValue: WorkResult.dummy(config: config))
         )
+    }
+}
+
+extension WorkReport {
+    public func hash() -> Data32 {
+        try! JamEncoder.encode(self).blake2b256hash()
     }
 }

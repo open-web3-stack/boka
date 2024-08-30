@@ -105,18 +105,6 @@ public struct SafrolePostState: Sendable, Equatable {
         self.ticketsOrKeys = ticketsOrKeys
         self.ticketsVerifier = ticketsVerifier
     }
-
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.timeslot == rhs.timeslot &&
-            lhs.entropyPool == rhs.entropyPool &&
-            lhs.previousValidators == rhs.previousValidators &&
-            lhs.currentValidators == rhs.currentValidators &&
-            lhs.nextValidators == rhs.nextValidators &&
-            lhs.validatorQueue == rhs.validatorQueue &&
-            lhs.ticketsAccumulator == rhs.ticketsAccumulator &&
-            lhs.ticketsOrKeys == rhs.ticketsOrKeys &&
-            lhs.ticketsVerifier == rhs.ticketsVerifier
-    }
 }
 
 public protocol Safrole {
@@ -336,7 +324,7 @@ extension Safrole {
                 }
 
             let newTickets = try extrinsics.getTickets(verifier: verifier, entropy: newEntropyPool.2)
-            guard newTickets.isSorted() else {
+            guard newTickets.isSortedAndUnique() else {
                 throw SafroleError.extrinsicsNotSorted
             }
 
