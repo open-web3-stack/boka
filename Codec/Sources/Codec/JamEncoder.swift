@@ -7,12 +7,20 @@ public class JamEncoder {
         encoder = EncodeContext(data)
     }
 
+    public init(capacity: Int) {
+        encoder = EncodeContext(Data(capacity: capacity))
+    }
+
     public func encode(_ value: some Encodable) throws {
         try encoder.encode(value)
     }
 
     public static func encode(_ value: some Encodable) throws -> Data {
-        let encoder = JamEncoder()
+        let encoder = if let value = value as? EncodedSize {
+            JamEncoder(capacity: value.encodedSize)
+        } else {
+            JamEncoder()
+        }
         try encoder.encode(value)
         return encoder.data
     }

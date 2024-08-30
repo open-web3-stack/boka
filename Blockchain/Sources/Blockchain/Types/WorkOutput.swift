@@ -110,3 +110,18 @@ extension WorkOutput: Codable {
         }
     }
 }
+
+extension WorkOutput: EncodedSize {
+    public var encodedSize: Int {
+        switch result {
+        case let .success(success):
+            success.encodedSize + 1
+        case .failure:
+            1
+        }
+    }
+
+    public static var encodeedSizeHint: Int? {
+        nil
+    }
+}

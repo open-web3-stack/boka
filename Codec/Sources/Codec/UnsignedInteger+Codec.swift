@@ -84,4 +84,11 @@ extension UnsignedInteger {
         }
         return data
     }
+
+    public func variableEncodingLength() -> Int {
+        for l in 1 ..< 9 where self < (1 << (7 * l)) {
+            return l
+        }
+        return 9
+    }
 }

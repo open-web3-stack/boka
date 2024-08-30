@@ -82,7 +82,7 @@ extension State {
     private func encode(_ account: ServiceAccount) throws -> Data {
         let capacity = 32 + 8 * 4 + 4 // codeHash, balance, accumlateGasLimit, onTransferGasLimit, totalByteLength, itemsCount
 
-        let encoder = JamEncoder(Data(capacity: capacity))
+        let encoder = JamEncoder(capacity: capacity)
 
         try encoder.encode(account.codeHash)
         try encoder.encode(account.balance)
