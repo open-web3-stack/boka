@@ -1,7 +1,5 @@
 import Testing
-#if os(Linux)
-// need to check
-#elseif os(macOS)
+#if os(macOS)
     import CoreFoundation
     import Security
 #endif

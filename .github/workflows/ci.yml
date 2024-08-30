@@ -31,21 +31,6 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
-    - name: Cache APT lists
-      uses: actions/cache@v4
-      with:
-        path: /var/lib/apt/lists
-        key: ${{ runner.os }}-apt-lists-${{ hashFiles('Networking/Sources/msquic/**') }}
-        restore-keys: |
-          ${{ runner.os }}-apt-lists-
-    - name: Cache APT packages
-      uses: actions/cache@v4
-      with:
-        path: /var/cache/apt
-        key: ${{ runner.os }}-apt-${{ hashFiles('Networking/Sources/msquic/**') }}
-        restore-keys: |
-          ${{ runner.os }}-apt-
-  
     - name: MsQuic Install Dependencies
       run: |
         export DEBIAN_FRONTEND=noninteractive

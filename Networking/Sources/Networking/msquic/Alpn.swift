@@ -43,8 +43,4 @@ struct Alpn {
             }
         )
     }
-
-    var rawValuePointer: UnsafePointer<QuicBuffer> {
-        withUnsafePointer(to: rawValue) { $0 }
-    }
 }
