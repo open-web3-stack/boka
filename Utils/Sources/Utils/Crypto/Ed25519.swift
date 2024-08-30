@@ -28,7 +28,7 @@ public struct Ed25519 {
         return Data64(signature)!
     }
 
-    public func verify(signature: Data64, message: Data, publicKey: Data32) -> Bool {
+    public static func verify(signature: Data64, message: Data, publicKey: Data32) -> Bool {
         guard let publicKey = try? Curve25519.Signing.PublicKey(rawRepresentation: publicKey.data) else {
             return false
         }

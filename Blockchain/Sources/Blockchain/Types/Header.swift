@@ -34,10 +34,6 @@ public struct Header: Sendable, Equatable, Codable {
                 ProtocolConfig.EpochLength
             >?
 
-        // Hj: The verdicts markers must contain exactly the sequence of report hashes of all new
-        // bad & wonky verdicts.
-        public var judgementsMarkers: [Data32]
-
         // Ho: The offenders markers must contain exactly the sequence of keys of all new offenders.
         public var offendersMarkers: [Ed25519PublicKey]
 
@@ -57,7 +53,6 @@ public struct Header: Sendable, Equatable, Codable {
                 Ticket,
                 ProtocolConfig.EpochLength
             >?,
-            judgementsMarkers: [Data32],
             offendersMarkers: [Ed25519PublicKey],
             authorIndex: ValidatorIndex,
             vrfSignature: BandersnatchSignature
@@ -68,7 +63,6 @@ public struct Header: Sendable, Equatable, Codable {
             self.timeslot = timeslot
             self.epoch = epoch
             self.winningTickets = winningTickets
-            self.judgementsMarkers = judgementsMarkers
             self.offendersMarkers = offendersMarkers
             self.authorIndex = authorIndex
             self.vrfSignature = vrfSignature
@@ -104,7 +98,6 @@ extension Header.Unsigned: Dummy {
             timeslot: 0,
             epoch: nil,
             winningTickets: nil,
-            judgementsMarkers: [],
             offendersMarkers: [],
             authorIndex: 0,
             vrfSignature: BandersnatchSignature()
@@ -138,7 +131,6 @@ extension Header {
     public var timeslot: TimeslotIndex { unsigned.timeslot }
     public var epoch: EpochMarker? { unsigned.epoch }
     public var winningTickets: ConfigFixedSizeArray<Ticket, ProtocolConfig.EpochLength>? { unsigned.winningTickets }
-    public var judgementsMarkers: [Data32] { unsigned.judgementsMarkers }
     public var offendersMarkers: [Ed25519PublicKey] { unsigned.offendersMarkers }
     public var authorIndex: ValidatorIndex { unsigned.authorIndex }
     public var vrfSignature: BandersnatchSignature { unsigned.vrfSignature }
