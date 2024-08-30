@@ -1,5 +1,5 @@
 {
-  "originHash" : "bdb8f4e8d924c572bbda33ae7f676b3bf0a09be9486e8feb5227190470ee030d",
+  "originHash" : "6d0c24ff032ea00dd46c16efbe5df39e0991db5de764148317e7f8327a3e3a9e",
   "pins" : [
     {
       "identity" : "blake2.swift",
@@ -8,15 +8,6 @@
       "state" : {
         "revision" : "29c55c8fe42d6661e5a32cc5bbbad1fff64fd01e",
         "version" : "0.2.0"
-      }
-    },
-    {
-      "identity" : "scalecodec.swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/AcalaNetwork/ScaleCodec.swift.git",
-      "state" : {
-        "branch" : "main",
-        "revision" : "dac3e7161de34c60c82794d031de0231b5a5746e"
       }
     },
     {
@@ -38,12 +29,39 @@
       }
     },
     {
+      "identity" : "swift-distributed-tracing",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-distributed-tracing.git",
+      "state" : {
+        "revision" : "11c756c5c4d7de0eeed8595695cadd7fa107aa19",
+        "version" : "1.1.1"
+      }
+    },
+    {
       "identity" : "swift-log",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
       "state" : {
         "revision" : "9cb486020ebf03bfa5b5df985387a14a98744537",
         "version" : "1.6.1"
+      }
+    },
+    {
+      "identity" : "swift-metrics",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-metrics.git",
+      "state" : {
+        "revision" : "e0165b53d49b413dd987526b641e05e246782685",
+        "version" : "2.5.0"
+      }
+    },
+    {
+      "identity" : "swift-service-context",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-service-context.git",
+      "state" : {
+        "revision" : "0c62c5b4601d6c125050b5c3a97f20cce881d32b",
+        "version" : "1.1.0"
       }
     },
     {
@@ -62,15 +80,6 @@
       "state" : {
         "branch" : "0.10.0",
         "revision" : "69d59cfc76e5daf498ca61f5af409f594768eef9"
-      }
-    },
-    {
-      "identity" : "tuples.swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tesseract-one/Tuples.swift.git",
-      "state" : {
-        "revision" : "4d2cf7c64443cdf4df833d0bedd767bf9dbc49d9",
-        "version" : "0.1.3"
       }
     }
   ],

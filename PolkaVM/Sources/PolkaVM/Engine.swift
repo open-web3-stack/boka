@@ -1,4 +1,7 @@
 import Foundation
+import TracingUtils
+
+private let logger = Logger(label: "Engine")
 
 public class Engine {
     let config: PvmConfig
@@ -32,6 +35,8 @@ public class Engine {
         guard let inst = InstructionTable.parse(data) else {
             return .exit(.panic(.invalidInstruction))
         }
+
+        logger.debug("executing \(inst)", metadata: ["skip": "\(skip)", "pc": "\(context.state.pc)"])
 
         return inst.execute(context: context, skip: skip)
     }

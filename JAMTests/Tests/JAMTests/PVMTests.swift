@@ -1,6 +1,7 @@
 import Foundation
 import PolkaVM
 import Testing
+import TracingUtils
 import Utils
 
 @testable import JAMTests
@@ -61,7 +62,13 @@ struct PolkaVMTestcase: Codable, CustomStringConvertible {
     }
 }
 
+private let logger = Logger(label: "PVMTests")
+
 struct PVMTests {
+    init() {
+        setupTestLogger(level: .trace)
+    }
+
     static func loadTests() throws -> [Testcase] {
         try TestLoader.getTestcases(path: "pvm/programs", extension: "json")
     }
@@ -84,6 +91,7 @@ struct PVMTests {
         )
         let engine = Engine(config: DefaultPvmConfig())
         let exitReason = engine.execute(program: program, state: vmState)
+        logger.debug("exit reason: \(exitReason)")
         let exitReason2: Status = switch exitReason {
         case .halt:
             .halt

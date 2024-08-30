@@ -1,4 +1,7 @@
 import Foundation
+import TracingUtils
+
+private let logger = Logger(label: "Branch Instruction")
 
 protocol Branch: Instruction {
     var offset: UInt32 { get }
@@ -39,6 +42,7 @@ extension BranchInstructionBase {
 
     public func condition(state: VMState) -> Bool {
         let regVal = state.readRegister(register)
+        logger.trace("\(Compare.self) a(\(regVal)) b(\(value)) => \(Compare.compare(a: regVal, b: value))")
         return Compare.compare(a: regVal, b: value)
     }
 }
@@ -62,6 +66,7 @@ extension BranchInstructionBase2 {
 
     public func condition(state: VMState) -> Bool {
         let (r1Val, r2Val) = state.readRegister(r1, r2)
+        logger.trace("\(Compare.self) a(\(r1Val)) b(\(r2Val)) => \(Compare.compare(a: r1Val, b: r2Val))")
         return Compare.compare(a: r1Val, b: r2Val)
     }
 }
