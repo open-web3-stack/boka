@@ -89,7 +89,7 @@ extension RocksDB {
 
         switch ret {
         case let .success(value):
-            if let pointee = err {
+            if let pointee: UnsafeMutablePointer<Int8> = err {
                 let message = String(cString: pointee)
                 try onErr(message)
             }
