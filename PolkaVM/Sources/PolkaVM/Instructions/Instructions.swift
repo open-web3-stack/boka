@@ -126,7 +126,7 @@ public enum Instructions {
     // MARK: Instructions with Arguments of One Offset (5.4)
 
     public struct Jump: Instruction {
-        public static var opcode: UInt8 { 58 }
+        public static var opcode: UInt8 { 5 }
 
         public let offset: UInt32
 
