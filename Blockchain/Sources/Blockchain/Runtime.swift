@@ -5,6 +5,7 @@ import Utils
 public final class Runtime {
     public enum Error: Swift.Error {
         case safroleError(SafroleError)
+        case DisputeError(DisputeError)
         case invalidTimeslot
         case invalidReportAuthorizer
         case encodeError(any Swift.Error)
@@ -13,6 +14,7 @@ public final class Runtime {
         case invalidHeaderStateRoot
         case invalidHeaderEpochMarker
         case invalidHeaderWinningTickets
+        case invalidHeaderOffendersMarkers
         case other(any Swift.Error)
     }
 
@@ -50,12 +52,11 @@ public final class Runtime {
             throw Error.invalidTimeslot
         }
 
-        // epoch is validated at apply time
+        // epoch is validated at apply time by Safrole
 
-        // winning tickets is validated at apply time
+        // winning tickets is validated at apply time by Safrole
 
-        // TODO: validate judgementsMarkers
-        // TODO: validate offendersMarkers
+        // offendersMarkers is validated at apply time by Disputes
 
         // TODO: validate block.header.seal
     }
@@ -88,11 +89,23 @@ public final class Runtime {
             throw error
         } catch let error as SafroleError {
             throw .safroleError(error)
+        } catch let error as DisputeError {
+            throw .DisputeError(error)
         } catch {
             throw .other(error)
         }
 
         return StateRef(newState)
+    }
+
+    public func updateRecentHistory(block: BlockRef, state newState: inout State) throws {
+        let workReportHashes = block.extrinsic.reports.guarantees.map(\.workReport.packageSpecification.workPackageHash)
+        try newState.recentHistory.update(
+            headerHash: block.header.parentHash,
+            parentStateRoot: block.header.priorStateRoot,
+            accumulateRoot: Data32(), // TODO: calculate accumulation result
+            workReportHashes: ConfigLimitedSizeArray(config: config, array: workReportHashes)
+        )
     }
 
     public func updateSafrole(block: BlockRef, state newState: inout State) throws {
@@ -114,14 +127,13 @@ public final class Runtime {
         }
     }
 
-    public func updateRecentHistory(block: BlockRef, state newState: inout State) throws {
-        let workReportHashes = block.extrinsic.reports.guarantees.map(\.workReport.packageSpecification.workPackageHash)
-        try newState.recentHistory.update(
-            headerHash: block.header.parentHash,
-            parentStateRoot: block.header.priorStateRoot,
-            accumulateRoot: Data32(), // TODO: calculate accumulation result
-            workReportHashes: ConfigLimitedSizeArray(config: config, array: workReportHashes)
-        )
+    public func updateDisputes(block: BlockRef, state newState: inout State) throws {
+        let (posState, offenders) = try newState.update(config: config, disputes: block.extrinsic.judgements)
+        newState.mergeWith(postState: posState)
+
+        guard offenders == block.header.offendersMarkers else {
+            throw Error.invalidHeaderOffendersMarkers
+        }
     }
 
     // TODO: add tests
