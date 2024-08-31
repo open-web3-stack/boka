@@ -3,18 +3,19 @@ import msquic
 
 class QuicConnection {
     private var connection: HQUIC?
-    private let api: UnsafePointer<QuicApiTable>
-    private var registration: HQuic?
-    private var configuration: HQuic?
-    private var refCount = 2
+    private let api: UnsafePointer<QuicApiTable>?
+    private let registration: HQuic?
+    private let configuration: HQuic?
     init(api: UnsafePointer<QuicApiTable>, registration: HQuic?, configuration: HQuic?) throws {
         self.api = api
         self.registration = registration
         self.configuration = configuration
-        refCount = 2
     }
 
     func open() throws {
+        guard let api else {
+            throw QuicError.getApiFailed
+        }
         let status = api.pointee.ConnectionOpen(registration, { _, context, event -> QuicStatus in
             let quicConnection = Unmanaged<QuicConnection>.fromOpaque(context!).takeUnretainedValue()
             return quicConnection.handleEvent(event)
@@ -25,6 +26,9 @@ class QuicConnection {
     }
 
     func start(target: String, port: UInt16) throws {
+        guard let api else {
+            throw QuicError.getApiFailed
+        }
         let status = api.pointee.ConnectionStart(connection, configuration, UInt8(QUIC_ADDRESS_FAMILY_UNSPEC), target, port)
         if QuicStatus(status).isFailed {
             throw QuicError.invalidStatus(status: status.code)
@@ -32,23 +36,29 @@ class QuicConnection {
     }
 
     private func handleEvent(_ event: UnsafePointer<QUIC_CONNECTION_EVENT>?) -> QuicStatus {
-        guard let event else {
-            return QuicStatusCode.connectionIdle.rawValue
-        }
-        switch event.pointee.Type {
+//        guard let api = self.api else {
+//            return QuicStatusCode.internalError.rawValue
+//        }
+        switch event?.pointee.Type {
         case QUIC_CONNECTION_EVENT_CONNECTED:
             print("Connected")
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
             print("Connection shutdown complete")
-            refCount -= 1
-            if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
-                api.pointee.ConnectionClose(connection)
+            if event?.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
+                api?.pointee.ConnectionClose(connection)
             }
 
         default:
             break
         }
         return QuicStatusCode.success.rawValue
+    }
+
+    deinit {
+        print("QuicConnection deinit")
+        if connection != nil {
+            api?.pointee.ConnectionClose(connection)
+        }
     }
 }
