@@ -1,3 +1,5 @@
+import Codec
+
 public enum Either<Left, Right> {
     case left(Left)
     case right(Right)
@@ -82,5 +84,23 @@ extension Either: Codable where Left: Codable, Right: Codable {
                 )
             }
         }
+    }
+}
+
+extension Either: EncodedSize where Left: EncodedSize, Right: EncodedSize {
+    public var encodedSize: Int {
+        switch self {
+        case let .left(left):
+            left.encodedSize + 1
+        case let .right(right):
+            right.encodedSize + 1
+        }
+    }
+
+    public static var encodeedSizeHint: Int? {
+        if let left = Left.encodeedSizeHint, let right = Right.encodeedSizeHint {
+            return left + right + 1
+        }
+        return nil
     }
 }

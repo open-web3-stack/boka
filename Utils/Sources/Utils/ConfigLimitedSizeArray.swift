@@ -1,3 +1,5 @@
+import Codec
+
 // TODO: add tests
 // TODO: consider using a circular buffer instead of a regular array to reduce memory usage
 
@@ -233,5 +235,20 @@ extension ConfigLimitedSizeArray: Encodable where T: Encodable {
             // variable size array
             try array.encode(to: encoder)
         }
+    }
+}
+
+extension ConfigLimitedSizeArray: EncodedSize where T: EncodedSize {
+    public var encodedSize: Int {
+        if TMinLength.self == TMaxLength.self {
+            if let hint = T.encodeedSizeHint {
+                return count * hint
+            }
+        }
+        return array.encodedSize
+    }
+
+    public static var encodeedSizeHint: Int? {
+        nil
     }
 }
