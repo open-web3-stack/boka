@@ -132,3 +132,13 @@ extension ConfigSizeBitString: FixedLengthData {
         try self.init(config: config, data: data)
     }
 }
+
+extension ConfigSizeBitString: EncodedSize {
+    public var encodedSize: Int {
+        UInt32(length).variableEncodingLength() + bytes.count
+    }
+
+    public static var encodeedSizeHint: Int? {
+        nil
+    }
+}
