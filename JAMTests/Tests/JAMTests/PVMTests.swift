@@ -66,7 +66,7 @@ private let logger = Logger(label: "PVMTests")
 
 struct PVMTests {
     init() {
-        setupTestLogger(level: .trace)
+        setupTestLogger()
     }
 
     static func loadTests() throws -> [Testcase] {
