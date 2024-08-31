@@ -7,12 +7,20 @@ public class JamEncoder {
         encoder = EncodeContext(data)
     }
 
+    public init(capacity: Int) {
+        encoder = EncodeContext(Data(capacity: capacity))
+    }
+
     public func encode(_ value: some Encodable) throws {
         try encoder.encode(value)
     }
 
     public static func encode(_ value: some Encodable) throws -> Data {
-        let encoder = JamEncoder()
+        let encoder = if let value = value as? EncodedSize {
+            JamEncoder(capacity: value.encodedSize)
+        } else {
+            JamEncoder()
+        }
         try encoder.encode(value)
         return encoder.data
     }
@@ -55,9 +63,6 @@ private class EncodeContext: Encoder {
     }
 
     fileprivate func encodeData(_ value: Data, lengthPrefix: Bool) {
-        // reserve capacity for the length
-        // length is variable size but very unlikely to be larger than 4 bytes
-        data.reserveCapacity(data.count + value.count + (lengthPrefix ? 4 : 0))
         if lengthPrefix {
             let length = UInt32(value.count)
             data.append(contentsOf: length.encode(method: .variableWidth))
@@ -66,9 +71,6 @@ private class EncodeContext: Encoder {
     }
 
     fileprivate func encodeData(_ value: [UInt8]) {
-        // reserve capacity for the length
-        // length is variable size but very unlikely to be larger than 4 bytes
-        data.reserveCapacity(data.count + value.count + 4)
         let length = UInt32(value.count)
         data.append(contentsOf: length.encode(method: .variableWidth))
         data.append(contentsOf: value)

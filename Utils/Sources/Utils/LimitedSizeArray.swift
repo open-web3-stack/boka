@@ -158,3 +158,23 @@ extension LimitedSizeArray: Decodable where T: Decodable {
         }
     }
 }
+
+extension LimitedSizeArray: EncodedSize where T: EncodedSize {
+    public var encodedSize: Int {
+        if TMinLength.self == TMaxLength.self {
+            if let hint = T.encodeedSizeHint {
+                return count * hint
+            }
+        }
+        return array.encodedSize
+    }
+
+    public static var encodeedSizeHint: Int? {
+        if TMinLength.self == TMaxLength.self {
+            if let hint = T.encodeedSizeHint {
+                return hint * TMinLength.value
+            }
+        }
+        return nil
+    }
+}

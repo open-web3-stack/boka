@@ -1,3 +1,4 @@
+import Codec
 import Utils
 
 // A refinement context, denoted by the set X, describes the context of the chain
@@ -66,5 +67,35 @@ extension RefinementContext: Dummy {
             ),
             prerequistieWorkPackage: nil
         )
+    }
+}
+
+extension RefinementContext.Anchor: EncodedSize {
+    public var encodedSize: Int {
+        headerHash.encodedSize + stateRoot.encodedSize + beefyRoot.encodedSize
+    }
+
+    public static var encodeedSizeHint: Int? {
+        nil
+    }
+}
+
+extension RefinementContext.LokupAnchor: EncodedSize {
+    public var encodedSize: Int {
+        headerHash.encodedSize + timeslot.encodedSize
+    }
+
+    public static var encodeedSizeHint: Int? {
+        nil
+    }
+}
+
+extension RefinementContext: EncodedSize {
+    public var encodedSize: Int {
+        anchor.encodedSize + lokupAnchor.encodedSize + prerequistieWorkPackage.encodedSize
+    }
+
+    public static var encodeedSizeHint: Int? {
+        nil
     }
 }

@@ -15,8 +15,7 @@ public func stateMerklize(kv: [Data32: Data], i: Int = 0) throws(MerklizeError) 
     }
 
     func embeddedLeaf(key: Data32, value: Data, size: UInt8) -> Data64 {
-        var data = Data()
-        data.reserveCapacity(64)
+        var data = Data(capacity: 64)
         data.append(0b01 | (size << 2))
         data += key.data[..<31]
         data += value
@@ -25,8 +24,7 @@ public func stateMerklize(kv: [Data32: Data], i: Int = 0) throws(MerklizeError) 
     }
 
     func regularLeaf(key: Data32, value: Data) -> Data64 {
-        var data = Data()
-        data.reserveCapacity(64)
+        var data = Data(capacity: 64)
         data.append(0b11)
         data += key.data[..<31]
         data += value.blake2b256hash().data
