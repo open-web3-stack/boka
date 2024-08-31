@@ -63,3 +63,14 @@ extension WorkReport {
         try! JamEncoder.encode(self).blake2b256hash()
     }
 }
+
+extension WorkReport: EncodedSize {
+    public var encodedSize: Int {
+        authorizerHash.encodedSize + coreIndex.encodedSize + output.encodedSize + refinementContext.encodedSize + packageSpecification
+            .encodedSize + results.encodedSize
+    }
+
+    public static var encodeedSizeHint: Int? {
+        nil
+    }
+}

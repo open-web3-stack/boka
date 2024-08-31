@@ -77,12 +77,18 @@ extension UnsignedInteger {
     }
 
     public func encode() -> Data {
-        var data = Data()
-        data.reserveCapacity(MemoryLayout<Self>.size)
+        var data = Data(capacity: MemoryLayout<Self>.size)
         // use withUnsafeBytes to avoid the overhead of creating a copy of the data
         withUnsafeBytes(of: self) { bytes in
             data.append(contentsOf: bytes)
         }
         return data
+    }
+
+    public func variableEncodingLength() -> Int {
+        for l in 1 ..< 9 where self < (1 << (7 * l)) {
+            return l
+        }
+        return 9
     }
 }

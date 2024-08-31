@@ -58,6 +58,16 @@ extension FixedSizeData: FixedLengthData {
     }
 }
 
+extension FixedSizeData: EncodedSize {
+    public var encodedSize: Int {
+        T.value
+    }
+
+    public static var encodeedSizeHint: Int? {
+        T.value
+    }
+}
+
 public typealias Data32 = FixedSizeData<ConstInt32>
 public typealias Data48 = FixedSizeData<ConstInt48>
 public typealias Data64 = FixedSizeData<ConstInt64>

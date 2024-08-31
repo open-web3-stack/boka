@@ -1,3 +1,4 @@
+import Codec
 import Utils
 
 public struct AvailabilitySpecifications: Sendable, Equatable, Codable {
@@ -35,5 +36,15 @@ extension AvailabilitySpecifications: Dummy {
             erasureRoot: Data32(),
             segmentRoot: Data32()
         )
+    }
+}
+
+extension AvailabilitySpecifications: EncodedSize {
+    public var encodedSize: Int {
+        workPackageHash.encodedSize + length.encodedSize + erasureRoot.encodedSize + segmentRoot.encodedSize
+    }
+
+    public static var encodeedSizeHint: Int? {
+        nil
     }
 }

@@ -48,3 +48,13 @@ extension WorkResult: Dummy {
         )
     }
 }
+
+extension WorkResult: EncodedSize {
+    public var encodedSize: Int {
+        serviceIndex.encodedSize + codeHash.encodedSize + payloadHash.encodedSize + gas.encodedSize + output.encodedSize
+    }
+
+    public static var encodeedSizeHint: Int? {
+        nil
+    }
+}
