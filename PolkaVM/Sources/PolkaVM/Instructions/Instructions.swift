@@ -450,7 +450,7 @@ public enum Instructions {
 
     public struct BranchLtUImm: BranchInstructionBase {
         public static var opcode: UInt8 { 44 }
-        typealias Compare = CompareLt
+        typealias Compare = CompareLtU
 
         var register: Registers.Index
         var value: UInt32
@@ -460,7 +460,7 @@ public enum Instructions {
 
     public struct BranchLeUImm: BranchInstructionBase {
         public static var opcode: UInt8 { 59 }
-        typealias Compare = CompareLe
+        typealias Compare = CompareLeU
 
         var register: Registers.Index
         var value: UInt32
@@ -470,7 +470,7 @@ public enum Instructions {
 
     public struct BranchGeUImm: BranchInstructionBase {
         public static var opcode: UInt8 { 52 }
-        typealias Compare = CompareGe
+        typealias Compare = CompareGeU
 
         var register: Registers.Index
         var value: UInt32
@@ -480,7 +480,7 @@ public enum Instructions {
 
     public struct BranchGtUImm: BranchInstructionBase {
         public static var opcode: UInt8 { 50 }
-        typealias Compare = CompareGt
+        typealias Compare = CompareGtU
 
         var register: Registers.Index
         var value: UInt32
@@ -490,7 +490,7 @@ public enum Instructions {
 
     public struct BranchLtSImm: BranchInstructionBase {
         public static var opcode: UInt8 { 32 }
-        typealias Compare = CompareLt
+        typealias Compare = CompareLtS
 
         var register: Registers.Index
         var value: UInt32
@@ -500,7 +500,7 @@ public enum Instructions {
 
     public struct BranchLeSImm: BranchInstructionBase {
         public static var opcode: UInt8 { 46 }
-        typealias Compare = CompareLe
+        typealias Compare = CompareLeS
 
         var register: Registers.Index
         var value: UInt32
@@ -510,7 +510,7 @@ public enum Instructions {
 
     public struct BranchGeSImm: BranchInstructionBase {
         public static var opcode: UInt8 { 45 }
-        typealias Compare = CompareGe
+        typealias Compare = CompareGeS
 
         var register: Registers.Index
         var value: UInt32
@@ -520,7 +520,7 @@ public enum Instructions {
 
     public struct BranchGtSImm: BranchInstructionBase {
         public static var opcode: UInt8 { 53 }
-        typealias Compare = CompareGt
+        typealias Compare = CompareGtS
 
         var register: Registers.Index
         var value: UInt32
@@ -1137,7 +1137,7 @@ public enum Instructions {
 
     public struct BranchLtU: BranchInstructionBase2 {
         public static var opcode: UInt8 { 47 }
-        typealias Compare = CompareLt
+        typealias Compare = CompareLtU
 
         var r1: Registers.Index
         var r2: Registers.Index
@@ -1147,7 +1147,7 @@ public enum Instructions {
 
     public struct BranchLtS: BranchInstructionBase2 {
         public static var opcode: UInt8 { 48 }
-        typealias Compare = CompareLt
+        typealias Compare = CompareLtS
 
         var r1: Registers.Index
         var r2: Registers.Index
@@ -1157,7 +1157,7 @@ public enum Instructions {
 
     public struct BranchGeU: BranchInstructionBase2 {
         public static var opcode: UInt8 { 41 }
-        typealias Compare = CompareGe
+        typealias Compare = CompareGeU
 
         var r1: Registers.Index
         var r2: Registers.Index
@@ -1167,7 +1167,7 @@ public enum Instructions {
 
     public struct BranchGeS: BranchInstructionBase2 {
         public static var opcode: UInt8 { 43 }
-        typealias Compare = CompareGe
+        typealias Compare = CompareGeS
 
         var r1: Registers.Index
         var r2: Registers.Index
