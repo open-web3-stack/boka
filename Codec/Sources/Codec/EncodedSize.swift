@@ -71,7 +71,7 @@ extension Optional: EncodedSize where Wrapped: EncodedSize {
     }
 
     public static var encodeedSizeHint: Int? {
-        Wrapped.encodeedSizeHint.map { $0 + 1 }
+        nil
     }
 }
 
@@ -86,10 +86,7 @@ extension Result: EncodedSize where Success: EncodedSize, Failure: EncodedSize {
     }
 
     public static var encodeedSizeHint: Int? {
-        if let success = Success.encodeedSizeHint, let failure = Failure.encodeedSizeHint {
-            return success + failure + 1
-        }
-        return nil
+        nil
     }
 }
 
