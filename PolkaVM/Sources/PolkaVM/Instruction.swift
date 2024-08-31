@@ -38,7 +38,7 @@ extension Instruction {
             return updatePC(context: context, skip: skip)
         } catch let e as Memory.Error {
             return .exit(.pageFault(e.address))
-        } catch let e as Error {
+        } catch let e {
             // other unknown errors
             logger.error("execution failed!", metadata: ["error": "\(e)"])
             return .exit(.panic(.trap))
