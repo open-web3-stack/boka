@@ -33,7 +33,9 @@ public final class Runtime {
         self.config = config
     }
 
-    public func validateHeader(block: BlockRef, state: StateRef, context: ApplyContext) throws(Error) {
+    public func validateHeader(block: Validated<BlockRef>, state: StateRef, context: ApplyContext) throws(Error) {
+        let block = block.value
+
         guard block.header.parentHash == state.value.lastBlockHash else {
             throw Error.invalidParentHash
         }
@@ -62,11 +64,7 @@ public final class Runtime {
         // TODO: validate block.header.seal
     }
 
-    public func validate(block: BlockRef, state: StateRef, context: ApplyContext) throws(Error) {
-        try Result { try block.validate(config: config) }
-            .mapError(Error.validateError)
-            .get()
-
+    public func validate(block: Validated<BlockRef>, state: StateRef, context: ApplyContext) throws(Error) {
         try validateHeader(block: block, state: state, context: context)
 
         // TODO: abstract input validation logic from Safrole state update function and call it here
@@ -74,7 +72,16 @@ public final class Runtime {
     }
 
     public func apply(block: BlockRef, state prevState: StateRef, context: ApplyContext) throws(Error) -> StateRef {
+        let validatedBlock = try Result { try block.toValidated(config: config) }
+            .mapError(Error.validateError)
+            .get()
+
+        return try apply(block: validatedBlock, state: prevState, context: context)
+    }
+
+    public func apply(block: Validated<BlockRef>, state prevState: StateRef, context: ApplyContext) throws(Error) -> StateRef {
         try validate(block: block, state: prevState, context: context)
+        let block = block.value
 
         var newState = prevState.value
 
