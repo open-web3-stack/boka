@@ -128,7 +128,7 @@ struct SafroleTests {
 
         let result = Result {
             try testcase.input.extrinsics.validate(config: config)
-            try testcase.preState.updateSafrole(
+            return try testcase.preState.updateSafrole(
                 config: config,
                 slot: testcase.input.slot,
                 entropy: testcase.input.entropy,
