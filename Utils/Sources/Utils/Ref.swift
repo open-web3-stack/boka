@@ -28,8 +28,11 @@ extension Ref: Hashable where T: Hashable {
     }
 }
 
-extension Ref: Dummy where T: Dummy {
+extension Ref: HasConfig where T: HasConfig {
     public typealias Config = T.Config
+}
+
+extension Ref: Dummy where T: Dummy {
     public static func dummy(config: Config) -> Self {
         Self(T.dummy(config: config))
     }

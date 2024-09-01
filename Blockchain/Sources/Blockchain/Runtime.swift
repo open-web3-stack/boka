@@ -16,6 +16,7 @@ public final class Runtime {
         case invalidHeaderWinningTickets
         case invalidHeaderOffendersMarkers
         case other(any Swift.Error)
+        case validateError(any Swift.Error)
     }
 
     public struct ApplyContext {
@@ -62,6 +63,10 @@ public final class Runtime {
     }
 
     public func validate(block: BlockRef, state: StateRef, context: ApplyContext) throws(Error) {
+        try Result { try block.validate(config: config) }
+            .mapError(Error.validateError)
+            .get()
+
         try validateHeader(block: block, state: state, context: context)
 
         // TODO: abstract input validation logic from Safrole state update function and call it here
