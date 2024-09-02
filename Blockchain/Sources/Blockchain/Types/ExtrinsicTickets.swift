@@ -50,3 +50,22 @@ extension ExtrinsicTickets {
         }
     }
 }
+
+extension ExtrinsicTickets.TicketItem: Validate {
+    public enum Error: Swift.Error {
+        case invalidAttempt
+    }
+
+    public typealias Config = ProtocolConfigRef
+    public func validate(config: Config) throws {
+        guard attempt < UInt32(config.value.ticketEntriesPerValidator) else {
+            throw Error.invalidAttempt
+        }
+    }
+}
+
+extension ExtrinsicTickets: Validate {
+    public func validate(config: Config) throws {
+        try tickets.validate(config: config)
+    }
+}

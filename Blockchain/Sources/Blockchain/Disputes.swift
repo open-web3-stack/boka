@@ -5,14 +5,8 @@ public enum DisputeError: Error {
     case invalidValidatorIndex
     case invalidJudgementSignature
     case invalidCulpritSigner
-    case invalidCulpritSignature
     case invalidFaultSigner
-    case invalidFaultSignature
-    case verdictsNotSorted
-    case culpritsNotSorted
-    case faultsNotSorted
     case duplicatedReport
-    case judgementsNotSorted
     case invalidJudgementsCount
     case expectInFaults
     case expectInCulprits
@@ -28,6 +22,13 @@ public struct ReportItem: Sendable, Equatable, Codable {
     ) {
         self.workReport = workReport
         self.timeslot = timeslot
+    }
+}
+
+extension ReportItem: Validate {
+    public typealias Config = ProtocolConfigRef
+    public func validate(config: Config) throws {
+        try workReport.validate(config: config)
     }
 }
 
@@ -105,10 +106,6 @@ extension Disputes {
                     throw .invalidJudgementSignature
                 }
             }
-
-            guard verdict.judgements.isSortedAndUnique(by: { $0.validatorIndex < $1.validatorIndex }) else {
-                throw .judgementsNotSorted
-            }
         }
 
         var validSigners = Set<Ed25519PublicKey>(currentValidators.map(\.ed25519))
@@ -120,11 +117,6 @@ extension Disputes {
                 throw .invalidCulpritSigner
             }
 
-            let payload = SigningContext.guarantee + culprit.reportHash.data
-            guard Ed25519.verify(signature: culprit.signature, message: payload, publicKey: culprit.validatorKey) else {
-                throw .invalidCulpritSignature
-            }
-
             newJudgements.punishSet.insert(culprit.validatorKey)
             offenders.append(culprit.validatorKey)
         }
@@ -134,26 +126,8 @@ extension Disputes {
                 throw .invalidFaultSigner
             }
 
-            let prefix = fault.vote ? SigningContext.valid : SigningContext.invalid
-            let payload = prefix + fault.reportHash.data
-            guard Ed25519.verify(signature: fault.signature, message: payload, publicKey: fault.validatorKey) else {
-                throw .invalidFaultSignature
-            }
-
             newJudgements.punishSet.insert(fault.validatorKey)
             offenders.append(fault.validatorKey)
-        }
-
-        guard disputes.verdicts.isSortedAndUnique(by: { $0.reportHash < $1.reportHash }) else {
-            throw .verdictsNotSorted
-        }
-
-        guard disputes.culprits.isSortedAndUnique(by: { $0.validatorKey < $1.validatorKey }) else {
-            throw .culpritsNotSorted
-        }
-
-        guard disputes.faults.isSortedAndUnique(by: { $0.validatorKey < $1.validatorKey }) else {
-            throw .faultsNotSorted
         }
 
         var allReports = Set(disputes.verdicts.map(\.reportHash))
