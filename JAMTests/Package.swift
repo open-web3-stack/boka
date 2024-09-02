@@ -18,6 +18,7 @@ let package = Package(
     dependencies: [
         .package(path: "../Codec"),
         .package(path: "../Utils"),
+        .package(path: "../TracingUtils"),
         .package(path: "../Blockchain"),
         .package(path: "../PolkaVM"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
@@ -34,6 +35,7 @@ let package = Package(
             dependencies: [
                 "Codec",
                 "Utils",
+                "TracingUtils",
                 "Blockchain",
                 "PolkaVM",
                 "JAMTests",

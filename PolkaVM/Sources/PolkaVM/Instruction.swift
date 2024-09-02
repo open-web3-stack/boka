@@ -1,4 +1,7 @@
 import Foundation
+import TracingUtils
+
+private let logger = Logger(label: "Instruction")
 
 public protocol Instruction {
     static var opcode: UInt8 { get }
@@ -25,17 +28,19 @@ public class ExecutionContext {
 extension Instruction {
     public func execute(context: ExecutionContext, skip: UInt32) -> ExecOutcome {
         context.state.consumeGas(gasCost())
+        logger.debug("consumed \(gasCost()) gas")
         do {
             let execRes = try _executeImpl(context: context)
             if case .exit = execRes {
                 return execRes
             }
+            logger.debug("execution success! updating pc...")
             return updatePC(context: context, skip: skip)
         } catch let e as Memory.Error {
             return .exit(.pageFault(e.address))
-        } catch {
+        } catch let e {
             // other unknown errors
-            // TODO: log details
+            logger.error("execution failed!", metadata: ["error": "\(e)"])
             return .exit(.panic(.trap))
         }
     }

@@ -14,26 +14,50 @@ struct CompareNe: BranchCompare {
     }
 }
 
-struct CompareLt: BranchCompare {
+struct CompareLtU: BranchCompare {
     static func compare(a: UInt32, b: UInt32) -> Bool {
         a < b
     }
 }
 
-struct CompareLe: BranchCompare {
+struct CompareLtS: BranchCompare {
+    static func compare(a: UInt32, b: UInt32) -> Bool {
+        Int32(bitPattern: a) < Int32(bitPattern: b)
+    }
+}
+
+struct CompareLeU: BranchCompare {
     static func compare(a: UInt32, b: UInt32) -> Bool {
         a <= b
     }
 }
 
-struct CompareGe: BranchCompare {
+struct CompareLeS: BranchCompare {
+    static func compare(a: UInt32, b: UInt32) -> Bool {
+        Int32(bitPattern: a) <= Int32(bitPattern: b)
+    }
+}
+
+struct CompareGeU: BranchCompare {
     static func compare(a: UInt32, b: UInt32) -> Bool {
         a >= b
     }
 }
 
-struct CompareGt: BranchCompare {
+struct CompareGeS: BranchCompare {
+    static func compare(a: UInt32, b: UInt32) -> Bool {
+        Int32(bitPattern: a) >= Int32(bitPattern: b)
+    }
+}
+
+struct CompareGtU: BranchCompare {
     static func compare(a: UInt32, b: UInt32) -> Bool {
         a > b
+    }
+}
+
+struct CompareGtS: BranchCompare {
+    static func compare(a: UInt32, b: UInt32) -> Bool {
+        Int32(bitPattern: a) > Int32(bitPattern: b)
     }
 }
