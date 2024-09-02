@@ -10,10 +10,7 @@ public enum SafroleError: Error {
     case extrinsicsNotSorted
     case extrinsicsTooLow
     case extrinsicsNotUnique
-    case extrinsicsTooManyEntry
-    case hashingError
     case bandersnatchError(BandersnatchError)
-    case decodingError(DecodingError)
     case other(any Swift.Error)
 }
 
@@ -328,12 +325,6 @@ extension Safrole {
                 throw SafroleError.extrinsicsNotSorted
             }
 
-            for ticket in newTickets {
-                guard ticket.attempt < config.value.ticketEntriesPerValidator else {
-                    throw SafroleError.extrinsicsTooManyEntry
-                }
-            }
-
             var newTicketsAccumulatorArr = if isEpochChange {
                 [Ticket]()
             } else {
@@ -381,10 +372,6 @@ extension Safrole {
             throw e
         } catch let e as BandersnatchError {
             throw .bandersnatchError(e)
-        } catch Blake2Error.hashingError {
-            throw .hashingError
-        } catch let e as DecodingError {
-            throw .decodingError(e)
         } catch {
             throw .other(error)
         }

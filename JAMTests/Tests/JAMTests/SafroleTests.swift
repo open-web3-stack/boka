@@ -127,7 +127,8 @@ struct SafroleTests {
         let testcase = try JamDecoder.decode(SafroleTestcase.self, from: input.data, withConfig: config)
 
         let result = Result {
-            try testcase.preState.updateSafrole(
+            try testcase.input.extrinsics.validate(config: config)
+            return try testcase.preState.updateSafrole(
                 config: config,
                 slot: testcase.input.slot,
                 entropy: testcase.input.entropy,

@@ -252,3 +252,7 @@ extension ConfigLimitedSizeArray: EncodedSize where T: EncodedSize {
         nil
     }
 }
+
+extension ConfigLimitedSizeArray: HasConfig where T: HasConfig {
+    public typealias Config = T.Config
+}

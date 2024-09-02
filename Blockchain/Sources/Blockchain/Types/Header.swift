@@ -135,3 +135,9 @@ extension Header {
     public var authorIndex: ValidatorIndex { unsigned.authorIndex }
     public var vrfSignature: BandersnatchSignature { unsigned.vrfSignature }
 }
+
+extension Header: Validate {
+    public func validate(config _: Config) throws {
+        // TODO: validate other fields
+    }
+}

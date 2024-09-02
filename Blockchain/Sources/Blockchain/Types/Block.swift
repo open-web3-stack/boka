@@ -25,3 +25,10 @@ extension Block: Dummy {
         )
     }
 }
+
+extension Block: Validate {
+    public func validate(config: Config) throws {
+        try header.validate(config: config)
+        try extrinsic.validate(config: config)
+    }
+}
