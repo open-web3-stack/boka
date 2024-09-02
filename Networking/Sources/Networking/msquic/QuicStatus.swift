@@ -1,5 +1,11 @@
 import Foundation
 
+extension UInt32? {
+    var status: QuicStatus {
+        QuicStatus(self)
+    }
+}
+
 extension QuicStatus {
     var isFailed: Bool {
         self > 0
@@ -7,6 +13,14 @@ extension QuicStatus {
 
     var isSucceeded: Bool {
         self <= 0
+    }
+
+    init(_ value: UInt32?) {
+        guard let value else {
+            self = QuicStatusCode.unknown.rawValue
+            return
+        }
+        self = value
     }
 
     var code: QuicStatusCode {
@@ -62,5 +76,12 @@ enum QuicStatusCode: QuicStatus, Equatable {
 
     static func from(rawValue: UInt32) -> QuicStatusCode {
         QuicStatusCode(rawValue: rawValue) ?? .unknown
+    }
+
+    static func from(rawValue: UInt32?) -> QuicStatusCode {
+        guard let rawValue else {
+            return .unknown
+        }
+        return QuicStatusCode(rawValue: rawValue) ?? .unknown
     }
 }
