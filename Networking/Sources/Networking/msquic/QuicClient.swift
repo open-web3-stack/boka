@@ -64,11 +64,10 @@ extension QuicClient {
         settings.IdleTimeoutMs = 1000
         settings.IsSet.IdleTimeoutMs = 1
 
-//        QUIC_CREDENTIAL_CONFIG CfgConfig = {0};
 //        CfgConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT | QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
         var credConfig = QUIC_CREDENTIAL_CONFIG()
-//        memset(&credConfig, 0, MemoryLayout.size(ofValue: credConfig))
-        credConfig.Type = QUIC_CREDENTIAL_TYPE_NONE
+        memset(&credConfig, 0, MemoryLayout.size(ofValue: credConfig))
+//        credConfig.Type = QUIC_CREDENTIAL_TYPE_NONE
         credConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT
         if unsecure {
 //            credConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT.rawValue | QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION.rawValue
@@ -84,16 +83,16 @@ extension QuicClient {
         )
         buffer.copyBytes(to: bufferPointer, count: buffer.count)
 
-        var Alpn = QuicBuffer(Length: UInt32(buffer.count), Buffer: bufferPointer)
+        var alpn = QuicBuffer(Length: UInt32(buffer.count), Buffer: bufferPointer)
 
 //        let status = api.pointee.ConfigurationOpen(
 //            registration, &Alpn, 1, &settings, UInt32(MemoryLayout.size(ofValue: settings)), nil,
 //            &configuration)
         let status = api.pointee.ConfigurationOpen(
-            registration, &Alpn, 1, nil, 0, nil,
+            registration, &alpn, 1, nil, 0, nil,
             &configuration
         )
-//        free(bufferPointer)
+        free(bufferPointer)
         if QuicStatus(status).isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }

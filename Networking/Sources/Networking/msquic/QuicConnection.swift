@@ -3,9 +3,9 @@ import msquic
 
 class QuicConnection {
     private var connection: HQuic?
-    private let api: UnsafePointer<QuicApiTable>?
-    private let registration: HQuic?
-    private let configuration: HQuic?
+    private let api: UnsafePointer<QuicApiTable>
+    private var registration: HQuic?
+    private var configuration: HQuic?
     init(api: UnsafePointer<QuicApiTable>, registration: HQuic?, configuration: HQuic?) throws {
         self.api = api
         self.registration = registration
@@ -13,32 +13,32 @@ class QuicConnection {
     }
 
     func open() throws {
-        guard let api else {
-            throw QuicError.getApiFailed
-        }
-        let status = api.pointee.ConnectionOpen(registration, { _, context, event -> QuicStatus in
-            let quicConnection = Unmanaged<QuicConnection>.fromOpaque(context!).takeUnretainedValue()
-            return quicConnection.handleEvent(event)
-        }, Unmanaged.passUnretained(self).toOpaque(), &connection)
+        let status = api.pointee.ConnectionOpen(
+            registration,
+            { _, context, event -> QuicStatus in
+                let quicConnection = Unmanaged<QuicConnection>.fromOpaque(context!)
+                    .takeUnretainedValue()
+                return quicConnection.handleEvent(event)
+            }, Unmanaged.passUnretained(self).toOpaque(), &connection
+        )
         if QuicStatus(status).isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }
     }
 
     func start(target: String, port: UInt16) throws {
-        guard let api else {
-            throw QuicError.getApiFailed
-        }
-        let status = api.pointee.ConnectionStart(connection, configuration, UInt8(QUIC_ADDRESS_FAMILY_UNSPEC), target, port)
+        let status = api.pointee.ConnectionStart(
+            connection, configuration, UInt8(QUIC_ADDRESS_FAMILY_UNSPEC), target, port
+        )
         if QuicStatus(status).isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }
     }
 
     private func handleEvent(_ event: UnsafePointer<QUIC_CONNECTION_EVENT>?) -> QuicStatus {
-        guard let api else {
-            return QuicStatusCode.success.rawValue
-        }
+        // guard let event else {
+        // return QuicStatusCode.connectionIdle.rawValue
+        // }
         switch event?.pointee.Type {
         case QUIC_CONNECTION_EVENT_CONNECTED:
             print("Connected")
@@ -55,17 +55,10 @@ class QuicConnection {
         return QuicStatusCode.success.rawValue
     }
 
-    func release() {
+    deinit {
         if connection != nil {
-            api?.pointee.ConnectionClose(connection)
+            api.pointee.ConnectionClose(connection)
         }
         connection = nil
-    }
-
-    deinit {
-        print("QuicConnection deinit")
-        if connection != nil {
-            api?.pointee.ConnectionClose(connection)
-        }
     }
 }
