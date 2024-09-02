@@ -65,3 +65,17 @@ extension ExtrinsicGuarantees: Dummy {
         try! ExtrinsicGuarantees(guarantees: ConfigLimitedSizeArray(config: config))
     }
 }
+
+extension ExtrinsicGuarantees.GuaranteeItem: Validate {
+    public typealias Config = ProtocolConfigRef
+    public func validate(config: Config) throws {
+        try workReport.validate(config: config)
+        // TODO: validate other fields
+    }
+}
+
+extension ExtrinsicGuarantees: Validate {
+    public func validate(config: Config) throws {
+        try guarantees.validate(config: config)
+    }
+}
