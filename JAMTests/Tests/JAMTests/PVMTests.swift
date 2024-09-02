@@ -64,6 +64,15 @@ struct PolkaVMTestcase: Codable, CustomStringConvertible {
 
 private let logger = Logger(label: "PVMTests")
 
+// TODO: pass these
+let knownFailedTestCases = [
+    "inst_load_u8_trap",
+    "inst_store_u8_trap_read_only",
+    "inst_store_u8_trap_inaccessible",
+    "inst_ret_halt",
+    "inst_ret_invalid",
+]
+
 struct PVMTests {
     init() {
         setupTestLogger()
@@ -99,7 +108,7 @@ struct PVMTests {
             .trap
         }
 
-        withKnownIssue("not yet implemented", isIntermittent: true) {
+        try withKnownIssue("not yet implemented", isIntermittent: true) {
             #expect(exitReason2 == testCase.expectedStatus)
             #expect(vmState.getRegisters() == Registers(testCase.expectedRegs))
             #expect(vmState.pc == testCase.expectedPC)
@@ -110,6 +119,8 @@ struct PVMTests {
                 }
             }
             #expect(vmState.getGas() == testCase.expectedGas)
+        } when: {
+            knownFailedTestCases.contains(testCase.name)
         }
     }
 }
