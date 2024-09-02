@@ -59,8 +59,14 @@ class QuicConnection {
 
     func relese() {
         if connection != nil {
+            print("Connection Close")
             api?.pointee.ConnectionClose(connection)
+            connection = nil
         }
-        connection = nil
+    }
+
+    deinit {
+        relese()
+        print("QuicConnection Deinit")
     }
 }

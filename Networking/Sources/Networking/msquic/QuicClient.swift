@@ -51,9 +51,6 @@ public class QuicClient {
     }
 
     deinit {
-//        if connection != nil {
-//            connection?.relese()
-//        }
         if configuration != nil {
             api?.pointee.ConfigurationClose(configuration)
             configuration = nil
