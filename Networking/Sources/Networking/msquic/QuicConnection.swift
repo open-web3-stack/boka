@@ -27,10 +27,10 @@ class QuicConnection {
         }
     }
 
-    func start(target: String, port: UInt16) throws {
+    func start(ipAddress: String, port: UInt16) throws {
         let status =
             (api?.pointee.ConnectionStart(
-                connection, configuration, UInt8(QUIC_ADDRESS_FAMILY_UNSPEC), target, port
+                connection, configuration, UInt8(QUIC_ADDRESS_FAMILY_UNSPEC), ipAddress, port
             )).status
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)

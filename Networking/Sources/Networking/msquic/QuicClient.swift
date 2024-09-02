@@ -1,7 +1,7 @@
 import Foundation
 import msquic
 
-public class QuicClient {
+public final class QuicClient {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
@@ -32,13 +32,13 @@ public class QuicClient {
         registration = registrationHandle
     }
 
-    func start(target: String, port: UInt16) throws {
+    func start(ipAddress: String, port: UInt16) throws {
         try loadConfiguration()
         connection = try QuicConnection(
             api: api, registration: registration, configuration: configuration
         )
         try connection?.open()
-        try connection?.start(target: target, port: port)
+        try connection?.start(ipAddress: ipAddress, port: port)
         print("Connection started")
     }
 
@@ -60,7 +60,7 @@ public class QuicClient {
             registration = nil
         }
         MsQuicClose(api)
-//        api = nil
+        //        api = nil
         print("QuicClient Deinit")
     }
 }
@@ -94,7 +94,9 @@ extension QuicClient {
             capacity: buffer.count
         )
         buffer.copyBytes(to: bufferPointer, count: buffer.count)
-
+        defer {
+            free(bufferPointer)
+        }
         var alpn = QuicBuffer(Length: UInt32(buffer.count), Buffer: bufferPointer)
 
         //        let status = api.pointee.ConfigurationOpen(
@@ -105,7 +107,7 @@ extension QuicClient {
                 registration, &alpn, 1, nil, 0, nil,
                 &configuration
             )).status
-        free(bufferPointer)
+
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }

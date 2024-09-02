@@ -6,3 +6,6 @@ public typealias HQuic = HQUIC
 public typealias QuicBuffer = QUIC_BUFFER
 public typealias QuicSettings = QUIC_SETTINGS
 public typealias QuicCredentialConfig = QUIC_CREDENTIAL_CONFIG
+public typealias QuicListenerEvent = QUIC_LISTENER_EVENT
+public typealias QuicConnectionEvent = QUIC_CONNECTION_EVENT
+public typealias QuicStreamEvent = QUIC_STREAM_EVENT

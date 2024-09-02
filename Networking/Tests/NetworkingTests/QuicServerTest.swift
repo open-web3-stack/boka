@@ -7,12 +7,11 @@ import Testing
     import Security
 #endif
 
-final class QuicClientTests {
+final class QuicServerTests {
     @Test func start() throws {
-        let quicClient = try QuicClient()
-//        try quicClient.start(target: "127.0.0.1", port: 4567)
+        let quicServer = try QuicServer()
         #expect(throws: QuicError.self) {
-            try quicClient.start(ipAddress: "127.0.0.1", port: 4567)
+            try quicServer.start(ipAddress: "127.0.0.1", port: 4567)
         }
         print("start Deinit")
     }
