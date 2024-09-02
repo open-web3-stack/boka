@@ -1,14 +1,36 @@
 import Foundation
+import TracingUtils
+
+private let logger = Logger(label: "Branch Instruction")
+
+protocol Branch: Instruction {
+    var offset: UInt32 { get }
+    func condition(state: VMState) -> Bool
+}
+
+extension Branch {
+    public func _executeImpl(context _: ExecutionContext) throws -> ExecOutcome { .continued }
+
+    public func updatePC(context: ExecutionContext, skip: UInt32) -> ExecOutcome {
+        let condition = condition(state: context.state)
+        if !condition {
+            context.state.increasePC(skip + 1)
+        } else if !Instructions.isBranchValid(context: context, offset: offset) {
+            return .exit(.panic(.invalidBranch))
+        } else {
+            context.state.increasePC(offset)
+        }
+        return .continued
+    }
+}
 
 // for branch in A.5.7
-protocol BranchInstructionBase<Compare>: Instruction {
+protocol BranchInstructionBase<Compare>: Branch {
     associatedtype Compare: BranchCompare
 
     var register: Registers.Index { get set }
     var value: UInt32 { get set }
     var offset: UInt32 { get set }
-
-    func condition(state: VMState) -> Bool
 }
 
 extension BranchInstructionBase {
@@ -18,35 +40,20 @@ extension BranchInstructionBase {
         return (register, value, offset)
     }
 
-    public func _executeImpl(context _: ExecutionContext) throws -> ExecOutcome { .continued }
-
-    public func updatePC(context: ExecutionContext, skip: UInt32) -> ExecOutcome {
-        guard Instructions.isBranchValid(context: context, offset: offset) else {
-            return .exit(.panic(.invalidBranch))
-        }
-        if condition(state: context.state) {
-            context.state.increasePC(offset)
-        } else {
-            context.state.increasePC(skip + 1)
-        }
-        return .continued
-    }
-
     public func condition(state: VMState) -> Bool {
         let regVal = state.readRegister(register)
+        logger.trace("\(Compare.self) a(\(regVal)) b(\(value)) => \(Compare.compare(a: regVal, b: value))")
         return Compare.compare(a: regVal, b: value)
     }
 }
 
 // for branch in A.5.10
-protocol BranchInstructionBase2<Compare>: Instruction {
+protocol BranchInstructionBase2<Compare>: Branch {
     associatedtype Compare: BranchCompare
 
     var r1: Registers.Index { get set }
     var r2: Registers.Index { get set }
     var offset: UInt32 { get set }
-
-    func condition(state: VMState) -> Bool
 }
 
 extension BranchInstructionBase2 {
@@ -57,23 +64,9 @@ extension BranchInstructionBase2 {
         return (r1, r2, offset)
     }
 
-    public func _executeImpl(context _: ExecutionContext) throws -> ExecOutcome { .continued }
-
-    public func updatePC(context: ExecutionContext, skip: UInt32) -> ExecOutcome {
-        guard Instructions.isBranchValid(context: context, offset: offset) else {
-            return .exit(.panic(.invalidBranch))
-        }
-        if condition(state: context.state) {
-            context.state.increasePC(offset)
-        } else {
-            context.state.increasePC(skip + 1)
-        }
-        return .continued
-    }
-
     public func condition(state: VMState) -> Bool {
-        let r1Val = state.readRegister(r1)
-        let r2Val = state.readRegister(r2)
+        let (r1Val, r2Val) = state.readRegister(r1, r2)
+        logger.trace("\(Compare.self) a(\(r1Val)) b(\(r2Val)) => \(Compare.compare(a: r1Val, b: r2Val))")
         return Compare.compare(a: r1Val, b: r2Val)
     }
 }
