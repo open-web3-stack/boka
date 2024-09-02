@@ -73,11 +73,11 @@ struct InMemoryDataProviderTests {
         await provider.add(state: state)
 
         #expect(await (provider.hasState(hash: state.value.lastBlockHash)) == true)
-        #expect(try await (provider.getBlockHash(byTimeslot: timeslotIndex).contains(state.value.lastBlockHash)) == true)
+        #expect(await (provider.getBlockHash(byTimeslot: timeslotIndex).contains(state.value.lastBlockHash)) == true)
 
         await provider.remove(hash: state.value.lastBlockHash)
 
         #expect(await (provider.hasState(hash: state.value.lastBlockHash)) == false)
-        #expect(try await (provider.getBlockHash(byTimeslot: timeslotIndex).contains(state.value.lastBlockHash)) == false)
+        #expect(await (provider.getBlockHash(byTimeslot: timeslotIndex).contains(state.value.lastBlockHash)) == false)
     }
 }
