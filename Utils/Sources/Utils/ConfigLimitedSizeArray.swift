@@ -1,6 +1,5 @@
 import Codec
 
-// TODO: add tests
 // TODO: consider using a circular buffer instead of a regular array to reduce memory usage
 
 public enum ConfigLimitedSizeArrayError: Swift.Error {
