@@ -58,7 +58,7 @@ extension ExtrinsicTickets.TicketItem: Validate {
 
     public typealias Config = ProtocolConfigRef
     public func validate(config: Config) throws {
-        guard attempt < UInt32(config.value.ticketSubmissionEndSlot) else {
+        guard attempt < UInt32(config.value.ticketEntriesPerValidator) else {
             throw Error.invalidAttempt
         }
     }
