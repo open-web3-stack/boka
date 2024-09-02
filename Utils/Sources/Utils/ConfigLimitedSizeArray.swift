@@ -227,13 +227,13 @@ extension ConfigLimitedSizeArray: Encodable where T: Encodable {
         if TMinLength.self == TMaxLength.self {
             // fixed size array
             var container = encoder.unkeyedContainer()
-            try container.encode(minLength)
             for item in array {
                 try container.encode(item)
             }
         } else {
             // variable size array
-            try array.encode(to: encoder)
+            var container = encoder.singleValueContainer()
+            try container.encode(array)
         }
     }
 }

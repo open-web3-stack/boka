@@ -1,7 +1,7 @@
 import Codec
 import Foundation
 
-public struct FixedSizeData<T: ConstInt>: Sendable, Codable {
+public struct FixedSizeData<T: ConstInt>: Sendable {
     public private(set) var data: Data
 
     public init?(_ value: Data) {
@@ -17,6 +17,18 @@ public struct FixedSizeData<T: ConstInt>: Sendable, Codable {
 }
 
 extension FixedSizeData: Equatable, Hashable {}
+
+extension FixedSizeData: Codable {
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        data = try container.decode(Data.self)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(data)
+    }
+}
 
 extension FixedSizeData: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String {

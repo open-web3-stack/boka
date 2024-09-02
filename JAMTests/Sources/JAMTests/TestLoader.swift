@@ -19,4 +19,9 @@ enum TestLoader {
             return Testcase(description: $0, data: data)
         }
     }
+
+    static func getFile(path: String, extension ext: String) throws -> Data {
+        let path = Bundle.module.resourcePath! + "/jamtestvectors/\(path).\(ext)"
+        return try Data(contentsOf: URL(fileURLWithPath: path))
+    }
 }
