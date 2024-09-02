@@ -1,5 +1,8 @@
 import Foundation
+import TracingUtils
 import Utils
+
+private let logger = Logger(label: "InstructionTable")
 
 public class InstructionTable {
     public static let table: [Instruction.Type?] = {
@@ -10,6 +13,7 @@ public class InstructionTable {
             Instructions.StoreImmU8.self,
             Instructions.StoreImmU16.self,
             Instructions.StoreImmU32.self,
+            Instructions.Jump.self,
             Instructions.JumpInd.self,
             Instructions.LoadImm.self,
             Instructions.LoadU8.self,
@@ -100,13 +104,17 @@ public class InstructionTable {
     }()
 
     public static func parse(_ data: Data) -> (any Instruction)? {
+        logger.debug("parsing \(data)")
         guard data.count >= 1 else {
             return nil
         }
         let opcode = data[data.startIndex]
+        logger.debug("parsed opcode: \(opcode)")
         guard let instType = table[Int(opcode)] else {
             return nil
         }
+
+        logger.debug("initializing \(instType)")
         // TODO: log errors
         return try? instType.init(data: data[relative: 1...])
     }

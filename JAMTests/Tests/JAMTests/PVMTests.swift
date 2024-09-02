@@ -1,6 +1,7 @@
 import Foundation
 import PolkaVM
 import Testing
+import TracingUtils
 import Utils
 
 @testable import JAMTests
@@ -61,7 +62,22 @@ struct PolkaVMTestcase: Codable, CustomStringConvertible {
     }
 }
 
+private let logger = Logger(label: "PVMTests")
+
+// TODO: pass these
+let knownFailedTestCases = [
+    "inst_load_u8_trap",
+    "inst_store_u8_trap_read_only",
+    "inst_store_u8_trap_inaccessible",
+    "inst_ret_halt",
+    "inst_ret_invalid",
+]
+
 struct PVMTests {
+    init() {
+        setupTestLogger()
+    }
+
     static func loadTests() throws -> [Testcase] {
         try TestLoader.getTestcases(path: "pvm/programs", extension: "json")
     }
@@ -84,6 +100,7 @@ struct PVMTests {
         )
         let engine = Engine(config: DefaultPvmConfig())
         let exitReason = engine.execute(program: program, state: vmState)
+        logger.debug("exit reason: \(exitReason)")
         let exitReason2: Status = switch exitReason {
         case .halt:
             .halt
@@ -91,7 +108,7 @@ struct PVMTests {
             .trap
         }
 
-        withKnownIssue("not yet implemented", isIntermittent: true) {
+        try withKnownIssue("not yet implemented", isIntermittent: true) {
             #expect(exitReason2 == testCase.expectedStatus)
             #expect(vmState.getRegisters() == Registers(testCase.expectedRegs))
             #expect(vmState.pc == testCase.expectedPC)
@@ -102,6 +119,8 @@ struct PVMTests {
                 }
             }
             #expect(vmState.getGas() == testCase.expectedGas)
+        } when: {
+            knownFailedTestCases.contains(testCase.name)
         }
     }
 }
