@@ -58,12 +58,9 @@ enum QuicStatusCode: QuicStatus, Equatable {
     case internalError = 5
     case tlsError = 126
     case streamLimitReached = 86
+    case unknown = 4_294_967_294
 
     static func from(rawValue: UInt32) -> QuicStatusCode {
         QuicStatusCode(rawValue: rawValue) ?? .unknown
-    }
-
-    static var unknown: QuicStatusCode {
-        .init(rawValue: UInt32.max) ?? .internalError
     }
 }

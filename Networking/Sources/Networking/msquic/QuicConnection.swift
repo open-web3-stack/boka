@@ -36,9 +36,9 @@ class QuicConnection {
     }
 
     private func handleEvent(_ event: UnsafePointer<QUIC_CONNECTION_EVENT>?) -> QuicStatus {
-//        guard let api = self.api else {
-//            return QuicStatusCode.internalError.rawValue
-//        }
+        guard let api else {
+            return QuicStatusCode.internalError.rawValue
+        }
         switch event?.pointee.Type {
         case QUIC_CONNECTION_EVENT_CONNECTED:
             print("Connected")
@@ -46,13 +46,20 @@ class QuicConnection {
         case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
             print("Connection shutdown complete")
             if event?.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
-                api?.pointee.ConnectionClose(connection)
+                api.pointee.ConnectionClose(connection)
             }
 
         default:
             break
         }
         return QuicStatusCode.success.rawValue
+    }
+
+    func release() {
+        if connection != nil {
+            api?.pointee.ConnectionClose(connection)
+        }
+        connection = nil
     }
 
     deinit {

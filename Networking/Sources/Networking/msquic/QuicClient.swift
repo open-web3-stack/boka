@@ -5,6 +5,7 @@ public class QuicClient {
     private let api: UnsafePointer<QuicApiTable>
     private var registration: HQuic?
     private var configuration: HQuic?
+    private var connection: QuicConnection?
     init() throws {
         var rawPointer: UnsafeRawPointer?
         let status: UInt32 = MsQuicOpenVersion(2, &rawPointer)
@@ -33,9 +34,9 @@ public class QuicClient {
 
     func start(target: String, port: UInt16) throws {
         try loadConfiguration()
-        let connection = try QuicConnection(api: api, registration: registration, configuration: configuration)
-        try connection.open()
-        try connection.start(target: target, port: port)
+        connection = try QuicConnection(api: api, registration: registration, configuration: configuration)
+        try connection?.open()
+        try connection?.start(target: target, port: port)
         print("Connection started")
     }
 
@@ -49,13 +50,19 @@ public class QuicClient {
 
     deinit {
         print("quicClient deinit")
+        if connection != nil {
+            connection?.release()
+        }
         if configuration != nil {
             api.pointee.ConfigurationClose(configuration)
+            configuration = nil
         }
         if registration != nil {
             api.pointee.RegistrationClose(registration)
+            registration = nil
         }
         MsQuicClose(api)
+        print("api closed")
     }
 }
 
@@ -87,7 +94,7 @@ extension QuicClient {
             registration, &alpn, 1, nil, 0, nil,
             &configuration
         )
-        free(bufferPointer)
+        // free(bufferPointer)
         if QuicStatus(status).isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }
