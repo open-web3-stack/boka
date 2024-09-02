@@ -45,3 +45,13 @@ extension Extrinsic: Dummy {
         )
     }
 }
+
+extension Extrinsic: Validate {
+    public func validate(config: Config) throws {
+        try tickets.validate(config: config)
+        try judgements.validate(config: config)
+        try reports.validate(config: config)
+
+        // TODO: validate other fields
+    }
+}

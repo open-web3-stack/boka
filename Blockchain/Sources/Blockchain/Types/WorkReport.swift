@@ -74,3 +74,15 @@ extension WorkReport: EncodedSize {
         nil
     }
 }
+
+extension WorkReport: Validate {
+    public enum WorkReportError: Swift.Error {
+        case tooBig
+    }
+
+    public func validate(config: Config) throws(WorkReportError) {
+        guard encodedSize <= config.value.maxEncodedWorkReportSize else {
+            throw WorkReportError.tooBig
+        }
+    }
+}

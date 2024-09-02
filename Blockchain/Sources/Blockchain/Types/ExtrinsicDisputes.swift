@@ -98,3 +98,49 @@ extension ExtrinsicDisputes: Dummy {
         ExtrinsicDisputes(verdicts: [], culprits: [], faults: [])
     }
 }
+
+extension ExtrinsicDisputes: Validate {
+    public enum Error: Swift.Error {
+        case verdictsNotSorted
+        case culpritsNotSorted
+        case faultsNotSorted
+        case judgementsNotSorted
+        case invalidCulpritSignature
+        case invalidFaultSignature
+    }
+
+    public func validate(config _: Config) throws(Error) {
+        guard verdicts.isSortedAndUnique(by: { $0.reportHash < $1.reportHash }) else {
+            throw .verdictsNotSorted
+        }
+
+        guard culprits.isSortedAndUnique(by: { $0.validatorKey < $1.validatorKey }) else {
+            throw .culpritsNotSorted
+        }
+
+        guard faults.isSortedAndUnique(by: { $0.validatorKey < $1.validatorKey }) else {
+            throw .faultsNotSorted
+        }
+
+        for verdict in verdicts {
+            guard verdict.judgements.isSortedAndUnique(by: { $0.validatorIndex < $1.validatorIndex }) else {
+                throw .judgementsNotSorted
+            }
+        }
+
+        for culprit in culprits {
+            let payload = SigningContext.guarantee + culprit.reportHash.data
+            guard Ed25519.verify(signature: culprit.signature, message: payload, publicKey: culprit.validatorKey) else {
+                throw .invalidCulpritSignature
+            }
+        }
+
+        for fault in faults {
+            let prefix = fault.vote ? SigningContext.valid : SigningContext.invalid
+            let payload = prefix + fault.reportHash.data
+            guard Ed25519.verify(signature: fault.signature, message: payload, publicKey: fault.validatorKey) else {
+                throw .invalidFaultSignature
+            }
+        }
+    }
+}
