@@ -55,11 +55,9 @@ public class QuicClient {
         }
         if configuration != nil {
             api.pointee.ConfigurationClose(configuration)
-            configuration = nil
         }
         if registration != nil {
             api.pointee.RegistrationClose(registration)
-            registration = nil
         }
         MsQuicClose(api)
         print("api closed")
@@ -73,7 +71,7 @@ extension QuicClient {
         settings.IsSet.IdleTimeoutMs = 1
 
         var credConfig = QUIC_CREDENTIAL_CONFIG()
-        credConfig.Type = QUIC_CREDENTIAL_TYPE_NONE
+//        credConfig.Type = QUIC_CREDENTIAL_TYPE_NONE
         credConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT
         if unsecure {
             credConfig

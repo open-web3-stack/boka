@@ -2,7 +2,7 @@ import Foundation
 import msquic
 
 class QuicConnection {
-    private var connection: HQUIC?
+    private var connection: HQuic?
     private let api: UnsafePointer<QuicApiTable>?
     private let registration: HQuic?
     private let configuration: HQuic?
@@ -37,7 +37,7 @@ class QuicConnection {
 
     private func handleEvent(_ event: UnsafePointer<QUIC_CONNECTION_EVENT>?) -> QuicStatus {
         guard let api else {
-            return QuicStatusCode.internalError.rawValue
+            return QuicStatusCode.success.rawValue
         }
         switch event?.pointee.Type {
         case QUIC_CONNECTION_EVENT_CONNECTED:
