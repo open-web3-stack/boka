@@ -153,7 +153,7 @@ private class DecodeContext: Decoder {
     }
 
     fileprivate func decodeArray<T: ArrayWrapper>(_ type: T.Type, key: CodingKey?) throws -> T {
-        guard let length = data.decode() else {
+        guard let length = data.decode(), length < 0xFFFFFF else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: codingPath,
@@ -161,7 +161,6 @@ private class DecodeContext: Decoder {
                 )
             )
         }
-        assert(length < 0xFFFFFF)
         var array = [T.Element]()
         array.reserveCapacity(Int(length))
         for _ in 0 ..< length {
