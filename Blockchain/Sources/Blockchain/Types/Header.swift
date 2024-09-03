@@ -4,7 +4,7 @@ import Utils
 
 private let logger = Logger(label: "Header")
 
-public struct Header: Sendable, Equatable, Codable {
+public struct Header: Sendable, Equatable {
     public struct Unsigned: Sendable, Equatable, Codable {
         // Hp: parent hash
         public var parentHash: Data32
@@ -77,6 +77,53 @@ public struct Header: Sendable, Equatable, Codable {
     public init(unsigned: Unsigned, seal: BandersnatchSignature) {
         self.unsigned = unsigned
         self.seal = seal
+    }
+}
+
+extension Header: Codable {
+    enum CodingKeys: String, CodingKey {
+        case parentHash
+        case priorStateRoot
+        case extrinsicsHash
+        case timeslot
+        case epoch
+        case winningTickets
+        case offendersMarkers
+        case authorIndex
+        case vrfSignature
+        case seal
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            unsigned: Unsigned(
+                parentHash: container.decode(Data32.self, forKey: .parentHash),
+                priorStateRoot: container.decode(Data32.self, forKey: .priorStateRoot),
+                extrinsicsHash: container.decode(Data32.self, forKey: .extrinsicsHash),
+                timeslot: container.decode(UInt32.self, forKey: .timeslot),
+                epoch: container.decode(EpochMarker?.self, forKey: .epoch),
+                winningTickets: container.decode(ConfigFixedSizeArray<Ticket, ProtocolConfig.EpochLength>?.self, forKey: .winningTickets),
+                offendersMarkers: container.decode([Ed25519PublicKey].self, forKey: .offendersMarkers),
+                authorIndex: container.decode(ValidatorIndex.self, forKey: .authorIndex),
+                vrfSignature: container.decode(BandersnatchSignature.self, forKey: .vrfSignature)
+            ),
+            seal: container.decode(BandersnatchSignature.self, forKey: .seal)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(unsigned.parentHash, forKey: .parentHash)
+        try container.encode(unsigned.priorStateRoot, forKey: .priorStateRoot)
+        try container.encode(unsigned.extrinsicsHash, forKey: .extrinsicsHash)
+        try container.encode(unsigned.timeslot, forKey: .timeslot)
+        try container.encodeIfPresent(unsigned.epoch, forKey: .epoch)
+        try container.encodeIfPresent(unsigned.winningTickets, forKey: .winningTickets)
+        try container.encode(unsigned.offendersMarkers, forKey: .offendersMarkers)
+        try container.encode(unsigned.authorIndex, forKey: .authorIndex)
+        try container.encode(unsigned.vrfSignature, forKey: .vrfSignature)
+        try container.encode(seal, forKey: .seal)
     }
 }
 

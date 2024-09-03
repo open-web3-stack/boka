@@ -128,13 +128,106 @@ struct CodecTests {
                 ].json,
             ].json
         }
+        if value is WorkItem {
+            return [
+                "service": json["serviceIndex"]!,
+                "code_hash": json["codeHash"]!,
+                "payload": json["payloadBlob"]!,
+                "gas_limit": json["gasLimit"]!,
+                "import_segments": json["inputs"]!.array!.map { item in
+                    [
+                        "tree_root": item["root"]!,
+                        "index": item["index"]!,
+                    ].json
+                }.json,
+                "extrinsic": json["outputs"]!.array!.map { item in
+                    [
+                        "hash": item["hash"]!,
+                        "len": item["length"]!,
+                    ].json
+                }.json,
+                "export_count": json["outputDataSegmentsCount"]!,
+            ].json
+        }
+        if let value = value as? WorkPackage {
+            return [
+                "authorization": json["authorizationToken"]!,
+                "auth_code_host": json["authorizationServiceIndex"]!,
+                "authorizer": [
+                    "code_hash": json["authorizationCodeHash"]!,
+                    "params": json["parameterizationBlob"]!,
+                ].json,
+                "context": transform(json["context"]!, value: value.context),
+                "items": transform(json["workItems"]!, value: value.workItems),
+            ].json
+        }
+        if let value = value as? WorkReport {
+            return [
+                "package_spec": transform(json["packageSpecification"]!, value: value.packageSpecification),
+                "context": transform(json["refinementContext"]!, value: value.refinementContext),
+                "core_index": json["coreIndex"]!,
+                "authorizer_hash": json["authorizerHash"]!,
+                "auth_output": json["output"]!,
+                "results": transform(json["results"]!, value: value.results),
+            ].json
+        }
+        if value is AvailabilitySpecifications {
+            return [
+                "hash": json["workPackageHash"]!,
+                "len": json["length"]!,
+                "root": json["erasureRoot"]!,
+                "segments": json["segmentRoot"]!,
+            ].json
+        }
+        if let value = value as? ExtrinsicGuarantees {
+            return zip(value.guarantees, json["guarantees"]!.array!).map { value, json in
+                [
+                    "report": transform(json["workReport"]!, value: value.workReport),
+                    "slot": json["timeslot"]!,
+                    "signatures": json["credential"]!.array!.map { item in
+                        [
+                            "validator_index": item["index"]!,
+                            "signature": item["signature"]!,
+                        ].json
+                    }.json,
+                ].json
+            }.json
+        }
+        if let value = value as? Extrinsic {
+            return [
+                "tickets": transform(json["tickets"]!, value: value.tickets),
+                "disputes": transform(json["judgements"]!, value: value.judgements),
+                "preimages": transform(json["preimages"]!, value: value.preimages),
+                "assurances": transform(json["availability"]!, value: value.availability),
+                "guarantees": transform(json["reports"]!, value: value.reports),
+            ].json
+        }
+        if let value = value as? Header {
+            return [
+                "parent": json["parentHash"]!,
+                "parent_state_root": json["priorStateRoot"]!,
+                "extrinsic_hash": json["extrinsicsHash"]!,
+                "slot": json["timeslot"]!,
+                "epoch_mark": json["epoch"] ?? .null,
+                "tickets_mark": transform(json["winningTickets"] ?? .null, value: value.winningTickets as Any),
+                "offenders_mark": transform(json["offendersMarkers"]!, value: value.offendersMarkers),
+                "author_index": json["authorIndex"]!,
+                "entropy_source": json["vrfSignature"]!,
+                "seal": json["seal"]!,
+            ].json
+        }
 
         var dict = [String: JSON]()
         for field in Mirror(reflecting: value).children {
             if case Optional<Any>.none = field.value {
                 dict[field.label!] = .null
             } else {
-                dict[field.label!] = transform(json[field.label!]!, value: field.value)
+                if field.label == nil {
+                    fatalError("unreachable: label is nil \(String(reflecting: value))")
+                }
+                if let jsonValue = json[field.label!] {
+                    dict[field.label!] = transform(jsonValue, value: field.value)
+                }
             }
         }
         return dict.json
