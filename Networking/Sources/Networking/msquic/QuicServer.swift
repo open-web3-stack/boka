@@ -1,5 +1,6 @@
 import Foundation
 import msquic
+import NIO
 
 typealias ConnectionCallback = @convention(c) (
     OpaquePointer?, UnsafeMutableRawPointer?, UnsafePointer<QuicConnectionEvent>?
@@ -18,6 +19,7 @@ public final class QuicServer {
     private var registration: HQuic?
     private var configuration: HQuic?
     private var listener: HQuic?
+    private var group: MultiThreadedEventLoopGroup?
 
     init() throws {
         var rawPointer: UnsafeRawPointer?
@@ -42,15 +44,18 @@ public final class QuicServer {
 
         api = boundPointer
         registration = registrationHandle
+        group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
     }
 
     func start(ipAddress: String, port: UInt16) throws {
         try loadConfiguration()
         try openListener(ipAddress: ipAddress, port: port)
-        print("Server started")
+        try group?.next().scheduleTask(in: .hours(1)) {}.futureResult.wait()
     }
 
     deinit {
+        print("QuicServer Deinit")
+
         if listener != nil {
             api?.pointee.ListenerClose(listener)
             listener = nil
@@ -64,16 +69,43 @@ public final class QuicServer {
             registration = nil
         }
         MsQuicClose(api)
-        print("QuicServer Deinit")
+        try? group?.syncShutdownGracefully()
     }
 
     private static let serverListenerCallback: ServerListenerCallback = {
-        listener, context, event in
+        _, context, event in
+        var status: QuicStatus = QuicStatusCode.notSupported.rawValue
         guard let context, let event else {
-            return QuicStatusCode.notSupported.rawValue
+            return status
         }
-        let server = Unmanaged<QuicServer>.fromOpaque(context).takeUnretainedValue()
-        return server.handleListenerEvent(listener, event)
+        let server: QuicServer = Unmanaged<QuicServer>.fromOpaque(context).takeUnretainedValue()
+        print("serverListenerCallback type:", event.pointee.Type)
+
+        switch event.pointee.Type {
+        case QUIC_LISTENER_EVENT_NEW_CONNECTION:
+//            break
+            let connection = event.pointee.NEW_CONNECTION.Connection
+            let connectionCallbackPointer = UnsafeMutablePointer<ConnectionCallback>.allocate(
+                capacity: 1
+            )
+            connectionCallbackPointer.initialize(to: QuicServer.connectionCallback)
+            guard let api = server.api else {
+                return status
+            }
+            api.pointee.SetCallbackHandler(
+                connection,
+                connectionCallbackPointer,
+                UnsafeMutableRawPointer(Unmanaged.passUnretained(server).toOpaque())
+            )
+
+            let res = api.pointee.ConnectionSetConfiguration(connection, server.configuration)
+            if res != QuicStatusCode.unknown.rawValue {
+                status = res
+            }
+        default:
+            break
+        }
+        return status
     }
 
     private static let streamCallback: StreamCallback = { stream, context, event in
@@ -108,10 +140,14 @@ public final class QuicServer {
     }
 
     private static let connectionCallback: ConnectionCallback = { _, context, event in
-        guard let event: UnsafePointer<QuicConnectionEvent> = event else {
-            return QuicStatusCode.invalidParameter.rawValue
+        print("connectionCallback")
+
+        guard let context, let event else {
+            print("connectionCallback nil context or event")
+            return QuicStatusCode.notSupported.rawValue
         }
-        let server = Unmanaged<QuicServer>.fromOpaque(context!).takeUnretainedValue()
+        print("connectionCallback ", event.pointee.Type)
+        let server: QuicServer = Unmanaged<QuicServer>.fromOpaque(context).takeUnretainedValue()
         switch event.pointee.Type {
         case QUIC_CONNECTION_EVENT_CONNECTED:
             print("Connected")
@@ -134,31 +170,18 @@ public final class QuicServer {
         }
         return QuicStatusCode.success.rawValue
     }
+}
 
-    private func handleListenerEvent(_: OpaquePointer?, _ event: UnsafePointer<QuicListenerEvent>)
-        -> QuicStatus
-    {
-        var status: QuicStatus = QuicStatusCode.success.rawValue
-        switch event.pointee.Type {
-        case QUIC_LISTENER_EVENT_NEW_CONNECTION:
-            let connection = event.pointee.NEW_CONNECTION.Connection
-            let connectionCallbackPointer = UnsafeMutablePointer<ConnectionCallback>.allocate(
-                capacity: 1
-            )
-            connectionCallbackPointer.initialize(to: QuicServer.connectionCallback)
-            api?.pointee.SetCallbackHandler(
-                connection,
-                connectionCallbackPointer,
-                UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
-            )
-            status = (api?.pointee.ConnectionSetConfiguration(connection, configuration)).status
-        default:
-            break
+public class ResourceHelper {
+    public static func getResourcePath(
+        for resourceName: String, withExtension ext: String, in bundle: Bundle = .main
+    ) -> String? {
+        guard let resourceURL = bundle.url(forResource: resourceName, withExtension: ext) else {
+            return nil
         }
-        return status
-    }
 
-    private func handleConnectionEvent(_: OpaquePointer?, _: UnsafePointer<QuicConnectionEvent>) {}
+        return resourceURL.path
+    }
 }
 
 extension QuicServer {
@@ -169,12 +192,45 @@ extension QuicServer {
         settings.IsSet.ServerResumptionLevel = 1
         settings.PeerBidiStreamCount = 1
         settings.IsSet.PeerBidiStreamCount = 1
-
+        var certificateFile = QUIC_CERTIFICATE_FILE()
         var credConfig = QUIC_CREDENTIAL_CONFIG()
+
+        memset(&certificateFile, 0, MemoryLayout.size(ofValue: certificateFile))
         memset(&credConfig, 0, MemoryLayout.size(ofValue: credConfig))
+        // let currentPath = FileManager.default.currentDirectoryPath
+
+        // let cert = currentPath + "/Sources/assets/server.cert"
+        // let keyFile = currentPath + "/Sources/assets/server.key"
+        // print("cert: \(cert)")
+        // print("keyFile: \(keyFile)")
+        let cert = "/Users/mackun/boka/Networking/Sources/assets/server.cert"
+        let keyFile = "/Users/mackun/boka/Networking/Sources/assets/server.key"
+        let certCString = cert.utf8CString
+        let keyFileCString = keyFile.utf8CString
+
+        let certPointer = UnsafeMutablePointer<CChar>.allocate(capacity: certCString.count)
+        let keyFilePointer = UnsafeMutablePointer<CChar>.allocate(capacity: keyFileCString.count)
+
+        certCString.withUnsafeBytes {
+            certPointer.initialize(
+                from: $0.bindMemory(to: CChar.self).baseAddress!, count: certCString.count
+            )
+        }
+
+        keyFileCString.withUnsafeBytes {
+            keyFilePointer.initialize(
+                from: $0.bindMemory(to: CChar.self).baseAddress!, count: keyFileCString.count
+            )
+        }
+        certificateFile.CertificateFile = UnsafePointer(certPointer)
+        certificateFile.PrivateKeyFile = UnsafePointer(keyFilePointer)
+
+        let certificateFilePointer =
+            UnsafeMutablePointer<QUIC_CERTIFICATE_FILE>.allocate(capacity: 1)
+        certificateFilePointer.initialize(to: certificateFile)
+        credConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE
         credConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE
-        // TODO: load certificate configuration
-        // Add your certificate loading logic here
+        credConfig.CertificateFile = certificateFilePointer
 
         let buffer = Data("sample".utf8)
         let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(
@@ -186,10 +242,15 @@ extension QuicServer {
         }
         var alpn = QuicBuffer(Length: UInt32(buffer.count), Buffer: bufferPointer)
 
+        //        let status =
+        //            (api?.pointee.ConfigurationOpen(
+        //                registration, &alpn, 1, &settings, UInt32(MemoryLayout.size(ofValue: settings)),
+        //                nil, &configuration
+        //            )).status
         let status =
             (api?.pointee.ConfigurationOpen(
-                registration, &alpn, 1, &settings, UInt32(MemoryLayout.size(ofValue: settings)),
-                nil, &configuration
+                registration, &alpn, 1, nil, 0, nil,
+                &configuration
             )).status
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)
@@ -204,6 +265,9 @@ extension QuicServer {
 
     private func openListener(ipAddress _: String, port: UInt16) throws {
         var listenerHandle: HQuic?
+        //
+        // Create/allocate a new listener object.
+        //
         let status =
             (api?.pointee.ListenerOpen(
                 registration, QuicServer.serverListenerCallback,
@@ -229,8 +293,11 @@ extension QuicServer {
 
         QuicAddrSetFamily(&address, QUIC_ADDRESS_FAMILY(QUIC_ADDRESS_FAMILY_UNSPEC))
         QuicAddrSetPort(&address, port)
-
-        let startStatus = (api?.pointee.ListenerStart(listener, &alpn, 1, &address)).status
+        //
+        // Starts listening for incoming connections.
+        //
+        let startStatus: QuicStatus = (api?.pointee.ListenerStart(listener, &alpn, 1, &address))
+            .status
 
         if startStatus.isFailed {
             throw QuicError.invalidStatus(status: startStatus.code)

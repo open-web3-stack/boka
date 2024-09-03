@@ -1,11 +1,14 @@
 import Foundation
 import msquic
+import NIO
 
 public final class QuicClient {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
     private var connection: QuicConnection?
+    // private var group: MultiThreadedEventLoopGroup?
+
     init() throws {
         var rawPointer: UnsafeRawPointer?
         let status: UInt32 = MsQuicOpenVersion(2, &rawPointer)
@@ -30,6 +33,7 @@ public final class QuicClient {
 
         api = boundPointer
         registration = registrationHandle
+        // group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     }
 
     func start(ipAddress: String, port: UInt16) throws {
@@ -39,7 +43,7 @@ public final class QuicClient {
         )
         try connection?.open()
         try connection?.start(ipAddress: ipAddress, port: port)
-        print("Connection started")
+        // try group?.next().scheduleTask(in: .hours(1)) { }.futureResult.wait()
     }
 
     func connect() throws -> QuicStatus {
@@ -60,8 +64,7 @@ public final class QuicClient {
             registration = nil
         }
         MsQuicClose(api)
-        //        api = nil
-        print("QuicClient Deinit")
+        // try? group?.syncShutdownGracefully()
     }
 }
 

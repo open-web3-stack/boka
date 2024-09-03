@@ -17,6 +17,8 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"),
+
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -25,6 +27,9 @@ let package = Package(
             name: "Networking",
             dependencies: [
                 "msquic",
+                .product(name: "NIO", package: "swift-nio"),
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
             ],
             swiftSettings: [
                 .define("DEBUG_ASSERT", .when(configuration: .debug)),
