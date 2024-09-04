@@ -46,7 +46,7 @@ class QuicConnection {
             print("Connected")
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
-            print("Connection shutdown complete")
+//            print("Connection shutdown complete")
             if event?.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 relese()
             }

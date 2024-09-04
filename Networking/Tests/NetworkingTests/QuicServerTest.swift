@@ -1,5 +1,3 @@
-import NIOCore
-import NIOPosix
 import Testing
 
 @testable import Networking

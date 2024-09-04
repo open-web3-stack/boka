@@ -86,7 +86,9 @@ public final class QuicServer {
                 return status
             }
 
-            let callbackPointer = unsafeBitCast(QuicServer.connectionCallback, to: UnsafeMutableRawPointer.self)
+            let callbackPointer = unsafeBitCast(
+                QuicServer.connectionCallback, to: UnsafeMutableRawPointer.self
+            )
 
             api.pointee.SetCallbackHandler(
                 connection,
@@ -120,10 +122,28 @@ public final class QuicServer {
             }
             print("[strm][\(String(describing: stream))] Data sent")
         case QUIC_STREAM_EVENT_RECEIVE:
-            print("[strm][\(String(describing: stream))] Data received")
+            let bufferCount = event.pointee.RECEIVE.BufferCount
+            let buffers = event.pointee.RECEIVE.Buffers
+            // Sends the buffer over the stream. Note the FIN flag is passed along with
+            // the buffer. This indicates this is the last buffer on the stream and the
+            // the stream is shut down (in the send direction) immediately after.
+            status =
+                (server.api?.pointee.StreamSend(
+                    stream, buffers, bufferCount, QUIC_SEND_FLAG_FIN, nil
+                ))
+                .status
+            let signedStatus = Int32(bitPattern: status)
+            if signedStatus > 0 {
+                let shutdown =
+                    (server.api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0))
+                        .status
+                if shutdown.isFailed {
+                    print("StreamShutdown failed, 0x\(String(format: "%x", shutdown))!")
+                    return QuicStatusCode.internalError.rawValue
+                }
+            }
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
             print("[strm][\(String(describing: stream))] Peer shut down")
-        // serverSend(stream)
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
             print("[strm][\(String(describing: stream))] Peer aborted")
             status =
@@ -131,7 +151,9 @@ public final class QuicServer {
                     .status
         case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
             print("[strm][\(String(describing: stream))] All done")
-            server.api?.pointee.StreamClose(stream)
+            if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
+                server.api?.pointee.StreamClose(stream)
+            }
         default:
             break
         }
@@ -155,7 +177,9 @@ public final class QuicServer {
             print("Connection shutdown complete.")
         case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
             let stream = event.pointee.PEER_STREAM_STARTED.Stream
-            let callbackPointer = unsafeBitCast(QuicServer.streamCallback, to: UnsafeMutableRawPointer.self)
+            let callbackPointer = unsafeBitCast(
+                QuicServer.streamCallback, to: UnsafeMutableRawPointer.self
+            )
 
             server.api?.pointee.SetCallbackHandler(
                 stream, callbackPointer,
@@ -233,11 +257,6 @@ extension QuicServer {
                 registration, &alpn, 1, &settings, UInt32(MemoryLayout.size(ofValue: settings)),
                 nil, &configuration
             )).status
-        //        let status =
-        //            (api?.pointee.ConfigurationOpen(
-        //                registration, &alpn, 1, nil, 0, nil,
-        //                &configuration
-        //            )).status
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }
@@ -251,9 +270,7 @@ extension QuicServer {
 
     private func openListener(ipAddress _: String, port: UInt16) throws {
         var listenerHandle: HQuic?
-        //
         // Create/allocate a new listener object.
-        //
         let status =
             (api?.pointee.ListenerOpen(
                 registration, QuicServer.serverListenerCallback,
@@ -279,9 +296,7 @@ extension QuicServer {
 
         QuicAddrSetFamily(&address, QUIC_ADDRESS_FAMILY(QUIC_ADDRESS_FAMILY_UNSPEC))
         QuicAddrSetPort(&address, port)
-        //
         // Starts listening for incoming connections.
-        //
         let startStatus: QuicStatus = (api?.pointee.ListenerStart(listener, &alpn, 1, &address))
             .status
 
