@@ -7,7 +7,7 @@ public final class QuicClient {
     private var registration: HQuic?
     private var configuration: HQuic?
     private var connection: QuicConnection?
-    private var group: MultiThreadedEventLoopGroup?
+//    private var group: MultiThreadedEventLoopGroup?
 
     init() throws {
         var rawPointer: UnsafeRawPointer?
@@ -33,7 +33,7 @@ public final class QuicClient {
 
         api = boundPointer
         registration = registrationHandle
-        group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+//        group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     }
 
     func start(ipAddress: String, port: UInt16) throws {
@@ -43,15 +43,18 @@ public final class QuicClient {
         )
         try connection?.open()
         try connection?.start(ipAddress: ipAddress, port: port)
-        try group?.next().scheduleTask(in: .hours(1)) {}.futureResult.wait()
+//        try group?.next().scheduleTask(in: .hours(1)) {}.futureResult.wait()
     }
 
     func connect() throws -> QuicStatus {
         QuicStatusCode.success.rawValue
     }
 
-    func send(message _: Data) throws -> QuicStatus {
-        QuicStatusCode.success.rawValue
+    func send(message: Data) throws -> QuicStatus {
+        guard let connection else {
+            throw QuicError.getConnectionFailed
+        }
+        return connection.clientSend(message: message)
     }
 
     deinit {
@@ -64,7 +67,7 @@ public final class QuicClient {
             registration = nil
         }
         MsQuicClose(api)
-        try? group?.syncShutdownGracefully()
+//        try? group?.syncShutdownGracefully()
     }
 }
 

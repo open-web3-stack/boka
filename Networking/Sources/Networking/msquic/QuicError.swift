@@ -3,4 +3,5 @@ enum QuicError: Error, Equatable {
     case invalidAlpn
     case getApiFailed
     case getRegistrationFailed
+    case getConnectionFailed
 }

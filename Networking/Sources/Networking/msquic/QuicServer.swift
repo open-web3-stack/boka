@@ -2,18 +2,6 @@ import Foundation
 import msquic
 import NIO
 
-typealias ConnectionCallback = @convention(c) (
-    OpaquePointer?, UnsafeMutableRawPointer?, UnsafePointer<QuicConnectionEvent>?
-) -> QuicStatus
-
-typealias StreamCallback = @convention(c) (
-    OpaquePointer?, UnsafeMutableRawPointer?, UnsafeMutablePointer<QuicStreamEvent>?
-) -> QuicStatus
-
-typealias ServerListenerCallback = @convention(c) (
-    OpaquePointer?, UnsafeMutableRawPointer?, UnsafeMutablePointer<QuicListenerEvent>?
-) -> QuicStatus
-
 public final class QuicServer {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
