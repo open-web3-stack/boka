@@ -11,17 +11,17 @@ struct SortedSetTests {
     }
 
     @Test func decode() throws {
-        let decoded = try JamDecoder.decode(SortedSet<UInt8>.self, from: Data([12, 1, 2, 3]))
+        let decoded = try JamDecoder.decode(SortedSet<UInt8>.self, from: Data([3, 1, 2, 3]))
         #expect(decoded.alias == [1, 2, 3])
     }
 
     @Test func invalidData() throws {
         #expect(throws: DecodingError.self) {
-            try JamDecoder.decode(SortedSet<UInt>.self, from: Data([12, 1, 2, 2]))
+            try JamDecoder.decode(SortedSet<UInt>.self, from: Data([3, 1, 2, 2]))
         }
 
         #expect(throws: DecodingError.self) {
-            try JamDecoder.decode(SortedSet<UInt>.self, from: Data([12, 3, 2, 1]))
+            try JamDecoder.decode(SortedSet<UInt>.self, from: Data([3, 3, 2, 1]))
         }
     }
 }
