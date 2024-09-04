@@ -18,6 +18,7 @@ public final class QuicServer {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
+
     private var listener: HQuic?
     private var group: MultiThreadedEventLoopGroup?
 
@@ -54,8 +55,6 @@ public final class QuicServer {
     }
 
     deinit {
-        print("QuicServer Deinit")
-
         if listener != nil {
             api?.pointee.ListenerClose(listener)
             listener = nil
@@ -79,29 +78,29 @@ public final class QuicServer {
             return status
         }
         let server: QuicServer = Unmanaged<QuicServer>.fromOpaque(context).takeUnretainedValue()
-        print("serverListenerCallback type:", event.pointee.Type)
 
         switch event.pointee.Type {
         case QUIC_LISTENER_EVENT_NEW_CONNECTION:
-//            break
-            let connection = event.pointee.NEW_CONNECTION.Connection
-            let connectionCallbackPointer = UnsafeMutablePointer<ConnectionCallback>.allocate(
-                capacity: 1
-            )
-            connectionCallbackPointer.initialize(to: QuicServer.connectionCallback)
+            let connection: HQuic = event.pointee.NEW_CONNECTION.Connection
             guard let api = server.api else {
                 return status
             }
+
+            let callbackPointer = unsafeBitCast(QuicServer.connectionCallback, to: UnsafeMutableRawPointer.self)
+
             api.pointee.SetCallbackHandler(
                 connection,
-                connectionCallbackPointer,
+                callbackPointer,
                 UnsafeMutableRawPointer(Unmanaged.passUnretained(server).toOpaque())
             )
 
-            let res = api.pointee.ConnectionSetConfiguration(connection, server.configuration)
-            if res != QuicStatusCode.unknown.rawValue {
-                status = res
-            }
+            let connectStatus = api.pointee.ConnectionSetConfiguration(
+                connection, server.configuration
+            )
+            // c unsigned int  < 0  pending
+            let signedStatus = Int32(bitPattern: connectStatus)
+            print("ConnectionSetConfiguration status:", signedStatus)
+            status = connectStatus
         default:
             break
         }
@@ -140,13 +139,10 @@ public final class QuicServer {
     }
 
     private static let connectionCallback: ConnectionCallback = { _, context, event in
-        print("connectionCallback")
 
-        guard let context, let event else {
-            print("connectionCallback nil context or event")
+        guard let context: UnsafeMutableRawPointer, let event else {
             return QuicStatusCode.notSupported.rawValue
         }
-        print("connectionCallback ", event.pointee.Type)
         let server: QuicServer = Unmanaged<QuicServer>.fromOpaque(context).takeUnretainedValue()
         switch event.pointee.Type {
         case QUIC_CONNECTION_EVENT_CONNECTED:
@@ -159,10 +155,10 @@ public final class QuicServer {
             print("Connection shutdown complete.")
         case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
             let stream = event.pointee.PEER_STREAM_STARTED.Stream
-            let streamCallbackPointer = UnsafeMutablePointer<StreamCallback>.allocate(capacity: 1)
-            streamCallbackPointer.initialize(to: QuicServer.streamCallback)
+            let callbackPointer = unsafeBitCast(QuicServer.streamCallback, to: UnsafeMutableRawPointer.self)
+
             server.api?.pointee.SetCallbackHandler(
-                stream, streamCallbackPointer,
+                stream, callbackPointer,
                 UnsafeMutableRawPointer(Unmanaged.passUnretained(server).toOpaque())
             )
         default:
@@ -172,23 +168,12 @@ public final class QuicServer {
     }
 }
 
-public class ResourceHelper {
-    public static func getResourcePath(
-        for resourceName: String, withExtension ext: String, in bundle: Bundle = .main
-    ) -> String? {
-        guard let resourceURL = bundle.url(forResource: resourceName, withExtension: ext) else {
-            return nil
-        }
-
-        return resourceURL.path
-    }
-}
-
 extension QuicServer {
     private func loadConfiguration() throws {
         var settings = QUIC_SETTINGS()
         settings.IdleTimeoutMs = 1000
         settings.IsSet.IdleTimeoutMs = 1
+        settings.ServerResumptionLevel = 2 // QUIC_SERVER_RESUME_AND_ZERORTT
         settings.IsSet.ServerResumptionLevel = 1
         settings.PeerBidiStreamCount = 1
         settings.IsSet.PeerBidiStreamCount = 1
@@ -222,6 +207,7 @@ extension QuicServer {
                 from: $0.bindMemory(to: CChar.self).baseAddress!, count: keyFileCString.count
             )
         }
+
         certificateFile.CertificateFile = UnsafePointer(certPointer)
         certificateFile.PrivateKeyFile = UnsafePointer(keyFilePointer)
 
@@ -242,16 +228,16 @@ extension QuicServer {
         }
         var alpn = QuicBuffer(Length: UInt32(buffer.count), Buffer: bufferPointer)
 
-        //        let status =
-        //            (api?.pointee.ConfigurationOpen(
-        //                registration, &alpn, 1, &settings, UInt32(MemoryLayout.size(ofValue: settings)),
-        //                nil, &configuration
-        //            )).status
         let status =
             (api?.pointee.ConfigurationOpen(
-                registration, &alpn, 1, nil, 0, nil,
-                &configuration
+                registration, &alpn, 1, &settings, UInt32(MemoryLayout.size(ofValue: settings)),
+                nil, &configuration
             )).status
+        //        let status =
+        //            (api?.pointee.ConfigurationOpen(
+        //                registration, &alpn, 1, nil, 0, nil,
+        //                &configuration
+        //            )).status
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }
