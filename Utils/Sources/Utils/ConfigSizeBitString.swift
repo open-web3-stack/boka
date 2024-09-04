@@ -135,7 +135,7 @@ extension ConfigSizeBitString: FixedLengthData {
 
 extension ConfigSizeBitString: EncodedSize {
     public var encodedSize: Int {
-        UInt32(length).variableEncodingLength() + bytes.count
+        bytes.count
     }
 
     public static var encodeedSizeHint: Int? {
