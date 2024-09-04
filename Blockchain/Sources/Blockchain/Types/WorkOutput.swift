@@ -76,18 +76,18 @@ extension WorkOutput: Codable {
             var container = encoder.unkeyedContainer()
             switch result {
             case let .success(success):
-                try container.encode(0)
+                try container.encode(UInt8(0))
                 try container.encode(success)
             case let .failure(failure):
                 switch failure {
                 case .outOfGas:
-                    try container.encode(1)
+                    try container.encode(UInt8(1))
                 case .panic:
-                    try container.encode(2)
+                    try container.encode(UInt8(2))
                 case .invalidCode:
-                    try container.encode(3)
+                    try container.encode(UInt8(3))
                 case .codeTooLarge:
-                    try container.encode(4)
+                    try container.encode(UInt8(4))
                 }
             }
         } else {

@@ -140,7 +140,7 @@ extension LimitedSizeArray: Decodable where T: Decodable {
 
         if TMinLength.self != TMaxLength.self, decoder.isJamCodec {
             // read length prefix for variable size array
-            let value = try ScaleIntegerCodec.decode { try container.decode(UInt8.self) }
+            let value = try IntegerCodec.decode { try container.decode(UInt8.self) }
             guard let value, let intValue = Int(exactly: value) else {
                 throw DecodingError.dataCorrupted(
                     DecodingError.Context(

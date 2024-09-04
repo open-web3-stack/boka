@@ -3,22 +3,20 @@ import Foundation
 import Utils
 
 public struct WorkReport: Sendable, Equatable, Codable {
-    // the order is based on the Block Serialization section
-
-    // a: authorizer hash
-    public var authorizerHash: Data32
-
-    // c: the core-index
-    public var coreIndex: CoreIndex
-
-    // o: output
-    public var output: Data
+    // s: package specification
+    public var packageSpecification: AvailabilitySpecifications
 
     // x: refinement context
     public var refinementContext: RefinementContext
 
-    // s: package specification
-    public var packageSpecification: AvailabilitySpecifications
+    // c: the core-index
+    public var coreIndex: CoreIndex
+
+    // a: authorizer hash
+    public var authorizerHash: Data32
+
+    // o: output
+    public var output: Data
 
     // r: the results of the evaluation of each of the items in the package
     public var results: ConfigLimitedSizeArray<

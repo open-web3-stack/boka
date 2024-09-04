@@ -12,7 +12,7 @@
 
 import Foundation
 
-indirect enum JSON: Codable {
+public indirect enum JSON: Codable, Equatable {
     case dictionary([String: JSON])
     case array([JSON])
     case string(String)
@@ -20,7 +20,7 @@ indirect enum JSON: Codable {
     case boolean(Bool)
     case null
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         if container.decodeNil() {
             self = .null
@@ -37,7 +37,7 @@ indirect enum JSON: Codable {
         }
     }
 
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         switch self {
         case let .dictionary(dictionary):
@@ -57,7 +57,7 @@ indirect enum JSON: Codable {
 }
 
 extension JSON: CustomDebugStringConvertible {
-    var debugDescription: String {
+    public var debugDescription: String {
         let encoder = JSONEncoder()
         if #available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -75,7 +75,7 @@ extension JSON: CustomDebugStringConvertible {
 }
 
 extension JSON {
-    subscript(key: Any) -> JSON? {
+    public subscript(key: Any) -> JSON? {
         if let array, let index = key as? Int, index < array.count {
             array[index]
         } else if let dic = dictionary, let key = key as? String, let obj = dic[key] {
@@ -86,7 +86,7 @@ extension JSON {
     }
 
     /// Returns a `JSON` dictionary, if possible.
-    var dictionary: [String: JSON]? {
+    public var dictionary: [String: JSON]? {
         switch self {
         case let .dictionary(dict):
             dict
@@ -96,7 +96,7 @@ extension JSON {
     }
 
     /// Returns a `JSON` array, if possible.
-    var array: [JSON]? {
+    public var array: [JSON]? {
         switch self {
         case let .array(array):
             array
@@ -106,7 +106,7 @@ extension JSON {
     }
 
     /// Returns a `String` value, if possible.
-    var string: String? {
+    public var string: String? {
         switch self {
         case let .string(value):
             value
@@ -116,7 +116,7 @@ extension JSON {
     }
 
     /// Returns a `Double` value, if possible.
-    var number: Double? {
+    public var number: Double? {
         switch self {
         case let .number(number):
             number
@@ -126,7 +126,7 @@ extension JSON {
     }
 
     /// Returns a `Bool` value, if possible.
-    var bool: Bool? {
+    public var bool: Bool? {
         switch self {
         case let .boolean(value):
             value
@@ -164,5 +164,35 @@ extension JSON {
             self.intValue = intValue
             self.stringValue = stringValue
         }
+    }
+}
+
+extension [String: JSON] {
+    public var json: JSON {
+        JSON.dictionary(self)
+    }
+}
+
+extension [JSON] {
+    public var json: JSON {
+        JSON.array(self)
+    }
+}
+
+extension String {
+    public var json: JSON {
+        JSON.string(self)
+    }
+}
+
+extension BinaryInteger {
+    public var json: JSON {
+        JSON.number(Double(self))
+    }
+}
+
+extension Bool {
+    public var json: JSON {
+        JSON.boolean(self)
     }
 }
