@@ -8,7 +8,12 @@ extension UInt32? {
 
 extension QuicStatus {
     var isFailed: Bool {
-        self > 0
+        // fix c unsigned int < 0
+        Int32(bitPattern: self) > 0
+    }
+
+    var value: Int32 {
+        Int32(bitPattern: self)
     }
 
     var isSucceeded: Bool {

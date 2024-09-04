@@ -7,7 +7,7 @@ public final class QuicClient {
     private var registration: HQuic?
     private var configuration: HQuic?
     private var connection: QuicConnection?
-//    private var group: MultiThreadedEventLoopGroup?
+    private var group: MultiThreadedEventLoopGroup?
 
     init() throws {
         var rawPointer: UnsafeRawPointer?
@@ -33,7 +33,7 @@ public final class QuicClient {
 
         api = boundPointer
         registration = registrationHandle
-//        group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     }
 
     func start(ipAddress: String, port: UInt16) throws {
@@ -43,11 +43,14 @@ public final class QuicClient {
         )
         try connection?.open()
         try connection?.start(ipAddress: ipAddress, port: port)
-//        try group?.next().scheduleTask(in: .hours(1)) {}.futureResult.wait()
     }
 
     func connect() throws -> QuicStatus {
         QuicStatusCode.success.rawValue
+    }
+
+    func wait() throws {
+        try group?.next().scheduleTask(in: .hours(1)) {}.futureResult.wait()
     }
 
     func send(message: Data) throws -> QuicStatus {
@@ -58,6 +61,8 @@ public final class QuicClient {
     }
 
     deinit {
+        print("QuicClient Deinit")
+
         if configuration != nil {
             api?.pointee.ConfigurationClose(configuration)
             configuration = nil
@@ -67,7 +72,7 @@ public final class QuicClient {
             registration = nil
         }
         MsQuicClose(api)
-//        try? group?.syncShutdownGracefully()
+        try? group?.syncShutdownGracefully()
     }
 }
 
@@ -105,14 +110,17 @@ extension QuicClient {
         }
         var alpn = QuicBuffer(Length: UInt32(buffer.count), Buffer: bufferPointer)
 
-        //        let status = api.pointee.ConfigurationOpen(
-        //            registration, &Alpn, 1, &settings, UInt32(MemoryLayout.size(ofValue: settings)), nil,
-        //            &configuration)
         let status =
             (api?.pointee.ConfigurationOpen(
-                registration, &alpn, 1, nil, 0, nil,
+                registration, &alpn, 1, &settings, UInt32(MemoryLayout.size(ofValue: settings)),
+                nil,
                 &configuration
             )).status
+        //        let status =
+        //            (api?.pointee.ConfigurationOpen(
+        //                registration, &alpn, 1, nil, 0, nil,
+        //                &configuration
+        //            )).status
 
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)

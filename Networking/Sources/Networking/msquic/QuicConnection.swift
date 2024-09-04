@@ -6,6 +6,8 @@ class QuicConnection {
     private let api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
+    private var stream: HQuic?
+    // private var sendBuffer:QuicBuffer?
     init(api: UnsafePointer<QuicApiTable>?, registration: HQuic?, configuration: HQuic?) throws {
         self.api = api
         self.registration = registration
@@ -77,7 +79,6 @@ class QuicConnection {
 
     func clientSend(message: Data) -> QuicStatus {
         var status = QuicStatusCode.success.rawValue
-        var stream: HQUIC?
 
         // Create/allocate a new bidirectional stream.
         status =
@@ -107,9 +108,6 @@ class QuicConnection {
             capacity: buffer.count
         )
         buffer.copyBytes(to: bufferPointer, count: buffer.count)
-        defer {
-            free(bufferPointer)
-        }
         var sendBuffer = QuicBuffer(Length: UInt32(buffer.count), Buffer: bufferPointer)
         // Sends the buffer over the stream. Note the FIN flag is passed along with
         // the buffer. This indicates this is the last buffer on the stream and the
@@ -174,7 +172,8 @@ class QuicConnection {
     }
 
     deinit {
-        relese()
         print("QuicConnection Deinit")
+
+        relese()
     }
 }
