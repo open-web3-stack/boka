@@ -83,7 +83,6 @@ extension QuicClient {
         settings.IdleTimeoutMs = 30000
         settings.IsSet.IdleTimeoutMs = 1
 
-        //        CfgConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT | QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
         var credConfig = QUIC_CREDENTIAL_CONFIG()
         memset(&credConfig, 0, MemoryLayout.size(ofValue: credConfig))
         //        credConfig.Type = QUIC_CREDENTIAL_TYPE_NONE

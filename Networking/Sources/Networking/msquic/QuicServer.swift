@@ -6,10 +6,10 @@ public final class QuicServer {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
-
     private var listener: HQuic?
     private var group: MultiThreadedEventLoopGroup?
-
+    private let streamCallback: StreamCallback
+    private let connectionCallback: ConnectionCallback
     init() throws {
         var rawPointer: UnsafeRawPointer?
         let status: UInt32 = MsQuicOpenVersion(2, &rawPointer)
@@ -34,12 +34,22 @@ public final class QuicServer {
         api = boundPointer
         registration = registrationHandle
         group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+        streamCallback = { stream, context, event in
+            QuicServer.streamCallback(
+                stream: stream, context: context, event: event
+            )
+        }
+        connectionCallback = { connection, context, event in
+            QuicServer.connectionCallback(
+                connection: connection, context: context, event: event
+            )
+        }
     }
 
     func start(ipAddress: String, port: UInt16) throws {
         try loadConfiguration()
         try openListener(ipAddress: ipAddress, port: port)
-        try group?.next().scheduleTask(in: .hours(1)) {}.futureResult.wait() // TODO: remove
+        try group?.next().scheduleTask(in: .minutes(1)) {}.futureResult.wait() // TODO: remove
     }
 
     deinit {
@@ -59,7 +69,10 @@ public final class QuicServer {
         try? group?.syncShutdownGracefully()
     }
 
-    private static let serverListenerCallback: ServerListenerCallback = { _, context, event in
+    private static func serverListenerCallback(
+        listener _: HQuic?, context: UnsafeMutableRawPointer?,
+        event: UnsafePointer<QUIC_LISTENER_EVENT>?
+    ) -> QuicStatus {
         var status: QuicStatus = QuicStatusCode.notSupported.rawValue
         guard let context, let event else {
             return status
@@ -74,7 +87,7 @@ public final class QuicServer {
             }
 
             let callbackPointer = unsafeBitCast(
-                QuicServer.connectionCallback, to: UnsafeMutableRawPointer.self
+                server.connectionCallback, to: UnsafeMutableRawPointer?.self
             )
 
             api.pointee.SetCallbackHandler(
@@ -93,7 +106,9 @@ public final class QuicServer {
         return status
     }
 
-    private static let streamCallback: StreamCallback = { stream, context, event in
+    private static func streamCallback(
+        stream: HQuic?, context: UnsafeMutableRawPointer?, event: UnsafePointer<QUIC_STREAM_EVENT>?
+    ) -> QuicStatus {
         guard let context, let event else {
             return QuicStatusCode.notSupported.rawValue
         }
@@ -109,7 +124,7 @@ public final class QuicServer {
             print("[strm][\(String(describing: stream))] Data Received")
 
             let bufferCount = event.pointee.RECEIVE.BufferCount
-            var buffers: UnsafePointer<QuicBuffer> = event.pointee.RECEIVE.Buffers
+            let buffers: UnsafePointer<QuicBuffer> = event.pointee.RECEIVE.Buffers
             for i in 0 ..< bufferCount {
                 let buffer = buffers[Int(i)]
                 let bufferLength = Int(buffer.Length)
@@ -157,8 +172,10 @@ public final class QuicServer {
         return status
     }
 
-    private static let connectionCallback: ConnectionCallback = { _, context, event in
-
+    private static func connectionCallback(
+        connection _: HQuic?, context: UnsafeMutableRawPointer?,
+        event: UnsafePointer<QUIC_CONNECTION_EVENT>?
+    ) -> QuicStatus {
         guard let context: UnsafeMutableRawPointer, let event else {
             return QuicStatusCode.notSupported.rawValue
         }
@@ -175,7 +192,7 @@ public final class QuicServer {
         case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
             let stream = event.pointee.PEER_STREAM_STARTED.Stream
             let callbackPointer = unsafeBitCast(
-                QuicServer.streamCallback, to: UnsafeMutableRawPointer.self
+                server.streamCallback, to: UnsafeMutableRawPointer.self
             )
 
             server.api?.pointee.SetCallbackHandler(
@@ -271,7 +288,12 @@ extension QuicServer {
         // Create/allocate a new listener object.
         let status =
             (api?.pointee.ListenerOpen(
-                registration, QuicServer.serverListenerCallback,
+                registration,
+                { listener, context, event -> QuicStatus in
+                    QuicServer.serverListenerCallback(
+                        listener: listener, context: context, event: event
+                    )
+                },
                 UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()), &listenerHandle
             ))
             .status

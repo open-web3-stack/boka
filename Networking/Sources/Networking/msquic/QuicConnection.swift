@@ -14,14 +14,17 @@ class QuicConnection {
         self.configuration = configuration
     }
 
-    private static let connectionCallback: ConnectionCallback = { connection, context, event in
+    private static func connectionCallback(
+        connection: HQuic?, context: UnsafeMutableRawPointer?,
+        event: UnsafePointer<QUIC_CONNECTION_EVENT>?
+    ) -> QuicStatus {
         guard let context, let event else {
             return QuicStatusCode.notSupported.rawValue
         }
 
         let quicConnection: QuicConnection = Unmanaged<QuicConnection>.fromOpaque(context)
             .takeUnretainedValue()
-        var status: QuicStatus = QuicStatusCode.success.rawValue
+        let status: QuicStatus = QuicStatusCode.success.rawValue
         switch event.pointee.Type {
         case QUIC_CONNECTION_EVENT_CONNECTED:
             // The handshake has completed for the connection.
@@ -67,7 +70,9 @@ class QuicConnection {
         return status
     }
 
-    private static let streamCallback: StreamCallback = { stream, context, event in
+    private static func streamCallback(
+        stream: HQuic?, context: UnsafeMutableRawPointer?, event: UnsafePointer<QUIC_STREAM_EVENT>?
+    ) -> QuicStatus {
         guard let context, let event else {
             return QuicStatusCode.notSupported.rawValue
         }
@@ -124,7 +129,9 @@ class QuicConnection {
             (api?.pointee.ConnectionOpen(
                 registration,
                 { connection, context, event -> QuicStatus in
-                    return QuicConnection.connectionCallback(connection, context, event)
+                    return QuicConnection.connectionCallback(
+                        connection: connection, context: context, event: event
+                    )
                 }, Unmanaged.passUnretained(self).toOpaque(), &connection
             )).status
         if status.isFailed {
@@ -136,7 +143,10 @@ class QuicConnection {
         // Create/allocate a new bidirectional stream.
         var status =
             (api?.pointee.StreamOpen(
-                connection, QUIC_STREAM_OPEN_FLAG_NONE, QuicConnection.streamCallback, Unmanaged.passUnretained(self).toOpaque(), &stream
+                connection, QUIC_STREAM_OPEN_FLAG_NONE,
+                { stream, context, event -> QuicStatus in
+                    QuicConnection.streamCallback(stream: stream, context: context, event: event)
+                }, Unmanaged.passUnretained(self).toOpaque(), &stream
             )).status
         if status.isFailed {
             print("StreamOpen failed, \(status)!")
@@ -188,17 +198,9 @@ class QuicConnection {
         }
     }
 
-//    func relese() {
-//        if connection != nil {
-//            print("Connection Close")
-//            api?.pointee.ConnectionClose(connection)
-//            connection = nil
-//        }
-//    }
-
     deinit {
         print("QuicConnection Deinit")
 
-//        relese()
+        //        relese()
     }
 }
