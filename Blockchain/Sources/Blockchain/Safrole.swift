@@ -177,10 +177,7 @@ func generateFallbackIndices(entropy: Data32, count: Int, length: Int) throws ->
     try (0 ..< count).map { i throws in
         // convert i to little endian
         let bytes = UInt32(i).encode()
-        var hasher = Blake2b256()
-        hasher.update(entropy.data)
-        hasher.update(Data(bytes))
-        let hash = hasher.finalize()
+        let hash = Blake2b256.hash(entropy, bytes)
         let hash4 = hash.data[0 ..< 4]
         let idx = hash4.decode(UInt32.self)
         return Int(idx % UInt32(length))
@@ -267,10 +264,7 @@ extension Safrole {
                 )
                 : (nextValidators, currentValidators, previousValidators, ticketsVerifier)
 
-            var hasher = Blake2b256()
-            hasher.update(entropyPool.t0.data)
-            hasher.update(entropy.data)
-            let newRandomness = hasher.finalize()
+            let newRandomness = Blake2b256.hash(entropyPool.t0, entropy)
 
             let newEntropyPool = isEpochChange
                 ? (newRandomness, entropyPool.t0, entropyPool.t1, entropyPool.t2)

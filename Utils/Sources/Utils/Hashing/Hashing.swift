@@ -6,14 +6,16 @@ public typealias DataPtrRepresentable = Blake2.DataPtrRepresentable
 // Waiting for NoncopyableGenerics to be available
 public protocol Hashing /*: ~Copyable */ {
     init()
-    mutating func update(_ data: some DataPtrRepresentable)
+    mutating func update(_ data: any DataPtrRepresentable)
     consuming func finalize() -> Data32
 }
 
 extension Hashing {
-    public static func hash(data: some DataPtrRepresentable) -> Data32 {
+    public static func hash(_ data: (any DataPtrRepresentable)...) -> Data32 {
         var hasher = Self()
-        hasher.update(data)
+        for item in data {
+            hasher.update(item)
+        }
         return hasher.finalize()
     }
 }

@@ -22,11 +22,8 @@ public enum Merklization {
             let midIndex = nodes.startIndex + half(nodes.count)
             let l = nodes[nodes.startIndex ..< midIndex]
             let r = nodes[midIndex ..< nodes.endIndex]
-            var hash = hasher.init()
-            hash.update("node")
-            hash.update(binaryMerklizeHelper(l).value)
-            hash.update(binaryMerklizeHelper(r).value)
-            return .init(right: hash.finalize())
+
+            return .init(right: hasher.hash("node", binaryMerklizeHelper(l).value, binaryMerklizeHelper(r).value))
         }
     }
 
@@ -36,7 +33,7 @@ public enum Merklization {
     {
         switch binaryMerklizeHelper(nodes, hasher: hasher).value {
         case let .left(data):
-            hasher.hash(data: data)
+            hasher.hash(data)
         case let .right(data):
             data
         }
@@ -102,10 +99,7 @@ public enum Merklization {
         var res: [Data32] = []
         res.reserveCapacity(newLength)
         for node in nodes {
-            var hash = hasher.init()
-            hash.update("leaf")
-            hash.update(node)
-            res.append(hash.finalize())
+            res.append(hasher.hash("leaf", node))
         }
         // fill the rest with zeros
         for _ in nodes.count ..< newLength {
