@@ -105,7 +105,7 @@ public final class QuicServer {
             if let clientContext = event.pointee.SEND_COMPLETE.ClientContext {
                 free(clientContext)
             }
-            print("[strm][\(String(describing: stream))] Data sent")
+            print("[strm][\(String(describing: stream))] Data sented")
         case QUIC_STREAM_EVENT_RECEIVE:
             print("[strm][\(String(describing: stream))] Data Received")
 
@@ -116,7 +116,7 @@ public final class QuicServer {
                 let bufferLength = Int(buffer.Length)
                 let bufferData = Data(bytes: buffer.Buffer, count: bufferLength)
                 print(
-                    "[strm] Data length \(bufferLength) received: \(String([UInt8](bufferData).map { Character(UnicodeScalar($0)) }))"
+                    "[strm] Data length \(bufferLength) bytes: \(String([UInt8](bufferData).map { Character(UnicodeScalar($0)) }))"
                 )
             }
             // Sends the buffer over the stream. Note the FIN flag is passed along with
@@ -138,7 +138,7 @@ public final class QuicServer {
                     return QuicStatusCode.internalError.rawValue
                 }
             }
-//            let pending = Int32(-2)
+            // pending = Int32(-2)
             status = UInt32(bitPattern: -2)
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
             print("[strm][\(String(describing: stream))] Peer shut down")

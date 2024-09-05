@@ -90,7 +90,9 @@ class QuicConnection {
                 let buffer = buffers![Int(i)]
                 let bufferLength = Int(buffer.Length)
                 let bufferData = Data(bytes: buffer.Buffer, count: bufferLength)
-                print("[strm] Data received: \(String(describing: bufferData))")
+                print(
+                    "[strm] Data length \(bufferLength) bytes: \(String([UInt8](bufferData).map { Character(UnicodeScalar($0)) }))"
+                )
             }
 
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
@@ -118,17 +120,6 @@ class QuicConnection {
     }
 
     func open() throws {
-        // let status =
-        //     (api?.pointee.ConnectionOpen(
-        //         registration,
-        //         { _, context, event -> QuicStatus in
-
-        //             let quicConnection = Unmanaged<QuicConnection>.fromOpaque(context!)
-        //                 .takeUnretainedValue()
-        //             return quicConnection.handleEvent(event)
-        //         }, Unmanaged.passUnretained(self).toOpaque(), &connection
-        //     )).status
-
         let status =
             (api?.pointee.ConnectionOpen(
                 registration,
@@ -140,29 +131,6 @@ class QuicConnection {
             throw QuicError.invalidStatus(status: status.code)
         }
     }
-
-//    private func handleEvent(_ event: UnsafePointer<QUIC_CONNECTION_EVENT>?) -> QuicStatus {
-//        // guard let event else {
-//        // return QuicStatusCode.connectionIdle.rawValue
-//        // }
-//
-//        var status: QuicStatus = QuicStatusCode.success.rawValue
-//        switch event?.pointee.Type {
-//        case QUIC_CONNECTION_EVENT_CONNECTED:
-//            print("Connected")
-//            clientSend(message: Data("sample".utf8))
-//
-//        case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
-//            print("Connection shutdown complete")
-//            if event?.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
-//                relese()
-//            }
-//
-//        default:
-//            break
-//        }
-//        return status
-//    }
 
     func clientSend(message: Data) {
         // Create/allocate a new bidirectional stream.
