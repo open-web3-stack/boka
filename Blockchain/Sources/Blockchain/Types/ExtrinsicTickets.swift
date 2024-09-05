@@ -64,8 +64,4 @@ extension ExtrinsicTickets.TicketItem: Validate {
     }
 }
 
-extension ExtrinsicTickets: Validate {
-    public func validate(config: Config) throws {
-        try tickets.validate(config: config)
-    }
-}
+extension ExtrinsicTickets: Validate {}

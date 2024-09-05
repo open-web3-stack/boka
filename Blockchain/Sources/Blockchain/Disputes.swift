@@ -27,9 +27,6 @@ public struct ReportItem: Sendable, Equatable, Codable {
 
 extension ReportItem: Validate {
     public typealias Config = ProtocolConfigRef
-    public func validate(config: Config) throws {
-        try workReport.validate(config: config)
-    }
 }
 
 public struct DisputePostState: Sendable, Equatable {
