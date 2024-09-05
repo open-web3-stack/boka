@@ -42,18 +42,18 @@ public enum IntegerCodec {
             return 0
         }
 
-        let byteLengh = (~firstByte).leadingZeroBitCount
+        let byteLength = (~firstByte).leadingZeroBitCount
         var res: UInt64 = 0
-        if byteLengh > 0 {
-            guard let rest: UInt64 = try decode(length: byteLengh, next: next) else {
+        if byteLength > 0 {
+            guard let rest: UInt64 = try decode(length: byteLength, next: next) else {
                 return nil
             }
             res = rest
         }
 
-        let mask = UInt8(UInt(1) << (8 - byteLengh) - 1)
+        let mask = UInt8(UInt(1) << (8 - byteLength) - 1)
         let topBits = firstByte & mask
 
-        return res + UInt64(topBits) << (8 * byteLengh)
+        return res + UInt64(topBits) << (8 * byteLength)
     }
 }
