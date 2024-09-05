@@ -4,6 +4,31 @@ public protocol Validate: HasConfig {
     func validate(config: Config) throws
 }
 
+public enum ValidateError: Error {
+    case invalidConfigType
+    case childError(field: String?, error: Error)
+}
+
+extension Validate {
+    private func validateTypeErased(config: Any) throws {
+        guard let config = config as? Config else {
+            throw ValidateError.invalidConfigType
+        }
+        try validate(config: config)
+    }
+
+    public func validate(config: Config) throws {
+        let mirror = Mirror(reflecting: self)
+        for child in mirror.children {
+            if let value = child.value as? any Validate {
+                try Result { try value.validateTypeErased(config: config) }
+                    .mapError { ValidateError.childError(field: child.label, error: $0) }
+                    .get()
+            }
+        }
+    }
+}
+
 public struct Validated<T: Validate> {
     public let value: T
 

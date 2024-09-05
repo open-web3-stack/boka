@@ -183,8 +183,4 @@ extension Header {
     public var vrfSignature: BandersnatchSignature { unsigned.vrfSignature }
 }
 
-extension Header: Validate {
-    public func validate(config _: Config) throws {
-        // TODO: validate other fields
-    }
-}
+extension Header: Validate {}
