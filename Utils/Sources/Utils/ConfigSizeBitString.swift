@@ -142,3 +142,11 @@ extension ConfigSizeBitString: EncodedSize {
         nil
     }
 }
+
+extension ConfigSizeBitString: DataPtrRepresentable {
+    public func withPtr<R>(
+        cb: (UnsafeRawBufferPointer) throws -> R
+    ) rethrows -> R {
+        try data.withUnsafeBytes(cb)
+    }
+}
