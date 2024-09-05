@@ -1,6 +1,4 @@
 import Foundation
-import TracingUtils
-import Utils
 
 /// Standard Program defined in GP.
 ///
@@ -11,16 +9,24 @@ public class StandardProgram {
         case invalidStandardProgram
     }
 
+    public enum Constants {
+        public static let initReg1: UInt32 = (1 << 32) - (1 << 16)
+        public static let stackBaseAddress: UInt32 = (1 << 32) - (2 * UInt32(DefaultPvmConfig().pvmProgramInitSegmentSize)) -
+            UInt32(DefaultPvmConfig().pvmProgramInitInputDataSize)
+        public static let inputStartAddress: UInt32 = (1 << 32) - UInt32(DefaultPvmConfig().pvmProgramInitSegmentSize) -
+            UInt32(DefaultPvmConfig().pvmProgramInitInputDataSize)
+    }
+
     public let code: ProgramCode
     public let initialMemory: Memory
     public let initialRegisters: Registers
 
-    public init(_ blob: Data) throws {
+    public init(blob: Data, argumentData: Data?) throws {
         var slice = Slice(base: blob, bounds: blob.startIndex ..< blob.endIndex)
-        guard let oLen: UInt32 = slice.decode(length: 3) else { // TODO: check and rename these
+        guard let readOnlyLen: UInt32 = slice.decode(length: 3) else {
             throw Error.invalidStandardProgram
         }
-        guard let wLen: UInt32 = slice.decode(length: 3) else {
+        guard let readWriteLen: UInt32 = slice.decode(length: 3) else {
             throw Error.invalidStandardProgram
         }
         guard let numPages: UInt16 = slice.decode(length: 2) else {
@@ -30,24 +36,36 @@ public class StandardProgram {
             throw Error.invalidStandardProgram
         }
 
-        let oEndIdx = slice.startIndex + Int(oLen)
-        guard oEndIdx <= slice.endIndex else {
+        let readOnlyEndIdx = slice.startIndex + Int(readOnlyLen)
+        guard readOnlyEndIdx <= slice.endIndex else {
             throw Error.invalidStandardProgram
         }
-        let o = blob[slice.startIndex ..< oEndIdx]
+        let readOnlyData = blob[slice.startIndex ..< readOnlyEndIdx]
 
-        let wEndIdx = oEndIdx + Int(wLen)
-        guard wEndIdx <= slice.endIndex else {
+        let readWriteEndIdx = readOnlyEndIdx + Int(readWriteLen)
+        guard readWriteEndIdx <= slice.endIndex else {
             throw Error.invalidStandardProgram
         }
-        let w = blob[oEndIdx ..< wEndIdx]
+        let readWriteData = blob[readOnlyEndIdx ..< readWriteEndIdx]
 
-        slice = slice.dropFirst(Int(oLen) + Int(wLen))
+        slice = slice.dropFirst(Int(readOnlyLen) + Int(readWriteLen))
 
         guard let codeLength: UInt32 = slice.decode(length: 4), slice.startIndex + Int(codeLength) <= slice.endIndex else {
             throw Error.invalidStandardProgram
         }
 
         code = try ProgramCode(blob[relative: slice.startIndex ..< slice.startIndex + Int(codeLength)])
+
+        initialRegisters = StandardProgram.initRegisters(argumentData: argumentData)
+        // initialMemory = Memory(pageMap: pageMap, chunks: readWriteData)
+    }
+
+    static func initRegisters(argumentData: Data?) -> Registers {
+        var registers = Registers()
+        registers.reg1 = Constants.initReg1
+        registers.reg2 = Constants.stackBaseAddress
+        registers.reg10 = Constants.inputStartAddress
+        registers.reg11 = UInt32(argumentData?.count ?? 0)
+        return registers
     }
 }

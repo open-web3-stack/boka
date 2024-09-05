@@ -18,8 +18,8 @@ public class VMState {
     }
 
     /// Initialize from a standard program blob
-    public init(standardProgramBlob blob: Data, pc: UInt32, gas: UInt64) throws {
-        let program = try StandardProgram(blob)
+    public init(standardProgramBlob blob: Data, pc: UInt32, gas: UInt64, argumentData: Data?) throws {
+        let program = try StandardProgram(blob: blob, argumentData: argumentData)
         self.program = program.code
         registers = program.initialRegisters
         memory = program.initialMemory
