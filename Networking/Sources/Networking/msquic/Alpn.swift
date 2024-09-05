@@ -28,19 +28,4 @@ struct Alpn {
         let characters = uint8Array.map { Character(UnicodeScalar($0)) }
         return String(characters)
     }
-
-    var rawValue: QuicBuffer {
-        let alpnData = alpnString.data(using: .utf8)!
-        let count = alpnData.count
-        return QuicBuffer(
-            Length: UInt32(count),
-            Buffer: alpnData.withUnsafeBytes { bytes -> UnsafeMutablePointer<UInt8> in
-                let pointer = UnsafeMutablePointer<UInt8>.allocate(capacity: count)
-                pointer.initialize(
-                    from: bytes.bindMemory(to: UInt8.self).baseAddress!, count: count
-                )
-                return pointer
-            }
-        )
-    }
 }

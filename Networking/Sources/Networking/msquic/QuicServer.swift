@@ -39,7 +39,7 @@ public final class QuicServer {
     func start(ipAddress: String, port: UInt16) throws {
         try loadConfiguration()
         try openListener(ipAddress: ipAddress, port: port)
-        try group?.next().scheduleTask(in: .hours(1)) {}.futureResult.wait()
+        try group?.next().scheduleTask(in: .hours(1)) {}.futureResult.wait() // TODO: remove
     }
 
     deinit {
@@ -84,13 +84,10 @@ public final class QuicServer {
                 UnsafeMutableRawPointer(Unmanaged.passUnretained(server).toOpaque())
             )
 
-            let connectStatus = api.pointee.ConnectionSetConfiguration(
+            status = api.pointee.ConnectionSetConfiguration(
                 connection, server.configuration
             )
-            // c unsigned int  < 0  pending
-            let signedStatus = Int32(bitPattern: connectStatus)
-            print("ConnectionSetConfiguration status:", signedStatus)
-            status = connectStatus
+
         default:
             break
         }
@@ -110,8 +107,18 @@ public final class QuicServer {
             }
             print("[strm][\(String(describing: stream))] Data sent")
         case QUIC_STREAM_EVENT_RECEIVE:
+            print("[strm][\(String(describing: stream))] Data Received")
+
             let bufferCount = event.pointee.RECEIVE.BufferCount
-            let buffers: UnsafePointer<QuicBuffer>? = event.pointee.RECEIVE.Buffers
+            var buffers: UnsafePointer<QuicBuffer> = event.pointee.RECEIVE.Buffers
+            for i in 0 ..< bufferCount {
+                let buffer = buffers[Int(i)]
+                let bufferLength = Int(buffer.Length)
+                let bufferData = Data(bytes: buffer.Buffer, count: bufferLength)
+                print(
+                    "[strm] Data length \(bufferLength) received: \(String([UInt8](bufferData).map { Character(UnicodeScalar($0)) }))"
+                )
+            }
             // Sends the buffer over the stream. Note the FIN flag is passed along with
             // the buffer. This indicates this is the last buffer on the stream and the
             // the stream is shut down (in the send direction) immediately after.
@@ -122,13 +129,17 @@ public final class QuicServer {
                 .status
             if status.isFailed {
                 let shutdown =
-                    (server.api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0))
-                        .status
+                    (server.api?.pointee.StreamShutdown(
+                        stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0
+                    ))
+                    .status
                 if shutdown.isFailed {
                     print("StreamShutdown failed, 0x\(String(format: "%x", shutdown))!")
                     return QuicStatusCode.internalError.rawValue
                 }
             }
+//            let pending = Int32(-2)
+            status = UInt32(bitPattern: -2)
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
             print("[strm][\(String(describing: stream))] Peer shut down")
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
@@ -182,7 +193,7 @@ public final class QuicServer {
 extension QuicServer {
     private func loadConfiguration() throws {
         var settings = QUIC_SETTINGS()
-        settings.IdleTimeoutMs = 1000
+        settings.IdleTimeoutMs = 30000
         settings.IsSet.IdleTimeoutMs = 1
         settings.ServerResumptionLevel = 2 // QUIC_SERVER_RESUME_AND_ZERORTT
         settings.IsSet.ServerResumptionLevel = 1
@@ -193,14 +204,13 @@ extension QuicServer {
 
         memset(&certificateFile, 0, MemoryLayout.size(ofValue: certificateFile))
         memset(&credConfig, 0, MemoryLayout.size(ofValue: credConfig))
-        let currentPath = FileManager.default.currentDirectoryPath
-
-        let cert = currentPath + "/Sources/assets/server.cert"
-        let keyFile = currentPath + "/Sources/assets/server.key"
-        print("cert: \(cert)")
-        print("keyFile: \(keyFile)")
-//        let cert = "/Users/mackun/boka/Networking/Sources/assets/server.cert"
-//        let keyFile = "/Users/mackun/boka/Networking/Sources/assets/server.key"
+        // let currentPath = FileManager.default.currentDirectoryPath
+        // let cert = currentPath + "/Sources/assets/server.cert"
+        // let keyFile = currentPath + "/Sources/assets/server.key"
+        // print("cert: \(cert)")
+        // print("keyFile: \(keyFile)")
+        let cert = "/Users/mackun/boka/Networking/Sources/assets/server.cert"
+        let keyFile = "/Users/mackun/boka/Networking/Sources/assets/server.key"
         let certCString = cert.utf8CString
         let keyFileCString = keyFile.utf8CString
 
