@@ -15,11 +15,8 @@ public struct MMR: Sendable, Equatable, Codable {
         if index >= peaks.count {
             peaks.append(data)
         } else if let current = peaks[index] {
-            var hash = hasher.init()
-            hash.update(current)
-            hash.update(data)
             peaks[index] = nil
-            append(hash.finalize(), at: index + 1, hasher: hasher)
+            append(hasher.hash(current, data), at: index + 1, hasher: hasher)
         } else {
             peaks[index] = data
         }

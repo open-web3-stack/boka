@@ -70,4 +70,28 @@ extension ExtrinsicGuarantees.GuaranteeItem: Validate {
     public typealias Config = ProtocolConfigRef
 }
 
-extension ExtrinsicGuarantees: Validate {}
+extension ExtrinsicGuarantees: Validate {
+    public enum Error: Swift.Error {
+        case guaranteesNotSorted
+        case invalidCoreIndex
+        case credentialsNotSorted
+    }
+
+    public func validate(config: Config) throws {
+        try guarantees.validate(config: config)
+
+        guard guarantees.isSortedAndUnique(by: { $0.workReport.coreIndex < $1.workReport.coreIndex }) else {
+            throw Error.guaranteesNotSorted
+        }
+
+        for guarantee in guarantees {
+            guard guarantee.workReport.coreIndex < UInt32(config.value.totalNumberOfCores) else {
+                throw Error.invalidCoreIndex
+            }
+
+            guard guarantee.credential.isSortedAndUnique(by: { $0.index < $1.index }) else {
+                throw Error.credentialsNotSorted
+            }
+        }
+    }
+}
