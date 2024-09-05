@@ -17,16 +17,16 @@ public class StandardProgram {
 
     public init(_ blob: Data) throws {
         var slice = Slice(base: blob, bounds: blob.startIndex ..< blob.endIndex)
-        guard let oLen: UInt32 = slice.decode(length: 3) else { // TODO: o is auth output? check and rename these
+        guard let oLen: UInt32 = slice.decode(length: 3) else { // TODO: check and rename these
             throw Error.invalidStandardProgram
         }
         guard let wLen: UInt32 = slice.decode(length: 3) else {
             throw Error.invalidStandardProgram
         }
-        guard let z: UInt16 = slice.decode(length: 2) else {
+        guard let numPages: UInt16 = slice.decode(length: 2) else {
             throw Error.invalidStandardProgram
         }
-        guard let s: UInt32 = slice.decode(length: 3) else {
+        guard let stackSize: UInt32 = slice.decode(length: 3) else {
             throw Error.invalidStandardProgram
         }
 
