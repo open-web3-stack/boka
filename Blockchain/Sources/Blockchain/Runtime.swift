@@ -15,6 +15,9 @@ public final class Runtime {
         case invalidHeaderEpochMarker
         case invalidHeaderWinningTickets
         case invalidHeaderOffendersMarkers
+        case invalidAssuranceParentHash
+        case invalidAssuranceSignature
+        case assuranceForEmptyCore
         case other(any Swift.Error)
         case validateError(any Swift.Error)
     }
@@ -67,6 +70,14 @@ public final class Runtime {
     public func validate(block: Validated<BlockRef>, state: StateRef, context: ApplyContext) throws(Error) {
         try validateHeader(block: block, state: state, context: context)
 
+        let block = block.value
+
+        for ext in block.extrinsic.availability.assurances {
+            guard ext.parentHash == block.header.parentHash else {
+                throw Error.invalidAssuranceParentHash
+            }
+        }
+
         // TODO: abstract input validation logic from Safrole state update function and call it here
         // TODO: validate other things
     }
@@ -89,6 +100,11 @@ public final class Runtime {
             try updateRecentHistory(block: block, state: &newState)
 
             try updateSafrole(block: block, state: &newState)
+
+            try updateDisputes(block: block, state: &newState)
+
+            // depends on Safrole and Disputes
+            try updateReports(block: block, state: &newState)
 
             newState.coreAuthorizationPool = try updateAuthorizationPool(
                 block: block, state: prevState
@@ -183,6 +199,34 @@ public final class Runtime {
         }
 
         return pool
+    }
+
+    public func updateReports(block: BlockRef, state newState: inout State) throws {
+        for assurance in block.extrinsic.availability.assurances {
+            let hash = Blake2b256.hash(assurance.parentHash, assurance.assurance)
+            let payload = SigningContext.available + hash.data
+            let validatorKey = try newState.currentValidators.at(Int(assurance.validatorIndex))
+            guard Ed25519.verify(signature: assurance.signature, message: payload, publicKey: validatorKey.ed25519) else {
+                throw Error.invalidAssuranceSignature
+            }
+        }
+
+        var availabilityCount = Array(repeating: 0, count: config.value.totalNumberOfCores)
+        for assurance in block.extrinsic.availability.assurances {
+            for bit in assurance.assurance where bit {
+                // ExtrinsicAvailability.validate() ensures that validatorIndex is in range
+                availabilityCount[Int(assurance.validatorIndex)] += 1
+            }
+        }
+
+        for (idx, count) in availabilityCount.enumerated() where count > 0 {
+            guard newState.reports[idx] != nil else {
+                throw Error.assuranceForEmptyCore
+            }
+            if count >= ProtocolConfig.TwoThirdValidatorsPlusOne.read(config: config) {
+                newState.reports[idx] = nil // remove available report from pending reports
+            }
+        }
     }
 
     // TODO: add tests

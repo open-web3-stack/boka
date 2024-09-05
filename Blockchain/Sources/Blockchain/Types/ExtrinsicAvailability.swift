@@ -46,3 +46,21 @@ extension ExtrinsicAvailability: Dummy {
         try! ExtrinsicAvailability(assurances: ConfigLimitedSizeArray(config: config))
     }
 }
+
+extension ExtrinsicAvailability: Validate {
+    public enum Error: Swift.Error {
+        case assurancesNotSorted
+        case invalidValidatorIndex
+    }
+
+    public func validate(config: Config) throws(Error) {
+        guard assurances.isSortedAndUnique(by: { $0.validatorIndex < $1.validatorIndex }) else {
+            throw .assurancesNotSorted
+        }
+        for assurance in assurances {
+            guard assurance.validatorIndex < UInt32(config.value.totalNumberOfCores) else {
+                throw .invalidValidatorIndex
+            }
+        }
+    }
+}

@@ -9,7 +9,7 @@ public struct Blake2b256: /* ~Copyable, */ Hashing {
         hasher = try! Blake2b(size: 32)
     }
 
-    public mutating func update(_ data: some DataPtrRepresentable) {
+    public mutating func update(_ data: any DataPtrRepresentable) {
         hasher.update(data)
     }
 
@@ -20,18 +20,8 @@ public struct Blake2b256: /* ~Copyable, */ Hashing {
     }
 }
 
-extension Data {
+extension DataPtrRepresentable {
     public func blake2b256hash() -> Data32 {
-        var hasher = Blake2b256()
-        hasher.update(self)
-        return hasher.finalize()
-    }
-}
-
-extension FixedSizeData {
-    public func blake2b256hash() -> Data32 {
-        var hasher = Blake2b256()
-        hasher.update(data)
-        return hasher.finalize()
+        Blake2b256.hash(self)
     }
 }
