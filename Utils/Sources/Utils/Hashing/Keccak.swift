@@ -10,7 +10,7 @@ public struct Keccak: /* ~Copyable, */ Hashing {
         sha3_SetFlags(&ctx, SHA3_FLAGS_KECCAK)
     }
 
-    public mutating func update(_ data: some DataPtrRepresentable) {
+    public mutating func update(_ data: any DataPtrRepresentable) {
         data.withPtr { ptr in
             sha3_Update(&ctx, ptr.baseAddress, ptr.count)
         }
