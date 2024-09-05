@@ -14,12 +14,66 @@ class QuicConnection {
         self.configuration = configuration
     }
 
+    private static let connectionCallback: ConnectionCallback = { connection, context, event in
+        guard let context, let event else {
+            return QuicStatusCode.notSupported.rawValue
+        }
+
+        let quicConnection: QuicConnection = Unmanaged<QuicConnection>.fromOpaque(context)
+            .takeUnretainedValue()
+        var status: QuicStatus = QuicStatusCode.success.rawValue
+        switch event.pointee.Type {
+        case QUIC_CONNECTION_EVENT_CONNECTED:
+            // The handshake has completed for the connection.
+            print("[conn][\(String(describing: connection))] Connected")
+            // ClientSend(connection)
+            quicConnection.clientSend(message: Data("hello world".utf8))
+
+        case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
+            // The connection has been shut down by the transport.
+            if event.pointee.SHUTDOWN_INITIATED_BY_TRANSPORT.Status
+                == QuicStatusCode.connectionIdle.rawValue
+            {
+                print("[conn][\(String(describing: connection))] Successfully shut down on idle.")
+            } else {
+                print(
+                    "[conn][\(String(describing: connection))] Shut down by transport, 0x\(String(format: "%x", event.pointee.SHUTDOWN_INITIATED_BY_TRANSPORT.Status))"
+                )
+            }
+
+        case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
+            // The connection was explicitly shut down by the peer.
+            print(
+                "[conn][\(String(describing: connection))] Shut down by peer, 0x\(String(format: "%llx", event.pointee.SHUTDOWN_INITIATED_BY_PEER.ErrorCode))"
+            )
+
+        case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
+            // The connection has completed the shutdown process and is ready to be safely cleaned up.
+            print("[conn][\(String(describing: connection))] All done")
+            if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
+                quicConnection.api?.pointee.ConnectionClose(connection)
+            }
+
+        case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
+            // A resumption ticket was received from the server.
+            print(
+                "[conn][\(String(describing: connection))] Resumption ticket received (\(event.pointee.RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength) bytes)"
+            )
+
+        default:
+            break
+        }
+
+        return status
+    }
+
     private static let streamCallback: StreamCallback = { stream, context, event in
         guard let context, let event else {
             return QuicStatusCode.notSupported.rawValue
         }
 
-        let quicConnection = Unmanaged<QuicConnection>.fromOpaque(context).takeUnretainedValue()
+        let quicConnection: QuicConnection = Unmanaged<QuicConnection>.fromOpaque(context)
+            .takeUnretainedValue()
         var status: QuicStatus = QuicStatusCode.success.rawValue
 
         switch event.pointee.Type {
@@ -45,8 +99,10 @@ class QuicConnection {
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
             print("[strm][\(String(describing: stream))] Peer aborted")
             status =
-                (quicConnection.api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0))
-                    .status
+                (quicConnection.api?.pointee.StreamShutdown(
+                    stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0
+                ))
+                .status
 
         case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
             print("[strm][\(String(describing: stream))] All done")
@@ -62,14 +118,22 @@ class QuicConnection {
     }
 
     func open() throws {
+        // let status =
+        //     (api?.pointee.ConnectionOpen(
+        //         registration,
+        //         { _, context, event -> QuicStatus in
+
+        //             let quicConnection = Unmanaged<QuicConnection>.fromOpaque(context!)
+        //                 .takeUnretainedValue()
+        //             return quicConnection.handleEvent(event)
+        //         }, Unmanaged.passUnretained(self).toOpaque(), &connection
+        //     )).status
+
         let status =
             (api?.pointee.ConnectionOpen(
                 registration,
-                { _, context, event -> QuicStatus in
-
-                    let quicConnection = Unmanaged<QuicConnection>.fromOpaque(context!)
-                        .takeUnretainedValue()
-                    return quicConnection.handleEvent(event)
+                { connection, context, event -> QuicStatus in
+                    return QuicConnection.connectionCallback(connection, context, event)
                 }, Unmanaged.passUnretained(self).toOpaque(), &connection
             )).status
         if status.isFailed {
@@ -77,19 +141,39 @@ class QuicConnection {
         }
     }
 
-    func clientSend(message: Data) -> QuicStatus {
-        var status = QuicStatusCode.success.rawValue
+//    private func handleEvent(_ event: UnsafePointer<QUIC_CONNECTION_EVENT>?) -> QuicStatus {
+//        // guard let event else {
+//        // return QuicStatusCode.connectionIdle.rawValue
+//        // }
+//
+//        var status: QuicStatus = QuicStatusCode.success.rawValue
+//        switch event?.pointee.Type {
+//        case QUIC_CONNECTION_EVENT_CONNECTED:
+//            print("Connected")
+//            clientSend(message: Data("sample".utf8))
+//
+//        case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
+//            print("Connection shutdown complete")
+//            if event?.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
+//                relese()
+//            }
+//
+//        default:
+//            break
+//        }
+//        return status
+//    }
 
+    func clientSend(message: Data) {
         // Create/allocate a new bidirectional stream.
-        status =
+        var status =
             (api?.pointee.StreamOpen(
-                connection, QUIC_STREAM_OPEN_FLAG_NONE, QuicConnection.streamCallback, nil, &stream
+                connection, QUIC_STREAM_OPEN_FLAG_NONE, QuicConnection.streamCallback, Unmanaged.passUnretained(self).toOpaque(), &stream
             )).status
         if status.isFailed {
             print("StreamOpen failed, \(status)!")
 
             api?.pointee.StreamClose(stream)
-            return status
         }
 
         print("[strm][\(String(describing: stream))] Starting...")
@@ -99,7 +183,6 @@ class QuicConnection {
         if status.isFailed {
             print("StreamStart failed, \(status)!")
             api?.pointee.StreamClose(stream)
-            return status
         }
 
         print("[strm][\(String(describing: stream))] Sending data...")
@@ -118,19 +201,13 @@ class QuicConnection {
         if status.isFailed {
             print("StreamSend failed, \(status)!")
 
-            api?.pointee.ConnectionShutdown(connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0)
-        }
-        let signedStatus = Int32(bitPattern: status)
-        if signedStatus > 0 {
             let shutdown =
                 (api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0))
                     .status
             if shutdown.isFailed {
                 print("StreamShutdown failed, 0x\(String(format: "%x", shutdown))!")
-                return QuicStatusCode.internalError.rawValue
             }
         }
-        return status
     }
 
     func start(ipAddress: String, port: UInt16) throws {
@@ -143,37 +220,17 @@ class QuicConnection {
         }
     }
 
-    private func handleEvent(_ event: UnsafePointer<QUIC_CONNECTION_EVENT>?) -> QuicStatus {
-        // guard let event else {
-        // return QuicStatusCode.connectionIdle.rawValue
-        // }
-        switch event?.pointee.Type {
-        case QUIC_CONNECTION_EVENT_CONNECTED:
-            print("Connected")
-
-        case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
-            //            print("Connection shutdown complete")
-            if event?.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
-                relese()
-            }
-
-        default:
-            break
-        }
-        return QuicStatusCode.success.rawValue
-    }
-
-    func relese() {
-        if connection != nil {
-            print("Connection Close")
-            api?.pointee.ConnectionClose(connection)
-            connection = nil
-        }
-    }
+//    func relese() {
+//        if connection != nil {
+//            print("Connection Close")
+//            api?.pointee.ConnectionClose(connection)
+//            connection = nil
+//        }
+//    }
 
     deinit {
         print("QuicConnection Deinit")
 
-        relese()
+//        relese()
     }
 }

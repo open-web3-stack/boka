@@ -53,11 +53,12 @@ public final class QuicClient {
         try group?.next().scheduleTask(in: .hours(1)) {}.futureResult.wait()
     }
 
-    func send(message: Data) throws -> QuicStatus {
+    func send(message: Data) throws {
         guard let connection else {
             throw QuicError.getConnectionFailed
+//            return QuicStatusCode.internalError.rawValue
         }
-        return connection.clientSend(message: message)
+        connection.clientSend(message: message)
     }
 
     deinit {
@@ -79,7 +80,7 @@ public final class QuicClient {
 extension QuicClient {
     private func loadConfiguration(_ unsecure: Bool = true) throws {
         var settings = QUIC_SETTINGS()
-        settings.IdleTimeoutMs = 1000
+        settings.IdleTimeoutMs = 30000
         settings.IsSet.IdleTimeoutMs = 1
 
         //        CfgConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT | QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;

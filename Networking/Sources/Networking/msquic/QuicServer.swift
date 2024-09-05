@@ -111,7 +111,7 @@ public final class QuicServer {
             print("[strm][\(String(describing: stream))] Data sent")
         case QUIC_STREAM_EVENT_RECEIVE:
             let bufferCount = event.pointee.RECEIVE.BufferCount
-            let buffers = event.pointee.RECEIVE.Buffers
+            let buffers: UnsafePointer<QuicBuffer>? = event.pointee.RECEIVE.Buffers
             // Sends the buffer over the stream. Note the FIN flag is passed along with
             // the buffer. This indicates this is the last buffer on the stream and the
             // the stream is shut down (in the send direction) immediately after.
@@ -120,8 +120,7 @@ public final class QuicServer {
                     stream, buffers, bufferCount, QUIC_SEND_FLAG_FIN, nil
                 ))
                 .status
-            let signedStatus = Int32(bitPattern: status)
-            if signedStatus > 0 {
+            if status.isFailed {
                 let shutdown =
                     (server.api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0))
                         .status
