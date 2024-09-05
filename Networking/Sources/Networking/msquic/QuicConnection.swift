@@ -7,7 +7,7 @@ class QuicConnection {
     private var registration: HQuic?
     private var configuration: HQuic?
     private var stream: HQuic?
-    // private var sendBuffer:QuicBuffer?
+    private var sendBuffer: QuicBuffer?
     init(api: UnsafePointer<QuicApiTable>?, registration: HQuic?, configuration: HQuic?) throws {
         self.api = api
         self.registration = registration
