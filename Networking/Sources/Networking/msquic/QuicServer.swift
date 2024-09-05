@@ -59,8 +59,7 @@ public final class QuicServer {
         try? group?.syncShutdownGracefully()
     }
 
-    private static let serverListenerCallback: ServerListenerCallback = {
-        _, context, event in
+    private static let serverListenerCallback: ServerListenerCallback = { _, context, event in
         var status: QuicStatus = QuicStatusCode.notSupported.rawValue
         guard let context, let event else {
             return status

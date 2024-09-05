@@ -37,14 +37,14 @@ class QuicConnection {
                 print("[conn][\(String(describing: connection))] Successfully shut down on idle.")
             } else {
                 print(
-                    "[conn][\(String(describing: connection))] Shut down by transport, 0x\(String(format: "%x", event.pointee.SHUTDOWN_INITIATED_BY_TRANSPORT.Status))"
+                    "[conn] Shut down by transport, 0x\(String(format: "%x", event.pointee.SHUTDOWN_INITIATED_BY_TRANSPORT.Status))"
                 )
             }
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
             // The connection was explicitly shut down by the peer.
             print(
-                "[conn][\(String(describing: connection))] Shut down by peer, 0x\(String(format: "%llx", event.pointee.SHUTDOWN_INITIATED_BY_PEER.ErrorCode))"
+                "[conn]Shut down by peer, 0x\(String(format: "%llx", event.pointee.SHUTDOWN_INITIATED_BY_PEER.ErrorCode))"
             )
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
@@ -57,7 +57,7 @@ class QuicConnection {
         case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
             // A resumption ticket was received from the server.
             print(
-                "[conn][\(String(describing: connection))] Resumption ticket received (\(event.pointee.RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength) bytes)"
+                "[conn] Ticket received (\(event.pointee.RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength) bytes)"
             )
 
         default:
