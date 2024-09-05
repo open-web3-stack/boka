@@ -232,7 +232,7 @@ extension QuicServer {
 
         let certPointer = UnsafeMutablePointer<CChar>.allocate(capacity: certCString.count)
         let keyFilePointer = UnsafeMutablePointer<CChar>.allocate(capacity: keyFileCString.count)
-
+        // TODO: manual memory management
         certCString.withUnsafeBytes {
             certPointer.initialize(
                 from: $0.bindMemory(to: CChar.self).baseAddress!, count: certCString.count
