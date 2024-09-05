@@ -245,7 +245,9 @@ extension QuicServer {
         )
         buffer.copyBytes(to: bufferPointer, count: buffer.count)
         defer {
-            free(bufferPointer)
+            certPointer.deallocate()
+            keyFilePointer.deallocate()
+            bufferPointer.deallocate()
         }
         var alpn = QuicBuffer(Length: UInt32(buffer.count), Buffer: bufferPointer)
 
