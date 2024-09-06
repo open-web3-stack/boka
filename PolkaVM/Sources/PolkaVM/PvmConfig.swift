@@ -30,6 +30,6 @@ public struct DefaultPvmConfig: PvmConfig {
 
         pvmProgramInitRegister1Value = (1 << 32) - (1 << 16)
         pvmProgramInitStackBaseAddress = (1 << 32) - (2 * pvmProgramInitSegmentSize) - pvmProgramInitInputDataSize
-        pvmProgramInitInputStartAddress = (1 << 32) - pvmProgramInitSegmentSize - pvmProgramInitInputDataSize
+        pvmProgramInitInputStartAddress = pvmProgramInitStackBaseAddress + pvmProgramInitSegmentSize
     }
 }

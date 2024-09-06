@@ -49,7 +49,7 @@ public struct Registers: Equatable {
         reg13 = values[12]
     }
 
-    /// standard program init
+    /// standard program init registers
     public init(config: DefaultPvmConfig, argumentData: Data?) {
         reg1 = UInt32(config.pvmProgramInitRegister1Value)
         reg2 = UInt32(config.pvmProgramInitStackBaseAddress)

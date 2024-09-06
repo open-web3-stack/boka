@@ -26,6 +26,36 @@ public class Memory {
         self.chunks = chunks
     }
 
+    /// standard program init
+    ///
+    /// init with some read only data, writable data and argument data
+    public init(readOnlyData: Data, readWriteData: Data, argumentData: Data, heapEmptyPagesSize: UInt32, stackSize: UInt32) {
+        let config = DefaultPvmConfig()
+        let P = StandardProgram.alignToPageSize
+        let Q = StandardProgram.alignToSegmentSize
+        let ZQ = UInt32(config.pvmProgramInitSegmentSize)
+        let readOnlyLen = UInt32(readOnlyData.count)
+        let readWriteLen = UInt32(readWriteData.count)
+        let argumentDataLen = UInt32(argumentData.count)
+
+        pageMap = [
+            (ZQ, readOnlyLen, false),
+            (ZQ + readOnlyLen, P(readOnlyLen, config) - readOnlyLen, false),
+            (2 * ZQ + Q(readOnlyLen, config), readWriteLen, true), // heap
+            (2 * ZQ + Q(readOnlyLen, config) + readWriteLen, P(readWriteLen, config) + heapEmptyPagesSize - readWriteLen, true), // heap
+            (UInt32(config.pvmProgramInitStackBaseAddress) - P(stackSize, config), stackSize, true), // stach
+            (UInt32(config.pvmProgramInitInputStartAddress), argumentDataLen, false), // argument
+            (UInt32(config.pvmProgramInitInputStartAddress) + argumentDataLen, P(argumentDataLen, config) - argumentDataLen, false),
+            // argument
+        ]
+
+        chunks = [
+            (ZQ, readOnlyData),
+            (2 * ZQ + Q(readOnlyLen, config), readWriteData),
+            (UInt32(config.pvmProgramInitInputStartAddress), argumentData),
+        ]
+    }
+
     public func read(address: UInt32) throws(Error) -> UInt8 {
         // TODO: optimize this
         // check for chunks
