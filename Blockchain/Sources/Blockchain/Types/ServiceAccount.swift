@@ -20,10 +20,10 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
     public var balance: Balance
 
     // g
-    public var accumlateGasLimit: Gas
+    public var minAccumlateGas: Gas
 
     // m
-    public var onTransferGasLimit: Gas
+    public var minOnTransferGas: Gas
 
     public init(
         storage: [Data32: Data],
@@ -31,16 +31,16 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
         preimageInfos: [HashAndLength: LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>],
         codeHash: Data32,
         balance: Balance,
-        accumlateGasLimit: Gas,
-        onTransferGasLimit: Gas
+        minAccumlateGas: Gas,
+        minOnTransferGas: Gas
     ) {
         self.storage = storage
         self.preimages = preimages
         self.preimageInfos = preimageInfos
         self.codeHash = codeHash
         self.balance = balance
-        self.accumlateGasLimit = accumlateGasLimit
-        self.onTransferGasLimit = onTransferGasLimit
+        self.minAccumlateGas = minAccumlateGas
+        self.minOnTransferGas = minOnTransferGas
     }
 }
 
@@ -53,8 +53,8 @@ extension ServiceAccount: Dummy {
             preimageInfos: [:],
             codeHash: Data32(),
             balance: 0,
-            accumlateGasLimit: 0,
-            onTransferGasLimit: 0
+            minAccumlateGas: 0,
+            minOnTransferGas: 0
         )
     }
 }

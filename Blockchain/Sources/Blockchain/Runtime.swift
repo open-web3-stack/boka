@@ -97,8 +97,6 @@ public final class Runtime {
         var newState = prevState.value
 
         do {
-            try updateRecentHistory(block: block, state: &newState)
-
             try updateSafrole(block: block, state: &newState)
 
             try updateDisputes(block: block, state: &newState)
@@ -113,6 +111,9 @@ public final class Runtime {
             newState.activityStatistics = try updateValidatorActivityStatistics(
                 block: block, state: prevState
             )
+
+            // after reports as it need old recent history
+            try updateRecentHistory(block: block, state: &newState)
         } catch let error as Error {
             throw error
         } catch let error as SafroleError {

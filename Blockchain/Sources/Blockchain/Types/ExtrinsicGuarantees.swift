@@ -75,6 +75,7 @@ extension ExtrinsicGuarantees: Validate {
         case guaranteesNotSorted
         case invalidCoreIndex
         case credentialsNotSorted
+        case duplicatedWorkPackageHash
     }
 
     public func validate(config: Config) throws {
@@ -92,6 +93,11 @@ extension ExtrinsicGuarantees: Validate {
             guard guarantee.credential.isSortedAndUnique(by: { $0.index < $1.index }) else {
                 throw Error.credentialsNotSorted
             }
+        }
+
+        let workPackageHashes = Set(guarantees.map(\.workReport.packageSpecification.workPackageHash))
+        guard workPackageHashes.count == guarantees.count else {
+            throw Error.duplicatedWorkPackageHash
         }
     }
 }
