@@ -1,3 +1,26 @@
+struct RandomnessSequence: Sequence {
+    let data: Data32
+    func makeIterator() -> RandomnessIterator {
+        RandomnessIterator(data: data, index: 0, source: data)
+    }
+}
+
+struct RandomnessIterator: IteratorProtocol {
+    let data: Data32
+    var index: Int
+    var source: Data32
+
+    mutating func next() -> UInt32? {
+        let idx = index % 8
+        if idx == 0 {
+            // update source
+            source = Blake2b256.hash(data, UInt32(index / 8).encode())
+        }
+        index += 1
+        return source.data[4 * idx ..< 4 * (idx + 1)].decode(UInt32.self)
+    }
+}
+
 extension Array {
     /// Insert the elements of the given sequence to the array, in sorted order.
     ///
@@ -19,6 +42,23 @@ extension Array {
                 startIdx = endIndex
             }
         }
+    }
+
+    // requires randomness have at least count elements
+    private mutating func shuffle(randomness: some Sequence<UInt32>) {
+        var iter = randomness.makeIterator()
+        // TODO: confirm this is matching to the defs in GP
+        for i in stride(from: count - 1, through: 1, by: -1) {
+            let j = Int(iter.next() ?? 0 % UInt32(i + 1))
+            guard i != j else {
+                continue
+            }
+            swapAt(i, j)
+        }
+    }
+
+    public mutating func shuffle(randomness: Data32) {
+        shuffle(randomness: RandomnessSequence(data: randomness))
     }
 }
 

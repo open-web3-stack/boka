@@ -1,3 +1,5 @@
+import Codec
+
 // TODO: add tests
 // Merkle Mountain Range
 public struct MMR: Sendable, Equatable, Codable {
@@ -20,5 +22,9 @@ public struct MMR: Sendable, Equatable, Codable {
         } else {
             peaks[index] = data
         }
+    }
+
+    public func hash() -> Data32 {
+        try! JamEncoder.encode(self).keccakHash()
     }
 }

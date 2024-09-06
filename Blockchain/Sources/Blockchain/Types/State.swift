@@ -211,3 +211,9 @@ extension State: Disputes {
         reports = postState.reports
     }
 }
+
+extension State: Guaranteeing {
+    public var offenders: Set<Ed25519PublicKey> {
+        judgements.punishSet
+    }
+}

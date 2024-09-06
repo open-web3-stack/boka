@@ -22,3 +22,9 @@ public struct Keccak: /* ~Copyable, */ Hashing {
         return Data32(data)!
     }
 }
+
+extension DataPtrRepresentable {
+    public func keccakHash() -> Data32 {
+        Keccak.hash(self)
+    }
+}

@@ -76,11 +76,15 @@ extension WorkReport: EncodedSize {
 extension WorkReport: Validate {
     public enum WorkReportError: Swift.Error {
         case tooBig
+        case invalidCoreIndex
     }
 
     public func validate(config: Config) throws(WorkReportError) {
         guard encodedSize <= config.value.maxEncodedWorkReportSize else {
-            throw WorkReportError.tooBig
+            throw .tooBig
+        }
+        guard coreIndex < UInt32(config.value.totalNumberOfCores) else {
+            throw .invalidCoreIndex
         }
     }
 }
