@@ -18,8 +18,8 @@ public struct DefaultPvmConfig: PvmConfig {
     public let pvmProgramInitPageSize: Int
     public let pvmProgramInitSegmentSize: Int
 
-    public let pvmProgramInitStackBaseAddress: Int
     public let pvmProgramInitRegister1Value: Int
+    public let pvmProgramInitStackBaseAddress: Int
     public let pvmProgramInitInputStartAddress: Int
 
     public init() {
@@ -28,8 +28,8 @@ public struct DefaultPvmConfig: PvmConfig {
         pvmProgramInitPageSize = 1 << 14
         pvmProgramInitSegmentSize = 1 << 16
 
-        pvmProgramInitStackBaseAddress = (1 << 32) - (2 * pvmProgramInitSegmentSize) - pvmProgramInitInputDataSize
         pvmProgramInitRegister1Value = (1 << 32) - (1 << 16)
+        pvmProgramInitStackBaseAddress = (1 << 32) - (2 * pvmProgramInitSegmentSize) - pvmProgramInitInputDataSize
         pvmProgramInitInputStartAddress = (1 << 32) - pvmProgramInitSegmentSize - pvmProgramInitInputDataSize
     }
 }
