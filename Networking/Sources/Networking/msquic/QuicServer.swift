@@ -49,7 +49,7 @@ public final class QuicServer {
     func start(ipAddress: String, port: UInt16) throws {
         try loadConfiguration()
         try openListener(ipAddress: ipAddress, port: port)
-        try group?.next().scheduleTask(in: .minutes(1)) {}.futureResult.wait() // TODO: remove
+        try group?.next().scheduleTask(in: .hours(1)) {}.futureResult.wait() // TODO: remove
     }
 
     deinit {
@@ -106,6 +106,31 @@ public final class QuicServer {
         return status
     }
 
+    private func sendBuffer(stream: HQuic?, buffer: Data) -> QuicStatus {
+        // Allocates and builds the buffer to send over the stream.
+        let messageLength = buffer.count
+
+        let sendBufferRaw = UnsafeMutableRawPointer.allocate(
+            byteCount: MemoryLayout<QUIC_BUFFER>.size + messageLength,
+            alignment: MemoryLayout<QUIC_BUFFER>.alignment
+        )
+
+        let sendBuffer = sendBufferRaw.assumingMemoryBound(to: QUIC_BUFFER.self)
+        let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(
+            capacity: messageLength
+        )
+        buffer.copyBytes(to: bufferPointer, count: messageLength)
+
+        sendBuffer.pointee.Buffer = bufferPointer
+        sendBuffer.pointee.Length = UInt32(messageLength)
+
+        var status = QuicStatusCode.success.rawValue
+        status =
+            (api?.pointee.StreamSend(stream, sendBuffer, 1, QUIC_SEND_FLAG_FIN, sendBufferRaw))
+                .status
+        return status
+    }
+
     private static func streamCallback(
         stream: HQuic?, context: UnsafeMutableRawPointer?, event: UnsafePointer<QUIC_STREAM_EVENT>?
     ) -> QuicStatus {
@@ -125,10 +150,12 @@ public final class QuicServer {
 
             let bufferCount = event.pointee.RECEIVE.BufferCount
             let buffers: UnsafePointer<QuicBuffer> = event.pointee.RECEIVE.Buffers
+            var buffersData = Data()
             for i in 0 ..< bufferCount {
                 let buffer = buffers[Int(i)]
                 let bufferLength = Int(buffer.Length)
                 let bufferData = Data(bytes: buffer.Buffer, count: bufferLength)
+                buffersData.append(bufferData)
                 print(
                     "[strm] Data length \(bufferLength) bytes: \(String([UInt8](bufferData).map { Character(UnicodeScalar($0)) }))"
                 )
@@ -136,11 +163,8 @@ public final class QuicServer {
             // Sends the buffer over the stream. Note the FIN flag is passed along with
             // the buffer. This indicates this is the last buffer on the stream and the
             // the stream is shut down (in the send direction) immediately after.
-            status =
-                (server.api?.pointee.StreamSend(
-                    stream, buffers, bufferCount, QUIC_SEND_FLAG_FIN, nil
-                ))
-                .status
+            status = server.sendBuffer(stream: stream, buffer: buffersData)
+
             if status.isFailed {
                 let shutdown =
                     (server.api?.pointee.StreamShutdown(
@@ -220,13 +244,13 @@ extension QuicServer {
 
         memset(&certificateFile, 0, MemoryLayout.size(ofValue: certificateFile))
         memset(&credConfig, 0, MemoryLayout.size(ofValue: credConfig))
-        let currentPath = FileManager.default.currentDirectoryPath
-        let cert = currentPath + "/Sources/assets/server.cert"
-        let keyFile = currentPath + "/Sources/assets/server.key"
+        //        let currentPath = FileManager.default.currentDirectoryPath
+        //        let cert = currentPath + "/Sources/assets/server.cert"
+        //        let keyFile = currentPath + "/Sources/assets/server.key"
         // print("cert: \(cert)")
         // print("keyFile: \(keyFile)")
-        // let cert = "/Users/mackun/boka/Networking/Sources/assets/server.cert"
-        // let keyFile = "/Users/mackun/boka/Networking/Sources/assets/server.key"
+        let cert = "/Users/mackun/boka/Networking/Sources/assets/server.cert"
+        let keyFile = "/Users/mackun/boka/Networking/Sources/assets/server.key"
         let certCString = cert.utf8CString
         let keyFileCString = keyFile.utf8CString
 
