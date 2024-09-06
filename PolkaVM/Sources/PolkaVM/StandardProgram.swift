@@ -9,14 +9,6 @@ public class StandardProgram {
         case invalidStandardProgram
     }
 
-    public enum Constants {
-        public static let initReg1: UInt32 = (1 << 32) - (1 << 16)
-        public static let stackBaseAddress: UInt32 = (1 << 32) - (2 * UInt32(DefaultPvmConfig().pvmProgramInitSegmentSize)) -
-            UInt32(DefaultPvmConfig().pvmProgramInitInputDataSize)
-        public static let inputStartAddress: UInt32 = (1 << 32) - UInt32(DefaultPvmConfig().pvmProgramInitSegmentSize) -
-            UInt32(DefaultPvmConfig().pvmProgramInitInputDataSize)
-    }
-
     public let code: ProgramCode
     public let initialMemory: Memory
     public let initialRegisters: Registers
@@ -54,18 +46,21 @@ public class StandardProgram {
             throw Error.invalidStandardProgram
         }
 
+        let config = DefaultPvmConfig()
+        // guard
+
         code = try ProgramCode(blob[relative: slice.startIndex ..< slice.startIndex + Int(codeLength)])
 
-        initialRegisters = StandardProgram.initRegisters(argumentData: argumentData)
-        // initialMemory = Memory(pageMap: pageMap, chunks: readWriteData)
+        initialRegisters = Registers(config: config, argumentData: argumentData)
     }
 
-    static func initRegisters(argumentData: Data?) -> Registers {
-        var registers = Registers()
-        registers.reg1 = Constants.initReg1
-        registers.reg2 = Constants.stackBaseAddress
-        registers.reg10 = Constants.inputStartAddress
-        registers.reg11 = UInt32(argumentData?.count ?? 0)
-        return registers
+    static func alignToPageSize(size: UInt32, config: PvmConfig) -> UInt32 {
+        let pageSize = UInt32(config.pvmProgramInitPageSize)
+        return (size + pageSize - 1) / pageSize * pageSize
+    }
+
+    static func alignToSegmentSize(size: UInt32, config: PvmConfig) -> UInt32 {
+        let segmentSize = UInt32(config.pvmProgramInitSegmentSize)
+        return (size + segmentSize - 1) / segmentSize * segmentSize
     }
 }

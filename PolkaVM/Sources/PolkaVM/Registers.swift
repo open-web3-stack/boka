@@ -1,3 +1,5 @@
+import Foundation
+
 public struct Registers: Equatable {
     public struct Index {
         public let value: UInt8
@@ -45,6 +47,14 @@ public struct Registers: Equatable {
         reg11 = values[10]
         reg12 = values[11]
         reg13 = values[12]
+    }
+
+    /// standard program init
+    public init(config: DefaultPvmConfig, argumentData: Data?) {
+        reg1 = UInt32(config.pvmProgramInitRegister1Value)
+        reg2 = UInt32(config.pvmProgramInitStackBaseAddress)
+        reg10 = UInt32(config.pvmProgramInitInputStartAddress)
+        reg11 = UInt32(argumentData?.count ?? 0)
     }
 
     public subscript(index: Index) -> UInt32 {
