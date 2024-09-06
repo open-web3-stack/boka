@@ -244,13 +244,13 @@ extension QuicServer {
 
         memset(&certificateFile, 0, MemoryLayout.size(ofValue: certificateFile))
         memset(&credConfig, 0, MemoryLayout.size(ofValue: credConfig))
-        //        let currentPath = FileManager.default.currentDirectoryPath
-        //        let cert = currentPath + "/Sources/assets/server.cert"
-        //        let keyFile = currentPath + "/Sources/assets/server.key"
+        let currentPath = FileManager.default.currentDirectoryPath
+        let cert = currentPath + "/Sources/assets/server.cert"
+        let keyFile = currentPath + "/Sources/assets/server.key"
         // print("cert: \(cert)")
         // print("keyFile: \(keyFile)")
-        let cert = "/Users/mackun/boka/Networking/Sources/assets/server.cert"
-        let keyFile = "/Users/mackun/boka/Networking/Sources/assets/server.key"
+        //        let cert = "/Users/mackun/boka/Networking/Sources/assets/server.cert"
+        //        let keyFile = "/Users/mackun/boka/Networking/Sources/assets/server.key"
         let certCString = cert.utf8CString
         let keyFileCString = keyFile.utf8CString
 
