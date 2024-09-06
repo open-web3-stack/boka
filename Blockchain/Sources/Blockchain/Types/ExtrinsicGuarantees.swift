@@ -74,6 +74,7 @@ extension ExtrinsicGuarantees: Validate {
     public enum Error: Swift.Error {
         case guaranteesNotSorted
         case invalidCoreIndex
+        case invalidValidatorIndex
         case credentialsNotSorted
         case duplicatedWorkPackageHash
     }
@@ -92,6 +93,12 @@ extension ExtrinsicGuarantees: Validate {
 
             guard guarantee.credential.isSortedAndUnique(by: { $0.index < $1.index }) else {
                 throw Error.credentialsNotSorted
+            }
+
+            for credential in guarantee.credential {
+                guard credential.index < UInt32(config.value.totalNumberOfValidators) else {
+                    throw Error.invalidValidatorIndex
+                }
             }
         }
 

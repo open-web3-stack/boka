@@ -3,6 +3,7 @@ import Utils
 
 public enum GuaranteeingError: Error {
     case invalidGuaranteeSignature
+    case invalidGuaranteeCore
     case coreNotAvailable
     case invalidReportAuthorizer
     case invalidServiceIndex
@@ -105,6 +106,11 @@ extension Guaranteeing {
                 let payload = SigningContext.guarantee + reportHash.data
                 guard Ed25519.verify(signature: credential.signature, message: payload, publicKey: key) else {
                     throw .invalidGuaranteeSignature
+                }
+
+                let coreAssignment = isCurrent ? currentCoreAssignment : previousCoreAssignment
+                guard coreAssignment[Int(credential.index)] == report.coreIndex else { // TODO: it should accepts the last core index?
+                    throw .invalidGuaranteeCore
                 }
             }
 

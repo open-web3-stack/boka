@@ -228,6 +228,8 @@ public final class Runtime {
                 newState.reports[idx] = nil // remove available report from pending reports
             }
         }
+
+        newState.reports = try newState.update(config: config, extrinsic: block.extrinsic.reports)
     }
 
     // TODO: add tests
