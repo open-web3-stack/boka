@@ -34,7 +34,7 @@ public class StandardProgram {
         guard readWriteEndIdx <= slice.endIndex else { throw Error.invalidDataLength }
         let readWriteData = blob[readOnlyEndIdx ..< readWriteEndIdx]
 
-        slice = slice.dropFirst(Int(readOnlyLen) + Int(readWriteLen))
+        slice = slice.dropFirst(Int(readOnlyLen + readWriteLen))
         guard let codeLength: UInt32 = slice.decode(length: 4), slice.startIndex + Int(codeLength) <= slice.endIndex else {
             throw Error.invalidCodeLength
         }

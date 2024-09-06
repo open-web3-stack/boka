@@ -43,10 +43,9 @@ public class Memory {
             (ZQ + readOnlyLen, P(readOnlyLen, config) - readOnlyLen, false),
             (2 * ZQ + Q(readOnlyLen, config), readWriteLen, true), // heap
             (2 * ZQ + Q(readOnlyLen, config) + readWriteLen, P(readWriteLen, config) + heapEmptyPagesSize - readWriteLen, true), // heap
-            (UInt32(config.pvmProgramInitStackBaseAddress) - P(stackSize, config), stackSize, true), // stach
+            (UInt32(config.pvmProgramInitStackBaseAddress) - P(stackSize, config), stackSize, true), // stack
             (UInt32(config.pvmProgramInitInputStartAddress), argumentDataLen, false), // argument
             (UInt32(config.pvmProgramInitInputStartAddress) + argumentDataLen, P(argumentDataLen, config) - argumentDataLen, false),
-            // argument
         ]
 
         chunks = [
