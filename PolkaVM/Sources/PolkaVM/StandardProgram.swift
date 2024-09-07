@@ -8,7 +8,7 @@ public class StandardProgram {
     public enum Error: Swift.Error {
         case invalidReadOnlyLength
         case invalidReadWriteLength
-        case invalidNumPages
+        case invalidHeapPages
         case invalidStackSize
         case invalidDataLength
         case invalidCodeLength
@@ -23,7 +23,7 @@ public class StandardProgram {
         var slice = Slice(base: blob, bounds: blob.startIndex ..< blob.endIndex)
         guard let readOnlyLen: UInt32 = slice.decode(length: 3) else { throw Error.invalidReadOnlyLength }
         guard let readWriteLen: UInt32 = slice.decode(length: 3) else { throw Error.invalidReadWriteLength }
-        guard let heapPages: UInt16 = slice.decode(length: 2) else { throw Error.invalidNumPages }
+        guard let heapPages: UInt16 = slice.decode(length: 2) else { throw Error.invalidHeapPages }
         guard let stackSize: UInt32 = slice.decode(length: 3) else { throw Error.invalidStackSize }
 
         let readOnlyEndIdx = slice.startIndex + Int(readOnlyLen)
