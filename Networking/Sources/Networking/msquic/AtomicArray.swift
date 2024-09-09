@@ -72,7 +72,7 @@ struct AtomicArray<T>: RangeReplaceableCollection {
         }
     }
 
-    mutating func popLast() -> AtomicArray.Element? {
+    @discardableResult mutating func popLast() -> AtomicArray.Element? {
         _write {
             array.popLast()
         }
@@ -179,27 +179,27 @@ struct AtomicArray<T>: RangeReplaceableCollection {
 
     // Single action
 
-    func get() -> [T] {
+    func getArray() -> [T] {
         _read {
             array
         }
     }
 
-    mutating func set(array: [T]) {
+    mutating func setArray(_ newArray: [T]) {
         _write {
-            self.array = array
+            array = newArray
         }
     }
 
     // Multi actions
 
-    mutating func get(closure: ([T]) -> Void) {
+    mutating func performRead(_ closure: ([T]) -> Void) {
         _read {
             closure(array)
         }
     }
 
-    mutating func set(closure: ([T]) -> ([T])) {
+    mutating func performWrite(_ closure: ([T]) -> ([T])) {
         _write {
             array = closure(array)
         }
@@ -225,21 +225,21 @@ struct AtomicArray<T>: RangeReplaceableCollection {
     }
 
     static func + <Other>(lhs: Other, rhs: AtomicArray) -> AtomicArray where Other: Sequence, AtomicArray.Element == Other.Element {
-        AtomicArray(lhs + rhs.get())
+        AtomicArray(lhs + rhs.getArray())
     }
 
     static func + <Other>(lhs: AtomicArray, rhs: Other) -> AtomicArray where Other: Sequence, AtomicArray.Element == Other.Element {
-        AtomicArray(lhs.get() + rhs)
+        AtomicArray(lhs.getArray() + rhs)
     }
 
     static func + <Other>(lhs: AtomicArray, rhs: Other) -> AtomicArray where Other: RangeReplaceableCollection,
         AtomicArray.Element == Other.Element
     {
-        AtomicArray(lhs.get() + rhs)
+        AtomicArray(lhs.getArray() + rhs)
     }
 
     static func + (lhs: AtomicArray<Element>, rhs: AtomicArray<Element>) -> AtomicArray {
-        AtomicArray(lhs.get() + rhs.get())
+        AtomicArray(lhs.getArray() + rhs.getArray())
     }
 
     static func += <Other>(lhs: inout AtomicArray, rhs: Other) where Other: Sequence, AtomicArray.Element == Other.Element {
