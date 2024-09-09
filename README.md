@@ -26,6 +26,16 @@ JAM built with Swift
   - Provide the networking interface for the blockchain node. Used by `Node`.
 - Utils
   - Provide the common utilities for the blockchain node.
+- TracingUtils
+  - Provide the tracing utilities.
+- Codec
+  - Implements JAM Codec.
+- PolkaVM
+  - Implements the Polka Virtual Machine.
+- PVMShell
+  - A module that can be compiled to Wasm for use in [debugger](https://pvm.fluffylabs.dev/).
+- JAMTests
+  - Integrate the JAM test vectors.
 
 ## Compile PVM to Wasm
 
