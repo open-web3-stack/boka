@@ -37,6 +37,8 @@ extension Instruction {
             logger.debug("execution success! updating pc...")
             return updatePC(context: context, skip: skip)
         } catch let e as Memory.Error {
+            // this passes test vector
+            context.state.consumeGas(gasCost())
             return .exit(.pageFault(e.address))
         } catch let e {
             // other unknown errors
