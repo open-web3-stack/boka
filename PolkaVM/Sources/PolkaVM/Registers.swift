@@ -67,6 +67,14 @@ public struct Registers: Equatable {
         reg13 = values[12]
     }
 
+    /// standard program init registers
+    public init(config: DefaultPvmConfig, argumentData: Data?) {
+        reg1 = UInt32(config.pvmProgramInitRegister1Value)
+        reg2 = UInt32(config.pvmProgramInitStackBaseAddress)
+        reg10 = UInt32(config.pvmProgramInitInputStartAddress)
+        reg11 = UInt32(argumentData?.count ?? 0)
+    }
+
     public subscript(index: Index) -> UInt32 {
         get {
             switch index.value {
