@@ -144,34 +144,9 @@ class QuicConnection {
         }
     }
 
-    func clientSend(buffer: Data) {
-        var stream: HQuic?
-        var status =
-            (api?.pointee.StreamOpen(
-                connection, QUIC_STREAM_OPEN_FLAG_NONE,
-                { stream, context, event -> QuicStatus in
-                    QuicConnection.streamCallback(stream: stream, context: context, event: event)
-                }, Unmanaged.passUnretained(self).toOpaque(), &stream
-            )).status
-        if status.isFailed {
-            logger.error("StreamOpen failed, \(status)!")
-            api?.pointee.StreamClose(stream)
-            return
-        }
-
-        logger.info("[strm][\(String(describing: stream))] Starting...")
-
-        streams.append(stream!)
-
-        status = (api?.pointee.StreamStart(stream, QUIC_STREAM_START_FLAG_NONE)).status
-        if status.isFailed {
-            logger.error("StreamStart failed, \(status)!")
-            api?.pointee.StreamClose(stream)
-            streams.removeFirstIfExist { $0 == stream }
-            return
-        }
-
+    func send(stream: HQuic?, buffer: Data) {
         logger.info("[strm][\(String(describing: stream))] Sending data...")
+        var status = QuicStatusCode.success.rawValue
         let messageLength = buffer.count
 
         let sendBufferRaw = UnsafeMutableRawPointer.allocate(
@@ -200,6 +175,35 @@ class QuicConnection {
             }
             streams.removeFirstIfExist { $0 == stream }
         }
+    }
+
+    func clientSend(buffer: Data) {
+        var stream: HQuic?
+        var status =
+            (api?.pointee.StreamOpen(
+                connection, QUIC_STREAM_OPEN_FLAG_NONE,
+                { stream, context, event -> QuicStatus in
+                    QuicConnection.streamCallback(stream: stream, context: context, event: event)
+                }, Unmanaged.passUnretained(self).toOpaque(), &stream
+            )).status
+        if status.isFailed {
+            logger.error("StreamOpen failed, \(status)!")
+            api?.pointee.StreamClose(stream)
+            return
+        }
+
+        logger.info("[strm][\(String(describing: stream))] Starting...")
+
+        streams.append(stream!)
+
+        status = (api?.pointee.StreamStart(stream, QUIC_STREAM_START_FLAG_NONE)).status
+        if status.isFailed {
+            logger.error("StreamStart failed, \(status)!")
+            api?.pointee.StreamClose(stream)
+            streams.removeFirstIfExist { $0 == stream }
+            return
+        }
+        send(stream: stream, buffer: buffer)
     }
 
     func start(ipAddress: String, port: UInt16) throws {
