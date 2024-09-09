@@ -66,9 +66,6 @@ private let logger = Logger(label: "PVMTests")
 
 // TODO: pass these
 let knownFailedTestCases = [
-    "inst_load_u8_trap",
-    "inst_store_u8_trap_read_only",
-    "inst_store_u8_trap_inaccessible",
     "inst_ret_halt",
     "inst_ret_invalid",
 ]
