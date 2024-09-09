@@ -5,14 +5,29 @@ struct AtomicArray<T>: RangeReplaceableCollection {
     typealias Index = Int
     typealias SubSequence = AtomicArray<T>
     typealias Indices = Range<Int>
+
     fileprivate var array: [T]
+    private let queue = DispatchQueue(label: "com.atomicArray.queue", attributes: .concurrent)
+
     var startIndex: Int { array.startIndex }
     var endIndex: Int { array.endIndex }
     var indices: Range<Int> { array.indices }
 
-    func index(after i: Int) -> Int { array.index(after: i) }
+    init() {
+        array = []
+    }
 
-    private let queue = DispatchQueue(label: "com.atomicArray.queue", attributes: .concurrent)
+    init<S>(_ elements: S) where S: Sequence, AtomicArray.Element == S.Element {
+        array = Array(elements)
+    }
+
+    init(repeating repeatedValue: AtomicArray.Element, count: Int) {
+        array = Array(repeating: repeatedValue, count: count)
+    }
+
+    func index(after i: Int) -> Int {
+        array.index(after: i)
+    }
 
     fileprivate func _read<R>(_ block: () throws -> R) rethrows -> R {
         try queue.sync {
@@ -25,22 +40,7 @@ struct AtomicArray<T>: RangeReplaceableCollection {
             try block()
         }
     }
-}
 
-extension AtomicArray {
-    init<S>(_ elements: S) where S: Sequence, AtomicArray.Element == S.Element {
-        array = [S.Element](elements)
-    }
-
-    init() { self.init([]) }
-
-    init(repeating repeatedValue: AtomicArray.Element, count: Int) {
-        let array = Array(repeating: repeatedValue, count: count)
-        self.init(array)
-    }
-}
-
-extension AtomicArray {
     public mutating func append(_ newElement: AtomicArray.Element) {
         _write {
             array.append(newElement)
@@ -176,10 +176,8 @@ extension AtomicArray {
             array.first
         }
     }
-}
 
-extension AtomicArray {
-    // Single  action
+    // Single action
 
     func get() -> [T] {
         _read {
@@ -193,7 +191,7 @@ extension AtomicArray {
         }
     }
 
-    // Multy actions
+    // Multi actions
 
     mutating func get(closure: ([T]) -> Void) {
         _read {
@@ -206,9 +204,7 @@ extension AtomicArray {
             array = closure(array)
         }
     }
-}
 
-extension AtomicArray {
     subscript(bounds: Range<AtomicArray.Index>) -> AtomicArray.SubSequence {
         _read {
             AtomicArray(array[bounds])
@@ -227,9 +223,7 @@ extension AtomicArray {
             }
         }
     }
-}
 
-extension AtomicArray {
     static func + <Other>(lhs: Other, rhs: AtomicArray) -> AtomicArray where Other: Sequence, AtomicArray.Element == Other.Element {
         AtomicArray(lhs + rhs.get())
     }
