@@ -237,7 +237,10 @@ private struct JamKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPr
 
     func decode(_: String.Type, forKey key: K) throws -> String {
         let data: Data = try decoder.decodeData(codingPath: codingPath + [key])
-        return String(decoding: data, as: UTF8.self)
+        guard let string = String(data: data, encoding: .utf8) else {
+            throw DecodingError.dataCorruptedError(forKey: key, in: self, debugDescription: "Invalid UTF8 string")
+        }
+        return string
     }
 
     func decode(_: Double.Type, forKey key: K) throws -> Double {
@@ -352,7 +355,9 @@ private struct JamUnkeyedDecodingContainer: UnkeyedDecodingContainer {
 
     mutating func decode(_: String.Type) throws -> String {
         let data: Data = try decoder.decodeData(codingPath: codingPath)
-        let value = String(decoding: data, as: UTF8.self)
+        guard let value = String(data: data, encoding: .utf8) else {
+            throw DecodingError.dataCorruptedError(in: self, debugDescription: "Invalid UTF8 string")
+        }
         currentIndex += 1
         return value
     }
@@ -465,7 +470,10 @@ private struct JamSingleValueDecodingContainer: SingleValueDecodingContainer {
 
     func decode(_: String.Type) throws -> String {
         let data: Data = try decoder.decodeData(codingPath: codingPath)
-        return String(decoding: data, as: UTF8.self)
+        guard let string = String(data: data, encoding: .utf8) else {
+            throw DecodingError.dataCorruptedError(in: self, debugDescription: "Invalid UTF8 string")
+        }
+        return string
     }
 
     func decode(_: Double.Type) throws -> Double {
