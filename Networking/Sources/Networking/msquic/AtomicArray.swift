@@ -30,15 +30,19 @@ struct AtomicArray<T>: RangeReplaceableCollection {
     }
 
     fileprivate func _read<R>(_ block: () throws -> R) rethrows -> R {
+        var result: R!
         try queue.sync {
-            try block()
+            result = try block()
         }
+        return result
     }
 
     fileprivate func _write<R>(_ block: () throws -> R) rethrows -> R {
+        var result: R!
         try queue.sync(flags: .barrier) {
-            try block()
+            result = try block()
         }
+        return result
     }
 
     public mutating func append(_ newElement: AtomicArray.Element) {
