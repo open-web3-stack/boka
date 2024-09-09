@@ -7,9 +7,10 @@ public final class QuicServer {
     private var registration: HQuic?
     private var configuration: HQuic?
     private var listener: HQuic?
-    private var group: MultiThreadedEventLoopGroup?
     private let streamCallback: StreamCallback
     private let connectionCallback: ConnectionCallback
+    public var onMessageReceived: ((Data) -> Void)?
+
     init() throws {
         var rawPointer: UnsafeRawPointer?
         let status: UInt32 = MsQuicOpenVersion(2, &rawPointer)
@@ -33,7 +34,6 @@ public final class QuicServer {
 
         api = boundPointer
         registration = registrationHandle
-        group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
         streamCallback = { stream, context, event in
             QuicServer.streamCallback(
                 stream: stream, context: context, event: event
@@ -49,7 +49,6 @@ public final class QuicServer {
     func start(ipAddress: String, port: UInt16) throws {
         try loadConfiguration()
         try openListener(ipAddress: ipAddress, port: port)
-        try group?.next().scheduleTask(in: .hours(1)) {}.futureResult.wait() // TODO: remove
     }
 
     deinit {
@@ -66,7 +65,6 @@ public final class QuicServer {
             registration = nil
         }
         MsQuicClose(api)
-        try? group?.syncShutdownGracefully()
     }
 
     private static func serverListenerCallback(
@@ -160,24 +158,27 @@ public final class QuicServer {
                     "[strm] Data length \(bufferLength) bytes: \(String([UInt8](bufferData).map { Character(UnicodeScalar($0)) }))"
                 )
             }
-            // Sends the buffer over the stream. Note the FIN flag is passed along with
-            // the buffer. This indicates this is the last buffer on the stream and the
-            // the stream is shut down (in the send direction) immediately after.
-            status = server.sendBuffer(stream: stream, buffer: buffersData)
+            // Notify the peer of the received data
+            server.onMessageReceived?(buffersData)
 
-            if status.isFailed {
-                let shutdown =
-                    (server.api?.pointee.StreamShutdown(
-                        stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0
-                    ))
-                    .status
-                if shutdown.isFailed {
-                    print("StreamShutdown failed, 0x\(String(format: "%x", shutdown))!")
-                    return QuicStatusCode.internalError.rawValue
-                }
-            }
-            // pending = Int32(-2)
-            status = UInt32(bitPattern: -2)
+//            // Sends the buffer over the stream. Note the FIN flag is passed along with
+//            // the buffer. This indicates this is the last buffer on the stream and the
+//            // the stream is shut down (in the send direction) immediately after.
+//            status = server.sendBuffer(stream: stream, buffer: buffersData)
+//
+//            if status.isFailed {
+//                let shutdown =
+//                    (server.api?.pointee.StreamShutdown(
+//                        stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0
+//                    ))
+//                    .status
+//                if shutdown.isFailed {
+//                    print("StreamShutdown failed, 0x\(String(format: "%x", shutdown))!")
+//                    return QuicStatusCode.internalError.rawValue
+//                }
+//            }
+//            // pending = Int32(-2)
+//            status = UInt32(bitPattern: -2)
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
             print("[strm][\(String(describing: stream))] Peer shut down")
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:

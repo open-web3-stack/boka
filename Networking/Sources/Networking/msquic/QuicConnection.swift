@@ -1,13 +1,18 @@
 import Foundation
+import Logging
 import msquic
+
+let logger = Logger(label: "QuicConnection")
 
 class QuicConnection {
     private var connection: HQuic?
     private let api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
-    private var stream: HQuic?
-    private var sendBuffer: QuicBuffer?
+    private var streams = AtomicArray<HQuic>()
+
+    public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
+
     init(api: UnsafePointer<QuicApiTable>?, registration: HQuic?, configuration: HQuic?) throws {
         self.api = api
         self.registration = registration
@@ -16,7 +21,7 @@ class QuicConnection {
 
     private static func connectionCallback(
         connection: HQuic?, context: UnsafeMutableRawPointer?,
-        event: UnsafePointer<QUIC_CONNECTION_EVENT>?
+        event: UnsafePointer<QuicConnectionEvent>?
     ) -> QuicStatus {
         guard let context, let event else {
             return QuicStatusCode.notSupported.rawValue
@@ -27,39 +32,32 @@ class QuicConnection {
         let status: QuicStatus = QuicStatusCode.success.rawValue
         switch event.pointee.Type {
         case QUIC_CONNECTION_EVENT_CONNECTED:
-            // The handshake has completed for the connection.
-            print("[conn][\(String(describing: connection))] Connected")
-            // ClientSend(connection)
-            quicConnection.clientSend(message: Data("hello world".utf8))
+            logger.info("[conn][\(String(describing: connection))] Connected")
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
-            // The connection has been shut down by the transport.
             if event.pointee.SHUTDOWN_INITIATED_BY_TRANSPORT.Status
                 == QuicStatusCode.connectionIdle.rawValue
             {
-                print("[conn][\(String(describing: connection))] Successfully shut down on idle.")
+                logger.info("[conn][\(String(describing: connection))] Successfully shut down on idle.")
             } else {
-                print(
+                logger.warning(
                     "[conn] Shut down by transport, 0x\(String(format: "%x", event.pointee.SHUTDOWN_INITIATED_BY_TRANSPORT.Status))"
                 )
             }
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
-            // The connection was explicitly shut down by the peer.
-            print(
-                "[conn]Shut down by peer, 0x\(String(format: "%llx", event.pointee.SHUTDOWN_INITIATED_BY_PEER.ErrorCode))"
+            logger.warning(
+                "[conn] Shut down by peer, 0x\(String(format: "%llx", event.pointee.SHUTDOWN_INITIATED_BY_PEER.ErrorCode))"
             )
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
-            // The connection has completed the shutdown process and is ready to be safely cleaned up.
-            print("[conn][\(String(describing: connection))] All done")
+            logger.info("[conn][\(String(describing: connection))] All done")
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 quicConnection.api?.pointee.ConnectionClose(connection)
             }
 
         case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
-            // A resumption ticket was received from the server.
-            print(
+            logger.info(
                 "[conn] Ticket received (\(event.pointee.RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength) bytes)"
             )
 
@@ -86,39 +84,46 @@ class QuicConnection {
             if let clientContext = event.pointee.SEND_COMPLETE.ClientContext {
                 free(clientContext)
             }
-            print("[strm][\(String(describing: stream))] Data sent")
+            logger.info("[strm][\(String(describing: stream))] Data sent")
 
         case QUIC_STREAM_EVENT_RECEIVE:
-            let bufferCount = event.pointee.RECEIVE.BufferCount
+            let bufferCount: UInt32 = event.pointee.RECEIVE.BufferCount
             let buffers = event.pointee.RECEIVE.Buffers
             for i in 0 ..< bufferCount {
                 let buffer = buffers![Int(i)]
                 let bufferLength = Int(buffer.Length)
                 let bufferData = Data(bytes: buffer.Buffer, count: bufferLength)
-                print(
+                logger.info(
                     "[strm] Data length \(bufferLength) bytes: \(String([UInt8](bufferData).map { Character(UnicodeScalar($0)) }))"
                 )
+                let message = QuicMessage(type: .received, data: bufferData)
+                quicConnection.onMessageReceived?(.success(message))
             }
 
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
-            print("[strm][\(String(describing: stream))] Peer shut down")
+            logger.info("[strm][\(String(describing: stream))] Peer shut down")
+            let message = QuicMessage(type: .shutdown, data: nil)
+            quicConnection.onMessageReceived?(.success(message))
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
-            print("[strm][\(String(describing: stream))] Peer aborted")
+            logger.warning("[strm][\(String(describing: stream))] Peer aborted")
             status =
                 (quicConnection.api?.pointee.StreamShutdown(
                     stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0
                 ))
                 .status
+            quicConnection.onMessageReceived?(.failure(QuicError.invalidStatus(status: status.code)))
 
         case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
-            print("[strm][\(String(describing: stream))] All done")
+            logger.info("[strm][\(String(describing: stream))] All done")
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 quicConnection.api?.pointee.StreamClose(stream)
+                quicConnection.streams.removeFirstIfExist { $0 == stream }
             }
 
         default:
-            break
+            let message = QuicMessage(type: .unknown, data: nil)
+            quicConnection.onMessageReceived?(.success(message))
         }
 
         return status
@@ -139,8 +144,8 @@ class QuicConnection {
         }
     }
 
-    func clientSend(message: Data) {
-        // Create/allocate a new bidirectional stream.
+    func clientSend(buffer: Data) {
+        var stream: HQuic?
         var status =
             (api?.pointee.StreamOpen(
                 connection, QUIC_STREAM_OPEN_FLAG_NONE,
@@ -149,49 +154,59 @@ class QuicConnection {
                 }, Unmanaged.passUnretained(self).toOpaque(), &stream
             )).status
         if status.isFailed {
-            print("StreamOpen failed, \(status)!")
-
+            logger.error("StreamOpen failed, \(status)!")
             api?.pointee.StreamClose(stream)
+            return
         }
 
-        print("[strm][\(String(describing: stream))] Starting...")
+        logger.info("[strm][\(String(describing: stream))] Starting...")
 
-        // Starts the bidirectional stream.
+        streams.append(stream!)
+
         status = (api?.pointee.StreamStart(stream, QUIC_STREAM_START_FLAG_NONE)).status
         if status.isFailed {
-            print("StreamStart failed, \(status)!")
+            logger.error("StreamStart failed, \(status)!")
             api?.pointee.StreamClose(stream)
+            streams.removeFirstIfExist { $0 == stream }
+            return
         }
 
-        print("[strm][\(String(describing: stream))] Sending data...")
-        let buffer = message
-        let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(
-            capacity: buffer.count
+        logger.info("[strm][\(String(describing: stream))] Sending data...")
+        let messageLength = buffer.count
+
+        let sendBufferRaw = UnsafeMutableRawPointer.allocate(
+            byteCount: MemoryLayout<QUIC_BUFFER>.size + messageLength,
+            alignment: MemoryLayout<QUIC_BUFFER>.alignment
         )
-        buffer.copyBytes(to: bufferPointer, count: buffer.count)
-        var sendBuffer = QuicBuffer(Length: UInt32(buffer.count), Buffer: bufferPointer)
-        // Sends the buffer over the stream. Note the FIN flag is passed along with
-        // the buffer. This indicates this is the last buffer on the stream and the
-        // the stream is shut down (in the send direction) immediately after.
+
+        let sendBuffer = sendBufferRaw.assumingMemoryBound(to: QUIC_BUFFER.self)
+        let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(
+            capacity: messageLength
+        )
+        buffer.copyBytes(to: bufferPointer, count: messageLength)
+
+        sendBuffer.pointee.Buffer = bufferPointer
+        sendBuffer.pointee.Length = UInt32(messageLength)
         status =
-            (api?.pointee.StreamSend(stream, &sendBuffer, 1, QUIC_SEND_FLAG_FIN, nil))
+            (api?.pointee.StreamSend(stream, sendBuffer, 1, QUIC_SEND_FLAG_FIN, sendBufferRaw))
                 .status
         if status.isFailed {
-            print("StreamSend failed, \(status)!")
-
+            logger.error("StreamSend failed, \(status)!")
             let shutdown =
                 (api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0))
                     .status
             if shutdown.isFailed {
-                print("StreamShutdown failed, 0x\(String(format: "%x", shutdown))!")
+                logger.error("StreamShutdown failed, 0x\(String(format: "%x", shutdown))!")
             }
+            streams.removeFirstIfExist { $0 == stream }
         }
     }
 
     func start(ipAddress: String, port: UInt16) throws {
         let status =
             (api?.pointee.ConnectionStart(
-                connection, configuration, QUIC_ADDRESS_FAMILY(QUIC_ADDRESS_FAMILY_UNSPEC), ipAddress, port
+                connection, configuration, QUIC_ADDRESS_FAMILY(QUIC_ADDRESS_FAMILY_UNSPEC),
+                ipAddress, port
             )).status
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)
@@ -199,8 +214,6 @@ class QuicConnection {
     }
 
     deinit {
-        print("QuicConnection Deinit")
-
-        //        relese()
+        logger.info("QuicConnection Deinit")
     }
 }

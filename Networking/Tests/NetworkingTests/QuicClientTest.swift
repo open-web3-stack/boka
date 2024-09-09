@@ -9,10 +9,11 @@ import Testing
 #endif
 
 final class QuicClientTests {
-    @Test func start() throws {
+    @Test func start() async throws {
         do {
             let quicClient = try QuicClient()
-            try quicClient.start(ipAddress: "127.0.0.1", port: 4568)
+            let status = try await quicClient.start(ipAddress: "127.0.0.1", port: 4568)
+            print(status)
         } catch {
             print("Failed to start quic client: \(error)")
         }
