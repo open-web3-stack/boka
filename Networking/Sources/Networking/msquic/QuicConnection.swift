@@ -4,7 +4,7 @@ import msquic
 
 let logger = Logger(label: "QuicConnection")
 
-class QuicConnection {
+public class QuicConnection {
     var connection: HQuic?
     private let api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
@@ -13,10 +13,39 @@ class QuicConnection {
 
     public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
 
-    init(api: UnsafePointer<QuicApiTable>?, registration: HQuic?, configuration: HQuic?) throws {
+    init(api: UnsafePointer<QuicApiTable>?, registration: HQuic?, configuration: HQuic?) {
         self.api = api
         self.registration = registration
         self.configuration = configuration
+    }
+
+    init(
+        api: UnsafePointer<QuicApiTable>?, registration: HQuic?, configuration: HQuic?,
+        connection: HQuic?
+    ) {
+        self.api = api
+        self.registration = registration
+        self.configuration = configuration
+        self.connection = connection
+    }
+
+    // TODO: set callback handler
+    func setCallbackHandler() -> QuicStatus {
+        guard let api, let connection, let configuration else {
+            return QuicStatusCode.invalidParameter.rawValue
+        }
+
+        let callbackPointer = unsafeBitCast(
+            QuicConnection.connectionCallback, to: UnsafeMutableRawPointer?.self
+        )
+
+        api.pointee.SetCallbackHandler(
+            connection,
+            callbackPointer,
+            UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+        )
+
+        return api.pointee.ConnectionSetConfiguration(connection, configuration)
     }
 
     private static func connectionCallback(
@@ -39,7 +68,9 @@ class QuicConnection {
             if event.pointee.SHUTDOWN_INITIATED_BY_TRANSPORT.Status
                 == QuicStatusCode.connectionIdle.rawValue
             {
-                logger.info("[conn][\(String(describing: connection))] Successfully shut down on idle.")
+                logger.info(
+                    "[conn][\(String(describing: connection))] Successfully shut down on idle."
+                )
             } else {
                 logger.warning(
                     "[conn] Shut down by transport, 0x\(String(format: "%x", event.pointee.SHUTDOWN_INITIATED_BY_TRANSPORT.Status))"
@@ -64,6 +95,14 @@ class QuicConnection {
                 "[conn] Ticket received (\(event.pointee.RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength) bytes)"
             )
 
+        case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
+            // TODO: Manage streams
+            logger.info("[conn][\(String(describing: connection))] Peer stream started")
+            let stream = event.pointee.PEER_STREAM_STARTED.Stream
+            let streamHandler = QuicStream(api: quicConnection.api, stream: stream)
+            streamHandler.onMessageReceived = serverConnection.onMessageReceived
+            streamHandler.setCallbackHandler()
+
         default:
             break
         }
@@ -86,8 +125,8 @@ class QuicConnection {
         }
     }
 
-    func createStream() throws -> QuicStream {
-        let stream = try QuicStream(api: api, connection: connection)
+    func createStream(_ streamKind: StreamKind = .commonEphemeral) -> QuicStream {
+        let stream = QuicStream(api: api, connection: connection, streamKind)
         streams.append(stream)
         return stream
     }

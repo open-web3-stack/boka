@@ -4,17 +4,28 @@ import msquic
 
 let streamLogger = Logger(label: "QuicStream")
 
+enum StreamKind {
+    case uniquePersistent
+    case commonEphemeral
+}
+
 class QuicStream {
     private var stream: HQuic?
     private let api: UnsafePointer<QuicApiTable>?
     private let connection: HQuic?
-
+    private let kind: StreamKind
     public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
 
-    init(api: UnsafePointer<QuicApiTable>?, connection: HQuic?) throws {
+    init(api: UnsafePointer<QuicApiTable>?, connection: HQuic?, _ streamKind: StreamKind = .uniquePersistent) {
         self.api = api
         self.connection = connection
-        try openStream()
+        kind = streamKind
+//        try openStream(self.kind)
+    }
+
+    init(api: UnsafePointer<QuicApiTable>?, stream: HQuic?) {
+        self.api = api
+        self.stream = stream
     }
 
     private static func streamCallback(
@@ -72,7 +83,7 @@ class QuicStream {
         return status
     }
 
-    private func openStream() throws {
+    private func openStream(_: StreamKind = .commonEphemeral) throws {
         var stream: HQuic?
         let status = (api?.pointee.StreamOpen(
             connection, QUIC_STREAM_OPEN_FLAG_NONE,
@@ -96,6 +107,23 @@ class QuicStream {
         streamLogger.info("[strm][\(String(describing: stream))] Stream started")
     }
 
+    func setCallbackHandler() {
+        guard let api, let stream else {
+            return
+        }
+
+        let callbackPointer = unsafeBitCast(
+            QuicStream.streamCallback, to: UnsafeMutableRawPointer?.self
+        )
+
+        api.pointee.SetCallbackHandler(
+            stream,
+            callbackPointer,
+            UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+        )
+    }
+
+    // TODO: check stream type & send
     func send(buffer: Data) {
         streamLogger.info("[strm][\(String(describing: stream))] Sending data...")
         var status = QuicStatusCode.success.rawValue

@@ -56,11 +56,18 @@ public class QuicClient {
         QuicStatusCode.success.rawValue
     }
 
+    // TODO: check stream & send
     func send(message: Data) throws {
+        try send(message: message, streamKind: .uniquePersistent)
+    }
+
+    // TODO: more send methods
+    func send(message: Data, streamKind: StreamKind = .commonEphemeral) throws {
         guard let connection else {
             throw QuicError.getConnectionFailed
         }
-        let stream = try connection.createStream()
+        // TODO: check stream type & send
+        let stream = try connection.createStream(streamKind)
         stream.onMessageReceived = { [weak self] result in
             self?.onMessageReceived?(result)
         }
