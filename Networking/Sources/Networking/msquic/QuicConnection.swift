@@ -99,8 +99,8 @@ public class QuicConnection {
             // TODO: Manage streams
             logger.info("[conn][\(String(describing: connection))] Peer stream started")
             let stream = event.pointee.PEER_STREAM_STARTED.Stream
-            let streamHandler = QuicStream(api: quicConnection.api, stream: stream)
-            streamHandler.onMessageReceived = serverConnection.onMessageReceived
+            let streamHandler = QuicStream(api: quicConnection.api, connection: connection, stream: stream)
+            streamHandler.onMessageReceived = quicConnection.onMessageReceived
             streamHandler.setCallbackHandler()
 
         default:

@@ -15,7 +15,7 @@ final class QuicClientTests {
             let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
             let quicClient = try QuicClient(
                 config: QuicConfig(
-                    id: "public-key", cert: "cert", key: "key", alpn: "alpn",
+                    id: "public-key", cert: "cert", key: "key", alpn: "simple",
                     ipAddress: "127.0.0.1", port: 4568
                 )
             )

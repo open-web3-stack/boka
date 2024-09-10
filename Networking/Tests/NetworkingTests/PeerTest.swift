@@ -14,17 +14,13 @@ final class PeerTests {
         do {
             let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
             let peer = try Peer(
-                config: PeerConfig(
+                config: QuicConfig(
                     id: "public-key", cert: "cert", key: "key", alpn: "alpn",
                     ipAddress: "127.0.0.1", port: 4568
                 )
             )
             try peer.start()
-            peer.onDataReceived = { data in
-                print(
-                    "Peer received: \(String([UInt8](data).map { Character(UnicodeScalar($0)) }))"
-                )
-            }
+
             try group.next().scheduleTask(in: .seconds(5)) {
                 peer.sendToPeer(
                     message: Message(.text, data: Data("Hello, World!".utf8)),
@@ -43,13 +39,23 @@ final class PeerTests {
 
     @Test func startPeer2() throws {
         do {
+            let cert = "Users/mackun/boka/Networking/Sources/assets/server.cert"
+            let keyFile = "Users/mackun/boka/Networking/Sources/assets/server.key"
             let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
             let peer = try Peer(
                 config: PeerConfig(
-                    id: "public-key", cert: "cert", key: "key", alpn: "alpn",
+                    id: "public-key", cert: cert, key: keyFile, alpn: "alpn",
                     ipAddress: "127.0.0.1", port: 4567
                 )
             )
+            peer.onMessageReceived = { result in
+                switch result {
+                case let .success(message):
+                    print("Peer received: \(message)")
+                case let .failure(error):
+                    print("Peer error: \(error)")
+                }
+            }
             try peer.start()
             peer.onDataReceived = { data in
                 print(

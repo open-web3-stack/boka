@@ -7,6 +7,7 @@ let streamLogger = Logger(label: "QuicStream")
 enum StreamKind {
     case uniquePersistent
     case commonEphemeral
+    case unknown
 }
 
 class QuicStream {
@@ -20,12 +21,13 @@ class QuicStream {
         self.api = api
         self.connection = connection
         kind = streamKind
-//        try openStream(self.kind)
     }
 
-    init(api: UnsafePointer<QuicApiTable>?, stream: HQuic?) {
+    init(api: UnsafePointer<QuicApiTable>?, connection: HQuic?, stream: HQuic?) {
         self.api = api
+        self.connection = connection
         self.stream = stream
+        kind = .commonEphemeral
     }
 
     private static func streamCallback(

@@ -41,49 +41,49 @@ struct AtomicMap<Key: Hashable, Value> {
     }
 
     public func value(forKey key: Key) -> Value? {
-        return _read {
+        _read {
             dictionary[key]
         }
     }
 
     public var count: Int {
-        return _read {
+        _read {
             dictionary.count
         }
     }
 
     public var isEmpty: Bool {
-        return _read {
+        _read {
             dictionary.isEmpty
         }
     }
 
     public func contains(key: Key) -> Bool {
-        return _read {
+        _read {
             dictionary.keys.contains(key)
         }
     }
 
     public var keys: Dictionary<Key, Value>.Keys {
-        return _read {
+        _read {
             dictionary.keys
         }
     }
 
     public var values: Dictionary<Key, Value>.Values {
-        return _read {
+        _read {
             dictionary.values
         }
     }
 
     public var allKeys: [Key] {
-        return _read {
+        _read {
             Array(dictionary.keys)
         }
     }
 
     public var allValues: [Value] {
-        return _read {
+        _read {
             Array(dictionary.values)
         }
     }
@@ -128,7 +128,7 @@ struct AtomicMap<Key: Hashable, Value> {
 
 extension AtomicMap: CustomStringConvertible {
     var description: String {
-        return _read {
+        _read {
             "\(dictionary)"
         }
     }

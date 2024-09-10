@@ -22,8 +22,10 @@ public struct Message: Equatable, Sendable {
 public final class Peer: @unchecked Sendable {
     private let config: QuicConfig
     private var quicServer: QuicServer?
-    public var onDataReceived: ((Data) -> Void)?
+    public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
+    // TODO: add data received queue
     private let callbackQueue: DispatchQueue
+    // TODO: add message queue
     private let messageQueue: DispatchQueue
 
     public init(config: QuicConfig) throws {
@@ -36,9 +38,7 @@ public final class Peer: @unchecked Sendable {
     func start() throws {
         // Implement start logic
         try quicServer?.start()
-        quicServer?.onMessageReceived = { [weak self] _ in
-            guard let self else { return }
-        }
+        quicServer?.onMessageReceived = onMessageReceived
     }
 
     func close() throws {

@@ -40,7 +40,7 @@ public class QuicClient {
     func start() throws -> QuicStatus {
         let status = QuicStatusCode.success.rawValue
         try loadConfiguration()
-        connection = try QuicConnection(
+        connection = QuicConnection(
             api: api, registration: registration, configuration: configuration
         )
         try connection?.open()
@@ -67,7 +67,7 @@ public class QuicClient {
             throw QuicError.getConnectionFailed
         }
         // TODO: check stream type & send
-        let stream = try connection.createStream(streamKind)
+        let stream = connection.createStream(streamKind)
         stream.onMessageReceived = { [weak self] result in
             self?.onMessageReceived?(result)
         }
