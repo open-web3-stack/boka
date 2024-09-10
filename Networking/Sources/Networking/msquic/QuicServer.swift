@@ -1,6 +1,9 @@
 import Foundation
+import Logging
 import msquic
 import NIO
+
+let quicServerLogger = Logger(label: "QuicServer")
 
 public final class QuicServer {
     private var api: UnsafePointer<QuicApiTable>?
@@ -9,9 +12,11 @@ public final class QuicServer {
     private var listener: HQuic?
     private let streamCallback: StreamCallback
     private let connectionCallback: ConnectionCallback
-    public var onMessageReceived: ((Data) -> Void)?
+    public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
+    private let config: QuicConfig
 
-    init() throws {
+    init(config: QuicConfig) throws {
+        self.config = config
         var rawPointer: UnsafeRawPointer?
         let status: UInt32 = MsQuicOpenVersion(2, &rawPointer)
 
@@ -46,9 +51,9 @@ public final class QuicServer {
         }
     }
 
-    func start(ipAddress: String, port: UInt16) throws {
+    func start() throws {
         try loadConfiguration()
-        try openListener(ipAddress: ipAddress, port: port)
+        try openListener(ipAddress: config.ipAddress, port: config.port)
     }
 
     deinit {
@@ -105,7 +110,6 @@ public final class QuicServer {
     }
 
     private func sendBuffer(stream: HQuic?, buffer: Data) -> QuicStatus {
-        // Allocates and builds the buffer to send over the stream.
         let messageLength = buffer.count
 
         let sendBufferRaw = UnsafeMutableRawPointer.allocate(
@@ -142,9 +146,9 @@ public final class QuicServer {
             if let clientContext = event.pointee.SEND_COMPLETE.ClientContext {
                 free(clientContext)
             }
-            print("[strm][\(String(describing: stream))] Data sented")
+            logger.info("[strm][\(String(describing: stream))] Data sent")
         case QUIC_STREAM_EVENT_RECEIVE:
-            print("[strm][\(String(describing: stream))] Data Received")
+            logger.info("[strm][\(String(describing: stream))] Data Received")
 
             let bufferCount = event.pointee.RECEIVE.BufferCount
             let buffers: UnsafePointer<QuicBuffer> = event.pointee.RECEIVE.Buffers
@@ -154,42 +158,23 @@ public final class QuicServer {
                 let bufferLength = Int(buffer.Length)
                 let bufferData = Data(bytes: buffer.Buffer, count: bufferLength)
                 buffersData.append(bufferData)
-                print(
+                logger.info(
                     "[strm] Data length \(bufferLength) bytes: \(String([UInt8](bufferData).map { Character(UnicodeScalar($0)) }))"
                 )
             }
-            // Notify the peer of the received data
-            server.onMessageReceived?(buffersData)
-
-//            // Sends the buffer over the stream. Note the FIN flag is passed along with
-//            // the buffer. This indicates this is the last buffer on the stream and the
-//            // the stream is shut down (in the send direction) immediately after.
-//            status = server.sendBuffer(stream: stream, buffer: buffersData)
-//
-//            if status.isFailed {
-//                let shutdown =
-//                    (server.api?.pointee.StreamShutdown(
-//                        stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0
-//                    ))
-//                    .status
-//                if shutdown.isFailed {
-//                    print("StreamShutdown failed, 0x\(String(format: "%x", shutdown))!")
-//                    return QuicStatusCode.internalError.rawValue
-//                }
-//            }
-//            // pending = Int32(-2)
-//            status = UInt32(bitPattern: -2)
+            server.onMessageReceived?(.success(QuicMessage(type: .received, data: buffersData)))
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
-            print("[strm][\(String(describing: stream))] Peer shut down")
+            logger.info("[strm][\(String(describing: stream))] Peer shut down")
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
-            print("[strm][\(String(describing: stream))] Peer aborted")
+            logger.info("[strm][\(String(describing: stream))] Peer aborted")
             status =
                 (server.api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0))
                     .status
         case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
-            print("[strm][\(String(describing: stream))] All done")
+            logger.info("[strm][\(String(describing: stream))] All done")
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 server.api?.pointee.StreamClose(stream)
+                server.onMessageReceived?(.success(QuicMessage(type: .shutdown, data: nil)))
             }
         default:
             break
@@ -207,13 +192,13 @@ public final class QuicServer {
         let server: QuicServer = Unmanaged<QuicServer>.fromOpaque(context).takeUnretainedValue()
         switch event.pointee.Type {
         case QUIC_CONNECTION_EVENT_CONNECTED:
-            print("Connected")
+            logger.info("Connected")
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
-            print("Connection shutdown initiated by transport.")
+            logger.info("Connection shutdown initiated by transport.")
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
-            print("Connection shutdown initiated by peer.")
+            logger.info("Connection shutdown initiated by peer.")
         case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
-            print("Connection shutdown complete.")
+            logger.info("Connection shutdown complete.")
         case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
             let stream = event.pointee.PEER_STREAM_STARTED.Stream
             let callbackPointer = unsafeBitCast(
@@ -245,19 +230,13 @@ extension QuicServer {
 
         memset(&certificateFile, 0, MemoryLayout.size(ofValue: certificateFile))
         memset(&credConfig, 0, MemoryLayout.size(ofValue: credConfig))
-        //        let currentPath = FileManager.default.currentDirectoryPath
-        //        let cert = currentPath + "/Sources/assets/server.cert"
-        //        let keyFile = currentPath + "/Sources/assets/server.key"
-        // print("cert: \(cert)")
-        // print("keyFile: \(keyFile)")
-        let cert = "/Users/mackun/boka/Networking/Sources/assets/server.cert"
-        let keyFile = "/Users/mackun/boka/Networking/Sources/assets/server.key"
-        let certCString = cert.utf8CString
-        let keyFileCString = keyFile.utf8CString
+
+        let certCString = config.cert.utf8CString
+        let keyFileCString = config.key.utf8CString
 
         let certPointer = UnsafeMutablePointer<CChar>.allocate(capacity: certCString.count)
         let keyFilePointer = UnsafeMutablePointer<CChar>.allocate(capacity: keyFileCString.count)
-        // TODO: manual memory management
+        // Copy the C strings to the pointers
         certCString.withUnsafeBytes {
             certPointer.initialize(
                 from: $0.bindMemory(to: CChar.self).baseAddress!, count: certCString.count
@@ -280,7 +259,7 @@ extension QuicServer {
         credConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE
         credConfig.CertificateFile = certificateFilePointer
 
-        let buffer = Data("sample".utf8)
+        let buffer = Data(config.alpn.utf8)
         let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(
             capacity: buffer.count
         )
@@ -310,7 +289,6 @@ extension QuicServer {
 
     private func openListener(ipAddress _: String, port: UInt16) throws {
         var listenerHandle: HQuic?
-        // Create/allocate a new listener object.
         let status =
             (api?.pointee.ListenerOpen(
                 registration,
@@ -328,7 +306,7 @@ extension QuicServer {
 
         listener = listenerHandle
 
-        let buffer = Data("sample".utf8)
+        let buffer = Data(config.alpn.utf8)
         let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(
             capacity: buffer.count
         )
@@ -341,7 +319,6 @@ extension QuicServer {
 
         QuicAddrSetFamily(&address, QUIC_ADDRESS_FAMILY(QUIC_ADDRESS_FAMILY_UNSPEC))
         QuicAddrSetPort(&address, port)
-        // Starts listening for incoming connections.
         let startStatus: QuicStatus = (api?.pointee.ListenerStart(listener, &alpn, 1, &address))
             .status
 

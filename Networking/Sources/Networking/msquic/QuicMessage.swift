@@ -7,9 +7,10 @@ enum QuicMessageType {
     case unknown
     case received
     case connect
+    case connected
 }
 
-struct QuicMessage {
+public struct QuicMessage {
     let type: QuicMessageType
     let data: Data?
 }

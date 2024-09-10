@@ -2,14 +2,16 @@ import Foundation
 import msquic
 import NIO
 
-public final class QuicClient {
+public class QuicClient {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
     private var connection: QuicConnection?
-    // public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
+    public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
+    private let config: QuicConfig
 
-    init() throws {
+    init(config: QuicConfig) throws {
+        self.config = config
         var rawPointer: UnsafeRawPointer?
         let status: UInt32 = MsQuicOpenVersion(2, &rawPointer)
 
@@ -35,14 +37,18 @@ public final class QuicClient {
         registration = registrationHandle
     }
 
-    func start(ipAddress: String, port: UInt16) async throws -> QuicStatus {
+    func start() throws -> QuicStatus {
         let status = QuicStatusCode.success.rawValue
         try loadConfiguration()
         connection = try QuicConnection(
             api: api, registration: registration, configuration: configuration
         )
         try connection?.open()
-        try connection?.start(ipAddress: ipAddress, port: port)
+        try connection?.start(ipAddress: config.ipAddress, port: config.port)
+        connection?.onMessageReceived = { [weak self] message in
+            guard let self else { return }
+            onMessageReceived?(message)
+        }
         return status
     }
 
@@ -53,14 +59,16 @@ public final class QuicClient {
     func send(message: Data) throws {
         guard let connection else {
             throw QuicError.getConnectionFailed
-//            return QuicStatusCode.internalError.rawValue
         }
-        connection.clientSend(buffer: message)
+        let stream = try connection.createStream()
+        stream.onMessageReceived = { [weak self] result in
+            self?.onMessageReceived?(result)
+        }
+        try stream.start()
+        stream.send(buffer: message)
     }
 
     deinit {
-        print("QuicClient Deinit")
-
         if configuration != nil {
             api?.pointee.ConfigurationClose(configuration)
             configuration = nil
@@ -81,22 +89,22 @@ extension QuicClient {
 
         var credConfig = QUIC_CREDENTIAL_CONFIG()
         memset(&credConfig, 0, MemoryLayout.size(ofValue: credConfig))
-        //        credConfig.Type = QUIC_CREDENTIAL_TYPE_NONE
         credConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT
         if unsecure {
-            //            credConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT.rawValue | QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION.rawValue
-            credConfig
-                .Flags =
-                QUIC_CREDENTIAL_FLAGS(
-                    UInt32(
-                        QUIC_CREDENTIAL_FLAG_CLIENT.rawValue
-                            | QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION
-                            .rawValue
-                    )
+            credConfig.Flags = QUIC_CREDENTIAL_FLAGS(
+                UInt32(
+                    QUIC_CREDENTIAL_FLAG_CLIENT.rawValue
+                        | QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION.rawValue
                 )
+            )
+        } else {
+            credConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT
+            //     TODO: load cert and key
+            //    credConfig.CertificateFile = UnsafePointer<Int8>(strdup(config.cert))
+            //    credConfig.PrivateKeyFile = UnsafePointer<Int8>(strdup(config.key))
         }
 
-        let buffer = Data("sample".utf8)
+        let buffer = Data(config.alpn.utf8)
         let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(
             capacity: buffer.count
         )
@@ -112,11 +120,6 @@ extension QuicClient {
                 nil,
                 &configuration
             )).status
-        //        let status =
-        //            (api?.pointee.ConfigurationOpen(
-        //                registration, &alpn, 1, nil, 0, nil,
-        //                &configuration
-        //            )).status
 
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)

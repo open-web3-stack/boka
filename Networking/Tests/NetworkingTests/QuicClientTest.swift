@@ -1,4 +1,5 @@
 import Foundation
+import NIO
 import Testing
 
 @testable import Networking
@@ -9,11 +10,24 @@ import Testing
 #endif
 
 final class QuicClientTests {
-    @Test func start() async throws {
+    @Test func start() throws {
         do {
-            let quicClient = try QuicClient()
-            let status = try await quicClient.start(ipAddress: "127.0.0.1", port: 4568)
+            let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+            let quicClient = try QuicClient(
+                config: QuicConfig(
+                    id: "public-key", cert: "cert", key: "key", alpn: "alpn",
+                    ipAddress: "127.0.0.1", port: 4568
+                )
+            )
+            let status = try quicClient.start()
             print(status)
+            quicClient.onMessageReceived = { [weak self] message in
+                guard let self else { return }
+                print(message)
+            }
+
+            try group.next().scheduleTask(in: .seconds(5)) {}.futureResult.wait()
+            try group.next().scheduleTask(in: .hours(1)) {}.futureResult.wait()
         } catch {
             print("Failed to start quic client: \(error)")
         }

@@ -1,19 +1,5 @@
 import Foundation
 
-struct NetAddr {
-    var ipAddress: String
-    var port: Int
-}
-
-public struct PeerConfig {
-    public let id: String
-    public let cert: String
-    public let key: String
-    public let alpn: String
-    public let ipAddress: String
-    public let port: UInt16
-}
-
 public enum MessageType: Int, Sendable {
     case text = 0
     case hello = 1
@@ -32,33 +18,26 @@ public struct Message: Equatable, Sendable {
     }
 }
 
-struct PendingMessages {
-    var messages: [(message: Message, completion: (Result<String, Error>) -> Void)] = []
-}
-
 // Define the Peer class
 public final class Peer: @unchecked Sendable {
-    private let config: PeerConfig
+    private let config: QuicConfig
     private var quicServer: QuicServer?
     public var onDataReceived: ((Data) -> Void)?
     private let callbackQueue: DispatchQueue
     private let messageQueue: DispatchQueue
-    private var pendingMessages: PendingMessages
 
-    public init(config: PeerConfig) throws {
+    public init(config: QuicConfig) throws {
         self.config = config
-        quicServer = try QuicServer()
+        quicServer = try QuicServer(config: config)
         callbackQueue = DispatchQueue(label: "com.peer.callbackQueue")
         messageQueue = DispatchQueue(label: "com.peer.messageQueue")
-        pendingMessages = PendingMessages()
     }
 
     func start() throws {
         // Implement start logic
-        try quicServer?.start(ipAddress: config.ipAddress, port: config.port)
-        quicServer?.onMessageReceived = { [weak self] data in
+        try quicServer?.start()
+        quicServer?.onMessageReceived = { [weak self] _ in
             guard let self else { return }
-            onDataReceived?(data)
         }
     }
 
@@ -80,7 +59,6 @@ public final class Peer: @unchecked Sendable {
         // Ensure serial execution using messageQueue
         messageQueue.async { [weak self] in
             guard let self else { return }
-            addPendingMessage(message, completion: completion)
             // Simulate sending message using a Task
             Task {
                 let isSuccess = await self.simulateSendMessage(message, peerAddr: peerAddr)
@@ -94,7 +72,6 @@ public final class Peer: @unchecked Sendable {
                     let error = NSError(domain: "SendError", code: 1, userInfo: nil)
                     completion(.failure(error))
                 }
-                self.removePendingMessage(message)
             }
         }
     }
@@ -109,12 +86,10 @@ public final class Peer: @unchecked Sendable {
         // Ensure serial execution using messageQueue
         messageQueue.async { [weak self] in
             guard let self else { return }
-            addPendingMessage(message, completion: { _ in })
             // Implement callback logic
             // Simulate callback processing
             Task {
                 try await self.simulateCallbackProcessing(message)
-                self.removePendingMessage(message)
             }
         }
     }
@@ -128,7 +103,6 @@ public final class Peer: @unchecked Sendable {
         // Ensure serial execution using messageQueue
         messageQueue.async { [weak self] in
             guard let self else { return }
-            addPendingMessage(message, completion: { _ in })
             do {
                 // Process the message
                 try processMessage(message)
@@ -136,7 +110,6 @@ public final class Peer: @unchecked Sendable {
                 // Handle exception
                 handleException(error)
             }
-            removePendingMessage(message)
         }
     }
 
@@ -163,24 +136,6 @@ public final class Peer: @unchecked Sendable {
 
     public func getPeerAddr() -> String {
         "\(config.ipAddress):\(config.port)"
-    }
-
-    private func addPendingMessage(
-        _ message: Message, completion: @escaping (Result<String, Error>) -> Void
-    ) {
-        pendingMessages.messages.append((message, completion))
-    }
-
-    private func removePendingMessage(_ message: Message) {
-        if let index = pendingMessages.messages.firstIndex(where: { $0.message == message }) {
-            pendingMessages.messages.remove(at: index)
-        }
-    }
-
-    public func getPendingMessages() -> [Message] {
-        messageQueue.sync {
-            pendingMessages.messages.map(\.message)
-        }
     }
 
     deinit {

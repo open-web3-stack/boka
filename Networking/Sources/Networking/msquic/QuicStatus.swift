@@ -33,7 +33,7 @@ extension QuicStatus {
     }
 }
 
-enum QuicStatusCode: QuicStatus, Equatable {
+public enum QuicStatusCode: QuicStatus, Equatable, Sendable {
     case success = 0
     case notFound = 2
     case outOfMemory = 12

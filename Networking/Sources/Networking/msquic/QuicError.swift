@@ -1,4 +1,4 @@
-enum QuicError: Error, Equatable {
+public enum QuicError: Error, Equatable, Sendable {
     case invalidStatus(status: QuicStatusCode)
     case invalidAlpn
     case getApiFailed
