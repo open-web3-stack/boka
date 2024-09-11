@@ -15,8 +15,8 @@ public struct WorkReport: Sendable, Equatable, Codable {
     // a: authorizer hash
     public var authorizerHash: Data32
 
-    // o: output
-    public var output: Data
+    // o: authorization output
+    public var authorizationOutput: Data
 
     // r: the results of the evaluation of each of the items in the package
     public var results: ConfigLimitedSizeArray<
@@ -28,14 +28,14 @@ public struct WorkReport: Sendable, Equatable, Codable {
     public init(
         authorizerHash: Data32,
         coreIndex: CoreIndex,
-        output: Data,
+        authorizationOutput: Data,
         refinementContext: RefinementContext,
         packageSpecification: AvailabilitySpecifications,
         results: ConfigLimitedSizeArray<WorkResult, ProtocolConfig.Int1, ProtocolConfig.MaxWorkItems>
     ) {
         self.authorizerHash = authorizerHash
         self.coreIndex = coreIndex
-        self.output = output
+        self.authorizationOutput = authorizationOutput
         self.refinementContext = refinementContext
         self.packageSpecification = packageSpecification
         self.results = results
@@ -48,7 +48,7 @@ extension WorkReport: Dummy {
         WorkReport(
             authorizerHash: Data32(),
             coreIndex: 0,
-            output: Data(),
+            authorizationOutput: Data(),
             refinementContext: RefinementContext.dummy(config: config),
             packageSpecification: AvailabilitySpecifications.dummy(config: config),
             results: try! ConfigLimitedSizeArray(config: config, defaultValue: WorkResult.dummy(config: config))
@@ -64,7 +64,8 @@ extension WorkReport {
 
 extension WorkReport: EncodedSize {
     public var encodedSize: Int {
-        authorizerHash.encodedSize + coreIndex.encodedSize + output.encodedSize + refinementContext.encodedSize + packageSpecification
+        authorizerHash.encodedSize + coreIndex.encodedSize + authorizationOutput.encodedSize + refinementContext
+            .encodedSize + packageSpecification
             .encodedSize + results.encodedSize
     }
 

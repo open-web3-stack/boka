@@ -18,6 +18,9 @@ public final class Runtime {
         case invalidAssuranceParentHash
         case invalidAssuranceSignature
         case assuranceForEmptyCore
+        case preimagesNotSorted
+        case invalidPreimageServiceIndex
+        case duplicatedPreimage
         case other(any Swift.Error)
         case validateError(any Swift.Error)
     }
@@ -102,7 +105,12 @@ public final class Runtime {
             try updateDisputes(block: block, state: &newState)
 
             // depends on Safrole and Disputes
-            try updateReports(block: block, state: &newState)
+            let availableReports = try updateReports(block: block, state: &newState)
+            let res = try newState.update(config: config, workReports: availableReports)
+            newState.privilegedServices = res.privilegedServices
+            newState.serviceAccounts = res.serviceAccounts
+            newState.authorizationQueue = res.authorizationQueue
+            newState.validatorQueue = res.validatorQueue
 
             newState.coreAuthorizationPool = try updateAuthorizationPool(
                 block: block, state: prevState
@@ -202,7 +210,8 @@ public final class Runtime {
         return pool
     }
 
-    public func updateReports(block: BlockRef, state newState: inout State) throws {
+    // returns available reports
+    public func updateReports(block: BlockRef, state newState: inout State) throws -> [WorkReport] {
         for assurance in block.extrinsic.availability.assurances {
             let hash = Blake2b256.hash(assurance.parentHash, assurance.assurance)
             let payload = SigningContext.available + hash.data
@@ -220,16 +229,46 @@ public final class Runtime {
             }
         }
 
+        var availableReports = [WorkReport]()
+
         for (idx, count) in availabilityCount.enumerated() where count > 0 {
-            guard newState.reports[idx] != nil else {
+            guard let report = newState.reports[idx] else {
                 throw Error.assuranceForEmptyCore
             }
             if count >= ProtocolConfig.TwoThirdValidatorsPlusOne.read(config: config) {
+                availableReports.append(report.workReport)
                 newState.reports[idx] = nil // remove available report from pending reports
             }
         }
 
         newState.reports = try newState.update(config: config, extrinsic: block.extrinsic.reports)
+
+        return availableReports
+    }
+
+    public func updatePreimages(block: BlockRef, state newState: inout State) throws {
+        let preimages = block.extrinsic.preimages.preimages
+
+        guard preimages.isSortedAndUnique() else {
+            throw Error.preimagesNotSorted
+        }
+
+        for preimage in preimages {
+            guard var acc = newState.serviceAccounts[preimage.serviceIndex] else {
+                throw Error.invalidPreimageServiceIndex
+            }
+
+            let hash = preimage.data.blake2b256hash()
+            let hashAndLength = HashAndLength(hash: hash, length: UInt32(preimage.data.count))
+            guard acc.preimages[hash] == nil, acc.preimageInfos[hashAndLength] == nil else {
+                throw Error.duplicatedPreimage
+            }
+
+            acc.preimages[hash] = preimage.data
+            acc.preimageInfos[hashAndLength] = .init([newState.timeslot])
+
+            newState.serviceAccounts[preimage.serviceIndex] = acc
+        }
     }
 
     // TODO: add tests
