@@ -10,7 +10,7 @@ enum QuicMessageType {
     case connected
 }
 
-public struct QuicMessage {
+public struct QuicMessage: @unchecked Sendable {
     let type: QuicMessageType
     let data: Data?
 }

@@ -53,21 +53,42 @@ public class QuicClient: @unchecked Sendable {
         QuicStatusCode.success.rawValue
     }
 
-    // TODO: check stream & send
-    func send(message: Data) throws {
-        try send(message: message, streamKind: .uniquePersistent)
+    // Asynchronous send method that waits for a reply
+    func send(message: Data) async throws -> QuicMessage {
+        try await send(message: message, streamKind: .uniquePersistent)
     }
 
-    // TODO: more send methods
-    func send(message: Data, streamKind: StreamKind = .commonEphemeral) throws {
+    // Asynchronous send method that waits for a reply
+    func send(message: Data, streamKind: StreamKind = .uniquePersistent) async throws -> QuicMessage {
         guard let connection else {
             throw QuicError.getConnectionFailed
         }
-        // TODO: check stream type & send
-        let stream = try connection.createStream(streamKind)
-        stream.onMessageReceived = onMessageReceived
-        try stream.start()
-        stream.send(buffer: message)
+        let sendStream: QuicStream
+        // Check if there is an existing stream of the same kind
+        if let stream = try connection.getUniquePersistentStream() {
+            // If there is, send the message to the existing stream
+            stream.send(buffer: message)
+            sendStream = stream
+        } else {
+            // If there is not, create a new stream
+            let stream = try connection.createStream(streamKind)
+            // Start the stream
+            try stream.start()
+            // Send the message to the new stream
+            stream.send(buffer: message)
+            sendStream = stream
+        }
+        // Wait for a reply
+        return try await withCheckedThrowingContinuation { continuation in
+            sendStream.onMessageReceived = { result in
+                switch result {
+                case let .success(quicMessage):
+                    continuation.resume(returning: quicMessage)
+                case let .failure(error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 
     deinit {

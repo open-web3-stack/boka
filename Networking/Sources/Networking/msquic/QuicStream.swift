@@ -14,7 +14,7 @@ class QuicStream {
     private var stream: HQuic?
     private let api: UnsafePointer<QuicApiTable>?
     private let connection: HQuic?
-    private let kind: StreamKind
+    public let kind: StreamKind
     public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
 
     init(api: UnsafePointer<QuicApiTable>?, connection: HQuic?, _ streamKind: StreamKind = .uniquePersistent) throws {
@@ -79,8 +79,9 @@ class QuicStream {
             }
 
         default:
-            let message = QuicMessage(type: .unknown, data: nil)
-            quicStream.onMessageReceived?(.success(message))
+            break
+//            let message = QuicMessage(type: .unknown, data: nil)
+//            quicStream.onMessageReceived?(.success(message))
         }
 
         return status
@@ -145,7 +146,7 @@ class QuicStream {
 
         sendBuffer.pointee.Buffer = bufferPointer
         sendBuffer.pointee.Length = UInt32(messageLength)
-        status = (api?.pointee.StreamSend(stream, sendBuffer, 1, QUIC_SEND_FLAG_FIN, sendBufferRaw)).status
+        status = (api?.pointee.StreamSend(stream, sendBuffer, 1, QUIC_SEND_FLAG_NONE, sendBufferRaw)).status
         if status.isFailed {
             streamLogger.error("StreamSend failed, \(status)!")
             let shutdown = (api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0)).status

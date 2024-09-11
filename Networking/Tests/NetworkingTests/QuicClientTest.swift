@@ -10,7 +10,7 @@ import Testing
 #endif
 
 final class QuicClientTests {
-    @Test func start() throws {
+    @Test func start() async throws {
         do {
             let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
             let quicClient = try QuicClient(
@@ -29,10 +29,12 @@ final class QuicClientTests {
                     print("Client error: \(error)")
                 }
             }
-            try group.next().scheduleTask(in: .seconds(5)) {
-                try quicClient.send(message: Data("Hello, World!".utf8))
-            }.futureResult.wait()
-            try group.next().scheduleTask(in: .hours(1)) {}.futureResult.wait()
+            let message1 = try await quicClient.send(message: Data("Hello, World!".utf8))
+            print("Client received: \(message1)")
+            let message2 = try await quicClient.send(message: Data("Hello, swift!".utf8))
+            print("Client received: \(message2)")
+
+            try await group.next().scheduleTask(in: .hours(1)) {}.futureResult.get()
         } catch {
             print("Failed to start quic client: \(error)")
         }
