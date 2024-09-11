@@ -1,21 +1,17 @@
 import Foundation
 
+public protocol PeerMessage: Equatable, Sendable {
+    var timestamp: Int { get }
+    var type: MessageType { get }
+    var data: Data { get }
+    init(type: MessageType, data: Data)
+}
+
 public enum MessageType: Int, Sendable {
     case text = 0
     case hello = 1
     case block = 2
     case transaction = 3
-}
-
-public struct Message: Equatable, Sendable {
-    public let id: Int
-    public let type: MessageType
-    public let data: Data
-    public init(_ type: MessageType = .text, data: Data) {
-        id = Int(Date().timeIntervalSince1970 * 1000)
-        self.type = type
-        self.data = data
-    }
 }
 
 // Define the Peer class
@@ -53,7 +49,7 @@ public final class Peer: @unchecked Sendable {
     }
 
     func sendToPeer(
-        message: Message, peerAddr: NetAddr,
+        message: any PeerMessage, peerAddr: NetAddr,
         completion: @Sendable @escaping (Result<String, Error>) -> Void
     ) {
         // Ensure serial execution using messageQueue
@@ -76,13 +72,13 @@ public final class Peer: @unchecked Sendable {
         }
     }
 
-    private func simulateSendMessage(_: Message, peerAddr _: NetAddr) async -> Bool {
+    private func simulateSendMessage(_: any PeerMessage, peerAddr _: NetAddr) async -> Bool {
         // Simulate network delay
         try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
         return true // Simulate successful send
     }
 
-    func callBackMessage(message: Message) throws {
+    func callBackMessage(message: any PeerMessage) throws {
         // Ensure serial execution using messageQueue
         messageQueue.async { [weak self] in
             guard let self else { return }
@@ -94,12 +90,12 @@ public final class Peer: @unchecked Sendable {
         }
     }
 
-    private func simulateCallbackProcessing(_: Message) async throws {
+    private func simulateCallbackProcessing(_: any PeerMessage) async throws {
         // Simulate processing delay
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second
     }
 
-    func handleReceivedMessage(_ message: Message) {
+    func handleReceivedMessage(_ message: any PeerMessage) {
         // Ensure serial execution using messageQueue
         messageQueue.async { [weak self] in
             guard let self else { return }
@@ -113,7 +109,7 @@ public final class Peer: @unchecked Sendable {
         }
     }
 
-    private func processMessage(_: Message) throws {
+    private func processMessage(_: any PeerMessage) throws {
         // Implement message processing logic
         // Throw an error if something goes wrong
     }

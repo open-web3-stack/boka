@@ -17,10 +17,11 @@ class QuicStream {
     private let kind: StreamKind
     public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
 
-    init(api: UnsafePointer<QuicApiTable>?, connection: HQuic?, _ streamKind: StreamKind = .uniquePersistent) {
+    init(api: UnsafePointer<QuicApiTable>?, connection: HQuic?, _ streamKind: StreamKind = .uniquePersistent) throws {
         self.api = api
         self.connection = connection
         kind = streamKind
+        try openStream(streamKind)
     }
 
     init(api: UnsafePointer<QuicApiTable>?, connection: HQuic?, stream: HQuic?) {
@@ -45,7 +46,7 @@ class QuicStream {
             if let clientContext = event.pointee.SEND_COMPLETE.ClientContext {
                 free(clientContext)
             }
-            streamLogger.info("[strm][\(String(describing: stream))] Data sent")
+            streamLogger.info("[\(String(describing: stream))] Data sent")
 
         case QUIC_STREAM_EVENT_RECEIVE:
             let bufferCount: UInt32 = event.pointee.RECEIVE.BufferCount
@@ -55,24 +56,24 @@ class QuicStream {
                 let bufferLength = Int(buffer.Length)
                 let bufferData = Data(bytes: buffer.Buffer, count: bufferLength)
                 streamLogger.info(
-                    "[strm] Data length \(bufferLength) bytes: \(String([UInt8](bufferData).map { Character(UnicodeScalar($0)) }))"
+                    " Data length \(bufferLength) bytes: \(String([UInt8](bufferData).map { Character(UnicodeScalar($0)) }))"
                 )
                 let message = QuicMessage(type: .received, data: bufferData)
                 quicStream.onMessageReceived?(.success(message))
             }
 
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
-            streamLogger.info("[strm][\(String(describing: stream))] Peer shut down")
+            streamLogger.info("[\(String(describing: stream))] Peer shut down")
             let message = QuicMessage(type: .shutdown, data: nil)
             quicStream.onMessageReceived?(.success(message))
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
-            streamLogger.warning("[strm][\(String(describing: stream))] Peer aborted")
+            streamLogger.warning("[\(String(describing: stream))] Peer aborted")
             status = (quicStream.api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0)).status
             quicStream.onMessageReceived?(.failure(QuicError.invalidStatus(status: status.code)))
 
         case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
-            streamLogger.info("[strm][\(String(describing: stream))] All done")
+            streamLogger.info("[\(String(describing: stream))] All done")
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 quicStream.api?.pointee.StreamClose(stream)
             }
@@ -98,7 +99,7 @@ class QuicStream {
         }
 
         self.stream = stream
-        streamLogger.info("[strm][\(String(describing: stream))] Stream opened")
+        streamLogger.info("[\(String(describing: stream))] Stream opened")
     }
 
     func start() throws {
@@ -106,7 +107,7 @@ class QuicStream {
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }
-        streamLogger.info("[strm][\(String(describing: stream))] Stream started")
+        streamLogger.info("[\(String(describing: stream))] Stream started")
     }
 
     func setCallbackHandler() {
@@ -127,7 +128,7 @@ class QuicStream {
 
     // TODO: check stream type & send
     func send(buffer: Data) {
-        streamLogger.info("[strm][\(String(describing: stream))] Sending data...")
+        streamLogger.info("[\(String(describing: stream))] Sending data...")
         var status = QuicStatusCode.success.rawValue
         let messageLength = buffer.count
 

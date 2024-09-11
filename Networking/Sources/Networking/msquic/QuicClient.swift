@@ -2,7 +2,7 @@ import Foundation
 import msquic
 import NIO
 
-public class QuicClient {
+public class QuicClient: @unchecked Sendable {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
@@ -45,10 +45,7 @@ public class QuicClient {
         )
         try connection?.open()
         try connection?.start(ipAddress: config.ipAddress, port: config.port)
-        connection?.onMessageReceived = { [weak self] message in
-            guard let self else { return }
-            onMessageReceived?(message)
-        }
+        connection?.onMessageReceived = onMessageReceived
         return status
     }
 
@@ -67,10 +64,8 @@ public class QuicClient {
             throw QuicError.getConnectionFailed
         }
         // TODO: check stream type & send
-        let stream = connection.createStream(streamKind)
-        stream.onMessageReceived = { [weak self] result in
-            self?.onMessageReceived?(result)
-        }
+        let stream = try connection.createStream(streamKind)
+        stream.onMessageReceived = onMessageReceived
         try stream.start()
         stream.send(buffer: message)
     }

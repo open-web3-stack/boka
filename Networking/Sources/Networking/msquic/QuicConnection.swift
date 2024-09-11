@@ -61,7 +61,7 @@ public class QuicConnection {
         let status: QuicStatus = QuicStatusCode.success.rawValue
         switch event.pointee.Type {
         case QUIC_CONNECTION_EVENT_CONNECTED:
-            logger.info("[conn][\(String(describing: connection))] Connected")
+            logger.info("[\(String(describing: connection))] Connected")
             quicConnection.onMessageReceived?(.success(QuicMessage(type: .connected, data: nil)))
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
@@ -69,21 +69,21 @@ public class QuicConnection {
                 == QuicStatusCode.connectionIdle.rawValue
             {
                 logger.info(
-                    "[conn][\(String(describing: connection))] Successfully shut down on idle."
+                    "[\(String(describing: connection))] Successfully shut down on idle."
                 )
             } else {
                 logger.warning(
-                    "[conn] Shut down by transport, 0x\(String(format: "%x", event.pointee.SHUTDOWN_INITIATED_BY_TRANSPORT.Status))"
+                    " Shut down by transport, 0x\(String(format: "%x", event.pointee.SHUTDOWN_INITIATED_BY_TRANSPORT.Status))"
                 )
             }
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
             logger.warning(
-                "[conn] Shut down by peer, 0x\(String(format: "%llx", event.pointee.SHUTDOWN_INITIATED_BY_PEER.ErrorCode))"
+                " Shut down by peer, 0x\(String(format: "%llx", event.pointee.SHUTDOWN_INITIATED_BY_PEER.ErrorCode))"
             )
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
-            logger.info("[conn][\(String(describing: connection))] All done")
+            logger.info("[\(String(describing: connection))] All done")
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 // TODO: close all streams
                 quicConnection.api?.pointee.ConnectionClose(connection)
@@ -92,12 +92,12 @@ public class QuicConnection {
 
         case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
             logger.info(
-                "[conn] Ticket received (\(event.pointee.RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength) bytes)"
+                " Ticket received (\(event.pointee.RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength) bytes)"
             )
 
         case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
             // TODO: Manage streams
-            logger.info("[conn][\(String(describing: connection))] Peer stream started")
+            logger.info("[\(String(describing: connection))] Peer stream started")
             let stream = event.pointee.PEER_STREAM_STARTED.Stream
             let streamHandler = QuicStream(api: quicConnection.api, connection: connection, stream: stream)
             streamHandler.onMessageReceived = quicConnection.onMessageReceived
@@ -125,8 +125,8 @@ public class QuicConnection {
         }
     }
 
-    func createStream(_ streamKind: StreamKind = .commonEphemeral) -> QuicStream {
-        let stream = QuicStream(api: api, connection: connection, streamKind)
+    func createStream(_ streamKind: StreamKind = .commonEphemeral) throws -> QuicStream {
+        let stream = try QuicStream(api: api, connection: connection, streamKind)
         streams.append(stream)
         return stream
     }

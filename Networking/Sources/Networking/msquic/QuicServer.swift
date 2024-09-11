@@ -5,7 +5,7 @@ import NIO
 
 let quicServerLogger = Logger(label: "QuicServer")
 
-public final class QuicServer {
+public final class QuicServer: @unchecked Sendable {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
@@ -91,11 +91,13 @@ public final class QuicServer {
             capacity: buffer.count
         )
         buffer.copyBytes(to: bufferPointer, count: buffer.count)
+
         defer {
             certPointer.deallocate()
             keyFilePointer.deallocate()
             bufferPointer.deallocate()
         }
+
         var alpn = QuicBuffer(Length: UInt32(buffer.count), Buffer: bufferPointer)
 
         let status =
