@@ -120,7 +120,7 @@ struct CodecTests {
         if value is WorkResult {
             return [
                 "code_hash": json["codeHash"]!,
-                "gas_ratio": json["gas"]!,
+                "gas_ratio": json["gasRatio"]!,
                 "payload_hash": json["payloadHash"]!,
                 "service": json["serviceIndex"]!,
                 "result": json["output"]!["success"] == nil ? json["output"]! : [
@@ -167,7 +167,7 @@ struct CodecTests {
                 "context": transform(json["refinementContext"]!, value: value.refinementContext),
                 "core_index": json["coreIndex"]!,
                 "authorizer_hash": json["authorizerHash"]!,
-                "auth_output": json["output"]!,
+                "auth_output": json["authorizationOutput"]!,
                 "results": transform(json["results"]!, value: value.results),
             ].json
         }

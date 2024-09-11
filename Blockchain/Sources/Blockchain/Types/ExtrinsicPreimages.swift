@@ -27,3 +27,12 @@ extension ExtrinsicPreimages: Dummy {
         ExtrinsicPreimages(preimages: [])
     }
 }
+
+extension ExtrinsicPreimages.PreimageItem: Comparable {
+    public static func < (lhs: ExtrinsicPreimages.PreimageItem, rhs: ExtrinsicPreimages.PreimageItem) -> Bool {
+        if lhs.serviceIndex != rhs.serviceIndex {
+            return lhs.serviceIndex < rhs.serviceIndex
+        }
+        return lhs.data.lexicographicallyPrecedes(rhs.data)
+    }
+}

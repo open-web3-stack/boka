@@ -1,19 +1,8 @@
 import Codec
+import Foundation
 import Utils
 
 public struct State: Sendable, Equatable, Codable {
-    public struct PrivilegedServiceIndices: Sendable, Equatable, Codable {
-        public var empower: ServiceIndex
-        public var assign: ServiceIndex
-        public var designate: ServiceIndex
-
-        public init(empower: ServiceIndex, assign: ServiceIndex, designate: ServiceIndex) {
-            self.empower = empower
-            self.assign = assign
-            self.designate = designate
-        }
-    }
-
     // α: The core αuthorizations pool.
     public var coreAuthorizationPool: ConfigFixedSizeArray<
         ConfigLimitedSizeArray<
@@ -70,7 +59,7 @@ public struct State: Sendable, Equatable, Codable {
     >
 
     // χ: The privileged service indices.
-    public var privilegedServiceIndices: PrivilegedServiceIndices
+    public var privilegedServices: PrivilegedServices
 
     // ψ: past judgements
     public var judgements: JudgementsState
@@ -112,7 +101,7 @@ public struct State: Sendable, Equatable, Codable {
             >,
             ProtocolConfig.TotalNumberOfCores
         >,
-        privilegedServiceIndices: PrivilegedServiceIndices,
+        privilegedServices: PrivilegedServices,
         judgements: JudgementsState,
         activityStatistics: ValidatorActivityStatistics
     ) {
@@ -127,7 +116,7 @@ public struct State: Sendable, Equatable, Codable {
         self.reports = reports
         self.timeslot = timeslot
         self.authorizationQueue = authorizationQueue
-        self.privilegedServiceIndices = privilegedServiceIndices
+        self.privilegedServices = privilegedServices
         self.judgements = judgements
         self.activityStatistics = activityStatistics
     }
@@ -157,10 +146,11 @@ extension State: Dummy {
                 config: config,
                 defaultValue: ConfigFixedSizeArray(config: config, defaultValue: Data32())
             ),
-            privilegedServiceIndices: PrivilegedServiceIndices(
+            privilegedServices: PrivilegedServices(
                 empower: ServiceIndex(),
                 assign: ServiceIndex(),
-                designate: ServiceIndex()
+                designate: ServiceIndex(),
+                basicGas: [:]
             ),
             judgements: JudgementsState.dummy(config: config),
             activityStatistics: ValidatorActivityStatistics.dummy(config: config)
@@ -215,5 +205,38 @@ extension State: Disputes {
 extension State: Guaranteeing {
     public var offenders: Set<Ed25519PublicKey> {
         judgements.punishSet
+    }
+}
+
+struct DummyFunction: AccumulateFunction, OnTransferFunction {
+    func invoke(
+        config _: ProtocolConfigRef,
+        service _: ServiceIndex,
+        code _: Data,
+        serviceAccounts _: [ServiceIndex: ServiceAccount],
+        gas _: Gas,
+        arguments _: [AccumulateArguments]
+    ) throws -> (ctx: AccumlateResultContext, result: Data32?) {
+        fatalError("not implemented")
+    }
+
+    func invoke(
+        config _: ProtocolConfigRef,
+        service _: ServiceIndex,
+        code _: Data,
+        serviceAccounts _: [ServiceIndex: ServiceAccount],
+        transfers _: [DeferredTransfers]
+    ) throws -> ServiceAccount {
+        fatalError("not implemented")
+    }
+}
+
+extension State: Accumulation {
+    public var accumlateFunction: AccumulateFunction {
+        DummyFunction()
+    }
+
+    public var onTransferFunction: OnTransferFunction {
+        DummyFunction()
     }
 }

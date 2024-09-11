@@ -39,6 +39,7 @@ extension Instruction {
         } catch let e as Memory.Error {
             // this passes test vector
             context.state.consumeGas(gasCost())
+            logger.debug("memory error: \(e)")
             return .exit(.pageFault(e.address))
         } catch let e {
             // other unknown errors
