@@ -5,7 +5,7 @@ import msquic
 let logger = Logger(label: "QuicConnection")
 
 public class QuicConnection {
-    var connection: HQuic?
+    private var connection: HQuic?
     private let api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
