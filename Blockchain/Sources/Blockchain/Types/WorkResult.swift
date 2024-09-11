@@ -15,7 +15,7 @@ public struct WorkResult: Sendable, Equatable, Codable {
 
     // g: the gas prioritization ratio
     // used when determining how much gas should be allocated to execute of this item’s accumulate
-    public var gas: Gas
+    public var gasRatio: Gas
 
     // o: there is the output or error of the execution of the code o
     // which may be either an octet sequence in case it was successful, or a member of the set J, if not
@@ -31,7 +31,7 @@ public struct WorkResult: Sendable, Equatable, Codable {
         self.serviceIndex = serviceIndex
         self.codeHash = codeHash
         self.payloadHash = payloadHash
-        self.gas = gas
+        gasRatio = gas
         self.output = output
     }
 }
@@ -51,7 +51,7 @@ extension WorkResult: Dummy {
 
 extension WorkResult: EncodedSize {
     public var encodedSize: Int {
-        serviceIndex.encodedSize + codeHash.encodedSize + payloadHash.encodedSize + gas.encodedSize + output.encodedSize
+        serviceIndex.encodedSize + codeHash.encodedSize + payloadHash.encodedSize + gasRatio.encodedSize + output.encodedSize
     }
 
     public static var encodeedSizeHint: Int? {

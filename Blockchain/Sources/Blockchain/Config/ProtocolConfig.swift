@@ -29,13 +29,13 @@ public struct ProtocolConfig: Sendable {
     public var auditBiasFactor: Int
 
     // GA: The total gas allocated to a core for Accumulation.
-    public var coreAccumulationGas: Int
+    public var coreAccumulationGas: Gas
 
     // GI: The gas allocated to invoke a work-package’s Is-Authorized logic.
-    public var workPackageAuthorizerGas: Int
+    public var workPackageAuthorizerGas: Gas
 
     // GR: The total gas allocated for a work-package’s Refine logic.
-    public var workPackageRefineGas: Int
+    public var workPackageRefineGas: Gas
 
     // H = 8: The size of recent history, in blocks.
     public var recentHistorySize: Int
@@ -116,9 +116,9 @@ public struct ProtocolConfig: Sendable {
         preimagePurgePeriod: Int,
         epochLength: Int,
         auditBiasFactor: Int,
-        coreAccumulationGas: Int,
-        workPackageAuthorizerGas: Int,
-        workPackageRefineGas: Int,
+        coreAccumulationGas: Gas,
+        workPackageAuthorizerGas: Gas,
+        workPackageRefineGas: Gas,
         recentHistorySize: Int,
         maxWorkItems: Int,
         maxTicketsPerExtrinsic: Int,
@@ -248,23 +248,26 @@ extension ProtocolConfig {
         }
     }
 
-    public enum CoreAccumulationGas: ReadInt {
+    public enum CoreAccumulationGas: ReadUInt64 {
         public typealias TConfig = ProtocolConfigRef
-        public static func read(config: ProtocolConfigRef) -> Int {
+        public typealias TOutput = Gas
+        public static func read(config: ProtocolConfigRef) -> Gas {
             config.value.coreAccumulationGas
         }
     }
 
-    public enum WorkPackageAuthorizerGas: ReadInt {
+    public enum WorkPackageAuthorizerGas: ReadUInt64 {
         public typealias TConfig = ProtocolConfigRef
-        public static func read(config: ProtocolConfigRef) -> Int {
+        public typealias TOutput = Gas
+        public static func read(config: ProtocolConfigRef) -> Gas {
             config.value.workPackageAuthorizerGas
         }
     }
 
-    public enum WorkPackageRefineGas: ReadInt {
+    public enum WorkPackageRefineGas: ReadUInt64 {
         public typealias TConfig = ProtocolConfigRef
-        public static func read(config: ProtocolConfigRef) -> Int {
+        public typealias TOutput = Gas
+        public static func read(config: ProtocolConfigRef) -> Gas {
             config.value.workPackageRefineGas
         }
     }

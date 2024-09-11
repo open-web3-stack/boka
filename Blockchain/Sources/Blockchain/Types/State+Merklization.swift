@@ -51,7 +51,7 @@ extension State {
         res[Self.constructKey(9)] = try JamEncoder.encode(previousValidators)
         res[Self.constructKey(10)] = try JamEncoder.encode(reports)
         res[Self.constructKey(11)] = try JamEncoder.encode(timeslot)
-        res[Self.constructKey(12)] = try JamEncoder.encode(privilegedServiceIndices)
+        res[Self.constructKey(12)] = try JamEncoder.encode(privilegedServices)
         res[Self.constructKey(13)] = try JamEncoder.encode(activityStatistics)
 
         for (idx, account) in serviceAccounts {
