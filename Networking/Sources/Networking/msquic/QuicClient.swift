@@ -6,7 +6,7 @@ import NIO
 let clientLogger = Logger(label: "QuicClient")
 
 public class QuicClient: @unchecked Sendable {
-    private var api: UnsafePointer<QuicApiTable>?
+    private let api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
     private var connection: QuicConnection?
@@ -106,7 +106,7 @@ public class QuicClient: @unchecked Sendable {
     deinit {
         if let persistentStream {
             persistentStream.close()
-//            self.persistentStream = nil
+            self.persistentStream = nil
         }
 
         if let connection {
@@ -117,7 +117,7 @@ public class QuicClient: @unchecked Sendable {
 
         if let configuration {
             api?.pointee.ConfigurationClose(configuration)
-//            self.configuration = nil
+            self.configuration = nil
             clientLogger.info("Configuration closed")
         }
 

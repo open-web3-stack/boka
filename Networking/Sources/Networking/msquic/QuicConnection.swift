@@ -7,8 +7,8 @@ let logger = Logger(label: "QuicConnection")
 public class QuicConnection {
     private var connection: HQuic?
     private let api: UnsafePointer<QuicApiTable>?
-    private var registration: HQuic?
-    private var configuration: HQuic?
+    private let registration: HQuic?
+    private let configuration: HQuic?
     private var streams: AtomicArray<QuicStream> = .init()
 
     public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
@@ -86,11 +86,11 @@ public class QuicConnection {
             logger.info("[\(String(describing: connection))] All done")
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 // TODO: close all streams
-                for stream in quicConnection.streams {
-                    stream.close()
-                }
-                quicConnection.streams.removeAll()
-                quicConnection.api?.pointee.ConnectionClose(connection)
+//                for stream in quicConnection.streams {
+//                    stream.close()
+//                }
+//                quicConnection.streams.removeAll()
+//                quicConnection.api?.pointee.ConnectionClose(connection)
                 quicConnection.onMessageReceived?(.success(QuicMessage(type: .shutdown, data: nil)))
             }
 

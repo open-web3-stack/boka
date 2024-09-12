@@ -115,12 +115,12 @@ class QuicStream {
     func close() {
         onMessageReceived = nil
         if stream == nil {
-            let status = (api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0)).status
-            if status.isFailed {
-                streamLogger.warning("Failed to shutdown stream: \(status.code)")
-            }
+//            let status = (api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0)).status
+//            if status.isFailed {
+//                streamLogger.warning("Failed to shutdown stream: \(status.code)")
+//            }
             api?.pointee.StreamClose(stream)
-//            stream = nil
+            stream = nil
         }
         streamLogger.info("Stream closed")
     }
