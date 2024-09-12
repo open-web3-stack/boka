@@ -7,7 +7,10 @@ public class QuicClient: @unchecked Sendable {
     private var registration: HQuic?
     private var configuration: HQuic?
     private var connection: QuicConnection?
+    private var persistentStream: QuicStream?
     public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
+    public var onMessageCallBack: ((Result<QuicMessage, QuicError>) -> Void)?
+
     private let config: QuicConfig
 
     init(config: QuicConfig) throws {
@@ -46,6 +49,9 @@ public class QuicClient: @unchecked Sendable {
         try connection?.open()
         try connection?.start(ipAddress: config.ipAddress, port: config.port)
         connection?.onMessageReceived = onMessageReceived
+        persistentStream = try connection?.createStream(.uniquePersistent)
+        persistentStream?.onMessageReceived = onMessageReceived
+        try persistentStream?.start()
         return status
     }
 
@@ -65,7 +71,7 @@ public class QuicClient: @unchecked Sendable {
         }
         let sendStream: QuicStream
         // Check if there is an existing stream of the same kind
-        if let stream = try connection.getUniquePersistentStream() {
+        if streamKind == .uniquePersistent, let stream = persistentStream {
             // If there is, send the message to the existing stream
             stream.send(buffer: message)
             sendStream = stream
@@ -77,6 +83,7 @@ public class QuicClient: @unchecked Sendable {
             // Send the message to the new stream
             stream.send(buffer: message)
             sendStream = stream
+//            defer { sendStream.close() }
         }
         // Wait for a reply
         return try await withCheckedThrowingContinuation { continuation in

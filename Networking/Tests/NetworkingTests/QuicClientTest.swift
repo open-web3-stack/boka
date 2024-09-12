@@ -21,17 +21,17 @@ final class QuicClientTests {
             )
             let status = try quicClient.start()
             print(status)
-            quicClient.onMessageReceived = { result in
-                switch result {
-                case let .success(message):
-                    print("Client received: \(message)")
-                case let .failure(error):
-                    print("Client error: \(error)")
-                }
-            }
+//            quicClient.onMessageReceived = { result in
+//                switch result {
+//                case let .success(message):
+//                    print("Client received: \(message)")
+//                case let .failure(error):
+//                    print("Client error: \(error)")
+//                }
+//            }
             let message1 = try await quicClient.send(message: Data("Hello, World!".utf8))
             print("Client received: \(message1)")
-            let message2 = try await quicClient.send(message: Data("Hello, swift!".utf8))
+            let message2 = try await quicClient.send(message: Data("Hello, swift!".utf8), streamKind: .commonEphemeral)
             print("Client received: \(message2)")
 
             try await group.next().scheduleTask(in: .hours(1)) {}.futureResult.get()

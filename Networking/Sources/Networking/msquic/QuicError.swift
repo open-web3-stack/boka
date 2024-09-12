@@ -4,4 +4,5 @@ public enum QuicError: Error, Equatable, Sendable {
     case getApiFailed
     case getRegistrationFailed
     case getConnectionFailed
+    case getStreamFailed
 }

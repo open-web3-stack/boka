@@ -124,9 +124,11 @@ public class QuicConnection {
             throw QuicError.invalidStatus(status: status.code)
         }
     }
+
     func getUniquePersistentStream() throws -> QuicStream? {
-        return streams.first(where: { $0.kind == .uniquePersistent })
+        streams.first(where: { $0.kind == .uniquePersistent })
     }
+
     func createStream(_ streamKind: StreamKind = .commonEphemeral) throws -> QuicStream {
         let stream = try QuicStream(api: api, connection: connection, streamKind)
         streams.append(stream)

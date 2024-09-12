@@ -40,7 +40,7 @@ class QuicStream {
 
         let quicStream: QuicStream = Unmanaged<QuicStream>.fromOpaque(context).takeUnretainedValue()
         var status: QuicStatus = QuicStatusCode.success.rawValue
-
+        streamLogger.info("[\(String(describing: stream))] Event: \(event.pointee.Type.rawValue)")
         switch event.pointee.Type {
         case QUIC_STREAM_EVENT_SEND_COMPLETE:
             if let clientContext = event.pointee.SEND_COMPLETE.ClientContext {
@@ -146,7 +146,8 @@ class QuicStream {
 
         sendBuffer.pointee.Buffer = bufferPointer
         sendBuffer.pointee.Length = UInt32(messageLength)
-        status = (api?.pointee.StreamSend(stream, sendBuffer, 1, QUIC_SEND_FLAG_NONE, sendBufferRaw)).status
+        let flags = (kind == .uniquePersistent) ? QUIC_SEND_FLAG_NONE : QUIC_SEND_FLAG_FIN
+        status = (api?.pointee.StreamSend(stream, sendBuffer, 1, flags, sendBufferRaw)).status
         if status.isFailed {
             streamLogger.error("StreamSend failed, \(status)!")
             let shutdown = (api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0)).status
