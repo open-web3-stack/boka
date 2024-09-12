@@ -17,7 +17,10 @@ class QuicStream {
     public let kind: StreamKind
     public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
 
-    init(api: UnsafePointer<QuicApiTable>?, connection: HQuic?, _ streamKind: StreamKind = .uniquePersistent) throws {
+    init(
+        api: UnsafePointer<QuicApiTable>?, connection: HQuic?,
+        _ streamKind: StreamKind = .uniquePersistent
+    ) throws {
         self.api = api
         self.connection = connection
         kind = streamKind
@@ -69,7 +72,9 @@ class QuicStream {
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
             streamLogger.warning("[\(String(describing: stream))] Peer aborted")
-            status = (quicStream.api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0)).status
+            status =
+                (quicStream.api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0))
+                    .status
             quicStream.onMessageReceived?(.failure(QuicError.invalidStatus(status: status.code)))
 
         case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
@@ -80,26 +85,22 @@ class QuicStream {
 
         default:
             break
-//            let message = QuicMessage(type: .unknown, data: nil)
-//            quicStream.onMessageReceived?(.success(message))
         }
 
         return status
     }
 
     private func openStream(_: StreamKind = .commonEphemeral) throws {
-        var stream: HQuic?
-        let status = (api?.pointee.StreamOpen(
-            connection, QUIC_STREAM_OPEN_FLAG_NONE,
-            { stream, context, event -> QuicStatus in
-                QuicStream.streamCallback(stream: stream, context: context, event: event)
-            }, Unmanaged.passUnretained(self).toOpaque(), &stream
-        )).status
+        let status =
+            (api?.pointee.StreamOpen(
+                connection, QUIC_STREAM_OPEN_FLAG_NONE,
+                { stream, context, event -> QuicStatus in
+                    QuicStream.streamCallback(stream: stream, context: context, event: event)
+                }, Unmanaged.passUnretained(self).toOpaque(), &stream
+            )).status
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }
-
-        self.stream = stream
         streamLogger.info("[\(String(describing: stream))] Stream opened")
     }
 
@@ -109,6 +110,19 @@ class QuicStream {
             throw QuicError.invalidStatus(status: status.code)
         }
         streamLogger.info("[\(String(describing: stream))] Stream started")
+    }
+
+    func close() {
+        onMessageReceived = nil
+        if stream == nil {
+            let status = (api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0)).status
+            if status.isFailed {
+                streamLogger.warning("Failed to shutdown stream: \(status.code)")
+            }
+            api?.pointee.StreamClose(stream)
+//            stream = nil
+        }
+        streamLogger.info("Stream closed")
     }
 
     func setCallbackHandler() {
@@ -127,7 +141,6 @@ class QuicStream {
         )
     }
 
-    // TODO: check stream type & send
     func send(buffer: Data) {
         streamLogger.info("[\(String(describing: stream))] Sending data...")
         var status = QuicStatusCode.success.rawValue
@@ -150,7 +163,8 @@ class QuicStream {
         status = (api?.pointee.StreamSend(stream, sendBuffer, 1, flags, sendBufferRaw)).status
         if status.isFailed {
             streamLogger.error("StreamSend failed, \(status)!")
-            let shutdown = (api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0)).status
+            let shutdown: QuicStatus =
+                (api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0)).status
             if shutdown.isFailed {
                 streamLogger.error("StreamShutdown failed, 0x\(String(format: "%x", shutdown))!")
             }
@@ -158,9 +172,9 @@ class QuicStream {
     }
 
     deinit {
-        if stream != nil {
-            api?.pointee.StreamClose(stream)
-        }
+//        if stream != nil {
+//            api?.pointee.StreamClose(stream)
+//        }
         streamLogger.info("QuicStream Deinit")
     }
 }

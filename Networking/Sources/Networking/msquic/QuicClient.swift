@@ -1,6 +1,9 @@
 import Foundation
+import Logging
 import msquic
 import NIO
+
+let clientLogger = Logger(label: "QuicClient")
 
 public class QuicClient: @unchecked Sendable {
     private var api: UnsafePointer<QuicApiTable>?
@@ -9,8 +12,6 @@ public class QuicClient: @unchecked Sendable {
     private var connection: QuicConnection?
     private var persistentStream: QuicStream?
     public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
-    public var onMessageCallBack: ((Result<QuicMessage, QuicError>) -> Void)?
-
     private let config: QuicConfig
 
     init(config: QuicConfig) throws {
@@ -55,10 +56,6 @@ public class QuicClient: @unchecked Sendable {
         return status
     }
 
-    func connect() throws -> QuicStatus {
-        QuicStatusCode.success.rawValue
-    }
-
     // Asynchronous send method that waits for a reply
     func send(message: Data) async throws -> QuicMessage {
         try await send(message: message, streamKind: .uniquePersistent)
@@ -73,7 +70,6 @@ public class QuicClient: @unchecked Sendable {
         // Check if there is an existing stream of the same kind
         if streamKind == .uniquePersistent, let stream = persistentStream {
             // If there is, send the message to the existing stream
-            stream.send(buffer: message)
             sendStream = stream
         } else {
             // If there is not, create a new stream
@@ -81,13 +77,22 @@ public class QuicClient: @unchecked Sendable {
             // Start the stream
             try stream.start()
             // Send the message to the new stream
-            stream.send(buffer: message)
             sendStream = stream
-//            defer { sendStream.close() }
         }
+
+        sendStream.send(buffer: message)
+
         // Wait for a reply
-        return try await withCheckedThrowingContinuation { continuation in
-            sendStream.onMessageReceived = { result in
+        return try await withCheckedThrowingContinuation { [weak self] continuation in
+            sendStream.onMessageReceived = { [weak self] result in
+                guard let self else {
+                    continuation.resume(throwing: QuicError.getClientFailed)
+                    return
+                }
+                if sendStream.kind == .commonEphemeral {
+                    sendStream.onMessageReceived = nil
+                    self.connection?.removeStream(stream: sendStream)
+                }
                 switch result {
                 case let .success(quicMessage):
                     continuation.resume(returning: quicMessage)
@@ -99,22 +104,38 @@ public class QuicClient: @unchecked Sendable {
     }
 
     deinit {
-        if configuration != nil {
+        if let persistentStream {
+            persistentStream.close()
+//            self.persistentStream = nil
+        }
+
+        if let connection {
+            connection.close()
+            self.connection = nil
+            clientLogger.info("Connection closed")
+        }
+
+        if let configuration {
             api?.pointee.ConfigurationClose(configuration)
-            configuration = nil
+//            self.configuration = nil
+            clientLogger.info("Configuration closed")
         }
-        if registration != nil {
+
+        if let registration {
             api?.pointee.RegistrationClose(registration)
-            registration = nil
+            self.registration = nil
+            clientLogger.info("Registration closed")
         }
+
         MsQuicClose(api)
+        clientLogger.info("QuicClient Deinit")
     }
 }
 
 extension QuicClient {
     private func loadConfiguration(_ unsecure: Bool = true) throws {
         var settings = QUIC_SETTINGS()
-        settings.IdleTimeoutMs = 30000
+        settings.IdleTimeoutMs = 1000
         settings.IsSet.IdleTimeoutMs = 1
 
         var credConfig = QUIC_CREDENTIAL_CONFIG()

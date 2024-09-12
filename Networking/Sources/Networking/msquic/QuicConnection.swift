@@ -86,6 +86,10 @@ public class QuicConnection {
             logger.info("[\(String(describing: connection))] All done")
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 // TODO: close all streams
+                for stream in quicConnection.streams {
+                    stream.close()
+                }
+                quicConnection.streams.removeAll()
                 quicConnection.api?.pointee.ConnectionClose(connection)
                 quicConnection.onMessageReceived?(.success(QuicMessage(type: .shutdown, data: nil)))
             }
@@ -99,7 +103,9 @@ public class QuicConnection {
             // TODO: Manage streams
             logger.info("[\(String(describing: connection))] Peer stream started")
             let stream = event.pointee.PEER_STREAM_STARTED.Stream
-            let streamHandler = QuicStream(api: quicConnection.api, connection: connection, stream: stream)
+            let streamHandler = QuicStream(
+                api: quicConnection.api, connection: connection, stream: stream
+            )
             streamHandler.onMessageReceived = quicConnection.onMessageReceived
             streamHandler.setCallbackHandler()
 
@@ -125,14 +131,15 @@ public class QuicConnection {
         }
     }
 
-    func getUniquePersistentStream() throws -> QuicStream? {
-        streams.first(where: { $0.kind == .uniquePersistent })
-    }
-
     func createStream(_ streamKind: StreamKind = .commonEphemeral) throws -> QuicStream {
         let stream = try QuicStream(api: api, connection: connection, streamKind)
         streams.append(stream)
         return stream
+    }
+
+    func removeStream(stream: QuicStream) {
+        stream.close()
+        streams.removeAll(where: { $0 === stream })
     }
 
     func start(ipAddress: String, port: UInt16) throws {
@@ -144,6 +151,17 @@ public class QuicConnection {
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }
+    }
+
+    func close() {
+        if connection != nil {
+            api?.pointee.ConnectionClose(connection)
+            connection = nil
+        }
+        for stream in streams {
+            stream.close()
+        }
+        streams.removeAll()
     }
 
     deinit {

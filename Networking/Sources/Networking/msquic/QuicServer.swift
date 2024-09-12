@@ -44,78 +44,6 @@ public final class QuicServer: @unchecked Sendable {
         try openListener(ipAddress: config.ipAddress, port: config.port)
     }
 
-    private func loadConfiguration() throws {
-        var settings = QUIC_SETTINGS()
-        settings.IdleTimeoutMs = 30000
-        settings.IsSet.IdleTimeoutMs = 1
-        settings.ServerResumptionLevel = 2 // QUIC_SERVER_RESUME_AND_ZERORTT
-        settings.IsSet.ServerResumptionLevel = 1
-        settings.PeerBidiStreamCount = 1
-        settings.IsSet.PeerBidiStreamCount = 1
-        var certificateFile = QUIC_CERTIFICATE_FILE()
-        var credConfig = QUIC_CREDENTIAL_CONFIG()
-
-        memset(&certificateFile, 0, MemoryLayout.size(ofValue: certificateFile))
-        memset(&credConfig, 0, MemoryLayout.size(ofValue: credConfig))
-
-        let certCString = config.cert.utf8CString
-        let keyFileCString = config.key.utf8CString
-
-        let certPointer = UnsafeMutablePointer<CChar>.allocate(capacity: certCString.count)
-        let keyFilePointer = UnsafeMutablePointer<CChar>.allocate(capacity: keyFileCString.count)
-        // Copy the C strings to the pointers
-        certCString.withUnsafeBytes {
-            certPointer.initialize(
-                from: $0.bindMemory(to: CChar.self).baseAddress!, count: certCString.count
-            )
-        }
-
-        keyFileCString.withUnsafeBytes {
-            keyFilePointer.initialize(
-                from: $0.bindMemory(to: CChar.self).baseAddress!, count: keyFileCString.count
-            )
-        }
-
-        certificateFile.CertificateFile = UnsafePointer(certPointer)
-        certificateFile.PrivateKeyFile = UnsafePointer(keyFilePointer)
-
-        let certificateFilePointer =
-            UnsafeMutablePointer<QUIC_CERTIFICATE_FILE>.allocate(capacity: 1)
-        certificateFilePointer.initialize(to: certificateFile)
-        credConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE
-        credConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE
-        credConfig.CertificateFile = certificateFilePointer
-
-        let buffer = Data(config.alpn.utf8)
-        let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(
-            capacity: buffer.count
-        )
-        buffer.copyBytes(to: bufferPointer, count: buffer.count)
-
-        defer {
-            certPointer.deallocate()
-            keyFilePointer.deallocate()
-            bufferPointer.deallocate()
-        }
-
-        var alpn = QuicBuffer(Length: UInt32(buffer.count), Buffer: bufferPointer)
-
-        let status =
-            (api?.pointee.ConfigurationOpen(
-                registration, &alpn, 1, &settings, UInt32(MemoryLayout.size(ofValue: settings)),
-                nil, &configuration
-            )).status
-        if status.isFailed {
-            throw QuicError.invalidStatus(status: status.code)
-        }
-
-        let configStatus = (api?.pointee.ConfigurationLoadCredential(configuration, &credConfig))
-            .status
-        if configStatus.isFailed {
-            throw QuicError.invalidStatus(status: configStatus.code)
-        }
-    }
-
     private func openListener(ipAddress _: String, port: UInt16) throws {
         var listenerHandle: HQuic?
         let status =
@@ -203,5 +131,79 @@ public final class QuicServer: @unchecked Sendable {
             registration = nil
         }
         MsQuicClose(api)
+    }
+}
+
+extension QuicServer {
+    private func loadConfiguration() throws {
+        var settings = QUIC_SETTINGS()
+        settings.IdleTimeoutMs = 30000
+        settings.IsSet.IdleTimeoutMs = 1
+        settings.ServerResumptionLevel = 2 // QUIC_SERVER_RESUME_AND_ZERORTT
+        settings.IsSet.ServerResumptionLevel = 1
+        settings.PeerBidiStreamCount = 1
+        settings.IsSet.PeerBidiStreamCount = 1
+        var certificateFile = QUIC_CERTIFICATE_FILE()
+        var credConfig = QUIC_CREDENTIAL_CONFIG()
+
+        memset(&certificateFile, 0, MemoryLayout.size(ofValue: certificateFile))
+        memset(&credConfig, 0, MemoryLayout.size(ofValue: credConfig))
+
+        let certCString = config.cert.utf8CString
+        let keyFileCString = config.key.utf8CString
+
+        let certPointer = UnsafeMutablePointer<CChar>.allocate(capacity: certCString.count)
+        let keyFilePointer = UnsafeMutablePointer<CChar>.allocate(capacity: keyFileCString.count)
+        // Copy the C strings to the pointers
+        certCString.withUnsafeBytes {
+            certPointer.initialize(
+                from: $0.bindMemory(to: CChar.self).baseAddress!, count: certCString.count
+            )
+        }
+
+        keyFileCString.withUnsafeBytes {
+            keyFilePointer.initialize(
+                from: $0.bindMemory(to: CChar.self).baseAddress!, count: keyFileCString.count
+            )
+        }
+
+        certificateFile.CertificateFile = UnsafePointer(certPointer)
+        certificateFile.PrivateKeyFile = UnsafePointer(keyFilePointer)
+
+        let certificateFilePointer =
+            UnsafeMutablePointer<QUIC_CERTIFICATE_FILE>.allocate(capacity: 1)
+        certificateFilePointer.initialize(to: certificateFile)
+        credConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE
+        credConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE
+        credConfig.CertificateFile = certificateFilePointer
+
+        let buffer = Data(config.alpn.utf8)
+        let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(
+            capacity: buffer.count
+        )
+        buffer.copyBytes(to: bufferPointer, count: buffer.count)
+
+        defer {
+            certPointer.deallocate()
+            keyFilePointer.deallocate()
+            bufferPointer.deallocate()
+        }
+
+        var alpn = QuicBuffer(Length: UInt32(buffer.count), Buffer: bufferPointer)
+
+        let status =
+            (api?.pointee.ConfigurationOpen(
+                registration, &alpn, 1, &settings, UInt32(MemoryLayout.size(ofValue: settings)),
+                nil, &configuration
+            )).status
+        if status.isFailed {
+            throw QuicError.invalidStatus(status: status.code)
+        }
+
+        let configStatus = (api?.pointee.ConfigurationLoadCredential(configuration, &credConfig))
+            .status
+        if configStatus.isFailed {
+            throw QuicError.invalidStatus(status: configStatus.code)
+        }
     }
 }
