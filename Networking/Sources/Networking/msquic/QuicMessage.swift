@@ -8,6 +8,7 @@ enum QuicMessageType {
     case received
     case connect
     case connected
+    case shutdownComplete
 }
 
 public struct QuicMessage: @unchecked Sendable {

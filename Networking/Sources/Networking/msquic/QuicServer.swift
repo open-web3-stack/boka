@@ -108,7 +108,7 @@ public final class QuicServer: @unchecked Sendable {
                 configuration: server.registration,
                 connection: server.configuration
             )
-            connectionHandler.onMessageReceived = server.onMessageReceived
+            // connectionHandler.onMessageReceived = server.onMessageReceived
             status = connectionHandler.setCallbackHandler()
 
         default:
