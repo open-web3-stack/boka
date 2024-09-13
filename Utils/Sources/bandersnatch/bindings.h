@@ -31,7 +31,7 @@ void ring_context_free(RingContext *ctx);
  * out is 784 bytes
  */
 intptr_t prover_ring_vrf_sign(const Secret *secret,
-                              const Public *ring,
+                              const Public *const *ring,
                               uintptr_t ring_len,
                               uintptr_t prover_idx,
                               const RingContext *ctx,
@@ -53,7 +53,7 @@ intptr_t prover_ietf_vrf_sign(const Secret *secret,
                               uint8_t *out,
                               uintptr_t out_len);
 
-intptr_t ring_commitment_new_from_ring(const Public *ring,
+intptr_t ring_commitment_new_from_ring(const Public *const *ring,
                                        uintptr_t ring_len,
                                        const RingContext *ctx,
                                        RingCommitment **out);

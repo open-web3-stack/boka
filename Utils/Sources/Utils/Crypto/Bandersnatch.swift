@@ -1,7 +1,7 @@
 import bandersnatch_vrfs
 import Foundation
 
-private func call<E: Error>(
+private func _call<E: Error>(
     data: [Data],
     out: inout Data?,
     fn: ([(ptr: UnsafeRawPointer, count: UInt)], (ptr: UnsafeMutableRawPointer, count: UInt)?) -> Int,
@@ -44,7 +44,7 @@ private func call<E: Error>(
     onErr: (Int) throws(E) -> Void
 ) throws(E) {
     var out: Data?
-    try call(data: data, out: &out, fn: { ptrs, _ in fn(ptrs) }, onErr: onErr)
+    try _call(data: data, out: &out, fn: { ptrs, _ in fn(ptrs) }, onErr: onErr)
 }
 
 private func call(
@@ -52,7 +52,7 @@ private func call(
     fn: ([(ptr: UnsafeRawPointer, count: UInt)]) -> Int
 ) {
     var out: Data?
-    call(data: data, out: &out, fn: { ptrs, _ in fn(ptrs) }, onErr: { err in fatalError("unreachable: \(err)") })
+    _call(data: data, out: &out, fn: { ptrs, _ in fn(ptrs) }, onErr: { err in fatalError("unreachable: \(err)") })
 }
 
 private func call<E: Error>(
@@ -61,8 +61,8 @@ private func call<E: Error>(
     fn: ([(ptr: UnsafeRawPointer, count: UInt)], (ptr: UnsafeMutableRawPointer, count: UInt)) -> Int,
     onErr: (Int) throws(E) -> Void
 ) throws(E) {
-    var out2: Data?
-    try call(data: data, out: &out2, fn: { ptrs, out_buf in fn(ptrs, out_buf!) }, onErr: onErr)
+    var out2: Data? = out
+    try _call(data: data, out: &out2, fn: { ptrs, out_buf in fn(ptrs, out_buf!) }, onErr: onErr)
     out = out2!
 }
 
@@ -71,8 +71,8 @@ private func call(
     out: inout Data,
     fn: ([(ptr: UnsafeRawPointer, count: UInt)], (ptr: UnsafeMutableRawPointer, count: UInt)) -> Int
 ) {
-    var out2: Data?
-    call(data: data, out: &out2, fn: { ptrs, out_buf in fn(ptrs, out_buf!) }, onErr: { err in fatalError("unreachable: \(err)") })
+    var out2: Data? = out
+    _call(data: data, out: &out2, fn: { ptrs, out_buf in fn(ptrs, out_buf!) }, onErr: { err in fatalError("unreachable: \(err)") })
     out = out2!
 }
 
@@ -227,7 +227,7 @@ public enum Bandersnatch {
     public class Prover {
         private let secret: SecretKey
         private let ring: [PublicKey]
-        private let ringPtrs: [OpaquePointer]
+        private let ringPtrs: [OpaquePointer?]
         private let proverIdx: UInt
         private let ctx: RingContext
 
@@ -249,7 +249,7 @@ public enum Bandersnatch {
                 ringPtrs.withUnsafeBufferPointer { ringPtrs in
                     prover_ring_vrf_sign(
                         secret.ptr,
-                        ringPtrs.baseAddress?.pointee,
+                        ringPtrs.baseAddress,
                         UInt(ringPtrs.count),
                         proverIdx,
                         ctx.ptr,
@@ -274,13 +274,13 @@ public enum Bandersnatch {
         public let data: Data144
 
         public init(ring: [PublicKey], ctx: RingContext) throws(Error) {
-            let ringPtrs = ring.map(\.ptr)
+            let ringPtrs = ring.map { $0.ptr as OpaquePointer? }
 
             var ptr: OpaquePointer!
             try call { _ in
                 ringPtrs.withUnsafeBufferPointer { ringPtrs in
                     ring_commitment_new_from_ring(
-                        ringPtrs.baseAddress?.pointee,
+                        ringPtrs.baseAddress,
                         UInt(ringPtrs.count),
                         ctx.ptr,
                         &ptr

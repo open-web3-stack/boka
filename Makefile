@@ -26,6 +26,13 @@ deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a .lib/librocksdb.a .lib/libec.a
 test: githooks deps
 	./scripts/runTests.sh test
 
+.PHONY: test-cargo
+test-cargo:
+	cargo test --manifest-path Utils/Sources/bandersnatch/Cargo.toml
+
+.PHONY: test-all
+test-all: test test-cargo
+
 .PHONY: build
 build: githooks deps
 	./scripts/run.sh build
@@ -56,6 +63,13 @@ lint: githooks
 .PHONY: format
 format: githooks
 	swiftformat .
+
+.PHONY: format-cargo
+format-cargo:
+	cargo fmt --manifest-path Utils/Sources/bandersnatch/Cargo.toml
+
+.PHONY: format-all
+format-all: format format-cargo
 
 .PHONY: run
 run: githooks

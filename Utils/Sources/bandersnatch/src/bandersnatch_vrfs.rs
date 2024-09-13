@@ -39,11 +39,11 @@ fn ring_context_params() -> &'static PcsParams {
 }
 
 // Construct VRF Input Point from arbitrary data (section 1.2)
-fn vrf_input_point(vrf_input_data: &[u8]) -> Input {
+fn vrf_input_point(vrf_input_data: &[u8]) -> Result<Input, ()> {
     let point =
         <bandersnatch::BandersnatchSha512Ell2 as ark_ec_vrfs::Suite>::data_to_point(vrf_input_data)
-            .unwrap();
-    Input::from(point)
+            .ok_or(())?;
+    Ok(Input::from(point))
 }
 
 /// Anonymous VRF signature.
@@ -51,7 +51,7 @@ fn vrf_input_point(vrf_input_data: &[u8]) -> Input {
 /// Used for tickets submission.
 pub fn ring_vrf_sign(
     secret: &Secret,
-    ring: &[Public],
+    ring: &[*const Public],
     prover_idx: usize,
     ctx: &RingContext,
     vrf_input_data: &[u8],
@@ -60,11 +60,11 @@ pub fn ring_vrf_sign(
 ) -> Result<(), ()> {
     use ark_ec_vrfs::ring::Prover as _;
 
-    let input = vrf_input_point(vrf_input_data);
+    let input = vrf_input_point(vrf_input_data)?;
     let output = secret.output(input);
 
     // Backend currently requires the wrapped type (plain affine points)
-    let pts: Vec<_> = ring.iter().map(|pk| pk.0).collect();
+    let pts: Vec<_> = unsafe { ring.iter().map(|pk| (*(*pk)).0).collect() };
 
     // Proof construction
     let prover_key = ctx.prover_key(&pts);
@@ -88,7 +88,7 @@ pub fn ietf_vrf_sign(
 ) -> Result<(), ()> {
     use ark_ec_vrfs::ietf::Prover as _;
 
-    let input = vrf_input_point(vrf_input_data);
+    let input = vrf_input_point(vrf_input_data)?;
     let output = secret.output(input);
 
     let proof = secret.prove(input, output, aux_data);
@@ -116,9 +116,9 @@ pub fn ring_vrf_verify(
 ) -> Result<(), ()> {
     use ark_ec_vrfs::ring::Verifier as _;
 
-    let signature = RingVrfSignature::deserialize_compressed(signature).unwrap();
+    let signature = RingVrfSignature::deserialize_compressed(signature).map_err(|_| ())?;
 
-    let input = vrf_input_point(vrf_input_data);
+    let input = vrf_input_point(vrf_input_data)?;
     let output = signature.output;
 
     // The verifier key is reconstructed from the commitment and the constant
@@ -128,8 +128,8 @@ pub fn ring_vrf_verify(
     // In other words, we prefer computing the commitment once, when the keyset changes.
     let verifier_key = ctx.verifier_key_from_commitment(commitment.clone());
     let verifier = ctx.verifier(verifier_key);
-    if Public::verify(input, output, aux_data, &signature.proof, &verifier).is_err() {
-        // println!("Ring signature verification failure");
+    if let Err(_) = Public::verify(input, output, aux_data, &signature.proof, &verifier) {
+        // println!("Ring signature verification failure {:?}", e);
         return Err(());
     }
     // println!("Ring signature verified");
@@ -157,7 +157,7 @@ pub fn ietf_vrf_verify(
 
     let signature = IetfVrfSignature::deserialize_compressed(signature).map_err(|_| ())?;
 
-    let input = vrf_input_point(vrf_input_data);
+    let input = vrf_input_point(vrf_input_data)?;
     let output = signature.output;
 
     if public
