@@ -18,8 +18,9 @@ public final class QuicServer: @unchecked Sendable, QuicConnectionDelegate {
     private var configuration: HQuic?
     private var listener: HQuic?
     private let config: QuicConfig
-//    public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
-    public var onMessageReceived: ((Result<QuicMessage, QuicError>, @escaping (Data) -> Void) -> Void)?
+    //    public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
+    public var onMessageReceived:
+        ((Result<QuicMessage, QuicError>, @escaping (Data) -> Void) -> Void)?
     private var pendingMessages: AtomicArray<Result<QuicMessage, QuicError>> = .init()
     private var connections: AtomicArray<QuicConnection> = .init()
 
@@ -54,13 +55,15 @@ public final class QuicServer: @unchecked Sendable, QuicConnectionDelegate {
         try openListener(ipAddress: config.ipAddress, port: config.port)
     }
 
-    public func didReceiveMessage(connection: QuicConnection, stream: QuicStream, result: Result<QuicMessage, QuicError>) {
+    public func didReceiveMessage(
+        connection: QuicConnection, stream: QuicStream, result: Result<QuicMessage, QuicError>
+    ) {
         switch result {
         case let .success(quicMessage):
             switch quicMessage.type {
             case .shutdownComplete:
-//                connection.close()
-//                connections.removeAll(where: { $0 === connection })
+                //                connection.close()
+                //                connections.removeAll(where: { $0 === connection })
                 break
             case .aborted:
                 break
@@ -134,9 +137,10 @@ public final class QuicServer: @unchecked Sendable, QuicConnectionDelegate {
             return status
         }
         let server: QuicServer = Unmanaged<QuicServer>.fromOpaque(context).takeUnretainedValue()
-
+        quicServerLogger.info("Server listener callback type \(event.pointee.Type.rawValue)")
         switch event.pointee.Type {
         case QUIC_LISTENER_EVENT_NEW_CONNECTION:
+            quicServerLogger.info("New connection")
             let connection: HQuic = event.pointee.NEW_CONNECTION.Connection
             guard let api = server.api else {
                 return status

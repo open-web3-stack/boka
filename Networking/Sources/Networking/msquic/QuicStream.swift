@@ -21,6 +21,7 @@ public class QuicStream {
     public let kind: StreamKind
     public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
     public var delegate: QuicStreamDelegate?
+    private var streamCallback: StreamCallback
     init(
         api: UnsafePointer<QuicApiTable>?, connection: HQuic?,
         _ streamKind: StreamKind = .uniquePersistent
@@ -28,6 +29,11 @@ public class QuicStream {
         self.api = api
         self.connection = connection
         kind = streamKind
+        streamCallback = { stream, context, event in
+            QuicStream.streamCallback(
+                stream: stream, context: context, event: event
+            )
+        }
         try openStream(streamKind)
     }
 
@@ -36,6 +42,11 @@ public class QuicStream {
         self.connection = connection
         self.stream = stream
         kind = .commonEphemeral
+        streamCallback = { stream, context, event in
+            QuicStream.streamCallback(
+                stream: stream, context: context, event: event
+            )
+        }
     }
 
     private static func streamCallback(
@@ -70,7 +81,9 @@ public class QuicStream {
                 let message = QuicMessage(type: .received, data: bufferData)
                 quicStream.onMessageReceived?(.success(message))
             }
-            quicStream.delegate?.didReceiveMessage(quicStream, result: .success(QuicMessage(type: .received, data: receivedData)))
+            quicStream.delegate?.didReceiveMessage(
+                quicStream, result: .success(QuicMessage(type: .received, data: receivedData))
+            )
 
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
             streamLogger.info("[\(String(describing: stream))] Peer shut down")
@@ -89,7 +102,9 @@ public class QuicStream {
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 quicStream.api?.pointee.StreamClose(stream)
             }
-            quicStream.delegate?.didReceiveMessage(quicStream, result: .success(QuicMessage(type: .shutdownComplete, data: nil)))
+            quicStream.delegate?.didReceiveMessage(
+                quicStream, result: .success(QuicMessage(type: .shutdownComplete, data: nil))
+            )
 
         default:
             break
@@ -136,7 +151,7 @@ public class QuicStream {
         }
 
         let callbackPointer = unsafeBitCast(
-            QuicStream.streamCallback, to: UnsafeMutableRawPointer?.self
+            streamCallback, to: UnsafeMutableRawPointer?.self
         )
 
         api.pointee.SetCallbackHandler(
@@ -177,9 +192,9 @@ public class QuicStream {
     }
 
     deinit {
-//        if stream != nil {
-//            api?.pointee.StreamClose(stream)
-//        }
+        //        if stream != nil {
+        //            api?.pointee.StreamClose(stream)
+        //        }
         streamLogger.info("QuicStream Deinit")
     }
 }

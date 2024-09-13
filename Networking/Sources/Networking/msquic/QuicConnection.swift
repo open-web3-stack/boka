@@ -5,7 +5,9 @@ import msquic
 let logger = Logger(label: "QuicConnection")
 
 public protocol QuicConnectionDelegate: AnyObject {
-    func didReceiveMessage(connection: QuicConnection, stream: QuicStream, result: Result<QuicMessage, QuicError>)
+    func didReceiveMessage(
+        connection: QuicConnection, stream: QuicStream, result: Result<QuicMessage, QuicError>
+    )
 }
 
 public class QuicConnection: QuicStreamDelegate {
@@ -16,11 +18,16 @@ public class QuicConnection: QuicStreamDelegate {
     private var streams: AtomicArray<QuicStream> = .init()
     public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
     public var delegate: QuicConnectionDelegate?
-
+    private let connectionCallback: ConnectionCallback
     init(api: UnsafePointer<QuicApiTable>?, registration: HQuic?, configuration: HQuic?) {
         self.api = api
         self.registration = registration
         self.configuration = configuration
+        connectionCallback = { connection, context, event in
+            QuicConnection.connectionCallback(
+                connection: connection, context: context, event: event
+            )
+        }
     }
 
     init(
@@ -31,6 +38,11 @@ public class QuicConnection: QuicStreamDelegate {
         self.registration = registration
         self.configuration = configuration
         self.connection = connection
+        connectionCallback = { connection, context, event in
+            QuicConnection.connectionCallback(
+                connection: connection, context: context, event: event
+            )
+        }
     }
 
     // TODO: set callback handler
@@ -40,7 +52,7 @@ public class QuicConnection: QuicStreamDelegate {
         }
 
         let callbackPointer = unsafeBitCast(
-            QuicConnection.connectionCallback, to: UnsafeMutableRawPointer?.self
+            connectionCallback, to: UnsafeMutableRawPointer?.self
         )
 
         api.pointee.SetCallbackHandler(
