@@ -4,14 +4,18 @@ import msquic
 
 let logger = Logger(label: "QuicConnection")
 
-public class QuicConnection {
+public protocol QuicConnectionDelegate: AnyObject {
+    func didReceiveMessage(_ connection: QuicConnection, result: Result<QuicMessage, QuicError>)
+}
+
+public class QuicConnection: QuicStreamDelegate {
     private var connection: HQuic?
     private let api: UnsafePointer<QuicApiTable>?
     private let registration: HQuic?
     private let configuration: HQuic?
     private var streams: AtomicArray<QuicStream> = .init()
-
     public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
+    public var delegate: QuicConnectionDelegate?
 
     init(api: UnsafePointer<QuicApiTable>?, registration: HQuic?, configuration: HQuic?) {
         self.api = api
@@ -46,6 +50,27 @@ public class QuicConnection {
         )
 
         return api.pointee.ConnectionSetConfiguration(connection, configuration)
+    }
+
+    func didReceiveMessage(_ stream: QuicStream, result: Result<QuicMessage, QuicError>) {
+        switch result {
+        case let .success(quicMessage):
+            switch quicMessage.type {
+            case .shutdownComplete:
+                removeStream(stream: stream)
+            case .aborted:
+                break
+            case .unknown:
+                break
+            case .received:
+                break
+            default:
+                break
+            }
+        case let .failure(error):
+            logger.error("Failed to receive message: \(error)")
+        }
+        delegate?.didReceiveMessage(self, result: result)
     }
 
     private static func connectionCallback(
@@ -86,11 +111,11 @@ public class QuicConnection {
             logger.info("[\(String(describing: connection))] All done")
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 // TODO: close all streams
-//                for stream in quicConnection.streams {
-//                    stream.close()
-//                }
-//                quicConnection.streams.removeAll()
-//                quicConnection.api?.pointee.ConnectionClose(connection)
+                //                for stream in quicConnection.streams {
+                //                    stream.close()
+                //                }
+                //                quicConnection.streams.removeAll()
+                //                quicConnection.api?.pointee.ConnectionClose(connection)
                 quicConnection.onMessageReceived?(.success(QuicMessage(type: .shutdown, data: nil)))
             }
 
@@ -112,7 +137,6 @@ public class QuicConnection {
         default:
             break
         }
-
         return status
     }
 
@@ -134,6 +158,7 @@ public class QuicConnection {
     func createStream(_ streamKind: StreamKind = .commonEphemeral) throws -> QuicStream {
         let stream = try QuicStream(api: api, connection: connection, streamKind)
         streams.append(stream)
+        stream.delegate = self
         return stream
     }
 

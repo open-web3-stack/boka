@@ -89,10 +89,6 @@ public class QuicClient: @unchecked Sendable {
                     continuation.resume(throwing: QuicError.getClientFailed)
                     return
                 }
-//                if sendStream.kind == .commonEphemeral {
-//                    self.connection?.removeStream(stream: sendStream)
-//                }
-//                self.connection?.removeStream(stream: sendStream)
                 switch result {
                 case let .success(quicMessage):
                     continuation.resume(returning: quicMessage)

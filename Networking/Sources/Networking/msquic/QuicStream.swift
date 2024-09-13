@@ -4,10 +4,14 @@ import msquic
 
 let streamLogger = Logger(label: "QuicStream")
 
-enum StreamKind {
+public enum StreamKind {
     case uniquePersistent
     case commonEphemeral
     case unknown
+}
+
+protocol QuicStreamDelegate: AnyObject {
+    func didReceiveMessage(_ stream: QuicStream, result: Result<QuicMessage, QuicError>)
 }
 
 class QuicStream {
@@ -16,7 +20,7 @@ class QuicStream {
     private let connection: HQuic?
     public let kind: StreamKind
     public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
-
+    public var delegate: QuicStreamDelegate?
     init(
         api: UnsafePointer<QuicApiTable>?, connection: HQuic?,
         _ streamKind: StreamKind = .uniquePersistent
@@ -82,6 +86,7 @@ class QuicStream {
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 quicStream.api?.pointee.StreamClose(stream)
             }
+            quicStream.delegate?.didReceiveMessage(quicStream, result: .success(QuicMessage(type: .shutdownComplete, data: nil)))
 
         default:
             break
@@ -114,11 +119,8 @@ class QuicStream {
 
     func close() {
         onMessageReceived = nil
+        delegate = nil
         if stream == nil {
-//            let status = (api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0)).status
-//            if status.isFailed {
-//                streamLogger.warning("Failed to shutdown stream: \(status.code)")
-//            }
             api?.pointee.StreamClose(stream)
             stream = nil
         }
