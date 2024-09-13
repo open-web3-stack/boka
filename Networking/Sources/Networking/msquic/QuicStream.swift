@@ -79,7 +79,9 @@ public class QuicStream {
                 )
                 receivedData.append(bufferData)
                 let message = QuicMessage(type: .received, data: bufferData)
-                quicStream.onMessageReceived?(.success(message))
+                if quicStream.onMessageReceived != nil {
+                    quicStream.onMessageReceived?(.success(message))
+                }
             }
             quicStream.delegate?.didReceiveMessage(
                 quicStream, result: .success(QuicMessage(type: .received, data: receivedData))
@@ -88,14 +90,18 @@ public class QuicStream {
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
             streamLogger.info("[\(String(describing: stream))] Peer shut down")
             let message = QuicMessage(type: .shutdown, data: nil)
-            quicStream.onMessageReceived?(.success(message))
+            if quicStream.onMessageReceived != nil {
+                quicStream.onMessageReceived?(.success(message))
+            }
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
             streamLogger.warning("[\(String(describing: stream))] Peer aborted")
             status =
                 (quicStream.api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0))
                     .status
-            quicStream.onMessageReceived?(.failure(QuicError.invalidStatus(status: status.code)))
+            if quicStream.onMessageReceived != nil {
+                quicStream.onMessageReceived?(.failure(QuicError.invalidStatus(status: status.code)))
+            }
 
         case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
             streamLogger.info("[\(String(describing: stream))] All done")

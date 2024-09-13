@@ -146,15 +146,15 @@ public final class QuicServer: @unchecked Sendable, QuicConnectionDelegate {
                 return status
             }
 
-            let connectionHandler = QuicConnection(
+            let quicConnection = QuicConnection(
                 api: api,
-                registration: connection,
-                configuration: server.registration,
-                connection: server.configuration
+                registration: server.registration,
+                configuration: server.configuration,
+                connection: connection
             )
-            connectionHandler.delegate = server
-            server.connections.append(connectionHandler)
-            status = connectionHandler.setCallbackHandler()
+            quicConnection.delegate = server
+            server.connections.append(quicConnection)
+            status = quicConnection.setCallbackHandler()
 
         default:
             break

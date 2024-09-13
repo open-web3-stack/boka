@@ -120,14 +120,13 @@ public class QuicConnection: QuicStreamDelegate {
             )
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
-            logger.info("[\(String(describing: connection))] All done")
+            logger.info("[\(String(describing: connection))] Shutdown all done")
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
-                // TODO: close all streams
-                //                for stream in quicConnection.streams {
-                //                    stream.close()
-                //                }
-                //                quicConnection.streams.removeAll()
-                //                quicConnection.api?.pointee.ConnectionClose(connection)
+                for stream in quicConnection.streams {
+                    stream.close()
+                }
+                quicConnection.streams.removeAll()
+                quicConnection.api?.pointee.ConnectionClose(connection)
                 quicConnection.onMessageReceived?(.success(QuicMessage(type: .shutdown, data: nil)))
             }
 
@@ -140,11 +139,12 @@ public class QuicConnection: QuicStreamDelegate {
             // TODO: Manage streams
             logger.info("[\(String(describing: connection))] Peer stream started")
             let stream = event.pointee.PEER_STREAM_STARTED.Stream
-            let streamHandler = QuicStream(
+            let quicStream = QuicStream(
                 api: quicConnection.api, connection: connection, stream: stream
             )
-            streamHandler.onMessageReceived = quicConnection.onMessageReceived
-            streamHandler.setCallbackHandler()
+            quicStream.delegate = quicConnection
+            quicStream.setCallbackHandler()
+            quicConnection.streams.append(quicStream)
 
         default:
             break
