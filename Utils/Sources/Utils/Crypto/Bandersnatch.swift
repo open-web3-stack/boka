@@ -1,199 +1,358 @@
 import bandersnatch_vrfs
 import Foundation
 
-public enum BandersnatchError: Error {
-    case createSecretFailed
-    case deserializePubKeyFailed
-    case generatePubKeyFailed
-    case createProverFailed
-    case createVerifierFailed
-    case ringVRFSignFailed
-    case ietfVRFSignFailed
-    case verifyRingVrfFailed
-    case verifyIetfVrfFailed
-    case wrongRingSize
-}
-
-extension Data {
-    init(cSecret: CSecret) {
-        let tuple = cSecret._0
-        // a short way to convert (UInt8, UInt8, ...) to [UInt8, UInt8, ...]
-        let array: [UInt8] = Swift.withUnsafeBytes(of: tuple) {
-            Array($0.bindMemory(to: UInt8.self))
+private func call<E: Error>(
+    data: [Data],
+    out: inout Data?,
+    fn: ([(ptr: UnsafeRawPointer, count: UInt)], (ptr: UnsafeMutableRawPointer, count: UInt)?) -> Int,
+    onErr: (Int) throws(E) -> Void
+) throws(E) {
+    func helper(data: ArraySlice<Data>, ptr: [(ptr: UnsafeRawPointer, count: UInt)]) -> Int {
+        if data.isEmpty {
+            if var outData = out {
+                let res = outData.withUnsafeMutableBytes { (bufferPtr: UnsafeMutableRawBufferPointer) -> Int in
+                    guard let bufferAddress = bufferPtr.baseAddress else {
+                        fatalError("unreachable: bufferPtr.baseAddress is nil")
+                    }
+                    return fn(ptr, (ptr: bufferAddress, count: UInt(bufferPtr.count)))
+                }
+                out = outData
+                return res
+            }
+            return fn(ptr, nil)
         }
-        self.init(array)
-    }
-
-    init(cPublic: CPublic) {
-        let tuple = cPublic._0
-        let array: [UInt8] = Swift.withUnsafeBytes(of: tuple) {
-            Array($0.bindMemory(to: UInt8.self))
+        let rest = data.dropFirst()
+        let first = data.first!
+        return first.withUnsafeBytes { (bufferPtr: UnsafeRawBufferPointer) -> Int in
+            guard let bufferAddress = bufferPtr.baseAddress else {
+                fatalError("unreachable: bufferPtr.baseAddress is nil")
+            }
+            return helper(data: rest, ptr: ptr + [(bufferAddress, UInt(bufferPtr.count))])
         }
-        self.init(array)
-    }
-}
-
-extension CPublic {
-    private static func deserialize(data: Data) throws -> CPublic {
-        let cPublicPtr = public_deserialize_compressed([UInt8](data), UInt(data.count))
-        guard let cPublicPtr else {
-            throw BandersnatchError.deserializePubKeyFailed
-        }
-        return CPublic(_0: cPublicPtr.pointee._0)
     }
 
-    init(data: Data) throws {
-        self = try CPublic.deserialize(data: data)
-    }
+    let ret = helper(data: data[...], ptr: [])
 
-    init(data32: Data32) throws {
-        self = try CPublic.deserialize(data: data32.data)
+    if ret != 0 {
+        try onErr(ret)
     }
 }
 
-extension RingSize {
-    init(_ size: UInt) throws {
-        guard size == 6 || size == 1023 else {
-            throw BandersnatchError.wrongRingSize
-        }
-        self = size == 6 ? Tiny : Full
-    }
+private func call<E: Error>(
+    _ data: Data...,
+    fn: ([(ptr: UnsafeRawPointer, count: UInt)]) -> Int,
+    onErr: (Int) throws(E) -> Void
+) throws(E) {
+    var out: Data?
+    try call(data: data, out: &out, fn: { ptrs, _ in fn(ptrs) }, onErr: onErr)
 }
 
-public struct Bandersnatch {
-    public let secret: Data96
-    public let publicKey: Data32
-
-    public init(seed: Data) throws {
-        let seedBytes = [UInt8](seed)
-        let secretPtr = secret_new_from_seed(seedBytes, UInt(seed.count))
-        guard let secretPtr else {
-            throw BandersnatchError.createSecretFailed
-        }
-
-        secret = Data96(Data(cSecret: secretPtr.pointee))!
-
-        let publicPtr = secret_get_public(secretPtr)
-        guard let publicPtr else {
-            throw BandersnatchError.generatePubKeyFailed
-        }
-
-        publicKey = Data32(Data(cPublic: publicPtr.pointee))!
-    }
+private func call(
+    _ data: Data...,
+    fn: ([(ptr: UnsafeRawPointer, count: UInt)]) -> Int
+) {
+    var out: Data?
+    call(data: data, out: &out, fn: { ptrs, _ in fn(ptrs) }, onErr: { err in fatalError("unreachable: \(err)") })
 }
 
-public class Prover {
-    private var prover: OpaquePointer
-
-    /// init with a set of bandersnatch public keys and provider index
-    public init(ring: [Data32], proverIdx: UInt, ringSize: UInt? = nil) throws {
-        var success = false
-        let cPublicArr = try ring.map { try CPublic(data32: $0) }
-        prover = try prover_new(cPublicArr, UInt(ring.count), RingSize(ringSize ?? UInt(ring.count)), proverIdx, &success)
-        if !success {
-            throw BandersnatchError.createProverFailed
-        }
-    }
-
-    deinit {
-        prover_free(prover)
-    }
-
-    /// Anonymous VRF signature.
-    ///
-    /// Used for tickets submission.
-    public func ringVRFSign(vrfInputData: Data, auxData: Data) throws -> Data784 {
-        var output = [UInt8](repeating: 0, count: 784)
-        let success = prover_ring_vrf_sign(
-            &output, prover, [UInt8](vrfInputData), UInt(vrfInputData.count), [UInt8](auxData),
-            UInt(auxData.count)
-        )
-        if !success {
-            throw BandersnatchError.ringVRFSignFailed
-        }
-        return Data784(Data(output))!
-    }
-
-    /// Non-Anonymous VRF signature.
-    ///
-    /// Used for ticket claiming during block production.
-    /// Not used with Safrole test vectors.
-    public func ietfVRFSign(vrfInputData: Data, auxData: Data) throws -> Data96 {
-        var output = [UInt8](repeating: 0, count: 96)
-        let success = prover_ietf_vrf_sign(
-            &output, prover, [UInt8](vrfInputData), UInt(vrfInputData.count), [UInt8](auxData),
-            UInt(auxData.count)
-        )
-        if !success {
-            throw BandersnatchError.ietfVRFSignFailed
-        }
-        return Data96(Data(output))!
-    }
+private func call<E: Error>(
+    _ data: Data...,
+    out: inout Data,
+    fn: ([(ptr: UnsafeRawPointer, count: UInt)], (ptr: UnsafeMutableRawPointer, count: UInt)) -> Int,
+    onErr: (Int) throws(E) -> Void
+) throws(E) {
+    var out2: Data?
+    try call(data: data, out: &out2, fn: { ptrs, out_buf in fn(ptrs, out_buf!) }, onErr: onErr)
+    out = out2!
 }
 
-public class Verifier {
-    private var verifier: OpaquePointer
-    /// Bandersnatch ring root
-    public var ringRoot: Data144
+private func call(
+    _ data: Data...,
+    out: inout Data,
+    fn: ([(ptr: UnsafeRawPointer, count: UInt)], (ptr: UnsafeMutableRawPointer, count: UInt)) -> Int
+) {
+    var out2: Data?
+    call(data: data, out: &out2, fn: { ptrs, out_buf in fn(ptrs, out_buf!) }, onErr: { err in fatalError("unreachable: \(err)") })
+    out = out2!
+}
 
-    public init(ring: [Data32], ringSize: UInt? = nil) throws {
-        var success = false
-        let cPublicArr = try ring.map { try CPublic(data32: $0) }
-        verifier = try verifier_new(cPublicArr, UInt(ring.count), RingSize(ringSize ?? UInt(ring.count)), &success)
-        if !success {
-            throw BandersnatchError.createVerifierFailed
-        }
-
-        var output = [UInt8](repeating: 0, count: 144)
-        success = verifier_commitment(&output, verifier)
-        if !success {
-            throw BandersnatchError.createVerifierFailed
-        }
-        ringRoot = Data144(Data(output))!
+public enum Bandersnatch {
+    public enum Error: Swift.Error {
+        case createSecretFailed(Int)
+        case createPublicKeyFailed(Int)
+        case invalidSeedLength
+        case createRingContextFailed(Int)
+        case ringVRFSignFailed(Int)
+        case ietfVRFSignFailed(Int)
+        case createRingCommitmentFailed(Int)
+        case serializeRingCommitmentFailed(Int)
+        case ringVRFVerifyFailed(Int)
+        case ietfVRFVerifyFailed(Int)
     }
 
-    deinit {
-        verifier_free(verifier)
+    public class SecretKey {
+        fileprivate let ptr: OpaquePointer
+        public let publicKey: PublicKey
+
+        public init(seed: Data) throws(Error) {
+            guard seed.count >= 32 else {
+                throw .invalidSeedLength
+            }
+
+            var ptr: OpaquePointer!
+
+            try call(seed) { ptrs in
+                secret_new(ptrs[0].ptr, ptrs[0].count, &ptr)
+            } onErr: { err throws(Error) in
+                throw .createSecretFailed(err)
+            }
+
+            self.ptr = ptr
+            publicKey = try PublicKey(secretKey: ptr)
+        }
+
+        deinit {
+            secret_free(ptr)
+        }
+
+        /// Non-Anonymous VRF signature.
+        ///
+        /// Used for ticket claiming during block production.
+        public func ietfVRFSign(vrfInputData: Data, auxData: Data) throws -> Data96 {
+            var output = Data(repeating: 0, count: 96)
+
+            try call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
+                prover_ietf_vrf_sign(
+                    ptr,
+                    ptrs[0].ptr,
+                    ptrs[0].count,
+                    ptrs[1].ptr,
+                    ptrs[1].count,
+                    out_buf.ptr,
+                    out_buf.count
+                )
+            } onErr: { err throws(Error) in
+                throw .ietfVRFSignFailed(err)
+            }
+
+            return Data96(Data(output))!
+        }
     }
 
-    /// Anonymous VRF signature verification.
-    ///
-    /// Used for tickets verification.
-    ///
-    /// On success returns the VRF output hash.
-    public func ringVRFVerify(vrfInputData: Data, auxData: Data, signature: Data) -> Result<
-        Data32, BandersnatchError
-    > {
-        var output = [UInt8](repeating: 0, count: 32)
-        let success = verifier_ring_vrf_verify(
-            &output, verifier, [UInt8](vrfInputData), UInt(vrfInputData.count), [UInt8](auxData),
-            UInt(auxData.count), [UInt8](signature), UInt(signature.count)
-        )
-        if !success {
-            return .failure(.verifyRingVrfFailed)
+    public class PublicKey {
+        fileprivate let ptr: OpaquePointer
+        public let data: Data32
+
+        public init(data: Data32) throws(Error) {
+            var ptr: OpaquePointer!
+            try call(data.data) { ptrs in
+                public_new_from_data(ptrs[0].ptr, ptrs[0].count, &ptr)
+            } onErr: { err throws(Error) in
+                throw .createPublicKeyFailed(err)
+            }
+            self.ptr = ptr
+            self.data = data
         }
-        return .success(Data32(Data(output))!)
+
+        fileprivate init(secretKey: OpaquePointer) throws(Error) {
+            var ptr: OpaquePointer!
+            try call { _ in
+                public_new_from_secret(secretKey, &ptr)
+            } onErr: { err throws(Error) in
+                throw .createRingContextFailed(err)
+            }
+
+            var data = Data(repeating: 0, count: 32)
+            call(out: &data) { _, out_buf in
+                public_serialize_compressed(ptr, out_buf.ptr, out_buf.count)
+            }
+
+            self.ptr = ptr
+            self.data = Data32(data)!
+        }
+
+        deinit {
+            public_free(ptr)
+        }
+
+        /// Non-Anonymous VRF signature verification.
+        ///
+        /// Used for ticket claim verification during block import.
+        /// Not used with Safrole test vectors.
+        ///
+        /// On success returns the VRF output hash.
+        public func ietfVRFVerify(
+            vrfInputData: Data, auxData: Data, signature: Data
+        ) throws(Error) -> Data32 {
+            var output = Data(repeating: 0, count: 32)
+
+            try call(vrfInputData, auxData, signature, out: &output) { ptrs, out_buf in
+                verifier_ietf_vrf_verify(
+                    ptr,
+                    ptrs[0].ptr,
+                    ptrs[0].count,
+                    ptrs[1].ptr,
+                    ptrs[1].count,
+                    ptrs[2].ptr,
+                    ptrs[2].count,
+                    out_buf.ptr,
+                    out_buf.count
+                )
+            } onErr: { err throws(Error) in
+                throw .ietfVRFVerifyFailed(err)
+            }
+
+            return Data32(output)!
+        }
     }
 
-    /// Non-Anonymous VRF signature verification.
-    ///
-    /// Used for ticket claim verification during block import.
-    /// Not used with Safrole test vectors.
-    ///
-    /// On success returns the VRF output hash.
-    public func ietfVRFVerify(
-        vrfInputData: Data, auxData: Data, signature: Data, signerKeyIndex: UInt
-    )
-        -> Result<Data32, BandersnatchError>
-    {
-        var output = [UInt8](repeating: 0, count: 32)
-        let success = verifier_ietf_vrf_verify(
-            &output, verifier, [UInt8](vrfInputData), UInt(vrfInputData.count), [UInt8](auxData),
-            UInt(auxData.count), [UInt8](signature), UInt(signature.count), signerKeyIndex
-        )
-        if !success {
-            return .failure(.verifyIetfVrfFailed)
+    public class RingContext {
+        fileprivate let ptr: OpaquePointer
+
+        public init(size: UInt) throws(Error) {
+            var ptr: OpaquePointer!
+            try call { _ in
+                ring_context_new(size, &ptr)
+            } onErr: { err throws(Error) in
+                throw .createRingContextFailed(err)
+            }
+            self.ptr = ptr
         }
-        return .success(Data32(Data(output))!)
+
+        deinit {
+            ring_context_free(ptr)
+        }
+    }
+
+    public class Prover {
+        private let secret: SecretKey
+        private let ring: [PublicKey]
+        private let ringPtrs: [OpaquePointer]
+        private let proverIdx: UInt
+        private let ctx: RingContext
+
+        public init(sercret: SecretKey, ring: [PublicKey], proverIdx: UInt, ctx: RingContext) {
+            secret = sercret
+            self.ring = ring
+            self.proverIdx = proverIdx
+            self.ctx = ctx
+            ringPtrs = ring.map(\.ptr)
+        }
+
+        /// Anonymous VRF signature.
+        ///
+        /// Used for tickets submission.
+        public func ringVRFSign(vrfInputData: Data, auxData: Data) throws(Error) -> Data784 {
+            var output = Data(repeating: 0, count: 784)
+
+            try call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
+                ringPtrs.withUnsafeBufferPointer { ringPtrs in
+                    prover_ring_vrf_sign(
+                        secret.ptr,
+                        ringPtrs.baseAddress?.pointee,
+                        UInt(ringPtrs.count),
+                        proverIdx,
+                        ctx.ptr,
+                        ptrs[0].ptr,
+                        ptrs[0].count,
+                        ptrs[1].ptr,
+                        ptrs[1].count,
+                        out_buf.ptr,
+                        out_buf.count
+                    )
+                }
+            } onErr: { err throws(Error) in
+                throw .ringVRFSignFailed(err)
+            }
+
+            return Data784(output)!
+        }
+    }
+
+    public class RingCommitment {
+        fileprivate let ptr: OpaquePointer
+        public let data: Data144
+
+        public init(ring: [PublicKey], ctx: RingContext) throws(Error) {
+            let ringPtrs = ring.map(\.ptr)
+
+            var ptr: OpaquePointer!
+            try call { _ in
+                ringPtrs.withUnsafeBufferPointer { ringPtrs in
+                    ring_commitment_new_from_ring(
+                        ringPtrs.baseAddress?.pointee,
+                        UInt(ringPtrs.count),
+                        ctx.ptr,
+                        &ptr
+                    )
+                }
+
+            } onErr: { err throws(Error) in
+                throw .createRingCommitmentFailed(err)
+            }
+
+            var out = Data(repeating: 0, count: 144)
+            try call(out: &out) { _, out_buf in
+                ring_commitment_serialize(ptr, out_buf.ptr, out_buf.count)
+            } onErr: { err throws(Error) in
+                throw .serializeRingCommitmentFailed(err)
+            }
+
+            self.ptr = ptr
+            data = Data144(out)!
+        }
+
+        public init(data: Data144) throws(Error) {
+            var ptr: OpaquePointer!
+            try call(data.data) { ptrs in
+                ring_commitment_new_from_data(ptrs[0].ptr, ptrs[0].count, &ptr)
+            } onErr: { err throws(Error) in
+                throw .createRingCommitmentFailed(err)
+            }
+            self.ptr = ptr
+            self.data = data
+        }
+
+        deinit {
+            ring_commitment_free(ptr)
+        }
+    }
+
+    public class Verifier {
+        private let ctx: RingContext
+        private let commitment: RingCommitment
+
+        public init(ctx: RingContext, commitment: RingCommitment) {
+            self.ctx = ctx
+            self.commitment = commitment
+        }
+
+        /// Anonymous VRF signature verification.
+        ///
+        /// Used for tickets verification.
+        ///
+        /// On success returns the VRF output hash.
+        public func ringVRFVerify(vrfInputData: Data, auxData: Data, signature: Data) throws(Error) -> Data32 {
+            var output = Data(repeating: 0, count: 32)
+
+            try call(vrfInputData, auxData, signature, out: &output) { ptrs, out_buf in
+                verifier_ring_vrf_verify(
+                    ctx.ptr,
+                    commitment.ptr,
+                    ptrs[0].ptr,
+                    ptrs[0].count,
+                    ptrs[1].ptr,
+                    ptrs[1].count,
+                    ptrs[2].ptr,
+                    ptrs[2].count,
+                    out_buf.ptr,
+                    out_buf.count
+                )
+            } onErr: { err throws(Error) in
+                throw .ringVRFVerifyFailed(err)
+            }
+
+            return Data32(output)!
+        }
     }
 }

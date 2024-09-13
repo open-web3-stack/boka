@@ -1,232 +1,245 @@
-use std::io::Cursor;
-use std::ptr;
-
 use ark_ec_vrfs::{prelude::ark_serialize, suites::bandersnatch::edwards as bandersnatch};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use bandersnatch::{Public, Secret};
+use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
+use bandersnatch::{Public, RingContext, Secret};
 
-use crate::bandersnatch_vrfs::{Prover, RingSize, Verifier};
+use crate::bandersnatch_vrfs::{
+    ietf_vrf_sign, ietf_vrf_verify, ring_context, ring_vrf_sign, ring_vrf_verify, RingCommitment,
+};
 
-// MARK: Public
+// MARK: Secret
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
-pub struct CPublic([u8; 32]);
-
-impl From<CPublic> for Public {
-    fn from(c_public: CPublic) -> Self {
-        Public::deserialize_compressed(&c_public.0[..]).expect("CPublic to Public failed")
+#[no_mangle]
+pub extern "C" fn secret_new(seed: *const u8, seed_len: usize, out_ptr: *mut *mut Secret) -> isize {
+    if seed.is_null() || out_ptr.is_null() {
+        return 1;
     }
-}
-
-impl From<Public> for CPublic {
-    fn from(public: Public) -> Self {
-        let mut buffer = Vec::with_capacity(32);
-        let mut cursor = Cursor::new(&mut buffer);
-        public
-            .serialize_compressed(&mut cursor)
-            .expect("Public to CPublic failed");
-
-        let mut c_public_bytes = [0u8; 32];
-        c_public_bytes.copy_from_slice(&buffer);
-        CPublic(c_public_bytes)
+    let seed_bytes = unsafe { std::slice::from_raw_parts(seed, seed_len) };
+    let secret = Box::new(Secret::from_seed(seed_bytes));
+    unsafe {
+        *out_ptr = Box::into_raw(secret);
     }
+    0
 }
 
 #[no_mangle]
-pub extern "C" fn public_deserialize_compressed(data: *const u8, len: usize) -> *mut CPublic {
-    if data.is_null() {
-        std::ptr::null_mut()
-    } else {
-        let slice = unsafe { std::slice::from_raw_parts(data, len) };
-
-        match Public::deserialize_compressed(slice) {
-            Ok(public) => Box::into_raw(Box::new(public.into())),
-            Err(_) => std::ptr::null_mut(),
+pub extern "C" fn secret_free(secret: *mut Secret) {
+    if !secret.is_null() {
+        unsafe {
+            drop(Box::from_raw(secret));
         }
     }
 }
 
-// MARK: Secret
+// MARK: Public
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
-pub struct CSecret([u8; 96]);
-
-impl From<CSecret> for Secret {
-    fn from(c_secret: CSecret) -> Self {
-        Secret::deserialize_compressed(&c_secret.0[..]).expect("CSecret to Secret failed")
+#[no_mangle]
+pub extern "C" fn public_new_from_secret(secret: *const Secret, out_ptr: *mut *mut Public) -> isize {
+    if secret.is_null() || out_ptr.is_null() {
+        return 1;
     }
+    let secret: &Secret = unsafe { &*secret };
+
+    let public = Box::new(secret.public());
+    unsafe {
+        *out_ptr = Box::into_raw(public);
+    }
+    0
 }
 
-impl From<Secret> for CSecret {
-    fn from(secret: Secret) -> Self {
-        let mut buffer = Vec::with_capacity(96);
-        let mut cursor = Cursor::new(&mut buffer);
-        secret
-            .serialize_compressed(&mut cursor)
-            .expect("Secret to CSecret failed");
+// public_new_from_data
+#[no_mangle]
+pub extern "C" fn public_new_from_data(data: *const u8, len: usize, out_ptr: *mut *mut Public) -> isize {
+    if data.is_null() || out_ptr.is_null() {
+        return 1;
+    }
+    let data_slice = unsafe { std::slice::from_raw_parts(data, len) };
+    let public = match Public::deserialize_compressed(data_slice) {
+        Ok(public) => Box::new(public),
+        Err(_) => return 2,
+    };
+    unsafe { *out_ptr = Box::into_raw(public) };
+    0
+}
 
-        let mut c_secret_bytes = [0u8; 96];
-        c_secret_bytes.copy_from_slice(&buffer);
-        CSecret(c_secret_bytes)
+#[no_mangle]
+pub extern "C" fn public_free(public: *mut Public) {
+    if !public.is_null() {
+        unsafe {
+            drop(Box::from_raw(public));
+        }
     }
 }
 
 #[no_mangle]
-pub extern "C" fn secret_new_from_seed(seed: *const u8, seed_len: usize) -> *mut CSecret {
-    if seed.is_null() {
-        std::ptr::null_mut()
-    } else {
-        let seed_bytes = unsafe { std::slice::from_raw_parts(seed, seed_len) };
-
-        let secret = Secret::from_seed(seed_bytes);
-
-        Box::into_raw(Box::new(secret.into()))
+pub extern "C" fn public_serialize_compressed(
+    public: *const Public,
+    out: *mut u8,
+    out_len: usize,
+) -> isize {
+    if public.is_null() || out.is_null() {
+        return 1;
+    }
+    if out_len < 32 {
+        return 2;
+    }
+    let public: &Public = unsafe { &*public };
+    let mut out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
+    match public.serialize_compressed(&mut out_slice) {
+        Ok(_) => 0,
+        Err(_) => 3,
     }
 }
 
+// MARK: RingContext
+
 #[no_mangle]
-pub extern "C" fn secret_get_public(secret: *const CSecret) -> *const CPublic {
-    if secret.is_null() {
-        std::ptr::null()
-    } else {
-        let secret = unsafe { &*secret };
+pub extern "C" fn ring_context_new(size: usize, out_ptr: *mut *mut RingContext) -> isize {
+    if out_ptr.is_null() {
+        return 1;
+    }
+    let ctx = ring_context(size);
+    if let Some(ctx) = ctx {
+        unsafe {
+            *out_ptr = Box::into_raw(Box::new(ctx));
+        }
+        return 0;
+    }
+    2
+}
 
-        let public = Into::<Secret>::into(*secret).public();
-
-        Box::into_raw(Box::new(public.into()))
+#[no_mangle]
+pub extern "C" fn ring_context_free(ctx: *mut RingContext) {
+    if !ctx.is_null() {
+        unsafe {
+            drop(Box::from_raw(ctx));
+        }
     }
 }
 
 // MARK: Prover
 
-#[no_mangle]
-pub extern "C" fn prover_new(
-    ring: *const CPublic,
-    ring_len: usize,
-    ring_size: RingSize,
-    prover_idx: usize,
-    success: *mut bool,
-) -> *mut Prover {
-    if ring.is_null() || success.is_null() {
-        unsafe { *success = false };
-        std::ptr::null_mut()
-    } else {
-        let ring_slice_c = unsafe { std::slice::from_raw_parts(ring, ring_len) };
-        let ring_vec = ring_slice_c.iter().map(|&cp| cp.into()).collect();
-        let prover = Prover::new(ring_vec, prover_idx, ring_size);
-        let boxed_prover = Box::new(prover);
-        unsafe { *success = true };
-        Box::into_raw(boxed_prover)
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn prover_free(prover: *mut Prover) {
-    if !prover.is_null() {
-        // drop the `Prover` and deallocate the memory
-        unsafe {
-            let _ = Box::from_raw(prover);
-        };
-    }
-}
-
 /// out is 784 bytes
 #[no_mangle]
 pub extern "C" fn prover_ring_vrf_sign(
-    out: *mut u8,
-    prover: *const Prover,
+    secret: *const Secret,
+    ring: *const Public,
+    ring_len: usize,
+    prover_idx: usize,
+    ctx: *const RingContext,
     vrf_input_data: *const u8,
     vrf_input_len: usize,
     aux_data: *const u8,
     aux_data_len: usize,
-) -> bool {
-    if prover.is_null()
+    out: *mut u8,
+    out_len: usize,
+) -> isize {
+    if secret.is_null()
+        || ring.is_null()
+        || ctx.is_null()
         || vrf_input_data.is_null()
         || aux_data.is_null()
-        || vrf_input_len == 0
         || out.is_null()
     {
-        return false;
+        return 1;
     }
-
+    if out_len < 784 {
+        return 2;
+    }
+    let secret: &Secret = unsafe { &*secret };
+    let ring_slice = unsafe { std::slice::from_raw_parts(ring, ring_len) };
+    let ctx: &RingContext = unsafe { &*ctx };
     let vrf_input_slice = unsafe { std::slice::from_raw_parts(vrf_input_data, vrf_input_len) };
     let aux_data_slice = unsafe { std::slice::from_raw_parts(aux_data, aux_data_len) };
-    let prover = unsafe { &*prover };
-
-    let result = prover.ring_vrf_sign(vrf_input_slice, aux_data_slice);
-    if result.len() != 784 {
-        return false;
+    let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
+    match ring_vrf_sign(
+        secret,
+        ring_slice,
+        prover_idx,
+        ctx,
+        vrf_input_slice,
+        aux_data_slice,
+        out_slice,
+    ) {
+        Ok(_) => 0,
+        Err(_) => 1,
     }
-    unsafe {
-        ptr::copy_nonoverlapping(result.as_ptr(), out, result.len());
-    }
-    true
 }
 
 /// out is 96 bytes
 #[no_mangle]
 pub extern "C" fn prover_ietf_vrf_sign(
-    out: *mut u8,
-    prover: *const Prover,
+    secret: *const Secret,
     vrf_input_data: *const u8,
     vrf_input_len: usize,
     aux_data: *const u8,
     aux_data_len: usize,
-) -> bool {
-    if prover.is_null()
-        || vrf_input_data.is_null()
-        || aux_data.is_null()
-        || vrf_input_len == 0
-        || out.is_null()
-    {
-        return false;
+    out: *mut u8,
+    out_len: usize,
+) -> isize {
+    if secret.is_null() || vrf_input_data.is_null() || aux_data.is_null() || out.is_null() {
+        return 1;
     }
-
+    if out_len < 96 {
+        return 2;
+    }
+    let secret: &Secret = unsafe { &*secret };
     let vrf_input_slice = unsafe { std::slice::from_raw_parts(vrf_input_data, vrf_input_len) };
     let aux_data_slice = unsafe { std::slice::from_raw_parts(aux_data, aux_data_len) };
-    let prover = unsafe { &*prover };
-
-    let result = prover.ietf_vrf_sign(vrf_input_slice, aux_data_slice);
-    if result.len() != 96 {
-        return false;
+    let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
+    match ietf_vrf_sign(secret, vrf_input_slice, aux_data_slice, out_slice) {
+        Ok(_) => 0,
+        Err(_) => 1,
     }
-    unsafe {
-        ptr::copy_nonoverlapping(result.as_ptr(), out, result.len());
-    }
-    true
 }
 
 // MARK: Verifier
 
 #[no_mangle]
-pub extern "C" fn verifier_new(
-    ring: *const CPublic,
+pub extern "C" fn ring_commitment_new_from_ring(
+    ring: *const Public,
     ring_len: usize,
-    ring_size: RingSize,
-    success: *mut bool,
-) -> *mut Verifier {
-    if ring.is_null() || success.is_null() {
-        unsafe { *success = false };
-        std::ptr::null_mut()
-    } else {
-        let ring_slice_c = unsafe { std::slice::from_raw_parts(ring, ring_len) };
-        let ring_vec = ring_slice_c.iter().map(|&cp| cp.into()).collect();
-        let verifier = Verifier::new(ring_vec, ring_size);
-        unsafe { *success = true };
-        let boxed_verifier = Box::new(verifier);
-        Box::into_raw(boxed_verifier)
+    ctx: *const RingContext,
+    out: *mut *mut RingCommitment,
+) -> isize {
+    if ring.is_null() || ctx.is_null() || out.is_null() {
+        return 1;
     }
+    let ring_slice = unsafe { std::slice::from_raw_parts(ring, ring_len) };
+    let ctx: &RingContext = unsafe { &*ctx };
+    // Backend currently requires the wrapped type (plain affine points)
+    let pts: Vec<_> = ring_slice.iter().map(|pk| pk.0).collect();
+    let verifier_key = ctx.verifier_key(&pts);
+    let commitment = verifier_key.commitment();
+    unsafe {
+        *out = Box::into_raw(Box::new(commitment));
+    }
+    0
 }
 
 #[no_mangle]
-pub extern "C" fn verifier_free(verifier: *mut Verifier) {
-    if !verifier.is_null() {
-        // drop the `Verifier` and deallocate the memory
+pub extern "C" fn ring_commitment_new_from_data(
+    data: *const u8,
+    len: usize,
+    out: *mut *mut RingCommitment,
+) -> isize {
+    if data.is_null() || out.is_null() {
+        return 1;
+    }
+    let data_slice = unsafe { std::slice::from_raw_parts(data, len) };
+    let commitment = match RingCommitment::deserialize_compressed(data_slice) {
+        Ok(commitment) => Box::new(commitment),
+        Err(_) => return 2,
+    };
+    unsafe { *out = Box::into_raw(commitment) };
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn ring_commitment_free(commitment: *mut RingCommitment) {
+    if !commitment.is_null() {
         unsafe {
-            let _ = Box::from_raw(verifier);
-        };
+            drop(Box::from_raw(commitment));
+        }
     }
 }
 
@@ -234,110 +247,107 @@ pub extern "C" fn verifier_free(verifier: *mut Verifier) {
 ///
 /// out is 144 bytes
 #[no_mangle]
-pub extern "C" fn verifier_commitment(out: *mut u8, verifier: *mut Verifier) -> bool {
-    if verifier.is_null() {
-        return false;
+pub extern "C" fn ring_commitment_serialize(
+    commitment: *const RingCommitment,
+    out: *mut u8,
+    out_len: usize,
+) -> isize {
+    if commitment.is_null() || out.is_null() {
+        return 1;
     }
-
-    let verifier = unsafe { &*verifier };
-
-    let mut buf = Vec::new();
-    verifier.commitment.serialize_compressed(&mut buf).unwrap();
-
-    if buf.len() != 144 {
-        return false;
+    if out_len < 144 {
+        return 2;
     }
-    unsafe {
-        ptr::copy_nonoverlapping(buf.as_ptr(), out, buf.len());
+    let commitment: &RingCommitment = unsafe { &*commitment };
+    let mut out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
+    match commitment.serialize_compressed(&mut out_slice) {
+        Ok(_) => 0,
+        Err(_) => 3,
     }
-    true
 }
 
 /// out is 32 bytes
 #[no_mangle]
 pub extern "C" fn verifier_ring_vrf_verify(
-    out: *mut u8,
-    verifier: *const Verifier,
+    ctx: *const RingContext,
+    commitment: *const RingCommitment,
     vrf_input_data: *const u8,
     vrf_input_len: usize,
     aux_data: *const u8,
     aux_data_len: usize,
     signature: *const u8,
     signature_len: usize,
-) -> bool {
-    if verifier.is_null()
+    out: *mut u8,
+    out_len: usize,
+) -> isize {
+    if ctx.is_null()
+        || commitment.is_null()
         || vrf_input_data.is_null()
         || aux_data.is_null()
         || signature.is_null()
-        || vrf_input_len == 0
-        || signature_len == 0
         || out.is_null()
     {
-        return false;
+        return 1;
     }
-
+    if out_len < 32 {
+        return 2;
+    }
+    let ctx: &RingContext = unsafe { &*ctx };
+    let commitment: &RingCommitment = unsafe { &*commitment };
     let vrf_input_slice = unsafe { std::slice::from_raw_parts(vrf_input_data, vrf_input_len) };
     let aux_data_slice = unsafe { std::slice::from_raw_parts(aux_data, aux_data_len) };
     let signature_slice = unsafe { std::slice::from_raw_parts(signature, signature_len) };
-
-    let verifier = unsafe { &*verifier };
-
-    let result_array =
-        match verifier.ring_vrf_verify(vrf_input_slice, aux_data_slice, signature_slice) {
-            Ok(array) => array,
-            Err(_) => return false,
-        };
-
-    unsafe {
-        std::ptr::copy_nonoverlapping(result_array.as_ptr(), out, result_array.len());
+    let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
+    match ring_vrf_verify(
+        ctx,
+        commitment,
+        vrf_input_slice,
+        aux_data_slice,
+        signature_slice,
+        out_slice,
+    ) {
+        Ok(_) => 0,
+        Err(_) => 1,
     }
-
-    true
 }
 
 /// out is 32 bytes
 #[no_mangle]
 pub extern "C" fn verifier_ietf_vrf_verify(
-    out: *mut u8,
-    verifier: *const Verifier,
+    public: *const Public,
     vrf_input_data: *const u8,
     vrf_input_len: usize,
     aux_data: *const u8,
     aux_data_len: usize,
     signature: *const u8,
     signature_len: usize,
-    signer_key_index: usize,
-) -> bool {
-    if verifier.is_null()
+    out: *mut u8,
+    out_len: usize,
+) -> isize {
+    if public.is_null()
         || vrf_input_data.is_null()
         || aux_data.is_null()
         || signature.is_null()
-        || vrf_input_len == 0
-        || signature_len == 0
         || out.is_null()
     {
-        return false;
+        return 1;
     }
-
+    if out_len < 32 {
+        return 2;
+    }
+    let public: &Public = unsafe { &*public };
     let vrf_input_slice = unsafe { std::slice::from_raw_parts(vrf_input_data, vrf_input_len) };
     let aux_data_slice = unsafe { std::slice::from_raw_parts(aux_data, aux_data_len) };
     let signature_slice = unsafe { std::slice::from_raw_parts(signature, signature_len) };
-
-    let verifier = unsafe { &*verifier };
-
-    let result_array = match verifier.ietf_vrf_verify(
+    let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
+    match ietf_vrf_verify(
+        public,
         vrf_input_slice,
         aux_data_slice,
         signature_slice,
-        signer_key_index,
+        out_slice,
     ) {
-        Ok(array) => array,
-        Err(_) => return false,
-    };
-
-    unsafe {
-        std::ptr::copy_nonoverlapping(result_array.as_ptr(), out, result_array.len());
+        Ok(_) => 0,
+        Err(_) => 1,
     }
-
-    true
 }
