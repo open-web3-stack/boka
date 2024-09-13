@@ -14,7 +14,7 @@ import Testing
             "f16e5352840afb47e206b5c89f560f2611835855cf2e6ebad1acc9520a72591d",
         ]
 
-        let ringData: [Data32] = ringHexStrings.compactMap { Data32(Data(fromHexString: $0)!) }
+        let ringData = try ringHexStrings.compactMap { try Bandersnatch.PublicKey(data: Data32(Data(fromHexString: $0)!)!) }
 
         var vrfInputData = Data("jam_ticket_seal".utf8)
         let eta2Hex = "bb30a42c1e62f0afda5f0a4e8a562f7a13a24cea00ee81917b86b89e801314aa"
@@ -30,11 +30,13 @@ import Testing
         let signatureBytes = Data(fromHexString: signatureHex)!
 
         // verifier
-        let verifier = try Verifier(ring: ringData)
-        let verifyRes = verifier.ringVRFVerify(
+        let ctx = try Bandersnatch.RingContext(size: 6)
+        let commitment = try Bandersnatch.RingCommitment(ring: ringData, ctx: ctx)
+
+        let verifier = Bandersnatch.Verifier(ctx: ctx, commitment: commitment)
+        let outputHashData = try verifier.ringVRFVerify(
             vrfInputData: vrfInputData, auxData: auxData, signature: signatureBytes
         )
-        let outputHashData = try verifyRes.get()
         #expect(outputHashData != nil)
     }
 }
