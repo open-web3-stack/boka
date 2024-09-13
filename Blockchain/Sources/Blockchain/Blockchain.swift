@@ -19,7 +19,7 @@ public final class Blockchain: Sendable {
 
     public func importBlock(_ block: BlockRef) async throws {
         try await withSpan("importBlock") { span in
-            span.attributes["hash"] = block.hash.description
+            span.attributes.blockHash = block.hash.description
 
             let runtime = Runtime(config: config)
             let parent = try await dataProvider.getState(hash: block.header.parentHash)
