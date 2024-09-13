@@ -420,10 +420,10 @@ mod tests {
             0
         );
 
-		ring_commitment_free(commitment_ptr);
-		ring_context_free(ctx_ptr);
-		for ptr in ring.iter() {
-			public_free(*ptr);
-		}
+        ring_commitment_free(commitment_ptr);
+        ring_context_free(ctx_ptr);
+        for ptr in ring.iter() {
+            public_free(*ptr);
+        }
     }
 }
