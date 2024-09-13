@@ -1,232 +1,252 @@
-use std::io::Cursor;
-use std::ptr;
-
 use ark_ec_vrfs::{prelude::ark_serialize, suites::bandersnatch::edwards as bandersnatch};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use bandersnatch::{Public, Secret};
+use bandersnatch::{Public, RingContext, Secret};
 
-use crate::bandersnatch_vrfs::{Prover, RingSize, Verifier};
+use crate::bandersnatch_vrfs::{
+    ietf_vrf_sign, ietf_vrf_verify, ring_context, ring_vrf_sign, ring_vrf_verify, RingCommitment,
+};
 
-// MARK: Public
+// MARK: Secret
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
-pub struct CPublic([u8; 32]);
-
-impl From<CPublic> for Public {
-    fn from(c_public: CPublic) -> Self {
-        Public::deserialize_compressed(&c_public.0[..]).expect("CPublic to Public failed")
+#[no_mangle]
+pub extern "C" fn secret_new(seed: *const u8, seed_len: usize, out_ptr: *mut *mut Secret) -> isize {
+    if seed.is_null() || out_ptr.is_null() {
+        return 1;
     }
-}
-
-impl From<Public> for CPublic {
-    fn from(public: Public) -> Self {
-        let mut buffer = Vec::with_capacity(32);
-        let mut cursor = Cursor::new(&mut buffer);
-        public
-            .serialize_compressed(&mut cursor)
-            .expect("Public to CPublic failed");
-
-        let mut c_public_bytes = [0u8; 32];
-        c_public_bytes.copy_from_slice(&buffer);
-        CPublic(c_public_bytes)
+    let seed_bytes = unsafe { std::slice::from_raw_parts(seed, seed_len) };
+    let secret = Box::new(Secret::from_seed(seed_bytes));
+    unsafe {
+        *out_ptr = Box::into_raw(secret);
     }
+    0
 }
 
 #[no_mangle]
-pub extern "C" fn public_deserialize_compressed(data: *const u8, len: usize) -> *mut CPublic {
-    if data.is_null() {
-        std::ptr::null_mut()
-    } else {
-        let slice = unsafe { std::slice::from_raw_parts(data, len) };
-
-        match Public::deserialize_compressed(slice) {
-            Ok(public) => Box::into_raw(Box::new(public.into())),
-            Err(_) => std::ptr::null_mut(),
+pub extern "C" fn secret_free(secret: *mut Secret) {
+    if !secret.is_null() {
+        unsafe {
+            drop(Box::from_raw(secret));
         }
     }
 }
 
-// MARK: Secret
+// MARK: Public
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
-pub struct CSecret([u8; 96]);
-
-impl From<CSecret> for Secret {
-    fn from(c_secret: CSecret) -> Self {
-        Secret::deserialize_compressed(&c_secret.0[..]).expect("CSecret to Secret failed")
+#[no_mangle]
+pub extern "C" fn public_new_from_secret(
+    secret: *const Secret,
+    out_ptr: *mut *mut Public,
+) -> isize {
+    if secret.is_null() || out_ptr.is_null() {
+        return 1;
     }
+    let secret: &Secret = unsafe { &*secret };
+
+    let public = Box::new(secret.public());
+    unsafe {
+        *out_ptr = Box::into_raw(public);
+    }
+    0
 }
 
-impl From<Secret> for CSecret {
-    fn from(secret: Secret) -> Self {
-        let mut buffer = Vec::with_capacity(96);
-        let mut cursor = Cursor::new(&mut buffer);
-        secret
-            .serialize_compressed(&mut cursor)
-            .expect("Secret to CSecret failed");
+// public_new_from_data
+#[no_mangle]
+pub extern "C" fn public_new_from_data(
+    data: *const u8,
+    len: usize,
+    out_ptr: *mut *mut Public,
+) -> isize {
+    if data.is_null() || out_ptr.is_null() {
+        return 1;
+    }
+    let data_slice = unsafe { std::slice::from_raw_parts(data, len) };
+    let public = match Public::deserialize_compressed(data_slice) {
+        Ok(public) => Box::new(public),
+        Err(_) => return 2,
+    };
+    unsafe { *out_ptr = Box::into_raw(public) };
+    0
+}
 
-        let mut c_secret_bytes = [0u8; 96];
-        c_secret_bytes.copy_from_slice(&buffer);
-        CSecret(c_secret_bytes)
+#[no_mangle]
+pub extern "C" fn public_free(public: *mut Public) {
+    if !public.is_null() {
+        unsafe {
+            drop(Box::from_raw(public));
+        }
     }
 }
 
 #[no_mangle]
-pub extern "C" fn secret_new_from_seed(seed: *const u8, seed_len: usize) -> *mut CSecret {
-    if seed.is_null() {
-        std::ptr::null_mut()
-    } else {
-        let seed_bytes = unsafe { std::slice::from_raw_parts(seed, seed_len) };
-
-        let secret = Secret::from_seed(seed_bytes);
-
-        Box::into_raw(Box::new(secret.into()))
+pub extern "C" fn public_serialize_compressed(
+    public: *const Public,
+    out: *mut u8,
+    out_len: usize,
+) -> isize {
+    if public.is_null() || out.is_null() {
+        return 1;
+    }
+    if out_len < 32 {
+        return 2;
+    }
+    let public: &Public = unsafe { &*public };
+    let mut out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
+    match public.serialize_compressed(&mut out_slice) {
+        Ok(_) => 0,
+        Err(_) => 3,
     }
 }
 
+// MARK: RingContext
+
 #[no_mangle]
-pub extern "C" fn secret_get_public(secret: *const CSecret) -> *const CPublic {
-    if secret.is_null() {
-        std::ptr::null()
-    } else {
-        let secret = unsafe { &*secret };
+pub extern "C" fn ring_context_new(size: usize, out_ptr: *mut *mut RingContext) -> isize {
+    if out_ptr.is_null() {
+        return 1;
+    }
+    let ctx = ring_context(size);
+    if let Some(ctx) = ctx {
+        unsafe {
+            *out_ptr = Box::into_raw(Box::new(ctx));
+        }
+        return 0;
+    }
+    2
+}
 
-        let public = Into::<Secret>::into(*secret).public();
-
-        Box::into_raw(Box::new(public.into()))
+#[no_mangle]
+pub extern "C" fn ring_context_free(ctx: *mut RingContext) {
+    if !ctx.is_null() {
+        unsafe {
+            drop(Box::from_raw(ctx));
+        }
     }
 }
 
 // MARK: Prover
 
-#[no_mangle]
-pub extern "C" fn prover_new(
-    ring: *const CPublic,
-    ring_len: usize,
-    ring_size: RingSize,
-    prover_idx: usize,
-    success: *mut bool,
-) -> *mut Prover {
-    if ring.is_null() || success.is_null() {
-        unsafe { *success = false };
-        std::ptr::null_mut()
-    } else {
-        let ring_slice_c = unsafe { std::slice::from_raw_parts(ring, ring_len) };
-        let ring_vec = ring_slice_c.iter().map(|&cp| cp.into()).collect();
-        let prover = Prover::new(ring_vec, prover_idx, ring_size);
-        let boxed_prover = Box::new(prover);
-        unsafe { *success = true };
-        Box::into_raw(boxed_prover)
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn prover_free(prover: *mut Prover) {
-    if !prover.is_null() {
-        // drop the `Prover` and deallocate the memory
-        unsafe {
-            let _ = Box::from_raw(prover);
-        };
-    }
-}
-
 /// out is 784 bytes
 #[no_mangle]
 pub extern "C" fn prover_ring_vrf_sign(
-    out: *mut u8,
-    prover: *const Prover,
+    secret: *const Secret,
+    ring: *const *const Public,
+    ring_len: usize,
+    prover_idx: usize,
+    ctx: *const RingContext,
     vrf_input_data: *const u8,
     vrf_input_len: usize,
     aux_data: *const u8,
     aux_data_len: usize,
-) -> bool {
-    if prover.is_null()
+    out: *mut u8,
+    out_len: usize,
+) -> isize {
+    if secret.is_null()
+        || ring.is_null()
+        || ctx.is_null()
         || vrf_input_data.is_null()
         || aux_data.is_null()
-        || vrf_input_len == 0
         || out.is_null()
     {
-        return false;
+        return 1;
     }
-
+    if out_len < 784 {
+        return 2;
+    }
+    let secret: &Secret = unsafe { &*secret };
+    let ring_slice = unsafe { std::slice::from_raw_parts(ring, ring_len) };
+    let ctx: &RingContext = unsafe { &*ctx };
     let vrf_input_slice = unsafe { std::slice::from_raw_parts(vrf_input_data, vrf_input_len) };
     let aux_data_slice = unsafe { std::slice::from_raw_parts(aux_data, aux_data_len) };
-    let prover = unsafe { &*prover };
-
-    let result = prover.ring_vrf_sign(vrf_input_slice, aux_data_slice);
-    if result.len() != 784 {
-        return false;
+    let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
+    match ring_vrf_sign(
+        secret,
+        ring_slice,
+        prover_idx,
+        ctx,
+        vrf_input_slice,
+        aux_data_slice,
+        out_slice,
+    ) {
+        Ok(_) => 0,
+        Err(_) => 1,
     }
-    unsafe {
-        ptr::copy_nonoverlapping(result.as_ptr(), out, result.len());
-    }
-    true
 }
 
 /// out is 96 bytes
 #[no_mangle]
 pub extern "C" fn prover_ietf_vrf_sign(
-    out: *mut u8,
-    prover: *const Prover,
+    secret: *const Secret,
     vrf_input_data: *const u8,
     vrf_input_len: usize,
     aux_data: *const u8,
     aux_data_len: usize,
-) -> bool {
-    if prover.is_null()
-        || vrf_input_data.is_null()
-        || aux_data.is_null()
-        || vrf_input_len == 0
-        || out.is_null()
-    {
-        return false;
+    out: *mut u8,
+    out_len: usize,
+) -> isize {
+    if secret.is_null() || vrf_input_data.is_null() || aux_data.is_null() || out.is_null() {
+        return 1;
     }
-
+    if out_len < 96 {
+        return 2;
+    }
+    let secret: &Secret = unsafe { &*secret };
     let vrf_input_slice = unsafe { std::slice::from_raw_parts(vrf_input_data, vrf_input_len) };
     let aux_data_slice = unsafe { std::slice::from_raw_parts(aux_data, aux_data_len) };
-    let prover = unsafe { &*prover };
-
-    let result = prover.ietf_vrf_sign(vrf_input_slice, aux_data_slice);
-    if result.len() != 96 {
-        return false;
+    let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
+    match ietf_vrf_sign(secret, vrf_input_slice, aux_data_slice, out_slice) {
+        Ok(_) => 0,
+        Err(_) => 1,
     }
-    unsafe {
-        ptr::copy_nonoverlapping(result.as_ptr(), out, result.len());
-    }
-    true
 }
 
 // MARK: Verifier
 
 #[no_mangle]
-pub extern "C" fn verifier_new(
-    ring: *const CPublic,
+pub extern "C" fn ring_commitment_new_from_ring(
+    ring: *const *const Public,
     ring_len: usize,
-    ring_size: RingSize,
-    success: *mut bool,
-) -> *mut Verifier {
-    if ring.is_null() || success.is_null() {
-        unsafe { *success = false };
-        std::ptr::null_mut()
-    } else {
-        let ring_slice_c = unsafe { std::slice::from_raw_parts(ring, ring_len) };
-        let ring_vec = ring_slice_c.iter().map(|&cp| cp.into()).collect();
-        let verifier = Verifier::new(ring_vec, ring_size);
-        unsafe { *success = true };
-        let boxed_verifier = Box::new(verifier);
-        Box::into_raw(boxed_verifier)
+    ctx: *const RingContext,
+    out: *mut *mut RingCommitment,
+) -> isize {
+    if ring.is_null() || ctx.is_null() || out.is_null() {
+        return 1;
     }
+    let ring_slice: &[*const Public] = unsafe { std::slice::from_raw_parts(ring, ring_len) };
+    let ctx: &RingContext = unsafe { &*ctx };
+    // Backend currently requires the wrapped type (plain affine points)
+    let pts: Vec<_> = unsafe { ring_slice.iter().map(|pk| (*(*pk)).0).collect() };
+    let verifier_key = ctx.verifier_key(&pts);
+    let commitment = verifier_key.commitment();
+    unsafe {
+        *out = Box::into_raw(Box::new(commitment));
+    }
+    0
 }
 
 #[no_mangle]
-pub extern "C" fn verifier_free(verifier: *mut Verifier) {
-    if !verifier.is_null() {
-        // drop the `Verifier` and deallocate the memory
+pub extern "C" fn ring_commitment_new_from_data(
+    data: *const u8,
+    len: usize,
+    out: *mut *mut RingCommitment,
+) -> isize {
+    if data.is_null() || out.is_null() {
+        return 1;
+    }
+    let data_slice = unsafe { std::slice::from_raw_parts(data, len) };
+    let commitment = match RingCommitment::deserialize_compressed(data_slice) {
+        Ok(commitment) => Box::new(commitment),
+        Err(_) => return 2,
+    };
+    unsafe { *out = Box::into_raw(commitment) };
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn ring_commitment_free(commitment: *mut RingCommitment) {
+    if !commitment.is_null() {
         unsafe {
-            let _ = Box::from_raw(verifier);
-        };
+            drop(Box::from_raw(commitment));
+        }
     }
 }
 
@@ -234,110 +254,176 @@ pub extern "C" fn verifier_free(verifier: *mut Verifier) {
 ///
 /// out is 144 bytes
 #[no_mangle]
-pub extern "C" fn verifier_commitment(out: *mut u8, verifier: *mut Verifier) -> bool {
-    if verifier.is_null() {
-        return false;
+pub extern "C" fn ring_commitment_serialize(
+    commitment: *const RingCommitment,
+    out: *mut u8,
+    out_len: usize,
+) -> isize {
+    if commitment.is_null() || out.is_null() {
+        return 1;
     }
-
-    let verifier = unsafe { &*verifier };
-
-    let mut buf = Vec::new();
-    verifier.commitment.serialize_compressed(&mut buf).unwrap();
-
-    if buf.len() != 144 {
-        return false;
+    if out_len < 144 {
+        return 2;
     }
-    unsafe {
-        ptr::copy_nonoverlapping(buf.as_ptr(), out, buf.len());
+    let commitment: &RingCommitment = unsafe { &*commitment };
+    let mut out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
+    match commitment.serialize_compressed(&mut out_slice) {
+        Ok(_) => 0,
+        Err(_) => 3,
     }
-    true
 }
 
 /// out is 32 bytes
 #[no_mangle]
 pub extern "C" fn verifier_ring_vrf_verify(
-    out: *mut u8,
-    verifier: *const Verifier,
+    ctx: *const RingContext,
+    commitment: *const RingCommitment,
     vrf_input_data: *const u8,
     vrf_input_len: usize,
     aux_data: *const u8,
     aux_data_len: usize,
     signature: *const u8,
     signature_len: usize,
-) -> bool {
-    if verifier.is_null()
+    out: *mut u8,
+    out_len: usize,
+) -> isize {
+    if ctx.is_null()
+        || commitment.is_null()
         || vrf_input_data.is_null()
         || aux_data.is_null()
         || signature.is_null()
-        || vrf_input_len == 0
-        || signature_len == 0
         || out.is_null()
     {
-        return false;
+        return 1;
     }
-
+    if out_len < 32 {
+        return 2;
+    }
+    let ctx: &RingContext = unsafe { &*ctx };
+    let commitment: &RingCommitment = unsafe { &*commitment };
     let vrf_input_slice = unsafe { std::slice::from_raw_parts(vrf_input_data, vrf_input_len) };
     let aux_data_slice = unsafe { std::slice::from_raw_parts(aux_data, aux_data_len) };
     let signature_slice = unsafe { std::slice::from_raw_parts(signature, signature_len) };
-
-    let verifier = unsafe { &*verifier };
-
-    let result_array =
-        match verifier.ring_vrf_verify(vrf_input_slice, aux_data_slice, signature_slice) {
-            Ok(array) => array,
-            Err(_) => return false,
-        };
-
-    unsafe {
-        std::ptr::copy_nonoverlapping(result_array.as_ptr(), out, result_array.len());
+    let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
+    match ring_vrf_verify(
+        ctx,
+        commitment,
+        vrf_input_slice,
+        aux_data_slice,
+        signature_slice,
+        out_slice,
+    ) {
+        Ok(_) => 0,
+        Err(_) => 3,
     }
-
-    true
 }
 
 /// out is 32 bytes
 #[no_mangle]
 pub extern "C" fn verifier_ietf_vrf_verify(
-    out: *mut u8,
-    verifier: *const Verifier,
+    public: *const Public,
     vrf_input_data: *const u8,
     vrf_input_len: usize,
     aux_data: *const u8,
     aux_data_len: usize,
     signature: *const u8,
     signature_len: usize,
-    signer_key_index: usize,
-) -> bool {
-    if verifier.is_null()
+    out: *mut u8,
+    out_len: usize,
+) -> isize {
+    if public.is_null()
         || vrf_input_data.is_null()
         || aux_data.is_null()
         || signature.is_null()
-        || vrf_input_len == 0
-        || signature_len == 0
         || out.is_null()
     {
-        return false;
+        return 1;
     }
-
+    if out_len < 32 {
+        return 2;
+    }
+    let public: &Public = unsafe { &*public };
     let vrf_input_slice = unsafe { std::slice::from_raw_parts(vrf_input_data, vrf_input_len) };
     let aux_data_slice = unsafe { std::slice::from_raw_parts(aux_data, aux_data_len) };
     let signature_slice = unsafe { std::slice::from_raw_parts(signature, signature_len) };
-
-    let verifier = unsafe { &*verifier };
-
-    let result_array = match verifier.ietf_vrf_verify(
+    let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
+    match ietf_vrf_verify(
+        public,
         vrf_input_slice,
         aux_data_slice,
         signature_slice,
-        signer_key_index,
+        out_slice,
     ) {
-        Ok(array) => array,
-        Err(_) => return false,
-    };
-
-    unsafe {
-        std::ptr::copy_nonoverlapping(result_array.as_ptr(), out, result_array.len());
+        Ok(_) => 0,
+        Err(_) => 3,
     }
+}
 
-    true
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hex_literal::hex;
+
+    #[test]
+    fn test_ring_vrf_sign() {
+        let ring_data = vec![
+            hex!("5e465beb01dbafe160ce8216047f2155dd0569f058afd52dcea601025a8d161d"),
+            hex!("3d5e5a51aab2b048f8686ecd79712a80e3265a114cc73f14bdb2a59233fb66d0"),
+            hex!("aa2b95f7572875b0d0f186552ae745ba8222fc0b5bd456554bfe51c68938f8bc"),
+            hex!("7f6190116d118d643a98878e294ccf62b509e214299931aad8ff9764181a4e33"),
+            hex!("48e5fcdce10e0b64ec4eebd0d9211c7bac2f27ce54bca6f7776ff6fee86ab3e3"),
+            hex!("f16e5352840afb47e206b5c89f560f2611835855cf2e6ebad1acc9520a72591d"),
+        ];
+
+        let signature = hex!("b342bf8f6fa69c745daad2e99c92929b1da2b840f67e5e8015ac22dd1076343ea95c5bb4b69c197bfdc1b7d2f484fe455fb19bba7e8d17fcaf309ba5814bf54f3a74d75b408da8d3b99bf07f7cde373e4fd757061b1c99e0aac4847f1e393e892b566c14a7f8643a5d976ced0a18d12e32c660d59c66c271332138269cb0fe9c2462d5b3c1a6e9f5ed330ff0d70f64218010ff337b0b69b531f916c67ec564097cd842306df1b4b44534c95ff4efb73b17a14476057fdf8678683b251dc78b0b94712179345c794b6bd99aa54b564933651aee88c93b648e91a613c87bc3f445fff571452241e03e7d03151600a6ee259051a23086b408adec7c112dd94bd8123cf0bed88fddac46b7f891f34c29f13bf883771725aa234d398b13c39fd2a871894f1b1e2dbc7fffbc9c65c49d1e9fd5ee0da133bef363d4ebebe63de2b50328b5d7e020303499d55c07cae617091e33a1ee72ba1b65f940852e93e2905fdf577adcf62be9c74ebda9af59d3f11bece8996773f392a2b35693a45a5a042d88a3dc816b689fe596762d4ea7c6024da713304f56dc928be6e8048c651766952b6c40d0f48afc067ca7cbd77763a2d4f11e88e16033b3343f39bf519fe734db8a139d148ccead4331817d46cf469befa64ae153b5923869144dfa669da36171c20e1f757ed5231fa5a08827d83f7b478ddfb44c9bceb5c6c920b8761ff1e3edb03de48fb55884351f0ac5a7a1805b9b6c49c0529deb97e994deaf2dfd008825e8704cdc04b621f316b505fde26ab71b31af7becbc1154f9979e43e135d35720b93b367bedbe6c6182bb6ed99051f28a3ad6d348ba5b178e3ea0ec0bb4a03fe36604a9eeb609857f8334d3b4b34867361ed2ff9163acd9a27fa20303abe9fc29f2d6c921a8ee779f7f77d940b48bc4fce70a58eed83a206fb7db4c1c7ebe7658603495bb40f6a581dd9e235ba0583165b1569052f8fb4a3e604f2dd74ad84531c6b96723c867b06b6fdd1c4ba150cf9080aa6bbf44cc29041090973d56913b9dc755960371568ef1cf03f127fe8eca209db5d18829f5bfb5826f98833e3f42472b47fad995a9a8bb0e41a1df45ead20285a8");
+
+        let ring = ring_data
+            .iter()
+            .map(|data| {
+                let mut ptr: *mut Public = std::ptr::null_mut();
+                public_new_from_data(data.as_ptr(), data.len(), &mut ptr);
+                ptr
+            })
+            .collect::<Vec<_>>();
+        let vrf_input_data = hex!("6a616d5f7469636b65745f7365616cbb30a42c1e62f0afda5f0a4e8a562f7a13a24cea00ee81917b86b89e801314aa01");
+        let aux_data = vec![];
+
+        let mut ctx_ptr: *mut RingContext = std::ptr::null_mut();
+        assert_eq!(ring_context_new(6, &mut ctx_ptr), 0);
+
+        let mut commitment_ptr: *mut RingCommitment = std::ptr::null_mut();
+        assert_eq!(
+            ring_commitment_new_from_ring(
+                ring.as_ptr() as *const *const Public,
+                ring.len(),
+                ctx_ptr,
+                &mut commitment_ptr
+            ),
+            0
+        );
+
+        let mut output = [0u8; 32];
+
+        assert_eq!(
+            verifier_ring_vrf_verify(
+                ctx_ptr,
+                commitment_ptr,
+                vrf_input_data.as_ptr(),
+                vrf_input_data.len(),
+                aux_data.as_ptr(),
+                aux_data.len(),
+                signature.as_ptr(),
+                signature.len(),
+                output.as_mut_ptr(),
+                output.len()
+            ),
+            0
+        );
+
+        ring_commitment_free(commitment_ptr);
+        ring_context_free(ctx_ptr);
+        for ptr in ring.iter() {
+            public_free(*ptr);
+        }
+    }
 }

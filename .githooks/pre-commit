@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if which swiftlint >/dev/null; then
-  swiftlint lint --fix
+  swiftlint lint --fix --quiet
 else
   echo "warning: SwiftLint not installed, download from https://github.com/realm/SwiftLint"
 fi
@@ -10,3 +10,9 @@ git diff --diff-filter=d --staged --name-only | grep -e '\(.*\).swift$' | while 
   swiftformat "${line}";
   git add "$line";
 done
+
+files=$((git diff --cached --name-only --diff-filter=ACMR | grep -Ei "\.rs$") || true)
+if [ ! -z "${files}" ]; then
+    make format-cargo
+    git add $(echo "$files" | paste -s -d " " -)
+fi
