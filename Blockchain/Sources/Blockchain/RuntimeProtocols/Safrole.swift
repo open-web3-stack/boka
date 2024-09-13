@@ -10,7 +10,7 @@ public enum SafroleError: Error {
     case extrinsicsNotSorted
     case extrinsicsTooLow
     case extrinsicsNotUnique
-    case bandersnatchError(BandersnatchError)
+    case bandersnatchError(Bandersnatch.Error)
     case other(any Swift.Error)
 }
 
@@ -252,15 +252,23 @@ extension Safrole {
         }
 
         do {
-            let verifier = try Verifier(ring: nextValidators.map(\.bandersnatch))
-            let newVerifier = try Verifier(ring: validatorQueue.map(\.bandersnatch))
+            let ctx = try Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
+            let commitment = try Bandersnatch.RingCommitment(
+                ring: nextValidators.map { try Bandersnatch.PublicKey(data: $0.bandersnatch) },
+                ctx: ctx
+            )
+            let newCommitment = try Bandersnatch.RingCommitment(
+                ring: validatorQueue.map { try Bandersnatch.PublicKey(data: $0.bandersnatch) },
+                ctx: ctx
+            )
+            let verifier = Bandersnatch.Verifier(ctx: ctx, commitment: commitment)
 
             let (newNextValidators, newCurrentValidators, newPreviousValidators, newTicketsVerifier) = isEpochChange
                 ? (
                     withoutOffenders(offenders: offenders, validators: validatorQueue),
                     nextValidators,
                     currentValidators,
-                    newVerifier.ringRoot
+                    newCommitment.data
                 )
                 : (nextValidators, currentValidators, previousValidators, ticketsVerifier)
 
@@ -364,7 +372,7 @@ extension Safrole {
             return (state: postState, epochMark: epochMark, ticketsMark: ticketsMark)
         } catch let e as SafroleError {
             throw e
-        } catch let e as BandersnatchError {
+        } catch let e as Bandersnatch.Error {
             throw .bandersnatchError(e)
         } catch {
             throw .other(error)
