@@ -83,12 +83,8 @@ public class QuicClient: @unchecked Sendable {
         sendStream.send(buffer: message)
 
         // Wait for a reply
-        return try await withCheckedThrowingContinuation { [weak self] continuation in
-            sendStream.onMessageReceived = { [weak self] result in
-                guard let self else {
-                    continuation.resume(throwing: QuicError.getClientFailed)
-                    return
-                }
+        return try await withCheckedThrowingContinuation { continuation in
+            sendStream.onMessageReceived = { result in
                 switch result {
                 case let .success(quicMessage):
                     continuation.resume(returning: quicMessage)

@@ -5,14 +5,24 @@ import NIO
 
 let quicServerLogger = Logger(label: "QuicServer")
 
-public final class QuicServer: @unchecked Sendable {
+class MessageProcessor {
+    func processMessage(_: QuicMessage, completion: @escaping (Data) -> Void) {
+        let responseData = Data("Processed response".utf8)
+        completion(responseData)
+    }
+}
+
+public final class QuicServer: @unchecked Sendable, QuicConnectionDelegate {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
     private var listener: HQuic?
-    public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
     private let config: QuicConfig
-    // TODO: add manage connections
+//    public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
+    public var onMessageReceived: ((Result<QuicMessage, QuicError>, @escaping (Data) -> Void) -> Void)?
+    private var pendingMessages: AtomicArray<Result<QuicMessage, QuicError>> = .init()
+    private var connections: AtomicArray<QuicConnection> = .init()
+
     init(config: QuicConfig) throws {
         self.config = config
         var rawPointer: UnsafeRawPointer?
@@ -42,6 +52,37 @@ public final class QuicServer: @unchecked Sendable {
     func start() throws {
         try loadConfiguration()
         try openListener(ipAddress: config.ipAddress, port: config.port)
+    }
+
+    public func didReceiveMessage(connection: QuicConnection, stream: QuicStream, result: Result<QuicMessage, QuicError>) {
+        switch result {
+        case let .success(quicMessage):
+            switch quicMessage.type {
+            case .shutdownComplete:
+//                connection.close()
+//                connections.removeAll(where: { $0 === connection })
+                break
+            case .aborted:
+                break
+            case .unknown:
+                break
+            case .received:
+                pendingMessages.append(result)
+                processPendingMessage(connection: connection, stream: stream)
+            default:
+                break
+            }
+        case let .failure(error):
+            logger.error("Failed to receive message: \(error)")
+        }
+    }
+
+    private func processPendingMessage(connection _: QuicConnection, stream: QuicStream) {
+        while let result = pendingMessages.popFirst() {
+            onMessageReceived?(result) { responseData in
+                stream.send(buffer: responseData)
+            }
+        }
     }
 
     private func openListener(ipAddress _: String, port: UInt16) throws {
@@ -96,7 +137,6 @@ public final class QuicServer: @unchecked Sendable {
 
         switch event.pointee.Type {
         case QUIC_LISTENER_EVENT_NEW_CONNECTION:
-            // TODO: Manage connections
             let connection: HQuic = event.pointee.NEW_CONNECTION.Connection
             guard let api = server.api else {
                 return status
@@ -108,7 +148,8 @@ public final class QuicServer: @unchecked Sendable {
                 configuration: server.registration,
                 connection: server.configuration
             )
-            // connectionHandler.onMessageReceived = server.onMessageReceived
+            connectionHandler.delegate = server
+            server.connections.append(connectionHandler)
             status = connectionHandler.setCallbackHandler()
 
         default:

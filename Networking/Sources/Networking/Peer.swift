@@ -34,7 +34,7 @@ public final class Peer: @unchecked Sendable {
     func start() throws {
         // Implement start logic
         try quicServer?.start()
-        quicServer?.onMessageReceived = onMessageReceived
+//        quicServer?.onMessageReceived = onMessageReceived
     }
 
     func close() throws {

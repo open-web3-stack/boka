@@ -5,7 +5,7 @@ import msquic
 let logger = Logger(label: "QuicConnection")
 
 public protocol QuicConnectionDelegate: AnyObject {
-    func didReceiveMessage(_ connection: QuicConnection, result: Result<QuicMessage, QuicError>)
+    func didReceiveMessage(connection: QuicConnection, stream: QuicStream, result: Result<QuicMessage, QuicError>)
 }
 
 public class QuicConnection: QuicStreamDelegate {
@@ -52,7 +52,7 @@ public class QuicConnection: QuicStreamDelegate {
         return api.pointee.ConnectionSetConfiguration(connection, configuration)
     }
 
-    func didReceiveMessage(_ stream: QuicStream, result: Result<QuicMessage, QuicError>) {
+    public func didReceiveMessage(_ stream: QuicStream, result: Result<QuicMessage, QuicError>) {
         switch result {
         case let .success(quicMessage):
             switch quicMessage.type {
@@ -70,7 +70,7 @@ public class QuicConnection: QuicStreamDelegate {
         case let .failure(error):
             logger.error("Failed to receive message: \(error)")
         }
-        delegate?.didReceiveMessage(self, result: result)
+        delegate?.didReceiveMessage(connection: self, stream: stream, result: result)
     }
 
     private static func connectionCallback(
@@ -179,14 +179,14 @@ public class QuicConnection: QuicStreamDelegate {
     }
 
     func close() {
-        if connection != nil {
-            api?.pointee.ConnectionClose(connection)
-            connection = nil
-        }
         for stream in streams {
             stream.close()
         }
         streams.removeAll()
+        if connection != nil {
+            api?.pointee.ConnectionClose(connection)
+            connection = nil
+        }
     }
 
     deinit {

@@ -1,3 +1,5 @@
+import Foundation
+import NIO
 import Testing
 
 @testable import Networking
@@ -9,11 +11,46 @@ import Testing
 
 final class QuicServerTests {
     @Test func start() throws {
-        // do {
-        //     let server = try QuicServer()
-        //     try server.start(ipAddress: "127.0.0.1", port: 4568)
-        // } catch {
-        //     print("Failed to start server: \(error)")
-        // }
+        do {
+            let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+            let quicServer = try QuicServer(
+                config: QuicConfig(
+                    id: "public-key", cert: cert, key: keyFile, alpn: "sample",
+                    ipAddress: "127.0.0.1", port: 4568
+                )
+            )
+            class MessageProcessor {
+                func processMessage(_: QuicMessage, completion: @escaping (Data) -> Void) {
+                    let responseData = Data("Processed response".utf8)
+                    completion(responseData)
+                }
+            }
+            let messageProcessor: MessageProcessor = .init()
+
+            quicServer.onMessageReceived = { result, completion in
+                switch result {
+                case let .success(message):
+                    print("Server received: \(message)")
+                    switch message.type {
+                    case .received:
+                        let buffer = message.data!
+                        print(
+                            "Server received: \(String([UInt8](buffer).map { Character(UnicodeScalar($0)) }))"
+                        )
+                        messageProcessor.processMessage(message) { responseData in
+                            completion(responseData)
+                        }
+                    default:
+                        break
+                    }
+                case let .failure(error):
+                    print("Server error: \(error)")
+                }
+            }
+            try quicServer.start()
+            try group.next().scheduleTask(in: .hours(1)) {}.futureResult.wait()
+        } catch {
+            print("Failed to start quic server: \(error)")
+        }
     }
 }

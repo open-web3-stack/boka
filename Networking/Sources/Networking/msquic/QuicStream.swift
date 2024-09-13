@@ -10,11 +10,11 @@ public enum StreamKind {
     case unknown
 }
 
-protocol QuicStreamDelegate: AnyObject {
+public protocol QuicStreamDelegate: AnyObject {
     func didReceiveMessage(_ stream: QuicStream, result: Result<QuicMessage, QuicError>)
 }
 
-class QuicStream {
+public class QuicStream {
     private var stream: HQuic?
     private let api: UnsafePointer<QuicApiTable>?
     private let connection: HQuic?
@@ -58,6 +58,7 @@ class QuicStream {
         case QUIC_STREAM_EVENT_RECEIVE:
             let bufferCount: UInt32 = event.pointee.RECEIVE.BufferCount
             let buffers = event.pointee.RECEIVE.Buffers
+            var receivedData = Data()
             for i in 0 ..< bufferCount {
                 let buffer = buffers![Int(i)]
                 let bufferLength = Int(buffer.Length)
@@ -65,9 +66,11 @@ class QuicStream {
                 streamLogger.info(
                     " Data length \(bufferLength) bytes: \(String([UInt8](bufferData).map { Character(UnicodeScalar($0)) }))"
                 )
+                receivedData.append(bufferData)
                 let message = QuicMessage(type: .received, data: bufferData)
                 quicStream.onMessageReceived?(.success(message))
             }
+            quicStream.delegate?.didReceiveMessage(quicStream, result: .success(QuicMessage(type: .received, data: receivedData)))
 
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
             streamLogger.info("[\(String(describing: stream))] Peer shut down")
