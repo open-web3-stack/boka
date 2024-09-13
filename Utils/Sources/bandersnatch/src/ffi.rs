@@ -1,5 +1,5 @@
 use ark_ec_vrfs::{prelude::ark_serialize, suites::bandersnatch::edwards as bandersnatch};
-use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use bandersnatch::{Public, RingContext, Secret};
 
 use crate::bandersnatch_vrfs::{
@@ -33,7 +33,10 @@ pub extern "C" fn secret_free(secret: *mut Secret) {
 // MARK: Public
 
 #[no_mangle]
-pub extern "C" fn public_new_from_secret(secret: *const Secret, out_ptr: *mut *mut Public) -> isize {
+pub extern "C" fn public_new_from_secret(
+    secret: *const Secret,
+    out_ptr: *mut *mut Public,
+) -> isize {
     if secret.is_null() || out_ptr.is_null() {
         return 1;
     }
@@ -48,7 +51,11 @@ pub extern "C" fn public_new_from_secret(secret: *const Secret, out_ptr: *mut *m
 
 // public_new_from_data
 #[no_mangle]
-pub extern "C" fn public_new_from_data(data: *const u8, len: usize, out_ptr: *mut *mut Public) -> isize {
+pub extern "C" fn public_new_from_data(
+    data: *const u8,
+    len: usize,
+    out_ptr: *mut *mut Public,
+) -> isize {
     if data.is_null() || out_ptr.is_null() {
         return 1;
     }
