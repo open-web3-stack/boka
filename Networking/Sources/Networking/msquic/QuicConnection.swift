@@ -99,7 +99,6 @@ public class QuicConnection: QuicStreamDelegate {
         switch event.pointee.Type {
         case QUIC_CONNECTION_EVENT_CONNECTED:
             logger.info("[\(String(describing: connection))] Connected")
-            quicConnection.onMessageReceived?(.success(QuicMessage(type: .connected, data: nil)))
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
             if event.pointee.SHUTDOWN_INITIATED_BY_TRANSPORT.Status

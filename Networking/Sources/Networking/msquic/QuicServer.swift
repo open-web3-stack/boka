@@ -3,13 +3,10 @@ import Logging
 import msquic
 import NIO
 
-let quicServerLogger = Logger(label: "QuicServer")
+let serverLogger = Logger(label: "QuicServer")
 
-class MessageProcessor {
-    func processMessage(_: QuicMessage, completion: @escaping (Data) -> Void) {
-        let responseData = Data("Processed response".utf8)
-        completion(responseData)
-    }
+public protocol QuicServerDelegate: AnyObject {
+    func didReceiveMessage(quicServer: QuicServer, messageID: Int64, result: Result<QuicMessage, QuicError>)
 }
 
 public final class QuicServer: @unchecked Sendable, QuicConnectionDelegate {
@@ -18,10 +15,8 @@ public final class QuicServer: @unchecked Sendable, QuicConnectionDelegate {
     private var configuration: HQuic?
     private var listener: HQuic?
     private let config: QuicConfig
-    //    public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
-    public var onMessageReceived:
-        ((Result<QuicMessage, QuicError>, @escaping (Data) -> Void) -> Void)?
-    private var pendingMessages: AtomicArray<Result<QuicMessage, QuicError>> = .init()
+    public var delegate: QuicServerDelegate?
+    private var pendingMessages: AtomicDictionary<Int64, (QuicConnection, QuicStream)> = .init()
     private var connections: AtomicArray<QuicConnection> = .init()
 
     init(config: QuicConfig) throws {
@@ -55,6 +50,27 @@ public final class QuicServer: @unchecked Sendable, QuicConnectionDelegate {
         try openListener(ipAddress: config.ipAddress, port: config.port)
     }
 
+    func sendMessage(_ message: Data, to messageID: Int64) {
+        if let (_, stream) = pendingMessages[messageID] {
+            stream.send(buffer: message)
+            serverLogger.info("Message sent: \(messageID)")
+            _ = pendingMessages.removeValue(forKey: messageID)
+        } else {
+            serverLogger.error("Message not found")
+        }
+    }
+
+    func sendMessage(_ message: Data, to messageID: Int64) async throws {
+        if let (_, stream) = pendingMessages[messageID] {
+            let quicMessage = try await stream.send(buffer: message)
+            serverLogger.info("Message sent: \(quicMessage)")
+            _ = pendingMessages.removeValue(forKey: messageID)
+        } else {
+            serverLogger.error("Message not found")
+            throw QuicError.messageNotFound
+        }
+    }
+
     public func didReceiveMessage(
         connection: QuicConnection, stream: QuicStream, result: Result<QuicMessage, QuicError>
     ) {
@@ -68,8 +84,7 @@ public final class QuicServer: @unchecked Sendable, QuicConnectionDelegate {
             case .unknown:
                 break
             case .received:
-                pendingMessages.append(result)
-                processPendingMessage(connection: connection, stream: stream)
+                processPendingMessage(connection: connection, stream: stream, result: result)
             default:
                 break
             }
@@ -78,12 +93,10 @@ public final class QuicServer: @unchecked Sendable, QuicConnectionDelegate {
         }
     }
 
-    private func processPendingMessage(connection _: QuicConnection, stream: QuicStream) {
-        while let result = pendingMessages.popFirst() {
-            onMessageReceived?(result) { responseData in
-                stream.send(buffer: responseData)
-            }
-        }
+    private func processPendingMessage(connection: QuicConnection, stream: QuicStream, result: Result<QuicMessage, QuicError>) {
+        let messageID = Int64(Date().timeIntervalSince1970 * 1000)
+        pendingMessages[messageID] = (connection, stream)
+        delegate?.didReceiveMessage(quicServer: self, messageID: messageID, result: result)
     }
 
     private func openListener(ipAddress _: String, port: UInt16) throws {
@@ -135,10 +148,10 @@ public final class QuicServer: @unchecked Sendable, QuicConnectionDelegate {
             return status
         }
         let server: QuicServer = Unmanaged<QuicServer>.fromOpaque(context).takeUnretainedValue()
-        quicServerLogger.info("Server listener callback type \(event.pointee.Type.rawValue)")
+        serverLogger.info("Server listener callback type \(event.pointee.Type.rawValue)")
         switch event.pointee.Type {
         case QUIC_LISTENER_EVENT_NEW_CONNECTION:
-            quicServerLogger.info("New connection")
+            serverLogger.info("New connection")
             let connection: HQuic = event.pointee.NEW_CONNECTION.Connection
             guard let api = server.api else {
                 return status
