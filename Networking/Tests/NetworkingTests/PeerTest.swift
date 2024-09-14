@@ -35,23 +35,6 @@ final class PeerTests {
                 )
             )
             try peer.start()
-            peer.onMessageReceived = { result in
-                switch result {
-                case let .success(message):
-                    print("Peer received: \(message)")
-                case let .failure(error):
-                    print("Peer error: \(error)")
-                }
-            }
-            try group.next().scheduleTask(in: .seconds(5)) {
-                peer.sendToPeer(
-                    message: Message(type: .text, data: Data("Hello, World!".utf8)),
-                    peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4567),
-                    completion: { result in
-                        print("Message sent: \(result)")
-                    }
-                )
-            }.futureResult.wait()
             try group.next().scheduleTask(in: .hours(1)) {}.futureResult.wait()
 
         } catch {
