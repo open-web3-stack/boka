@@ -19,13 +19,6 @@ final class QuicServerTests {
                     ipAddress: "127.0.0.1", port: 4568
                 )
             )
-            class MessageProcessor {
-                func processMessage(_: QuicMessage, completion: @escaping (Data) -> Void) {
-                    let responseData = Data("Processed response".utf8)
-                    completion(responseData)
-                }
-            }
-            let messageProcessor: MessageProcessor = .init()
 
             quicServer.onMessageReceived = { result, completion in
                 switch result {
@@ -37,9 +30,7 @@ final class QuicServerTests {
                         print(
                             "Server received: \(String([UInt8](buffer).map { Character(UnicodeScalar($0)) }))"
                         )
-                        messageProcessor.processMessage(message) { responseData in
-                            completion(responseData)
-                        }
+                        completion(buffer)
                     default:
                         break
                     }

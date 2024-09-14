@@ -62,8 +62,6 @@ public final class QuicServer: @unchecked Sendable, QuicConnectionDelegate {
         case let .success(quicMessage):
             switch quicMessage.type {
             case .shutdownComplete:
-                //                connection.close()
-                //                connections.removeAll(where: { $0 === connection })
                 break
             case .aborted:
                 break
