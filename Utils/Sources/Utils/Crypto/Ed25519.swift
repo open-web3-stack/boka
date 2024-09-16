@@ -2,20 +2,12 @@ import Crypto
 import Foundation
 
 public enum Ed25519: KeyType {
-    public enum Error: Swift.Error {
-        case invalidPrivateKey
-        case signatureError
-    }
-
     public final class SecretKey: SecretKeyProtocol {
         private let secretKey: Curve25519.Signing.PrivateKey
         public let publicKey: PublicKey
 
         public init(from seed: Data32) throws {
-            guard let key = try? Curve25519.Signing.PrivateKey(rawRepresentation: seed.data) else {
-                throw Error.invalidPrivateKey
-            }
-            secretKey = key
+            secretKey = try Curve25519.Signing.PrivateKey(rawRepresentation: seed.data)
             publicKey = PublicKey(pk: key.publicKey)
         }
 
@@ -35,10 +27,7 @@ public enum Ed25519: KeyType {
         }
 
         public init(from data: Data32) throws {
-            guard let key = try? Curve25519.Signing.PublicKey(rawRepresentation: data.data) else {
-                throw Error.invalidPrivateKey
-            }
-            publicKey = key
+            publicKey = try Curve25519.Signing.PublicKey(rawRepresentation: data.data)
             self.data = data
         }
 
