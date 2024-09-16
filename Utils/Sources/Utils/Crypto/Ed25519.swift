@@ -8,7 +8,7 @@ public enum Ed25519: KeyType {
 
         public init(from seed: Data32) throws {
             secretKey = try Curve25519.Signing.PrivateKey(rawRepresentation: seed.data)
-            publicKey = PublicKey(pk: key.publicKey)
+            publicKey = PublicKey(pk: secretKey.publicKey)
         }
 
         public func sign(message: Data) throws -> Data64 {
