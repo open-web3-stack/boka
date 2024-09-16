@@ -12,7 +12,7 @@ public class IsAuthorizedContext: HostCallContext {
             Gas.call(state: state, input: ())
         } else {
             state.consumeGas(10)
-            state.writeRegister(Registers.Index(raw: 0), HostCallResultConstants.WHAT)
+            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHAT.rawValue)
         }
         return .continued
     }
