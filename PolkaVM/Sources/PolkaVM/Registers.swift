@@ -14,6 +14,10 @@ public struct Registers: Equatable {
         public init(rd: UInt8) {
             value = min(rd, 12)
         }
+
+        public init(raw: UInt8) {
+            value = raw
+        }
     }
 
     public var reg1: UInt32 = 0

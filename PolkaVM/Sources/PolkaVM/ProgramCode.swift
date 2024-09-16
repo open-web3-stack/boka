@@ -98,7 +98,7 @@ public class ProgramCode {
 
     /// traverse the program code and collect basic block indices
     private static func getBasicBlockIndices(code: Data, bitmask: Data) -> Set<UInt32> {
-        // TODO: parse the instructions here and so we don't need to do skip calculation twice
+        // TODO: parse the instructions here and so we don't need to do skip calculation multiple times
         var res: Set<UInt32> = [0]
         var i = UInt32(0)
         while i < code.count {
