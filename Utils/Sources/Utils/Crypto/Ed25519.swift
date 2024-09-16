@@ -1,38 +1,68 @@
 import Crypto
 import Foundation
 
-public struct Ed25519 {
-    public let secretKey: Curve25519.Signing.PrivateKey
-
-    public var publicKey: Data32 {
-        Data32(secretKey.publicKey.rawRepresentation)!
+public enum Ed25519: KeyType {
+    public enum Error: Swift.Error {
+        case invalidPrivateKey
+        case signatureError
     }
 
-    public var privateKey: Data32 {
-        Data32(secretKey.rawRepresentation)!
-    }
+    public final class SecretKey: SecretKeyProtocol {
+        private let secretKey: Curve25519.Signing.PrivateKey
+        public let publicKey: PublicKey
 
-    public init() {
-        secretKey = Curve25519.Signing.PrivateKey()
-    }
-
-    public init?(privateKey: Data32) {
-        guard let key = try? Curve25519.Signing.PrivateKey(rawRepresentation: privateKey.data) else {
-            return nil
-        }
-        secretKey = key
-    }
-
-    public func sign(message: Data) throws -> Data64 {
-        let signature = try secretKey.signature(for: message)
-        return Data64(signature)!
-    }
-
-    public static func verify(signature: Data64, message: Data, publicKey: Data32) -> Bool {
-        guard let publicKey = try? Curve25519.Signing.PublicKey(rawRepresentation: publicKey.data) else {
-            return false
+        public init(from seed: Data32) throws {
+            guard let key = try? Curve25519.Signing.PrivateKey(rawRepresentation: seed.data) else {
+                throw Error.invalidPrivateKey
+            }
+            secretKey = key
+            publicKey = PublicKey(pk: key.publicKey)
         }
 
-        return publicKey.isValidSignature(signature.data, for: message)
+        public func sign(message: Data) throws -> Data64 {
+            let signature = try secretKey.signature(for: message)
+            return Data64(signature)!
+        }
+    }
+
+    public final class PublicKey: PublicKeyProtocol {
+        private let publicKey: Curve25519.Signing.PublicKey
+        public let data: Data32
+
+        fileprivate init(pk: Curve25519.Signing.PublicKey) {
+            publicKey = pk
+            data = Data32(pk.rawRepresentation)!
+        }
+
+        public init(from data: Data32) throws {
+            guard let key = try? Curve25519.Signing.PublicKey(rawRepresentation: data.data) else {
+                throw Error.invalidPrivateKey
+            }
+            publicKey = key
+            self.data = data
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(data)
+        }
+
+        public convenience init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            let data = try container.decode(Data32.self)
+            try self.init(from: data)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(data)
+        }
+
+        public static func == (lhs: PublicKey, rhs: PublicKey) -> Bool {
+            lhs.data == rhs.data
+        }
+
+        public func verify(signature: Data64, message: Data) -> Bool {
+            publicKey.isValidSignature(signature.data, for: message)
+        }
     }
 }
