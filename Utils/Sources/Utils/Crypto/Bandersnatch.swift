@@ -76,11 +76,10 @@ private func call(
     out = out2!
 }
 
-public enum Bandersnatch {
+public enum Bandersnatch: KeyType {
     public enum Error: Swift.Error {
         case createSecretFailed(Int)
         case createPublicKeyFailed(Int)
-        case invalidSeedLength
         case createRingContextFailed(Int)
         case ringVRFSignFailed(Int)
         case ietfVRFSignFailed(Int)
@@ -90,18 +89,14 @@ public enum Bandersnatch {
         case ietfVRFVerifyFailed(Int)
     }
 
-    public class SecretKey {
+    public final class SecretKey: SecretKeyProtocol {
         fileprivate let ptr: OpaquePointer
         public let publicKey: PublicKey
 
-        public init(seed: Data) throws(Error) {
-            guard seed.count >= 32 else {
-                throw .invalidSeedLength
-            }
-
+        public init(from seed: Data32) throws(Error) {
             var ptr: OpaquePointer!
 
-            try call(seed) { ptrs in
+            try call(seed.data) { ptrs in
                 secret_new(ptrs[0].ptr, ptrs[0].count, &ptr)
             } onErr: { err throws(Error) in
                 throw .createSecretFailed(err)
@@ -139,7 +134,7 @@ public enum Bandersnatch {
         }
     }
 
-    public class PublicKey {
+    public final class PublicKey: PublicKeyProtocol, Hashable {
         fileprivate let ptr: OpaquePointer
         public let data: Data32
 
@@ -175,6 +170,25 @@ public enum Bandersnatch {
             public_free(ptr)
         }
 
+        public convenience init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            let data = try container.decode(Data32.self)
+            try self.init(data: data)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(data)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(data)
+        }
+
+        public static func == (lhs: PublicKey, rhs: PublicKey) -> Bool {
+            lhs.data == rhs.data
+        }
+
         /// Non-Anonymous VRF signature verification.
         ///
         /// Used for ticket claim verification during block import.
@@ -206,7 +220,7 @@ public enum Bandersnatch {
         }
     }
 
-    public class RingContext {
+    public final class RingContext {
         fileprivate let ptr: OpaquePointer
 
         public init(size: UInt) throws(Error) {
@@ -224,7 +238,7 @@ public enum Bandersnatch {
         }
     }
 
-    public class Prover {
+    public final class Prover {
         private let secret: SecretKey
         private let ring: [PublicKey]
         private let ringPtrs: [OpaquePointer?]
@@ -269,7 +283,7 @@ public enum Bandersnatch {
         }
     }
 
-    public class RingCommitment {
+    public final class RingCommitment {
         fileprivate let ptr: OpaquePointer
         public let data: Data144
 
@@ -318,7 +332,7 @@ public enum Bandersnatch {
         }
     }
 
-    public class Verifier {
+    public struct Verifier {
         private let ctx: RingContext
         private let commitment: RingCommitment
 
