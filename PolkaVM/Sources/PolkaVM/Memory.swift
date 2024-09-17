@@ -202,7 +202,7 @@ public class Memory {
         try getSection(forAddress: address).read(address: address, length: 1).first ?? 0
     }
 
-    public func read(address: UInt32, length: Int) throws -> Data {
+    public func read(address: UInt32, length: Int) throws(Error) -> Data {
         try getSection(forAddress: address).read(address: address, length: length)
     }
 

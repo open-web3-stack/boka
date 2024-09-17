@@ -1,3 +1,5 @@
+import Utils
+
 public class Validator {
     private let blockchain: Blockchain
     private var keystore: KeyStore

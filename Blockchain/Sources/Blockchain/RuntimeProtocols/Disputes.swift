@@ -10,6 +10,7 @@ public enum DisputeError: Error {
     case invalidJudgementsCount
     case expectInFaults
     case expectInCulprits
+    case invalidPublicKey
 }
 
 public struct ReportItem: Sendable, Equatable, Codable {
@@ -99,7 +100,10 @@ extension Disputes {
 
                 let prefix = judgement.isValid ? SigningContext.valid : SigningContext.invalid
                 let payload = prefix + verdict.reportHash.data
-                guard Ed25519.verify(signature: judgement.signature, message: payload, publicKey: signer) else {
+                let pubkey = try Result { try Ed25519.PublicKey(from: signer) }
+                    .mapError { _ in DisputeError.invalidPublicKey }
+                    .get()
+                guard pubkey.verify(signature: judgement.signature, message: payload) else {
                     throw .invalidJudgementSignature
                 }
             }
