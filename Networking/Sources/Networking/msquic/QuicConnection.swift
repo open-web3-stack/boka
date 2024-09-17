@@ -10,7 +10,7 @@ public protocol QuicConnectionDelegate: AnyObject {
     )
 }
 
-public class QuicConnection: QuicStreamDelegate {
+public class QuicConnection {
     private var connection: HQuic?
     private let api: UnsafePointer<QuicApiTable>?
     private let registration: HQuic?
@@ -62,27 +62,6 @@ public class QuicConnection: QuicStreamDelegate {
         )
 
         return api.pointee.ConnectionSetConfiguration(connection, configuration)
-    }
-
-    public func didReceiveMessage(_ stream: QuicStream, result: Result<QuicMessage, QuicError>) {
-        switch result {
-        case let .success(quicMessage):
-            switch quicMessage.type {
-            case .shutdownComplete:
-                removeStream(stream: stream)
-            case .aborted:
-                break
-            case .unknown:
-                break
-            case .received:
-                break
-            default:
-                break
-            }
-        case let .failure(error):
-            logger.error("Failed to receive message: \(error)")
-        }
-        delegate?.didReceiveMessage(connection: self, stream: stream, result: result)
     }
 
     private static func connectionCallback(
@@ -202,5 +181,28 @@ public class QuicConnection: QuicStreamDelegate {
 
     deinit {
         logger.info("QuicConnection Deinit")
+    }
+}
+
+extension QuicConnection: QuicStreamDelegate {
+    public func didReceiveMessage(_ stream: QuicStream, result: Result<QuicMessage, QuicError>) {
+        switch result {
+        case let .success(quicMessage):
+            switch quicMessage.type {
+            case .shutdownComplete:
+                removeStream(stream: stream)
+            case .aborted:
+                break
+            case .unknown:
+                break
+            case .received:
+                break
+            default:
+                break
+            }
+        case let .failure(error):
+            logger.error("Failed to receive message: \(error)")
+        }
+        delegate?.didReceiveMessage(connection: self, stream: stream, result: result)
     }
 }

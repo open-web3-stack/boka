@@ -9,7 +9,7 @@ public protocol QuicServerDelegate: AnyObject {
     func didReceiveMessage(quicServer: QuicServer, messageID: Int64, result: Result<QuicMessage, QuicError>)
 }
 
-public final class QuicServer: @unchecked Sendable, QuicConnectionDelegate {
+public final class QuicServer: @unchecked Sendable {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
@@ -69,34 +69,6 @@ public final class QuicServer: @unchecked Sendable, QuicConnectionDelegate {
             serverLogger.error("Message not found")
             throw QuicError.messageNotFound
         }
-    }
-
-    public func didReceiveMessage(
-        connection: QuicConnection, stream: QuicStream, result: Result<QuicMessage, QuicError>
-    ) {
-        switch result {
-        case let .success(quicMessage):
-            switch quicMessage.type {
-            case .shutdownComplete:
-                break
-            case .aborted:
-                break
-            case .unknown:
-                break
-            case .received:
-                processPendingMessage(connection: connection, stream: stream, result: result)
-            default:
-                break
-            }
-        case let .failure(error):
-            logger.error("Failed to receive message: \(error)")
-        }
-    }
-
-    private func processPendingMessage(connection: QuicConnection, stream: QuicStream, result: Result<QuicMessage, QuicError>) {
-        let messageID = Int64(Date().timeIntervalSince1970 * 1000)
-        pendingMessages[messageID] = (connection, stream)
-        delegate?.didReceiveMessage(quicServer: self, messageID: messageID, result: result)
     }
 
     private func openListener(ipAddress _: String, port: UInt16) throws {
@@ -187,6 +159,36 @@ public final class QuicServer: @unchecked Sendable, QuicConnectionDelegate {
             registration = nil
         }
         MsQuicClose(api)
+    }
+}
+
+extension QuicServer: QuicConnectionDelegate {
+    public func didReceiveMessage(
+        connection: QuicConnection, stream: QuicStream, result: Result<QuicMessage, QuicError>
+    ) {
+        switch result {
+        case let .success(quicMessage):
+            switch quicMessage.type {
+            case .shutdownComplete:
+                break
+            case .aborted:
+                break
+            case .unknown:
+                break
+            case .received:
+                processPendingMessage(connection: connection, stream: stream, result: result)
+            default:
+                break
+            }
+        case let .failure(error):
+            logger.error("Failed to receive message: \(error)")
+        }
+    }
+
+    private func processPendingMessage(connection: QuicConnection, stream: QuicStream, result: Result<QuicMessage, QuicError>) {
+        let messageID = Int64(Date().timeIntervalSince1970 * 1000)
+        pendingMessages[messageID] = (connection, stream)
+        delegate?.didReceiveMessage(quicServer: self, messageID: messageID, result: result)
     }
 }
 
