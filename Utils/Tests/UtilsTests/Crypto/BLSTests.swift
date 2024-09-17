@@ -5,35 +5,33 @@ import Testing
 
 @Suite struct BLSTests {
     @Test func BLSSignatureWorks() throws {
-        let bls = try BLS(ikm: Data("this is random high entropy ikm for key1".utf8))
+        let bls = try BLS.SecretKey(from: Data32())
         let publicKey1 = bls.publicKey
         let message1 = Data("test1".utf8)
         let signature1 = bls.sign(message: message1)
 
         #expect(
-            BLS.verify(signature: signature1, message: message1, publicKey: publicKey1)
+            publicKey1.verify(signature: signature1, message: message1)
         )
 
         let invalidMessage = Data("testUnknown".utf8)
         #expect(
-            !BLS.verify(signature: signature1, message: invalidMessage, publicKey: publicKey1)
+            !publicKey1.verify(signature: signature1, message: invalidMessage)
         )
 
         var invalidSignature = signature1.data
         invalidSignature.replaceSubrange(0 ... 1, with: [2, 3])
         #expect(
-            !BLS.verify(
-                signature: Data96(invalidSignature)!, message: message1, publicKey: publicKey1
-            )
+            !publicKey1.verify(signature: Data96(invalidSignature)!, message: message1)
         )
 
-        let bls2 = try BLS(ikm: Data("this is random high entropy ikm for key2".utf8))
+        let bls2 = try BLS.SecretKey(from: Data32.random())
         let publicKey2 = bls2.publicKey
         let message2 = Data("test2".utf8)
         let signature2 = bls2.sign(message: message2)
 
         #expect(
-            BLS.verify(signature: signature2, message: message2, publicKey: publicKey2)
+            publicKey2.verify(signature: signature2, message: message2)
         )
 
         let aggSig = try BLS.aggregateSignatures(signatures: [signature1, signature2])

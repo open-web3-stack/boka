@@ -80,6 +80,19 @@ extension FixedSizeData: EncodedSize {
     }
 }
 
+extension FixedSizeData {
+    public static func random() -> Self {
+        var data = Data(repeating: 0, count: T.value)
+        data.withUnsafeMutableBytes { ptr in
+            ptr.baseAddress!.withMemoryRebound(to: UInt8.self, capacity: T.value) { ptr in
+                arc4random_buf(ptr, T.value)
+            }
+        }
+
+        return Self(data)!
+    }
+}
+
 public typealias Data32 = FixedSizeData<ConstInt32>
 public typealias Data48 = FixedSizeData<ConstInt48>
 public typealias Data64 = FixedSizeData<ConstInt64>

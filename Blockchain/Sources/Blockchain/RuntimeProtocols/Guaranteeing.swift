@@ -12,6 +12,7 @@ public enum GuaranteeingError: Error {
     case duplicatedWorkPackage
     case prerequistieNotFound
     case invalidResultCodeHash
+    case invalidPublicKey
 }
 
 public protocol Guaranteeing {
@@ -104,7 +105,10 @@ extension Guaranteeing {
                 let reportHash = report.hash()
                 workReportHashes.insert(reportHash)
                 let payload = SigningContext.guarantee + reportHash.data
-                guard Ed25519.verify(signature: credential.signature, message: payload, publicKey: key) else {
+                let pubkey = try Result { try Ed25519.PublicKey(from: key) }
+                    .mapError { _ in GuaranteeingError.invalidPublicKey }
+                    .get()
+                guard pubkey.verify(signature: credential.signature, message: payload) else {
                     throw .invalidGuaranteeSignature
                 }
 
