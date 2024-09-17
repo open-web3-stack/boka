@@ -216,7 +216,8 @@ public final class Runtime {
             let hash = Blake2b256.hash(assurance.parentHash, assurance.assurance)
             let payload = SigningContext.available + hash.data
             let validatorKey = try newState.currentValidators.at(Int(assurance.validatorIndex))
-            guard Ed25519.verify(signature: assurance.signature, message: payload, publicKey: validatorKey.ed25519) else {
+            let pubkey = try Ed25519.PublicKey(from: validatorKey.ed25519)
+            guard pubkey.verify(signature: assurance.signature, message: payload) else {
                 throw Error.invalidAssuranceSignature
             }
         }
