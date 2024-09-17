@@ -30,7 +30,7 @@ public struct AtomicDictionary<Key: Hashable, Value> {
 
     public subscript(key: Key) -> Value? {
         get {
-            _read {
+            return _read {
                 dictionary[key]
             }
         }
@@ -48,43 +48,43 @@ public struct AtomicDictionary<Key: Hashable, Value> {
     }
 
     public func value(forKey key: Key) -> Value? {
-        _read {
+        return _read {
             dictionary[key]
         }
     }
 
     public var count: Int {
-        _read {
+        return _read {
             dictionary.count
         }
     }
 
     public var isEmpty: Bool {
-        _read {
+        return _read {
             dictionary.isEmpty
         }
     }
 
     public var keys: [Key] {
-        _read {
+        return _read {
             Array(dictionary.keys)
         }
     }
 
     public var values: [Value] {
-        _read {
+        return _read {
             Array(dictionary.values)
         }
     }
 
     public func contains(key: Key) -> Bool {
-        _read {
+        return _read {
             dictionary.keys.contains(key)
         }
     }
 
     public mutating func removeValue(forKey key: Key) -> Value? {
-        _write {
+        return _write {
             dictionary.removeValue(forKey: key)
         }
     }
@@ -96,7 +96,7 @@ public struct AtomicDictionary<Key: Hashable, Value> {
     }
 
     public mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
-        _write {
+        return _write {
             dictionary.updateValue(value, forKey: key)
         }
     }
@@ -108,7 +108,7 @@ public struct AtomicDictionary<Key: Hashable, Value> {
     }
 
     public func filter(_ isIncluded: ((key: Key, value: Value)) throws -> Bool) rethrows -> AtomicDictionary {
-        try _read {
+        return try _read {
             let filtered = try dictionary.filter(isIncluded)
             return AtomicDictionary(filtered)
         }
@@ -127,14 +127,14 @@ public struct AtomicDictionary<Key: Hashable, Value> {
     }
 
     public func mapValues<T>(_ transform: (Value) throws -> T) rethrows -> AtomicDictionary<Key, T> {
-        try _read {
+        return try _read {
             let mapped = try dictionary.mapValues(transform)
             return AtomicDictionary<Key, T>(mapped)
         }
     }
 
     public func compactMapValues<T>(_ transform: (Value) throws -> T?) rethrows -> AtomicDictionary<Key, T> {
-        try _read {
+        return try _read {
             let compactMapped = try dictionary.compactMapValues(transform)
             return AtomicDictionary<Key, T>(compactMapped)
         }
@@ -144,7 +144,7 @@ public struct AtomicDictionary<Key: Hashable, Value> {
 // Equatable conformance
 extension AtomicDictionary: Equatable where Value: Equatable {
     public static func == (lhs: AtomicDictionary<Key, Value>, rhs: AtomicDictionary<Key, Value>) -> Bool {
-        lhs._read {
+        return lhs._read {
             rhs._read {
                 lhs.dictionary == rhs.dictionary
             }
