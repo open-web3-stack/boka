@@ -1,4 +1,7 @@
 import Foundation
+import Logging
+
+let peerLogger = Logger(label: "PeerServer")
 
 public protocol PeerMessage: Equatable, Sendable {
     var timestamp: Int { get }
@@ -14,29 +17,61 @@ public enum MessageType: Int, Sendable {
     case transaction = 3
 }
 
+public protocol PeerMessageHandler {
+    func didReceivePeerMessage(peer: Peer, messageID: Int64, message: QuicMessage)
+    func didReceivePeerError(peer: Peer, messageID: Int64, error: QuicError)
+}
+
 // Define the Peer class
 public final class Peer: @unchecked Sendable {
     private let config: QuicConfig
     private var quicServer: QuicServer?
-    public var onMessageReceived: ((Int64, Result<QuicMessage, QuicError>) -> Void)?
-
-    public init(config: QuicConfig) throws {
+    private var clients: AtomicDictionary<NetAddr, QuicClient>
+    private var messageHandler: PeerMessageHandler?
+    public init(config: QuicConfig, messageHandler: PeerMessageHandler? = nil) throws {
         self.config = config
-        quicServer = try QuicServer(config: config)
-        quicServer?.messageHandler = self
+        self.messageHandler = messageHandler
+        clients = .init()
+        quicServer = try QuicServer(config: config, messageHandler: self)
     }
 
     func start() throws {
         // Implement start logic
         try quicServer?.start()
-        //        quicServer?.onMessageReceived = onMessageReceived
     }
 
     func close() throws {
         // Implement close logic
     }
 
-    public func getPeerAddr() -> String {
+    func replyTo(messageID: Int64, with data: Data) async throws {
+        try await quicServer?.replyTo(messageID: messageID, with: data)
+    }
+
+    func sendMessageToPeer(
+        message: any PeerMessage, peerAddr: NetAddr
+    ) async throws -> QuicMessage {
+        let buffer = Data(message.data)
+        return try await sendDataToPeer(buffer, to: peerAddr)
+    }
+
+    func sendDataToPeer(_ data: Data, to peerAddr: NetAddr) async throws -> QuicMessage {
+        if let client = clients[peerAddr] {
+            // Client already exists, use it to send the data
+            return try await client.send(message: data)
+        } else {
+            let config = QuicConfig(
+                id: config.id, cert: config.cert, key: config.key, alpn: config.alpn,
+                ipAddress: peerAddr.ipAddress, port: peerAddr.port
+            )
+            // Client does not exist, create a new one
+            let client = try QuicClient(config: config)
+            clients[peerAddr] = client
+            return try await client.send(message: data)
+        }
+    }
+
+    func getPeerAddr() -> String {
         "\(config.ipAddress):\(config.port)"
     }
 
@@ -46,7 +81,21 @@ public final class Peer: @unchecked Sendable {
 }
 
 extension Peer: QuicServerMessageHandler {
-    public func didReceiveMessage(quicServer _: QuicServer, messageID _: Int64, message _: QuicMessage) {}
+    public func didReceiveMessage(quicServer _: QuicServer, messageID _: Int64, message: QuicMessage) {
+        switch message.type {
+        case .received:
+            let buffer = message.data!
+            peerLogger.info(
+                "Peer received: \(String([UInt8](buffer).map { Character(UnicodeScalar($0)) }))"
+            )
+        case .shutdownComplete:
+            break
+        default:
+            break
+        }
+    }
 
-    public func didReceiveError(quicServer _: QuicServer, messageID _: Int64, error _: QuicError) {}
+    public func didReceiveError(quicServer _: QuicServer, messageID _: Int64, error: QuicError) {
+        peerLogger.error("Failed to receive message: \(error)")
+    }
 }

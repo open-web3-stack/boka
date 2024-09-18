@@ -12,7 +12,6 @@ public class QuicClient: @unchecked Sendable {
     private var connection: QuicConnection?
     // TODO: remove persistent stream
     private var persistentStream: QuicStream?
-    public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
     private let config: QuicConfig
 
     init(config: QuicConfig) throws {

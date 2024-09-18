@@ -17,9 +17,8 @@ final class QuicServerTests {
                 config: QuicConfig(
                     id: "public-key", cert: cert, key: keyFile, alpn: "sample",
                     ipAddress: "127.0.0.1", port: 4568
-                )
+                ), messageHandler: self
             )
-            quicServer.messageHandler = self
             try quicServer.start()
 
             try group.next().scheduleTask(in: .hours(1)) {}.futureResult.wait()
@@ -34,7 +33,7 @@ extension QuicServerTests: QuicServerMessageHandler {
         switch message.type {
         case .received:
             print("Server received message with ID \(messageID): \(message)")
-            quicServer.sendMessage(message.data!, to: messageID)
+            quicServer.replyTo(messageID: messageID, with: message.data!)
         case .shutdownComplete:
             print("Server shutdown complete")
         case .aborted:

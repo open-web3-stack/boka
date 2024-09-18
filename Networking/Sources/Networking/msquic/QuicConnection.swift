@@ -19,13 +19,18 @@ public class QuicConnection {
     private let registration: HQuic?
     private let configuration: HQuic?
     private var streams: AtomicArray<QuicStream> = .init()
-    public var onErrorReceived: ((QuicError) -> Void)?
-    public var messageHandler: QuicConnectionMessageHandler?
+    private var messageHandler: QuicConnectionMessageHandler?
     private let connectionCallback: ConnectionCallback
-    init(api: UnsafePointer<QuicApiTable>?, registration: HQuic?, configuration: HQuic?) {
+    init(
+        api: UnsafePointer<QuicApiTable>?,
+        registration: HQuic?,
+        configuration: HQuic?,
+        messageHandler: QuicConnectionMessageHandler? = nil
+    ) {
         self.api = api
         self.registration = registration
         self.configuration = configuration
+        self.messageHandler = messageHandler
         connectionCallback = { connection, context, event in
             QuicConnection.connectionCallback(
                 connection: connection, context: context, event: event
@@ -35,12 +40,13 @@ public class QuicConnection {
 
     init(
         api: UnsafePointer<QuicApiTable>?, registration: HQuic?, configuration: HQuic?,
-        connection: HQuic?
+        connection: HQuic?, messageHandler: QuicConnectionMessageHandler? = nil
     ) {
         self.api = api
         self.registration = registration
         self.configuration = configuration
         self.connection = connection
+        self.messageHandler = messageHandler
         connectionCallback = { connection, context, event in
             QuicConnection.connectionCallback(
                 connection: connection, context: context, event: event
@@ -121,9 +127,8 @@ public class QuicConnection {
             logger.info("[\(String(describing: connection))] Peer stream started")
             let stream = event.pointee.PEER_STREAM_STARTED.Stream
             let quicStream = QuicStream(
-                api: quicConnection.api, connection: connection, stream: stream
+                api: quicConnection.api, connection: connection, stream: stream, messageHandler: quicConnection
             )
-            quicStream.messageHandler = quicConnection
             quicStream.setCallbackHandler()
             quicConnection.streams.append(quicStream)
 
@@ -149,9 +154,8 @@ public class QuicConnection {
     }
 
     func createStream(_ streamKind: StreamKind = .commonEphemeral) throws -> QuicStream {
-        let stream = try QuicStream(api: api, connection: connection, streamKind)
+        let stream = try QuicStream(api: api, connection: connection, streamKind, messageHandler: self)
         streams.append(stream)
-        stream.messageHandler = self
         return stream
     }
 

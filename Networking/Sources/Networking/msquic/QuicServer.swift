@@ -16,12 +16,15 @@ public final class QuicServer: @unchecked Sendable {
     private var configuration: HQuic?
     private var listener: HQuic?
     private let config: QuicConfig
-    public var messageHandler: QuicServerMessageHandler?
-    private var pendingMessages: AtomicDictionary<Int64, (QuicConnection, QuicStream)> = .init()
-    private var connections: AtomicArray<QuicConnection> = .init()
+    private var messageHandler: QuicServerMessageHandler?
+    private var pendingMessages: AtomicDictionary<Int64, (QuicConnection, QuicStream)>
+    private var connections: AtomicArray<QuicConnection>
 
-    init(config: QuicConfig) throws {
+    init(config: QuicConfig, messageHandler: QuicServerMessageHandler? = nil) throws {
         self.config = config
+        self.messageHandler = messageHandler
+        pendingMessages = .init()
+        connections = .init()
         var rawPointer: UnsafeRawPointer?
         let status: UInt32 = MsQuicOpenVersion(2, &rawPointer)
 
@@ -51,9 +54,9 @@ public final class QuicServer: @unchecked Sendable {
         try openListener(ipAddress: config.ipAddress, port: config.port)
     }
 
-    func sendMessage(_ message: Data, to messageID: Int64) {
+    func replyTo(messageID: Int64, with data: Data) {
         if let (_, stream) = pendingMessages[messageID] {
-            stream.send(buffer: message)
+            stream.send(buffer: data)
             serverLogger.info("Message sent: \(messageID)")
             _ = pendingMessages.removeValue(forKey: messageID)
         } else {
@@ -61,9 +64,9 @@ public final class QuicServer: @unchecked Sendable {
         }
     }
 
-    func sendMessage(_ message: Data, to messageID: Int64) async throws {
+    func replyTo(messageID: Int64, with data: Data) async throws {
         if let (_, stream) = pendingMessages[messageID] {
-            let quicMessage = try await stream.send(buffer: message)
+            let quicMessage = try await stream.send(buffer: data)
             serverLogger.info("Message sent: \(quicMessage)")
             _ = pendingMessages.removeValue(forKey: messageID)
         } else {
@@ -134,9 +137,9 @@ public final class QuicServer: @unchecked Sendable {
                 api: api,
                 registration: server.registration,
                 configuration: server.configuration,
-                connection: connection
+                connection: connection,
+                messageHandler: server
             )
-            quicConnection.messageHandler = server
             server.connections.append(quicConnection)
             status = quicConnection.setCallbackHandler()
 

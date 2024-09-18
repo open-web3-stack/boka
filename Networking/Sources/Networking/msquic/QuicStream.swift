@@ -20,16 +20,18 @@ public class QuicStream {
     private let api: UnsafePointer<QuicApiTable>?
     private let connection: HQuic?
     public let kind: StreamKind
-    public var messageHandler: QuicStreamMessageHandler?
+    private var messageHandler: QuicStreamMessageHandler?
     private var streamCallback: StreamCallback
     private var sendCompletion: CheckedContinuation<QuicMessage, Error>?
 
     init(
         api: UnsafePointer<QuicApiTable>?, connection: HQuic?,
-        _ streamKind: StreamKind = .uniquePersistent
+        _ streamKind: StreamKind = .uniquePersistent,
+        messageHandler: QuicStreamMessageHandler? = nil
     ) throws {
         self.api = api
         self.connection = connection
+        self.messageHandler = messageHandler
         kind = streamKind
         streamCallback = { stream, context, event in
             QuicStream.streamCallback(
@@ -39,9 +41,10 @@ public class QuicStream {
         try openStream(streamKind)
     }
 
-    init(api: UnsafePointer<QuicApiTable>?, connection: HQuic?, stream: HQuic?) {
+    init(api: UnsafePointer<QuicApiTable>?, connection: HQuic?, stream: HQuic?, messageHandler: QuicStreamMessageHandler? = nil) {
         self.api = api
         self.connection = connection
+        self.messageHandler = messageHandler
         self.stream = stream
         kind = .commonEphemeral
         streamCallback = { stream, context, event in
