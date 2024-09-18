@@ -4,9 +4,12 @@ import msquic
 
 let logger = Logger(label: "QuicConnection")
 
-public protocol QuicConnectionDelegate: AnyObject {
+public protocol QuicConnectionMessageHandler {
     func didReceiveMessage(
-        connection: QuicConnection, stream: QuicStream, result: Result<QuicMessage, QuicError>
+        connection: QuicConnection, stream: QuicStream, message: QuicMessage
+    )
+    func didReceiveError(
+        connection: QuicConnection, stream: QuicStream, error: QuicError
     )
 }
 
@@ -16,8 +19,8 @@ public class QuicConnection {
     private let registration: HQuic?
     private let configuration: HQuic?
     private var streams: AtomicArray<QuicStream> = .init()
-    public var onMessageReceived: ((Result<QuicMessage, QuicError>) -> Void)?
-    public var delegate: QuicConnectionDelegate?
+    public var onErrorReceived: ((QuicError) -> Void)?
+    public var messageHandler: QuicConnectionMessageHandler?
     private let connectionCallback: ConnectionCallback
     init(api: UnsafePointer<QuicApiTable>?, registration: HQuic?, configuration: HQuic?) {
         self.api = api
@@ -105,7 +108,7 @@ public class QuicConnection {
                 }
                 quicConnection.streams.removeAll()
                 quicConnection.api?.pointee.ConnectionClose(connection)
-                quicConnection.onMessageReceived?(.success(QuicMessage(type: .shutdown, data: nil)))
+                // quicConnection.onMessageReceived?(QuicMessage(type: .shutdown, data: nil))
             }
 
         case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
@@ -120,7 +123,7 @@ public class QuicConnection {
             let quicStream = QuicStream(
                 api: quicConnection.api, connection: connection, stream: stream
             )
-            quicStream.delegate = quicConnection
+            quicStream.messageHandler = quicConnection
             quicStream.setCallbackHandler()
             quicConnection.streams.append(quicStream)
 
@@ -148,7 +151,7 @@ public class QuicConnection {
     func createStream(_ streamKind: StreamKind = .commonEphemeral) throws -> QuicStream {
         let stream = try QuicStream(api: api, connection: connection, streamKind)
         streams.append(stream)
-        stream.delegate = self
+        stream.messageHandler = self
         return stream
     }
 
@@ -184,25 +187,25 @@ public class QuicConnection {
     }
 }
 
-extension QuicConnection: QuicStreamDelegate {
-    public func didReceiveMessage(_ stream: QuicStream, result: Result<QuicMessage, QuicError>) {
-        switch result {
-        case let .success(quicMessage):
-            switch quicMessage.type {
-            case .shutdownComplete:
-                removeStream(stream: stream)
-            case .aborted:
-                break
-            case .unknown:
-                break
-            case .received:
-                break
-            default:
-                break
-            }
-        case let .failure(error):
-            logger.error("Failed to receive message: \(error)")
+extension QuicConnection: QuicStreamMessageHandler {
+    public func didReceiveMessage(_ stream: QuicStream, message: QuicMessage) {
+        switch message.type {
+        case .shutdownComplete:
+            removeStream(stream: stream)
+        case .aborted:
+            break
+        case .unknown:
+            break
+        case .received:
+            break
+        default:
+            break
         }
-        delegate?.didReceiveMessage(connection: self, stream: stream, result: result)
+        messageHandler?.didReceiveMessage(connection: self, stream: stream, message: message)
+    }
+
+    public func didReceiveError(_ stream: QuicStream, error: QuicError) {
+        logger.error("Failed to receive message: \(error)")
+        messageHandler?.didReceiveError(connection: self, stream: stream, error: error)
     }
 }

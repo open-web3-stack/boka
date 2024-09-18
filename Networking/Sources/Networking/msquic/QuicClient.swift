@@ -50,7 +50,6 @@ public class QuicClient: @unchecked Sendable {
         )
         try connection?.open()
         try connection?.start(ipAddress: config.ipAddress, port: config.port)
-        connection?.onMessageReceived = onMessageReceived
         persistentStream = try connection?.createStream(.uniquePersistent)
         try persistentStream?.start()
         return status

@@ -15,7 +15,7 @@ public enum MessageType: Int, Sendable {
 }
 
 // Define the Peer class
-public final class Peer: @unchecked Sendable, QuicServerDelegate {
+public final class Peer: @unchecked Sendable {
     private let config: QuicConfig
     private var quicServer: QuicServer?
     public var onMessageReceived: ((Int64, Result<QuicMessage, QuicError>) -> Void)?
@@ -23,23 +23,17 @@ public final class Peer: @unchecked Sendable, QuicServerDelegate {
     public init(config: QuicConfig) throws {
         self.config = config
         quicServer = try QuicServer(config: config)
-        quicServer?.delegate = self
+        quicServer?.messageHandler = self
     }
 
     func start() throws {
         // Implement start logic
         try quicServer?.start()
-//        quicServer?.onMessageReceived = onMessageReceived
+        //        quicServer?.onMessageReceived = onMessageReceived
     }
 
     func close() throws {
         // Implement close logic
-    }
-
-    public func didReceiveMessage(
-        quicServer _: QuicServer, messageID: Int64, result: Result<QuicMessage, QuicError>
-    ) {
-        onMessageReceived?(messageID, result)
     }
 
     public func getPeerAddr() -> String {
@@ -49,4 +43,10 @@ public final class Peer: @unchecked Sendable, QuicServerDelegate {
     deinit {
         // Clean up resources if necessary
     }
+}
+
+extension Peer: QuicServerMessageHandler {
+    public func didReceiveMessage(quicServer _: QuicServer, messageID _: Int64, message _: QuicMessage) {}
+
+    public func didReceiveError(quicServer _: QuicServer, messageID _: Int64, error _: QuicError) {}
 }

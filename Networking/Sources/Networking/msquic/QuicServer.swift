@@ -5,8 +5,9 @@ import NIO
 
 let serverLogger = Logger(label: "QuicServer")
 
-public protocol QuicServerDelegate: AnyObject {
-    func didReceiveMessage(quicServer: QuicServer, messageID: Int64, result: Result<QuicMessage, QuicError>)
+public protocol QuicServerMessageHandler {
+    func didReceiveMessage(quicServer: QuicServer, messageID: Int64, message: QuicMessage)
+    func didReceiveError(quicServer: QuicServer, messageID: Int64, error: QuicError)
 }
 
 public final class QuicServer: @unchecked Sendable {
@@ -15,7 +16,7 @@ public final class QuicServer: @unchecked Sendable {
     private var configuration: HQuic?
     private var listener: HQuic?
     private let config: QuicConfig
-    public var delegate: QuicServerDelegate?
+    public var messageHandler: QuicServerMessageHandler?
     private var pendingMessages: AtomicDictionary<Int64, (QuicConnection, QuicStream)> = .init()
     private var connections: AtomicArray<QuicConnection> = .init()
 
@@ -135,7 +136,7 @@ public final class QuicServer: @unchecked Sendable {
                 configuration: server.configuration,
                 connection: connection
             )
-            quicConnection.delegate = server
+            quicConnection.messageHandler = server
             server.connections.append(quicConnection)
             status = quicConnection.setCallbackHandler()
 
@@ -162,33 +163,34 @@ public final class QuicServer: @unchecked Sendable {
     }
 }
 
-extension QuicServer: QuicConnectionDelegate {
+extension QuicServer: QuicConnectionMessageHandler {
     public func didReceiveMessage(
-        connection: QuicConnection, stream: QuicStream, result: Result<QuicMessage, QuicError>
+        connection: QuicConnection, stream: QuicStream, message: QuicMessage
     ) {
-        switch result {
-        case let .success(quicMessage):
-            switch quicMessage.type {
-            case .shutdownComplete:
-                break
-            case .aborted:
-                break
-            case .unknown:
-                break
-            case .received:
-                processPendingMessage(connection: connection, stream: stream, result: result)
-            default:
-                break
-            }
-        case let .failure(error):
-            logger.error("Failed to receive message: \(error)")
+        switch message.type {
+        case .shutdownComplete:
+            break
+        case .aborted:
+            break
+        case .unknown:
+            break
+        case .received:
+            processPendingMessage(connection: connection, stream: stream, message: message)
+        default:
+            break
         }
     }
 
-    private func processPendingMessage(connection: QuicConnection, stream: QuicStream, result: Result<QuicMessage, QuicError>) {
+    public func didReceiveError(
+        connection _: QuicConnection, stream _: QuicStream, error: QuicError
+    ) {
+        logger.error("Failed to receive message: \(error)")
+    }
+
+    private func processPendingMessage(connection: QuicConnection, stream: QuicStream, message: QuicMessage) {
         let messageID = Int64(Date().timeIntervalSince1970 * 1000)
         pendingMessages[messageID] = (connection, stream)
-        delegate?.didReceiveMessage(quicServer: self, messageID: messageID, result: result)
+        messageHandler?.didReceiveMessage(quicServer: self, messageID: messageID, message: message)
     }
 }
 

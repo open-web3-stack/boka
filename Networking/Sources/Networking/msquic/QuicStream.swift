@@ -10,8 +10,9 @@ public enum StreamKind {
     case unknown
 }
 
-public protocol QuicStreamDelegate: AnyObject {
-    func didReceiveMessage(_ stream: QuicStream, result: Result<QuicMessage, QuicError>)
+public protocol QuicStreamMessageHandler {
+    func didReceiveMessage(_ stream: QuicStream, message: QuicMessage)
+    func didReceiveError(_ stream: QuicStream, error: QuicError)
 }
 
 public class QuicStream {
@@ -19,7 +20,7 @@ public class QuicStream {
     private let api: UnsafePointer<QuicApiTable>?
     private let connection: HQuic?
     public let kind: StreamKind
-    public var delegate: QuicStreamDelegate?
+    public var messageHandler: QuicStreamMessageHandler?
     private var streamCallback: StreamCallback
     private var sendCompletion: CheckedContinuation<QuicMessage, Error>?
 
@@ -79,43 +80,30 @@ public class QuicStream {
                     " Data length \(bufferLength) bytes: \(String([UInt8](bufferData).map { Character(UnicodeScalar($0)) }))"
                 )
                 receivedData.append(bufferData)
-                let message = QuicMessage(type: .received, data: bufferData)
-                if let continuation = quicStream.sendCompletion {
-                    continuation.resume(returning: message)
-                    quicStream.sendCompletion = nil
-                }
             }
             if receivedData.count > 0 {
-                quicStream.delegate?.didReceiveMessage(
-                    quicStream, result: .success(QuicMessage(type: .received, data: receivedData))
+                quicStream.messageHandler?.didReceiveMessage(
+                    quicStream, message: QuicMessage(type: .received, data: receivedData)
                 )
             }
 
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
             streamLogger.info("[\(String(describing: stream))] Peer shut down")
             let message = QuicMessage(type: .shutdown, data: nil)
-            if let continuation = quicStream.sendCompletion {
-                continuation.resume(returning: message)
-                quicStream.sendCompletion = nil
-            }
+            quicStream.messageHandler?.didReceiveMessage(quicStream, message: message)
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
             streamLogger.warning("[\(String(describing: stream))] Peer aborted")
-            status =
-                (quicStream.api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0))
-                    .status
-            if let continuation = quicStream.sendCompletion {
-                continuation.resume(throwing: QuicError.invalidStatus(status: status.code))
-                quicStream.sendCompletion = nil
-            }
+            status = (quicStream.api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0)).status
+            quicStream.messageHandler?.didReceiveError(quicStream, error: QuicError.invalidStatus(status: status.code))
 
         case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
             streamLogger.info("[\(String(describing: stream))] All done")
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 quicStream.api?.pointee.StreamClose(stream)
             }
-            quicStream.delegate?.didReceiveMessage(
-                quicStream, result: .success(QuicMessage(type: .shutdownComplete, data: nil))
+            quicStream.messageHandler?.didReceiveMessage(
+                quicStream, message: QuicMessage(type: .shutdownComplete, data: nil)
             )
 
         default:
@@ -126,13 +114,12 @@ public class QuicStream {
     }
 
     private func openStream(_: StreamKind = .commonEphemeral) throws {
-        let status =
-            (api?.pointee.StreamOpen(
-                connection, QUIC_STREAM_OPEN_FLAG_NONE,
-                { stream, context, event -> QuicStatus in
-                    QuicStream.streamCallback(stream: stream, context: context, event: event)
-                }, Unmanaged.passUnretained(self).toOpaque(), &stream
-            )).status
+        let status = (api?.pointee.StreamOpen(
+            connection, QUIC_STREAM_OPEN_FLAG_NONE,
+            { stream, context, event -> QuicStatus in
+                QuicStream.streamCallback(stream: stream, context: context, event: event)
+            }, Unmanaged.passUnretained(self).toOpaque(), &stream
+        )).status
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }
@@ -148,7 +135,7 @@ public class QuicStream {
     }
 
     func close() {
-        if stream == nil {
+        if stream != nil {
             api?.pointee.StreamClose(stream)
             stream = nil
         }
