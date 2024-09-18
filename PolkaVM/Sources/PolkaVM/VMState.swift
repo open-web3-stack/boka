@@ -82,6 +82,10 @@ public class VMState {
         (registers[index], registers[index2])
     }
 
+    public func readRegisters(in range: Range<UInt8>) -> [UInt32] {
+        range.map { registers[Registers.Index(raw: $0)] }
+    }
+
     public func writeRegister(_ index: Registers.Index, _ value: UInt32) {
         registers[index] = value
     }

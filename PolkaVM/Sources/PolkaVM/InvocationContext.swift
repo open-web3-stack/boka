@@ -1,6 +1,7 @@
-public protocol HostCallContext<ContextType> {
+public protocol InvocationContext<ContextType> {
     associatedtype ContextType
 
+    /// Items required for the invocation, some items inside this context might be mutated by the host-call
     var context: ContextType { get set }
 
     /// host-call dispatch function

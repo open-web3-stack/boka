@@ -12,16 +12,18 @@ public protocol IsAuthorizedFunction {
 
 extension IsAuthorizedFunction {
     public func invoke(config: ProtocolConfigRef, package: WorkPackage, coreIndex: CoreIndex) throws -> Result<Data, WorkResultError> {
-        var ctx = IsAuthorizedContext()
         let args = try JamEncoder.encode(package) + JamEncoder.encode(coreIndex)
+        let ctx = IsAuthorizedContext()
+
         let (exitReason, _, _, output) = invokePVM(
             config: config,
             blob: package.authorizationCodeHash.data,
             pc: 0,
             gas: config.value.workPackageAuthorizerGas,
             argumentData: args,
-            ctx: &ctx
+            ctx: ctx
         )
+
         switch exitReason {
         case .outOfGas:
             return .failure(.outOfGas)
