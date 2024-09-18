@@ -4,7 +4,7 @@ import msquic
 
 let logger = Logger(label: "QuicConnection")
 
-public protocol QuicConnectionMessageHandler {
+public protocol QuicConnectionMessageHandler: AnyObject {
     func didReceiveMessage(
         connection: QuicConnection, stream: QuicStream?, message: QuicMessage
     )
@@ -15,11 +15,11 @@ public protocol QuicConnectionMessageHandler {
 
 public class QuicConnection {
     private var connection: HQuic?
-    private let api: UnsafePointer<QuicApiTable>?
-    private let registration: HQuic?
-    private let configuration: HQuic?
+    private var api: UnsafePointer<QuicApiTable>?
+    private var registration: HQuic?
+    private var configuration: HQuic?
     private var streams: AtomicArray<QuicStream> = .init()
-    private var messageHandler: QuicConnectionMessageHandler?
+    private weak var messageHandler: QuicConnectionMessageHandler?
     private let connectionCallback: ConnectionCallback
     init(
         api: UnsafePointer<QuicApiTable>?,
@@ -90,7 +90,11 @@ public class QuicConnection {
 
     func createStream(_ streamKind: StreamKind = .commonEphemeral) throws -> QuicStream {
         let stream = try QuicStream(api: api, connection: connection, streamKind, messageHandler: self)
+        streamLogger.info("QuicStream reference count: \(CFGetRetainCount(stream))")
+
         streams.append(stream)
+        streamLogger.info("QuicStream reference count: \(CFGetRetainCount(stream))")
+
         return stream
     }
 
@@ -120,6 +124,7 @@ public class QuicConnection {
             connection = nil
         }
         messageHandler = nil
+        logger.info("QuicConnection close called, reference count: \(CFGetRetainCount(self))")
     }
 
     deinit {

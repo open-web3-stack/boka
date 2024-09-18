@@ -17,7 +17,7 @@ public enum MessageType: Int, Sendable {
     case transaction = 3
 }
 
-public protocol PeerMessageHandler {
+public protocol PeerMessageHandler: AnyObject {
     func didReceivePeerMessage(peer: Peer, messageID: Int64, message: QuicMessage)
     func didReceivePeerError(peer: Peer, messageID: Int64, error: QuicError)
 }
@@ -27,7 +27,7 @@ public final class Peer: @unchecked Sendable {
     private let config: QuicConfig
     private var quicServer: QuicServer?
     private var clients: AtomicDictionary<NetAddr, QuicClient>
-    private var messageHandler: PeerMessageHandler?
+    private weak var messageHandler: PeerMessageHandler?
     public init(config: QuicConfig, messageHandler: PeerMessageHandler? = nil) throws {
         self.config = config
         self.messageHandler = messageHandler

@@ -11,7 +11,7 @@ public class QuicClient: @unchecked Sendable {
     private var configuration: HQuic?
     private var connection: QuicConnection?
     // TODO: remove persistent stream
-    private var persistentStream: QuicStream?
+//    private var persistentStream: QuicStream?
     private let config: QuicConfig
 
     init(config: QuicConfig) throws {
@@ -49,8 +49,8 @@ public class QuicClient: @unchecked Sendable {
         )
         try connection?.open()
         try connection?.start(ipAddress: config.ipAddress, port: config.port)
-        persistentStream = try connection?.createStream(.uniquePersistent)
-        try persistentStream?.start()
+//        persistentStream = try connection?.createStream(.uniquePersistent)
+//        try persistentStream?.start()
         return status
     }
 
@@ -66,26 +66,29 @@ public class QuicClient: @unchecked Sendable {
         }
         let sendStream: QuicStream
         // Check if there is an existing stream of the same kind
-        if streamKind == .uniquePersistent, let stream = persistentStream {
-            // If there is, send the message to the existing stream
-            sendStream = stream
-        } else {
-            // If there is not, create a new stream
-            let stream = try connection.createStream(streamKind)
-            // Start the stream
-            try stream.start()
-            // Send the message to the new stream
-            sendStream = stream
-        }
+//        if streamKind == .uniquePersistent, let stream = persistentStream {
+//            // If there is, send the message to the existing stream
+//            sendStream = stream
+//        } else {
+        // If there is not, create a new stream
+        let stream = try connection.createStream(streamKind)
+        // Start the stream
+        try stream.start()
+        streamLogger.info("QuicStream reference count: \(CFGetRetainCount(self))")
+
+        // Send the message to the new stream
+        sendStream = stream
+//        }
+        streamLogger.info("QuicStream reference count: \(CFGetRetainCount(self))")
 
         return try await sendStream.send(buffer: message)
     }
 
     func close() {
-        if let persistentStream {
-            persistentStream.close()
-            self.persistentStream = nil
-        }
+//        if let persistentStream {
+//            persistentStream.close()
+//            self.persistentStream = nil
+//        }
 
         if let connection {
             connection.close()
@@ -106,6 +109,7 @@ public class QuicClient: @unchecked Sendable {
         }
 
         MsQuicClose(api)
+        clientLogger.info("QuicClient close called, reference count: \(CFGetRetainCount(self))")
     }
 
     deinit {

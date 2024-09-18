@@ -10,7 +10,7 @@ public enum StreamKind {
     case unknown
 }
 
-public protocol QuicStreamMessageHandler {
+public protocol QuicStreamMessageHandler: AnyObject {
     func didReceiveMessage(_ stream: QuicStream, message: QuicMessage)
     func didReceiveError(_ stream: QuicStream, error: QuicError)
 }
@@ -20,8 +20,8 @@ public class QuicStream {
     private let api: UnsafePointer<QuicApiTable>?
     private let connection: HQuic?
     public let kind: StreamKind
-    private var messageHandler: QuicStreamMessageHandler?
-    private var streamCallback: StreamCallback
+    private weak var messageHandler: QuicStreamMessageHandler?
+    private var streamCallback: StreamCallback?
     private var sendCompletion: CheckedContinuation<QuicMessage, Error>?
 
     init(
@@ -33,12 +33,15 @@ public class QuicStream {
         self.connection = connection
         self.messageHandler = messageHandler
         kind = streamKind
+        streamLogger.info("QuicStream init reference count: \(CFGetRetainCount(self))")
+
         streamCallback = { stream, context, event in
             QuicStream.streamCallback(
                 stream: stream, context: context, event: event
             )
         }
         try openStream(streamKind)
+        streamLogger.info("QuicStream init reference count: \(CFGetRetainCount(self))")
     }
 
     init(
@@ -84,8 +87,10 @@ public class QuicStream {
             api?.pointee.StreamClose(stream)
             stream = nil
         }
+        streamCallback = nil
         messageHandler = nil
         streamLogger.info("Stream closed")
+        streamLogger.info("QuicStream close called, reference count: \(CFGetRetainCount(self))")
     }
 
     func setCallbackHandler() {
@@ -106,6 +111,8 @@ public class QuicStream {
 
     func send(buffer: Data) -> QuicStatus {
         streamLogger.info("[\(String(describing: stream))] Sending data...")
+        streamLogger.info("QuicStream reference count: \(CFGetRetainCount(self))")
+
         var status = QuicStatusCode.success.rawValue
         let messageLength = buffer.count
 
@@ -137,6 +144,8 @@ public class QuicStream {
 
     func send(buffer: Data) async throws -> QuicMessage {
         streamLogger.info("[\(String(describing: stream))] Sending data...")
+        streamLogger.info("QuicStream reference count: \(CFGetRetainCount(self))")
+
         var status = QuicStatusCode.success.rawValue
         let messageLength = buffer.count
 

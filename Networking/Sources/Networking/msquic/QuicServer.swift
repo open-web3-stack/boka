@@ -5,7 +5,7 @@ import NIO
 
 let serverLogger = Logger(label: "QuicServer")
 
-public protocol QuicServerMessageHandler {
+public protocol QuicServerMessageHandler: AnyObject {
     func didReceiveMessage(quicServer: QuicServer, messageID: Int64, message: QuicMessage)
     func didReceiveError(quicServer: QuicServer, messageID: Int64, error: QuicError)
 }
@@ -16,7 +16,7 @@ public final class QuicServer: @unchecked Sendable {
     private var configuration: HQuic?
     private var listener: HQuic?
     private let config: QuicConfig
-    private var messageHandler: QuicServerMessageHandler?
+    private weak var messageHandler: QuicServerMessageHandler?
     private var pendingMessages: AtomicDictionary<Int64, (QuicConnection, QuicStream)>
     private var connections: AtomicArray<QuicConnection>
 

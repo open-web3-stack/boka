@@ -47,19 +47,19 @@ import Testing
                         }
                     }
                 }.futureResult.wait()
-                try group.next().scheduleTask(in: .seconds(10)) {
-                    Task {
-                        do {
-                            let quicmessage = try await peer.sendMessageToPeer(
-                                message: Message(type: .text, data: Data("Hello, swift!".utf8)),
-                                peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4569)
-                            )
-                            print("Peer message got: \(quicmessage)")
-                        } catch {
-                            print("Failed to send message: \(error)")
-                        }
-                    }
-                }.futureResult.wait()
+//                try group.next().scheduleTask(in: .seconds(10)) {
+//                    Task {
+//                        do {
+//                            let quicmessage = try await peer.sendMessageToPeer(
+//                                message: Message(type: .text, data: Data("Hello, swift!".utf8)),
+//                                peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4569)
+//                            )
+//                            print("Peer message got: \(quicmessage)")
+//                        } catch {
+//                            print("Failed to send message: \(error)")
+//                        }
+//                    }
+//                }.futureResult.wait()
                 try group.next().scheduleTask(in: .minutes(10)) {}.futureResult.wait()
 
             } catch {
