@@ -33,14 +33,11 @@ public class QuicStream {
         self.connection = connection
         self.messageHandler = messageHandler
         kind = streamKind
-        streamLogger.info("QuicStream init reference count: \(CFGetRetainCount(self))")
-
         streamCallback = { stream, context, event in
             QuicStream.streamCallback(
                 stream: stream, context: context, event: event
             )
         }
-        try openStream(streamKind)
         streamLogger.info("QuicStream init reference count: \(CFGetRetainCount(self))")
     }
 
@@ -75,6 +72,7 @@ public class QuicStream {
     }
 
     func start() throws {
+        try openStream(kind)
         let status = (api?.pointee.StreamStart(stream, QUIC_STREAM_START_FLAG_NONE)).status
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)
@@ -83,14 +81,14 @@ public class QuicStream {
     }
 
     func close() {
+        streamCallback = nil
+        messageHandler = nil
+        streamLogger.info("QuicStream [\(String(describing: stream))] close called, reference count: \(CFGetRetainCount(self))")
+
         if stream != nil {
             api?.pointee.StreamClose(stream)
             stream = nil
         }
-        streamCallback = nil
-        messageHandler = nil
-        streamLogger.info("Stream closed")
-        streamLogger.info("QuicStream close called, reference count: \(CFGetRetainCount(self))")
     }
 
     func setCallbackHandler() {
@@ -111,8 +109,6 @@ public class QuicStream {
 
     func send(buffer: Data) -> QuicStatus {
         streamLogger.info("[\(String(describing: stream))] Sending data...")
-        streamLogger.info("QuicStream reference count: \(CFGetRetainCount(self))")
-
         var status = QuicStatusCode.success.rawValue
         let messageLength = buffer.count
 
@@ -144,8 +140,6 @@ public class QuicStream {
 
     func send(buffer: Data) async throws -> QuicMessage {
         streamLogger.info("[\(String(describing: stream))] Sending data...")
-        streamLogger.info("QuicStream reference count: \(CFGetRetainCount(self))")
-
         var status = QuicStatusCode.success.rawValue
         let messageLength = buffer.count
 
@@ -164,7 +158,11 @@ public class QuicStream {
         sendBuffer.pointee.Length = UInt32(messageLength)
         let flags = (kind == .uniquePersistent) ? QUIC_SEND_FLAG_NONE : QUIC_SEND_FLAG_FIN
 
-        return try await withCheckedThrowingContinuation { continuation in
+        return try await withCheckedThrowingContinuation { [weak self] continuation in
+            guard let self else {
+                continuation.resume(throwing: QuicError.sendFailed)
+                return
+            }
             sendCompletion = continuation
             status = (api?.pointee.StreamSend(stream, sendBuffer, 1, flags, sendBufferRaw)).status
             if status.isFailed {
@@ -251,9 +249,9 @@ extension QuicStream {
                 continuation.resume(throwing: QuicError.sendFailed)
                 quicStream.sendCompletion = nil
             }
-            quicStream.messageHandler?.didReceiveMessage(
-                quicStream, message: QuicMessage(type: .shutdownComplete, data: nil)
-            )
+//            quicStream.messageHandler?.didReceiveMessage(
+//                quicStream, message: QuicMessage(type: .shutdownComplete, data: nil)
+//            )
 
         default:
             break

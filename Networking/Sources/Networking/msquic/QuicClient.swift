@@ -74,12 +74,8 @@ public class QuicClient: @unchecked Sendable {
         let stream = try connection.createStream(streamKind)
         // Start the stream
         try stream.start()
-        streamLogger.info("QuicStream reference count: \(CFGetRetainCount(self))")
-
         // Send the message to the new stream
         sendStream = stream
-//        }
-        streamLogger.info("QuicStream reference count: \(CFGetRetainCount(self))")
 
         return try await sendStream.send(buffer: message)
     }

@@ -20,7 +20,7 @@ public class QuicConnection {
     private var configuration: HQuic?
     private var streams: AtomicArray<QuicStream> = .init()
     private weak var messageHandler: QuicConnectionMessageHandler?
-    private let connectionCallback: ConnectionCallback
+    private var connectionCallback: ConnectionCallback?
     init(
         api: UnsafePointer<QuicApiTable>?,
         registration: HQuic?,
@@ -36,6 +36,7 @@ public class QuicConnection {
                 connection: connection, context: context, event: event
             )
         }
+        streamLogger.info("QuicConnection init reference count: \(CFGetRetainCount(self))")
     }
 
     init(
@@ -52,6 +53,8 @@ public class QuicConnection {
                 connection: connection, context: context, event: event
             )
         }
+
+        streamLogger.info("QuicConnection init reference count: \(CFGetRetainCount(self))")
     }
 
     // TODO: set callback handler
@@ -90,11 +93,7 @@ public class QuicConnection {
 
     func createStream(_ streamKind: StreamKind = .commonEphemeral) throws -> QuicStream {
         let stream = try QuicStream(api: api, connection: connection, streamKind, messageHandler: self)
-        streamLogger.info("QuicStream reference count: \(CFGetRetainCount(stream))")
-
         streams.append(stream)
-        streamLogger.info("QuicStream reference count: \(CFGetRetainCount(stream))")
-
         return stream
     }
 
@@ -115,6 +114,8 @@ public class QuicConnection {
     }
 
     func close() {
+        connectionCallback = nil
+        messageHandler = nil
         for stream in streams {
             stream.close()
         }
@@ -123,7 +124,7 @@ public class QuicConnection {
             api?.pointee.ConnectionClose(connection)
             connection = nil
         }
-        messageHandler = nil
+
         logger.info("QuicConnection close called, reference count: \(CFGetRetainCount(self))")
     }
 

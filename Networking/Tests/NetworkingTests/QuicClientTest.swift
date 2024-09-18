@@ -15,13 +15,13 @@ import Testing
                 let quicClient = try QuicClient(
                     config: QuicConfig(
                         id: "public-key", cert: cert, key: keyFile, alpn: "sample",
-                        ipAddress: "127.0.0.1", port: 4568
+                        ipAddress: "127.0.0.1", port: 4569
                     )
                 )
                 let status = try quicClient.start()
                 print(status)
                 let message1 = try await quicClient.send(
-                    message: Data("Hello, World!".utf8), streamKind: .uniquePersistent
+                    message: Data("Hello, World!".utf8), streamKind: .commonEphemeral
                 )
                 print("Client received 1: \(message1)")
                 let message2 = try await quicClient.send(
@@ -33,10 +33,10 @@ import Testing
                 )
                 print("Client received 3: \(message3)")
                 let message4 = try await quicClient.send(
-                    message: Data("Hello, i am fine!".utf8), streamKind: .uniquePersistent
+                    message: Data("Hello, i am fine!".utf8), streamKind: .commonEphemeral
                 )
                 print("Client received 4: \(message4)")
-                try await group.next().scheduleTask(in: .hours(1)) {}.futureResult.get()
+                try await group.next().scheduleTask(in: .seconds(5)) {}.futureResult.get()
             } catch {
                 print("Failed to start quic client: \(error)")
             }
