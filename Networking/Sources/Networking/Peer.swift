@@ -48,6 +48,10 @@ public final class Peer: @unchecked Sendable {
         try await quicServer?.replyTo(messageID: messageID, with: data)
     }
 
+    func replyTo(messageID: Int64, with data: Data) -> QuicStatus {
+        quicServer?.replyTo(messageID: messageID, with: data) ?? QuicStatusCode.internalError.rawValue
+    }
+
     func sendMessageToPeer(
         message: any PeerMessage, peerAddr: NetAddr
     ) async throws -> QuicMessage {
@@ -66,6 +70,10 @@ public final class Peer: @unchecked Sendable {
             )
             // Client does not exist, create a new one
             let client = try QuicClient(config: config)
+            let status = try client.start()
+            if status.isFailed {
+                throw QuicError.getClientFailed
+            }
             clients[peerAddr] = client
             return try await client.send(message: data)
         }
@@ -81,13 +89,10 @@ public final class Peer: @unchecked Sendable {
 }
 
 extension Peer: QuicServerMessageHandler {
-    public func didReceiveMessage(quicServer _: QuicServer, messageID _: Int64, message: QuicMessage) {
+    public func didReceiveMessage(quicServer _: QuicServer, messageID: Int64, message: QuicMessage) {
         switch message.type {
         case .received:
-            let buffer = message.data!
-            peerLogger.info(
-                "Peer received: \(String([UInt8](buffer).map { Character(UnicodeScalar($0)) }))"
-            )
+            messageHandler?.didReceivePeerMessage(peer: self, messageID: messageID, message: message)
         case .shutdownComplete:
             break
         default:

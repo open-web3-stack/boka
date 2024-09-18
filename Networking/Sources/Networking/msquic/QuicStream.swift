@@ -41,7 +41,10 @@ public class QuicStream {
         try openStream(streamKind)
     }
 
-    init(api: UnsafePointer<QuicApiTable>?, connection: HQuic?, stream: HQuic?, messageHandler: QuicStreamMessageHandler? = nil) {
+    init(
+        api: UnsafePointer<QuicApiTable>?, connection: HQuic?, stream: HQuic?,
+        messageHandler: QuicStreamMessageHandler? = nil
+    ) {
         self.api = api
         self.connection = connection
         self.messageHandler = messageHandler
@@ -54,6 +57,128 @@ public class QuicStream {
         }
     }
 
+    private func openStream(_: StreamKind = .commonEphemeral) throws {
+        let status =
+            (api?.pointee.StreamOpen(
+                connection, QUIC_STREAM_OPEN_FLAG_NONE,
+                { stream, context, event -> QuicStatus in
+                    QuicStream.streamCallback(stream: stream, context: context, event: event)
+                }, Unmanaged.passUnretained(self).toOpaque(), &stream
+            )).status
+        if status.isFailed {
+            throw QuicError.invalidStatus(status: status.code)
+        }
+        streamLogger.info("[\(String(describing: stream))] Stream opened")
+    }
+
+    func start() throws {
+        let status = (api?.pointee.StreamStart(stream, QUIC_STREAM_START_FLAG_NONE)).status
+        if status.isFailed {
+            throw QuicError.invalidStatus(status: status.code)
+        }
+        streamLogger.info("[\(String(describing: stream))] Stream started")
+    }
+
+    func close() {
+        if stream != nil {
+            api?.pointee.StreamClose(stream)
+            stream = nil
+        }
+        messageHandler = nil
+        streamLogger.info("Stream closed")
+    }
+
+    func setCallbackHandler() {
+        guard let api, let stream else {
+            return
+        }
+
+        let callbackPointer = unsafeBitCast(
+            streamCallback, to: UnsafeMutableRawPointer?.self
+        )
+
+        api.pointee.SetCallbackHandler(
+            stream,
+            callbackPointer,
+            UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+        )
+    }
+
+    func send(buffer: Data) -> QuicStatus {
+        streamLogger.info("[\(String(describing: stream))] Sending data...")
+        var status = QuicStatusCode.success.rawValue
+        let messageLength = buffer.count
+
+        let sendBufferRaw = UnsafeMutableRawPointer.allocate(
+            byteCount: MemoryLayout<QUIC_BUFFER>.size + messageLength,
+            alignment: MemoryLayout<QUIC_BUFFER>.alignment
+        )
+
+        let sendBuffer = sendBufferRaw.assumingMemoryBound(to: QUIC_BUFFER.self)
+        let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(
+            capacity: messageLength
+        )
+        buffer.copyBytes(to: bufferPointer, count: messageLength)
+
+        sendBuffer.pointee.Buffer = bufferPointer
+        sendBuffer.pointee.Length = UInt32(messageLength)
+        let flags = (kind == .uniquePersistent) ? QUIC_SEND_FLAG_NONE : QUIC_SEND_FLAG_FIN
+        status = (api?.pointee.StreamSend(stream, sendBuffer, 1, flags, sendBufferRaw)).status
+        if status.isFailed {
+            streamLogger.error("StreamSend failed, \(status)!")
+            let shutdown: QuicStatus =
+                (api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0)).status
+            if shutdown.isFailed {
+                streamLogger.error("StreamShutdown failed, 0x\(String(format: "%x", shutdown))!")
+            }
+        }
+        return status
+    }
+
+    func send(buffer: Data) async throws -> QuicMessage {
+        streamLogger.info("[\(String(describing: stream))] Sending data...")
+        var status = QuicStatusCode.success.rawValue
+        let messageLength = buffer.count
+
+        let sendBufferRaw = UnsafeMutableRawPointer.allocate(
+            byteCount: MemoryLayout<QUIC_BUFFER>.size + messageLength,
+            alignment: MemoryLayout<QUIC_BUFFER>.alignment
+        )
+
+        let sendBuffer = sendBufferRaw.assumingMemoryBound(to: QUIC_BUFFER.self)
+        let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(
+            capacity: messageLength
+        )
+        buffer.copyBytes(to: bufferPointer, count: messageLength)
+
+        sendBuffer.pointee.Buffer = bufferPointer
+        sendBuffer.pointee.Length = UInt32(messageLength)
+        let flags = (kind == .uniquePersistent) ? QUIC_SEND_FLAG_NONE : QUIC_SEND_FLAG_FIN
+
+        return try await withCheckedThrowingContinuation { continuation in
+            sendCompletion = continuation
+            status = (api?.pointee.StreamSend(stream, sendBuffer, 1, flags, sendBufferRaw)).status
+            if status.isFailed {
+                streamLogger.error("StreamSend failed, \(status)!")
+                let shutdown: QuicStatus =
+                    (api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0)).status
+                if shutdown.isFailed {
+                    streamLogger.error(
+                        "StreamShutdown failed, 0x\(String(format: "%x", shutdown))!"
+                    )
+                }
+                continuation.resume(throwing: QuicError.invalidStatus(status: status.code))
+                sendCompletion = nil
+            }
+        }
+    }
+
+    deinit {
+        streamLogger.info("QuicStream Deinit")
+    }
+}
+
+extension QuicStream {
     private static func streamCallback(
         stream: HQuic?, context: UnsafeMutableRawPointer?, event: UnsafePointer<QUIC_STREAM_EVENT>?
     ) -> QuicStatus {
@@ -85,6 +210,10 @@ public class QuicStream {
                 receivedData.append(bufferData)
             }
             if receivedData.count > 0 {
+                if let continuation = quicStream.sendCompletion {
+                    continuation.resume(returning: QuicMessage(type: .received, data: receivedData))
+                    quicStream.sendCompletion = nil
+                }
                 quicStream.messageHandler?.didReceiveMessage(
                     quicStream, message: QuicMessage(type: .received, data: receivedData)
                 )
@@ -97,13 +226,21 @@ public class QuicStream {
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
             streamLogger.warning("[\(String(describing: stream))] Peer aborted")
-            status = (quicStream.api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0)).status
-            quicStream.messageHandler?.didReceiveError(quicStream, error: QuicError.invalidStatus(status: status.code))
+            status =
+                (quicStream.api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0))
+                    .status
+            quicStream.messageHandler?.didReceiveError(
+                quicStream, error: QuicError.invalidStatus(status: status.code)
+            )
 
         case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
             streamLogger.info("[\(String(describing: stream))] All done")
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 quicStream.api?.pointee.StreamClose(stream)
+            }
+            if let continuation = quicStream.sendCompletion {
+                continuation.resume(throwing: QuicError.sendFailed)
+                quicStream.sendCompletion = nil
             }
             quicStream.messageHandler?.didReceiveMessage(
                 quicStream, message: QuicMessage(type: .shutdownComplete, data: nil)
@@ -114,120 +251,5 @@ public class QuicStream {
         }
 
         return status
-    }
-
-    private func openStream(_: StreamKind = .commonEphemeral) throws {
-        let status = (api?.pointee.StreamOpen(
-            connection, QUIC_STREAM_OPEN_FLAG_NONE,
-            { stream, context, event -> QuicStatus in
-                QuicStream.streamCallback(stream: stream, context: context, event: event)
-            }, Unmanaged.passUnretained(self).toOpaque(), &stream
-        )).status
-        if status.isFailed {
-            throw QuicError.invalidStatus(status: status.code)
-        }
-        streamLogger.info("[\(String(describing: stream))] Stream opened")
-    }
-
-    func start() throws {
-        let status = (api?.pointee.StreamStart(stream, QUIC_STREAM_START_FLAG_NONE)).status
-        if status.isFailed {
-            throw QuicError.invalidStatus(status: status.code)
-        }
-        streamLogger.info("[\(String(describing: stream))] Stream started")
-    }
-
-    func close() {
-        if stream != nil {
-            api?.pointee.StreamClose(stream)
-            stream = nil
-        }
-        streamLogger.info("Stream closed")
-    }
-
-    func setCallbackHandler() {
-        guard let api, let stream else {
-            return
-        }
-
-        let callbackPointer = unsafeBitCast(
-            streamCallback, to: UnsafeMutableRawPointer?.self
-        )
-
-        api.pointee.SetCallbackHandler(
-            stream,
-            callbackPointer,
-            UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
-        )
-    }
-
-    func send(buffer: Data) {
-        streamLogger.info("[\(String(describing: stream))] Sending data...")
-        var status = QuicStatusCode.success.rawValue
-        let messageLength = buffer.count
-
-        let sendBufferRaw = UnsafeMutableRawPointer.allocate(
-            byteCount: MemoryLayout<QUIC_BUFFER>.size + messageLength,
-            alignment: MemoryLayout<QUIC_BUFFER>.alignment
-        )
-
-        let sendBuffer = sendBufferRaw.assumingMemoryBound(to: QUIC_BUFFER.self)
-        let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(
-            capacity: messageLength
-        )
-        buffer.copyBytes(to: bufferPointer, count: messageLength)
-
-        sendBuffer.pointee.Buffer = bufferPointer
-        sendBuffer.pointee.Length = UInt32(messageLength)
-        let flags = (kind == .uniquePersistent) ? QUIC_SEND_FLAG_NONE : QUIC_SEND_FLAG_FIN
-        status = (api?.pointee.StreamSend(stream, sendBuffer, 1, flags, sendBufferRaw)).status
-        if status.isFailed {
-            streamLogger.error("StreamSend failed, \(status)!")
-            let shutdown: QuicStatus =
-                (api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0)).status
-            if shutdown.isFailed {
-                streamLogger.error("StreamShutdown failed, 0x\(String(format: "%x", shutdown))!")
-            }
-        }
-    }
-
-    func send(buffer: Data) async throws -> QuicMessage {
-        streamLogger.info("[\(String(describing: stream))] Sending data...")
-        var status = QuicStatusCode.success.rawValue
-        let messageLength = buffer.count
-
-        let sendBufferRaw = UnsafeMutableRawPointer.allocate(
-            byteCount: MemoryLayout<QUIC_BUFFER>.size + messageLength,
-            alignment: MemoryLayout<QUIC_BUFFER>.alignment
-        )
-
-        let sendBuffer = sendBufferRaw.assumingMemoryBound(to: QUIC_BUFFER.self)
-        let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(
-            capacity: messageLength
-        )
-        buffer.copyBytes(to: bufferPointer, count: messageLength)
-
-        sendBuffer.pointee.Buffer = bufferPointer
-        sendBuffer.pointee.Length = UInt32(messageLength)
-        let flags = (kind == .uniquePersistent) ? QUIC_SEND_FLAG_NONE : QUIC_SEND_FLAG_FIN
-
-        return try await withCheckedThrowingContinuation { continuation in
-            sendCompletion = continuation
-            status = (api?.pointee.StreamSend(stream, sendBuffer, 1, flags, sendBufferRaw)).status
-            if status.isFailed {
-                streamLogger.error("StreamSend failed, \(status)!")
-                let shutdown: QuicStatus =
-                    (api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0)).status
-                if shutdown.isFailed {
-                    streamLogger.error("StreamShutdown failed, 0x\(String(format: "%x", shutdown))!")
-                }
-                continuation.resume(throwing: QuicError.invalidStatus(status: status.code))
-                sendCompletion = nil
-            }
-        }
-    }
-
-    deinit {
-        streamLogger.info("QuicStream Deinit")
     }
 }

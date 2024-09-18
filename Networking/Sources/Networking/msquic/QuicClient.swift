@@ -45,7 +45,7 @@ public class QuicClient: @unchecked Sendable {
         let status = QuicStatusCode.success.rawValue
         try loadConfiguration()
         connection = QuicConnection(
-            api: api, registration: registration, configuration: configuration
+            api: api, registration: registration, configuration: configuration, messageHandler: self
         )
         try connection?.open()
         try connection?.start(ipAddress: config.ipAddress, port: config.port)
@@ -81,7 +81,7 @@ public class QuicClient: @unchecked Sendable {
         return try await sendStream.send(buffer: message)
     }
 
-    deinit {
+    func close() {
         if let persistentStream {
             persistentStream.close()
             self.persistentStream = nil
@@ -106,7 +106,32 @@ public class QuicClient: @unchecked Sendable {
         }
 
         MsQuicClose(api)
+    }
+
+    deinit {
         clientLogger.info("QuicClient Deinit")
+    }
+}
+
+extension QuicClient: QuicConnectionMessageHandler {
+    public func didReceiveMessage(
+        connection _: QuicConnection, stream _: QuicStream?, message: QuicMessage
+    ) {
+        switch message.type {
+        case .received:
+            let buffer = message.data!
+            clientLogger.info(
+                "Client received: \(String([UInt8](buffer).map { Character(UnicodeScalar($0)) }))"
+            )
+        case .shutdownComplete:
+            close()
+        default:
+            break
+        }
+    }
+
+    public func didReceiveError(connection _: QuicConnection, stream _: QuicStream, error: QuicError) {
+        clientLogger.error("Failed to receive message: \(error)")
     }
 }
 

@@ -54,14 +54,16 @@ public final class QuicServer: @unchecked Sendable {
         try openListener(ipAddress: config.ipAddress, port: config.port)
     }
 
-    func replyTo(messageID: Int64, with data: Data) {
+    func replyTo(messageID: Int64, with data: Data) -> QuicStatus {
+        var status = QuicStatusCode.internalError.rawValue
         if let (_, stream) = pendingMessages[messageID] {
-            stream.send(buffer: data)
+            status = stream.send(buffer: data)
             serverLogger.info("Message sent: \(messageID)")
             _ = pendingMessages.removeValue(forKey: messageID)
         } else {
             serverLogger.error("Message not found")
         }
+        return status
     }
 
     func replyTo(messageID: Int64, with data: Data) async throws {
@@ -75,6 +77,59 @@ public final class QuicServer: @unchecked Sendable {
         }
     }
 
+    deinit {
+        if listener != nil {
+            api?.pointee.ListenerClose(listener)
+            listener = nil
+        }
+        if configuration != nil {
+            api?.pointee.ConfigurationClose(configuration)
+            configuration = nil
+        }
+        if registration != nil {
+            api?.pointee.RegistrationClose(registration)
+            registration = nil
+        }
+        MsQuicClose(api)
+    }
+}
+
+extension QuicServer: QuicConnectionMessageHandler {
+    public func didReceiveMessage(
+        connection: QuicConnection, stream: QuicStream?, message: QuicMessage
+    ) {
+        switch message.type {
+        case .shutdownComplete:
+            break
+        case .aborted:
+            break
+        case .unknown:
+            break
+        case .received:
+            if let stream {
+                processPendingMessage(connection: connection, stream: stream, message: message)
+            }
+        default:
+            break
+        }
+    }
+
+    public func didReceiveError(
+        connection _: QuicConnection, stream _: QuicStream, error: QuicError
+    ) {
+        logger.error("Failed to receive message: \(error)")
+    }
+
+    private func processPendingMessage(
+        connection: QuicConnection, stream: QuicStream, message: QuicMessage
+    ) {
+        let messageID = Int64(Date().timeIntervalSince1970 * 1000)
+        pendingMessages[messageID] = (connection, stream)
+        messageHandler?.didReceiveMessage(quicServer: self, messageID: messageID, message: message)
+    }
+}
+
+extension QuicServer {
     private func openListener(ipAddress _: String, port: UInt16) throws {
         var listenerHandle: HQuic?
         let status =
@@ -149,58 +204,9 @@ public final class QuicServer: @unchecked Sendable {
         return status
     }
 
-    deinit {
-        if listener != nil {
-            api?.pointee.ListenerClose(listener)
-            listener = nil
-        }
-        if configuration != nil {
-            api?.pointee.ConfigurationClose(configuration)
-            configuration = nil
-        }
-        if registration != nil {
-            api?.pointee.RegistrationClose(registration)
-            registration = nil
-        }
-        MsQuicClose(api)
-    }
-}
-
-extension QuicServer: QuicConnectionMessageHandler {
-    public func didReceiveMessage(
-        connection: QuicConnection, stream: QuicStream, message: QuicMessage
-    ) {
-        switch message.type {
-        case .shutdownComplete:
-            break
-        case .aborted:
-            break
-        case .unknown:
-            break
-        case .received:
-            processPendingMessage(connection: connection, stream: stream, message: message)
-        default:
-            break
-        }
-    }
-
-    public func didReceiveError(
-        connection _: QuicConnection, stream _: QuicStream, error: QuicError
-    ) {
-        logger.error("Failed to receive message: \(error)")
-    }
-
-    private func processPendingMessage(connection: QuicConnection, stream: QuicStream, message: QuicMessage) {
-        let messageID = Int64(Date().timeIntervalSince1970 * 1000)
-        pendingMessages[messageID] = (connection, stream)
-        messageHandler?.didReceiveMessage(quicServer: self, messageID: messageID, message: message)
-    }
-}
-
-extension QuicServer {
     private func loadConfiguration() throws {
         var settings = QUIC_SETTINGS()
-        settings.IdleTimeoutMs = 30000
+        settings.IdleTimeoutMs = 10000
         settings.IsSet.IdleTimeoutMs = 1
         settings.ServerResumptionLevel = 2 // QUIC_SERVER_RESUME_AND_ZERORTT
         settings.IsSet.ServerResumptionLevel = 1
