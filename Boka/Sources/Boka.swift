@@ -8,6 +8,7 @@ import ArgumentParser
 import Node
 import ServiceLifecycle
 import TracingUtils
+import Utils
 
 @main
 struct Boka: AsyncParsableCommand {
@@ -18,7 +19,14 @@ struct Boka: AsyncParsableCommand {
         logger.info("Starting Boka...")
 
         let config = Node.Config(rpc: RPCConfig(listenAddress: "127.0.0.1", port: 9955), protocol: .dev)
-        var node: Node! = try await Node(genesis: .dev, config: config)
+        let eventBus = EventBus(
+            eventMiddleware: .serial(
+                .log(logger: Logger(label: "EventBus")),
+                .tracing(prefix: "EventBusEvent")
+            ),
+            handlerMiddleware: .tracing(prefix: "Handler")
+        )
+        var node: Node! = try await Node(genesis: .dev, config: config, eventBus: eventBus)
         node.sayHello()
 
         for service in services {
