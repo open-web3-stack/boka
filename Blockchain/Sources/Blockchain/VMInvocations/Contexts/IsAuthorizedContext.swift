@@ -14,7 +14,7 @@ public class IsAuthorizedContext: InvocationContext {
     public func dispatch(index: UInt32, state: VMState) -> ExecOutcome {
         do {
             if index == GasFn.identifier {
-                try GasFn.call(state: state, invariant: ())
+                try GasFn.call(state: state, input: ())
             } else {
                 state.consumeGas(10)
                 state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHAT.rawValue)

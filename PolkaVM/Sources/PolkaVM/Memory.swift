@@ -198,12 +198,33 @@ public class Memory {
         throw Error.pageFault(address)
     }
 
+    public func isReadable(address: UInt32, length: Int) -> Bool {
+        do {
+            let section = try getSection(forAddress: address)
+            if section.startAddressBound <= address, address + UInt32(length) < section.endAddressBound {
+                return true
+            }
+            return false
+        } catch {
+            return false
+        }
+    }
+
     public func read(address: UInt32) throws(Error) -> UInt8 {
         try getSection(forAddress: address).read(address: address, length: 1).first ?? 0
     }
 
     public func read(address: UInt32, length: Int) throws(Error) -> Data {
         try getSection(forAddress: address).read(address: address, length: length)
+    }
+
+    public func isWritable(address: UInt32, length: Int) -> Bool {
+        do {
+            let section = try getSection(forAddress: address)
+            return section.isWritable && section.startAddressBound <= address && address + UInt32(length) < section.endAddressBound
+        } catch {
+            return false
+        }
     }
 
     public func write(address: UInt32, value: UInt8) throws(Error) {

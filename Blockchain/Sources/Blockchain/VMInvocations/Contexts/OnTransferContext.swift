@@ -16,15 +16,15 @@ public class OnTransferContext: InvocationContext {
     public func dispatch(index: UInt32, state: VMState) -> ExecOutcome {
         do {
             if index == Lookup.identifier {
-                try Lookup.call(state: state, invariant: (context.1, context.2), mutable: &context.0)
+                try Lookup.call(state: state, input: (context.0, context.1, context.2))
             } else if index == Read.identifier {
-                try Read.call(state: state, invariant: (context.1, context.2), mutable: &context.0)
+                try Read.call(state: state, input: (context.0, context.1, context.2))
             } else if index == Write.identifier {
-                try Write.call(state: state, invariant: (), mutable: &context.0)
+                context.0 = try Write.call(state: state, input: (context.0, context.1, context.2))
             } else if index == GasFn.identifier {
-                try GasFn.call(state: state, invariant: ())
+                try GasFn.call(state: state, input: ())
             } else if index == Info.identifier {
-                try Info.call(state: state, invariant: (context.1, context.2), mutable: &context.0)
+                try Info.call(state: state, input: (context.0, context.1, context.2))
             } else {
                 state.consumeGas(10)
                 state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHAT.rawValue)

@@ -47,6 +47,14 @@ public class VMState {
         try memory.read(address: address, length: length)
     }
 
+    public func isMemoryReadable(address: UInt32, length: Int) -> Bool {
+        memory.isReadable(address: address, length: length)
+    }
+
+    public func isMemoryWritable(address: UInt32, length: Int) -> Bool {
+        memory.isWritable(address: address, length: length)
+    }
+
     public func writeMemory(address: UInt32, value: UInt8) throws {
         try memory.write(address: address, value: value)
     }
