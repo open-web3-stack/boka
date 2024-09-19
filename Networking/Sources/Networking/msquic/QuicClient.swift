@@ -56,8 +56,6 @@ public class QuicClient: @unchecked Sendable {
         )
         try connection?.open()
         try connection?.start(ipAddress: config.ipAddress, port: config.port)
-        //        persistentStream = try connection?.createStream(.uniquePersistent)
-        //        try persistentStream?.start()
         return status
     }
 
@@ -73,13 +71,15 @@ public class QuicClient: @unchecked Sendable {
         }
         let sendStream: QuicStream
         // Check if there is an existing stream of the same kind
-        // If there is not, create a new stream
-        let stream = try connection.createStream(streamKind)
-        // Start the stream
-        try stream.start()
-        // Send the message to the new stream
-        sendStream = stream
-
+        if streamKind == .uniquePersistent {
+            // If there is, send the message to the existing stream
+            sendStream = try connection.createOrGetUniquePersistentStream(kind: streamKind)
+        } else {
+            // If there is not, create a new stream
+            sendStream = try connection.createCommonEphemeralStream()
+            // Start the stream
+            try sendStream.start()
+        }
         return try await sendStream.send(buffer: message)
     }
 
@@ -147,7 +147,7 @@ extension QuicClient: QuicConnectionMessageHandler {
 extension QuicClient {
     private func loadConfiguration(_ unsecure: Bool = true) throws {
         var settings = QUIC_SETTINGS()
-        settings.IdleTimeoutMs = 1000
+        settings.IdleTimeoutMs = 10000
         settings.IsSet.IdleTimeoutMs = 1
 
         var credConfig = QUIC_CREDENTIAL_CONFIG()

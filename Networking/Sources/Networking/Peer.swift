@@ -3,8 +3,21 @@ import Logging
 
 let peerLogger = Logger(label: "PeerServer")
 
+public enum PeerMessageType: Sendable {
+    case uniquePersistent
+    case commonEphemeral
+    case unknown
+}
+
 public protocol PeerMessage: Equatable, Sendable {
     func getData() -> Data
+    func getMessageType() -> PeerMessageType
+}
+
+extension PeerMessage {
+    public func getMessageType() -> PeerMessageType {
+        .uniquePersistent
+    }
 }
 
 public protocol PeerMessageHandler: AnyObject {
@@ -45,13 +58,14 @@ public final class Peer: @unchecked Sendable {
         message: any PeerMessage, peerAddr: NetAddr
     ) async throws -> QuicMessage {
         let buffer = message.getData()
-        return try await sendDataToPeer(buffer, to: peerAddr)
+        let messageType = message.getMessageType()
+        return try await sendDataToPeer(buffer, to: peerAddr, messageType: messageType)
     }
 
-    func sendDataToPeer(_ data: Data, to peerAddr: NetAddr) async throws -> QuicMessage {
+    private func sendDataToPeer(_ data: Data, to peerAddr: NetAddr, messageType: PeerMessageType) async throws -> QuicMessage {
         if let client = clients[peerAddr] {
             // Client already exists, use it to send the data
-            return try await client.send(message: data)
+            return try await client.send(message: data, streamKind: messageType == .uniquePersistent ? .uniquePersistent : .commonEphemeral)
         } else {
             let config = QuicConfig(
                 id: config.id, cert: config.cert, key: config.key, alpn: config.alpn,
@@ -64,7 +78,7 @@ public final class Peer: @unchecked Sendable {
                 throw QuicError.getClientFailed
             }
             clients[peerAddr] = client
-            return try await client.send(message: data)
+            return try await client.send(message: data, streamKind: messageType == .uniquePersistent ? .uniquePersistent : .commonEphemeral)
         }
     }
 

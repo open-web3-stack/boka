@@ -9,7 +9,7 @@ import Testing
     import Security
 
     struct Message: PeerMessage {
-        private let data: Data
+        public let data: Data
         public init(data: Data) {
             self.data = data
         }
@@ -39,7 +39,7 @@ import Testing
                 )
                 print("Peer message got: \(quicmessage)")
 
-                try await group.next().scheduleTask(in: .seconds(5)) {
+                _ = try await group.next().scheduleTask(in: .seconds(5)) {
                     Task {
                         do {
                             let quicmessage = try await peer.sendMessageToPeer(
@@ -52,7 +52,7 @@ import Testing
                         }
                     }
                 }.futureResult.get()
-                try await group.next().scheduleTask(in: .seconds(15)) {}.futureResult.get()
+                try await group.next().scheduleTask(in: .seconds(60)) {}.futureResult.get()
 
             } catch {
                 print("Failed to start peer: \(error)")
@@ -70,7 +70,7 @@ import Testing
                 )
 
                 try peer.start()
-                try group.next().scheduleTask(in: .seconds(10)) {
+                _ = try group.next().scheduleTask(in: .seconds(10)) {
                     Task {
                         do {
                             let quicmessage = try await peer.sendMessageToPeer(
@@ -84,7 +84,7 @@ import Testing
                     }
                 }.futureResult.wait()
 
-                try group.next().scheduleTask(in: .minutes(10)) {
+                try group.next().scheduleTask(in: .seconds(20)) {
                     print("scheduleTask end")
                 }.futureResult.wait()
 

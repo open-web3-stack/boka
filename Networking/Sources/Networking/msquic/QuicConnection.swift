@@ -18,9 +18,11 @@ public class QuicConnection {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
-    private var streams: AtomicArray<QuicStream> = .init()
+    private var uniquePersistentStreams: AtomicDictionary<StreamKind, QuicStream>
+    private var commonEphemeralStreams: AtomicArray<QuicStream>
     private weak var messageHandler: QuicConnectionMessageHandler?
     private var connectionCallback: ConnectionCallback?
+
     init(
         api: UnsafePointer<QuicApiTable>?,
         registration: HQuic?,
@@ -31,6 +33,8 @@ public class QuicConnection {
         self.registration = registration
         self.configuration = configuration
         self.messageHandler = messageHandler
+        uniquePersistentStreams = .init()
+        commonEphemeralStreams = .init()
         connectionCallback = { connection, context, event in
             QuicConnection.connectionCallback(
                 connection: connection, context: context, event: event
@@ -47,6 +51,8 @@ public class QuicConnection {
         self.configuration = configuration
         self.connection = connection
         self.messageHandler = messageHandler
+        uniquePersistentStreams = .init()
+        commonEphemeralStreams = .init()
         connectionCallback = { connection, context, event in
             QuicConnection.connectionCallback(
                 connection: connection, context: context, event: event
@@ -54,7 +60,6 @@ public class QuicConnection {
         }
     }
 
-    // TODO: set callback handler
     func setCallbackHandler() -> QuicStatus {
         guard let api, let connection, let configuration else {
             return QuicStatusCode.invalidParameter.rawValue
@@ -88,15 +93,29 @@ public class QuicConnection {
         }
     }
 
-    func createStream(_ streamKind: StreamKind = .commonEphemeral) throws -> QuicStream {
-        let stream = try QuicStream(api: api, connection: connection, streamKind, messageHandler: self)
-        streams.append(stream)
+    func createOrGetUniquePersistentStream(kind: StreamKind) throws -> QuicStream {
+        if let stream = uniquePersistentStreams[kind] {
+            return stream
+        }
+        let stream = try QuicStream(api: api, connection: connection, kind, messageHandler: self)
+        uniquePersistentStreams[kind] = stream
+        try stream.start()
+        return stream
+    }
+
+    func createCommonEphemeralStream() throws -> QuicStream {
+        let stream = try QuicStream(api: api, connection: connection, .commonEphemeral, messageHandler: self)
+        commonEphemeralStreams.append(stream)
         return stream
     }
 
     func removeStream(stream: QuicStream) {
         stream.close()
-        streams.removeAll(where: { $0 === stream })
+        if stream.kind == .uniquePersistent {
+            _ = uniquePersistentStreams.removeValue(forKey: stream.kind)
+        } else {
+            commonEphemeralStreams.removeAll(where: { $0 === stream })
+        }
     }
 
     func start(ipAddress: String, port: UInt16) throws {
@@ -113,10 +132,14 @@ public class QuicConnection {
     func close() {
         connectionCallback = nil
         messageHandler = nil
-        for stream in streams {
+        for stream in commonEphemeralStreams {
             stream.close()
         }
-        streams.removeAll()
+        commonEphemeralStreams.removeAll()
+        for stream in uniquePersistentStreams.values {
+            stream.close()
+        }
+        uniquePersistentStreams.removeAll()
         api?.pointee.ConnectionClose(connection)
     }
 
@@ -178,14 +201,13 @@ extension QuicConnection {
             )
 
         case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
-            // TODO: Manage streams
             logger.info("[\(String(describing: connection))] Peer stream started")
             let stream = event.pointee.PEER_STREAM_STARTED.Stream
             let quicStream = QuicStream(
                 api: quicConnection.api, connection: connection, stream: stream, messageHandler: quicConnection
             )
             quicStream.setCallbackHandler()
-            quicConnection.streams.append(quicStream)
+            quicConnection.commonEphemeralStreams.append(quicStream)
 
         default:
             break

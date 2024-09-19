@@ -8,4 +8,5 @@ public enum QuicError: Error, Equatable, Sendable {
     case getClientFailed
     case messageNotFound
     case sendFailed
+    case streamAlreadyExist
 }
