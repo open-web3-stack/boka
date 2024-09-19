@@ -17,6 +17,7 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../Codec"),
+        .package(path: "../TracingUtils"),
         .package(url: "https://github.com/tesseract-one/Blake2.swift.git", from: "0.2.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0" ..< "4.0.0"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
@@ -29,6 +30,7 @@ let package = Package(
             name: "Utils",
             dependencies: [
                 "Codec",
+                "TracingUtils",
                 .product(name: "Blake2", package: "Blake2.swift"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Atomics", package: "swift-atomics"),
