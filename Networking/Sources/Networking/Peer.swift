@@ -58,7 +58,7 @@ public final class Peer: @unchecked Sendable {
                 ipAddress: peerAddr.ipAddress, port: peerAddr.port
             )
             // Client does not exist, create a new one
-            let client = try QuicClient(config: config)
+            let client = try QuicClient(config: config, messageHandler: self)
             let status = try client.start()
             if status.isFailed {
                 throw QuicError.getClientFailed
@@ -68,12 +68,36 @@ public final class Peer: @unchecked Sendable {
         }
     }
 
+    func removeClient(with peerAddr: NetAddr) {
+        _ = clients.removeValue(forKey: peerAddr)
+    }
+
     func getPeerAddr() -> String {
         "\(config.ipAddress):\(config.port)"
     }
 
     deinit {
+        peerLogger.info("Peer Deinit")
         // Clean up resources if necessary
+    }
+}
+
+extension Peer: QuicClientMessageHandler {
+    public func didReceiveMessage(quicClient: QuicClient, message: QuicMessage) {
+        switch message.type {
+        case .shutdownComplete:
+            peerLogger.info("QuicClient shutdown complete")
+            // Use [weak self] to avoid strong reference cycle
+            DispatchQueue.main.async { [weak self] in
+                self?.removeClient(with: quicClient.getNetAddr())
+            }
+        default:
+            break
+        }
+    }
+
+    public func didReceiveError(quicClient _: QuicClient, error: QuicError) {
+        peerLogger.error("Failed to receive message: \(error)")
     }
 }
 

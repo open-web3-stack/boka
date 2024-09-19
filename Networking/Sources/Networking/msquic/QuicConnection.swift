@@ -36,7 +36,6 @@ public class QuicConnection {
                 connection: connection, context: context, event: event
             )
         }
-        streamLogger.info("QuicConnection init reference count: \(CFGetRetainCount(self))")
     }
 
     init(
@@ -53,8 +52,6 @@ public class QuicConnection {
                 connection: connection, context: context, event: event
             )
         }
-
-        streamLogger.info("QuicConnection init reference count: \(CFGetRetainCount(self))")
     }
 
     // TODO: set callback handler
@@ -116,14 +113,11 @@ public class QuicConnection {
     func close() {
         connectionCallback = nil
         messageHandler = nil
-        logger.info("QuicConnection close called, reference count: \(CFGetRetainCount(self))")
         for stream in streams {
             stream.close()
         }
         streams.removeAll()
         api?.pointee.ConnectionClose(connection)
-
-        logger.info("QuicConnection close called, reference count: \(CFGetRetainCount(self))")
     }
 
     deinit {
@@ -202,7 +196,6 @@ extension QuicConnection {
 
 extension QuicConnection: QuicStreamMessageHandler {
     public func didReceiveMessage(_ stream: QuicStream, message: QuicMessage) {
-        logger.error("QuicConnection receive message: \(message)")
         switch message.type {
         case .shutdownComplete:
             removeStream(stream: stream)

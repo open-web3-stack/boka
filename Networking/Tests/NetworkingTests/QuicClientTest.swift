@@ -39,10 +39,6 @@ import Testing
 
                 try await group.next().scheduleTask(in: .seconds(5)) {
                     print("scheduleTask: 5s")
-//                    quicClient.close()
-                }.futureResult.get()
-                try await group.next().scheduleTask(in: .seconds(5)) {
-                    print("scheduleTask: 5s")
                 }.futureResult.get()
             } catch {
                 print("Failed to start quic client: \(error)")

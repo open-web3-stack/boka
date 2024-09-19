@@ -5,17 +5,24 @@ import NIO
 
 let clientLogger = Logger(label: "QuicClient")
 
+public protocol QuicClientMessageHandler: AnyObject {
+    func didReceiveMessage(quicClient: QuicClient, message: QuicMessage)
+    func didReceiveError(quicClient: QuicClient, error: QuicError)
+}
+
 public class QuicClient: @unchecked Sendable {
     private let api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
     private var connection: QuicConnection?
     // TODO: remove persistent stream
-    //    private var persistentStream: QuicStream?
+    // private var persistentStream: QuicStream?
     private let config: QuicConfig
+    private weak var messageHandler: QuicClientMessageHandler?
 
-    init(config: QuicConfig) throws {
+    init(config: QuicConfig, messageHandler: QuicClientMessageHandler? = nil) throws {
         self.config = config
+        self.messageHandler = messageHandler
         var rawPointer: UnsafeRawPointer?
         let status: UInt32 = MsQuicOpenVersion(2, &rawPointer)
 
@@ -66,10 +73,6 @@ public class QuicClient: @unchecked Sendable {
         }
         let sendStream: QuicStream
         // Check if there is an existing stream of the same kind
-        //        if streamKind == .uniquePersistent, let stream = persistentStream {
-        //            // If there is, send the message to the existing stream
-        //            sendStream = stream
-        //        } else {
         // If there is not, create a new stream
         let stream = try connection.createStream(streamKind)
         // Start the stream
@@ -80,36 +83,55 @@ public class QuicClient: @unchecked Sendable {
         return try await sendStream.send(buffer: message)
     }
 
-    func close() {
-        //        if let persistentStream {
-        //            persistentStream.close()
-        //            self.persistentStream = nil
-        //        }
+    func getNetAddr() -> NetAddr {
+        NetAddr(ipAddress: config.ipAddress, port: config.port)
+    }
 
+    func close() {
         if let connection {
             connection.close()
             self.connection = nil
-            clientLogger.info("Connection closed")
         }
 
         if let configuration {
             api?.pointee.ConfigurationClose(configuration)
             self.configuration = nil
-            clientLogger.info("Configuration closed")
         }
 
         if let registration {
             api?.pointee.RegistrationClose(registration)
             self.registration = nil
-            clientLogger.info("Registration closed")
         }
 
         MsQuicClose(api)
-        clientLogger.info("QuicClient close called, reference count: \(CFGetRetainCount(self))")
+
+        if let messageHandler {
+            messageHandler.didReceiveMessage(quicClient: self, messageID: 0, message: QuicMessage(type: .shutdownComplete, data: nil))
+        }
     }
 
     deinit {
         clientLogger.info("QuicClient Deinit")
+    }
+}
+
+extension QuicClient: QuicClientMessageHandler {
+    public func didReceiveMessage(quicClient _: QuicClient, messageID _: Int64, message: QuicMessage) {
+        switch message.type {
+        case .received:
+            let buffer = message.data!
+            clientLogger.info(
+                "Client received: \(String([UInt8](buffer).map { Character(UnicodeScalar($0)) }))"
+            )
+        case .shutdownComplete:
+            clientLogger.info("Client shutdown complete")
+        default:
+            break
+        }
+    }
+
+    public func didReceiveError(quicClient _: QuicClient, messageID _: Int64, error: QuicError) {
+        clientLogger.error("Failed to receive message: \(error)")
     }
 }
 
@@ -125,9 +147,6 @@ extension QuicClient: QuicConnectionMessageHandler {
             )
 
         case .shutdownComplete:
-            clientLogger.info(
-                "QuicConnectionMessageHandler shutdownComplete"
-            )
             // Use [weak self] to avoid strong reference cycle
             DispatchQueue.main.async { [weak self] in
                 self?.close()

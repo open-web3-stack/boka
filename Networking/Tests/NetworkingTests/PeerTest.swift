@@ -22,7 +22,7 @@ import Testing
     let cert = "/Users/mackun/boka/Networking/Sources/assets/server.cert"
     let keyFile = "/Users/mackun/boka/Networking/Sources/assets/server.key"
     final class PeerTests {
-        @Test func startPeer1() throws {
+        @Test func startPeer1() async throws {
             do {
                 let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
                 let peer = try Peer(
@@ -33,11 +33,17 @@ import Testing
                     messageHandler: self
                 )
                 try peer.start()
-                try group.next().scheduleTask(in: .seconds(5)) {
+                let quicmessage = try await peer.sendMessageToPeer(
+                    message: Message(data: Data("Hello, World!".utf8)),
+                    peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4569)
+                )
+                print("Peer message got: \(quicmessage)")
+
+                try await group.next().scheduleTask(in: .seconds(5)) {
                     Task {
                         do {
                             let quicmessage = try await peer.sendMessageToPeer(
-                                message: Message(data: Data("Hello, World!".utf8)),
+                                message: Message(data: Data("Hello, swift!".utf8)),
                                 peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4569)
                             )
                             print("Peer message got: \(quicmessage)")
@@ -45,21 +51,8 @@ import Testing
                             print("Failed to send message: \(error)")
                         }
                     }
-                }.futureResult.wait()
-//                try group.next().scheduleTask(in: .seconds(10)) {
-//                    Task {
-//                        do {
-//                            let quicmessage = try await peer.sendMessageToPeer(
-//                                message: Message(type: .text, data: Data("Hello, swift!".utf8)),
-//                                peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4569)
-//                            )
-//                            print("Peer message got: \(quicmessage)")
-//                        } catch {
-//                            print("Failed to send message: \(error)")
-//                        }
-//                    }
-//                }.futureResult.wait()
-                try group.next().scheduleTask(in: .minutes(10)) {}.futureResult.wait()
+                }.futureResult.get()
+                try await group.next().scheduleTask(in: .minutes(10)) {}.futureResult.get()
 
             } catch {
                 print("Failed to start peer: \(error)")
