@@ -116,14 +116,12 @@ public class QuicConnection {
     func close() {
         connectionCallback = nil
         messageHandler = nil
+        logger.info("QuicConnection close called, reference count: \(CFGetRetainCount(self))")
         for stream in streams {
             stream.close()
         }
         streams.removeAll()
-        if connection != nil {
-            api?.pointee.ConnectionClose(connection)
-            connection = nil
-        }
+        api?.pointee.ConnectionClose(connection)
 
         logger.info("QuicConnection close called, reference count: \(CFGetRetainCount(self))")
     }
@@ -170,14 +168,14 @@ extension QuicConnection {
         case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
             logger.info("[\(String(describing: connection))] Shutdown all done")
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
-                for stream in quicConnection.streams {
-                    stream.close()
+                if let messageHandler = quicConnection.messageHandler {
+                    messageHandler.didReceiveMessage(
+                        connection: quicConnection,
+                        stream: nil,
+                        message: QuicMessage(type: .shutdownComplete, data: nil)
+                    )
+                    quicConnection.messageHandler = nil
                 }
-                quicConnection.streams.removeAll()
-                quicConnection.api?.pointee.ConnectionClose(connection)
-                quicConnection.messageHandler?
-                    .didReceiveMessage(connection: quicConnection, stream: nil, message: QuicMessage(type: .shutdownComplete, data: nil))
-                // quicConnection.onMessageReceived?(QuicMessage(type: .shutdown, data: nil))
             }
 
         case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
@@ -204,6 +202,7 @@ extension QuicConnection {
 
 extension QuicConnection: QuicStreamMessageHandler {
     public func didReceiveMessage(_ stream: QuicStream, message: QuicMessage) {
+        logger.error("QuicConnection receive message: \(message)")
         switch message.type {
         case .shutdownComplete:
             removeStream(stream: stream)

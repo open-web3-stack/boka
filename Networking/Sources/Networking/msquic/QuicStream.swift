@@ -83,12 +83,11 @@ public class QuicStream {
     func close() {
         streamCallback = nil
         messageHandler = nil
-        streamLogger.info("QuicStream [\(String(describing: stream))] close called, reference count: \(CFGetRetainCount(self))")
-
         if stream != nil {
             api?.pointee.StreamClose(stream)
             stream = nil
         }
+        streamLogger.info("QuicStream [\(String(describing: stream))] close called, reference count: \(CFGetRetainCount(self))")
     }
 
     func setCallbackHandler() {

@@ -11,7 +11,7 @@ public class QuicClient: @unchecked Sendable {
     private var configuration: HQuic?
     private var connection: QuicConnection?
     // TODO: remove persistent stream
-//    private var persistentStream: QuicStream?
+    //    private var persistentStream: QuicStream?
     private let config: QuicConfig
 
     init(config: QuicConfig) throws {
@@ -49,8 +49,8 @@ public class QuicClient: @unchecked Sendable {
         )
         try connection?.open()
         try connection?.start(ipAddress: config.ipAddress, port: config.port)
-//        persistentStream = try connection?.createStream(.uniquePersistent)
-//        try persistentStream?.start()
+        //        persistentStream = try connection?.createStream(.uniquePersistent)
+        //        try persistentStream?.start()
         return status
     }
 
@@ -66,10 +66,10 @@ public class QuicClient: @unchecked Sendable {
         }
         let sendStream: QuicStream
         // Check if there is an existing stream of the same kind
-//        if streamKind == .uniquePersistent, let stream = persistentStream {
-//            // If there is, send the message to the existing stream
-//            sendStream = stream
-//        } else {
+        //        if streamKind == .uniquePersistent, let stream = persistentStream {
+        //            // If there is, send the message to the existing stream
+        //            sendStream = stream
+        //        } else {
         // If there is not, create a new stream
         let stream = try connection.createStream(streamKind)
         // Start the stream
@@ -81,10 +81,10 @@ public class QuicClient: @unchecked Sendable {
     }
 
     func close() {
-//        if let persistentStream {
-//            persistentStream.close()
-//            self.persistentStream = nil
-//        }
+        //        if let persistentStream {
+        //            persistentStream.close()
+        //            self.persistentStream = nil
+        //        }
 
         if let connection {
             connection.close()
@@ -123,14 +123,24 @@ extension QuicClient: QuicConnectionMessageHandler {
             clientLogger.info(
                 "Client received: \(String([UInt8](buffer).map { Character(UnicodeScalar($0)) }))"
             )
+
         case .shutdownComplete:
-            close()
+            clientLogger.info(
+                "QuicConnectionMessageHandler shutdownComplete"
+            )
+            // Use [weak self] to avoid strong reference cycle
+            DispatchQueue.main.async { [weak self] in
+                self?.close()
+            }
+
         default:
             break
         }
     }
 
-    public func didReceiveError(connection _: QuicConnection, stream _: QuicStream, error: QuicError) {
+    public func didReceiveError(
+        connection _: QuicConnection, stream _: QuicStream, error: QuicError
+    ) {
         clientLogger.error("Failed to receive message: \(error)")
     }
 }

@@ -4,17 +4,7 @@ import Logging
 let peerLogger = Logger(label: "PeerServer")
 
 public protocol PeerMessage: Equatable, Sendable {
-    var timestamp: Int { get }
-    var type: MessageType { get }
-    var data: Data { get }
-    init(type: MessageType, data: Data)
-}
-
-public enum MessageType: Int, Sendable {
-    case text = 0
-    case hello = 1
-    case block = 2
-    case transaction = 3
+    func getData() -> Data
 }
 
 public protocol PeerMessageHandler: AnyObject {
@@ -36,12 +26,11 @@ public final class Peer: @unchecked Sendable {
     }
 
     func start() throws {
-        // Implement start logic
         try quicServer?.start()
     }
 
     func close() throws {
-        // Implement close logic
+        try quicServer?.close()
     }
 
     func replyTo(messageID: Int64, with data: Data) async throws {
@@ -55,7 +44,7 @@ public final class Peer: @unchecked Sendable {
     func sendMessageToPeer(
         message: any PeerMessage, peerAddr: NetAddr
     ) async throws -> QuicMessage {
-        let buffer = Data(message.data)
+        let buffer = message.getData()
         return try await sendDataToPeer(buffer, to: peerAddr)
     }
 

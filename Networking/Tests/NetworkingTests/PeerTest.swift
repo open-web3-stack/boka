@@ -9,14 +9,13 @@ import Testing
     import Security
 
     struct Message: PeerMessage {
-        public let timestamp: Int
-        public let type: MessageType
-        public let data: Data
-
-        public init(type: MessageType, data: Data) {
-            timestamp = Int(Date().timeIntervalSince1970 * 1000)
-            self.type = type
+        private let data: Data
+        public init(data: Data) {
             self.data = data
+        }
+
+        public func getData() -> Data {
+            data
         }
     }
 
@@ -38,7 +37,7 @@ import Testing
                     Task {
                         do {
                             let quicmessage = try await peer.sendMessageToPeer(
-                                message: Message(type: .text, data: Data("Hello, World!".utf8)),
+                                message: Message(data: Data("Hello, World!".utf8)),
                                 peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4569)
                             )
                             print("Peer message got: \(quicmessage)")
@@ -82,7 +81,7 @@ import Testing
                     Task {
                         do {
                             let quicmessage = try await peer.sendMessageToPeer(
-                                message: Message(type: .text, data: Data("Hello, World!".utf8)),
+                                message: Message(data: Data("Hello, World!".utf8)),
                                 peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4568)
                             )
                             print("Message sent: \(quicmessage)")

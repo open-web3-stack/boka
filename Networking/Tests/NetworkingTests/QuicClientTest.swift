@@ -36,7 +36,14 @@ import Testing
                     message: Data("Hello, i am fine!".utf8), streamKind: .commonEphemeral
                 )
                 print("Client received 4: \(message4)")
-                try await group.next().scheduleTask(in: .seconds(5)) {}.futureResult.get()
+
+                try await group.next().scheduleTask(in: .seconds(5)) {
+                    print("scheduleTask: 5s")
+//                    quicClient.close()
+                }.futureResult.get()
+                try await group.next().scheduleTask(in: .seconds(5)) {
+                    print("scheduleTask: 5s")
+                }.futureResult.get()
             } catch {
                 print("Failed to start quic client: \(error)")
             }

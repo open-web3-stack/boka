@@ -54,6 +54,22 @@ public final class QuicServer: @unchecked Sendable {
         try openListener(ipAddress: config.ipAddress, port: config.port)
     }
 
+    func close() throws {
+        if listener != nil {
+            api?.pointee.ListenerClose(listener)
+            listener = nil
+        }
+        if configuration != nil {
+            api?.pointee.ConfigurationClose(configuration)
+            configuration = nil
+        }
+        if registration != nil {
+            api?.pointee.RegistrationClose(registration)
+            registration = nil
+        }
+        MsQuicClose(api)
+    }
+
     func replyTo(messageID: Int64, with data: Data) -> QuicStatus {
         var status = QuicStatusCode.internalError.rawValue
         if let (_, stream) = pendingMessages[messageID] {
@@ -91,6 +107,7 @@ public final class QuicServer: @unchecked Sendable {
             registration = nil
         }
         MsQuicClose(api)
+        serverLogger.info("QuicServer Deinit")
     }
 }
 
