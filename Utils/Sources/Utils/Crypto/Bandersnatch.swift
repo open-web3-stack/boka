@@ -89,7 +89,7 @@ public enum Bandersnatch: KeyType {
         case ietfVRFVerifyFailed(Int)
     }
 
-    public final class SecretKey: SecretKeyProtocol {
+    public final class SecretKey: SecretKeyProtocol, @unchecked Sendable {
         fileprivate let ptr: OpaquePointer
         public let publicKey: PublicKey
 
@@ -134,7 +134,7 @@ public enum Bandersnatch: KeyType {
         }
     }
 
-    public final class PublicKey: PublicKeyProtocol, Hashable {
+    public final class PublicKey: PublicKeyProtocol, Hashable, @unchecked Sendable, CustomStringConvertible {
         fileprivate let ptr: OpaquePointer
         public let data: Data32
 
@@ -187,6 +187,10 @@ public enum Bandersnatch: KeyType {
 
         public static func == (lhs: PublicKey, rhs: PublicKey) -> Bool {
             lhs.data == rhs.data
+        }
+
+        public var description: String {
+            "0x\(data.toHexString())"
         }
 
         /// Non-Anonymous VRF signature verification.

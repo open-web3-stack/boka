@@ -41,12 +41,12 @@ public actor EventBus: Sendable {
     private let eventMiddleware: Middleware
     private let handlerMiddleware: Middleware
 
-    public init(eventMiddleware: Middleware = Middlewares.noop, handlerMiddleware: Middleware = Middlewares.noop) {
+    public init(eventMiddleware: Middleware = .noop, handlerMiddleware: Middleware = .noop) {
         self.eventMiddleware = eventMiddleware
         self.handlerMiddleware = handlerMiddleware
     }
 
-    public func subscribe<T>(_ eventType: T.Type, handler: @escaping @Sendable (T) async throws -> Void) -> SubscriptionToken {
+    public func subscribe<T: Event>(_ eventType: T.Type, handler: @escaping @Sendable (T) async throws -> Void) -> SubscriptionToken {
         let key = ObjectIdentifier(eventType)
         let token = SubscriptionToken(id: EventBus.idGenerator.loadThenWrappingIncrement(ordering: .relaxed), eventTypeId: key)
 
@@ -66,7 +66,7 @@ public actor EventBus: Sendable {
         }
     }
 
-    public func publish(_ event: some Sendable) {
+    public func publish(_ event: some Event) {
         let key = ObjectIdentifier(type(of: event))
         if let eventHandlers = handlers[key] {
             Task {

@@ -1,9 +1,9 @@
 private typealias Handler = @Sendable (Any) async throws -> Void
 
-public final class SerialDispatcher: Middleware {
+private final class SerialDispatcher: MiddlewareProtocol {
     private let middlewares: [Middleware]
 
-    public init(middlewares: [Middleware]) {
+    init(middlewares: [Middleware]) {
         self.middlewares = middlewares
     }
 
@@ -23,10 +23,10 @@ public struct ParallelDispatcherError: Error {
     public var errors: [(index: Int, error: Error)]
 }
 
-public final class ParallelDispatcher: Middleware {
+private final class ParallelDispatcher: MiddlewareProtocol {
     private let middlewares: [Middleware]
 
-    public init(middlewares: [Middleware]) {
+    init(middlewares: [Middleware]) {
         self.middlewares = middlewares
     }
 
@@ -59,22 +59,22 @@ public final class ParallelDispatcher: Middleware {
     }
 }
 
-extension Middlewares {
-    public static func serial(_ middlewares: Middleware...) -> some Middleware {
-        SerialDispatcher(middlewares: middlewares)
+extension Middleware {
+    public static func serial(_ middlewares: Middleware...) -> Middleware {
+        Middleware(SerialDispatcher(middlewares: middlewares))
     }
 
     @_disfavoredOverload
-    public static func serial(_ middlewares: [Middleware]) -> some Middleware {
-        SerialDispatcher(middlewares: middlewares)
+    public static func serial(_ middlewares: [Middleware]) -> Middleware {
+        Middleware(SerialDispatcher(middlewares: middlewares))
     }
 
-    public static func parallel(_ middlewares: Middleware...) -> some Middleware {
-        ParallelDispatcher(middlewares: middlewares)
+    public static func parallel(_ middlewares: Middleware...) -> Middleware {
+        Middleware(ParallelDispatcher(middlewares: middlewares))
     }
 
     @_disfavoredOverload
-    public static func parallel(_ middlewares: [Middleware]) -> some Middleware {
-        ParallelDispatcher(middlewares: middlewares)
+    public static func parallel(_ middlewares: [Middleware]) -> Middleware {
+        Middleware(ParallelDispatcher(middlewares: middlewares))
     }
 }
