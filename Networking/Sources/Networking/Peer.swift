@@ -29,8 +29,8 @@ public final class Peer: @unchecked Sendable {
         try quicServer?.start()
     }
 
-    func close() throws {
-        try quicServer?.close()
+    func close() {
+        quicServer?.close()
     }
 
     func replyTo(messageID: Int64, with data: Data) async throws {
@@ -85,8 +85,8 @@ public final class Peer: @unchecked Sendable {
 extension Peer: QuicClientMessageHandler {
     public func didReceiveMessage(quicClient: QuicClient, message: QuicMessage) {
         switch message.type {
-        case .shutdownComplete:
-            peerLogger.info("QuicClient shutdown complete")
+        case .close:
+            peerLogger.info("QuicClient close")
             // Use [weak self] to avoid strong reference cycle
             DispatchQueue.main.async { [weak self] in
                 self?.removeClient(with: quicClient.getNetAddr())

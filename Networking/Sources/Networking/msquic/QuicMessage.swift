@@ -6,7 +6,7 @@ enum QuicMessageType {
     case aborted
     case unknown
     case received
-    case connect
+    case close
     case connected
     case shutdownComplete
 }

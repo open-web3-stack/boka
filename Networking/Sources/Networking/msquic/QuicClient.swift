@@ -106,32 +106,12 @@ public class QuicClient: @unchecked Sendable {
         MsQuicClose(api)
 
         if let messageHandler {
-            messageHandler.didReceiveMessage(quicClient: self, messageID: 0, message: QuicMessage(type: .shutdownComplete, data: nil))
+            messageHandler.didReceiveMessage(quicClient: self, message: QuicMessage(type: .close, data: nil))
         }
     }
 
     deinit {
         clientLogger.info("QuicClient Deinit")
-    }
-}
-
-extension QuicClient: QuicClientMessageHandler {
-    public func didReceiveMessage(quicClient _: QuicClient, messageID _: Int64, message: QuicMessage) {
-        switch message.type {
-        case .received:
-            let buffer = message.data!
-            clientLogger.info(
-                "Client received: \(String([UInt8](buffer).map { Character(UnicodeScalar($0)) }))"
-            )
-        case .shutdownComplete:
-            clientLogger.info("Client shutdown complete")
-        default:
-            break
-        }
-    }
-
-    public func didReceiveError(quicClient _: QuicClient, messageID _: Int64, error: QuicError) {
-        clientLogger.error("Failed to receive message: \(error)")
     }
 }
 

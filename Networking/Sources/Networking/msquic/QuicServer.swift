@@ -54,7 +54,7 @@ public final class QuicServer: @unchecked Sendable {
         try openListener(ipAddress: config.ipAddress, port: config.port)
     }
 
-    func close() throws {
+    func close() {
         if listener != nil {
             api?.pointee.ListenerClose(listener)
             listener = nil

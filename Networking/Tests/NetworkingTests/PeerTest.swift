@@ -52,7 +52,7 @@ import Testing
                         }
                     }
                 }.futureResult.get()
-                try await group.next().scheduleTask(in: .minutes(10)) {}.futureResult.get()
+                try await group.next().scheduleTask(in: .seconds(15)) {}.futureResult.get()
 
             } catch {
                 print("Failed to start peer: \(error)")
@@ -77,7 +77,7 @@ import Testing
                                 message: Message(data: Data("Hello, World!".utf8)),
                                 peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4568)
                             )
-                            print("Message sent: \(quicmessage)")
+                            print("Message got: \(quicmessage)")
                         } catch {
                             print("Failed to send message: \(error)")
                         }
