@@ -20,16 +20,14 @@ public class IsAuthorizedContext: InvocationContext {
                 state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHAT.rawValue)
             }
             return .continued
+        } catch let e as Memory.Error {
+            logger.error("invocation memory error: \(e)")
+            return .exit(.pageFault(e.address))
         } catch let e as VMInvocationsError {
-            switch e {
-            case let .pageFault(addr):
-                return .exit(.pageFault(addr))
-            default:
-                logger.error("IsAuthorized invocation dispatch error: \(e)")
-                return .exit(.panic(.trap))
-            }
+            logger.error("invocation dispatch error: \(e)")
+            return .exit(.panic(.trap))
         } catch let e {
-            logger.error("IsAuthorized invocation unknown error: \(e)")
+            logger.error("invocation unknown error: \(e)")
             return .exit(.panic(.trap))
         }
     }
