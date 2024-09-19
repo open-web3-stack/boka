@@ -69,11 +69,13 @@ public actor EventBus: Sendable {
     public func publish(_ event: some Event) {
         let key = ObjectIdentifier(type(of: event))
         if let eventHandlers = handlers[key] {
+            let eventMiddleware = eventMiddleware
+            let handlerMiddleware = handlerMiddleware
             Task {
                 do {
-                    try await self.eventMiddleware.handle(event) { event in
+                    try await eventMiddleware.handle(event) { event in
                         for handler in eventHandlers {
-                            try await self.handlerMiddleware.handle(event) { evt in
+                            try await handlerMiddleware.handle(event) { evt in
                                 try await handler.handle(evt)
                             }
                         }
