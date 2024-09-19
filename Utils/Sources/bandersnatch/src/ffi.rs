@@ -50,6 +50,7 @@ pub extern "C" fn public_new_from_secret(
 }
 
 // public_new_from_data
+// TODO: if provided data is invalid (e.g. all zeros), return padding points instead
 #[no_mangle]
 pub extern "C" fn public_new_from_data(
     data: *const u8,
