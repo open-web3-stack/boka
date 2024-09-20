@@ -1,6 +1,7 @@
 import Foundation
 import NIO
 import Testing
+import Utils
 
 @testable import Networking
 
@@ -25,12 +26,14 @@ import Testing
         @Test func startPeer1() async throws {
             do {
                 let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+                // Example instantiation of Peer with EventBus
+                let eventBus = EventBus()
                 let peer = try Peer(
                     config: QuicConfig(
                         id: "public-key", cert: cert, key: keyFile, alpn: "sample",
                         ipAddress: "127.0.0.1", port: 4568
                     ),
-                    messageHandler: self
+                    eventBus: eventBus
                 )
                 try peer.start()
                 let quicmessage = try await peer.sendMessageToPeer(
@@ -38,20 +41,18 @@ import Testing
                     peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4569)
                 )
                 print("Peer message got: \(quicmessage)")
+                // Example subscription to PeerMessageReceived
+                _ = await eventBus.subscribe(PeerMessageReceived.self) { event in
+                    print("Received message from peer messageID: \(event.messageID), message: \(event.message)")
+                    let status = peer.replyTo(messageID: event.messageID, with: event.message.data!)
+                    print("Peer sent: \(status)")
+                }
 
-                _ = try await group.next().scheduleTask(in: .seconds(5)) {
-                    Task {
-                        do {
-                            let quicmessage = try await peer.sendMessageToPeer(
-                                message: Message(data: Data("Hello, swift!".utf8)),
-                                peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4569)
-                            )
-                            print("Peer message got: \(quicmessage)")
-                        } catch {
-                            print("Failed to send message: \(error)")
-                        }
-                    }
-                }.futureResult.get()
+                // Example subscription to PeerErrorReceived
+                _ = await eventBus.subscribe(PeerErrorReceived.self) { event in
+                    print("Received error from peer messageID: \(event.messageID ?? -1), error: \(event.error)")
+                }
+
                 try await group.next().scheduleTask(in: .seconds(60)) {}.futureResult.get()
 
             } catch {
@@ -62,11 +63,12 @@ import Testing
         @Test func startPeer2() throws {
             do {
                 let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+                let eventBus = EventBus()
                 let peer = try Peer(
                     config: QuicConfig(
                         id: "public-key", cert: cert, key: keyFile, alpn: "alpn",
                         ipAddress: "127.0.0.1", port: 4567
-                    ), messageHandler: self
+                    ), eventBus: eventBus
                 )
 
                 try peer.start()
@@ -91,28 +93,6 @@ import Testing
             } catch {
                 print("Failed to start peer: \(error)")
             }
-        }
-    }
-
-    extension PeerTests: PeerMessageHandler {
-        func didReceivePeerMessage(peer: Peer, messageID: Int64, message: QuicMessage) {
-            switch message.type {
-            case .received:
-                let buffer = message.data!
-                print(
-                    "Peer \(peer.getPeerAddr()) received: \(String([UInt8](buffer).map { Character(UnicodeScalar($0)) }))"
-                )
-                let status = peer.replyTo(messageID: messageID, with: buffer)
-                print("Peer sent: \(status)")
-            case .shutdownComplete:
-                break
-            default:
-                break
-            }
-        }
-
-        func didReceivePeerError(peer _: Peer, messageID _: Int64, error: QuicError) {
-            print("Failed to receive message: \(error)")
         }
     }
 #endif

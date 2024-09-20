@@ -1,14 +1,18 @@
 import Foundation
 import Logging
+import Utils
 
+// Logger for Peer
 let peerLogger = Logger(label: "PeerServer")
 
+// Define message types
 public enum PeerMessageType: Sendable {
     case uniquePersistent
     case commonEphemeral
     case unknown
 }
 
+// Define PeerMessage protocol
 public protocol PeerMessage: Equatable, Sendable {
     func getData() -> Data
     func getMessageType() -> PeerMessageType
@@ -20,9 +24,15 @@ extension PeerMessage {
     }
 }
 
-public protocol PeerMessageHandler: AnyObject {
-    func didReceivePeerMessage(peer: Peer, messageID: Int64, message: QuicMessage)
-    func didReceivePeerError(peer: Peer, messageID: Int64, error: QuicError)
+// Define events
+public struct PeerMessageReceived: Event {
+    public let messageID: Int64
+    public let message: QuicMessage
+}
+
+public struct PeerErrorReceived: Event {
+    public let messageID: Int64?
+    public let error: QuicError
 }
 
 // Define the Peer class
@@ -30,10 +40,11 @@ public final class Peer: @unchecked Sendable {
     private let config: QuicConfig
     private var quicServer: QuicServer?
     private var clients: AtomicDictionary<NetAddr, QuicClient>
-    private weak var messageHandler: PeerMessageHandler?
-    public init(config: QuicConfig, messageHandler: PeerMessageHandler? = nil) throws {
+    private let eventBus: EventBus
+
+    public init(config: QuicConfig, eventBus: EventBus) throws {
         self.config = config
-        self.messageHandler = messageHandler
+        self.eventBus = eventBus
         clients = .init()
         quicServer = try QuicServer(config: config, messageHandler: self)
     }
@@ -101,9 +112,10 @@ extension Peer: QuicClientMessageHandler {
         switch message.type {
         case .close:
             peerLogger.info("QuicClient close")
-            // Use [weak self] to avoid strong reference cycle
-            DispatchQueue.main.async { [weak self] in
-                self?.removeClient(with: quicClient.getNetAddr())
+            // Use Task to avoid strong reference cycle
+            Task { [weak self] in
+                guard let self else { return }
+                removeClient(with: quicClient.getNetAddr())
             }
         default:
             break
@@ -112,6 +124,10 @@ extension Peer: QuicClientMessageHandler {
 
     public func didReceiveError(quicClient _: QuicClient, error: QuicError) {
         peerLogger.error("Failed to receive message: \(error)")
+        Task { [weak self] in
+            guard let self else { return }
+            await eventBus.publish(PeerErrorReceived(messageID: nil, error: error))
+        }
     }
 }
 
@@ -119,7 +135,10 @@ extension Peer: QuicServerMessageHandler {
     public func didReceiveMessage(quicServer _: QuicServer, messageID: Int64, message: QuicMessage) {
         switch message.type {
         case .received:
-            messageHandler?.didReceivePeerMessage(peer: self, messageID: messageID, message: message)
+            Task { [weak self] in
+                guard let self else { return }
+                await eventBus.publish(PeerMessageReceived(messageID: messageID, message: message))
+            }
         case .shutdownComplete:
             break
         default:
@@ -127,7 +146,11 @@ extension Peer: QuicServerMessageHandler {
         }
     }
 
-    public func didReceiveError(quicServer _: QuicServer, messageID _: Int64, error: QuicError) {
+    public func didReceiveError(quicServer _: QuicServer, messageID: Int64, error: QuicError) {
         peerLogger.error("Failed to receive message: \(error)")
+        Task { [weak self] in
+            guard let self else { return }
+            await eventBus.publish(PeerErrorReceived(messageID: messageID, error: error))
+        }
     }
 }

@@ -1,6 +1,15 @@
 {
-  "originHash" : "2bd817ec6b101cbac42c92668d2a467323d0a5777f833d05ea477e95cf7a7bcd",
+  "originHash" : "0aae40602a1ec8f3bdc65f3534920c8c21504bae77ee06e6558df8b5b37de3fd",
   "pins" : [
+    {
+      "identity" : "blake2.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tesseract-one/Blake2.swift.git",
+      "state" : {
+        "revision" : "29c55c8fe42d6661e5a32cc5bbbad1fff64fd01e",
+        "version" : "0.2.0"
+      }
+    },
     {
       "identity" : "swift-atomics",
       "kind" : "remoteSourceControl",
@@ -20,6 +29,24 @@
       }
     },
     {
+      "identity" : "swift-crypto",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-crypto.git",
+      "state" : {
+        "revision" : "81bee98e706aee68d39ed5996db069ef2b313d62",
+        "version" : "3.7.1"
+      }
+    },
+    {
+      "identity" : "swift-distributed-tracing",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-distributed-tracing.git",
+      "state" : {
+        "revision" : "11c756c5c4d7de0eeed8595695cadd7fa107aa19",
+        "version" : "1.1.1"
+      }
+    },
+    {
       "identity" : "swift-log",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
@@ -29,12 +56,30 @@
       }
     },
     {
+      "identity" : "swift-metrics",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-metrics.git",
+      "state" : {
+        "revision" : "e0165b53d49b413dd987526b641e05e246782685",
+        "version" : "2.5.0"
+      }
+    },
+    {
       "identity" : "swift-nio",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio.git",
       "state" : {
         "revision" : "30df8551f4e636b8f68627dbc205221bcfc57782",
         "version" : "2.71.0"
+      }
+    },
+    {
+      "identity" : "swift-service-context",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-service-context.git",
+      "state" : {
+        "revision" : "0c62c5b4601d6c125050b5c3a97f20cce881d32b",
+        "version" : "1.1.0"
       }
     },
     {
