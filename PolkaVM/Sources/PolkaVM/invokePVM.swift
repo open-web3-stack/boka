@@ -5,11 +5,11 @@ private let logger = Logger(label: "invokePVM")
 
 /// common PVM program-argument invocation function
 public func invokePVM(config: PvmConfig, blob: Data, pc: UInt32, gas: UInt64, argumentData: Data?,
-                      ctx: inout some HostCallContext) -> (ExitReason, VMState?, UInt64?, Data?)
+                      ctx: any InvocationContext) -> (ExitReason, VMState?, UInt64?, Data?)
 {
     do {
         let state = try VMState(standardProgramBlob: blob, pc: pc, gas: gas, argumentData: argumentData)
-        let engine = Engine(config: config, hostCallContext: ctx)
+        let engine = Engine(config: config, invocationContext: ctx)
         let exitReason = engine.execute(program: state.program, state: state)
 
         switch exitReason {

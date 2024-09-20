@@ -5,11 +5,11 @@ private let logger = Logger(label: "Engine")
 
 public class Engine {
     let config: PvmConfig
-    let hostCallContext: (any HostCallContext)?
+    let invocationContext: (any InvocationContext)?
 
-    public init(config: PvmConfig, hostCallContext: (any HostCallContext)? = nil) {
+    public init(config: PvmConfig, invocationContext: (any InvocationContext)? = nil) {
         self.config = config
-        self.hostCallContext = hostCallContext
+        self.invocationContext = invocationContext
     }
 
     public func execute(program: ProgramCode, state: VMState) -> ExitReason {
@@ -32,11 +32,11 @@ public class Engine {
     }
 
     func hostCall(state: VMState, callIndex: UInt32) -> ExecOutcome {
-        guard let hostCallContext else {
+        guard let invocationContext else {
             return .exit(.panic(.trap))
         }
 
-        let result = hostCallContext.dispatch(index: callIndex, state: state)
+        let result = invocationContext.dispatch(index: callIndex, state: state)
         switch result {
         case let .exit(reason):
             switch reason {
