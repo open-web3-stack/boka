@@ -15,7 +15,7 @@ public struct AccumulateArguments {
     }
 }
 
-public struct DeferredTransfers {
+public struct DeferredTransfers: Codable {
     // s
     public var sender: ServiceIndex
     // d

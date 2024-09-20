@@ -47,6 +47,14 @@ public class VMState {
         try memory.read(address: address, length: length)
     }
 
+    public func isMemoryReadable(address: UInt32, length: Int) -> Bool {
+        memory.isReadable(address: address, length: length)
+    }
+
+    public func isMemoryWritable(address: UInt32, length: Int) -> Bool {
+        memory.isWritable(address: address, length: length)
+    }
+
     public func writeMemory(address: UInt32, value: UInt8) throws {
         try memory.write(address: address, value: value)
     }
@@ -80,6 +88,10 @@ public class VMState {
 
     public func readRegister(_ index: Registers.Index, _ index2: Registers.Index) -> (UInt32, UInt32) {
         (registers[index], registers[index2])
+    }
+
+    public func readRegisters(in range: Range<UInt8>) -> [UInt32] {
+        range.map { registers[Registers.Index(raw: $0)] }
     }
 
     public func writeRegister(_ index: Registers.Index, _ value: UInt32) {
