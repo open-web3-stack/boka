@@ -1,3 +1,4 @@
+import Atomics
 import Foundation
 import Logging
 import msquic
@@ -23,6 +24,7 @@ public class QuicStream {
     private weak var messageHandler: QuicStreamMessageHandler?
     private var streamCallback: StreamCallback?
     private var sendCompletion: CheckedContinuation<QuicMessage, Error>?
+    private let isClosed: ManagedAtomic<Bool> = .init(false)
 
     init(
         api: UnsafePointer<QuicApiTable>?, connection: HQuic?,
@@ -80,11 +82,14 @@ public class QuicStream {
     }
 
     func close() {
-        streamCallback = nil
-        messageHandler = nil
-        if stream != nil {
-            api?.pointee.StreamClose(stream)
-            stream = nil
+        if isClosed.compareExchange(expected: false, desired: true, ordering: .acquiring).exchanged {
+            streamLogger.info("QuicStream close")
+            streamCallback = nil
+            messageHandler = nil
+            if stream != nil {
+                api?.pointee.StreamClose(stream)
+                stream = nil
+            }
         }
     }
 
@@ -178,6 +183,7 @@ public class QuicStream {
     }
 
     deinit {
+        close()
         streamLogger.info("QuicStream Deinit")
     }
 }
@@ -246,9 +252,9 @@ extension QuicStream {
                 continuation.resume(throwing: QuicError.sendFailed)
                 quicStream.sendCompletion = nil
             }
-//            quicStream.messageHandler?.didReceiveMessage(
-//                quicStream, message: QuicMessage(type: .shutdownComplete, data: nil)
-//            )
+        //            quicStream.messageHandler?.didReceiveMessage(
+        //                quicStream, message: QuicMessage(type: .shutdownComplete, data: nil)
+        //            )
 
         default:
             break

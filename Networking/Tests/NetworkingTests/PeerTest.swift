@@ -20,8 +20,9 @@ import Utils
         }
     }
 
-    let cert = "/Users/mackun/boka/Networking/Sources/assets/server.cert"
-    let keyFile = "/Users/mackun/boka/Networking/Sources/assets/server.key"
+    let cert = Bundle.module.path(forResource: "server", ofType: "cert")!
+    let keyFile = Bundle.module.path(forResource: "server", ofType: "key")!
+
     final class PeerTests {
         @Test func startPeer1() async throws {
             do {
@@ -36,24 +37,33 @@ import Utils
                     eventBus: eventBus
                 )
                 try peer.start()
-                let quicmessage = try await peer.sendMessageToPeer(
-                    message: Message(data: Data("Hello, World!".utf8)),
-                    peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4569)
-                )
-                print("Peer message got: \(quicmessage)")
+                do {
+                    let quicmessage = try await peer.sendMessageToPeer(
+                        message: Message(data: Data("Hello, World!".utf8)),
+                        peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4569)
+                    )
+                    print("Peer message got: \(quicmessage)")
+                } catch {
+                    print("Failed to send: \(error)")
+                }
+
                 // Example subscription to PeerMessageReceived
                 _ = await eventBus.subscribe(PeerMessageReceived.self) { event in
-                    print("Received message from peer messageID: \(event.messageID), message: \(event.message)")
+                    print(
+                        "Received message from peer messageID: \(event.messageID), message: \(event.message)"
+                    )
                     let status = peer.replyTo(messageID: event.messageID, with: event.message.data!)
                     print("Peer sent: \(status)")
                 }
 
                 // Example subscription to PeerErrorReceived
                 _ = await eventBus.subscribe(PeerErrorReceived.self) { event in
-                    print("Received error from peer messageID: \(event.messageID ?? -1), error: \(event.error)")
+                    print(
+                        "Received error from peer messageID: \(event.messageID ?? -1), error: \(event.error)"
+                    )
                 }
 
-                try await group.next().scheduleTask(in: .seconds(60)) {}.futureResult.get()
+                try await group.next().scheduleTask(in: .minutes(5)) {}.futureResult.get()
 
             } catch {
                 print("Failed to start peer: \(error)")

@@ -1,3 +1,4 @@
+import Atomics
 import Foundation
 import Logging
 import msquic
@@ -19,6 +20,7 @@ public final class QuicServer: @unchecked Sendable {
     private weak var messageHandler: QuicServerMessageHandler?
     private var pendingMessages: AtomicDictionary<Int64, (QuicConnection, QuicStream)>
     private var connections: AtomicArray<QuicConnection>
+    private let isClosed: ManagedAtomic<Bool> = .init(false)
 
     init(config: QuicConfig, messageHandler: QuicServerMessageHandler? = nil) throws {
         self.config = config
@@ -55,26 +57,31 @@ public final class QuicServer: @unchecked Sendable {
     }
 
     func close() {
-        if listener != nil {
-            api?.pointee.ListenerClose(listener)
-            listener = nil
+        if isClosed.compareExchange(expected: false, desired: true, ordering: .acquiring).exchanged {
+            if listener != nil {
+                api?.pointee.ListenerClose(listener)
+                listener = nil
+            }
+            if configuration != nil {
+                api?.pointee.ConfigurationClose(configuration)
+                configuration = nil
+            }
+            if registration != nil {
+                api?.pointee.RegistrationClose(registration)
+                registration = nil
+            }
+            if api != nil {
+                MsQuicClose(api)
+                api = nil
+            }
+            serverLogger.info("QuicServer Close")
         }
-        if configuration != nil {
-            api?.pointee.ConfigurationClose(configuration)
-            configuration = nil
-        }
-        if registration != nil {
-            api?.pointee.RegistrationClose(registration)
-            registration = nil
-        }
-        MsQuicClose(api)
     }
 
     func replyTo(messageID: Int64, with data: Data) -> QuicStatus {
         var status = QuicStatusCode.internalError.rawValue
         if let (_, stream) = pendingMessages[messageID] {
             status = stream.send(buffer: data)
-            serverLogger.info("Message sent: \(messageID)")
             _ = pendingMessages.removeValue(forKey: messageID)
         } else {
             serverLogger.error("Message not found")
@@ -93,20 +100,13 @@ public final class QuicServer: @unchecked Sendable {
         }
     }
 
+    private func removeConnection(_ connection: QuicConnection) {
+        connection.close()
+        connections.removeAll(where: { $0 === connection })
+    }
+
     deinit {
-        if listener != nil {
-            api?.pointee.ListenerClose(listener)
-            listener = nil
-        }
-        if configuration != nil {
-            api?.pointee.ConfigurationClose(configuration)
-            configuration = nil
-        }
-        if registration != nil {
-            api?.pointee.RegistrationClose(registration)
-            registration = nil
-        }
-        MsQuicClose(api)
+        close()
         serverLogger.info("QuicServer Deinit")
     }
 }
@@ -117,7 +117,9 @@ extension QuicServer: QuicConnectionMessageHandler {
     ) {
         switch message.type {
         case .shutdownComplete:
-            break
+            serverLogger.info("Connection shutdown complete")
+            // Use [weak self] to avoid strong reference cycle
+            removeConnection(connection)
         case .received:
             if let stream {
                 processPendingMessage(connection: connection, stream: stream, message: message)

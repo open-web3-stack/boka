@@ -1,3 +1,4 @@
+import Atomics
 import Foundation
 import Logging
 import msquic
@@ -11,14 +12,13 @@ public protocol QuicClientMessageHandler: AnyObject {
 }
 
 public class QuicClient: @unchecked Sendable {
-    private let api: UnsafePointer<QuicApiTable>?
+    private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
     private var connection: QuicConnection?
-    // TODO: remove persistent stream
-    // private var persistentStream: QuicStream?
     private let config: QuicConfig
     private weak var messageHandler: QuicClientMessageHandler?
+    private let isClosed: ManagedAtomic<Bool> = .init(false)
 
     init(config: QuicConfig, messageHandler: QuicClientMessageHandler? = nil) throws {
         self.config = config
@@ -88,29 +88,38 @@ public class QuicClient: @unchecked Sendable {
     }
 
     func close() {
-        if let connection {
-            connection.close()
-            self.connection = nil
-        }
+        if isClosed.compareExchange(expected: false, desired: true, ordering: .acquiring).exchanged {
+            if let connection {
+                connection.close()
+                self.connection = nil
+            }
 
-        if let configuration {
-            api?.pointee.ConfigurationClose(configuration)
-            self.configuration = nil
-        }
+            if let configuration {
+                api?.pointee.ConfigurationClose(configuration)
+                self.configuration = nil
+            }
 
-        if let registration {
-            api?.pointee.RegistrationClose(registration)
-            self.registration = nil
-        }
+            if let registration {
+                api?.pointee.RegistrationClose(registration)
+                self.registration = nil
+            }
 
-        MsQuicClose(api)
+            if api != nil {
+                MsQuicClose(api)
+                api = nil
+            }
 
-        if let messageHandler {
-            messageHandler.didReceiveMessage(quicClient: self, message: QuicMessage(type: .close, data: nil))
+            if let messageHandler {
+                messageHandler.didReceiveMessage(
+                    quicClient: self, message: QuicMessage(type: .close, data: nil)
+                )
+            }
+            clientLogger.info("QuicClient Close")
         }
     }
 
     deinit {
+        close()
         clientLogger.info("QuicClient Deinit")
     }
 }
@@ -128,8 +137,9 @@ extension QuicClient: QuicConnectionMessageHandler {
 
         case .shutdownComplete:
             // Use [weak self] to avoid strong reference cycle
-            DispatchQueue.main.async { [weak self] in
-                self?.close()
+            Task { [weak self] in
+                guard let self else { return }
+                close()
             }
 
         default:
@@ -166,7 +176,9 @@ extension QuicClient {
             let keyFileCString = config.key.utf8CString
 
             let certPointer = UnsafeMutablePointer<CChar>.allocate(capacity: certCString.count)
-            let keyFilePointer = UnsafeMutablePointer<CChar>.allocate(capacity: keyFileCString.count)
+            let keyFilePointer = UnsafeMutablePointer<CChar>.allocate(
+                capacity: keyFileCString.count
+            )
             // Copy the C strings to the pointers
             certCString.withUnsafeBytes {
                 certPointer.initialize(

@@ -1,3 +1,4 @@
+import Atomics
 import Foundation
 import Logging
 import msquic
@@ -22,6 +23,7 @@ public class QuicConnection {
     private var commonEphemeralStreams: AtomicArray<QuicStream>
     private weak var messageHandler: QuicConnectionMessageHandler?
     private var connectionCallback: ConnectionCallback?
+    private let isClosed: ManagedAtomic<Bool> = .init(false)
 
     init(
         api: UnsafePointer<QuicApiTable>?,
@@ -130,20 +132,27 @@ public class QuicConnection {
     }
 
     func close() {
-        connectionCallback = nil
-        messageHandler = nil
-        for stream in commonEphemeralStreams {
-            stream.close()
+        if isClosed.compareExchange(expected: false, desired: true, ordering: .acquiring).exchanged {
+            connectionCallback = nil
+            messageHandler = nil
+            for stream in commonEphemeralStreams {
+                stream.close()
+            }
+            commonEphemeralStreams.removeAll()
+            for stream in uniquePersistentStreams.values {
+                stream.close()
+            }
+            uniquePersistentStreams.removeAll()
+            if connection != nil {
+                api?.pointee.ConnectionClose(connection)
+                connection = nil
+            }
+            logger.info("QuicConnection close")
         }
-        commonEphemeralStreams.removeAll()
-        for stream in uniquePersistentStreams.values {
-            stream.close()
-        }
-        uniquePersistentStreams.removeAll()
-        api?.pointee.ConnectionClose(connection)
     }
 
     deinit {
+        close()
         logger.info("QuicConnection Deinit")
     }
 }
@@ -221,12 +230,6 @@ extension QuicConnection: QuicStreamMessageHandler {
         switch message.type {
         case .shutdownComplete:
             removeStream(stream: stream)
-        case .aborted:
-            break
-        case .unknown:
-            break
-        case .received:
-            break
         default:
             break
         }

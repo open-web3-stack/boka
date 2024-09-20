@@ -28,6 +28,7 @@ let package = Package(
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "Networking",
+
             dependencies: [
                 "msquic",
                 "Utils",
@@ -37,6 +38,9 @@ let package = Package(
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Atomics", package: "swift-atomics"),
 
+            ],
+            resources: [
+                .process("assets"),
             ],
             swiftSettings: [
                 .define("DEBUG_ASSERT", .when(configuration: .debug)),
