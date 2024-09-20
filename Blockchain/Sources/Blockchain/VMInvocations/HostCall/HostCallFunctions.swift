@@ -99,7 +99,7 @@ public class Read: HostCallFunction {
 
         let key = try? Blake2b256.hash(serviceIndex.encode(), state.readMemory(address: regs[0], length: Int(regs[1])))
 
-        let value: Data? = if let account, let key, account.storage.keys.contains(key) {
+        let value: Data? = if let account, let key {
             account.storage[key]
         } else {
             nil
