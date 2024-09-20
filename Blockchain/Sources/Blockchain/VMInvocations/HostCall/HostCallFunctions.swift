@@ -46,12 +46,7 @@ public class Lookup: HostCallFunction {
 
         let regs = state.readRegisters(in: 1 ..< 4)
 
-        var preimageHash: Data32?
-        do {
-            preimageHash = try Blake2b256.hash(state.readMemory(address: regs[0], length: 32))
-        } catch {
-            preimageHash = nil
-        }
+        let preimageHash = try? Blake2b256.hash(state.readMemory(address: regs[0], length: 32))
 
         let value: Data? = if let account, let preimageHash, account.preimages.keys.contains(preimageHash) {
             account.preimages[preimageHash]
@@ -104,12 +99,7 @@ public class Read: HostCallFunction {
 
         let regs = state.readRegisters(in: 1 ..< 5)
 
-        var key: Data32?
-        do {
-            key = try Blake2b256.hash(serviceIndex.encode(), state.readMemory(address: regs[0], length: Int(regs[1])))
-        } catch {
-            key = nil
-        }
+        let key = try? Blake2b256.hash(serviceIndex.encode(), state.readMemory(address: regs[0], length: Int(regs[1])))
 
         let value: Data? = if let account, let key, account.storage.keys.contains(key) {
             account.storage[key]
@@ -152,12 +142,7 @@ public class Write: HostCallFunction {
 
         let regs = state.readRegisters(in: 0 ..< 4)
 
-        var key: Data32?
-        do {
-            key = try Blake2b256.hash(serviceIndex.encode(), state.readMemory(address: regs[0], length: Int(regs[1])))
-        } catch {
-            key = nil
-        }
+        let key = try? Blake2b256.hash(serviceIndex.encode(), state.readMemory(address: regs[0], length: Int(regs[1])))
 
         var account: ServiceAccount?
         if let key, state.isMemoryReadable(address: regs[2], length: Int(regs[3])) {
