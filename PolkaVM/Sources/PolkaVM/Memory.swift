@@ -201,10 +201,7 @@ public class Memory {
     public func isReadable(address: UInt32, length: Int) -> Bool {
         do {
             let section = try getSection(forAddress: address)
-            if section.startAddressBound <= address, address + UInt32(length) < section.endAddressBound {
-                return true
-            }
-            return false
+            return section.startAddressBound <= address && address + UInt32(length) < section.endAddressBound
         } catch {
             return false
         }
