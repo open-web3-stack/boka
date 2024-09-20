@@ -17,17 +17,18 @@ public class OnTransferContext: InvocationContext {
 
     public func dispatch(index: UInt32, state: VMState) -> ExecOutcome {
         do {
-            if index == Lookup.identifier {
+            switch UInt8(index) {
+            case Lookup.identifier:
                 try Lookup.call(state: state, input: (context.0, context.1, context.2))
-            } else if index == Read.identifier {
+            case Read.identifier:
                 try Read.call(state: state, input: (context.0, context.1, context.2))
-            } else if index == Write.identifier {
+            case Write.identifier:
                 context.0 = try Write.call(state: state, input: (config, context.0, context.1))
-            } else if index == GasFn.identifier {
+            case GasFn.identifier:
                 try GasFn.call(state: state, input: ())
-            } else if index == Info.identifier {
+            case Info.identifier:
                 try Info.call(state: state, input: (config, context.0, context.1, context.2, [:]))
-            } else {
+            default:
                 state.consumeGas(10)
                 state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHAT.rawValue)
             }

@@ -48,7 +48,7 @@ public class Lookup: HostCallFunction {
 
         let preimageHash = try? Blake2b256.hash(state.readMemory(address: regs[0], length: 32))
 
-        let value: Data? = if let account, let preimageHash, account.preimages.keys.contains(preimageHash) {
+        let value: Data? = if let account, let preimageHash {
             account.preimages[preimageHash]
         } else {
             nil
@@ -91,10 +91,8 @@ public class Read: HostCallFunction {
         let reg0 = state.readRegister(Registers.Index(raw: 0))
         if reg0 == serviceIndex || reg0 == Int32.max {
             account = serviceAccount
-        } else if serviceAccounts.keys.contains(reg0) {
-            account = serviceAccounts[reg0]
         } else {
-            account = nil
+            account = serviceAccounts[reg0]
         }
 
         let regs = state.readRegisters(in: 1 ..< 5)
