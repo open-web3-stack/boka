@@ -30,6 +30,7 @@ public struct PeerMessageReceived: Event {
     public let message: QuicMessage
 }
 
+// TODO: add error or remove it
 public struct PeerErrorReceived: Event {
     public let messageID: Int64?
     public let error: QuicError
@@ -62,7 +63,12 @@ public final class Peer: @unchecked Sendable {
     }
 
     func replyTo(messageID: Int64, with data: Data) -> QuicStatus {
-        quicServer?.replyTo(messageID: messageID, with: data) ?? QuicStatusCode.internalError.rawValue
+        quicServer?.replyTo(messageID: messageID, with: data)
+            ?? QuicStatusCode.internalError.rawValue
+    }
+
+    func replyTo(messageID: Int64, with message: any PeerMessage) async throws {
+        try await quicServer?.replyTo(messageID: messageID, with: message.getData())
     }
 
     func sendMessageToPeer(
@@ -73,10 +79,15 @@ public final class Peer: @unchecked Sendable {
         return try await sendDataToPeer(buffer, to: peerAddr, messageType: messageType)
     }
 
-    private func sendDataToPeer(_ data: Data, to peerAddr: NetAddr, messageType: PeerMessageType) async throws -> QuicMessage {
+    private func sendDataToPeer(_ data: Data, to peerAddr: NetAddr, messageType: PeerMessageType)
+        async throws -> QuicMessage
+    {
         if let client = clients[peerAddr] {
             // Client already exists, use it to send the data
-            return try await client.send(message: data, streamKind: messageType == .uniquePersistent ? .uniquePersistent : .commonEphemeral)
+            return try await client.send(
+                message: data,
+                streamKind: messageType == .uniquePersistent ? .uniquePersistent : .commonEphemeral
+            )
         } else {
             let config = QuicConfig(
                 id: config.id, cert: config.cert, key: config.key, alpn: config.alpn,
@@ -89,7 +100,10 @@ public final class Peer: @unchecked Sendable {
                 throw QuicError.getClientFailed
             }
             clients[peerAddr] = client
-            return try await client.send(message: data, streamKind: messageType == .uniquePersistent ? .uniquePersistent : .commonEphemeral)
+            return try await client.send(
+                message: data,
+                streamKind: messageType == .uniquePersistent ? .uniquePersistent : .commonEphemeral
+            )
         }
     }
 
@@ -126,8 +140,7 @@ extension Peer: QuicClientMessageHandler {
 
     public func didReceiveError(quicClient _: QuicClient, error: QuicError) {
         peerLogger.error("Failed to receive message: \(error)")
-        Task { [weak self] in
-            guard let self else { return }
+        Task {
             await eventBus.publish(PeerErrorReceived(messageID: nil, error: error))
         }
     }
@@ -137,8 +150,7 @@ extension Peer: QuicServerMessageHandler {
     public func didReceiveMessage(quicServer _: QuicServer, messageID: Int64, message: QuicMessage) {
         switch message.type {
         case .received:
-            Task { [weak self] in
-                guard let self else { return }
+            Task {
                 await eventBus.publish(PeerMessageReceived(messageID: messageID, message: message))
             }
         case .shutdownComplete:
@@ -150,8 +162,7 @@ extension Peer: QuicServerMessageHandler {
 
     public func didReceiveError(quicServer _: QuicServer, messageID: Int64, error: QuicError) {
         peerLogger.error("Failed to receive message: \(error)")
-        Task { [weak self] in
-            guard let self else { return }
+        Task {
             await eventBus.publish(PeerErrorReceived(messageID: messageID, error: error))
         }
     }

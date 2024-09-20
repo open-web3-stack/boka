@@ -8,6 +8,7 @@ let serverLogger = Logger(label: "QuicServer")
 
 public protocol QuicServerMessageHandler: AnyObject {
     func didReceiveMessage(quicServer: QuicServer, messageID: Int64, message: QuicMessage)
+    // TODO: add error or remove it
     func didReceiveError(quicServer: QuicServer, messageID: Int64, error: QuicError)
 }
 

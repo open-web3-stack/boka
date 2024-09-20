@@ -252,9 +252,6 @@ extension QuicStream {
                 continuation.resume(throwing: QuicError.sendFailed)
                 quicStream.sendCompletion = nil
             }
-        //            quicStream.messageHandler?.didReceiveMessage(
-        //                quicStream, message: QuicMessage(type: .shutdownComplete, data: nil)
-        //            )
 
         default:
             break

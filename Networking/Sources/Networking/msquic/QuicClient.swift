@@ -8,6 +8,7 @@ let clientLogger = Logger(label: "QuicClient")
 
 public protocol QuicClientMessageHandler: AnyObject {
     func didReceiveMessage(quicClient: QuicClient, message: QuicMessage)
+    // TODO: add error or remove it
     func didReceiveError(quicClient: QuicClient, error: QuicError)
 }
 
