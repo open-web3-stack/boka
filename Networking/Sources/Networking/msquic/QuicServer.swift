@@ -118,10 +118,6 @@ extension QuicServer: QuicConnectionMessageHandler {
         switch message.type {
         case .shutdownComplete:
             break
-        case .aborted:
-            break
-        case .unknown:
-            break
         case .received:
             if let stream {
                 processPendingMessage(connection: connection, stream: stream, message: message)

@@ -145,13 +145,14 @@ extension QuicClient: QuicConnectionMessageHandler {
 }
 
 extension QuicClient {
-    private func loadConfiguration(_ unsecure: Bool = true) throws {
+    private func loadConfiguration(_ unsecure: Bool = false) throws {
         var settings = QUIC_SETTINGS()
         settings.IdleTimeoutMs = 10000
         settings.IsSet.IdleTimeoutMs = 1
 
+        var certificateFile = QUIC_CERTIFICATE_FILE()
         var credConfig = QUIC_CREDENTIAL_CONFIG()
-        memset(&credConfig, 0, MemoryLayout.size(ofValue: credConfig))
+
         credConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT
         if unsecure {
             credConfig.Flags = QUIC_CREDENTIAL_FLAGS(
@@ -161,10 +162,32 @@ extension QuicClient {
                 )
             )
         } else {
-            credConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT
-            //     TODO: load cert and key
-            //    credConfig.CertificateFile = UnsafePointer<Int8>(strdup(config.cert))
-            //    credConfig.PrivateKeyFile = UnsafePointer<Int8>(strdup(config.key))
+            let certCString = config.cert.utf8CString
+            let keyFileCString = config.key.utf8CString
+
+            let certPointer = UnsafeMutablePointer<CChar>.allocate(capacity: certCString.count)
+            let keyFilePointer = UnsafeMutablePointer<CChar>.allocate(capacity: keyFileCString.count)
+            // Copy the C strings to the pointers
+            certCString.withUnsafeBytes {
+                certPointer.initialize(
+                    from: $0.bindMemory(to: CChar.self).baseAddress!, count: certCString.count
+                )
+            }
+
+            keyFileCString.withUnsafeBytes {
+                keyFilePointer.initialize(
+                    from: $0.bindMemory(to: CChar.self).baseAddress!, count: keyFileCString.count
+                )
+            }
+
+            certificateFile.CertificateFile = UnsafePointer(certPointer)
+            certificateFile.PrivateKeyFile = UnsafePointer(keyFilePointer)
+            let certificateFilePointer =
+                UnsafeMutablePointer<QUIC_CERTIFICATE_FILE>.allocate(capacity: 1)
+            certificateFilePointer.initialize(to: certificateFile)
+            credConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE
+            credConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE
+            credConfig.CertificateFile = certificateFilePointer
         }
 
         let buffer = Data(config.alpn.utf8)
