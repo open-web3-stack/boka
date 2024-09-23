@@ -27,7 +27,7 @@ public class Node {
         let genesisState = try genesis.toState(config: config.protcol)
         let dataProvider = await InMemoryDataProvider(genesis: genesisState)
         let timeProvider = SystemTimeProvider()
-        blockchain = await Blockchain(
+        blockchain = try await Blockchain(
             config: config.protcol,
             dataProvider: dataProvider,
             timeProvider: timeProvider,
@@ -35,10 +35,6 @@ public class Node {
         )
 
         rpcServer = try Server(config: config.rpc, source: blockchain)
-    }
-
-    public func sayHello() {
-        logger.info("Hello, World!")
     }
 
     public func wait() async throws {

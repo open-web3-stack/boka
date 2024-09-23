@@ -253,25 +253,24 @@ extension Safrole {
 
         do {
             let ctx = try Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
-            let commitment = try Bandersnatch.RingCommitment(
-                ring: nextValidators.map { try Bandersnatch.PublicKey(data: $0.bandersnatch) },
-                ctx: ctx
-            )
+            let commitment = try Bandersnatch.RingCommitment(data: ticketsVerifier)
 
             let validatorQueueWithoutOffenders = withoutOffenders(offenders: offenders, validators: validatorQueue)
 
-            let newCommitment = try Bandersnatch.RingCommitment(
-                ring: validatorQueueWithoutOffenders.map { try Bandersnatch.PublicKey(data: $0.bandersnatch) },
-                ctx: ctx
-            )
+            let newCommitment = {
+                try Bandersnatch.RingCommitment(
+                    ring: validatorQueueWithoutOffenders.map { try Bandersnatch.PublicKey(data: $0.bandersnatch) },
+                    ctx: ctx
+                ).data
+            }
             let verifier = Bandersnatch.Verifier(ctx: ctx, commitment: commitment)
 
-            let (newNextValidators, newCurrentValidators, newPreviousValidators, newTicketsVerifier) = isEpochChange
+            let (newNextValidators, newCurrentValidators, newPreviousValidators, newTicketsVerifier) = try isEpochChange
                 ? (
                     validatorQueueWithoutOffenders,
                     nextValidators,
                     currentValidators,
-                    newCommitment.data
+                    newCommitment()
                 )
                 : (nextValidators, currentValidators, previousValidators, ticketsVerifier)
 
