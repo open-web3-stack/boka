@@ -18,3 +18,15 @@ public typealias BandersnatchSignature = Data96
 public typealias BandersnatchRingVRFProof = Data784
 public typealias BandersnatchRingVRFRoot = Data144
 public typealias BLSKey = Data144
+
+extension TimeslotIndex {
+    public func toEpochIndex(config: ProtocolConfigRef) -> EpochIndex {
+        self / EpochIndex(config.value.epochLength)
+    }
+}
+
+extension EpochIndex {
+    public func toTimeslotIndex(config: ProtocolConfigRef) -> TimeslotIndex {
+        self * TimeslotIndex(config.value.epochLength)
+    }
+}

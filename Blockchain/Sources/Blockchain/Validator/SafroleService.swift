@@ -4,16 +4,8 @@ import Utils
 
 private let logger = Logger(label: "SafroleService")
 
-public struct NewSafroleTickets: Event {
-    public let items: [ExtrinsicTickets.TicketItem]
-}
-
-public final class SafroleService: @unchecked Sendable {
-    private let config: ProtocolConfigRef
-    private let eventBus: EventBus
+public final class SafroleService: ServiceBase, @unchecked Sendable {
     private let keystore: KeyStore
-    private var subscriptionToken: EventBus.SubscriptionToken?
-
     private let ringContext: Bandersnatch.RingContext
 
     public init(
@@ -21,23 +13,13 @@ public final class SafroleService: @unchecked Sendable {
         eventBus: EventBus,
         keystore: KeyStore
     ) async {
-        self.config = config
-        self.eventBus = eventBus
         self.keystore = keystore
-
         ringContext = try! Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
 
-        subscriptionToken = await eventBus.subscribe(BlockImported.self) { [weak self] event in
-            try await self?.on(blockImported: event)
-        }
-    }
+        super.init(config, eventBus)
 
-    deinit {
-        let eventBus = self.eventBus
-        if let subscriptionToken = self.subscriptionToken {
-            Task {
-                await eventBus.unsubscribe(token: subscriptionToken)
-            }
+        await subscribe(RuntimeEvents.BlockImported.self) { [weak self] event in
+            try await self?.on(blockImported: event)
         }
     }
 
@@ -47,7 +29,7 @@ public final class SafroleService: @unchecked Sendable {
         }
     }
 
-    private func on(blockImported event: BlockImported) async throws {
+    private func on(blockImported event: RuntimeEvents.BlockImported) async throws {
         if event.isNewEpoch(config: config) {
             try await generateAndSubmitTickets(state: event.state)
         }
@@ -56,11 +38,11 @@ public final class SafroleService: @unchecked Sendable {
     private func generateAndSubmitTickets(state: StateRef) async throws {
         let tickets = try await generateTickets(state: state)
         if let tickets {
-            await eventBus.publish(tickets)
+            await publish(tickets)
         }
     }
 
-    private func generateTickets(state: StateRef) async throws -> NewSafroleTickets? {
+    private func generateTickets(state: StateRef) async throws -> RuntimeEvents.NewSafroleTickets? {
         var items = [ExtrinsicTickets.TicketItem]()
 
         for (idx, validator) in state.value.nextValidators.enumerated() {
@@ -81,15 +63,13 @@ public final class SafroleService: @unchecked Sendable {
 
                 let prover = Bandersnatch.Prover(sercret: secret, ring: pubkeys, proverIdx: UInt(idx), ctx: ringContext)
 
-                var vrfInputData = SigningContext.ticketSeal
-                vrfInputData.append(state.value.entropyPool.t2.data)
-                vrfInputData.append(TicketIndex(0))
+                var vrfInputData = SigningContext.safroleTicketInputData(entropy: state.value.entropyPool.t2, attempt: 0)
 
-                let sig1 = try prover.ringVRFSign(vrfInputData: vrfInputData, auxData: Data())
+                let sig1 = try prover.ringVRFSign(vrfInputData: vrfInputData)
 
                 vrfInputData[vrfInputData.count - 1] = TicketIndex(1)
 
-                let sig2 = try prover.ringVRFSign(vrfInputData: vrfInputData, auxData: Data())
+                let sig2 = try prover.ringVRFSign(vrfInputData: vrfInputData)
 
                 items.append(.init(
                     attempt: 0,
@@ -108,6 +88,6 @@ public final class SafroleService: @unchecked Sendable {
             return nil
         }
 
-        return NewSafroleTickets(items: items)
+        return .init(items: items)
     }
 }
