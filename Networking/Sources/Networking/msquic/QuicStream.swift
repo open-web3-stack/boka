@@ -109,7 +109,7 @@ public class QuicStream {
         )
     }
 
-    func send(buffer: Data) -> QuicStatus {
+    func send(buffer: Data, kind: StreamKind? = nil) -> QuicStatus {
         streamLogger.info("[\(String(describing: stream))] Sending data...")
         var status = QuicStatusCode.success.rawValue
         let messageLength = buffer.count
@@ -127,7 +127,11 @@ public class QuicStream {
 
         sendBuffer.pointee.Buffer = bufferPointer
         sendBuffer.pointee.Length = UInt32(messageLength)
-        let flags = (kind == .uniquePersistent) ? QUIC_SEND_FLAG_NONE : QUIC_SEND_FLAG_FIN
+
+        // Use the provided kind if available, otherwise use the stream's kind
+        let effectiveKind = kind ?? self.kind
+        let flags = (effectiveKind == .uniquePersistent) ? QUIC_SEND_FLAG_NONE : QUIC_SEND_FLAG_FIN
+
         status = (api?.pointee.StreamSend(stream, sendBuffer, 1, flags, sendBufferRaw)).status
         if status.isFailed {
             streamLogger.error("StreamSend failed, \(status)!")
@@ -140,7 +144,7 @@ public class QuicStream {
         return status
     }
 
-    func send(buffer: Data) async throws -> QuicMessage {
+    func send(buffer: Data, kind: StreamKind? = nil) async throws -> QuicMessage {
         streamLogger.info("[\(String(describing: stream))] Sending data...")
         var status = QuicStatusCode.success.rawValue
         let messageLength = buffer.count
@@ -158,7 +162,10 @@ public class QuicStream {
 
         sendBuffer.pointee.Buffer = bufferPointer
         sendBuffer.pointee.Length = UInt32(messageLength)
-        let flags = (kind == .uniquePersistent) ? QUIC_SEND_FLAG_NONE : QUIC_SEND_FLAG_FIN
+
+        // Use the provided kind if available, otherwise use the stream's kind
+        let effectiveKind = kind ?? self.kind
+        let flags = (effectiveKind == .uniquePersistent) ? QUIC_SEND_FLAG_NONE : QUIC_SEND_FLAG_FIN
 
         return try await withCheckedThrowingContinuation { [weak self] continuation in
             guard let self else {

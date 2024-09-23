@@ -32,7 +32,7 @@ import Testing
             switch message.type {
             case .received:
                 print("Server received message with ID \(messageID): \(message)")
-                _ = quicServer.replyTo(messageID: messageID, with: message.data!)
+                _ = quicServer.respondTo(messageID: messageID, with: message.data!)
             case .shutdownComplete:
                 print("Server shutdown complete")
             case .aborted:

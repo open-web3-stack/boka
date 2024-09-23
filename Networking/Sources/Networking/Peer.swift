@@ -58,20 +58,37 @@ public final class Peer: @unchecked Sendable {
         quicServer?.close()
     }
 
-    // reply messsage to other peer
-    func replyTo(messageID: Int64, with data: Data) async throws {
-        try await quicServer?.replyTo(messageID: messageID, with: data)
+    // Respond to a message with a specific messageID using Data
+    func respondTo(messageID: Int64, with data: Data) async throws {
+        try await quicServer?.respondTo(messageID: messageID, with: data)
     }
 
-    // reply messsage to other peer
-    func replyTo(messageID: Int64, with data: Data) -> QuicStatus {
-        quicServer?.replyTo(messageID: messageID, with: data)
+    // Respond to a message with a specific messageID using Data
+    func respondTo(messageID: Int64, with data: Data) -> QuicStatus {
+        quicServer?.respondTo(messageID: messageID, with: data)
             ?? QuicStatusCode.internalError.rawValue
     }
 
-    // reply messsage to other peer
-    func replyTo(messageID: Int64, with message: any PeerMessage) async throws {
-        try await quicServer?.replyTo(messageID: messageID, with: message.getData())
+    // Respond to a message with a specific messageID using PeerMessage
+    func respondTo(messageID: Int64, with message: any PeerMessage) async throws {
+        let messageType = message.getMessageType()
+
+        try await quicServer?.respondTo(
+            messageID: messageID, with: message.getData(),
+            kind: (messageType == .uniquePersistent) ? .uniquePersistent : .commonEphemeral
+        )
+    }
+
+    // Respond to a message with a specific messageID using PeerMessage
+    func respondTo(messageID: Int64, with message: any PeerMessage) -> QuicStatus {
+        let messageType = message.getMessageType()
+        return quicServer?
+            .respondTo(
+                messageID: messageID,
+                with: message.getData(),
+                kind: (messageType == .uniquePersistent) ? .uniquePersistent : .commonEphemeral
+            )
+            ?? QuicStatusCode.internalError.rawValue
     }
 
     // send message to other peer
@@ -81,6 +98,16 @@ public final class Peer: @unchecked Sendable {
         let buffer = message.getData()
         let messageType = message.getMessageType()
         return try await sendDataToPeer(buffer, to: peerAddr, messageType: messageType)
+    }
+
+    // send message to other peer
+    func sendMessageToPeer(
+        message: any PeerMessage, peerAddr: NetAddr
+    ) throws -> QuicStatus {
+        let buffer = message.getData()
+        let messageType = message.getMessageType()
+
+        return try sendDataToPeer(buffer, to: peerAddr, messageType: messageType)
     }
 
     private func sendDataToPeer(_ data: Data, to peerAddr: NetAddr, messageType: PeerMessageType)
@@ -105,6 +132,34 @@ public final class Peer: @unchecked Sendable {
             }
             clients[peerAddr] = client
             return try await client.send(
+                message: data,
+                streamKind: messageType == .uniquePersistent ? .uniquePersistent : .commonEphemeral
+            )
+        }
+    }
+
+    private func sendDataToPeer(_ data: Data, to peerAddr: NetAddr, messageType: PeerMessageType)
+        throws -> QuicStatus
+    {
+        if let client = clients[peerAddr] {
+            // Client already exists, use it to send the data
+            return try client.send(
+                message: data,
+                streamKind: messageType == .uniquePersistent ? .uniquePersistent : .commonEphemeral
+            )
+        } else {
+            let config = QuicConfig(
+                id: config.id, cert: config.cert, key: config.key, alpn: config.alpn,
+                ipAddress: peerAddr.ipAddress, port: peerAddr.port
+            )
+            // Client does not exist, create a new one
+            let client = try QuicClient(config: config, messageHandler: self)
+            let status = try client.start()
+            if status.isFailed {
+                throw QuicError.getClientFailed
+            }
+            clients[peerAddr] = client
+            return try client.send(
                 message: data,
                 streamKind: messageType == .uniquePersistent ? .uniquePersistent : .commonEphemeral
             )

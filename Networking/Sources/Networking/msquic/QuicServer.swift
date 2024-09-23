@@ -77,24 +77,28 @@ public final class QuicServer: @unchecked Sendable {
         }
     }
 
-    func replyTo(messageID: Int64, with data: Data) -> QuicStatus {
+    // Respond to a message with a specific messageID using Data
+    func respondTo(messageID: Int64, with data: Data, kind: StreamKind? = nil) -> QuicStatus {
         var status = QuicStatusCode.internalError.rawValue
         if let (_, stream) = pendingMessages[messageID] {
-            status = stream.send(buffer: data)
+            let streamKind = kind ?? stream.kind
+            status = stream.send(buffer: data, kind: streamKind)
             _ = pendingMessages.removeValue(forKey: messageID)
         } else {
-            serverLogger.error("Message not found")
+            peerLogger.error("Message not found")
         }
         return status
     }
 
-    func replyTo(messageID: Int64, with data: Data) async throws {
+    // Respond to a message with a specific messageID using Data
+    func respondTo(messageID: Int64, with data: Data, kind: StreamKind? = nil) async throws {
         if let (_, stream) = pendingMessages[messageID] {
-            let quicMessage = try await stream.send(buffer: data)
-            serverLogger.info("Message sent: \(quicMessage)")
+            let streamKind = kind ?? stream.kind
+            let quicMessage = try await stream.send(buffer: data, kind: streamKind)
+            peerLogger.info("Message sent: \(quicMessage)")
             _ = pendingMessages.removeValue(forKey: messageID)
         } else {
-            serverLogger.error("Message not found")
+            peerLogger.error("Message not found")
             throw QuicError.messageNotFound
         }
     }

@@ -65,6 +65,25 @@ public class QuicClient: @unchecked Sendable {
         try await send(message: message, streamKind: .uniquePersistent)
     }
 
+    //  send method that not wait for a reply
+    func send(message: Data, streamKind: StreamKind) throws -> QuicStatus {
+        guard let connection else {
+            throw QuicError.getConnectionFailed
+        }
+        let sendStream: QuicStream
+        // Check if there is an existing stream of the same kind
+        if streamKind == .uniquePersistent {
+            // If there is, send the message to the existing stream
+            sendStream = try connection.createOrGetUniquePersistentStream(kind: streamKind)
+        } else {
+            // If there is not, create a new stream
+            sendStream = try connection.createCommonEphemeralStream()
+            // Start the stream
+            try sendStream.start()
+        }
+        return sendStream.send(buffer: message, kind: streamKind)
+    }
+
     // Asynchronous send method that waits for a reply
     func send(message: Data, streamKind: StreamKind = .uniquePersistent) async throws -> QuicMessage {
         guard let connection else {
@@ -157,6 +176,8 @@ extension QuicClient: QuicConnectionMessageHandler {
 
 extension QuicClient {
     private func loadConfiguration() throws {
-        configuration = try QuicConfigHelper.loadConfiguration(api: api, registration: registration, config: config)
+        configuration = try QuicConfigHelper.loadConfiguration(
+            api: api, registration: registration, config: config
+        )
     }
 }
