@@ -2,14 +2,10 @@ import Foundation
 import TracingUtils
 import Utils
 
-public struct BlockImported: Event {
-    public var block: BlockRef
-    public var state: StateRef
-    public var parentState: StateRef
-}
-
-public struct BlockFinalized: Event {
-    public var hash: Data32
+private struct BlockchainStorage: Sendable {
+    var bestHead: Data32
+    var bestHeadTimeslot: TimeslotIndex
+    var finalizedHead: Data32
 }
 
 /// Holds the state of the blockchain.
@@ -18,15 +14,43 @@ public struct BlockFinalized: Event {
 public final class Blockchain: Sendable {
     public let config: ProtocolConfigRef
 
+    private let storage: ThreadSafeContainer<BlockchainStorage>
     private let dataProvider: BlockchainDataProvider
     private let timeProvider: TimeProvider
     private let eventBus: EventBus
 
-    public init(config: ProtocolConfigRef, dataProvider: BlockchainDataProvider, timeProvider: TimeProvider, eventBus: EventBus) async {
+    public init(
+        config: ProtocolConfigRef,
+        dataProvider: BlockchainDataProvider,
+        timeProvider: TimeProvider,
+        eventBus: EventBus
+    ) async throws {
         self.config = config
         self.dataProvider = dataProvider
         self.timeProvider = timeProvider
         self.eventBus = eventBus
+
+        let heads = try await dataProvider.getHeads()
+        var bestHead: (HeaderRef, Data32)?
+        for head in heads {
+            guard let header = try? await dataProvider.getHeader(hash: head) else {
+                try throwUnreachable("No header for head hash \(head)")
+            }
+            if bestHead == nil || header.value.timeslot > bestHead!.0.value.timeslot {
+                bestHead = (header, head)
+            }
+        }
+        let finalizedHead = try await dataProvider.getFinalizedHead()
+
+        guard let bestHead else {
+            try throwUnreachable("No best head")
+        }
+
+        storage = ThreadSafeContainer(.init(
+            bestHead: bestHead.1,
+            bestHeadTimeslot: bestHead.0.value.timeslot,
+            finalizedHead: finalizedHead
+        ))
     }
 
     public func importBlock(_ block: BlockRef) async throws {
@@ -39,14 +63,27 @@ public final class Blockchain: Sendable {
             let state = try runtime.apply(block: block, state: parent, context: .init(timeslot: timeslot))
             try await dataProvider.add(state: state)
 
-            await eventBus.publish(BlockImported(block: block, state: state, parentState: parent))
+            // update best head
+            if state.value.timeslot > storage.value.bestHeadTimeslot {
+                storage.mutate { storage in
+                    storage.bestHead = block.hash
+                    storage.bestHeadTimeslot = state.value.timeslot
+                }
+            }
+
+            await eventBus.publish(RuntimeEvents.BlockImported(block: block, state: state, parentState: parent))
         }
     }
 
     public func finalize(hash: Data32) async throws {
         // TODO: purge forks
         try await dataProvider.setFinalizedHead(hash: hash)
-        await eventBus.publish(BlockFinalized(hash: hash))
+
+        storage.write { storage in
+            storage.finalizedHead = hash
+        }
+
+        await eventBus.publish(RuntimeEvents.BlockFinalized(hash: hash))
     }
 
     public func getBestBlock() async throws -> BlockRef {
@@ -59,13 +96,16 @@ public final class Blockchain: Sendable {
     public func getBlock(hash: Data32) async throws -> BlockRef? {
         try await dataProvider.getBlock(hash: hash)
     }
-}
 
-extension BlockImported {
-    public func isNewEpoch(config: ProtocolConfigRef) -> Bool {
-        let epochLength = UInt32(config.value.epochLength)
-        let prevEpoch = parentState.value.timeslot / epochLength
-        let newEpoch = state.value.timeslot / epochLength
-        return prevEpoch != newEpoch
+    public func getState(hash: Data32) async throws -> StateRef? {
+        try await dataProvider.getState(hash: hash)
+    }
+
+    public var bestHead: Data32 {
+        storage.value.bestHead
+    }
+
+    public var finalizedHead: Data32 {
+        storage.value.finalizedHead
     }
 }

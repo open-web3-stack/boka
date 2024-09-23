@@ -449,8 +449,44 @@ private struct JamSingleValueEncodingContainer: SingleValueEncodingContainer {
         encoder.encodeData(Data(value.utf8), lengthPrefix: true)
     }
 
+    mutating func encode(_ value: Int) throws {
+        encoder.encodeInt(Int64(value))
+    }
+
+    mutating func encode(_ value: Int8) throws {
+        encoder.data.append(UInt8(bitPattern: value))
+    }
+
+    mutating func encode(_ value: Int16) throws {
+        encoder.encodeInt(value)
+    }
+
+    mutating func encode(_ value: Int32) throws {
+        encoder.encodeInt(value)
+    }
+
+    mutating func encode(_ value: Int64) throws {
+        encoder.encodeInt(value)
+    }
+
+    mutating func encode(_ value: UInt) throws {
+        encoder.encodeInt(UInt64(value))
+    }
+
     mutating func encode(_ value: UInt8) throws {
         encoder.data.append(value)
+    }
+
+    mutating func encode(_ value: UInt16) throws {
+        encoder.encodeInt(value)
+    }
+
+    mutating func encode(_ value: UInt32) throws {
+        encoder.encodeInt(value)
+    }
+
+    mutating func encode(_ value: UInt64) throws {
+        encoder.encodeInt(value)
     }
 
     mutating func encode(_ value: some Encodable) throws {
