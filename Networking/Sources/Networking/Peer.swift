@@ -58,19 +58,23 @@ public final class Peer: @unchecked Sendable {
         quicServer?.close()
     }
 
+    // reply messsage to other peer
     func replyTo(messageID: Int64, with data: Data) async throws {
         try await quicServer?.replyTo(messageID: messageID, with: data)
     }
 
+    // reply messsage to other peer
     func replyTo(messageID: Int64, with data: Data) -> QuicStatus {
         quicServer?.replyTo(messageID: messageID, with: data)
             ?? QuicStatusCode.internalError.rawValue
     }
 
+    // reply messsage to other peer
     func replyTo(messageID: Int64, with message: any PeerMessage) async throws {
         try await quicServer?.replyTo(messageID: messageID, with: message.getData())
     }
 
+    // send message to other peer
     func sendMessageToPeer(
         message: any PeerMessage, peerAddr: NetAddr
     ) async throws -> QuicMessage {
@@ -107,7 +111,7 @@ public final class Peer: @unchecked Sendable {
         }
     }
 
-    func removeClient(with peerAddr: NetAddr) {
+    private func removeClient(with peerAddr: NetAddr) {
         _ = clients.removeValue(forKey: peerAddr)
     }
 
@@ -115,6 +119,7 @@ public final class Peer: @unchecked Sendable {
         "\(config.ipAddress):\(config.port)"
     }
 
+    // TODO: add more functions for peer
     deinit {
         clients.removeAll()
         quicServer?.close()
