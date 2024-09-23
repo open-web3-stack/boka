@@ -26,18 +26,17 @@ struct Boka: AsyncParsableCommand {
             ),
             handlerMiddleware: .tracing(prefix: "Handler")
         )
-        var node: Node! = try await Node(genesis: .dev, config: config, eventBus: eventBus)
-        node.sayHello()
+        do {
+            let node = try await Node(genesis: .dev, config: config, eventBus: eventBus)
 
-        for service in services {
-            Task {
-                try await service.run()
+            for service in services {
+                Task {
+                    try await service.run()
+                }
             }
+
+            try await node.wait()
         }
-
-        try await node.wait()
-
-        node = nil
 
         logger.info("Exiting...")
     }

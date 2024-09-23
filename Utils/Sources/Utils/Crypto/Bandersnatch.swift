@@ -224,7 +224,7 @@ public enum Bandersnatch: KeyType {
         }
     }
 
-    public final class RingContext {
+    public final class RingContext: @unchecked Sendable {
         fileprivate let ptr: OpaquePointer
 
         public init(size: UInt) throws(Error) {
@@ -260,7 +260,7 @@ public enum Bandersnatch: KeyType {
         /// Anonymous VRF signature.
         ///
         /// Used for tickets submission.
-        public func ringVRFSign(vrfInputData: Data, auxData: Data) throws(Error) -> Data784 {
+        public func ringVRFSign(vrfInputData: Data, auxData: Data = Data()) throws(Error) -> Data784 {
             var output = Data(repeating: 0, count: 784)
 
             try call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
@@ -287,7 +287,7 @@ public enum Bandersnatch: KeyType {
         }
     }
 
-    public final class RingCommitment {
+    public final class RingCommitment: @unchecked Sendable {
         fileprivate let ptr: OpaquePointer
         public let data: Data144
 
@@ -336,7 +336,7 @@ public enum Bandersnatch: KeyType {
         }
     }
 
-    public struct Verifier {
+    public struct Verifier: Sendable {
         private let ctx: RingContext
         private let commitment: RingCommitment
 
@@ -350,7 +350,7 @@ public enum Bandersnatch: KeyType {
         /// Used for tickets verification.
         ///
         /// On success returns the VRF output hash.
-        public func ringVRFVerify(vrfInputData: Data, auxData: Data, signature: Data) throws(Error) -> Data32 {
+        public func ringVRFVerify(vrfInputData: Data, auxData: Data = Data(), signature: Data) throws(Error) -> Data32 {
             var output = Data(repeating: 0, count: 32)
 
             try call(vrfInputData, auxData, signature, out: &output) { ptrs, out_buf in
