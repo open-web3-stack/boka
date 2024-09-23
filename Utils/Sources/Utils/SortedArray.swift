@@ -5,12 +5,12 @@ public enum SortedArrayError: Swift.Error {
 public struct SortedArray<T: Comparable> {
     public private(set) var array: [T]
 
-    public init(unsorted: [T] = []) {
+    public init(unsorted: [T]) {
         array = unsorted
         array.sort()
     }
 
-    public init(sorted: [T] = []) throws(SortedArrayError) {
+    public init(sorted: [T]) throws(SortedArrayError) {
         array = sorted
 
         guard array.isSorted() else {
@@ -63,6 +63,14 @@ public struct SortedArray<T: Comparable> {
         array.remove(at: index)
     }
 
+    public mutating func removeAll() {
+        array.removeAll()
+    }
+
+    public mutating func remove(where predicate: (T) throws -> Bool) rethrows {
+        try array.removeAll(where: predicate)
+    }
+
     public var count: Int {
         array.count
     }
@@ -82,3 +90,5 @@ extension SortedArray: Decodable where T: Decodable {
         try self.init(sorted: array)
     }
 }
+
+extension SortedArray: Sendable where T: Sendable {}

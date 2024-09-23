@@ -2,13 +2,24 @@ import TracingUtils
 import Utils
 
 private typealias TicketItem = ExtrinsicTickets.TicketItem
-public typealias TicketItemAndOutput = (ticket: ExtrinsicTickets.TicketItem, output: Data32)
+public struct TicketItemAndOutput: Comparable, Sendable {
+    public let ticket: ExtrinsicTickets.TicketItem
+    public let output: Data32
+
+    public static func < (lhs: TicketItemAndOutput, rhs: TicketItemAndOutput) -> Bool {
+        lhs.output < rhs.output
+    }
+
+    public static func == (lhs: TicketItemAndOutput, rhs: TicketItemAndOutput) -> Bool {
+        lhs.output == rhs.output && lhs.ticket == rhs.ticket
+    }
+}
 
 private let logger = Logger(label: "ExtrinsicPoolService")
 
 private actor ServiceStorage {
     // sorted array ordered by output
-    var pendingTickets: [TicketItemAndOutput] = []
+    var pendingTickets: SortedArray<TicketItemAndOutput> = .init()
     var epoch: EpochIndex = 0
     var verifier: Bandersnatch.Verifier!
     var entropy: Data32 = .init()
@@ -26,7 +37,7 @@ private actor ServiceStorage {
                 logger.info("Received invalid ticket: \(ticket)")
                 continue
             }
-            pendingTickets.append((ticket, output))
+            pendingTickets.insert(.init(ticket: ticket, output: output))
         }
     }
 
@@ -46,7 +57,7 @@ private actor ServiceStorage {
     }
 
     func removeTickets(tickets: [TicketItem]) {
-        pendingTickets = pendingTickets.filter { ticket in
+        pendingTickets.remove { ticket in
             !tickets.contains { $0 == ticket.ticket }
         }
     }
@@ -93,7 +104,7 @@ public final class ExtrinsicPoolService: ServiceBase, @unchecked Sendable {
         await storage.removeTickets(tickets: block.extrinsic.tickets.tickets.array)
     }
 
-    public var pendingTickets: [TicketItemAndOutput] {
+    public var pendingTickets: SortedArray<TicketItemAndOutput> {
         get async {
             await storage.pendingTickets
         }
