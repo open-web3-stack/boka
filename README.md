@@ -6,6 +6,7 @@ JAM built with Swift
 
 - SwiftLint: `brew install swiftlint`
 - SwiftFormat: `brew install swiftformat`
+- CMake (required by msquic): `brew install cmake`
 - Precommit hooks: `make githooks`
 - Pull submodules: `git submodule update --init --recursive`
 - Setup deps: `make deps`

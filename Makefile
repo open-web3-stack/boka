@@ -8,7 +8,7 @@ default: build
 githooks: .git/hooks/pre-commit
 
 .PHONY: deps
-deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a .lib/librocksdb.a .lib/libec.a
+deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a .lib/librocksdb.a .lib/libec.a .lib/libmsquic.a
 
 .lib/libblst.a:
 	./scripts/blst.sh
@@ -22,6 +22,9 @@ deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a .lib/librocksdb.a .lib/libec.a
 .lib/librocksdb.a:
 	./scripts/rocksdb.sh
 
+.lib/libmsquic.a:
+	./scripts/msquic.sh
+	
 .PHONY: test
 test: githooks deps
 	./scripts/runTests.sh test
