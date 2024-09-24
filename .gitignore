@@ -17,3 +17,5 @@ tasks.json
 
 *.d
 *.swiftdeps
+Package.resolved
+contents.xcworkspacedata
