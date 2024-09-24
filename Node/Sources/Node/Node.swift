@@ -10,11 +10,9 @@ public typealias RPCConfig = Server.Config
 public class Node {
     public class Config {
         public let rpc: Server.Config
-        public let protcol: ProtocolConfigRef
 
-        public init(rpc: Server.Config, protocol: ProtocolConfigRef) {
+        public init(rpc: Server.Config) {
             self.rpc = rpc
-            protcol = `protocol`
         }
     }
 
@@ -24,11 +22,11 @@ public class Node {
     public init(genesis: Genesis, config: Config, eventBus: EventBus) async throws {
         logger.debug("Initializing node")
 
-        let genesisState = try genesis.toState(config: config.protcol)
+        let (genesisState, protocolConfig) = try await genesis.load()
         let dataProvider = await InMemoryDataProvider(genesis: genesisState)
         let timeProvider = SystemTimeProvider()
         blockchain = try await Blockchain(
-            config: config.protcol,
+            config: protocolConfig,
             dataProvider: dataProvider,
             timeProvider: timeProvider,
             eventBus: eventBus
