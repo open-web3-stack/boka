@@ -5,6 +5,8 @@ struct Alpn {
     private let version: String
     private let genesisHeader: String
 
+    lazy var alpnString: String = "\(protocolName)/\(version)/\(genesisHeader.prefix(4))"
+
     init(_ protocolName: String = "jamnp-s", version: String = "0", genesisHeader: String) throws {
         self.protocolName = protocolName
         self.version = version
@@ -13,9 +15,5 @@ struct Alpn {
             throw QuicError.invalidAlpn
         }
         self.genesisHeader = genesisHeader
-    }
-
-    var alpnString: String {
-        "\(protocolName)/\(version)/\(genesisHeader.prefix(4))"
     }
 }
