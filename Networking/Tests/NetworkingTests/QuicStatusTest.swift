@@ -17,4 +17,9 @@ struct QuicStatusTests {
         #expect(QuicStatusCode.notFound == QuicStatusCode.from(rawValue: status))
         #expect(status.isFailed)
     }
+
+    @Test func isFailed() throws {
+        #expect(QuicStatusCode.notFound.rawValue.isFailed)
+        #expect(!QuicStatusCode.success.rawValue.isFailed)
+    }
 }
