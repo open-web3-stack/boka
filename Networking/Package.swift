@@ -42,9 +42,6 @@ let package = Package(
             resources: [
                 .process("assets"),
             ],
-            swiftSettings: [
-                .define("DEBUG_ASSERT", .when(configuration: .debug)),
-            ],
             linkerSettings: [
                 .unsafeFlags(["-L../.lib"]),
             ]
