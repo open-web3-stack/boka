@@ -17,7 +17,7 @@ extension QuicStatus {
     }
 
     var isSucceeded: Bool {
-        self <= 0
+        Int32(bitPattern: self) <= 0
     }
 
     init(_ value: UInt32?) {
