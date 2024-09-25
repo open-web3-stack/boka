@@ -17,7 +17,7 @@ public enum Ed25519: KeyType {
         }
     }
 
-    public final class PublicKey: PublicKeyProtocol {
+    public final class PublicKey: PublicKeyProtocol, @unchecked Sendable {
         private let publicKey: Curve25519.Signing.PublicKey
         public let data: Data32
 
@@ -48,6 +48,10 @@ public enum Ed25519: KeyType {
 
         public static func == (lhs: PublicKey, rhs: PublicKey) -> Bool {
             lhs.data == rhs.data
+        }
+
+        public var description: String {
+            "0x\(data.toHexString())"
         }
 
         public func verify(signature: Data64, message: Data) -> Bool {

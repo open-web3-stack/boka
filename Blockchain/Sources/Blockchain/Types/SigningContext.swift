@@ -40,4 +40,23 @@ extension SigningContext {
         vrfInputData.append(attempt)
         return vrfInputData
     }
+
+    public static func ticketSealInputData(entropy: Data32, attempt: TicketIndex) -> Data {
+        var vrfInputData = SigningContext.ticketSeal
+        vrfInputData.append(entropy.data)
+        vrfInputData.append(attempt)
+        return vrfInputData
+    }
+
+    public static func fallbackSealInputData(entropy: Data32) -> Data {
+        var vrfInputData = SigningContext.fallbackSeal
+        vrfInputData.append(entropy.data)
+        return vrfInputData
+    }
+
+    public static func entropyInputData(entropy: Data32) -> Data {
+        var vrfInputData = SigningContext.entropy
+        vrfInputData.append(entropy.data)
+        return vrfInputData
+    }
 }

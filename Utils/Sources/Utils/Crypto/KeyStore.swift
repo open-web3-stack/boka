@@ -19,7 +19,7 @@ struct HashableKey: Hashable {
     }
 }
 
-public class InMemoryKeyStore {
+public class InMemoryKeyStore: KeyStore {
     private var keys: [HashableKey: any SecretKeyProtocol] = [:]
 
     public init() {}

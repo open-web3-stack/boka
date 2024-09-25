@@ -1,4 +1,4 @@
-public protocol PublicKeyProtocol: Codable, Hashable {}
+public protocol PublicKeyProtocol: Codable, Hashable, CustomStringConvertible {}
 
 public protocol SecretKeyProtocol {
     associatedtype PublicKey: PublicKeyProtocol
