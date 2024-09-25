@@ -11,7 +11,7 @@ struct AlpnTests {
     }
 
     @Test func validAlpn() throws {
-        var alpn = try Alpn(version: "1.2", genesisHeader: "jamabcdefg")
+        let alpn = try Alpn(version: "1.2", genesisHeader: "jamabcdefg")
         #expect(alpn.alpnString == "jamnp-s/1.2/jama")
     }
 }
