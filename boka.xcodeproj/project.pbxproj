@@ -17,6 +17,7 @@
 		06E2B78F2C7304FF00E35A48 /* Codec */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Codec; sourceTree = "<group>"; };
 		06F2335F2C0B306000A5E2E0 /* Database */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Database; sourceTree = "<group>"; };
 		06F233602C0C69F100A5E2E0 /* Utils */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Utils; sourceTree = "<group>"; };
+		5A48C0302CA2D8FA000927F7 /* Networking */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Networking; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -33,6 +34,7 @@
 				066C926F2C095D76005DDE4F /* Blockchain */,
 				066C926E2C095D67005DDE4F /* Boka */,
 				063EC59D2C33954600BF1550 /* JAMTests */,
+				5A48C0302CA2D8FA000927F7 /* Networking */,
 			);
 			sourceTree = "<group>";
 		};
