@@ -21,6 +21,9 @@ public final class Runtime {
         case preimagesNotSorted
         case invalidPreimageServiceIndex
         case duplicatedPreimage
+        case notBlockAuthor
+        case invalidBlockSeal(any Swift.Error)
+        case invalidVrfSignature
         case other(any Swift.Error)
         case validateError(any Swift.Error)
     }
@@ -67,7 +70,44 @@ public final class Runtime {
 
         // offendersMarkers is validated at apply time by Disputes
 
-        // TODO: validate block.header.seal
+        // validate block.header.seal
+        let vrfOutput: Data32
+        let blockAuthorKey = try Result {
+            try Bandersnatch.PublicKey(data: state.value.validatorQueue[Int(block.header.authorIndex)].bandersnatch)
+        }.mapError(Error.invalidBlockSeal).get()
+        let index = block.header.timeslot % UInt32(config.value.epochLength)
+        let encodedHeader = try Result { try JamEncoder.encode(block.header) }.mapError(Error.invalidBlockSeal).get()
+        switch state.value.safroleState.ticketsOrKeys {
+        case let .left(keys):
+            let ticket = keys[Int(index)]
+            let vrfInputData = SigningContext.ticketSealInputData(entropy: state.value.entropyPool.t3, attempt: ticket.attempt)
+            vrfOutput = try Result {
+                try blockAuthorKey.ietfVRFVerify(
+                    vrfInputData: vrfInputData,
+                    auxData: encodedHeader,
+                    signature: block.header.seal.data
+                )
+            }.mapError(Error.invalidBlockSeal).get()
+
+        case let .right(keys):
+            let key = keys[Int(index)]
+            guard key == blockAuthorKey.data else {
+                throw Error.notBlockAuthor
+            }
+            let vrfInputData = SigningContext.fallbackSealInputData(entropy: state.value.entropyPool.t3)
+            vrfOutput = try Result {
+                try blockAuthorKey.ietfVRFVerify(
+                    vrfInputData: vrfInputData,
+                    auxData: encodedHeader,
+                    signature: block.header.seal.data
+                )
+            }.mapError(Error.invalidBlockSeal).get()
+        }
+
+        let vrfInputData = SigningContext.entropyInputData(entropy: vrfOutput)
+        _ = try Result {
+            try blockAuthorKey.ietfVRFVerify(vrfInputData: vrfInputData, signature: block.header.vrfSignature.data)
+        }.mapError { _ in Error.invalidVrfSignature }.get()
     }
 
     public func validate(block: Validated<BlockRef>, state: StateRef, context: ApplyContext) throws(Error) {

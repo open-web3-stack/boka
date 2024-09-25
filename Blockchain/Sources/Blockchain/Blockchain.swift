@@ -3,8 +3,8 @@ import TracingUtils
 import Utils
 
 private struct BlockchainStorage: Sendable {
-    var bestHead: Data32
-    var bestHeadTimeslot: TimeslotIndex
+    var bestHead: Data32?
+    var bestHeadTimeslot: TimeslotIndex?
     var finalizedHead: Data32
 }
 
@@ -34,7 +34,7 @@ public final class Blockchain: Sendable {
         var bestHead: (HeaderRef, Data32)?
         for head in heads {
             guard let header = try? await dataProvider.getHeader(hash: head) else {
-                try throwUnreachable("No header for head hash \(head)")
+                continue
             }
             if bestHead == nil || header.value.timeslot > bestHead!.0.value.timeslot {
                 bestHead = (header, head)
@@ -42,13 +42,9 @@ public final class Blockchain: Sendable {
         }
         let finalizedHead = try await dataProvider.getFinalizedHead()
 
-        guard let bestHead else {
-            try throwUnreachable("No best head")
-        }
-
         storage = ThreadSafeContainer(.init(
-            bestHead: bestHead.1,
-            bestHeadTimeslot: bestHead.0.value.timeslot,
+            bestHead: bestHead?.1,
+            bestHeadTimeslot: bestHead?.0.value.timeslot,
             finalizedHead: finalizedHead
         ))
     }
@@ -64,7 +60,7 @@ public final class Blockchain: Sendable {
             try await dataProvider.add(state: state)
 
             // update best head
-            if state.value.timeslot > storage.value.bestHeadTimeslot {
+            if state.value.timeslot > storage.value.bestHeadTimeslot ?? 0 {
                 storage.mutate { storage in
                     storage.bestHead = block.hash
                     storage.bestHeadTimeslot = state.value.timeslot
@@ -102,7 +98,7 @@ public final class Blockchain: Sendable {
     }
 
     public var bestHead: Data32 {
-        storage.value.bestHead
+        storage.value.bestHead ?? Data32()
     }
 
     public var finalizedHead: Data32 {
