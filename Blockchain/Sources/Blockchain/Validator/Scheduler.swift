@@ -1,4 +1,3 @@
-import Dispatch
 import Foundation
 
 // TODO: make a scheduler protocol so we can mock it
@@ -31,7 +30,7 @@ public class Scheduler {
 
     private func timeslotToTime(timeslot: TimeslotIndex) -> DispatchTime {
         let seconds = timeslot * timeslotPeriod + offset
-        let ns = UInt64(seconds) * NSEC_PER_SEC
+        let ns = UInt64(seconds) * 1_000_000_000
         return DispatchTime(uptimeNanoseconds: ns)
     }
 }
