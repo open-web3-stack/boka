@@ -1,3 +1,4 @@
+import Dispatch
 import Foundation
 
 // TODO: make a scheduler protocol so we can mock it
