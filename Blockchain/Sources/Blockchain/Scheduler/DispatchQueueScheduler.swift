@@ -4,7 +4,7 @@ import TracingUtils
 private let logger = Logger(label: "Scheduler")
 
 // TODO: make a scheduler protocol so we can mock it
-public class Scheduler {
+public class DispatchQueueScheduler {
     private let timeslotPeriod: UInt32
     private let timeProvider: TimeProvider
     private let queue = DispatchQueue(label: "boka.scheduler.queue", attributes: .concurrent)
