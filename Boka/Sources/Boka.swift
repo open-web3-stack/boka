@@ -5,6 +5,7 @@
 // https://swiftpackageindex.com/apple/swift-argument-parser/documentation
 
 import ArgumentParser
+import Blockchain
 import Node
 import ServiceLifecycle
 import TracingUtils
@@ -27,10 +28,7 @@ struct Boka: AsyncParsableCommand {
             handlerMiddleware: .tracing(prefix: "Handler")
         )
         do {
-            let keystore = InMemoryKeyStore()
-            let devKeys = try await keystore.addKeys(bandersnatch: Data32(), ed25519: Data32(), bls: Data32())
-            logger.info("Generated dev keys: \(String(reflecting: devKeys))")
-
+            let keystore = try await DevKeyStore()
             let node = try await ValidatorNode(genesis: .dev, config: config, eventBus: eventBus, keystore: keystore)
 
             for service in services {

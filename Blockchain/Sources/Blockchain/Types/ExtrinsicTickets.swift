@@ -43,7 +43,7 @@ extension ExtrinsicTickets {
     public func getTickets(verifier: Bandersnatch.Verifier, entropy: Data32) throws -> [Ticket] {
         try tickets.array.map {
             let vrfInputData = SigningContext.safroleTicketInputData(entropy: entropy, attempt: $0.attempt)
-            let ticketId = try verifier.ringVRFVerify(vrfInputData: vrfInputData, signature: $0.signature.data)
+            let ticketId = try verifier.ringVRFVerify(vrfInputData: vrfInputData, signature: $0.signature)
             return Ticket(id: ticketId, attempt: $0.attempt)
         }
     }

@@ -18,7 +18,10 @@ public class Validator {
         self.blockchain = blockchain
         self.keystore = keystore
 
-        scheduler = Scheduler(timeslotPeriod: UInt32(blockchain.config.value.slotPeriodSeconds), offset: Date.jamCommonEraBeginning)
+        scheduler = Scheduler(
+            timeslotPeriod: UInt32(blockchain.config.value.slotPeriodSeconds),
+            timeProvider: timeProvider
+        )
 
         safrole = await SafroleService(
             config: blockchain.config,
@@ -43,5 +46,6 @@ public class Validator {
 
     public func on(genesis: StateRef) async {
         await safrole.on(genesis: genesis)
+        await blockAuthor.on(genesis: genesis)
     }
 }

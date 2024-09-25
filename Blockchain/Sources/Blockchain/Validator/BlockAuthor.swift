@@ -36,9 +36,9 @@ public class BlockAuthor: ServiceBase, @unchecked Sendable {
     }
 
     private func scheduleForNextEpoch() async {
-        let now = timeProvider.getTime()
-        let nextEpoch = now.toEpochIndex(config: blockchain.config) + 1
-        let timeslot = nextEpoch.toTimeslotIndex(config: blockchain.config)
+        let now = timeProvider.getTime() / UInt32(config.value.slotPeriodSeconds)
+        let nextEpoch = now.toEpochIndex(config: config) + 1
+        let timeslot = nextEpoch.toTimeslotIndex(config: config)
 
         // at end of an epoch, try to determine the block author of next epoch
         // and schedule new block task
@@ -66,7 +66,7 @@ public class BlockAuthor: ServiceBase, @unchecked Sendable {
             try throwUnreachable("no state for best head")
         }
 
-        let extrinsic = Extrinsic.dummy(config: blockchain.config)
+        let extrinsic = Extrinsic.dummy(config: config)
 
         let (ticket, publicKey): (TicketItemAndOutput?, Bandersnatch.PublicKey) = switch claim {
         case let .left((ticket, publicKey)):
@@ -84,11 +84,11 @@ public class BlockAuthor: ServiceBase, @unchecked Sendable {
             vrfOutput = ticket.output
         } else {
             let inputData = SigningContext.fallbackSealInputData(entropy: state.value.entropyPool.t3)
-            let sig = secretKey.ietfVRFSign(vrfInputData: inputData)
+            let sig = try secretKey.ietfVRFSign(vrfInputData: inputData)
             vrfOutput = try secretKey.publicKey.ietfVRFVerify(vrfInputData: inputData, signature: sig)
         }
 
-        let vrfSignature = if let ticket {
+        let vrfSignature = if ticket != nil {
             try secretKey.ietfVRFSign(vrfInputData: SigningContext.entropyInputData(entropy: vrfOutput))
         } else {
             try secretKey.ietfVRFSign(vrfInputData: SigningContext.fallbackSealInputData(entropy: state.value.entropyPool.t3))
@@ -103,7 +103,7 @@ public class BlockAuthor: ServiceBase, @unchecked Sendable {
             parentHash: parentHash,
             priorStateRoot: state.stateRoot,
             extrinsicsHash: extrinsic.hash(),
-            timeslot: timeProvider.getTime().toTimeslotIndex(config: blockchain.config),
+            timeslot: timeProvider.getTime().toTimeslotIndex(config: config),
             epoch: nil, // TODO:
             winningTickets: nil, // TODO:
             offendersMarkers: [], // TODO:
@@ -114,12 +114,18 @@ public class BlockAuthor: ServiceBase, @unchecked Sendable {
         let encodedHeader = try JamEncoder.encode(unsignedHeader)
 
         let seal = if let ticket {
-            try secretKey.ietfVRFSign(vrfInputData: SigningContext.safroleTicketInputData(
-                entropy: vrfOutput,
-                attempt: ticket.ticket.attempt
-            ))
+            try secretKey.ietfVRFSign(
+                vrfInputData: SigningContext.safroleTicketInputData(
+                    entropy: vrfOutput,
+                    attempt: ticket.ticket.attempt
+                ),
+                auxData: encodedHeader
+            )
         } else {
-            try secretKey.ietfVRFSign(vrfInputData: SigningContext.fallbackSealInputData(entropy: state.value.entropyPool.t3))
+            try secretKey.ietfVRFSign(
+                vrfInputData: SigningContext.fallbackSealInputData(entropy: state.value.entropyPool.t3),
+                auxData: encodedHeader
+            )
         }
 
         let header = Header(
@@ -154,11 +160,11 @@ public class BlockAuthor: ServiceBase, @unchecked Sendable {
 
             // simulate next block to determine the block authors for next epoch
             let res = try state.value.updateSafrole(
-                config: blockchain.config,
+                config: config,
                 slot: timeslot,
                 entropy: Data32(),
                 offenders: [],
-                extrinsics: .dummy(config: blockchain.config)
+                extrinsics: .dummy(config: config)
             )
 
             await scheduleNewBlocks(ticketsOrKeys: res.state.ticketsOrKeys)
@@ -168,8 +174,8 @@ public class BlockAuthor: ServiceBase, @unchecked Sendable {
     private func scheduleNewBlocks(ticketsOrKeys: SafroleTicketsOrKeys) async {
         let selfTickets = tickets.value
         let now = timeProvider.getTime()
-        let epochBase = now.toEpochIndex(config: blockchain.config)
-        let timeslotBase = epochBase.toTimeslotIndex(config: blockchain.config)
+        let epochBase = now.toEpochIndex(config: config)
+        let timeslotBase = epochBase.toTimeslotIndex(config: config)
         switch ticketsOrKeys {
         case let .left(tickets):
             if selfTickets.isEmpty {

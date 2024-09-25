@@ -20,7 +20,7 @@ private actor ServiceStorage {
     func add(tickets: [TicketItem]) {
         for ticket in tickets {
             let inputData = SigningContext.safroleTicketInputData(entropy: entropy, attempt: ticket.attempt)
-            let output = try? verifier.ringVRFVerify(vrfInputData: inputData, signature: ticket.signature.data)
+            let output = try? verifier.ringVRFVerify(vrfInputData: inputData, signature: ticket.signature)
             guard let output else {
                 logger.info("Received invalid ticket: \(ticket)")
                 continue

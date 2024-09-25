@@ -85,7 +85,7 @@ public final class Runtime {
                 try blockAuthorKey.ietfVRFVerify(
                     vrfInputData: vrfInputData,
                     auxData: encodedHeader,
-                    signature: block.header.seal.data
+                    signature: block.header.seal
                 )
             }.mapError(Error.invalidBlockSeal).get()
             guard ticket.id == vrfOutput else {
@@ -102,14 +102,14 @@ public final class Runtime {
                 try blockAuthorKey.ietfVRFVerify(
                     vrfInputData: vrfInputData,
                     auxData: encodedHeader,
-                    signature: block.header.seal.data
+                    signature: block.header.seal
                 )
             }.mapError(Error.invalidBlockSeal).get()
         }
 
         let vrfInputData = SigningContext.entropyInputData(entropy: vrfOutput)
         _ = try Result {
-            try blockAuthorKey.ietfVRFVerify(vrfInputData: vrfInputData, signature: block.header.vrfSignature.data)
+            try blockAuthorKey.ietfVRFVerify(vrfInputData: vrfInputData, signature: block.header.vrfSignature)
         }.mapError { _ in Error.invalidVrfSignature }.get()
     }
 

@@ -200,11 +200,11 @@ public enum Bandersnatch: KeyType {
         ///
         /// On success returns the VRF output hash.
         public func ietfVRFVerify(
-            vrfInputData: Data, auxData: Data = Data(), signature: Data
+            vrfInputData: Data, auxData: Data = Data(), signature: Data96
         ) throws(Error) -> Data32 {
             var output = Data(repeating: 0, count: 32)
 
-            try call(vrfInputData, auxData, signature, out: &output) { ptrs, out_buf in
+            try call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in
                 verifier_ietf_vrf_verify(
                     ptr,
                     ptrs[0].ptr,
@@ -350,10 +350,10 @@ public enum Bandersnatch: KeyType {
         /// Used for tickets verification.
         ///
         /// On success returns the VRF output hash.
-        public func ringVRFVerify(vrfInputData: Data, auxData: Data = Data(), signature: Data) throws(Error) -> Data32 {
+        public func ringVRFVerify(vrfInputData: Data, auxData: Data = Data(), signature: Data784) throws(Error) -> Data32 {
             var output = Data(repeating: 0, count: 32)
 
-            try call(vrfInputData, auxData, signature, out: &output) { ptrs, out_buf in
+            try call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in
                 verifier_ring_vrf_verify(
                     ctx.ptr,
                     commitment.ptr,

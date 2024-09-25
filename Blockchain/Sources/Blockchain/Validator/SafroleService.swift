@@ -83,12 +83,12 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
                 var vrfInputData = SigningContext.safroleTicketInputData(entropy: state.value.entropyPool.t2, attempt: 0)
 
                 let sig1 = try prover.ringVRFSign(vrfInputData: vrfInputData)
-                let out1 = try verifier.ringVRFVerify(vrfInputData: vrfInputData, signature: sig1.data)
+                let out1 = try verifier.ringVRFVerify(vrfInputData: vrfInputData, signature: sig1)
 
                 vrfInputData[vrfInputData.count - 1] = TicketIndex(1)
 
                 let sig2 = try prover.ringVRFSign(vrfInputData: vrfInputData)
-                let out2 = try verifier.ringVRFVerify(vrfInputData: vrfInputData, signature: sig2.data)
+                let out2 = try verifier.ringVRFVerify(vrfInputData: vrfInputData, signature: sig2)
 
                 events.append(.init(
                     items: [
