@@ -31,7 +31,7 @@ public struct QuicConfig {
                 )
 
                 // Use withUnsafePointer to ensure the pointer is valid
-                try withUnsafePointer(to: &certificateFile) { certFilePointer in
+                try withUnsafeMutablePointer(to: &certificateFile) { certFilePointer in
                     let mutableCertFilePointer = UnsafeMutablePointer(mutating: certFilePointer)
                     var credConfig = QuicCredentialConfig(
                         Type: QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE,
