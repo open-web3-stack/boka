@@ -25,11 +25,11 @@ private actor ServiceStorage {
     var entropy: Data32 = .init()
     let ringContext: Bandersnatch.RingContext
 
-    public init(ringContext: Bandersnatch.RingContext) {
+    init(ringContext: Bandersnatch.RingContext) {
         self.ringContext = ringContext
     }
 
-    func add(tickets: [TicketItem]) {
+    private func add(tickets: [TicketItem]) {
         for ticket in tickets {
             let inputData = SigningContext.safroleTicketInputData(entropy: entropy, attempt: ticket.attempt)
             let output = try? verifier.ringVRFVerify(vrfInputData: inputData, signature: ticket.signature.data)
@@ -43,7 +43,7 @@ private actor ServiceStorage {
 
     func update(state: StateRef, config: ProtocolConfigRef, tickets: [TicketItem]) throws {
         let epoch = state.value.timeslot.toEpochIndex(config: config)
-        if self.epoch != epoch {
+        if verifier == nil || self.epoch != epoch {
             let commitment = try Bandersnatch.RingCommitment(data: state.value.safroleState.ticketsVerifier)
             let verifier = Bandersnatch.Verifier(ctx: ringContext, commitment: commitment)
 

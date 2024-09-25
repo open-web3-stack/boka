@@ -1,14 +1,19 @@
+import Foundation
 import Utils
 
 public class Validator {
     private let blockchain: Blockchain
     private var keystore: KeyStore
+    private let scheduler: Scheduler
     private let safrole: SafroleService
     private let extrinsicPool: ExtrinsicPoolService
+    private let blockAuthor: BlockAuthor
 
     public init(blockchain: Blockchain, keystore: KeyStore, eventBus: EventBus) async {
         self.blockchain = blockchain
         self.keystore = keystore
+
+        scheduler = Scheduler(timeslotPeriod: UInt32(blockchain.config.value.slotPeriodSeconds), offset: Date.jamCommonEraBeginning)
 
         safrole = await SafroleService(
             config: blockchain.config,
@@ -19,6 +24,14 @@ public class Validator {
         extrinsicPool = await ExtrinsicPoolService(
             blockchain: blockchain,
             eventBus: eventBus
+        )
+
+        blockAuthor = await BlockAuthor(
+            blockchain: blockchain,
+            eventBus: eventBus,
+            keystore: keystore,
+            scheduler: scheduler,
+            extrinsicPool: extrinsicPool
         )
     }
 

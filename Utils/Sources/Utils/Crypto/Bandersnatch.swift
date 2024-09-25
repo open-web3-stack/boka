@@ -200,7 +200,7 @@ public enum Bandersnatch: KeyType {
         ///
         /// On success returns the VRF output hash.
         public func ietfVRFVerify(
-            vrfInputData: Data, auxData: Data, signature: Data
+            vrfInputData: Data, auxData: Data = Data(), signature: Data
         ) throws(Error) -> Data32 {
             var output = Data(repeating: 0, count: 32)
 

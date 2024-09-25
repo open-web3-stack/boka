@@ -53,7 +53,7 @@ public enum BLS: KeyType {
         }
     }
 
-    public final class PublicKey: PublicKeyProtocol {
+    public final class PublicKey: PublicKeyProtocol, @unchecked Sendable {
         // this is immutable after initialization but C API requires it to be mutable
         fileprivate var pk = blst_p1_affine()
         public let data: Data48
@@ -97,6 +97,10 @@ public enum BLS: KeyType {
 
         public static func == (lhs: PublicKey, rhs: PublicKey) -> Bool {
             lhs.data == rhs.data
+        }
+
+        public var description: String {
+            "0x\(data.toHexString())"
         }
 
         public func verify(signature: Data96, message: Data) -> Bool {
