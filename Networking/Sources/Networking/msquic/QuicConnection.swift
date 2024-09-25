@@ -66,6 +66,12 @@ public class QuicConnection {
         }
     }
 
+    // Deinitializer to ensure resources are cleaned up
+    deinit {
+        close()
+        logger.trace("QuicConnection Deinit")
+    }
+
     // Sets the callback handler for the connection
     func setCallbackHandler() -> QuicStatus {
         guard let api, let connection, let configuration else {
@@ -108,7 +114,6 @@ public class QuicConnection {
         }
         let stream = try QuicStream(api: api, connection: connection, kind, messageHandler: self)
         uniquePersistentStreams[kind] = stream
-        try stream.start()
         return stream
     }
 
@@ -160,12 +165,6 @@ public class QuicConnection {
             }
             logger.debug("QuicConnection close")
         }
-    }
-
-    // Deinitializer to ensure resources are cleaned up
-    deinit {
-        close()
-        logger.trace("QuicConnection Deinit")
     }
 }
 

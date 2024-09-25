@@ -41,6 +41,7 @@ public class QuicStream {
                 stream: stream, context: context, event: event
             )
         }
+        try start()
     }
 
     // Initializer for wrapping an existing stream
@@ -60,6 +61,12 @@ public class QuicStream {
         }
     }
 
+    // Deinitializer to ensure resources are cleaned up
+    deinit {
+        close()
+        streamLogger.trace("QuicStream Deinit")
+    }
+
     // Opens a stream with the specified kind
     private func openStream(_: StreamKind = .commonEphemeral) throws {
         let status =
@@ -76,7 +83,7 @@ public class QuicStream {
     }
 
     // Starts the stream
-    func start() throws {
+    private func start() throws {
         try openStream(kind)
         let status = (api?.pointee.StreamStart(stream, QUIC_STREAM_START_FLAG_NONE)).status
         if status.isFailed {
@@ -122,11 +129,11 @@ public class QuicStream {
         let messageLength = buffer.count
 
         let sendBufferRaw = UnsafeMutableRawPointer.allocate(
-            byteCount: MemoryLayout<QUIC_BUFFER>.size + messageLength,
-            alignment: MemoryLayout<QUIC_BUFFER>.alignment
+            byteCount: MemoryLayout<QuicBuffer>.size + messageLength,
+            alignment: MemoryLayout<QuicBuffer>.alignment
         )
 
-        let sendBuffer = sendBufferRaw.assumingMemoryBound(to: QUIC_BUFFER.self)
+        let sendBuffer = sendBufferRaw.assumingMemoryBound(to: QuicBuffer.self)
         let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(
             capacity: messageLength
         )
@@ -158,11 +165,11 @@ public class QuicStream {
         let messageLength = buffer.count
 
         let sendBufferRaw = UnsafeMutableRawPointer.allocate(
-            byteCount: MemoryLayout<QUIC_BUFFER>.size + messageLength,
-            alignment: MemoryLayout<QUIC_BUFFER>.alignment
+            byteCount: MemoryLayout<QuicBuffer>.size + messageLength,
+            alignment: MemoryLayout<QuicBuffer>.alignment
         )
 
-        let sendBuffer = sendBufferRaw.assumingMemoryBound(to: QUIC_BUFFER.self)
+        let sendBuffer = sendBufferRaw.assumingMemoryBound(to: QuicBuffer.self)
         let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(
             capacity: messageLength
         )
@@ -195,12 +202,6 @@ public class QuicStream {
                 sendCompletion = nil
             }
         }
-    }
-
-    // Deinitializer to ensure resources are cleaned up
-    deinit {
-        close()
-        streamLogger.trace("QuicStream Deinit")
     }
 }
 

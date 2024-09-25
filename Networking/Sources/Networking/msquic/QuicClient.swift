@@ -49,6 +49,11 @@ public class QuicClient: @unchecked Sendable {
         registration = registrationHandle
     }
 
+    deinit {
+        close()
+        clientLogger.trace("QuicClient Deinit")
+    }
+
     func start() throws -> QuicStatus {
         let status = QuicStatusCode.success.rawValue
         try loadConfiguration()
@@ -70,15 +75,14 @@ public class QuicClient: @unchecked Sendable {
             throw QuicError.getConnectionFailed
         }
         let sendStream: QuicStream
-        // Check if there is an existing stream of the same kind
-        if streamKind == .uniquePersistent {
+            // Check if there is an existing stream of the same kind
+            = if streamKind == .uniquePersistent
+        {
             // If there is, send the message to the existing stream
-            sendStream = try connection.createOrGetUniquePersistentStream(kind: streamKind)
+            try connection.createOrGetUniquePersistentStream(kind: streamKind)
         } else {
             // If there is not, create a new stream
-            sendStream = try connection.createCommonEphemeralStream()
-            // Start the stream
-            try sendStream.start()
+            try connection.createCommonEphemeralStream()
         }
         return sendStream.send(buffer: message, kind: streamKind)
     }
@@ -89,15 +93,14 @@ public class QuicClient: @unchecked Sendable {
             throw QuicError.getConnectionFailed
         }
         let sendStream: QuicStream
-        // Check if there is an existing stream of the same kind
-        if streamKind == .uniquePersistent {
+            // Check if there is an existing stream of the same kind
+            = if streamKind == .uniquePersistent
+        {
             // If there is, send the message to the existing stream
-            sendStream = try connection.createOrGetUniquePersistentStream(kind: streamKind)
+            try connection.createOrGetUniquePersistentStream(kind: streamKind)
         } else {
             // If there is not, create a new stream
-            sendStream = try connection.createCommonEphemeralStream()
-            // Start the stream
-            try sendStream.start()
+            try connection.createCommonEphemeralStream()
         }
         return try await sendStream.send(buffer: message)
     }
@@ -135,11 +138,6 @@ public class QuicClient: @unchecked Sendable {
             }
             clientLogger.debug("QuicClient Close")
         }
-    }
-
-    deinit {
-        close()
-        clientLogger.trace("QuicClient Deinit")
     }
 }
 
