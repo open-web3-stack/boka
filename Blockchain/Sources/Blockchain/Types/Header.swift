@@ -183,4 +183,14 @@ extension Header {
     public var vrfSignature: BandersnatchSignature { unsigned.vrfSignature }
 }
 
-extension Header: Validate {}
+extension Header: Validate {
+    public enum Error: Swift.Error {
+        case invalidAuthorIndex
+    }
+
+    public func validateSelf(config: ProtocolConfigRef) throws(Error) {
+        guard authorIndex < UInt32(config.value.totalNumberOfValidators) else {
+            throw .invalidAuthorIndex
+        }
+    }
+}
