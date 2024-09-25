@@ -136,7 +136,6 @@ public struct AtomicArray<T>: RangeReplaceableCollection {
         }
     }
 
-    @inlinable
     public func forEach(_ body: (Element) throws -> Void) rethrows {
         try _read {
             try array.forEach(body)
