@@ -113,7 +113,7 @@ public enum Bandersnatch: KeyType {
         /// Non-Anonymous VRF signature.
         ///
         /// Used for ticket claiming during block production.
-        public func ietfVRFSign(vrfInputData: Data, auxData: Data) throws -> Data96 {
+        public func ietfVRFSign(vrfInputData: Data, auxData: Data = Data()) throws -> Data96 {
             var output = Data(repeating: 0, count: 96)
 
             try call(vrfInputData, auxData, out: &output) { ptrs, out_buf in

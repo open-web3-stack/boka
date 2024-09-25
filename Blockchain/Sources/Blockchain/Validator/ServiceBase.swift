@@ -1,7 +1,7 @@
 import Utils
 
 public class ServiceBase {
-    let config: ProtocolConfigRef
+    public let config: ProtocolConfigRef
     private let eventBus: EventBus
     private var subscriptionTokens: [EventBus.SubscriptionToken] = []
 

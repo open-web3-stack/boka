@@ -2,6 +2,8 @@ import Foundation
 import TracingUtils
 import Utils
 
+private let logger = Logger(label: "Blockchain")
+
 private struct BlockchainStorage: Sendable {
     var bestHead: Data32?
     var bestHeadTimeslot: TimeslotIndex?
@@ -11,13 +13,10 @@ private struct BlockchainStorage: Sendable {
 /// Holds the state of the blockchain.
 /// Includes the canonical chain as well as pending forks.
 /// Assume all blocks and states are valid and have been validated.
-public final class Blockchain: Sendable {
-    public let config: ProtocolConfigRef
-
+public final class Blockchain: ServiceBase, @unchecked Sendable {
     private let storage: ThreadSafeContainer<BlockchainStorage>
     private let dataProvider: BlockchainDataProvider
     private let timeProvider: TimeProvider
-    private let eventBus: EventBus
 
     public init(
         config: ProtocolConfigRef,
@@ -25,10 +24,8 @@ public final class Blockchain: Sendable {
         timeProvider: TimeProvider,
         eventBus: EventBus
     ) async throws {
-        self.config = config
         self.dataProvider = dataProvider
         self.timeProvider = timeProvider
-        self.eventBus = eventBus
 
         let heads = try await dataProvider.getHeads()
         var bestHead: (HeaderRef, Data32)?
@@ -47,6 +44,16 @@ public final class Blockchain: Sendable {
             bestHeadTimeslot: bestHead?.0.value.timeslot,
             finalizedHead: finalizedHead
         ))
+
+        super.init(config, eventBus)
+
+        await subscribe(RuntimeEvents.BlockAuthored.self) { [weak self] event in
+            try await self?.on(blockAuthored: event)
+        }
+    }
+
+    private func on(blockAuthored event: RuntimeEvents.BlockAuthored) async throws {
+        try await importBlock(event.block)
     }
 
     public func importBlock(_ block: BlockRef) async throws {
@@ -67,7 +74,7 @@ public final class Blockchain: Sendable {
                 }
             }
 
-            await eventBus.publish(RuntimeEvents.BlockImported(block: block, state: state, parentState: parent))
+            await publish(RuntimeEvents.BlockImported(block: block, state: state, parentState: parent))
         }
     }
 
@@ -79,7 +86,7 @@ public final class Blockchain: Sendable {
             storage.finalizedHead = hash
         }
 
-        await eventBus.publish(RuntimeEvents.BlockFinalized(hash: hash))
+        await publish(RuntimeEvents.BlockFinalized(hash: hash))
     }
 
     public func getBestBlock() async throws -> BlockRef {

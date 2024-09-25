@@ -78,9 +78,9 @@ public final class Runtime {
         let index = block.header.timeslot % UInt32(config.value.epochLength)
         let encodedHeader = try Result { try JamEncoder.encode(block.header) }.mapError(Error.invalidBlockSeal).get()
         switch state.value.safroleState.ticketsOrKeys {
-        case let .left(keys):
-            let ticket = keys[Int(index)]
-            let vrfInputData = SigningContext.ticketSealInputData(entropy: state.value.entropyPool.t3, attempt: ticket.attempt)
+        case let .left(tickets):
+            let ticket = tickets[Int(index)]
+            let vrfInputData = SigningContext.safroleTicketInputData(entropy: state.value.entropyPool.t3, attempt: ticket.attempt)
             vrfOutput = try Result {
                 try blockAuthorKey.ietfVRFVerify(
                     vrfInputData: vrfInputData,
@@ -88,6 +88,9 @@ public final class Runtime {
                     signature: block.header.seal.data
                 )
             }.mapError(Error.invalidBlockSeal).get()
+            guard ticket.id == vrfOutput else {
+                throw Error.notBlockAuthor
+            }
 
         case let .right(keys):
             let key = keys[Int(index)]

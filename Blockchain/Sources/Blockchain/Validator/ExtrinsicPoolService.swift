@@ -2,18 +2,6 @@ import TracingUtils
 import Utils
 
 private typealias TicketItem = ExtrinsicTickets.TicketItem
-public struct TicketItemAndOutput: Comparable, Sendable {
-    public let ticket: ExtrinsicTickets.TicketItem
-    public let output: Data32
-
-    public static func < (lhs: TicketItemAndOutput, rhs: TicketItemAndOutput) -> Bool {
-        lhs.output < rhs.output
-    }
-
-    public static func == (lhs: TicketItemAndOutput, rhs: TicketItemAndOutput) -> Bool {
-        lhs.output == rhs.output && lhs.ticket == rhs.ticket
-    }
-}
 
 private let logger = Logger(label: "ExtrinsicPoolService")
 
@@ -29,7 +17,7 @@ private actor ServiceStorage {
         self.ringContext = ringContext
     }
 
-    private func add(tickets: [TicketItem]) {
+    func add(tickets: [TicketItem]) {
         for ticket in tickets {
             let inputData = SigningContext.safroleTicketInputData(entropy: entropy, attempt: ticket.attempt)
             let output = try? verifier.ringVRFVerify(vrfInputData: inputData, signature: ticket.signature.data)
@@ -41,7 +29,11 @@ private actor ServiceStorage {
         }
     }
 
-    func update(state: StateRef, config: ProtocolConfigRef, tickets: [TicketItem]) throws {
+    func add(tickets: [TicketItemAndOutput]) {
+        pendingTickets.append(contentsOf: tickets)
+    }
+
+    func update(state: StateRef, config: ProtocolConfigRef) throws {
         let epoch = state.value.timeslot.toEpochIndex(config: config)
         if verifier == nil || self.epoch != epoch {
             let commitment = try Bandersnatch.RingCommitment(data: state.value.safroleState.ticketsVerifier)
@@ -52,8 +44,6 @@ private actor ServiceStorage {
             entropy = state.value.entropyPool.t2
             pendingTickets.removeAll()
         }
-
-        add(tickets: tickets)
     }
 
     func removeTickets(tickets: [TicketItem]) {
@@ -75,16 +65,20 @@ public final class ExtrinsicPoolService: ServiceBase, @unchecked Sendable {
 
         super.init(blockchain.config, eventBus)
 
-        await subscribe(RuntimeEvents.NewSafroleTickets.self) { [weak self] event in
-            try await self?.on(newSafroleTickets: event)
+        await subscribe(RuntimeEvents.SafroleTicketsGenerated.self) { [weak self] event in
+            try await self?.on(safroleTicketsGenerated: event)
         }
 
         await subscribe(RuntimeEvents.BlockFinalized.self) { [weak self] event in
             try await self?.on(blockFinalized: event)
         }
+
+        await subscribe(RuntimeEvents.SafroleTicketsReceived.self) { [weak self] event in
+            try await self?.on(safroleTicketsReceived: event)
+        }
     }
 
-    private func on(newSafroleTickets tickets: RuntimeEvents.NewSafroleTickets) async throws {
+    private func on(safroleTicketsGenerated tickets: RuntimeEvents.SafroleTicketsGenerated) async throws {
         // Safrole VRF commitments only changes every epoch
         // and we should never receive tickets at very beginning and very end of an epoch
         // so it is safe to use best head state without worrying about forks or edge cases
@@ -93,7 +87,18 @@ public final class ExtrinsicPoolService: ServiceBase, @unchecked Sendable {
             try throwUnreachable("no state for best head")
         }
 
-        try await storage.update(state: state, config: blockchain.config, tickets: tickets.items)
+        try await storage.update(state: state, config: blockchain.config)
+        await storage.add(tickets: tickets.items)
+    }
+
+    private func on(safroleTicketsReceived tickets: RuntimeEvents.SafroleTicketsReceived) async throws {
+        let state = try await blockchain.getState(hash: blockchain.bestHead)
+        guard let state else {
+            try throwUnreachable("no state for best head")
+        }
+
+        try await storage.update(state: state, config: blockchain.config)
+        await storage.add(tickets: tickets.items)
     }
 
     private func on(blockFinalized event: RuntimeEvents.BlockFinalized) async throws {

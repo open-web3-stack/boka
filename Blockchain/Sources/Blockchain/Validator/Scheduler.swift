@@ -11,6 +11,7 @@ public class Scheduler {
         self.offset = offset
     }
 
+    @discardableResult
     public func schedule(delay: TimeInterval, repeats: Bool = false, task: @escaping () -> Void) -> DispatchSourceTimer {
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now() + delay, repeating: repeats ? delay : .infinity)
@@ -19,7 +20,8 @@ public class Scheduler {
         return timer
     }
 
-    public func scheduler(at: TimeslotIndex, task: @escaping () -> Void) -> DispatchSourceTimer {
+    @discardableResult
+    public func schedule(at: TimeslotIndex, task: @escaping () -> Void) -> DispatchSourceTimer {
         let delay = timeslotToTime(timeslot: at)
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: delay, repeating: .infinity)

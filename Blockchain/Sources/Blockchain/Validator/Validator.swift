@@ -9,7 +9,12 @@ public class Validator {
     private let extrinsicPool: ExtrinsicPoolService
     private let blockAuthor: BlockAuthor
 
-    public init(blockchain: Blockchain, keystore: KeyStore, eventBus: EventBus) async {
+    public init(
+        blockchain: Blockchain,
+        keystore: KeyStore,
+        eventBus: EventBus,
+        timeProvider: TimeProvider
+    ) async {
         self.blockchain = blockchain
         self.keystore = keystore
 
@@ -30,6 +35,7 @@ public class Validator {
             blockchain: blockchain,
             eventBus: eventBus,
             keystore: keystore,
+            timeProvider: timeProvider,
             scheduler: scheduler,
             extrinsicPool: extrinsicPool
         )

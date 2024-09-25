@@ -42,15 +42,12 @@ public struct SortedArray<T: Comparable> {
     }
 
     public mutating func append(contentsOf newElements: some Collection<T>) {
-        array.reserveCapacity(array.count + newElements.count)
         for element in newElements {
             insert(element)
         }
     }
 
     public mutating func append(contentsOf other: SortedArray<T>) {
-        array.reserveCapacity(array.count + other.count)
-
         var begin = 0
         for element in other.array {
             let idx = insertIndex(element, begin: begin)
