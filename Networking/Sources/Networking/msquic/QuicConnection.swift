@@ -32,7 +32,7 @@ public class QuicConnection {
         registration: HQuic?,
         configuration: HQuic?,
         messageHandler: QuicConnectionMessageHandler? = nil
-    ) {
+    ) throws {
         self.api = api
         self.registration = registration
         self.configuration = configuration
@@ -44,6 +44,7 @@ public class QuicConnection {
                 connection: connection, context: context, event: event
             )
         }
+        try open()
     }
 
     // Initializer for wrapping an existing connection
@@ -85,7 +86,7 @@ public class QuicConnection {
     }
 
     // Opens the connection
-    func open() throws {
+    private func open() throws {
         let status =
             (api?.pointee.ConnectionOpen(
                 registration,
@@ -164,7 +165,7 @@ public class QuicConnection {
     // Deinitializer to ensure resources are cleaned up
     deinit {
         close()
-        logger.info("QuicConnection Deinit")
+        logger.trace("QuicConnection Deinit")
     }
 }
 

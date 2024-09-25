@@ -52,10 +52,9 @@ public class QuicClient: @unchecked Sendable {
     func start() throws -> QuicStatus {
         let status = QuicStatusCode.success.rawValue
         try loadConfiguration()
-        connection = QuicConnection(
+        connection = try QuicConnection(
             api: api, registration: registration, configuration: configuration, messageHandler: self
         )
-        try connection?.open()
         try connection?.start(ipAddress: config.ipAddress, port: config.port)
         return status
     }
