@@ -5,7 +5,7 @@ import ServiceLifecycle
 import TracingUtils
 
 public enum Tracing {
-    public static func bootstrap(_ serviceName: String) async throws -> [Service] {
+    public static func bootstrap(_ serviceName: String, loggerOnly: Bool = false) async throws -> [Service] {
         // Bootstrap the logging backend with the OTel metadata provider which includes span IDs in logging messages.
         LoggingSystem.bootstrap(
             fragment: timestampDefaultLoggerFragment(),
@@ -13,6 +13,10 @@ public enum Tracing {
             level: .trace,
             metadataProvider: .otel
         )
+
+        if loggerOnly {
+            return []
+        }
 
         // Configure OTel resource detection to automatically apply helpful attributes to events.
         let environment = OTelEnvironment.detected()
@@ -36,10 +40,7 @@ public enum Tracing {
             resource: resource,
             producer: registry,
             exporter: metricsExporter,
-            configuration: .init(
-                environment: environment,
-                exportInterval: .seconds(5) // NOTE: This is overridden for the example; the default is 60 seconds.
-            )
+            configuration: .init(environment: environment)
         )
         MetricsSystem.bootstrap(OTLPMetricsFactory(registry: registry))
 
