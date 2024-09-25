@@ -11,8 +11,9 @@ public struct QuicConfig {
 
     public func loadConfiguration(
         api: UnsafePointer<QuicApiTable>?,
-        registration: HQuic?
-    ) throws -> HQuic? {
+        registration: HQuic?,
+        configuration: inout HQuic?
+    ) throws {
         // Initialize QUIC settings
         var settings = QuicSettings()
         settings.IdleTimeoutMs = 10000
@@ -22,69 +23,57 @@ public struct QuicConfig {
         settings.PeerBidiStreamCount = 1
         settings.IsSet.PeerBidiStreamCount = 1
 
-        // Initialize certificate and credential configurations
-        var certificateFile = QuicCertificateFile()
-        var credConfig = QuicCredentialConfig()
+        // Use withCString to avoid manual memory management
+        try cert.withCString { certPointer in
+            try key.withCString { keyPointer in
+                var certificateFile = QuicCertificateFile(
+                    PrivateKeyFile: keyPointer, CertificateFile: certPointer
+                )
 
-        // Convert certificate and key paths to C strings
-        let certCString = cert.utf8CString
-        let keyFileCString = key.utf8CString
+                // Use withUnsafePointer to ensure the pointer is valid
+                try withUnsafePointer(to: &certificateFile) { certFilePointer in
+                    let mutableCertFilePointer = UnsafeMutablePointer(mutating: certFilePointer)
+                    var credConfig = QuicCredentialConfig(
+                        Type: QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE,
+                        Flags: QUIC_CREDENTIAL_FLAG_NONE,
+                        QuicCredentialConfig.__Unnamed_union___Anonymous_field2(
+                            CertificateFile: mutableCertFilePointer
+                        ),
+                        Principal: nil, // Not needed in this context
+                        Reserved: nil, // Not needed in this context
+                        AsyncHandler: nil, // Not needed in this context
+                        AllowedCipherSuites: QUIC_ALLOWED_CIPHER_SUITE_NONE, // Default value
+                        CaCertificateFile: nil // Not needed in this context
+                    )
 
-        // Allocate memory for certificate and key paths
-        let certPointer = UnsafeMutablePointer<CChar>.allocate(capacity: certCString.count)
-        let keyFilePointer = UnsafeMutablePointer<CChar>.allocate(capacity: keyFileCString.count)
+                    // Convert ALPN to data buffer
+                    let buffer = Data(alpn.utf8)
+                    try buffer.withUnsafeBytes { bufferPointer in
+                        var alpnBuffer = QUIC_BUFFER(
+                            Length: UInt32(buffer.count),
+                            Buffer: UnsafeMutablePointer(
+                                mutating: bufferPointer.bindMemory(to: UInt8.self).baseAddress!
+                            )
+                        )
 
-        // Copy the C strings to the allocated memory
-        let certBufferPointer = UnsafeMutableBufferPointer(start: certPointer, count: certCString.count)
-        _ = certBufferPointer.initialize(from: certCString)
+                        // Open QUIC configuration
+                        let status = (api?.pointee.ConfigurationOpen(
+                            registration, &alpnBuffer, 1, &settings, UInt32(MemoryLayout.size(ofValue: settings)),
+                            nil, &configuration
+                        )).status
 
-        let keyFileBufferPointer = UnsafeMutableBufferPointer(start: keyFilePointer, count: keyFileCString.count)
-        _ = keyFileBufferPointer.initialize(from: keyFileCString)
+                        if status.isFailed {
+                            throw QuicError.invalidStatus(status: status.code)
+                        }
 
-        // Set certificate file paths in QUIC_CERTIFICATE_FILE
-        certificateFile.CertificateFile = UnsafePointer(certPointer)
-        certificateFile.PrivateKeyFile = UnsafePointer(keyFilePointer)
-
-        let certificateFilePointer = UnsafeMutablePointer<QUIC_CERTIFICATE_FILE>.allocate(capacity: 1)
-        certificateFilePointer.initialize(to: certificateFile)
-
-        // Configure credentials
-        credConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE
-        credConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE
-        credConfig.CertificateFile = certificateFilePointer
-
-        // Convert ALPN to data buffer
-        let buffer = Data(alpn.utf8)
-        let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(capacity: buffer.count)
-        buffer.copyBytes(to: bufferPointer, count: buffer.count)
-
-        // Ensure memory is deallocated
-        defer {
-            certPointer.deallocate()
-            keyFilePointer.deallocate()
-            certificateFilePointer.deallocate()
-            bufferPointer.deallocate()
+                        // Load credentials into the configuration
+                        let configStatus = (api?.pointee.ConfigurationLoadCredential(configuration, &credConfig)).status
+                        if configStatus.isFailed {
+                            throw QuicError.invalidStatus(status: configStatus.code)
+                        }
+                    }
+                }
+            }
         }
-
-        var alpn = QuicBuffer(Length: UInt32(buffer.count), Buffer: bufferPointer)
-
-        // Open QUIC configuration
-        var configuration: HQuic?
-        let status = (api?.pointee.ConfigurationOpen(
-            registration, &alpn, 1, &settings, UInt32(MemoryLayout.size(ofValue: settings)),
-            nil, &configuration
-        )).status
-
-        if status.isFailed {
-            throw QuicError.invalidStatus(status: status.code)
-        }
-
-        // Load credentials into the configuration
-        let configStatus = (api?.pointee.ConfigurationLoadCredential(configuration, &credConfig)).status
-        if configStatus.isFailed {
-            throw QuicError.invalidStatus(status: configStatus.code)
-        }
-
-        return configuration
     }
 }

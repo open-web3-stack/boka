@@ -175,8 +175,6 @@ extension QuicClient: QuicConnectionMessageHandler {
 
 extension QuicClient {
     private func loadConfiguration() throws {
-        configuration = try config.loadConfiguration(
-            api: api, registration: registration
-        )
+        try config.loadConfiguration(api: api, registration: registration, configuration: &configuration)
     }
 }
