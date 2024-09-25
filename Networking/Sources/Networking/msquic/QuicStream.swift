@@ -88,13 +88,13 @@ public class QuicStream {
     // Closes the stream and cleans up resources
     func close() {
         if isClosed.compareExchange(expected: false, desired: true, ordering: .acquiring).exchanged {
-            streamLogger.info("QuicStream close")
             streamCallback = nil
             messageHandler = nil
             if stream != nil {
                 api?.pointee.StreamClose(stream)
                 stream = nil
             }
+            streamLogger.debug("QuicStream close")
         }
     }
 
@@ -200,7 +200,7 @@ public class QuicStream {
     // Deinitializer to ensure resources are cleaned up
     deinit {
         close()
-        streamLogger.info("QuicStream Deinit")
+        streamLogger.trace("QuicStream Deinit")
     }
 }
 
@@ -250,7 +250,7 @@ extension QuicStream {
             streamLogger.info("[\(String(describing: stream))] Peer shut down")
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
-            streamLogger.warning("[\(String(describing: stream))] Peer aborted")
+            streamLogger.error("[\(String(describing: stream))] Peer aborted")
             status =
                 (quicStream.api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0))
                     .status

@@ -158,7 +158,7 @@ public class QuicConnection {
                 api?.pointee.ConnectionClose(connection)
                 connection = nil
             }
-            logger.info("QuicConnection close")
+            logger.debug("QuicConnection close")
         }
     }
 
