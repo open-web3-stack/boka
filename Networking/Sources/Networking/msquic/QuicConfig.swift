@@ -26,9 +26,6 @@ public struct QuicConfig {
         var certificateFile = QuicCertificateFile()
         var credConfig = QuicCredentialConfig()
 
-        memset(&certificateFile, 0, MemoryLayout.size(ofValue: certificateFile))
-        memset(&credConfig, 0, MemoryLayout.size(ofValue: credConfig))
-
         // Convert certificate and key paths to C strings
         let certCString = cert.utf8CString
         let keyFileCString = key.utf8CString
