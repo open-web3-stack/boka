@@ -133,13 +133,13 @@ public class QuicClient: @unchecked Sendable {
                     quicClient: self, message: QuicMessage(type: .close, data: nil)
                 )
             }
-            clientLogger.info("QuicClient Close")
+            clientLogger.debug("QuicClient Close")
         }
     }
 
     deinit {
         close()
-        clientLogger.info("QuicClient Deinit")
+        clientLogger.trace("QuicClient Deinit")
     }
 }
 
