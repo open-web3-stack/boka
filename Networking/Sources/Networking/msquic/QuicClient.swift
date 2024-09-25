@@ -140,7 +140,7 @@ public class QuicClient: @unchecked Sendable {
 
     deinit {
         close()
-        clientLogger.info("QuicClient Deinit")
+        clientLogger.trace("QuicClient Deinit")
     }
 }
 
