@@ -30,14 +30,13 @@ public struct QuicConfig {
                     PrivateKeyFile: keyPointer, CertificateFile: certPointer
                 )
 
-                // Use withUnsafePointer to ensure the pointer is valid
+                // Use withUnsafeMutablePointer to ensure the pointer is valid
                 try withUnsafeMutablePointer(to: &certificateFile) { certFilePointer in
-                    let mutableCertFilePointer = UnsafeMutablePointer(mutating: certFilePointer)
                     var credConfig = QuicCredentialConfig(
                         Type: QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE,
                         Flags: QUIC_CREDENTIAL_FLAG_NONE,
                         QuicCredentialConfig.__Unnamed_union___Anonymous_field2(
-                            CertificateFile: mutableCertFilePointer
+                            CertificateFile: certFilePointer
                         ),
                         Principal: nil, // Not needed in this context
                         Reserved: nil, // Not needed in this context
