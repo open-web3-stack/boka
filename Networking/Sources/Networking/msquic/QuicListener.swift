@@ -80,7 +80,7 @@ public class QuicListener {
         let listener: QuicListener = Unmanaged<QuicListener>.fromOpaque(context).takeUnretainedValue()
         switch event.pointee.Type {
         case QUIC_LISTENER_EVENT_NEW_CONNECTION:
-            listenLogger.info("New connection")
+            listenLogger.debug("New connection")
             let connection: HQuic = event.pointee.NEW_CONNECTION.Connection
             guard let api = listener.api else {
                 return status
