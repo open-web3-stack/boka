@@ -171,7 +171,7 @@ extension Peer: QuicClientMessageHandler {
     public func didReceiveMessage(quicClient: QuicClient, message: QuicMessage) {
         switch message.type {
         case .close:
-            peerLogger.info("QuicClient close")
+            peerLogger.trace("QuicClient close")
             // Use Task to avoid strong reference cycle
             Task { [weak self] in
                 guard let self else { return }
