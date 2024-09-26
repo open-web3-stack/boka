@@ -1,4 +1,3 @@
-import Atomics
 import Foundation
 import Logging
 import msquic
@@ -24,7 +23,6 @@ public class QuicConnection {
     private var commonEphemeralStreams: AtomicArray<QuicStream>
     private weak var messageHandler: QuicConnectionMessageHandler?
     private var connectionCallback: ConnectionCallback?
-    private let isClosed: ManagedAtomic<Bool> = .init(false)
 
     // Initializer for creating a new connection
     init(
@@ -119,7 +117,7 @@ public class QuicConnection {
 
     // Creates a common ephemeral stream
     func createCommonEphemeralStream() throws -> QuicStream {
-        let stream = try QuicStream(api: api, connection: connection, .commonEphemeral, messageHandler: self)
+        let stream: QuicStream = try QuicStream(api: api, connection: connection, .commonEphemeral, messageHandler: self)
         commonEphemeralStreams.append(stream)
         return stream
     }
@@ -148,23 +146,21 @@ public class QuicConnection {
 
     // Closes the connection and cleans up resources
     func close() {
-        if isClosed.compareExchange(expected: false, desired: true, ordering: .acquiring).exchanged {
-            connectionCallback = nil
-            messageHandler = nil
-            for stream in commonEphemeralStreams {
-                stream.close()
-            }
-            commonEphemeralStreams.removeAll()
-            for stream in uniquePersistentStreams.values {
-                stream.close()
-            }
-            uniquePersistentStreams.removeAll()
-            if connection != nil {
-                api?.pointee.ConnectionClose(connection)
-                connection = nil
-            }
-            logger.debug("QuicConnection close")
+        connectionCallback = nil
+        messageHandler = nil
+        for stream in commonEphemeralStreams {
+            stream.close()
         }
+        commonEphemeralStreams.removeAll()
+        for stream in uniquePersistentStreams.values {
+            stream.close()
+        }
+        uniquePersistentStreams.removeAll()
+        if connection != nil {
+            api?.pointee.ConnectionClose(connection)
+            connection = nil
+        }
+        logger.debug("QuicConnection close")
     }
 }
 

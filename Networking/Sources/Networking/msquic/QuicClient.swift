@@ -1,4 +1,3 @@
-import Atomics
 import Foundation
 import Logging
 import msquic
@@ -19,7 +18,6 @@ public class QuicClient: @unchecked Sendable {
     private var connection: QuicConnection?
     private let config: QuicConfig
     private weak var messageHandler: QuicClientMessageHandler?
-    private let isClosed: ManagedAtomic<Bool> = .init(false)
 
     init(config: QuicConfig, messageHandler: QuicClientMessageHandler? = nil) throws {
         self.config = config
@@ -47,21 +45,20 @@ public class QuicClient: @unchecked Sendable {
 
         api = boundPointer
         registration = registrationHandle
+        try start()
     }
 
     deinit {
         close()
-        clientLogger.trace("QuicClient Deinit")
+        clientLogger.info("QuicClient Deinit")
     }
 
-    func start() throws -> QuicStatus {
-        let status = QuicStatusCode.success.rawValue
+    private func start() throws {
         try loadConfiguration()
         connection = try QuicConnection(
             api: api, registration: registration, configuration: configuration, messageHandler: self
         )
         try connection?.start(ipAddress: config.ipAddress, port: config.port)
-        return status
     }
 
     // Asynchronous send method that waits for a QuicMessage reply
@@ -74,16 +71,15 @@ public class QuicClient: @unchecked Sendable {
         guard let connection else {
             throw QuicError.getConnectionFailed
         }
-        let sendStream: QuicStream
-            // Check if there is an existing stream of the same kind
-            = if streamKind == .uniquePersistent
-        {
-            // If there is, send the message to the existing stream
-            try connection.createOrGetUniquePersistentStream(kind: streamKind)
-        } else {
-            // If there is not, create a new stream
-            try connection.createCommonEphemeralStream()
-        }
+        let sendStream: QuicStream // Check if there is an existing stream of the same kind
+            =
+                if streamKind == .uniquePersistent {
+                    // If there is, send the message to the existing stream
+                    try connection.createOrGetUniquePersistentStream(kind: streamKind)
+                } else {
+                    // If there is not, create a new stream
+                    try connection.createCommonEphemeralStream()
+                }
         return sendStream.send(buffer: message, kind: streamKind)
     }
 
@@ -92,16 +88,15 @@ public class QuicClient: @unchecked Sendable {
         guard let connection else {
             throw QuicError.getConnectionFailed
         }
-        let sendStream: QuicStream
-            // Check if there is an existing stream of the same kind
-            = if streamKind == .uniquePersistent
-        {
-            // If there is, send the message to the existing stream
-            try connection.createOrGetUniquePersistentStream(kind: streamKind)
-        } else {
-            // If there is not, create a new stream
-            try connection.createCommonEphemeralStream()
-        }
+        let sendStream: QuicStream // Check if there is an existing stream of the same kind
+            =
+                if streamKind == .uniquePersistent {
+                    // If there is, send the message to the existing stream
+                    try connection.createOrGetUniquePersistentStream(kind: streamKind)
+                } else {
+                    // If there is not, create a new stream
+                    try connection.createCommonEphemeralStream()
+                }
         return try await sendStream.send(buffer: message)
     }
 
@@ -110,34 +105,26 @@ public class QuicClient: @unchecked Sendable {
     }
 
     func close() {
-        if isClosed.compareExchange(expected: false, desired: true, ordering: .acquiring).exchanged {
-            if let connection {
-                connection.close()
-                self.connection = nil
-            }
-
-            if let configuration {
-                api?.pointee.ConfigurationClose(configuration)
-                self.configuration = nil
-            }
-
-            if let registration {
-                api?.pointee.RegistrationClose(registration)
-                self.registration = nil
-            }
-
-            if api != nil {
-                MsQuicClose(api)
-                api = nil
-            }
-
-            if let messageHandler {
-                messageHandler.didReceiveMessage(
-                    quicClient: self, message: QuicMessage(type: .close, data: nil)
-                )
-            }
-            clientLogger.debug("QuicClient Close")
+        if let connection {
+            connection.close()
+            self.connection = nil
         }
+
+        if let configuration {
+            api?.pointee.ConfigurationClose(configuration)
+            self.configuration = nil
+        }
+
+        if let registration {
+            api?.pointee.RegistrationClose(registration)
+            self.registration = nil
+        }
+
+        if api != nil {
+            MsQuicClose(api)
+            api = nil
+        }
+        clientLogger.debug("QuicClient Close")
     }
 }
 
@@ -173,6 +160,8 @@ extension QuicClient: QuicConnectionMessageHandler {
 
 extension QuicClient {
     private func loadConfiguration() throws {
-        try config.loadConfiguration(api: api, registration: registration, configuration: &configuration)
+        try config.loadConfiguration(
+            api: api, registration: registration, configuration: &configuration
+        )
     }
 }

@@ -1,4 +1,3 @@
-import Atomics
 import Foundation
 import Logging
 import msquic
@@ -24,8 +23,6 @@ public class QuicStream {
     private weak var messageHandler: QuicStreamMessageHandler?
     private var streamCallback: StreamCallback?
     private var sendCompletion: CheckedContinuation<QuicMessage, Error>?
-    private let isClosed: ManagedAtomic<Bool> = .init(false)
-
     // Initializer for creating a new stream
     init(
         api: UnsafePointer<QuicApiTable>?, connection: HQuic?,
@@ -94,15 +91,13 @@ public class QuicStream {
 
     // Closes the stream and cleans up resources
     func close() {
-        if isClosed.compareExchange(expected: false, desired: true, ordering: .acquiring).exchanged {
-            streamCallback = nil
-            messageHandler = nil
-            if stream != nil {
-                api?.pointee.StreamClose(stream)
-                stream = nil
-            }
-            streamLogger.debug("QuicStream close")
+        streamCallback = nil
+        messageHandler = nil
+        if stream != nil {
+            api?.pointee.StreamClose(stream)
+            stream = nil
         }
+        streamLogger.debug("QuicStream close")
     }
 
     // Sets the callback handler for the stream

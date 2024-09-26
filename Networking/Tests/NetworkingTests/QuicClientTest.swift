@@ -10,18 +10,16 @@ import Testing
 
     final class QuicClientTests {
         @Test func start() async throws {
-            do {
-                let cert = Bundle.module.path(forResource: "server", ofType: "cert")!
-                let keyFile = Bundle.module.path(forResource: "server", ofType: "key")!
-                let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
-                let quicClient = try QuicClient(
-                    config: QuicConfig(
-                        id: "public-key", cert: cert, key: keyFile, alpn: "sample",
-                        ipAddress: "127.0.0.1", port: 4569
-                    )
+            let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+            let cert = Bundle.module.path(forResource: "server", ofType: "cert")!
+            let keyFile = Bundle.module.path(forResource: "server", ofType: "key")!
+            let quicClient = try QuicClient(
+                config: QuicConfig(
+                    id: "public-key", cert: cert, key: keyFile, alpn: "sample",
+                    ipAddress: "127.0.0.1", port: 4569
                 )
-                let status = try quicClient.start()
-                print(status)
+            )
+            do {
                 let message1 = try await quicClient.send(
                     message: Data("Hello, World!".utf8), streamKind: .uniquePersistent
                 )
@@ -39,13 +37,14 @@ import Testing
                 )
                 print("Client received 4: \(message4)")
 
-                try await group.next().scheduleTask(in: .seconds(5)) {
-                    print("scheduleTask: 5s")
-                }.futureResult.get()
             } catch {
                 // Handle the error if sending the message fails or if the connection fails
                 print("Failed about quic client: \(error)")
             }
+
+            try await group.next().scheduleTask(in: .seconds(5)) {
+                print("scheduleTask: 5s")
+            }.futureResult.get()
         }
     }
 #endif
