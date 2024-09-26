@@ -53,7 +53,7 @@ public final class Peer: @unchecked Sendable {
     deinit {
         clients.removeAll()
         quicServer?.close()
-        peerLogger.info("Peer Deinit")
+        peerLogger.trace("Peer Deinit")
         // Clean up resources if necessary
     }
 
