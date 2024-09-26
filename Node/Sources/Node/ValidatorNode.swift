@@ -1,4 +1,5 @@
 import Blockchain
+import Foundation
 import TracingUtils
 import Utils
 
@@ -10,10 +11,9 @@ public class ValidatorNode: Node {
     ) async throws {
         try await super.init(genesis: genesis, config: config, eventBus: eventBus)
 
-        let timeProvider = SystemTimeProvider(slotPeriodSeconds: config.value.slotPeriodSeconds)
         let scheduler = DispatchQueueScheduler(
-            timeslotPeriod: UInt32(config.value.slotPeriodSeconds),
-            timeProvider: timeProvider
+            timeProvider: timeProvider,
+            queue: DispatchQueue(label: "boka.validator.scheduler", attributes: .concurrent)
         )
         validator = await Validator(
             blockchain: blockchain,
