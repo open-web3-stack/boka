@@ -5,11 +5,9 @@ import Utils
 
 private let logger = Logger(label: "BlockAuthor")
 
-public class BlockAuthor: ServiceBase, @unchecked Sendable {
+public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
     private let blockchain: Blockchain
     private let keystore: KeyStore
-    private let timeProvider: TimeProvider
-    private let scheduler: Scheduler
     private let extrinsicPool: ExtrinsicPoolService
 
     private var tickets: ThreadSafeContainer<[RuntimeEvents.SafroleTicketsGenerated]> = .init([])
@@ -18,17 +16,14 @@ public class BlockAuthor: ServiceBase, @unchecked Sendable {
         blockchain: Blockchain,
         eventBus: EventBus,
         keystore: KeyStore,
-        timeProvider: TimeProvider,
         scheduler: Scheduler,
         extrinsicPool: ExtrinsicPoolService
     ) async {
         self.blockchain = blockchain
         self.keystore = keystore
-        self.timeProvider = timeProvider
-        self.scheduler = scheduler
         self.extrinsicPool = extrinsicPool
 
-        super.init(blockchain.config, eventBus)
+        super.init(blockchain.config, eventBus, scheduler)
 
         await subscribe(RuntimeEvents.SafroleTicketsGenerated.self) { [weak self] event in
             try await self?.on(safroleTicketsGenerated: event)
@@ -42,7 +37,7 @@ public class BlockAuthor: ServiceBase, @unchecked Sendable {
 
         // at end of an epoch, try to determine the block author of next epoch
         // and schedule new block task
-        scheduler.schedule(at: timeslot - 1) { [weak self] in
+        schedule(at: timeslot - 1) { [weak self] in
             if let self {
                 Task {
                     await self.onBeforeEpoch(timeslot: timeslot)
@@ -144,13 +139,13 @@ public class BlockAuthor: ServiceBase, @unchecked Sendable {
         }
     }
 
-    private func on(safroleTicketsGenerated tickets: RuntimeEvents.SafroleTicketsGenerated) async throws {
-        self.tickets.value.append(tickets)
+    private func on(safroleTicketsGenerated event: RuntimeEvents.SafroleTicketsGenerated) async throws {
+        tickets.write { $0.append(event) }
     }
 
     private func onBeforeEpoch(timeslot: TimeslotIndex) async {
         await withSpan("BlockAuthor.onBeforeEpoch", logger: logger) { _ in
-            self.tickets.value = []
+            tickets.value = []
 
             let bestHead = blockchain.bestHead
             let state = try await blockchain.getState(hash: bestHead)
@@ -185,7 +180,7 @@ public class BlockAuthor: ServiceBase, @unchecked Sendable {
                 if let claim = selfTickets.first(withOutput: ticket.id) {
                     let timeslot = timeslotBase + TimeslotIndex(idx)
                     logger.info("Scheduling new block task at timeslot \(timeslot))")
-                    scheduler.schedule(at: timeslot) { [weak self] in
+                    schedule(at: timeslot) { [weak self] in
                         if let self {
                             Task {
                                 await self.newBlock(claim: .left(claim))
@@ -200,7 +195,7 @@ public class BlockAuthor: ServiceBase, @unchecked Sendable {
                 if let pubkey, await keystore.contains(publicKey: pubkey) {
                     let timeslot = timeslotBase + TimeslotIndex(idx)
                     logger.info("Scheduling new block task at timeslot \(timeslot))")
-                    scheduler.schedule(at: timeslot) { [weak self] in
+                    schedule(at: timeslot) { [weak self] in
                         if let self {
                             Task {
                                 await self.newBlock(claim: .right(pubkey))

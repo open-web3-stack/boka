@@ -68,7 +68,7 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
 
             // update best head
             if state.value.timeslot > storage.value.bestHeadTimeslot ?? 0 {
-                storage.mutate { storage in
+                storage.write { storage in
                     storage.bestHead = block.hash
                     storage.bestHeadTimeslot = state.value.timeslot
                 }

@@ -1,44 +1,31 @@
-import Foundation
+@preconcurrency import Foundation
 import TracingUtils
 
 private let logger = Logger(label: "Scheduler")
 
-// TODO: make a scheduler protocol so we can mock it
-public class DispatchQueueScheduler {
-    private let timeslotPeriod: UInt32
-    private let timeProvider: TimeProvider
-    private let queue = DispatchQueue(label: "boka.scheduler.queue", attributes: .concurrent)
+public final class DispatchQueueScheduler: Scheduler {
+    public let timeProvider: TimeProvider
+    private let queue: DispatchQueue
 
-    public init(timeslotPeriod: UInt32, timeProvider: TimeProvider) {
-        self.timeslotPeriod = timeslotPeriod
+    public init(timeProvider: TimeProvider, queue: DispatchQueue = .global()) {
         self.timeProvider = timeProvider
+        self.queue = queue
     }
 
-    @discardableResult
-    public func schedule(delay: TimeInterval, repeats: Bool = false, task: @escaping () -> Void) -> DispatchSourceTimer {
+    public func schedule(
+        delay: TimeInterval,
+        repeats: Bool,
+        task: @escaping @Sendable () -> Void,
+        onCancel: (@Sendable () -> Void)?
+    ) -> Cancellable {
         logger.trace("scheduling task in \(delay) seconds, repeats: \(repeats)")
         let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.setEventHandler(handler: task)
+        timer.setCancelHandler(handler: onCancel)
         timer.schedule(deadline: .now() + delay, repeating: repeats ? delay : .infinity)
-        timer.setEventHandler(handler: task)
-        timer.resume()
-        return timer
-    }
-
-    @discardableResult
-    public func schedule(at: TimeslotIndex, task: @escaping () -> Void) -> DispatchSourceTimer {
-        let deadline = timeslotToTime(timeslot: at)
-        logger.trace("scheduling task at timeslot \(at), delay: \(Double(deadline.uptimeNanoseconds) / 1_000_000_000) seconds")
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: deadline, repeating: .infinity)
-        timer.setEventHandler(handler: task)
-        timer.resume()
-        return timer
-    }
-
-    private func timeslotToTime(timeslot: TimeslotIndex) -> DispatchTime {
-        let seconds = timeslot * timeslotPeriod
-        let now = timeProvider.getTime()
-        let ns = UInt64(seconds - now) * 1_000_000_000
-        return DispatchTime(uptimeNanoseconds: ns)
+        timer.activate()
+        return Cancellable {
+            timer.cancel()
+        }
     }
 }
