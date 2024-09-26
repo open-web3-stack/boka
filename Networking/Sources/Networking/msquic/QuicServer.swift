@@ -56,7 +56,7 @@ public final class QuicServer: @unchecked Sendable {
 
     deinit {
         close()
-        serverLogger.info("QuicServer Deinit")
+        serverLogger.trace("QuicServer Deinit")
     }
 
     private func start() throws {
@@ -64,7 +64,10 @@ public final class QuicServer: @unchecked Sendable {
     }
 
     func close() {
-        listener?.close()
+        if listener != nil {
+            listener?.close()
+            listener = nil
+        }
         if configuration != nil {
             api?.pointee.ConfigurationClose(configuration)
             configuration = nil

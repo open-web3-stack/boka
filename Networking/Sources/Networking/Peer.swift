@@ -109,6 +109,7 @@ public final class Peer: @unchecked Sendable {
         return try sendDataToPeer(buffer, to: peerAddr, messageType: messageType)
     }
 
+    // send message to other peer wait for response quicMessage
     private func sendDataToPeer(_ data: Data, to peerAddr: NetAddr, messageType: PeerMessageType)
         async throws -> QuicMessage
     {

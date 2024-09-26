@@ -95,36 +95,44 @@ import Utils
                 )
 
                 // Subscribe to PeerMessageReceived for peer1
-                _ = await eventBus1.subscribe(PeerMessageReceived.self) { event in
+                let token1 = await eventBus1.subscribe(PeerMessageReceived.self) { event in
                     print(
                         "Peer1 received message from messageID: \(event.messageID), message: \(event.message)"
                     )
-                    let status = peer1.respondTo(messageID: event.messageID, with: Message(data: event.message.data!))
+                    let status = peer1.respondTo(
+                        messageID: event.messageID, with: Message(data: event.message.data!)
+                    )
                     print("Peer1 sent response: \(status.isFailed ? "Failed" : "Success")")
                 }
 
                 // Subscribe to PeerMessageReceived for peer2
-                _ = await eventBus2.subscribe(PeerMessageReceived.self) { event in
+                let token2 = await eventBus2.subscribe(PeerMessageReceived.self) { event in
                     print(
                         "Peer2 received message from messageID: \(event.messageID), message: \(event.message)"
                     )
-                    let status = peer2.respondTo(messageID: event.messageID, with: Message(data: event.message.data!))
+                    let status = peer2.respondTo(
+                        messageID: event.messageID, with: Message(data: event.message.data!)
+                    )
                     print("Peer2 sent response: \(status.isFailed ? "Failed" : "Success")")
                 }
 
-                // Schedule message sending after 5 seconds
+                //  Schedule message sending after 5 seconds
                 _ = try await group.next().scheduleTask(in: .seconds(2)) {
                     Task {
                         do {
                             for i in 1 ... 5 {
                                 let messageToPeer2 = try await peer1.sendMessageToPeer(
-                                    message: Message(data: Data("Hello from Peer1 - Message \(i)".utf8)),
+                                    message: Message(
+                                        data: Data("Hello from Peer1 - Message \(i)".utf8)
+                                    ),
                                     peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4569)
                                 )
                                 print("Peer1 sent message \(i): \(messageToPeer2)")
 
                                 let messageToPeer1 = try await peer2.sendMessageToPeer(
-                                    message: Message(data: Data("Hello from Peer2 - Message \(i)".utf8)),
+                                    message: Message(
+                                        data: Data("Hello from Peer2 - Message \(i)".utf8)
+                                    ),
                                     peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4568)
                                 )
                                 print("Peer2 sent message \(i): \(messageToPeer1)")
@@ -135,10 +143,16 @@ import Utils
                     }
                 }.futureResult.get()
 
-                try await group.next().scheduleTask(in: .seconds(20)) {
-                    print("scheduleTask 10s")
+                _ = try await group.next().scheduleTask(in: .seconds(5)) {
+                    Task {
+                        await eventBus1.unsubscribe(token: token1)
+                        await eventBus2.unsubscribe(token: token2)
+                        print("eventBus unsubscribe")
+                    }
                 }.futureResult.get()
-
+                try await group.next().scheduleTask(in: .seconds(5)) {
+                    print("scheduleTask end")
+                }.futureResult.get()
             } catch {
                 print("Failed about peer communication test: \(error)")
             }

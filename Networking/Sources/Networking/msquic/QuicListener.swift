@@ -78,7 +78,6 @@ public class QuicListener {
             return status
         }
         let listener: QuicListener = Unmanaged<QuicListener>.fromOpaque(context).takeUnretainedValue()
-        listenLogger.info("Server listener callback type \(event.pointee.Type.rawValue)")
         switch event.pointee.Type {
         case QUIC_LISTENER_EVENT_NEW_CONNECTION:
             listenLogger.info("New connection")
@@ -125,7 +124,6 @@ extension QuicListener: QuicConnectionMessageHandler {
     ) {
         switch message.type {
         case .shutdownComplete:
-            listenLogger.info("Connection shutdown complete")
             removeConnection(connection)
         case .received:
             if let stream {
