@@ -1,7 +1,7 @@
 import Foundation
 import Utils
 
-public struct AccumulateArguments {
+public struct AccumulateArguments: Codable {
     public var result: WorkResult
     public var paylaodHash: Data32
     public var packageHash: Data32
@@ -36,7 +36,7 @@ public struct DeferredTransfers: Codable {
     }
 }
 
-public struct AccumlateResultContext {
+public class AccumlateResultContext {
     // s: updated current account
     public var account: ServiceAccount?
     // c
@@ -59,15 +59,67 @@ public struct AccumlateResultContext {
     public var newAccounts: [ServiceIndex: ServiceAccount]
     // p
     public var privilegedServices: PrivilegedServices
+
+    public init(
+        account: ServiceAccount?,
+        authorizationQueue: ConfigFixedSizeArray<
+            ConfigFixedSizeArray<
+                Data32,
+                ProtocolConfig.MaxAuthorizationsQueueItems
+            >,
+            ProtocolConfig.TotalNumberOfCores
+        >,
+        validatorQueue: ConfigFixedSizeArray<
+            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        >,
+        serviceIndex: ServiceIndex,
+        transfers: [DeferredTransfers],
+        newAccounts: [ServiceIndex: ServiceAccount],
+        privilegedServices: PrivilegedServices
+    ) {
+        self.account = account
+        self.authorizationQueue = authorizationQueue
+        self.validatorQueue = validatorQueue
+        self.serviceIndex = serviceIndex
+        self.transfers = transfers
+        self.newAccounts = newAccounts
+        self.privilegedServices = privilegedServices
+    }
+
+    public func copy() -> AccumlateResultContext {
+        AccumlateResultContext(
+            account: account,
+            authorizationQueue: authorizationQueue,
+            validatorQueue: validatorQueue,
+            serviceIndex: serviceIndex,
+            transfers: transfers,
+            newAccounts: newAccounts,
+            privilegedServices: privilegedServices
+        )
+    }
 }
 
 public protocol AccumulateFunction {
     func invoke(
         config: ProtocolConfigRef,
-        service: ServiceIndex,
+        serviceIndex: ServiceIndex,
         code: Data,
         serviceAccounts: [ServiceIndex: ServiceAccount],
         gas: Gas,
-        arguments: [AccumulateArguments]
+        arguments: [AccumulateArguments],
+        // other inputs needed (not directly in GP's Accumulation function signature)
+        validatorQueue: ConfigFixedSizeArray<
+            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        >,
+        authorizationQueue: ConfigFixedSizeArray<
+            ConfigFixedSizeArray<
+                Data32,
+                ProtocolConfig.MaxAuthorizationsQueueItems
+            >,
+            ProtocolConfig.TotalNumberOfCores
+        >,
+        privilegedServices: PrivilegedServices,
+        initialIndex: ServiceIndex,
+        timeslot: TimeslotIndex
     ) throws -> (ctx: AccumlateResultContext, result: Data32?)
 }

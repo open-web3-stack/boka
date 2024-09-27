@@ -3,6 +3,9 @@ import Foundation
 import PolkaVM
 import Utils
 
+// MARK: - General
+
+/// Get gas remaining
 public class GasFn: HostCallFunction {
     public static var identifier: UInt8 { 0 }
     public static var gasCost: UInt64 { 10 }
@@ -21,6 +24,7 @@ public class GasFn: HostCallFunction {
     }
 }
 
+/// Lookup a preimage from a service account
 public class Lookup: HostCallFunction {
     public static var identifier: UInt8 { 1 }
     public static var gasCost: UInt64 { 10 }
@@ -72,6 +76,7 @@ public class Lookup: HostCallFunction {
     }
 }
 
+/// Read a service account storage
 public class Read: HostCallFunction {
     public static var identifier: UInt8 { 2 }
     public static var gasCost: UInt64 { 10 }
@@ -123,6 +128,7 @@ public class Read: HostCallFunction {
     }
 }
 
+/// Write to a service account storage
 public class Write: HostCallFunction {
     public static var identifier: UInt8 { 3 }
     public static var gasCost: UInt64 { 10 }
@@ -173,16 +179,18 @@ public class Write: HostCallFunction {
     }
 }
 
+/// Get information details about a service account
 public class Info: HostCallFunction {
     public static var identifier: UInt8 { 4 }
     public static var gasCost: UInt64 { 10 }
 
     public typealias Input = (
-        ProtocolConfigRef,
-        ServiceAccount,
-        ServiceIndex,
-        [ServiceIndex: ServiceAccount],
-        [ServiceIndex: ServiceAccount]
+        config: ProtocolConfigRef,
+        account: ServiceAccount,
+        serviceIndex: ServiceIndex,
+        serviceAccounts: [ServiceIndex: ServiceAccount],
+        // only used in accumulation x.n
+        newServiceAccounts: [ServiceIndex: ServiceAccount]
     )
     public typealias Output = Void
 
@@ -227,6 +235,50 @@ public class Info: HostCallFunction {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.OK.rawValue)
         } else if m == nil {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.NONE.rawValue)
+        } else {
+            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.OOB.rawValue)
+        }
+    }
+}
+
+// MARK: - Accumulate
+
+/// Set privileged services details
+public class Empower: HostCallFunction {
+    public static var identifier: UInt8 { 5 }
+    public static var gasCost: UInt64 { 10 }
+
+    public typealias Input = (x: AccumlateResultContext, y: AccumlateResultContext)
+    public typealias Output = Void
+
+    public static func call(state: VMState, input: Input) throws -> Output {
+        guard hasEnoughGas(state: state) else {
+            return
+        }
+        state.consumeGas(gasCost)
+
+        let (x, _) = input
+
+        let regs = state.readRegisters(in: 0 ..< 5)
+
+        var basicGas: [ServiceIndex: Gas] = [:]
+
+        let length = 12 * Int(regs[4])
+        if state.isMemoryReadable(address: regs[3], length: length) {
+            let data = try state.readMemory(address: regs[3], length: length)
+            for i in stride(from: 0, to: length, by: 12) {
+                let serviceIndex = ServiceIndex(data[i ..< i + 4].decode(UInt32.self))
+                let gas = Gas(data[i + 4 ..< i + 12].decode(UInt64.self))
+                basicGas[serviceIndex] = gas
+            }
+        }
+
+        if basicGas.count != 0 {
+            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.OK.rawValue)
+            x.privilegedServices.empower = regs[0]
+            x.privilegedServices.assign = regs[1]
+            x.privilegedServices.designate = regs[2]
+            x.privilegedServices.basicGas = basicGas
         } else {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.OOB.rawValue)
         }
