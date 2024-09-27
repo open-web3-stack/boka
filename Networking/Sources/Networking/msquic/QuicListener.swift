@@ -25,47 +25,54 @@ public class QuicListener {
         configuration: HQuic?,
         config: QuicConfig,
         messageHandler: QuicListenerMessageHandler? = nil
-    ) {
+    ) throws {
         self.api = api
         self.registration = registration
         self.configuration = configuration
         self.config = config
         self.messageHandler = messageHandler
+        // try openListener(port: config.port, listener: &listener)
     }
 
-    public func openListener(port: UInt16) throws {
-        var listenerHandle: HQuic?
-        let status = (api?.pointee.ListenerOpen(
-            registration,
-            { listener, context, event -> QuicStatus in
-                QuicListener.serverListenerCallback(
-                    listener: listener, context: context, event: event
-                )
-            },
-            UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()), &listenerHandle
-        )).status
+    private func openListener(port: UInt16, listener: inout HQuic?) throws {
+        // Open the listener
+        let status =
+            (api?.pointee.ListenerOpen(
+                registration,
+                { listener, context, event -> QuicStatus in
+                    QuicListener.serverListenerCallback(
+                        listener: listener, context: context, event: event
+                    )
+                },
+                UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()), &listener
+            )).status
 
-        if status.isFailed {
+        guard status.isSucceeded else {
             throw QuicError.invalidStatus(status: status.code)
         }
 
-        listener = listenerHandle
+        // Prepare ALPN buffer
+        let alpnData = Data(config.alpn.utf8)
+        try alpnData.withUnsafeBytes { bufferPointer in
+            var alpnBuffer = QuicBuffer(
+                Length: UInt32(bufferPointer.count),
+                Buffer: UnsafeMutablePointer(
+                    mutating: bufferPointer.bindMemory(to: UInt8.self).baseAddress!
+                )
+            )
 
-        let buffer = Data(config.alpn.utf8)
-        let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(capacity: buffer.count)
-        buffer.copyBytes(to: bufferPointer, count: buffer.count)
-        defer {
-            free(bufferPointer)
-        }
-        var alpn = QuicBuffer(Length: UInt32(buffer.count), Buffer: bufferPointer)
-        var address = QUIC_ADDR()
+            // Prepare address
+            var address = QUIC_ADDR()
+            QuicAddrSetFamily(&address, QUIC_ADDRESS_FAMILY(QUIC_ADDRESS_FAMILY_UNSPEC))
+            QuicAddrSetPort(&address, port)
 
-        QuicAddrSetFamily(&address, QUIC_ADDRESS_FAMILY(QUIC_ADDRESS_FAMILY_UNSPEC))
-        QuicAddrSetPort(&address, port)
-        let startStatus: QuicStatus = (api?.pointee.ListenerStart(listener, &alpn, 1, &address)).status
+            // Start the listener
+            let startStatus: QuicStatus =
+                (api?.pointee.ListenerStart(listener, &alpnBuffer, 1, &address)).status
 
-        if startStatus.isFailed {
-            throw QuicError.invalidStatus(status: startStatus.code)
+            guard startStatus.isSucceeded else {
+                throw QuicError.invalidStatus(status: startStatus.code)
+            }
         }
     }
 
@@ -77,7 +84,8 @@ public class QuicListener {
         guard let context, let event else {
             return status
         }
-        let listener: QuicListener = Unmanaged<QuicListener>.fromOpaque(context).takeUnretainedValue()
+        let listener: QuicListener = Unmanaged<QuicListener>.fromOpaque(context)
+            .takeUnretainedValue()
         switch event.pointee.Type {
         case QUIC_LISTENER_EVENT_NEW_CONNECTION:
             listenLogger.debug("New connection")
@@ -127,7 +135,9 @@ extension QuicListener: QuicConnectionMessageHandler {
             removeConnection(connection)
         case .received:
             if let stream {
-                messageHandler?.didReceiveMessage(connection: connection, stream: stream, message: message)
+                messageHandler?.didReceiveMessage(
+                    connection: connection, stream: stream, message: message
+                )
             }
         default:
             break

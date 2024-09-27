@@ -43,24 +43,18 @@ public final class QuicServer: @unchecked Sendable {
         if QuicStatus(registrationStatus).isFailed {
             throw QuicError.invalidStatus(status: registrationStatus.code)
         }
-
         api = boundPointer
         registration = registrationHandle
         try loadConfiguration()
-        listener = QuicListener(
+        listener = try QuicListener(
             api: api, registration: registration, configuration: configuration, config: config,
             messageHandler: self
         )
-        try start()
     }
 
     deinit {
         close()
         serverLogger.trace("QuicServer Deinit")
-    }
-
-    private func start() throws {
-        try listener?.openListener(port: config.port)
     }
 
     func close() {

@@ -51,6 +51,9 @@ public actor Peer {
     }
 
     deinit {
+        for client in clients.values {
+            client.close()
+        }
         clients.removeAll()
         quicServer?.close()
         peerLogger.trace("Peer Deinit")
