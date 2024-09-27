@@ -1,6 +1,6 @@
-public protocol PublicKeyProtocol: Codable, Hashable, CustomStringConvertible {}
+public protocol PublicKeyProtocol: Codable, Hashable, CustomStringConvertible, Sendable {}
 
-public protocol SecretKeyProtocol {
+public protocol SecretKeyProtocol: Sendable {
     associatedtype PublicKey: PublicKeyProtocol
     init(from seed: Data32) throws
 

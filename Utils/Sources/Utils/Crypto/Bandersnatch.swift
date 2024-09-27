@@ -87,6 +87,7 @@ public enum Bandersnatch: KeyType {
         case serializeRingCommitmentFailed(Int)
         case ringVRFVerifyFailed(Int)
         case ietfVRFVerifyFailed(Int)
+        case getOutputFailed(Int)
     }
 
     public final class SecretKey: SecretKeyProtocol, @unchecked Sendable {
@@ -113,7 +114,7 @@ public enum Bandersnatch: KeyType {
         /// Non-Anonymous VRF signature.
         ///
         /// Used for ticket claiming during block production.
-        public func ietfVRFSign(vrfInputData: Data, auxData: Data) throws -> Data96 {
+        public func ietfVRFSign(vrfInputData: Data, auxData: Data = Data()) throws -> Data96 {
             var output = Data(repeating: 0, count: 96)
 
             try call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
@@ -131,6 +132,24 @@ public enum Bandersnatch: KeyType {
             }
 
             return Data96(Data(output))!
+        }
+
+        public func getOutput(vrfInputData: Data) throws -> Data32 {
+            var output = Data(repeating: 0, count: 32)
+
+            try call(vrfInputData, out: &output) { ptrs, out_buf in
+                secret_output(
+                    ptr,
+                    ptrs[0].ptr,
+                    ptrs[0].count,
+                    out_buf.ptr,
+                    out_buf.count
+                )
+            } onErr: { err throws(Error) in
+                throw .getOutputFailed(err)
+            }
+
+            return Data32(output)!
         }
     }
 
@@ -200,11 +219,11 @@ public enum Bandersnatch: KeyType {
         ///
         /// On success returns the VRF output hash.
         public func ietfVRFVerify(
-            vrfInputData: Data, auxData: Data = Data(), signature: Data
+            vrfInputData: Data, auxData: Data = Data(), signature: Data96
         ) throws(Error) -> Data32 {
             var output = Data(repeating: 0, count: 32)
 
-            try call(vrfInputData, auxData, signature, out: &output) { ptrs, out_buf in
+            try call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in
                 verifier_ietf_vrf_verify(
                     ptr,
                     ptrs[0].ptr,
@@ -350,10 +369,10 @@ public enum Bandersnatch: KeyType {
         /// Used for tickets verification.
         ///
         /// On success returns the VRF output hash.
-        public func ringVRFVerify(vrfInputData: Data, auxData: Data = Data(), signature: Data) throws(Error) -> Data32 {
+        public func ringVRFVerify(vrfInputData: Data, auxData: Data = Data(), signature: Data784) throws(Error) -> Data32 {
             var output = Data(repeating: 0, count: 32)
 
-            try call(vrfInputData, auxData, signature, out: &output) { ptrs, out_buf in
+            try call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in
                 verifier_ring_vrf_verify(
                     ctx.ptr,
                     commitment.ptr,

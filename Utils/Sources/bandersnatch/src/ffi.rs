@@ -3,7 +3,8 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use bandersnatch::{Public, RingContext, Secret};
 
 use crate::bandersnatch_vrfs::{
-    ietf_vrf_sign, ietf_vrf_verify, ring_context, ring_vrf_sign, ring_vrf_verify, RingCommitment,
+    ietf_vrf_sign, ietf_vrf_verify, ring_context, ring_vrf_sign, ring_vrf_verify, vrf_input_point,
+    RingCommitment,
 };
 
 // MARK: Secret
@@ -18,6 +19,35 @@ pub extern "C" fn secret_new(seed: *const u8, seed_len: usize, out_ptr: *mut *mu
     unsafe {
         *out_ptr = Box::into_raw(secret);
     }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn secret_output(
+    secret: *const Secret,
+    input: *const u8,
+    input_len: usize,
+    out: *mut u8,
+    out_len: usize,
+) -> isize {
+    if secret.is_null() || input.is_null() || out.is_null() {
+        return 1;
+    }
+    if out_len < 32 {
+        return 2;
+    }
+    let secret: &Secret = unsafe { &*secret };
+    let input_slice = unsafe { std::slice::from_raw_parts(input, input_len) };
+    let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
+    let input_point = vrf_input_point(input_slice);
+    let input_point = if let Ok(input_point) = input_point {
+        input_point
+    } else {
+        return 3;
+    };
+
+    let output = secret.output(input_point);
+    out_slice.copy_from_slice(&output.hash()[..32]);
     0
 }
 

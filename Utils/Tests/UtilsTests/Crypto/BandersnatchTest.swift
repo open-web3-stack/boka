@@ -35,7 +35,7 @@ import Testing
 
         let verifier = Bandersnatch.Verifier(ctx: ctx, commitment: commitment)
         let outputHashData = try verifier.ringVRFVerify(
-            vrfInputData: vrfInputData, auxData: auxData, signature: signatureBytes
+            vrfInputData: vrfInputData, auxData: auxData, signature: Data784(signatureBytes)!
         )
         #expect(outputHashData != nil)
     }
