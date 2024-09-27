@@ -11,7 +11,19 @@ public enum RuntimeEvents {
         public let hash: Data32
     }
 
-    public struct NewSafroleTickets: Event {
+    // New safrole ticket generated from SafroleService
+    public struct SafroleTicketsGenerated: Event {
+        public let items: [TicketItemAndOutput]
+        public let publicKey: Bandersnatch.PublicKey
+    }
+
+    // New safrole ticket received from network
+    public struct SafroleTicketsReceived: Event {
         public let items: [ExtrinsicTickets.TicketItem]
+    }
+
+    // New block authored by BlockAuthor service
+    public struct BlockAuthored: Event {
+        public let block: BlockRef
     }
 }

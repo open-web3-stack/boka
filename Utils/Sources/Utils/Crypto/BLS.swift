@@ -9,8 +9,7 @@ public enum BLS: KeyType {
         case blstError(BLST_ERROR)
     }
 
-    public final class SecretKey: SecretKeyProtocol {
-        // this is immutable after initialization but C API requires it to be mutable
+    public final class SecretKey: SecretKeyProtocol, @unchecked Sendable {
         private var sk: blst_scalar
 
         public let publicKey: PublicKey

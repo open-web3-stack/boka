@@ -37,5 +37,5 @@ let package = Package(
             dependencies: ["Node"]
         ),
     ],
-    swiftLanguageVersions: [.version("6")]
+    swiftLanguageModes: [.version("6")]
 )
