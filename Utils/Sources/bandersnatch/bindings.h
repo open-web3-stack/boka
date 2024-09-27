@@ -13,6 +13,12 @@ typedef struct RingCommitment RingCommitment;
 
 intptr_t secret_new(const uint8_t *seed, uintptr_t seed_len, Secret **out_ptr);
 
+intptr_t secret_output(const Secret *secret,
+                       const uint8_t *input,
+                       uintptr_t input_len,
+                       uint8_t *out,
+                       uintptr_t out_len);
+
 void secret_free(Secret *secret);
 
 intptr_t public_new_from_secret(const Secret *secret, Public **out_ptr);

@@ -1,9 +1,9 @@
 import Utils
 
 public class ServiceBase {
-    let config: ProtocolConfigRef
+    public let config: ProtocolConfigRef
     private let eventBus: EventBus
-    private var subscriptionTokens: [EventBus.SubscriptionToken] = []
+    private let subscriptionTokens: ThreadSafeContainer<[EventBus.SubscriptionToken]> = .init([])
 
     init(_ config: ProtocolConfigRef, _ eventBus: EventBus) {
         self.config = config
@@ -15,12 +15,14 @@ public class ServiceBase {
         .SubscriptionToken
     {
         let token = await eventBus.subscribe(eventType, handler: handler)
-        subscriptionTokens.append(token)
+        subscriptionTokens.write { $0.append(token) }
         return token
     }
 
     func unsubscribe(token: EventBus.SubscriptionToken) async {
-        subscriptionTokens.removeAll { $0 == token }
+        subscriptionTokens.write { tokens in
+            tokens.removeAll { $0 == token }
+        }
         await eventBus.unsubscribe(token: token)
     }
 
@@ -32,7 +34,7 @@ public class ServiceBase {
         let eventBus = self.eventBus
         let subscriptionTokens = self.subscriptionTokens
         Task {
-            for token in subscriptionTokens {
+            for token in subscriptionTokens.value {
                 await eventBus.unsubscribe(token: token)
             }
         }

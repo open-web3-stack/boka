@@ -1,6 +1,6 @@
 import Foundation
 
-public protocol KeyStore {
+public protocol KeyStore: Sendable {
     func generate<K: KeyType>(_ type: K.Type) async throws -> K.SecretKey
     func add<K: KeyType>(_ type: K.Type, seed: Data32) async throws -> K.SecretKey
     func contains<PK: PublicKeyProtocol>(publicKey: PK) async -> Bool
@@ -19,7 +19,7 @@ struct HashableKey: Hashable {
     }
 }
 
-public class InMemoryKeyStore: KeyStore {
+public actor InMemoryKeyStore: KeyStore {
     private var keys: [HashableKey: any SecretKeyProtocol] = [:]
 
     public init() {}
