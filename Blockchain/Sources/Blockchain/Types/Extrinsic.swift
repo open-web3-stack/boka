@@ -1,4 +1,8 @@
+import Codec
+import TracingUtils
 import Utils
+
+private let logger = Logger(label: "Extrinsic")
 
 public struct Extrinsic: Sendable, Equatable, Codable {
     // ET: Tickets, used for the mechanism which manages the selection of validators for the
@@ -47,3 +51,14 @@ extension Extrinsic: Dummy {
 }
 
 extension Extrinsic: Validate {}
+
+extension Extrinsic {
+    public func hash() -> Data32 {
+        do {
+            return try JamEncoder.encode(self).blake2b256hash()
+        } catch {
+            logger.error("Failed to encode extrinsic, returning empty hash", metadata: ["error": "\(error)"])
+            return Data32()
+        }
+    }
+}

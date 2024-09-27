@@ -2,7 +2,7 @@ import Crypto
 import Foundation
 
 public enum Ed25519: KeyType {
-    public final class SecretKey: SecretKeyProtocol {
+    public final class SecretKey: SecretKeyProtocol, @unchecked Sendable {
         private let secretKey: Curve25519.Signing.PrivateKey
         public let publicKey: PublicKey
 

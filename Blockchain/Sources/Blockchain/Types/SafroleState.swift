@@ -10,16 +10,7 @@ public struct SafroleState: Sendable, Equatable, Codable {
     public var ticketsVerifier: BandersnatchRingVRFRoot
 
     // γs
-    public var ticketsOrKeys: Either<
-        ConfigFixedSizeArray<
-            Ticket,
-            ProtocolConfig.EpochLength
-        >,
-        ConfigFixedSizeArray<
-            BandersnatchPublicKey,
-            ProtocolConfig.EpochLength
-        >
-    >
+    public var ticketsOrKeys: SafroleTicketsOrKeys
 
     // γa
     public var ticketsAccumulator: ConfigLimitedSizeArray<
@@ -33,16 +24,7 @@ public struct SafroleState: Sendable, Equatable, Codable {
             ValidatorKey, ProtocolConfig.TotalNumberOfValidators
         >,
         ticketsVerifier: BandersnatchRingVRFRoot,
-        ticketsOrKeys: Either<
-            ConfigFixedSizeArray<
-                Ticket,
-                ProtocolConfig.EpochLength
-            >,
-            ConfigFixedSizeArray<
-                BandersnatchPublicKey,
-                ProtocolConfig.EpochLength
-            >
-        >,
+        ticketsOrKeys: SafroleTicketsOrKeys,
         ticketsAccumulator: ConfigLimitedSizeArray<
             Ticket,
             ProtocolConfig.Int0,

@@ -4,6 +4,19 @@ import Utils
 
 private let logger = Logger(label: "SafroleService")
 
+public struct TicketItemAndOutput: Comparable, Sendable, Codable {
+    public let ticket: ExtrinsicTickets.TicketItem
+    public let output: Data32
+
+    public static func < (lhs: TicketItemAndOutput, rhs: TicketItemAndOutput) -> Bool {
+        lhs.output < rhs.output
+    }
+
+    public static func == (lhs: TicketItemAndOutput, rhs: TicketItemAndOutput) -> Bool {
+        lhs.output == rhs.output && lhs.ticket == rhs.ticket
+    }
+}
+
 public final class SafroleService: ServiceBase, @unchecked Sendable {
     private let keystore: KeyStore
     private let ringContext: Bandersnatch.RingContext
@@ -36,14 +49,14 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
     }
 
     private func generateAndSubmitTickets(state: StateRef) async throws {
-        let tickets = try await generateTickets(state: state)
-        if let tickets {
-            await publish(tickets)
+        let events = try await generateTickets(state: state)
+        for event in events {
+            await publish(event)
         }
     }
 
-    private func generateTickets(state: StateRef) async throws -> RuntimeEvents.NewSafroleTickets? {
-        var items = [ExtrinsicTickets.TicketItem]()
+    private func generateTickets(state: StateRef) async throws -> [RuntimeEvents.SafroleTicketsGenerated] {
+        var events = [RuntimeEvents.SafroleTicketsGenerated]()
 
         for (idx, validator) in state.value.nextValidators.enumerated() {
             guard let pubkey = try? Bandersnatch.PublicKey(data: validator.bandersnatch) else {
@@ -62,32 +75,35 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
                 }
 
                 let prover = Bandersnatch.Prover(sercret: secret, ring: pubkeys, proverIdx: UInt(idx), ctx: ringContext)
+                let verifier = try Bandersnatch.Verifier(
+                    ctx: ringContext,
+                    commitment: Bandersnatch.RingCommitment(data: state.value.safroleState.ticketsVerifier)
+                )
 
                 var vrfInputData = SigningContext.safroleTicketInputData(entropy: state.value.entropyPool.t2, attempt: 0)
 
                 let sig1 = try prover.ringVRFSign(vrfInputData: vrfInputData)
+                let out1 = try verifier.ringVRFVerify(vrfInputData: vrfInputData, signature: sig1)
 
                 vrfInputData[vrfInputData.count - 1] = TicketIndex(1)
 
                 let sig2 = try prover.ringVRFSign(vrfInputData: vrfInputData)
+                let out2 = try verifier.ringVRFVerify(vrfInputData: vrfInputData, signature: sig2)
 
-                items.append(.init(
-                    attempt: 0,
-                    signature: sig1
-                ))
-
-                items.append(.init(
-                    attempt: 1,
-                    signature: sig2
+                events.append(.init(
+                    items: [
+                        .init(ticket: .init(attempt: 0, signature: sig1), output: out1),
+                        .init(ticket: .init(attempt: 1, signature: sig2), output: out2),
+                    ],
+                    publicKey: secret.publicKey
                 ))
             }
         }
 
-        if items.isEmpty {
+        if events.isEmpty {
             logger.debug("Not in next validators")
-            return nil
         }
 
-        return .init(items: items)
+        return events
     }
 }

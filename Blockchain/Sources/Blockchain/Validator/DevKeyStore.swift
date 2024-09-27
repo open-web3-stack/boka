@@ -1,7 +1,7 @@
 import Foundation
 import Utils
 
-public class DevKeyStore: KeyStore {
+public final class DevKeyStore: KeyStore {
     private let keystore: InMemoryKeyStore
 
     public init(devKeysCount: UInt32 = 12) async throws {

@@ -39,7 +39,7 @@ fn ring_context_params() -> &'static PcsParams {
 }
 
 // Construct VRF Input Point from arbitrary data (section 1.2)
-fn vrf_input_point(vrf_input_data: &[u8]) -> Result<Input, ()> {
+pub fn vrf_input_point(vrf_input_data: &[u8]) -> Result<Input, ()> {
     let point =
         <bandersnatch::BandersnatchSha512Ell2 as ark_ec_vrfs::Suite>::data_to_point(vrf_input_data)
             .ok_or(())?;

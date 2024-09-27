@@ -28,6 +28,17 @@ public struct EntropyPool: Sendable, Equatable, Codable {
     }
 }
 
+public typealias SafroleTicketsOrKeys = Either<
+    ConfigFixedSizeArray<
+        Ticket,
+        ProtocolConfig.EpochLength
+    >,
+    ConfigFixedSizeArray<
+        BandersnatchPublicKey,
+        ProtocolConfig.EpochLength
+    >
+>
+
 public struct SafrolePostState: Sendable, Equatable {
     public var timeslot: TimeslotIndex
     public var entropyPool: EntropyPool
@@ -48,16 +59,7 @@ public struct SafrolePostState: Sendable, Equatable {
         ProtocolConfig.Int0,
         ProtocolConfig.EpochLength
     >
-    public var ticketsOrKeys: Either<
-        ConfigFixedSizeArray<
-            Ticket,
-            ProtocolConfig.EpochLength
-        >,
-        ConfigFixedSizeArray<
-            BandersnatchPublicKey,
-            ProtocolConfig.EpochLength
-        >
-    >
+    public var ticketsOrKeys: SafroleTicketsOrKeys
     public var ticketsVerifier: BandersnatchRingVRFRoot
 
     public init(
@@ -124,16 +126,7 @@ public protocol Safrole {
         ProtocolConfig.Int0,
         ProtocolConfig.EpochLength
     > { get }
-    var ticketsOrKeys: Either<
-        ConfigFixedSizeArray<
-            Ticket,
-            ProtocolConfig.EpochLength
-        >,
-        ConfigFixedSizeArray<
-            BandersnatchPublicKey,
-            ProtocolConfig.EpochLength
-        >
-    > { get }
+    var ticketsOrKeys: SafroleTicketsOrKeys { get }
     var ticketsVerifier: BandersnatchRingVRFRoot { get }
 
     func updateSafrole(
