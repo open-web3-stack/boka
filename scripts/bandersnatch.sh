@@ -10,7 +10,7 @@ mkdir -p .lib
 
 cd Utils/Sources/bandersnatch || { echo "directory not found"; exit 1; }
 
-cargo build --release --lib --target aarch64-apple-darwin
+cargo build --release --lib
 
 cp target/release/libbandersnatch_vrfs.a ${CWD}/.lib
 
