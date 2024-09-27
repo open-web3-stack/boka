@@ -137,17 +137,19 @@ public enum Bandersnatch: KeyType {
         public func getOutput(vrfInputData: Data) throws -> Data32 {
             var output = Data(repeating: 0, count: 32)
 
-            try call(vrfInputData) { ptrs in
+            try call(vrfInputData, out: &output) { ptrs, out_buf in
                 secret_output(
-                    secretPtr,
+                    ptr,
                     ptrs[0].ptr,
                     ptrs[0].count,
-                    output.ptr,
-                    output.count
+                    out_buf.ptr,
+                    out_buf.count
                 )
             } onErr: { err throws(Error) in
                 throw .getOutputFailed(err)
             }
+
+            return Data32(output)!
         }
     }
 

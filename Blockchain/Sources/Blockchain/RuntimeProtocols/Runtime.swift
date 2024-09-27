@@ -82,8 +82,10 @@ public final class Runtime {
             let ticket = tickets[Int(index)]
             let vrfInputData = SigningContext.safroleTicketInputData(entropy: state.value.entropyPool.t3, attempt: ticket.attempt)
             vrfOutput = try Result {
-                try blockAuthorKey.getOutput(
-                    vrfInputData: vrfInputData
+                try blockAuthorKey.ietfVRFVerify(
+                    vrfInputData: vrfInputData,
+                    auxData: encodedHeader,
+                    signature: block.header.seal
                 )
             }.mapError(Error.invalidBlockSeal).get()
             guard ticket.id == vrfOutput else {
@@ -97,8 +99,10 @@ public final class Runtime {
             }
             let vrfInputData = SigningContext.fallbackSealInputData(entropy: state.value.entropyPool.t3)
             vrfOutput = try Result {
-                try blockAuthorKey.getOutput(
+                try blockAuthorKey.ietfVRFVerify(
                     vrfInputData: vrfInputData,
+                    auxData: encodedHeader,
+                    signature: block.header.seal
                 )
             }.mapError(Error.invalidBlockSeal).get()
         }
