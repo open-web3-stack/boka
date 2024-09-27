@@ -47,7 +47,9 @@ public actor Peer {
         self.config = config
         self.eventBus = eventBus
         clients = [:]
-        quicServer = try QuicServer(config: config, messageHandler: self)
+        Task {
+            self.quicServer = try await QuicServer(config: config, messageHandler: self)
+        }
     }
 
     deinit {
@@ -55,21 +57,23 @@ public actor Peer {
             client.close()
         }
         clients.removeAll()
-        quicServer?.close()
+        quicServer?.closeSync()
         peerLogger.trace("Peer Deinit")
         // Clean up resources if necessary
     }
 
+    private nonisolated func initQuicServer() throws {}
+
     // Respond to a message with a specific messageID using Data
     func respondTo(messageID: Int64, with data: Data) async -> QuicStatus {
-        quicServer?.respondTo(messageID: messageID, with: data)
+        await quicServer?.respondTo(messageID: messageID, with: data)
             ?? QuicStatusCode.internalError.rawValue
     }
 
     // Respond to a message with a specific messageID using PeerMessage
     func respondTo(messageID: Int64, with message: any PeerMessage) async -> QuicStatus {
         let messageType = message.getMessageType()
-        return quicServer?
+        return await quicServer?
             .respondTo(
                 messageID: messageID,
                 with: message.getData(),
@@ -81,10 +85,9 @@ public actor Peer {
     // Respond to a message with a specific messageID using PeerMessage (async throws)
     func respondToPeerMessage(messageID: Int64, with message: any PeerMessage) async throws {
         let messageType = message.getMessageType()
-
-        try await quicServer?.respondTo(
+        _ = try await quicServer?.respondTo(
             messageID: messageID, with: message.getData(),
-            kind: (messageType == .uniquePersistent) ? .uniquePersistent : .commonEphemeral
+            streamKind: (messageType == .uniquePersistent) ? .uniquePersistent : .commonEphemeral
         )
     }
 
