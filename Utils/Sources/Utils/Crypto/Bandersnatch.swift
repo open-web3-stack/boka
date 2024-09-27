@@ -87,6 +87,7 @@ public enum Bandersnatch: KeyType {
         case serializeRingCommitmentFailed(Int)
         case ringVRFVerifyFailed(Int)
         case ietfVRFVerifyFailed(Int)
+        case getOutputFailed(Int)
     }
 
     public final class SecretKey: SecretKeyProtocol, @unchecked Sendable {
@@ -131,6 +132,22 @@ public enum Bandersnatch: KeyType {
             }
 
             return Data96(Data(output))!
+        }
+
+        public func getOutput(vrfInputData: Data) throws -> Data32 {
+            var output = Data(repeating: 0, count: 32)
+
+            try call(vrfInputData) { ptrs in
+                secret_output(
+                    secretPtr,
+                    ptrs[0].ptr,
+                    ptrs[0].count,
+                    output.ptr,
+                    output.count
+                )
+            } onErr: { err throws(Error) in
+                throw .getOutputFailed(err)
+            }
         }
     }
 

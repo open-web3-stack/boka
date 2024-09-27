@@ -79,8 +79,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
             vrfOutput = ticket.output
         } else {
             let inputData = SigningContext.fallbackSealInputData(entropy: state.value.entropyPool.t3)
-            let sig = try secretKey.ietfVRFSign(vrfInputData: inputData)
-            vrfOutput = try secretKey.publicKey.ietfVRFVerify(vrfInputData: inputData, signature: sig)
+            vrfOutput = try secretKey.getOutput(vrfInputData: inputData)
         }
 
         let vrfSignature = if ticket != nil {
@@ -103,7 +102,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
             winningTickets: nil, // TODO:
             offendersMarkers: [], // TODO:
             authorIndex: ValidatorIndex(authorIndex),
-            vrfSignature: vrfSignature // TODO:
+            vrfSignature: vrfSignature
         )
 
         let encodedHeader = try JamEncoder.encode(unsignedHeader)
