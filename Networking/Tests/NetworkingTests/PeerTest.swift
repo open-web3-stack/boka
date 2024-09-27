@@ -29,7 +29,7 @@ import Utils
                 let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
                 // Example instantiation of Peer with EventBus
                 let eventBus = EventBus()
-                let peer = try Peer(
+                let peer = try await Peer(
                     config: QuicConfig(
                         id: "public-key", cert: cert, key: keyFile, alpn: "sample",
                         ipAddress: "127.0.0.1", port: 4568
@@ -51,8 +51,8 @@ import Utils
                     print(
                         "Received message from peer messageID: \(event.messageID), message: \(event.message)"
                     )
-                    let status = peer.respondTo(
-                        messageID: event.messageID, with: event.message.data!
+                    let status: QuicStatus = await peer.respondTo(
+                        messageID: event.messageID, with: Message(data: event.message.data!)
                     )
                     print("Peer sent: \(status)")
                 }
@@ -78,7 +78,7 @@ import Utils
                 let eventBus2 = EventBus()
 
                 // Create two Peer instances
-                let peer1 = try Peer(
+                let peer1 = try await Peer(
                     config: QuicConfig(
                         id: "public-key1", cert: cert, key: keyFile, alpn: "sample",
                         ipAddress: "127.0.0.1", port: 4568
@@ -86,7 +86,7 @@ import Utils
                     eventBus: eventBus1
                 )
 
-                let peer2 = try Peer(
+                let peer2 = try await Peer(
                     config: QuicConfig(
                         id: "public-key2", cert: cert, key: keyFile, alpn: "sample",
                         ipAddress: "127.0.0.1", port: 4569
@@ -99,7 +99,7 @@ import Utils
                     print(
                         "Peer1 received message from messageID: \(event.messageID), message: \(event.message)"
                     )
-                    let status = peer1.respondTo(
+                    let status: QuicStatus = await peer1.respondTo(
                         messageID: event.messageID, with: Message(data: event.message.data!)
                     )
                     print("Peer1 sent response: \(status.isFailed ? "Failed" : "Success")")
@@ -110,7 +110,7 @@ import Utils
                     print(
                         "Peer2 received message from messageID: \(event.messageID), message: \(event.message)"
                     )
-                    let status = peer2.respondTo(
+                    let status: QuicStatus = await peer2.respondTo(
                         messageID: event.messageID, with: Message(data: event.message.data!)
                     )
                     print("Peer2 sent response: \(status.isFailed ? "Failed" : "Success")")

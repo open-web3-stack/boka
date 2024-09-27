@@ -100,9 +100,9 @@ public final class QuicServer: @unchecked Sendable {
     func respondTo(messageID: Int64, with data: Data, kind: StreamKind? = nil) async throws {
         if let (_, stream) = pendingMessages[messageID] {
             let streamKind = kind ?? stream.kind
+            _ = pendingMessages.removeValue(forKey: messageID)
             let quicMessage = try await stream.send(buffer: data, kind: streamKind)
             peerLogger.info("Message sent: \(quicMessage)")
-            _ = pendingMessages.removeValue(forKey: messageID)
         } else {
             peerLogger.error("Message not found")
             throw QuicError.messageNotFound

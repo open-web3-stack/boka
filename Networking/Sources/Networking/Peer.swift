@@ -36,17 +36,17 @@ public struct PeerErrorReceived: Event {
     public let error: QuicError
 }
 
-// Define the Peer class
-public final class Peer: @unchecked Sendable {
+// Define the Peer actor
+public actor Peer {
     private let config: QuicConfig
     private var quicServer: QuicServer?
-    private var clients: AtomicDictionary<NetAddr, QuicClient>
+    private var clients: [NetAddr: QuicClient]
     private let eventBus: EventBus
 
-    public init(config: QuicConfig, eventBus: EventBus) throws {
+    public init(config: QuicConfig, eventBus: EventBus) async throws {
         self.config = config
         self.eventBus = eventBus
-        clients = .init()
+        clients = [:]
         quicServer = try QuicServer(config: config, messageHandler: self)
     }
 
@@ -58,28 +58,13 @@ public final class Peer: @unchecked Sendable {
     }
 
     // Respond to a message with a specific messageID using Data
-    func respondTo(messageID: Int64, with data: Data) async throws {
-        try await quicServer?.respondTo(messageID: messageID, with: data)
-    }
-
-    // Respond to a message with a specific messageID using Data
-    func respondTo(messageID: Int64, with data: Data) -> QuicStatus {
+    func respondTo(messageID: Int64, with data: Data) async -> QuicStatus {
         quicServer?.respondTo(messageID: messageID, with: data)
             ?? QuicStatusCode.internalError.rawValue
     }
 
     // Respond to a message with a specific messageID using PeerMessage
-    func respondTo(messageID: Int64, with message: any PeerMessage) async throws {
-        let messageType = message.getMessageType()
-
-        try await quicServer?.respondTo(
-            messageID: messageID, with: message.getData(),
-            kind: (messageType == .uniquePersistent) ? .uniquePersistent : .commonEphemeral
-        )
-    }
-
-    // Respond to a message with a specific messageID using PeerMessage
-    func respondTo(messageID: Int64, with message: any PeerMessage) -> QuicStatus {
+    func respondTo(messageID: Int64, with message: any PeerMessage) async -> QuicStatus {
         let messageType = message.getMessageType()
         return quicServer?
             .respondTo(
@@ -88,6 +73,16 @@ public final class Peer: @unchecked Sendable {
                 kind: (messageType == .uniquePersistent) ? .uniquePersistent : .commonEphemeral
             )
             ?? QuicStatusCode.internalError.rawValue
+    }
+
+    // Respond to a message with a specific messageID using PeerMessage (async throws)
+    func respondToPeerMessage(messageID: Int64, with message: any PeerMessage) async throws {
+        let messageType = message.getMessageType()
+
+        try await quicServer?.respondTo(
+            messageID: messageID, with: message.getData(),
+            kind: (messageType == .uniquePersistent) ? .uniquePersistent : .commonEphemeral
+        )
     }
 
     // send message to other peer
@@ -167,15 +162,15 @@ public final class Peer: @unchecked Sendable {
     }
 }
 
-extension Peer: QuicClientMessageHandler {
+// QuicClientMessageHandler methods
+extension Peer: @preconcurrency QuicClientMessageHandler {
     public func didReceiveMessage(quicClient: QuicClient, message: QuicMessage) {
         switch message.type {
         case .close:
             peerLogger.trace("QuicClient close")
-            // Use Task to avoid strong reference cycle
             Task { [weak self] in
                 guard let self else { return }
-                removeClient(with: quicClient.getNetAddr())
+                await removeClient(with: quicClient.getNetAddr())
             }
         default:
             break
@@ -190,7 +185,8 @@ extension Peer: QuicClientMessageHandler {
     }
 }
 
-extension Peer: QuicServerMessageHandler {
+// QuicServerMessageHandler methods
+extension Peer: @preconcurrency QuicServerMessageHandler {
     public func didReceiveMessage(quicServer _: QuicServer, messageID: Int64, message: QuicMessage) {
         switch message.type {
         case .received:
