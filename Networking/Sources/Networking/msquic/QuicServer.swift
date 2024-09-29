@@ -10,7 +10,7 @@ public protocol QuicServerMessageHandler: AnyObject, Sendable {
     func didReceiveError(messageID: Int64, error: QuicError) async
 }
 
-public actor QuicServer: @unchecked Sendable {
+public actor QuicServer: Sendable {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
