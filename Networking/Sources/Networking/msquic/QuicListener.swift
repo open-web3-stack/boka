@@ -6,8 +6,8 @@ import Utils
 let listenLogger: Logger = .init(label: "QuicListener")
 
 public protocol QuicListenerMessageHandler: AnyObject {
-    func didReceiveMessage(connection: QuicConnection, stream: QuicStream, message: QuicMessage)
-    func didReceiveError(connection: QuicConnection, stream: QuicStream, error: QuicError)
+    func didReceiveMessage(connection: QuicConnection, stream: QuicStream, message: QuicMessage) async
+    func didReceiveError(connection: QuicConnection, stream: QuicStream, error: QuicError) async
 }
 
 public class QuicListener {
@@ -17,14 +17,14 @@ public class QuicListener {
     private var config: QuicConfig
     private var listener: HQuic?
     private var connections: AtomicArray<QuicConnection> = .init()
-    public weak var messageHandler: QuicListenerMessageHandler?
+    public weak var messageHandler: QuicServer?
 
     public init(
         api: UnsafePointer<QuicApiTable>?,
         registration: HQuic?,
         configuration: HQuic?,
         config: QuicConfig,
-        messageHandler: QuicListenerMessageHandler? = nil
+        messageHandler: QuicServer? = nil
     ) throws {
         self.api = api
         self.registration = registration
@@ -134,10 +134,10 @@ extension QuicListener: QuicConnectionMessageHandler {
         case .shutdownComplete:
             removeConnection(connection)
         case .received:
-            if let stream {
-                messageHandler?.didReceiveMessage(
-                    connection: connection, stream: stream, message: message
-                )
+            if let stream, let messageHandler {
+                Task {
+                    await messageHandler.didReceiveMessage(connection: connection, stream: stream, message: message)
+                }
             }
         default:
             break
@@ -148,7 +148,11 @@ extension QuicListener: QuicConnectionMessageHandler {
         connection: QuicConnection, stream: QuicStream, error: QuicError
     ) {
         listenLogger.error("Failed to receive message: \(error)")
-        messageHandler?.didReceiveError(connection: connection, stream: stream, error: error)
+        if let messageHandler {
+            Task {
+                await messageHandler.didReceiveError(connection: connection, stream: stream, error: error)
+            }
+        }
     }
 
     private func removeConnection(_ connection: QuicConnection) {

@@ -122,10 +122,10 @@ public actor QuicServer: Sendable {
     }
 }
 
-extension QuicServer: @preconcurrency QuicListenerMessageHandler {
+extension QuicServer: QuicListenerMessageHandler {
     public func didReceiveMessage(
         connection: QuicConnection, stream: QuicStream, message: QuicMessage
-    ) {
+    ) async {
         switch message.type {
         case .received:
             let messageID = Int64(Date().timeIntervalSince1970 * 1000)
@@ -143,7 +143,7 @@ extension QuicServer: @preconcurrency QuicListenerMessageHandler {
 
     public func didReceiveError(
         connection _: QuicConnection, stream _: QuicStream, error: QuicError
-    ) {
+    ) async {
         serverLogger.error("Failed to receive message: \(error)")
     }
 }
