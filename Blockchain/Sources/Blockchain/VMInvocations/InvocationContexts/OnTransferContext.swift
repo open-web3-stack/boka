@@ -20,41 +20,30 @@ public class OnTransferContext: InvocationContext {
     }
 
     public func dispatch(index: UInt32, state: VMState) -> ExecOutcome {
-        do {
-            switch UInt8(index) {
-            case Lookup.identifier:
-                try Lookup(serviceAccount: context.account, serviceIndex: context.index, serviceAccounts: context.accounts)
-                    .call(config: config, state: state)
-            case Read.identifier:
-                try Read(serviceAccount: context.account, serviceIndex: context.index, serviceAccounts: context.accounts)
-                    .call(config: config, state: state)
-            case Write.identifier:
-                try Write(serviceAccount: &context.account, serviceIndex: context.index)
-                    .call(config: config, state: state)
-            case GasFn.identifier:
-                try GasFn().call(config: config, state: state)
-            case Info.identifier:
-                try Info(
-                    serviceAccount: context.account,
-                    serviceIndex: context.index,
-                    serviceAccounts: context.accounts,
-                    newServiceAccounts: [:]
-                )
+        switch UInt8(index) {
+        case Lookup.identifier:
+            return Lookup(serviceAccount: context.account, serviceIndex: context.index, serviceAccounts: context.accounts)
                 .call(config: config, state: state)
-            default:
-                state.consumeGas(10)
-                state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHAT.rawValue)
-            }
+        case Read.identifier:
+            return Read(serviceAccount: context.account, serviceIndex: context.index, serviceAccounts: context.accounts)
+                .call(config: config, state: state)
+        case Write.identifier:
+            return Write(serviceAccount: &context.account, serviceIndex: context.index)
+                .call(config: config, state: state)
+        case GasFn.identifier:
+            return GasFn().call(config: config, state: state)
+        case Info.identifier:
+            return Info(
+                serviceAccount: context.account,
+                serviceIndex: context.index,
+                serviceAccounts: context.accounts,
+                newServiceAccounts: [:]
+            )
+            .call(config: config, state: state)
+        default:
+            state.consumeGas(10)
+            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHAT.rawValue)
             return .continued
-        } catch let e as Memory.Error {
-            logger.error("invocation memory error: \(e)")
-            return .exit(.pageFault(e.address))
-        } catch let e as VMInvocationsError {
-            logger.error("invocation dispatch error: \(e)")
-            return .exit(.panic(.trap))
-        } catch let e {
-            logger.error("invocation unknown error: \(e)")
-            return .exit(.panic(.trap))
         }
     }
 }
