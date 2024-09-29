@@ -98,7 +98,7 @@ public actor QuicServer: Sendable {
     }
 
     // Respond to a message with a specific messageID using Data
-    func respondTo(messageID: Int64, with data: Data, streamKind: StreamKind? = nil) async throws
+    func respondingTo(messageID: Int64, with data: Data, kind: StreamKind? = nil) async throws
         -> QuicMessage
     {
         guard let (_, stream) = pendingMessages[messageID] else {
@@ -106,7 +106,7 @@ public actor QuicServer: Sendable {
             throw QuicError.messageNotFound
         }
 
-        let streamKind = streamKind ?? stream.kind
+        let streamKind = kind ?? stream.kind
         pendingMessages.removeValue(forKey: messageID)
 
         let quicMessage = try await Task {

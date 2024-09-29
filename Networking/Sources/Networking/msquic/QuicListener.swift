@@ -132,7 +132,7 @@ extension QuicListener: QuicConnectionMessageHandler {
     ) {
         switch message.type {
         case .shutdownComplete:
-            removeConnection(connection) // Actor-safe; called directly
+            removeConnection(connection)
         case .received:
             if let stream {
                 messageHandler?.didReceiveMessage(

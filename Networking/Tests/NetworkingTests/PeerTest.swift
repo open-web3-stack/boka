@@ -121,7 +121,7 @@ import Utils
                     Task {
                         do {
                             for i in 1 ... 5 {
-                                let messageToPeer2 = try await peer1.sendMessageToPeer(
+                                let messageToPeer2 = try await peer1.sendMessageToPeerAsync(
                                     message: Message(
                                         data: Data("Hello from Peer1 - Message \(i)".utf8)
                                     ),
@@ -129,7 +129,7 @@ import Utils
                                 )
                                 print("Peer1 sent message \(i): \(messageToPeer2)")
 
-                                let messageToPeer1 = try await peer2.sendMessageToPeer(
+                                let messageToPeer1 = try await peer2.sendMessageToPeerAsync(
                                     message: Message(
                                         data: Data("Hello from Peer2 - Message \(i)".utf8)
                                     ),

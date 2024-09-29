@@ -81,14 +81,14 @@ public actor Peer {
     // Respond to a message with a specific messageID using PeerMessage (async throws)
     func respondToPeerMessage(messageID: Int64, with message: any PeerMessage) async throws {
         let messageType = message.getMessageType()
-        _ = try await quicServer?.respondTo(
+        _ = try await quicServer?.respondingTo(
             messageID: messageID, with: message.getData(),
-            streamKind: (messageType == .uniquePersistent) ? .uniquePersistent : .commonEphemeral
+            kind: (messageType == .uniquePersistent) ? .uniquePersistent : .commonEphemeral
         )
     }
 
-    // send message to other peer
-    func sendMessageToPeer(
+    // Sends a message to another peer asynchronously
+    func sendMessageToPeerAsync(
         message: any PeerMessage, peerAddr: NetAddr
     ) async throws -> QuicMessage {
         let buffer = message.getData()
@@ -96,8 +96,8 @@ public actor Peer {
         return try await sendDataToPeer(buffer, to: peerAddr, messageType: messageType)
     }
 
-    // send message to other peer
-    func sentMessageToPeer(
+    // Sends a message to another peer and returns the status
+    func sendMessageToPeer(
         message: any PeerMessage, peerAddr: NetAddr
     ) async throws -> QuicStatus {
         let buffer = message.getData()
