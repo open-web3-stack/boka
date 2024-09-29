@@ -89,7 +89,7 @@ public actor QuicServer: Sendable {
         var status = QuicStatusCode.internalError.rawValue
         if let (_, stream) = pendingMessages[messageID] {
             let streamKind = kind ?? stream.kind
-            status = stream.send(buffer: data, kind: streamKind)
+            status = stream.send(data: data, kind: streamKind)
             pendingMessages.removeValue(forKey: messageID)
         } else {
             serverLogger.error("Message not found")

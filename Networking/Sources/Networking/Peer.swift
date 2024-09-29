@@ -52,7 +52,7 @@ public actor Peer {
 
     deinit {
         for client in clients.values {
-            client.close()
+            client.closeSync()
         }
         clients.removeAll()
         quicServer?.closeSync()
@@ -97,13 +97,13 @@ public actor Peer {
     }
 
     // send message to other peer
-    func sendMessageToPeer(
+    func sentMessageToPeer(
         message: any PeerMessage, peerAddr: NetAddr
-    ) throws -> QuicStatus {
+    ) async throws -> QuicStatus {
         let buffer = message.getData()
         let messageType = message.getMessageType()
 
-        return try sendDataToPeer(buffer, to: peerAddr, messageType: messageType)
+        return try await sendDataToPeer(buffer, to: peerAddr, messageType: messageType)
     }
 
     // send message to other peer wait for response quicMessage
@@ -122,7 +122,7 @@ public actor Peer {
                 ipAddress: peerAddr.ipAddress, port: peerAddr.port
             )
             // Client does not exist, create a new one
-            let client = try QuicClient(config: config, messageHandler: self)
+            let client = try await QuicClient(config: config, messageHandler: self)
             clients[peerAddr] = client
             return try await client.send(
                 message: data,
@@ -132,12 +132,12 @@ public actor Peer {
     }
 
     private func sendDataToPeer(_ data: Data, to peerAddr: NetAddr, messageType: PeerMessageType)
-        throws -> QuicStatus
+        async throws -> QuicStatus
     {
         if let client = clients[peerAddr] {
             // Client already exists, use it to send the data
-            return try client.send(
-                message: data,
+            return try await client.send(
+                data: data,
                 streamKind: messageType == .uniquePersistent ? .uniquePersistent : .commonEphemeral
             )
         } else {
@@ -146,10 +146,10 @@ public actor Peer {
                 ipAddress: peerAddr.ipAddress, port: peerAddr.port
             )
             // Client does not exist, create a new one
-            let client = try QuicClient(config: config, messageHandler: self)
+            let client = try await QuicClient(config: config, messageHandler: self)
             clients[peerAddr] = client
-            return try client.send(
-                message: data,
+            return try await client.send(
+                data: data,
                 streamKind: messageType == .uniquePersistent ? .uniquePersistent : .commonEphemeral
             )
         }

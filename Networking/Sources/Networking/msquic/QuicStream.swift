@@ -4,7 +4,7 @@ import msquic
 
 let streamLogger = Logger(label: "QuicStream")
 
-public enum StreamKind {
+public enum StreamKind: Sendable {
     case uniquePersistent
     case commonEphemeral
     case unknown
@@ -15,7 +15,7 @@ public protocol QuicStreamMessageHandler: AnyObject {
     func didReceiveError(_ stream: QuicStream, error: QuicError)
 }
 
-public class QuicStream {
+public class QuicStream: @unchecked Sendable {
     private var stream: HQuic?
     private let api: UnsafePointer<QuicApiTable>?
     private let connection: HQuic?
@@ -118,10 +118,10 @@ public class QuicStream {
     }
 
     // Sends data over the stream and returns the status
-    func send(buffer: Data, kind: StreamKind? = nil) -> QuicStatus {
+    func send(data: Data, kind: StreamKind? = nil) -> QuicStatus {
         streamLogger.info("[\(String(describing: stream))] Sending data...")
         var status = QuicStatusCode.success.rawValue
-        let messageLength = buffer.count
+        let messageLength = data.count
 
         let sendBufferRaw = UnsafeMutableRawPointer.allocate(
             byteCount: MemoryLayout<QuicBuffer>.size + messageLength,
@@ -132,7 +132,7 @@ public class QuicStream {
         let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(
             capacity: messageLength
         )
-        buffer.copyBytes(to: bufferPointer, count: messageLength)
+        data.copyBytes(to: bufferPointer, count: messageLength)
 
         sendBuffer.pointee.Buffer = bufferPointer
         sendBuffer.pointee.Length = UInt32(messageLength)

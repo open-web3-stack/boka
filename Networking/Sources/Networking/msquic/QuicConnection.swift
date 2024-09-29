@@ -14,7 +14,7 @@ public protocol QuicConnectionMessageHandler: AnyObject {
     )
 }
 
-public class QuicConnection {
+public class QuicConnection: @unchecked Sendable {
     private var connection: HQuic?
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
@@ -106,7 +106,7 @@ public class QuicConnection {
     }
 
     // Creates or retrieves a unique persistent stream
-    func createOrGetUniquePersistentStream(kind: StreamKind) throws -> QuicStream {
+    func createOrGetUniquePersistentStream(kind: StreamKind) async throws -> QuicStream {
         if let stream = uniquePersistentStreams[kind] {
             return stream
         }
@@ -116,7 +116,7 @@ public class QuicConnection {
     }
 
     // Creates a common ephemeral stream
-    func createCommonEphemeralStream() throws -> QuicStream {
+    func createCommonEphemeralStream() async throws -> QuicStream {
         let stream: QuicStream = try QuicStream(api: api, connection: connection, .commonEphemeral, messageHandler: self)
         commonEphemeralStreams.append(stream)
         return stream
