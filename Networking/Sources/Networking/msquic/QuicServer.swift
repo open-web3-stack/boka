@@ -55,16 +55,17 @@ public actor QuicServer: Sendable {
 
     deinit {
         closeSync()
-        serverLogger.trace("QuicServer Deinit")
     }
 
     nonisolated func closeSync() {
+        serverLogger.info("server closeSync")
         Task { [weak self] in
             await self?.close() // Using weak self to avoid retain cycle
+            serverLogger.info("QuicServer Deinit")
         }
     }
 
-    private func close() async {
+    private func close() {
         if listener != nil {
             listener?.close()
             listener = nil

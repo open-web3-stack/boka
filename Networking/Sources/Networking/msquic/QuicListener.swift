@@ -6,7 +6,8 @@ import Utils
 let listenLogger: Logger = .init(label: "QuicListener")
 
 public protocol QuicListenerMessageHandler: AnyObject {
-    func didReceiveMessage(connection: QuicConnection, stream: QuicStream, message: QuicMessage) async
+    func didReceiveMessage(connection: QuicConnection, stream: QuicStream, message: QuicMessage)
+        async
     func didReceiveError(connection: QuicConnection, stream: QuicStream, error: QuicError) async
 }
 
@@ -32,6 +33,10 @@ public class QuicListener {
         self.config = config
         self.messageHandler = messageHandler
         try openListener(port: config.port, listener: &listener)
+    }
+
+    deinit {
+        listenLogger.info("QuicListener Deinit")
     }
 
     private func openListener(port: UInt16, listener: inout HQuic?) throws {
@@ -74,6 +79,10 @@ public class QuicListener {
                 throw QuicError.invalidStatus(status: startStatus.code)
             }
         }
+    }
+
+    func getNetAddr() -> NetAddr {
+        NetAddr(ipAddress: config.ipAddress, port: config.port)
     }
 
     private static func serverListenerCallback(
@@ -120,7 +129,9 @@ public class QuicListener {
 
     private func closeAllConnections() {
         for connection in connections {
-            connection.close()
+            Task {
+                await connection.close()
+            }
         }
         connections.removeAll()
     }
@@ -136,7 +147,9 @@ extension QuicListener: QuicConnectionMessageHandler {
         case .received:
             if let stream, let messageHandler {
                 Task {
-                    await messageHandler.didReceiveMessage(connection: connection, stream: stream, message: message)
+                    await messageHandler.didReceiveMessage(
+                        connection: connection, stream: stream, message: message
+                    )
                 }
             }
         default:
@@ -150,13 +163,16 @@ extension QuicListener: QuicConnectionMessageHandler {
         listenLogger.error("Failed to receive message: \(error)")
         if let messageHandler {
             Task {
-                await messageHandler.didReceiveError(connection: connection, stream: stream, error: error)
+                await messageHandler.didReceiveError(
+                    connection: connection, stream: stream, error: error
+                )
             }
         }
     }
 
     private func removeConnection(_ connection: QuicConnection) {
-        connection.close()
+        listenLogger.info("listener[\(getNetAddr())] shutdown")
+        connection.closeSync()
         connections.removeAll(where: { $0 === connection })
     }
 }

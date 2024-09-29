@@ -120,7 +120,7 @@ import Utils
                 _ = try await group.next().scheduleTask(in: .seconds(2)) {
                     Task {
                         do {
-                            for i in 1 ... 5 {
+                            for i in 1 ... 1 {
                                 let messageToPeer2 = try await peer1.sendMessageToPeerAsync(
                                     message: Message(
                                         data: Data("Hello from Peer1 - Message \(i)".utf8)

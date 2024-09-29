@@ -55,12 +55,13 @@ public actor QuicClient: Sendable {
 
     deinit {
         closeSync()
-        clientLogger.info("QuicClient Deinit")
     }
 
     nonisolated func closeSync() {
+        clientLogger.info("client closeSync")
         Task { [weak self] in
             await self?.close() // Using weak self to avoid retain cycle
+            clientLogger.info("QuicClient Deinit")
         }
     }
 
@@ -74,11 +75,12 @@ public actor QuicClient: Sendable {
         guard let connection else {
             throw QuicError.getConnectionFailed
         }
-        let sendStream: QuicStream = if streamKind == .uniquePersistent {
-            try await connection.createOrGetUniquePersistentStream(kind: streamKind)
-        } else {
-            try await connection.createCommonEphemeralStream()
-        }
+        let sendStream: QuicStream =
+            if streamKind == .uniquePersistent {
+                try await connection.createOrGetUniquePersistentStream(kind: streamKind)
+            } else {
+                try await connection.createCommonEphemeralStream()
+            }
         return try await sendStream.send(buffer: message, kind: streamKind)
     }
 
@@ -87,11 +89,12 @@ public actor QuicClient: Sendable {
         guard let connection else {
             throw QuicError.getConnectionFailed
         }
-        let sendStream: QuicStream = if streamKind == .uniquePersistent {
-            try await connection.createOrGetUniquePersistentStream(kind: streamKind)
-        } else {
-            try await connection.createCommonEphemeralStream()
-        }
+        let sendStream: QuicStream =
+            if streamKind == .uniquePersistent {
+                try await connection.createOrGetUniquePersistentStream(kind: streamKind)
+            } else {
+                try await connection.createCommonEphemeralStream()
+            }
         return sendStream.send(data: data, kind: streamKind)
     }
 
@@ -101,25 +104,29 @@ public actor QuicClient: Sendable {
 
     public func close() async {
         if let connection {
-            connection.close()
+            await connection.close()
             self.connection = nil
+            clientLogger.info("QuicConnection close")
         }
 
         if let configuration {
             api?.pointee.ConfigurationClose(configuration)
             self.configuration = nil
+            clientLogger.info("configuration close")
         }
 
         if let registration {
             api?.pointee.RegistrationClose(registration)
             self.registration = nil
+            clientLogger.info("registration close")
         }
 
         if api != nil {
             MsQuicClose(api)
             api = nil
+            clientLogger.info("api close")
         }
-        clientLogger.debug("QuicClient Close")
+        clientLogger.info("QuicClient Close")
     }
 }
 
@@ -135,6 +142,9 @@ extension QuicClient: @preconcurrency QuicConnectionMessageHandler {
             )
 
         case .shutdownComplete:
+            clientLogger.info(
+                "Client[\(getNetAddr())] shutdown"
+            )
             // Use [weak self] to avoid strong reference cycle
             Task { [weak self] in
                 guard let self else { return }

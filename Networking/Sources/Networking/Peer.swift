@@ -53,6 +53,7 @@ public actor Peer {
     deinit {
         for client in clients.values {
             client.closeSync()
+            peerLogger.info("client closeSync")
         }
         clients.removeAll()
         quicServer?.closeSync()

@@ -61,7 +61,7 @@ public class QuicStream: @unchecked Sendable {
     // Deinitializer to ensure resources are cleaned up
     deinit {
         close()
-        streamLogger.trace("QuicStream Deinit")
+        streamLogger.info("QuicStream Deinit")
     }
 
     // Opens a stream with the specified kind
@@ -76,7 +76,7 @@ public class QuicStream: @unchecked Sendable {
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }
-        streamLogger.info("[\(String(describing: stream))] Stream opened")
+//        streamLogger.info("[\(String(describing: stream))] Stream opened")
     }
 
     // Starts the stream
@@ -86,7 +86,7 @@ public class QuicStream: @unchecked Sendable {
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }
-        streamLogger.info("[\(String(describing: stream))] Stream started")
+//        streamLogger.info("[\(String(describing: stream))] Stream started")
     }
 
     // Closes the stream and cleans up resources
@@ -96,8 +96,8 @@ public class QuicStream: @unchecked Sendable {
         if stream != nil {
             api?.pointee.StreamClose(stream)
             stream = nil
+            streamLogger.info("QuicStream close")
         }
-        streamLogger.debug("QuicStream close")
     }
 
     // Sets the callback handler for the stream
@@ -211,13 +211,11 @@ extension QuicStream {
 
         let quicStream: QuicStream = Unmanaged<QuicStream>.fromOpaque(context).takeUnretainedValue()
         var status: QuicStatus = QuicStatusCode.success.rawValue
-        streamLogger.info("[\(String(describing: stream))] Event: \(event.pointee.Type.rawValue)")
         switch event.pointee.Type {
         case QUIC_STREAM_EVENT_SEND_COMPLETE:
             if let clientContext = event.pointee.SEND_COMPLETE.ClientContext {
                 free(clientContext)
             }
-            streamLogger.info("[\(String(describing: stream))] Data sent")
 
         case QUIC_STREAM_EVENT_RECEIVE:
             let bufferCount: UInt32 = event.pointee.RECEIVE.BufferCount
@@ -227,9 +225,9 @@ extension QuicStream {
                 let buffer = buffers![Int(i)]
                 let bufferLength = Int(buffer.Length)
                 let bufferData = Data(bytes: buffer.Buffer, count: bufferLength)
-                streamLogger.info(
-                    " Data length \(bufferLength) bytes: \(String([UInt8](bufferData).map { Character(UnicodeScalar($0)) }))"
-                )
+//                streamLogger.info(
+//                    " Data length \(bufferLength) bytes: \(String([UInt8](bufferData).map { Character(UnicodeScalar($0)) }))"
+//                )
                 receivedData.append(bufferData)
             }
             if receivedData.count > 0 {
@@ -243,7 +241,8 @@ extension QuicStream {
             }
 
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
-            streamLogger.info("[\(String(describing: stream))] Peer shut down")
+//            streamLogger.info("[\(String(describing: stream))] Peer shut down")
+            break
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
             streamLogger.error("[\(String(describing: stream))] Peer aborted")
