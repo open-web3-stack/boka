@@ -47,9 +47,7 @@ public actor Peer {
         self.config = config
         self.eventBus = eventBus
         clients = [:]
-        Task {
-            self.quicServer = try await QuicServer(config: config, messageHandler: self)
-        }
+        quicServer = try await QuicServer(config: config, messageHandler: self)
     }
 
     deinit {

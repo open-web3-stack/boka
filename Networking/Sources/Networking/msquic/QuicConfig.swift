@@ -1,7 +1,7 @@
 import Foundation
 import msquic
 
-public struct QuicConfig {
+public struct QuicConfig: Sendable {
     public let id: String
     public let cert: String
     public let key: String

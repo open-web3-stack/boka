@@ -59,14 +59,14 @@ public actor QuicServer: @unchecked Sendable {
     }
 
     nonisolated func closeSync() {
-        Task {
-            await close()
+        Task { [weak self] in
+            await self?.close() // Using weak self to avoid retain cycle
         }
     }
 
     private func close() async {
         if listener != nil {
-            listener?.close()
+            await listener?.close()
             listener = nil
         }
         if configuration != nil {
