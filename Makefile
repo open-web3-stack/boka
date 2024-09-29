@@ -20,11 +20,11 @@ deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a .lib/librocksdb.a .lib/libec.a 
 	./scripts/erasure-coding.sh
 
 .lib/librocksdb.a:
-	./scripts/rocksdb.sh
+	./scripts/external-libs.sh
 
 .lib/libmsquic.a:
-	./scripts/msquic.sh
-	
+	./scripts/external-libs.sh
+
 .PHONY: test
 test: githooks deps
 	./scripts/runTests.sh test
