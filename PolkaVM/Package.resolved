@@ -1,5 +1,5 @@
 {
-  "originHash" : "6d0c24ff032ea00dd46c16efbe5df39e0991db5de764148317e7f8327a3e3a9e",
+  "originHash" : "9e424d7bcd3f17dac238113a9cadb3e3629fd0d79c9ae55474a71e3340fff9e8",
   "pins" : [
     {
       "identity" : "blake2.swift",
@@ -53,6 +53,15 @@
       "state" : {
         "revision" : "e0165b53d49b413dd987526b641e05e246782685",
         "version" : "2.5.0"
+      }
+    },
+    {
+      "identity" : "swift-numerics",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-numerics",
+      "state" : {
+        "branch" : "main",
+        "revision" : "e30276bff2ff5ed80566fbdca49f50aa160b0e83"
       }
     },
     {

@@ -3,8 +3,6 @@ import Foundation
 import PolkaVM
 import Utils
 
-private let modValue: UInt32 = (1 << 32) - (1 << 9)
-
 extension AccumulateFunction {
     public func invoke(
         config: ProtocolConfigRef,
@@ -41,12 +39,15 @@ extension AccumulateFunction {
             return (ctx: defaultCtx, result: nil)
         }
 
-        defaultCtx.serviceIndex = check(i: initialIndex & (modValue - 1) + 256, serviceAccounts: serviceAccounts)
+        defaultCtx.serviceIndex = try AccumulateContext.check(
+            i: initialIndex & (serviceIndexModValue - 1) + 256,
+            serviceAccounts: serviceAccounts
+        )
 
         let ctx = AccumulateContext(
             context: (
                 x: defaultCtx,
-                y: defaultCtx.copy(),
+                y: nil,
                 serviceIndex: serviceIndex,
                 accounts: serviceAccounts,
                 timeslot: timeslot
@@ -64,32 +65,26 @@ extension AccumulateFunction {
             ctx: ctx
         )
 
-        return collapse(exitReason: exitReason, output: output, context: ctx.context)
-    }
-
-    // a check function to find the first such index in this sequence which does not already represent a service
-    private func check(i: ServiceIndex, serviceAccounts: [ServiceIndex: ServiceAccount]) -> ServiceIndex {
-        // TODO: check will this cause infinite recursion
-        if !serviceAccounts.keys.contains(i) {
-            return i
-        }
-        return check(i: (i - 255) & (modValue - 1) + 256, serviceAccounts: serviceAccounts)
+        return try collapse(exitReason: exitReason, output: output, context: ctx.context)
     }
 
     // collapse function C selects one of the two dimensions of context depending on whether the virtual
     // machine’s halt was regular or exceptional
     private func collapse(
         exitReason: ExitReason, output: Data?, context: AccumulateContext.ContextType
-    ) -> (ctx: AccumlateResultContext, result: Data32?) {
+    ) throws -> (ctx: AccumlateResultContext, result: Data32?) {
         switch exitReason {
         case .halt:
             if let output, let o = Data32(output) {
-                (ctx: context.x, result: o)
+                return (ctx: context.x, result: o)
             } else {
-                (ctx: context.x, result: nil)
+                return (ctx: context.x, result: nil)
             }
         default:
-            (ctx: context.y, result: nil)
+            guard let y = context.y else {
+                throw VMInvocationsError.contextItemUndefined
+            }
+            return (ctx: y, result: nil)
         }
     }
 }

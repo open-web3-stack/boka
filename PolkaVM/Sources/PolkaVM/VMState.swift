@@ -1,4 +1,5 @@
 import Foundation
+import Numerics
 
 public class VMState {
     public let program: ProgramCode
@@ -68,8 +69,7 @@ public class VMState {
     }
 
     public func consumeGas(_ amount: UInt64) {
-        // TODO: use saturating subtraction
-        gas -= Int64(amount)
+        gas = gas.subtractingWithSaturation(Int64(amount))
     }
 
     public func increasePC(_ amount: UInt32) {

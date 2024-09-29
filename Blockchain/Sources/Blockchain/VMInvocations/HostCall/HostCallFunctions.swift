@@ -1,5 +1,6 @@
 import Codec
 import Foundation
+import Numerics
 import PolkaVM
 import Utils
 
@@ -179,7 +180,7 @@ public class Write: HostCallFunction {
     }
 }
 
-/// Get information details about a service account
+/// Get information about a service account
 public class Info: HostCallFunction {
     public static var identifier: UInt8 { 4 }
     public static var gasCost: UInt64 { 10 }
@@ -248,21 +249,18 @@ public class Empower: HostCallFunction {
     public static var identifier: UInt8 { 5 }
     public static var gasCost: UInt64 { 10 }
 
-    public typealias Input = (x: AccumlateResultContext, y: AccumlateResultContext)
+    public typealias Input = AccumlateResultContext
     public typealias Output = Void
 
-    public static func call(state: VMState, input: Input) throws -> Output {
+    public static func call(state: VMState, input x: Input) throws -> Output {
         guard hasEnoughGas(state: state) else {
             return
         }
         state.consumeGas(gasCost)
 
-        let (x, _) = input
-
         let regs = state.readRegisters(in: 0 ..< 5)
 
         var basicGas: [ServiceIndex: Gas] = [:]
-
         let length = 12 * Int(regs[4])
         if state.isMemoryReadable(address: regs[3], length: length) {
             let data = try state.readMemory(address: regs[3], length: length)
@@ -281,6 +279,156 @@ public class Empower: HostCallFunction {
             x.privilegedServices.basicGas = basicGas
         } else {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.OOB.rawValue)
+        }
+    }
+}
+
+/// Set authorization queue for a service account
+public class Assign: HostCallFunction {
+    public static var identifier: UInt8 { 6 }
+    public static var gasCost: UInt64 { 10 }
+
+    public typealias Input = (config: ProtocolConfigRef, x: AccumlateResultContext)
+    public typealias Output = Void
+
+    public static func call(state: VMState, input: Input) throws -> Output {
+        guard hasEnoughGas(state: state) else {
+            return
+        }
+        state.consumeGas(gasCost)
+
+        let (config, x) = input
+
+        let (targetCoreIndex, startAddr) = state.readRegister(Registers.Index(raw: 0), Registers.Index(raw: 1))
+
+        var authorizationQueue: [Data32] = []
+        let length = 32 * config.value.maxAuthorizationsQueueItems
+        if state.isMemoryReadable(address: startAddr, length: length) {
+            let data = try state.readMemory(address: startAddr, length: length)
+            for i in stride(from: 0, to: length, by: 32) {
+                authorizationQueue.append(Data32(data[i ..< i + 32])!)
+            }
+        }
+
+        if targetCoreIndex < config.value.totalNumberOfCores, !authorizationQueue.isEmpty {
+            x.authorizationQueue[targetCoreIndex] = try ConfigFixedSizeArray(config: config, array: authorizationQueue)
+            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.OK.rawValue)
+        } else if authorizationQueue.isEmpty {
+            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.OOB.rawValue)
+        } else {
+            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.CORE.rawValue)
+        }
+    }
+}
+
+/// Set validator queue for a service account
+public class Designate: HostCallFunction {
+    public static var identifier: UInt8 { 7 }
+    public static var gasCost: UInt64 { 10 }
+
+    public typealias Input = (config: ProtocolConfigRef, x: AccumlateResultContext)
+    public typealias Output = Void
+
+    public static func call(state: VMState, input: Input) throws -> Output {
+        guard hasEnoughGas(state: state) else {
+            return
+        }
+        state.consumeGas(gasCost)
+
+        let (config, x) = input
+
+        let startAddr = state.readRegister(Registers.Index(raw: 0))
+
+        var validatorQueue: [ValidatorKey] = []
+        let length = 336 * config.value.totalNumberOfValidators
+        if state.isMemoryReadable(address: startAddr, length: length) {
+            let data = try state.readMemory(address: startAddr, length: length)
+            for i in stride(from: 0, to: length, by: 336) {
+                try validatorQueue.append(ValidatorKey(data: Data(data[i ..< i + 336])))
+            }
+        }
+
+        if !validatorQueue.isEmpty {
+            x.validatorQueue = try ConfigFixedSizeArray(config: config, array: validatorQueue)
+            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.OK.rawValue)
+        } else {
+            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.OOB.rawValue)
+        }
+    }
+}
+
+/// Save a checkpoint
+public class Checkpoint: HostCallFunction {
+    public static var identifier: UInt8 { 8 }
+    public static var gasCost: UInt64 { 10 }
+
+    public typealias Input = AccumlateResultContext
+    public typealias Output = AccumlateResultContext?
+
+    public static func call(state: VMState, input: Input) throws -> Output {
+        guard hasEnoughGas(state: state) else {
+            return nil
+        }
+        state.consumeGas(gasCost)
+
+        state.writeRegister(Registers.Index(raw: 0), UInt32(bitPattern: Int32(state.getGas() & 0xFFFF_FFFF)))
+        state.writeRegister(Registers.Index(raw: 1), UInt32(bitPattern: Int32(state.getGas() >> 32)))
+
+        return input.copy()
+    }
+}
+
+/// Create a new service account
+public class New: HostCallFunction {
+    public static var identifier: UInt8 { 9 }
+    public static var gasCost: UInt64 { 10 }
+
+    public typealias Input = (config: ProtocolConfigRef, x: AccumlateResultContext, accounts: [ServiceIndex: ServiceAccount])
+    public typealias Output = Void
+
+    private static func bump(i: ServiceIndex) -> ServiceIndex {
+        256 + ((i - 256 + 42) & (serviceIndexModValue - 1))
+    }
+
+    public static func call(state: VMState, input: Input) throws -> Output {
+        guard hasEnoughGas(state: state) else {
+            return
+        }
+        state.consumeGas(gasCost)
+
+        let (config, x, accounts) = input
+
+        let regs = state.readRegisters(in: 0 ..< 6)
+
+        let codeHash: Data32? = try? Data32(state.readMemory(address: regs[0], length: 32))
+        let minAccumlateGas: Gas = (UInt64(UInt32.max) + 1) * UInt64(regs[3]) + UInt64(regs[2])
+        let minOnTransferGas: Gas = (UInt64(UInt32.max) + 1) * UInt64(regs[5]) + UInt64(regs[4])
+
+        var newAccount: ServiceAccount?
+        if let codeHash {
+            newAccount = ServiceAccount(
+                storage: [:],
+                preimages: [:],
+                preimageInfos: [HashAndLength(hash: codeHash, length: regs[1]): LimitedSizeArray([])],
+                codeHash: codeHash,
+                balance: 0,
+                minAccumlateGas: minAccumlateGas,
+                minOnTransferGas: minOnTransferGas
+            )
+            newAccount!.balance = newAccount!.thresholdBalance(config: config)
+        }
+
+        let newBalance = (x.account?.balance ?? 0).subtractingWithSaturation(newAccount!.balance)
+
+        if let newAccount, x.account != nil, newBalance >= x.account!.thresholdBalance(config: config) {
+            state.writeRegister(Registers.Index(raw: 0), x.serviceIndex)
+            x.newAccounts[x.serviceIndex] = newAccount
+            x.account!.balance = newBalance
+            x.serviceIndex = try AccumulateContext.check(i: bump(i: x.serviceIndex), serviceAccounts: accounts)
+        } else if codeHash == nil {
+            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.OOB.rawValue)
+        } else {
+            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.CASH.rawValue)
         }
     }
 }
