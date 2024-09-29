@@ -31,7 +31,7 @@ public class QuicListener {
         self.configuration = configuration
         self.config = config
         self.messageHandler = messageHandler
-        // try openListener(port: config.port, listener: &listener)
+        try openListener(port: config.port, listener: &listener)
     }
 
     private func openListener(port: UInt16, listener: inout HQuic?) throws {

@@ -66,7 +66,7 @@ public actor QuicServer: @unchecked Sendable {
 
     private func close() async {
         if listener != nil {
-            await listener?.close()
+            listener?.close()
             listener = nil
         }
         if configuration != nil {

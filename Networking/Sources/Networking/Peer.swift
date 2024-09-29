@@ -60,8 +60,6 @@ public actor Peer {
         // Clean up resources if necessary
     }
 
-    private nonisolated func initQuicServer() throws {}
-
     // Respond to a message with a specific messageID using Data
     func respondTo(messageID: Int64, with data: Data) async -> QuicStatus {
         await quicServer?.respondTo(messageID: messageID, with: data)
