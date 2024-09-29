@@ -7,40 +7,30 @@ import Utils
 // MARK: - General
 
 /// Get gas remaining
-public class GasFn: HostCallFunction {
+public class GasFn: HostCall {
     public static var identifier: UInt8 { 0 }
-    public static var gasCost: UInt64 { 10 }
 
-    public typealias Input = Void
-    public typealias Output = Void
-
-    public static func call(state: VMState, input _: Input) throws -> Output {
-        guard hasEnoughGas(state: state) else {
-            return
-        }
-        state.consumeGas(gasCost)
-
+    public func _callImpl(config _: ProtocolConfigRef, state: VMState) throws {
         state.writeRegister(Registers.Index(raw: 0), UInt32(bitPattern: Int32(state.getGas() & 0xFFFF_FFFF)))
         state.writeRegister(Registers.Index(raw: 1), UInt32(bitPattern: Int32(state.getGas() >> 32)))
     }
 }
 
 /// Lookup a preimage from a service account
-public class Lookup: HostCallFunction {
+public class Lookup: HostCall {
     public static var identifier: UInt8 { 1 }
-    public static var gasCost: UInt64 { 10 }
 
-    public typealias Input = (ServiceAccount, ServiceIndex, [ServiceIndex: ServiceAccount])
-    public typealias Output = Void
+    public let serviceAccount: ServiceAccount
+    public let serviceIndex: ServiceIndex
+    public let serviceAccounts: [ServiceIndex: ServiceAccount]
 
-    public static func call(state: VMState, input: Input) throws -> Output {
-        guard hasEnoughGas(state: state) else {
-            return
-        }
-        state.consumeGas(gasCost)
+    public init(serviceAccount: ServiceAccount, serviceIndex: ServiceIndex, serviceAccounts: [ServiceIndex: ServiceAccount]) {
+        self.serviceAccount = serviceAccount
+        self.serviceIndex = serviceIndex
+        self.serviceAccounts = serviceAccounts
+    }
 
-        let (serviceAccount, serviceIndex, serviceAccounts) = input
-
+    public func _callImpl(config _: ProtocolConfigRef, state: VMState) throws {
         var account: ServiceAccount?
         let reg0 = state.readRegister(Registers.Index(raw: 0))
         if reg0 == serviceIndex || reg0 == Int32.max {
@@ -78,21 +68,20 @@ public class Lookup: HostCallFunction {
 }
 
 /// Read a service account storage
-public class Read: HostCallFunction {
+public class Read: HostCall {
     public static var identifier: UInt8 { 2 }
-    public static var gasCost: UInt64 { 10 }
 
-    public typealias Input = (ServiceAccount, ServiceIndex, [ServiceIndex: ServiceAccount])
-    public typealias Output = Void
+    public let serviceAccount: ServiceAccount
+    public let serviceIndex: ServiceIndex
+    public let serviceAccounts: [ServiceIndex: ServiceAccount]
 
-    public static func call(state: VMState, input: Input) throws -> Output {
-        guard hasEnoughGas(state: state) else {
-            return
-        }
-        state.consumeGas(gasCost)
+    public init(serviceAccount: ServiceAccount, serviceIndex: ServiceIndex, serviceAccounts: [ServiceIndex: ServiceAccount]) {
+        self.serviceAccount = serviceAccount
+        self.serviceIndex = serviceIndex
+        self.serviceAccounts = serviceAccounts
+    }
 
-        let (serviceAccount, serviceIndex, serviceAccounts) = input
-
+    public func _callImpl(config _: ProtocolConfigRef, state: VMState) throws {
         var account: ServiceAccount?
         let reg0 = state.readRegister(Registers.Index(raw: 0))
         if reg0 == serviceIndex || reg0 == Int32.max {
@@ -130,21 +119,18 @@ public class Read: HostCallFunction {
 }
 
 /// Write to a service account storage
-public class Write: HostCallFunction {
+public class Write: HostCall {
     public static var identifier: UInt8 { 3 }
-    public static var gasCost: UInt64 { 10 }
 
-    public typealias Input = (ProtocolConfigRef, ServiceAccount, ServiceIndex)
-    public typealias Output = ServiceAccount
+    public var serviceAccount: ServiceAccount
+    public let serviceIndex: ServiceIndex
 
-    public static func call(state: VMState, input: Input) throws -> Output {
-        let (config, serviceAccount, serviceIndex) = input
-        guard hasEnoughGas(state: state) else {
-            return serviceAccount
-        }
+    public init(serviceAccount: inout ServiceAccount, serviceIndex: ServiceIndex) {
+        self.serviceAccount = serviceAccount
+        self.serviceIndex = serviceIndex
+    }
 
-        state.consumeGas(gasCost)
-
+    public func _callImpl(config: ProtocolConfigRef, state: VMState) throws {
         let regs = state.readRegisters(in: 0 ..< 4)
 
         let key = try? Blake2b256.hash(serviceIndex.encode(), state.readMemory(address: regs[0], length: Int(regs[1])))
@@ -169,40 +155,38 @@ public class Write: HostCallFunction {
 
         if key != nil, let account, account.thresholdBalance(config: config) <= account.balance {
             state.writeRegister(Registers.Index(raw: 0), l)
-            return account
+            serviceAccount = account
         } else if let account, account.thresholdBalance(config: config) > account.balance {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.FULL.rawValue)
-            return serviceAccount
         } else {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.OOB.rawValue)
-            return serviceAccount
         }
     }
 }
 
 /// Get information about a service account
-public class Info: HostCallFunction {
+public class Info: HostCall {
     public static var identifier: UInt8 { 4 }
-    public static var gasCost: UInt64 { 10 }
 
-    public typealias Input = (
-        config: ProtocolConfigRef,
-        account: ServiceAccount,
+    public let serviceAccount: ServiceAccount
+    public let serviceIndex: ServiceIndex
+    public let serviceAccounts: [ServiceIndex: ServiceAccount]
+    // only used in accumulation x.n
+    public let newServiceAccounts: [ServiceIndex: ServiceAccount]
+
+    public init(
+        serviceAccount: ServiceAccount,
         serviceIndex: ServiceIndex,
         serviceAccounts: [ServiceIndex: ServiceAccount],
-        // only used in accumulation x.n
         newServiceAccounts: [ServiceIndex: ServiceAccount]
-    )
-    public typealias Output = Void
+    ) {
+        self.serviceAccount = serviceAccount
+        self.serviceIndex = serviceIndex
+        self.serviceAccounts = serviceAccounts
+        self.newServiceAccounts = newServiceAccounts
+    }
 
-    public static func call(state: VMState, input: Input) throws -> Output {
-        guard hasEnoughGas(state: state) else {
-            return
-        }
-        state.consumeGas(gasCost)
-
-        let (config, serviceAccount, serviceIndex, serviceAccounts, newServiceAccounts) = input
-
+    public func _callImpl(config: ProtocolConfigRef, state: VMState) throws {
         var account: ServiceAccount?
         let reg0 = state.readRegister(Registers.Index(raw: 0))
         if reg0 == serviceIndex || reg0 == Int32.max {
@@ -245,19 +229,16 @@ public class Info: HostCallFunction {
 // MARK: - Accumulate
 
 /// Set privileged services details
-public class Empower: HostCallFunction {
+public class Empower: HostCall {
     public static var identifier: UInt8 { 5 }
-    public static var gasCost: UInt64 { 10 }
 
-    public typealias Input = AccumlateResultContext
-    public typealias Output = Void
+    public var x: AccumlateResultContext
 
-    public static func call(state: VMState, input x: Input) throws -> Output {
-        guard hasEnoughGas(state: state) else {
-            return
-        }
-        state.consumeGas(gasCost)
+    public init(x: inout AccumlateResultContext) {
+        self.x = x
+    }
 
+    public func _callImpl(config _: ProtocolConfigRef, state: VMState) throws {
         let regs = state.readRegisters(in: 0 ..< 5)
 
         var basicGas: [ServiceIndex: Gas] = [:]
@@ -284,21 +265,16 @@ public class Empower: HostCallFunction {
 }
 
 /// Set authorization queue for a service account
-public class Assign: HostCallFunction {
+public class Assign: HostCall {
     public static var identifier: UInt8 { 6 }
-    public static var gasCost: UInt64 { 10 }
 
-    public typealias Input = (config: ProtocolConfigRef, x: AccumlateResultContext)
-    public typealias Output = Void
+    public var x: AccumlateResultContext
 
-    public static func call(state: VMState, input: Input) throws -> Output {
-        guard hasEnoughGas(state: state) else {
-            return
-        }
-        state.consumeGas(gasCost)
+    public init(x: inout AccumlateResultContext) {
+        self.x = x
+    }
 
-        let (config, x) = input
-
+    public func _callImpl(config: ProtocolConfigRef, state: VMState) throws {
         let (targetCoreIndex, startAddr) = state.readRegister(Registers.Index(raw: 0), Registers.Index(raw: 1))
 
         var authorizationQueue: [Data32] = []
@@ -322,21 +298,16 @@ public class Assign: HostCallFunction {
 }
 
 /// Set validator queue for a service account
-public class Designate: HostCallFunction {
+public class Designate: HostCall {
     public static var identifier: UInt8 { 7 }
-    public static var gasCost: UInt64 { 10 }
 
-    public typealias Input = (config: ProtocolConfigRef, x: AccumlateResultContext)
-    public typealias Output = Void
+    public var x: AccumlateResultContext
 
-    public static func call(state: VMState, input: Input) throws -> Output {
-        guard hasEnoughGas(state: state) else {
-            return
-        }
-        state.consumeGas(gasCost)
+    public init(x: inout AccumlateResultContext) {
+        self.x = x
+    }
 
-        let (config, x) = input
-
+    public func _callImpl(config: ProtocolConfigRef, state: VMState) throws {
         let startAddr = state.readRegister(Registers.Index(raw: 0))
 
         var validatorQueue: [ValidatorKey] = []
@@ -358,46 +329,42 @@ public class Designate: HostCallFunction {
 }
 
 /// Save a checkpoint
-public class Checkpoint: HostCallFunction {
+public class Checkpoint: HostCall {
     public static var identifier: UInt8 { 8 }
-    public static var gasCost: UInt64 { 10 }
 
-    public typealias Input = AccumlateResultContext
-    public typealias Output = AccumlateResultContext?
+    public let x: AccumlateResultContext
+    public var y: AccumlateResultContext
 
-    public static func call(state: VMState, input: Input) throws -> Output {
-        guard hasEnoughGas(state: state) else {
-            return nil
-        }
-        state.consumeGas(gasCost)
+    public init(x: AccumlateResultContext, y: inout AccumlateResultContext) {
+        self.x = x
+        self.y = y
+    }
 
+    public func _callImpl(config _: ProtocolConfigRef, state: VMState) throws {
         state.writeRegister(Registers.Index(raw: 0), UInt32(bitPattern: Int32(state.getGas() & 0xFFFF_FFFF)))
         state.writeRegister(Registers.Index(raw: 1), UInt32(bitPattern: Int32(state.getGas() >> 32)))
 
-        return input.copy()
+        y = x
     }
 }
 
 /// Create a new service account
-public class New: HostCallFunction {
+public class New: HostCall {
     public static var identifier: UInt8 { 9 }
-    public static var gasCost: UInt64 { 10 }
 
-    public typealias Input = (config: ProtocolConfigRef, x: AccumlateResultContext, accounts: [ServiceIndex: ServiceAccount])
-    public typealias Output = Void
+    public var x: AccumlateResultContext
+    public let accounts: [ServiceIndex: ServiceAccount]
+
+    public init(x: inout AccumlateResultContext, accounts: [ServiceIndex: ServiceAccount]) {
+        self.x = x
+        self.accounts = accounts
+    }
 
     private static func bump(i: ServiceIndex) -> ServiceIndex {
         256 + ((i - 256 + 42) & (serviceIndexModValue - 1))
     }
 
-    public static func call(state: VMState, input: Input) throws -> Output {
-        guard hasEnoughGas(state: state) else {
-            return
-        }
-        state.consumeGas(gasCost)
-
-        let (config, x, accounts) = input
-
+    public func _callImpl(config: ProtocolConfigRef, state: VMState) throws {
         let regs = state.readRegisters(in: 0 ..< 6)
 
         let codeHash: Data32? = try? Data32(state.readMemory(address: regs[0], length: 32))
@@ -424,11 +391,41 @@ public class New: HostCallFunction {
             state.writeRegister(Registers.Index(raw: 0), x.serviceIndex)
             x.newAccounts[x.serviceIndex] = newAccount
             x.account!.balance = newBalance
-            x.serviceIndex = try AccumulateContext.check(i: bump(i: x.serviceIndex), serviceAccounts: accounts)
+            x.serviceIndex = try AccumulateContext.check(i: New.bump(i: x.serviceIndex), serviceAccounts: accounts)
         } else if codeHash == nil {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.OOB.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.CASH.rawValue)
+        }
+    }
+}
+
+/// Upgrade a service account
+public class Upgrade: HostCall {
+    public static var identifier: UInt8 { 10 }
+
+    public var x: AccumlateResultContext
+    public let serviceIndex: ServiceIndex
+
+    public init(x: inout AccumlateResultContext, serviceIndex: ServiceIndex) {
+        self.x = x
+        self.serviceIndex = serviceIndex
+    }
+
+    public func _callImpl(config _: ProtocolConfigRef, state: VMState) throws {
+        let regs = state.readRegisters(in: 0 ..< 5)
+
+        let codeHash: Data32? = try? Data32(state.readMemory(address: regs[0], length: 32))
+        let minAccumlateGas: Gas = (UInt64(UInt32.max) + 1) * UInt64(regs[1]) + UInt64(regs[2])
+        let minOnTransferGas: Gas = (UInt64(UInt32.max) + 1) * UInt64(regs[3]) + UInt64(regs[4])
+
+        if let codeHash {
+            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.OK.rawValue)
+            x.newAccounts[serviceIndex]?.codeHash = codeHash
+            x.newAccounts[serviceIndex]?.minAccumlateGas = minAccumlateGas
+            x.newAccounts[serviceIndex]?.minOnTransferGas = minOnTransferGas
+        } else {
+            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.OOB.rawValue)
         }
     }
 }

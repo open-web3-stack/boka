@@ -7,7 +7,7 @@ private let logger = Logger(label: "AccumulateContext")
 public class AccumulateContext: InvocationContext {
     public typealias ContextType = (
         x: AccumlateResultContext,
-        y: AccumlateResultContext?, // only set in checkpoint function
+        y: AccumlateResultContext, // only set in checkpoint function
         serviceIndex: ServiceIndex,
         accounts: [ServiceIndex: ServiceAccount],
         timeslot: TimeslotIndex
@@ -26,39 +26,54 @@ public class AccumulateContext: InvocationContext {
             switch UInt8(index) {
             case Read.identifier:
                 // x.account won't be nil here, already checked in AccumulateFunction.invoke
-                try Read.call(state: state, input: (context.x.account!, context.serviceIndex, context.accounts))
+                try Read(serviceAccount: context.x.account!, serviceIndex: context.serviceIndex, serviceAccounts: context.accounts)
+                    .call(config: config, state: state)
             case Write.identifier:
-                let newAccount = try Write.call(state: state, input: (config, context.x.account!, context.serviceIndex))
-                context.x.account = newAccount
+                try Write(serviceAccount: &context.x.account!, serviceIndex: context.serviceIndex)
+                    .call(config: config, state: state)
             case Lookup.identifier:
-                try Lookup.call(state: state, input: (context.x.account!, context.serviceIndex, context.accounts))
+                try Lookup(serviceAccount: context.x.account!, serviceIndex: context.serviceIndex, serviceAccounts: context.accounts)
+                    .call(config: config, state: state)
             case GasFn.identifier:
-                try GasFn.call(state: state, input: ())
+                try GasFn().call(config: config, state: state)
             case Info.identifier:
-                try Info.call(
-                    state: state,
-                    input: (config, context.x.account!, context.serviceIndex, context.accounts, context.x.newAccounts)
+                try Info(
+                    serviceAccount: context.x.account!,
+                    serviceIndex: context.serviceIndex,
+                    serviceAccounts: context.accounts,
+                    newServiceAccounts: context.x.newAccounts
                 )
+                .call(config: config, state: state)
             case Empower.identifier:
-                try Empower.call(state: state, input: context.x)
+                try Empower(x: &context.x)
+                    .call(config: config, state: state)
             case Assign.identifier:
-                try Assign.call(state: state, input: (config, context.x))
+                try Assign(x: &context.x)
+                    .call(config: config, state: state)
             case Designate.identifier:
-                try Designate.call(state: state, input: (config, context.x))
+                try Designate(x: &context.x)
+                    .call(config: config, state: state)
             case Checkpoint.identifier:
-                context.y = try Checkpoint.call(state: state, input: context.x)
+                try Checkpoint(x: context.x, y: &context.y)
+                    .call(config: config, state: state)
             case New.identifier:
-                try New.call(state: state, input: (config, context.x, context.accounts))
+                try New(x: &context.x, accounts: context.accounts)
+                    .call(config: config, state: state)
             case Upgrade.identifier:
-                try Upgrade.call(state: state, input: (context.x, context.serviceIndex))
-            case Transfer.identifier:
-                try Transfer.call(state: state, input: (context.x, context.serviceIndex, context.accounts))
-            case Quit.identifier:
-                try Quit.call(state: state, input: (context.x, context.serviceIndex))
-            case Solicit.identifier:
-                try Solicit.call(state: state, input: (context.x, context.timeslot))
-            case Forget.identifier:
-                try Forget.call(state: state, input: (context.x, context.timeslot))
+                try Upgrade(x: &context.x, serviceIndex: context.serviceIndex)
+                    .call(config: config, state: state)
+            // case Transfer.identifier:
+            //     try Transfer(x: context.x, serviceIndex: context.serviceIndex, serviceAccounts: context.accounts)
+            //         .call(config: config, state: state)
+            // case Quit.identifier:
+            //     try Quit(x: context.x, serviceIndex: context.serviceIndex)
+            //         .call(config: config, state: state)
+            // case Solicit.identifier:
+            //     try Solicit(x: context.x, timeslot: context.timeslot)
+            //         .call(config: config, state: state)
+            // case Forget.identifier:
+            //     try Forget(x: context.x, timeslot: context.timeslot)
+            //         .call(config: config, state: state)
             default:
                 state.consumeGas(10)
                 state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHAT.rawValue)

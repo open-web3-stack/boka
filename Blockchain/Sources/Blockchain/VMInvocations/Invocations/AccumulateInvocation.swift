@@ -25,7 +25,7 @@ extension AccumulateFunction {
         initialIndex: ServiceIndex,
         timeslot: TimeslotIndex
     ) throws -> (ctx: AccumlateResultContext, result: Data32?) {
-        let defaultCtx = AccumlateResultContext(
+        var defaultCtx = AccumlateResultContext(
             account: serviceAccounts[serviceIndex],
             authorizationQueue: authorizationQueue,
             validatorQueue: validatorQueue,
@@ -47,7 +47,7 @@ extension AccumulateFunction {
         let ctx = AccumulateContext(
             context: (
                 x: defaultCtx,
-                y: nil,
+                y: defaultCtx,
                 serviceIndex: serviceIndex,
                 accounts: serviceAccounts,
                 timeslot: timeslot
@@ -76,15 +76,12 @@ extension AccumulateFunction {
         switch exitReason {
         case .halt:
             if let output, let o = Data32(output) {
-                return (ctx: context.x, result: o)
+                (ctx: context.x, result: o)
             } else {
-                return (ctx: context.x, result: nil)
+                (ctx: context.x, result: nil)
             }
         default:
-            guard let y = context.y else {
-                throw VMInvocationsError.contextItemUndefined
-            }
-            return (ctx: y, result: nil)
+            (ctx: context.y, result: nil)
         }
     }
 }

@@ -8,13 +8,16 @@ public class IsAuthorizedContext: InvocationContext {
     public typealias ContextType = Void
 
     public var context: ContextType = ()
+    public let config: ProtocolConfigRef
 
-    public init() {}
+    public init(config: ProtocolConfigRef) {
+        self.config = config
+    }
 
     public func dispatch(index: UInt32, state: VMState) -> ExecOutcome {
         do {
             if index == GasFn.identifier {
-                try GasFn.call(state: state, input: ())
+                try GasFn().call(config: config, state: state)
             } else {
                 state.consumeGas(10)
                 state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHAT.rawValue)

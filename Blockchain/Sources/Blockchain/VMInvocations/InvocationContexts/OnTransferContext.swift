@@ -23,15 +23,24 @@ public class OnTransferContext: InvocationContext {
         do {
             switch UInt8(index) {
             case Lookup.identifier:
-                try Lookup.call(state: state, input: (context.account, context.index, context.accounts))
+                try Lookup(serviceAccount: context.account, serviceIndex: context.index, serviceAccounts: context.accounts)
+                    .call(config: config, state: state)
             case Read.identifier:
-                try Read.call(state: state, input: (context.account, context.index, context.accounts))
+                try Read(serviceAccount: context.account, serviceIndex: context.index, serviceAccounts: context.accounts)
+                    .call(config: config, state: state)
             case Write.identifier:
-                context.account = try Write.call(state: state, input: (config, context.account, context.index))
+                try Write(serviceAccount: &context.account, serviceIndex: context.index)
+                    .call(config: config, state: state)
             case GasFn.identifier:
-                try GasFn.call(state: state, input: ())
+                try GasFn().call(config: config, state: state)
             case Info.identifier:
-                try Info.call(state: state, input: (config, context.account, context.index, context.accounts, [:]))
+                try Info(
+                    serviceAccount: context.account,
+                    serviceIndex: context.index,
+                    serviceAccounts: context.accounts,
+                    newServiceAccounts: [:]
+                )
+                .call(config: config, state: state)
             default:
                 state.consumeGas(10)
                 state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHAT.rawValue)

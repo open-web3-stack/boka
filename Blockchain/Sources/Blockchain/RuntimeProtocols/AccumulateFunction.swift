@@ -36,7 +36,7 @@ public struct DeferredTransfers: Codable {
     }
 }
 
-public class AccumlateResultContext {
+public struct AccumlateResultContext {
     // s: updated current account
     public var account: ServiceAccount?
     // c
@@ -84,18 +84,6 @@ public class AccumlateResultContext {
         self.transfers = transfers
         self.newAccounts = newAccounts
         self.privilegedServices = privilegedServices
-    }
-
-    public func copy() -> AccumlateResultContext {
-        AccumlateResultContext(
-            account: account,
-            authorizationQueue: authorizationQueue,
-            validatorQueue: validatorQueue,
-            serviceIndex: serviceIndex,
-            transfers: transfers,
-            newAccounts: newAccounts,
-            privilegedServices: privilegedServices
-        )
     }
 }
 
