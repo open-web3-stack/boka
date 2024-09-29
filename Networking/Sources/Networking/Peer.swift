@@ -189,12 +189,10 @@ extension Peer: @preconcurrency QuicClientMessageHandler {
 
 // QuicServerMessageHandler methods
 extension Peer: @preconcurrency QuicServerMessageHandler {
-    public func didReceiveMessage(quicServer _: QuicServer, messageID: Int64, message: QuicMessage) {
+    public func didReceiveMessage(messageID: Int64, message: QuicMessage) async {
         switch message.type {
         case .received:
-            Task {
-                await eventBus.publish(PeerMessageReceived(messageID: messageID, message: message))
-            }
+            await eventBus.publish(PeerMessageReceived(messageID: messageID, message: message))
         case .shutdownComplete:
             break
         default:
@@ -202,7 +200,7 @@ extension Peer: @preconcurrency QuicServerMessageHandler {
         }
     }
 
-    public func didReceiveError(quicServer _: QuicServer, messageID: Int64, error: QuicError) {
+    public func didReceiveError(messageID: Int64, error: QuicError) {
         peerLogger.error("Failed to receive message: \(error)")
         Task {
             await eventBus.publish(PeerErrorReceived(messageID: messageID, error: error))

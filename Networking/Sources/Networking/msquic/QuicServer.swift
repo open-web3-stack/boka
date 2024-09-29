@@ -5,9 +5,9 @@ import Utils
 
 let serverLogger: Logger = .init(label: "QuicServer")
 
-public protocol QuicServerMessageHandler: AnyObject {
-    func didReceiveMessage(quicServer: QuicServer, messageID: Int64, message: QuicMessage)
-    func didReceiveError(quicServer: QuicServer, messageID: Int64, error: QuicError)
+public protocol QuicServerMessageHandler: AnyObject, Sendable {
+    func didReceiveMessage(messageID: Int64, message: QuicMessage) async
+    func didReceiveError(messageID: Int64, error: QuicError) async
 }
 
 public actor QuicServer: @unchecked Sendable {
@@ -128,10 +128,13 @@ extension QuicServer: @preconcurrency QuicListenerMessageHandler {
     ) {
         switch message.type {
         case .received:
-            Task {
-                await processPendingMessage(
-                    connection: connection, stream: stream, message: message
-                )
+            let messageID = Int64(Date().timeIntervalSince1970 * 1000)
+            pendingMessages[messageID] = (connection, stream)
+
+            // Call messageHandler safely in the actor context
+            Task { [weak self] in
+                guard let self else { return }
+                await messageHandler?.didReceiveMessage(messageID: messageID, message: message)
             }
         default:
             break
@@ -142,13 +145,5 @@ extension QuicServer: @preconcurrency QuicListenerMessageHandler {
         connection _: QuicConnection, stream _: QuicStream, error: QuicError
     ) {
         serverLogger.error("Failed to receive message: \(error)")
-    }
-
-    private func processPendingMessage(
-        connection: QuicConnection, stream: QuicStream, message: QuicMessage
-    ) async {
-        let messageID = Int64(Date().timeIntervalSince1970 * 1000)
-        pendingMessages[messageID] = (connection, stream)
-        messageHandler?.didReceiveMessage(quicServer: self, messageID: messageID, message: message)
     }
 }
