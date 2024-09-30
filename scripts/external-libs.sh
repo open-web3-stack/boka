@@ -2,7 +2,7 @@
 
 set -e
 
-release=v5
+release=v1
 
 os=$(uname -s)
 arch=$(uname -m)
