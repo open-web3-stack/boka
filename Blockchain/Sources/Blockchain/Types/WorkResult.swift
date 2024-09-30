@@ -43,7 +43,7 @@ extension WorkResult: Dummy {
             serviceIndex: 0,
             codeHash: Data32(),
             payloadHash: Data32(),
-            gas: 0,
+            gas: Gas(0),
             output: .init(.success(Data()))
         )
     }

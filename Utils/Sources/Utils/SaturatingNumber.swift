@@ -1,3 +1,4 @@
+import Codec
 import Numerics
 
 public struct SaturatingNumber<T: FixedWidthInteger & Sendable>: Sendable {
@@ -107,11 +108,13 @@ public struct SaturatingNumber<T: FixedWidthInteger & Sendable>: Sendable {
     }
 }
 
-extension SaturatingNumber: Equatable where T: Equatable {}
-
-extension SaturatingNumber: Comparable {
+extension SaturatingNumber: Comparable, Equatable {
     public static func < (lhs: SaturatingNumber, rhs: SaturatingNumber) -> Bool {
         lhs.value < rhs.value
+    }
+
+    public static func == (lhs: SaturatingNumber, rhs: SaturatingNumber) -> Bool {
+        lhs.value == rhs.value
     }
 }
 
@@ -131,5 +134,15 @@ extension SaturatingNumber: Codable where T: Codable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(value)
+    }
+}
+
+extension SaturatingNumber: EncodedSize {
+    public var encodedSize: Int {
+        MemoryLayout<T>.size
+    }
+
+    public static var encodeedSizeHint: Int? {
+        MemoryLayout<T>.size
     }
 }

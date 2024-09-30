@@ -39,10 +39,10 @@ extension HostCall {
 
     // TODO: host-calls will have different gas costs later on
     public func gasCost(state _: VMState) -> Gas {
-        10
+        Gas(10)
     }
 
     func hasEnoughGas(state: VMState) -> Bool {
-        state.getGas() >= gasCost(state: state)
+        Gas(state.getGas()) >= gasCost(state: state)
     }
 }

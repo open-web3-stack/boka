@@ -42,7 +42,7 @@ public class OnTransferContext: InvocationContext {
             )
             .call(config: config, state: state)
         default:
-            state.consumeGas(10)
+            state.consumeGas(Gas(10))
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHAT.rawValue)
             return .continued
         }
