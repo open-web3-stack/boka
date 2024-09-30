@@ -91,12 +91,12 @@ public class QuicStream: @unchecked Sendable {
 
     // Closes the stream and cleans up resources
     func close() {
-        guard streamCallback != nil else { return }
         streamCallback = nil
         messageHandler = nil
-        guard let stream else { return }
-        api?.pointee.StreamClose(stream)
-        self.stream = nil
+        if let stream {
+            api?.pointee.StreamClose(stream)
+            self.stream = nil
+        }
         streamLogger.info("QuicStream close")
     }
 

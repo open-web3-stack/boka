@@ -184,17 +184,15 @@ public class QuicConnection: @unchecked Sendable {
 
     // Closes the connection and cleans up resources
     func close() async {
-        guard connectionCallback != nil else { return }
         connectionCallback = nil
-        guard messageHandler != nil else { return }
         messageHandler = nil
         await streamManager.closeAllCommonEphemeralStreams()
         await streamManager.closeAllUniquePersistentStreams()
-        guard let connection else { return }
-        api?.pointee.ConnectionClose(connection)
-        self.connection = nil
+        if let connection {
+            api?.pointee.ConnectionClose(connection)
+            self.connection = nil
+        }
         logger.info("QuicConnection ConnectionClose")
-
     }
 
     // Starts the connection with the specified IP address and port
