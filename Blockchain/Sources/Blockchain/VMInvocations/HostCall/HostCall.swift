@@ -26,7 +26,7 @@ extension HostCall {
             logger.error("memory error: \(e)")
             return .exit(.pageFault(e.address))
         } catch VMInvocationsError.forceHalt {
-            logger.error("force halt")
+            logger.debug("force halt")
             return .exit(.halt)
         } catch let e as VMInvocationsError {
             logger.error("invocation error: \(e)")

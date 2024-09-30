@@ -23,9 +23,11 @@ public class AccumulateContext: InvocationContext {
 
     public func dispatch(index: UInt32, state: VMState) -> ExecOutcome {
         logger.debug("dispatching host-call: \(index)")
+        guard context.x.account != nil else {
+            fatalError("context x.account is nil")
+        }
         switch UInt8(index) {
         case Read.identifier:
-            // x.account won't be nil here, already checked in AccumulateFunction.invoke
             return Read(account: context.x.account!, serviceIndex: context.serviceIndex, accounts: context.accounts)
                 .call(config: config, state: state)
         case Write.identifier:
