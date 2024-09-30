@@ -24,7 +24,7 @@ jobs:
 
   test:
     name: Build and Test
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout Code
