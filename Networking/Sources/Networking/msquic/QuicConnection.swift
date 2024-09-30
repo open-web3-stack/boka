@@ -109,12 +109,12 @@ public class QuicConnection: @unchecked Sendable {
     // Deinitializer to ensure resources are cleaned up
     deinit {
         closeSync()
+        logger.info("QuicConnection Deinit")
     }
 
     nonisolated func closeSync() {
         Task { [weak self] in
             await self?.close() // Using weak self to avoid retain cycle
-            logger.info("QuicConnection Deinit")
         }
     }
 
@@ -191,9 +191,10 @@ public class QuicConnection: @unchecked Sendable {
         await streamManager.closeAllCommonEphemeralStreams()
         await streamManager.closeAllUniquePersistentStreams()
         guard let connection else { return }
-        logger.info("QuicConnection ConnectionClose")
         api?.pointee.ConnectionClose(connection)
         self.connection = nil
+        logger.info("QuicConnection ConnectionClose")
+
     }
 
     // Starts the connection with the specified IP address and port

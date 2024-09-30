@@ -5,9 +5,9 @@ import NIO
 
 let clientLogger = Logger(label: "QuicClient")
 
-public protocol QuicClientMessageHandler: AnyObject {
-    func didReceiveMessage(quicClient: QuicClient, message: QuicMessage)
-    func didReceiveError(quicClient: QuicClient, error: QuicError)
+public protocol QuicClientMessageHandler: AnyObject, Sendable {
+    func didReceiveMessage(quicClient: QuicClient, message: QuicMessage) async
+    func didReceiveError(quicClient: QuicClient, error: QuicError) async
 }
 
 public actor QuicClient: Sendable {
@@ -16,9 +16,9 @@ public actor QuicClient: Sendable {
     private var configuration: HQuic?
     private var connection: QuicConnection?
     private let config: QuicConfig
-    private weak var messageHandler: QuicClientMessageHandler?
+    private weak var messageHandler: Peer?
 
-    public init(config: QuicConfig, messageHandler: QuicClientMessageHandler? = nil) async throws {
+    public init(config: QuicConfig, messageHandler: Peer? = nil) async throws {
         self.config = config
         self.messageHandler = messageHandler
         var rawPointer: UnsafeRawPointer?
@@ -55,12 +55,12 @@ public actor QuicClient: Sendable {
 
     deinit {
         closeSync()
+        clientLogger.info("QuicClient Deinit")
     }
 
     nonisolated func closeSync() {
         Task { [weak self] in
             await self?.close() // Using weak self to avoid retain cycle
-            clientLogger.info("QuicClient Deinit")
         }
     }
 
@@ -102,19 +102,27 @@ public actor QuicClient: Sendable {
     }
 
     public func close() async {
+        clientLogger.info(" [\(getNetAddr())] client close")
+
         guard let connection else { return }
         await connection.close()
         self.connection = nil
+        clientLogger.info(" [\(getNetAddr())] client connection close")
+
         guard let configuration else { return }
         api?.pointee.ConfigurationClose(configuration)
         self.configuration = nil
+        clientLogger.info(" [\(getNetAddr())] client configuration close")
+
         guard let registration else { return }
         api?.pointee.RegistrationClose(registration)
         self.registration = nil
+        clientLogger.info(" [\(getNetAddr())] client registration close")
+
         guard let api else { return }
         MsQuicClose(api)
         self.api = nil
-        clientLogger.debug("[\(getNetAddr())] QuicClient Close")
+        clientLogger.info("[\(getNetAddr())] QuicClient Close")
     }
 }
 
@@ -134,9 +142,15 @@ extension QuicClient: @preconcurrency QuicConnectionMessageHandler {
                 "Client[\(getNetAddr())] shutdown"
             )
             // Use [weak self] to avoid strong reference cycle
+//            Task { [weak self] in
+//                guard let self else { return }
+//                self.messageHandler?.didReceiveMessage(quicClient: self, message: QuicMessage.init(type: .shutdownComplete, data: null));
+//                await close()
+//            }
+            // Call messageHandler safely in the actor context
             Task { [weak self] in
                 guard let self else { return }
-                await close()
+                await messageHandler?.didReceiveMessage(quicClient: self, message: QuicMessage(type: .shutdownComplete, data: nil))
             }
 
         default:

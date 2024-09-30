@@ -47,7 +47,7 @@ import Utils
                 }
 
                 // Example subscription to PeerMessageReceived
-                _ = await eventBus.subscribe(PeerMessageReceived.self) { event in
+                let token1 = await eventBus.subscribe(PeerMessageReceived.self) { event in
                     print(
                         "Received message from peer messageID: \(event.messageID), message: \(event.message)"
                     )
@@ -58,13 +58,21 @@ import Utils
                 }
 
                 // Example subscription to PeerErrorReceived
-                _ = await eventBus.subscribe(PeerErrorReceived.self) { event in
+                let token2 = await eventBus.subscribe(PeerErrorReceived.self) { event in
                     print(
                         "Received error from peer messageID: \(event.messageID ?? -1), error: \(event.error)"
                     )
                 }
 
-                try await group.next().scheduleTask(in: .seconds(20)) {}.futureResult.get()
+                _ = try await group.next().scheduleTask(in: .seconds(5)) {
+                    Task {
+                        await eventBus.unsubscribe(token: token1)
+                        await eventBus.unsubscribe(token: token2)
+                        print("eventBus unsubscribe")
+                    }
+                }.futureResult.get()
+
+                try await group.next().scheduleTask(in: .seconds(10)) {}.futureResult.get()
 
             } catch {
                 print("Failed to start peer: \(error)")

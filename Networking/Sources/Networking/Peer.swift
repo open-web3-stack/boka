@@ -56,7 +56,7 @@ public actor Peer {
         }
         clients.removeAll()
         quicServer?.closeSync()
-        peerLogger.trace("Peer Deinit")
+        peerLogger.info("Peer Deinit")
     }
 
     // Respond to a message with a specific messageID using Data
@@ -154,7 +154,10 @@ public actor Peer {
         }
     }
 
-    private func removeClient(with peerAddr: NetAddr) {
+    private func removeClient(client: QuicClient) async {
+        peerLogger.info("remove client")
+        let peerAddr = await client.getNetAddr()
+        await client.close()
         _ = clients.removeValue(forKey: peerAddr)
     }
 
@@ -164,13 +167,13 @@ public actor Peer {
 }
 
 // QuicClientMessageHandler methods
-extension Peer: @preconcurrency QuicClientMessageHandler {
+extension Peer: QuicClientMessageHandler {
     public func didReceiveMessage(quicClient: QuicClient, message: QuicMessage) {
         switch message.type {
-        case .close:
+        case .shutdownComplete:
             Task { [weak self] in
                 guard let self else { return }
-                await removeClient(with: quicClient.getNetAddr())
+                await removeClient(client: quicClient)
             }
         default:
             break
@@ -186,7 +189,7 @@ extension Peer: @preconcurrency QuicClientMessageHandler {
 }
 
 // QuicServerMessageHandler methods
-extension Peer: @preconcurrency QuicServerMessageHandler {
+extension Peer: QuicServerMessageHandler {
     public func didReceiveMessage(messageID: Int64, message: QuicMessage) async {
         switch message.type {
         case .received:
