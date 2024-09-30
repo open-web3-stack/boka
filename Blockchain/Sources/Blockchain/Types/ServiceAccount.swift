@@ -52,9 +52,9 @@ extension ServiceAccount: Dummy {
             preimages: [:],
             preimageInfos: [:],
             codeHash: Data32(),
-            balance: 0,
-            minAccumlateGas: 0,
-            minOnTransferGas: 0
+            balance: Balance(0),
+            minAccumlateGas: Gas(0),
+            minOnTransferGas: Gas(0)
         )
     }
 }

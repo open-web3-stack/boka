@@ -11,9 +11,9 @@ extension Ref where T == ProtocolConfig {
         preimagePurgePeriod: 28800,
         epochLength: 600,
         auditBiasFactor: 2,
-        coreAccumulationGas: 10_000_000, // TODO: check this
-        workPackageAuthorizerGas: 10_000_000, // TODO: check this
-        workPackageRefineGas: 10_000_000, // TODO: check this
+        coreAccumulationGas: Gas(10_000_000), // TODO: check this
+        workPackageAuthorizerGas: Gas(10_000_000), // TODO: check this
+        workPackageRefineGas: Gas(10_000_000), // TODO: check this
         recentHistorySize: 8,
         maxWorkItems: 4,
         maxTicketsPerExtrinsic: 16,
@@ -48,9 +48,9 @@ extension Ref where T == ProtocolConfig {
         preimagePurgePeriod: 28800,
         epochLength: 600,
         auditBiasFactor: 2,
-        coreAccumulationGas: 10_000_000, // TODO: check this
-        workPackageAuthorizerGas: 10_000_000, // TODO: check this
-        workPackageRefineGas: 10_000_000, // TODO: check this
+        coreAccumulationGas: Gas(10_000_000), // TODO: check this
+        workPackageAuthorizerGas: Gas(10_000_000), // TODO: check this
+        workPackageRefineGas: Gas(10_000_000), // TODO: check this
         recentHistorySize: 8,
         maxWorkItems: 4,
         maxTicketsPerExtrinsic: 16,

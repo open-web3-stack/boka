@@ -1,5 +1,6 @@
 import Foundation
 import TracingUtils
+import Utils
 
 private let logger = Logger(label: "invokePVM")
 
@@ -8,10 +9,10 @@ public func invokePVM(
     config: PvmConfig,
     blob: Data,
     pc: UInt32,
-    gas: UInt64,
+    gas: Gas,
     argumentData: Data?,
     ctx: any InvocationContext
-) -> (ExitReason, VMState?, UInt64?, Data?) {
+) -> (ExitReason, VMState?, Gas?, Data?) {
     do {
         let state = try VMState(standardProgramBlob: blob, pc: pc, gas: gas, argumentData: argumentData)
         let engine = Engine(config: config, invocationContext: ctx)
@@ -23,7 +24,7 @@ public func invokePVM(
         case .halt:
             let (addr, len) = state.readRegister(Registers.Index(raw: 10), Registers.Index(raw: 11))
             let output = try? state.readMemory(address: addr, length: Int(len))
-            return (.halt, state, UInt64(state.getGas()), output ?? Data())
+            return (.halt, state, Gas(state.getGas()), output ?? Data())
         default:
             return (.panic(.trap), state, nil, nil)
         }
