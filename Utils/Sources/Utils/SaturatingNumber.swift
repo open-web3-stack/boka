@@ -32,6 +32,14 @@ public struct SaturatingNumber<T: FixedWidthInteger & Sendable>: Sendable {
         SaturatingNumber(lhs.value.multipliedWithSaturation(by: rhs.value))
     }
 
+    public static func / (lhs: SaturatingNumber, rhs: SaturatingNumber) -> SaturatingNumber {
+        SaturatingNumber(lhs.value / rhs.value)
+    }
+
+    public static func % (lhs: SaturatingNumber, rhs: SaturatingNumber) -> SaturatingNumber {
+        SaturatingNumber(lhs.value % rhs.value)
+    }
+
     public static prefix func - (lhs: SaturatingNumber) -> SaturatingNumber {
         SaturatingNumber(lhs.value.negatedWithSaturation())
     }
@@ -48,6 +56,14 @@ public struct SaturatingNumber<T: FixedWidthInteger & Sendable>: Sendable {
         lhs.value = lhs.value.multipliedWithSaturation(by: rhs.value)
     }
 
+    public static func /= (lhs: inout SaturatingNumber, rhs: SaturatingNumber) {
+        lhs.value = lhs.value / rhs.value
+    }
+
+    public static func %= (lhs: inout SaturatingNumber, rhs: SaturatingNumber) {
+        lhs.value = lhs.value % rhs.value
+    }
+
     // With other types
 
     public static func + (lhs: SaturatingNumber, rhs: T) -> SaturatingNumber {
@@ -62,6 +78,14 @@ public struct SaturatingNumber<T: FixedWidthInteger & Sendable>: Sendable {
         SaturatingNumber(lhs.value.multipliedWithSaturation(by: rhs))
     }
 
+    public static func / (lhs: SaturatingNumber, rhs: T) -> SaturatingNumber {
+        SaturatingNumber(lhs.value / rhs)
+    }
+
+    public static func % (lhs: SaturatingNumber, rhs: T) -> SaturatingNumber {
+        SaturatingNumber(lhs.value % rhs)
+    }
+
     public static func += (lhs: inout SaturatingNumber, rhs: T) {
         lhs.value = lhs.value.addingWithSaturation(rhs)
     }
@@ -72,6 +96,14 @@ public struct SaturatingNumber<T: FixedWidthInteger & Sendable>: Sendable {
 
     public static func *= (lhs: inout SaturatingNumber, rhs: T) {
         lhs.value = lhs.value.multipliedWithSaturation(by: rhs)
+    }
+
+    public static func /= (lhs: inout SaturatingNumber, rhs: T) {
+        lhs.value = lhs.value / rhs
+    }
+
+    public static func %= (lhs: inout SaturatingNumber, rhs: T) {
+        lhs.value = lhs.value % rhs
     }
 }
 

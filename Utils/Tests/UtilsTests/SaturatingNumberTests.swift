@@ -90,4 +90,20 @@ struct SaturatingNumberTests {
         #expect(gas1 != gas2)
         #expect(gas1 + gas2 == gas3)
     }
+
+    @Test func testDivision() {
+        let gas1 = Gas(100)
+        let gas2 = Gas(200)
+        let result = gas2 / gas1
+
+        #expect(result == Gas(2))
+    }
+
+    @Test func testModulo() {
+        let gas1 = Gas(100)
+        let gas2 = Gas(200)
+
+        #expect(gas2 % gas1 == Gas(0))
+        #expect(gas1 % gas2 == Gas(100))
+    }
 }
