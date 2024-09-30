@@ -58,7 +58,6 @@ public actor QuicServer: Sendable {
     }
 
     nonisolated func closeSync() {
-        serverLogger.info("server closeSync")
         Task { [weak self] in
             await self?.close() // Using weak self to avoid retain cycle
             serverLogger.info("QuicServer Deinit")
@@ -66,23 +65,22 @@ public actor QuicServer: Sendable {
     }
 
     private func close() {
-        if listener != nil {
-            listener?.close()
-            listener = nil
-        }
-        if configuration != nil {
-            api?.pointee.ConfigurationClose(configuration)
-            configuration = nil
-        }
-        if registration != nil {
-            api?.pointee.RegistrationClose(registration)
-            registration = nil
-        }
-        if api != nil {
-            MsQuicClose(api)
-            api = nil
-        }
-        serverLogger.info("QuicServer Close")
+        guard let listener else { return }
+        listener.close()
+        self.listener = nil
+        serverLogger.debug("QuicListener close")
+        guard let configuration else { return }
+        api?.pointee.ConfigurationClose(configuration)
+        self.configuration = nil
+        serverLogger.debug("configuration close")
+        guard let registration else { return }
+        api?.pointee.RegistrationClose(registration)
+        self.registration = nil
+        serverLogger.debug("registration close")
+        guard let api else { return }
+        MsQuicClose(api)
+        self.api = nil
+        serverLogger.debug("QuicServer Close")
     }
 
     // Respond to a message with a specific messageID using Data

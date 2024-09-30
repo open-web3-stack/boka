@@ -58,7 +58,6 @@ public actor QuicClient: Sendable {
     }
 
     nonisolated func closeSync() {
-        clientLogger.info("client closeSync")
         Task { [weak self] in
             await self?.close() // Using weak self to avoid retain cycle
             clientLogger.info("QuicClient Deinit")
@@ -103,30 +102,19 @@ public actor QuicClient: Sendable {
     }
 
     public func close() async {
-        if let connection {
-            await connection.close()
-            self.connection = nil
-            clientLogger.info("QuicConnection close")
-        }
-
-        if let configuration {
-            api?.pointee.ConfigurationClose(configuration)
-            self.configuration = nil
-            clientLogger.info("configuration close")
-        }
-
-        if let registration {
-            api?.pointee.RegistrationClose(registration)
-            self.registration = nil
-            clientLogger.info("registration close")
-        }
-
-        if api != nil {
-            MsQuicClose(api)
-            api = nil
-            clientLogger.info("api close")
-        }
-        clientLogger.info("QuicClient Close")
+        guard let connection else { return }
+        await connection.close()
+        self.connection = nil
+        guard let configuration else { return }
+        api?.pointee.ConfigurationClose(configuration)
+        self.configuration = nil
+        guard let registration else { return }
+        api?.pointee.RegistrationClose(registration)
+        self.registration = nil
+        guard let api else { return }
+        MsQuicClose(api)
+        self.api = nil
+        clientLogger.debug("[\(getNetAddr())] QuicClient Close")
     }
 }
 

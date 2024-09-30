@@ -1,7 +1,7 @@
 import Foundation
 import Logging
-import Utils
 import msquic
+import Utils
 
 let logger = Logger(label: "QuicConnection")
 
@@ -24,7 +24,7 @@ actor StreamManager {
     }
 
     func getUniquePersistentStream(kind: StreamKind) -> QuicStream? {
-        return uniquePersistentStreams[kind]
+        uniquePersistentStreams[kind]
     }
 
     func addUniquePersistentStream(kind: StreamKind, stream: QuicStream) {
@@ -32,7 +32,6 @@ actor StreamManager {
     }
 
     func removeUniquePersistentStream(kind: StreamKind) {
-
         _ = uniquePersistentStreams.removeValue(forKey: kind)
     }
 
@@ -44,21 +43,20 @@ actor StreamManager {
         stream.close()
         commonEphemeralStreams.removeAll(where: { $0 === stream })
     }
-    
+
     func closeAllCommonEphemeralStreams() {
         for stream in commonEphemeralStreams {
             stream.close()
         }
         commonEphemeralStreams.removeAll()
     }
-    
+
     func closeAllUniquePersistentStreams() {
         for stream in uniquePersistentStreams.values {
             stream.close()
         }
         uniquePersistentStreams.removeAll()
     }
-    
 }
 
 public class QuicConnection: @unchecked Sendable {
@@ -81,7 +79,7 @@ public class QuicConnection: @unchecked Sendable {
         self.registration = registration
         self.configuration = configuration
         self.messageHandler = messageHandler
-        self.streamManager = StreamManager()
+        streamManager = StreamManager()
         connectionCallback = { connection, context, event in
             QuicConnection.connectionCallback(
                 connection: connection, context: context, event: event
@@ -89,6 +87,7 @@ public class QuicConnection: @unchecked Sendable {
         }
         try open()
     }
+
     // Initializer for wrapping an existing connection
     init(
         api: UnsafePointer<QuicApiTable>?, registration: HQuic?, configuration: HQuic?,
@@ -99,7 +98,7 @@ public class QuicConnection: @unchecked Sendable {
         self.configuration = configuration
         self.connection = connection
         self.messageHandler = messageHandler
-        self.streamManager = StreamManager()
+        streamManager = StreamManager()
         connectionCallback = { connection, context, event in
             QuicConnection.connectionCallback(
                 connection: connection, context: context, event: event
@@ -111,15 +110,13 @@ public class QuicConnection: @unchecked Sendable {
     deinit {
         closeSync()
     }
-    
+
     nonisolated func closeSync() {
         Task { [weak self] in
             await self?.close() // Using weak self to avoid retain cycle
             logger.info("QuicConnection Deinit")
-
         }
     }
-
 
     // Sets the callback handler for the connection
     func setCallbackHandler() -> QuicStatus {
@@ -169,7 +166,8 @@ public class QuicConnection: @unchecked Sendable {
     // Creates a common ephemeral stream
     func createCommonEphemeralStream() async throws -> QuicStream {
         let stream: QuicStream = try QuicStream(
-            api: api, connection: connection, .commonEphemeral, messageHandler: self)
+            api: api, connection: connection, .commonEphemeral, messageHandler: self
+        )
         await streamManager.addCommonEphemeralStream(stream)
         return stream
     }
@@ -186,16 +184,18 @@ public class QuicConnection: @unchecked Sendable {
 
     // Closes the connection and cleans up resources
     func close() async {
+        guard connectionCallback != nil else { return }
         connectionCallback = nil
+        guard messageHandler != nil else { return }
         messageHandler = nil
         await streamManager.closeAllCommonEphemeralStreams()
         await streamManager.closeAllUniquePersistentStreams()
-        if connection != nil {
-            api?.pointee.ConnectionClose(connection)
-            connection = nil
-        }
-        logger.info("QuicConnection close")
+        guard let connection else { return }
+        logger.info("QuicConnection ConnectionClose")
+        api?.pointee.ConnectionClose(connection)
+        self.connection = nil
     }
+
     // Starts the connection with the specified IP address and port
     func start(ipAddress: String, port: UInt16) throws {
         let status =

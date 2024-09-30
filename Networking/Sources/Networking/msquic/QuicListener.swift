@@ -36,7 +36,7 @@ public class QuicListener {
     }
 
     deinit {
-        listenLogger.info("QuicListener Deinit")
+        listenLogger.trace("QuicListener Deinit")
     }
 
     private func openListener(port: UInt16, listener: inout HQuic?) throws {
@@ -171,7 +171,6 @@ extension QuicListener: QuicConnectionMessageHandler {
     }
 
     private func removeConnection(_ connection: QuicConnection) {
-        listenLogger.info("listener[\(getNetAddr())] shutdown")
         connection.closeSync()
         connections.removeAll(where: { $0 === connection })
     }
