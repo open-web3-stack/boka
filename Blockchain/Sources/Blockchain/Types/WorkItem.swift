@@ -60,7 +60,7 @@ extension WorkItem: Dummy {
             serviceIndex: 0,
             codeHash: Data32(),
             payloadBlob: Data(),
-            gasLimit: 0,
+            gasLimit: Gas(0),
             inputs: [],
             outputs: [],
             outputDataSegmentsCount: 0

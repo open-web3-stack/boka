@@ -1,9 +1,9 @@
 import Utils
 
-public typealias Balance = UInt64
+public typealias Balance = Utils.Balance
 public typealias ServiceIndex = UInt32
 public typealias TimeslotIndex = UInt32
-public typealias Gas = UInt64
+public typealias Gas = Utils.Gas
 public typealias DataLength = UInt32
 
 public typealias ValidatorIndex = UInt16

@@ -34,13 +34,13 @@ struct PolkaVMTestcase: Codable, CustomStringConvertible {
     var initialPC: UInt32
     var initialPageMap: [PageMap]
     var initialMemory: [MemoryChunk]
-    var initialGas: Int64
+    var initialGas: Gas
     var program: [UInt8]
     var expectedStatus: Status
     var expectedRegs: [UInt32]
     var expectedPC: UInt32
     var expectedMemory: [MemoryChunk]
-    var expectedGas: Int64
+    var expectedGas: GasInt
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -92,7 +92,7 @@ struct PVMTests {
             program: program,
             pc: testCase.initialPC,
             registers: Registers(testCase.initialRegs),
-            gas: UInt64(testCase.initialGas),
+            gas: testCase.initialGas,
             memory: memory
         )
         let engine = Engine(config: DefaultPvmConfig())

@@ -1,6 +1,5 @@
 import Codec
 import Foundation
-import Numerics
 import PolkaVM
 import Utils
 
@@ -11,8 +10,8 @@ public class GasFn: HostCall {
     public static var identifier: UInt8 { 0 }
 
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) throws {
-        state.writeRegister(Registers.Index(raw: 0), UInt32(bitPattern: Int32(state.getGas() & 0xFFFF_FFFF)))
-        state.writeRegister(Registers.Index(raw: 1), UInt32(bitPattern: Int32(state.getGas() >> 32)))
+        state.writeRegister(Registers.Index(raw: 0), UInt32(bitPattern: Int32(state.getGas().value & 0xFFFF_FFFF)))
+        state.writeRegister(Registers.Index(raw: 1), UInt32(bitPattern: Int32(state.getGas().value >> 32)))
     }
 }
 
@@ -341,8 +340,8 @@ public class Checkpoint: HostCall {
     }
 
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) throws {
-        state.writeRegister(Registers.Index(raw: 0), UInt32(bitPattern: Int32(state.getGas() & 0xFFFF_FFFF)))
-        state.writeRegister(Registers.Index(raw: 1), UInt32(bitPattern: Int32(state.getGas() >> 32)))
+        state.writeRegister(Registers.Index(raw: 0), UInt32(bitPattern: Int32(state.getGas().value & 0xFFFF_FFFF)))
+        state.writeRegister(Registers.Index(raw: 1), UInt32(bitPattern: Int32(state.getGas().value >> 32)))
 
         y = x
     }
@@ -368,10 +367,8 @@ public class New: HostCall {
         let regs = state.readRegisters(in: 0 ..< 6)
 
         let codeHash: Data32? = try? Data32(state.readMemory(address: regs[0], length: 32))
-        let minAccumlateGas = Gas(0x1_0000_0000).multipliedWithSaturation(by: Gas(regs[3]))
-            .addingWithSaturation(Gas(regs[2]))
-        let minOnTransferGas = Gas(0x1_0000_0000).multipliedWithSaturation(by: Gas(regs[5]))
-            .addingWithSaturation(Gas(regs[4]))
+        let minAccumlateGas = Gas(0x1_0000_0000) * Gas(regs[3]) + Gas(regs[2])
+        let minOnTransferGas = Gas(0x1_0000_0000) * Gas(regs[5]) + Gas(regs[4])
 
         var newAccount: ServiceAccount?
         if let codeHash {
@@ -380,14 +377,14 @@ public class New: HostCall {
                 preimages: [:],
                 preimageInfos: [HashAndLength(hash: codeHash, length: regs[1]): []],
                 codeHash: codeHash,
-                balance: 0,
+                balance: Balance(0),
                 minAccumlateGas: minAccumlateGas,
                 minOnTransferGas: minOnTransferGas
             )
             newAccount!.balance = newAccount!.thresholdBalance(config: config)
         }
 
-        let newBalance = (x.account?.balance ?? 0).subtractingWithSaturation(newAccount!.balance)
+        let newBalance = (x.account?.balance ?? Balance(0)) - newAccount!.balance
 
         if let newAccount, x.account != nil, newBalance >= x.account!.thresholdBalance(config: config) {
             state.writeRegister(Registers.Index(raw: 0), x.serviceIndex)
@@ -418,10 +415,8 @@ public class Upgrade: HostCall {
         let regs = state.readRegisters(in: 0 ..< 5)
 
         let codeHash: Data32? = try? Data32(state.readMemory(address: regs[0], length: 32))
-        let minAccumlateGas = Gas(0x1_0000_0000).multipliedWithSaturation(by: Gas(regs[1]))
-            .addingWithSaturation(Gas(regs[2]))
-        let minOnTransferGas = Gas(0x1_0000_0000).multipliedWithSaturation(by: Gas(regs[3]))
-            .addingWithSaturation(Gas(regs[4]))
+        let minAccumlateGas = Gas(0x1_0000_0000) * Gas(regs[1]) + Gas(regs[2])
+        let minOnTransferGas = Gas(0x1_0000_0000) * Gas(regs[3]) + Gas(regs[4])
 
         if let codeHash {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.OK.rawValue)
@@ -450,21 +445,18 @@ public class Transfer: HostCall {
 
     public func gasCost(state: VMState) -> Gas {
         let (reg1, reg2) = state.readRegister(Registers.Index(raw: 1), Registers.Index(raw: 2))
-        return Gas(10).addingWithSaturation(Gas(reg1))
-            .addingWithSaturation(Gas(0x1_0000_0000).multipliedWithSaturation(by: Gas(reg2)))
+        return Gas(10) + Gas(reg1) + Gas(0x1_0000_0000) * Gas(reg2)
     }
 
     public func _callImpl(config: ProtocolConfigRef, state: VMState) throws {
         let regs = state.readRegisters(in: 0 ..< 6)
-        let amount = Balance(0x1_0000_0000).multipliedWithSaturation(by: Balance(regs[2]))
-            .addingWithSaturation(Balance(regs[1]))
-        let gasLimit = Gas(0x1_0000_0000).multipliedWithSaturation(by: Gas(regs[4]))
-            .addingWithSaturation(Gas(regs[3]))
+        let amount = Balance(0x1_0000_0000) * Balance(regs[2]) + Balance(regs[1])
+        let gasLimit = Gas(0x1_0000_0000) * Gas(regs[4]) + Gas(regs[3])
         let memo = try? state.readMemory(address: regs[5], length: config.value.transferMemoSize)
         let dest = regs[0]
         let allAccounts = accounts.merging(x.newAccounts) { _, new in new }
 
-        let newBalance = x.account?.balance.subtractingWithSaturation(UInt64(amount)) ?? 0
+        let newBalance = (x.account?.balance ?? Balance(0)) - amount
 
         if memo == nil {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.OOB.rawValue)
@@ -472,7 +464,7 @@ public class Transfer: HostCall {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHO.rawValue)
         } else if gasLimit < allAccounts[dest]!.minOnTransferGas {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.LOW.rawValue)
-        } else if state.getGas() < gasLimit {
+        } else if Gas(state.getGas()) < gasLimit {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.HIGH.rawValue)
         } else if newBalance < x.account!.thresholdBalance(config: config) {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.CASH.rawValue)
@@ -506,17 +498,15 @@ public class Quit: HostCall {
 
     public func gasCost(state: VMState) -> Gas {
         let (reg1, reg2) = state.readRegister(Registers.Index(raw: 1), Registers.Index(raw: 2))
-        return Gas(10).addingWithSaturation(Gas(reg1))
-            .addingWithSaturation(Gas(0x1_0000_0000).multipliedWithSaturation(by: Gas(reg2)))
+        return Gas(10) + Gas(reg1) + Gas(0x1_0000_0000) * Gas(reg2)
     }
 
     public func _callImpl(config: ProtocolConfigRef, state: VMState) throws {
         let (reg0, reg1) = state.readRegister(Registers.Index(raw: 0), Registers.Index(raw: 1))
         let allAccounts = accounts.merging(x.newAccounts) { _, new in new }
-        let amount = Balance(x.account?.balance ?? 0)
-            .subtractingWithSaturation(x.account!.thresholdBalance(config: config))
-            .addingWithSaturation(Balance(config.value.serviceMinBalance))
-        let gasLimit = state.getGas()
+        let amount = (x.account?.balance ?? Balance(0)) - x.account!
+            .thresholdBalance(config: config) + Balance(config.value.serviceMinBalance)
+        let gasLimit = Gas(state.getGas())
         let dest = reg0
 
         let isValidDest = dest == serviceIndex || dest == Int32.max
@@ -541,7 +531,7 @@ public class Quit: HostCall {
                 destination: dest,
                 amount: amount,
                 memo: memo!,
-                gasLimit: Gas(gasLimit)
+                gasLimit: gasLimit
             ))
             throw VMInvocationsError.forceHalt
         }

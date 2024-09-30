@@ -49,20 +49,22 @@ extension Accumulation {
             servicesGas[service] = gas
         }
 
-        let totalGasRatio = workReports.flatMap(\.results).reduce(0) { $0 + $1.gasRatio }
+        let totalGasRatio = workReports.flatMap(\.results).reduce(Gas(0)) { $0 + $1.gasRatio }
         let totalMinimalGas = try workReports.flatMap(\.results)
-            .reduce(0) { try $0 + serviceAccounts[$1.serviceIndex].unwrap(orError: AccumulationError.invalidServiceIndex).minAccumlateGas }
+            .reduce(Gas(0)) {
+                try $0 + serviceAccounts[$1.serviceIndex].unwrap(orError: AccumulationError.invalidServiceIndex).minAccumlateGas
+            }
         for report in workReports {
             for result in report.results {
-                servicesGasRatio[result.serviceIndex, default: 0] += result.gasRatio
-                servicesGas[result.serviceIndex, default: 0] += try serviceAccounts[result.serviceIndex]
+                servicesGasRatio[result.serviceIndex, default: Gas(0)] += result.gasRatio
+                servicesGas[result.serviceIndex, default: Gas(0)] += try serviceAccounts[result.serviceIndex]
                     .unwrap(orError: AccumulationError.invalidServiceIndex).minAccumlateGas
             }
         }
         let remainingGas = config.value.coreAccumulationGas - totalMinimalGas
 
         for (service, gas) in servicesGas {
-            servicesGas[service] = gas + servicesGasRatio[service, default: 0] * remainingGas / totalGasRatio
+            servicesGas[service] = gas + servicesGasRatio[service, default: Gas(0)] * remainingGas / totalGasRatio
         }
 
         var serviceArguments: [ServiceIndex: [AccumulateArguments]] = [:]
