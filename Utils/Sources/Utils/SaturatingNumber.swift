@@ -124,7 +124,6 @@ extension SaturatingNumber: CustomStringConvertible {
     }
 }
 
-// TODO: check if this is correct
 extension SaturatingNumber: Codable where T: Codable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
