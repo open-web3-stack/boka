@@ -20,24 +20,25 @@ public class OnTransferContext: InvocationContext {
     }
 
     public func dispatch(index: UInt32, state: VMState) -> ExecOutcome {
+        logger.debug("dispatching host-call: \(index)")
         switch UInt8(index) {
         case Lookup.identifier:
-            return Lookup(serviceAccount: context.account, serviceIndex: context.index, serviceAccounts: context.accounts)
+            return Lookup(account: context.account, serviceIndex: context.index, accounts: context.accounts)
                 .call(config: config, state: state)
         case Read.identifier:
-            return Read(serviceAccount: context.account, serviceIndex: context.index, serviceAccounts: context.accounts)
+            return Read(account: context.account, serviceIndex: context.index, accounts: context.accounts)
                 .call(config: config, state: state)
         case Write.identifier:
-            return Write(serviceAccount: &context.account, serviceIndex: context.index)
+            return Write(account: &context.account, serviceIndex: context.index)
                 .call(config: config, state: state)
         case GasFn.identifier:
             return GasFn().call(config: config, state: state)
         case Info.identifier:
             return Info(
-                serviceAccount: context.account,
+                account: context.account,
                 serviceIndex: context.index,
-                serviceAccounts: context.accounts,
-                newServiceAccounts: [:]
+                accounts: context.accounts,
+                newAccounts: [:]
             )
             .call(config: config, state: state)
         default:

@@ -23,11 +23,11 @@ public struct DeferredTransfers: Codable {
     // a
     public var amount: Balance
     // m
-    public var memo: Data64
+    public var memo: Data128
     // g
     public var gasLimit: Gas
 
-    public init(sender: ServiceIndex, destination: ServiceIndex, amount: Balance, memo: Data64, gasLimit: Gas) {
+    public init(sender: ServiceIndex, destination: ServiceIndex, amount: Balance, memo: Data128, gasLimit: Gas) {
         self.sender = sender
         self.destination = destination
         self.amount = amount

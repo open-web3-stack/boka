@@ -6,7 +6,7 @@ private let logger = Logger(label: "HostCall")
 public protocol HostCall {
     static var identifier: UInt8 { get }
 
-    func gasCost() -> Gas
+    func gasCost(state: VMState) -> Gas
     func _callImpl(config: ProtocolConfigRef, state: VMState) throws
 }
 
@@ -16,30 +16,33 @@ extension HostCall {
             logger.debug("not enough gas")
             return .exit(.outOfGas)
         }
-        state.consumeGas(gasCost())
-        logger.debug("consumed \(gasCost()) gas")
+        state.consumeGas(gasCost(state: state))
+        logger.debug("consumed \(gasCost(state: state)) gas")
 
         do {
             try _callImpl(config: config, state: state)
             return .continued
         } catch let e as Memory.Error {
-            logger.error("invocation memory error: \(e)")
+            logger.error("memory error: \(e)")
             return .exit(.pageFault(e.address))
+        } catch VMInvocationsError.forceHalt {
+            logger.error("force halt")
+            return .exit(.halt)
         } catch let e as VMInvocationsError {
-            logger.error("invocation dispatch error: \(e)")
+            logger.error("invocation error: \(e)")
             return .exit(.panic(.trap))
         } catch let e {
-            logger.error("invocation unknown error: \(e)")
+            logger.error("unknown error: \(e)")
             return .exit(.panic(.trap))
         }
     }
 
     // TODO: host-calls will have different gas costs later on
-    public func gasCost() -> UInt64 {
+    public func gasCost(state _: VMState) -> Gas {
         10
     }
 
     func hasEnoughGas(state: VMState) -> Bool {
-        state.getGas() >= gasCost()
+        state.getGas() >= gasCost(state: state)
     }
 }
