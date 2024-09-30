@@ -149,7 +149,7 @@ public final class Runtime {
 
             // depends on Safrole and Disputes
             let availableReports = try updateReports(block: block, state: &newState)
-            let res = try newState.update(config: config, workReports: availableReports)
+            let res = try newState.update(config: config, block: block, workReports: availableReports)
             newState.privilegedServices = res.privilegedServices
             newState.serviceAccounts = res.serviceAccounts
             newState.authorizationQueue = res.authorizationQueue
