@@ -211,11 +211,24 @@ extension State: Guaranteeing {
 struct DummyFunction: AccumulateFunction, OnTransferFunction {
     func invoke(
         config _: ProtocolConfigRef,
-        service _: ServiceIndex,
+        serviceIndex _: ServiceIndex,
         code _: Data,
         serviceAccounts _: [ServiceIndex: ServiceAccount],
         gas _: Gas,
-        arguments _: [AccumulateArguments]
+        arguments _: [AccumulateArguments],
+        validatorQueue _: ConfigFixedSizeArray<
+            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        >,
+        authorizationQueue _: ConfigFixedSizeArray<
+            ConfigFixedSizeArray<
+                Data32,
+                ProtocolConfig.MaxAuthorizationsQueueItems
+            >,
+            ProtocolConfig.TotalNumberOfCores
+        >,
+        privilegedServices _: PrivilegedServices,
+        initialIndex _: ServiceIndex,
+        timeslot _: TimeslotIndex
     ) throws -> (ctx: AccumlateResultContext, result: Data32?) {
         fatalError("not implemented")
     }

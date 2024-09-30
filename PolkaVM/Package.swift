@@ -19,6 +19,7 @@ let package = Package(
         .package(path: "../TracingUtils"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.0"),
+        .package(url: "https://github.com/apple/swift-numerics", branch: "main"),
     ],
     targets: [
         .target(
@@ -27,6 +28,7 @@ let package = Package(
                 "Utils",
                 "TracingUtils",
                 .product(name: "Logging", package: "swift-log"),
+                .product(name: "Numerics", package: "swift-numerics"),
             ]
         ),
         .testTarget(

@@ -23,13 +23,24 @@ public struct AccumulationOutput {
 
 public protocol Accumulation {
     var privilegedServices: PrivilegedServices { get }
+    var validatorQueue: ConfigFixedSizeArray<
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+    > { get }
+    var authorizationQueue: ConfigFixedSizeArray<
+        ConfigFixedSizeArray<
+            Data32,
+            ProtocolConfig.MaxAuthorizationsQueueItems
+        >,
+        ProtocolConfig.TotalNumberOfCores
+    > { get }
+    var entropyPool: EntropyPool { get }
     var serviceAccounts: [ServiceIndex: ServiceAccount] { get }
     var accumlateFunction: AccumulateFunction { get }
     var onTransferFunction: OnTransferFunction { get }
 }
 
 extension Accumulation {
-    public func update(config: ProtocolConfigRef, workReports: [WorkReport]) throws -> AccumulationOutput {
+    public func update(config: ProtocolConfigRef, block: BlockRef, workReports: [WorkReport]) throws -> AccumulationOutput {
         var servicesGasRatio: [ServiceIndex: Gas] = [:]
         var servicesGas: [ServiceIndex: Gas] = [:]
 
@@ -100,11 +111,17 @@ extension Accumulation {
             }
             let (ctx, commitment) = try accumlateFunction.invoke(
                 config: config,
-                service: service,
+                serviceIndex: service,
                 code: code,
                 serviceAccounts: serviceAccounts,
                 gas: gas,
-                arguments: arguments
+                arguments: arguments,
+                validatorQueue: validatorQueue,
+                authorizationQueue: authorizationQueue,
+                privilegedServices: privilegedServices,
+                initialIndex: Blake2b256.hash(service.encode(), entropyPool.t0.data, block.header.timeslot.encode())
+                    .data.decode(UInt32.self),
+                timeslot: block.header.timeslot
             )
             if let commitment {
                 commitments.append((service, commitment))
