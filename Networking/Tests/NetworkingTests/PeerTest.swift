@@ -70,7 +70,7 @@ import Utils
                         print("eventBus unsubscribe")
                     }
                 }.futureResult.get()
-                try await group.next().scheduleTask(in: .seconds(20)) {}.futureResult.get()
+                try await group.next().scheduleTask(in: .seconds(5)) {}.futureResult.get()
 
             } catch {
                 print("Failed to start peer: \(error)")

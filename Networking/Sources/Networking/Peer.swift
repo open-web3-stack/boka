@@ -197,7 +197,7 @@ extension Peer: @preconcurrency QuicServerMessageHandler {
                 await eventBus.publish(PeerMessageReceived(messageID: messageID, message: message))
             }
         case .shutdownComplete:
-            break
+            peerLogger.info("quic server shutdown")
         default:
             break
         }

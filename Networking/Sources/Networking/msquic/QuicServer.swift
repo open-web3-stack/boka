@@ -74,7 +74,7 @@ public final class QuicServer: @unchecked Sendable {
             MsQuicClose(api)
             api = nil
         }
-        serverLogger.info("QuicServer Close")
+        serverLogger.trace("QuicServer Close")
     }
 
     // Respond to a message with a specific messageID using Data
