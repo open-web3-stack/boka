@@ -10,7 +10,7 @@ public protocol QuicClientMessageHandler: AnyObject, Sendable {
     func didReceiveError(quicClient: QuicClient, error: QuicError) async
 }
 
-public actor QuicClient: Sendable {
+public actor QuicClient: Sendable, QuicConnectionMessageHandler {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
@@ -124,9 +124,7 @@ public actor QuicClient: Sendable {
         self.api = nil
         clientLogger.info("[\(getNetAddr())] QuicClient Close")
     }
-}
 
-extension QuicClient: @preconcurrency QuicConnectionMessageHandler {
     public func didReceiveMessage(
         connection _: QuicConnection, stream _: QuicStream?, message: QuicMessage
     ) {
@@ -141,16 +139,12 @@ extension QuicClient: @preconcurrency QuicConnectionMessageHandler {
             clientLogger.info(
                 "Client[\(getNetAddr())] shutdown"
             )
-            // Use [weak self] to avoid strong reference cycle
-//            Task { [weak self] in
-//                guard let self else { return }
-//                self.messageHandler?.didReceiveMessage(quicClient: self, message: QuicMessage.init(type: .shutdownComplete, data: null));
-//                await close()
-//            }
             // Call messageHandler safely in the actor context
             Task { [weak self] in
                 guard let self else { return }
-                await messageHandler?.didReceiveMessage(quicClient: self, message: QuicMessage(type: .shutdownComplete, data: nil))
+                await messageHandler?.didReceiveMessage(
+                    quicClient: self, message: QuicMessage(type: .shutdownComplete, data: nil)
+                )
             }
 
         default:

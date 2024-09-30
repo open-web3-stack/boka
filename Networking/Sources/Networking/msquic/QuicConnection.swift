@@ -8,10 +8,10 @@ let logger = Logger(label: "QuicConnection")
 public protocol QuicConnectionMessageHandler: AnyObject {
     func didReceiveMessage(
         connection: QuicConnection, stream: QuicStream?, message: QuicMessage
-    )
+    ) async
     func didReceiveError(
         connection: QuicConnection, stream: QuicStream, error: QuicError
-    )
+    ) async
 }
 
 actor StreamManager {
@@ -109,7 +109,6 @@ public class QuicConnection: @unchecked Sendable {
     // Deinitializer to ensure resources are cleaned up
     deinit {
         closeSync()
-        logger.info("QuicConnection Deinit")
     }
 
     nonisolated func closeSync() {
@@ -192,7 +191,7 @@ public class QuicConnection: @unchecked Sendable {
             api?.pointee.ConnectionClose(connection)
             self.connection = nil
         }
-        logger.info("QuicConnection ConnectionClose")
+        logger.debug("QuicConnection Close")
     }
 
     // Starts the connection with the specified IP address and port
@@ -247,12 +246,14 @@ extension QuicConnection {
             logger.info("[\(String(describing: connection))] Shutdown all done")
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 if let messageHandler = quicConnection.messageHandler {
-                    messageHandler.didReceiveMessage(
-                        connection: quicConnection,
-                        stream: nil,
-                        message: QuicMessage(type: .shutdownComplete, data: nil)
-                    )
-                    quicConnection.messageHandler = nil
+                    Task {
+                        await messageHandler.didReceiveMessage(
+                            connection: quicConnection,
+                            stream: nil,
+                            message: QuicMessage(type: .shutdownComplete, data: nil)
+                        )
+                        quicConnection.messageHandler = nil
+                    }
                 }
             }
 
@@ -291,12 +292,16 @@ extension QuicConnection: QuicStreamMessageHandler {
         default:
             break
         }
-        messageHandler?.didReceiveMessage(connection: self, stream: stream, message: message)
+        // Call messageHandler safely in the actor context
+        Task { [weak self] in
+            guard let self else { return }
+            await messageHandler?.didReceiveMessage(connection: self, stream: stream, message: message)
+        }
     }
 
     // Handles errors received from the stream
-    public func didReceiveError(_ stream: QuicStream, error: QuicError) {
+    public func didReceiveError(_: QuicStream, error: QuicError) {
         logger.error("Failed to receive message: \(error)")
-        messageHandler?.didReceiveError(connection: self, stream: stream, error: error)
+//       await  messageHandler?.didReceiveError(connection: self, stream: stream, error: error)
     }
 }
