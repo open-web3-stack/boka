@@ -31,6 +31,7 @@ let package = Package(
                 .linkedLibrary("z"),
                 .linkedLibrary("bz2"),
                 .linkedLibrary("zstd"),
+                .linkedLibrary("lz4"),
             ]
         ),
         .systemLibrary(
