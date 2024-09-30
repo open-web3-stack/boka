@@ -449,10 +449,9 @@ public class Transfer: HostCall {
     }
 
     public func gasCost(state: VMState) -> Gas {
-        let reg1 = Gas(state.readRegister(Registers.Index(raw: 1)))
-        let reg2 = Gas(state.readRegister(Registers.Index(raw: 2)))
-        return Gas(10).addingWithSaturation(reg1)
-            .addingWithSaturation(Gas(0x1_0000_0000).multipliedWithSaturation(by: reg2))
+        let (reg1, reg2) = state.readRegister(Registers.Index(raw: 1), Registers.Index(raw: 2))
+        return Gas(10).addingWithSaturation(Gas(reg1))
+            .addingWithSaturation(Gas(0x1_0000_0000).multipliedWithSaturation(by: Gas(reg2)))
     }
 
     public func _callImpl(config: ProtocolConfigRef, state: VMState) throws {
@@ -506,10 +505,9 @@ public class Quit: HostCall {
     }
 
     public func gasCost(state: VMState) -> Gas {
-        let reg1 = Gas(state.readRegister(Registers.Index(raw: 1)))
-        let reg2 = Gas(state.readRegister(Registers.Index(raw: 2)))
-        return Gas(10).addingWithSaturation(reg1)
-            .addingWithSaturation(Gas(0x1_0000_0000).multipliedWithSaturation(by: reg2))
+        let (reg1, reg2) = state.readRegister(Registers.Index(raw: 1), Registers.Index(raw: 2))
+        return Gas(10).addingWithSaturation(Gas(reg1))
+            .addingWithSaturation(Gas(0x1_0000_0000).multipliedWithSaturation(by: Gas(reg2)))
     }
 
     public func _callImpl(config: ProtocolConfigRef, state: VMState) throws {
@@ -550,7 +548,7 @@ public class Quit: HostCall {
     }
 }
 
-/// Solicit data to be made availabl in-core (through preimage lookups)
+/// Solicit data to be made available in-core (through preimage lookups)
 public class Solicit: HostCall {
     public static var identifier: UInt8 { 13 }
 
@@ -588,7 +586,7 @@ public class Solicit: HostCall {
     }
 }
 
-/// Forget data made availabl in-core (through preimage lookups)
+/// Forget data made available in-core (through preimage lookups)
 public class Forget: HostCall {
     public static var identifier: UInt8 { 14 }
 
