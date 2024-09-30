@@ -7,6 +7,7 @@ JAM built with Swift
 - SwiftLint: `brew install swiftlint`
 - SwiftFormat: `brew install swiftformat`
 - CMake (required by msquic): `brew install cmake`
+- zstd (required by rocksdb): `brew install zstd`
 - Precommit hooks: `make githooks`
 - Pull submodules: `git submodule update --init --recursive`
 - Setup deps: `make deps`
