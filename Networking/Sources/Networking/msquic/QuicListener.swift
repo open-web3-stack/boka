@@ -11,14 +11,14 @@ public protocol QuicListenerMessageHandler: AnyObject {
     func didReceiveError(connection: QuicConnection, stream: QuicStream, error: QuicError) async
 }
 
-public class QuicListener {
+public class QuicListener: @unchecked Sendable {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
     private var config: QuicConfig
     private var listener: HQuic?
     private var connections: AtomicArray<QuicConnection> = .init()
-    public weak var messageHandler: QuicServer?
+    public weak var messageHandler: QuicListenerMessageHandler?
 
     public init(
         api: UnsafePointer<QuicApiTable>?,

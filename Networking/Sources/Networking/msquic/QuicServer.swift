@@ -10,7 +10,7 @@ public protocol QuicServerMessageHandler: AnyObject, Sendable {
     func didReceiveError(messageID: Int64, error: QuicError) async
 }
 
-public actor QuicServer: Sendable {
+public actor QuicServer: Sendable, QuicListenerMessageHandler {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
@@ -119,9 +119,7 @@ public actor QuicServer: Sendable {
     {
         try await stream.send(buffer: data, kind: kind)
     }
-}
 
-extension QuicServer: QuicListenerMessageHandler {
     public func didReceiveMessage(
         connection: QuicConnection, stream: QuicStream, message: QuicMessage
     ) async {
