@@ -56,7 +56,7 @@ public actor Peer {
         }
         clients.removeAll()
         quicServer?.closeSync()
-        peerLogger.info("Peer Deinit")
+        peerLogger.trace("Peer Deinit")
     }
 
     // Respond to a message with a specific messageID using Data

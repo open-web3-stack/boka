@@ -55,7 +55,7 @@ public actor QuicClient: Sendable, QuicConnectionMessageHandler {
 
     deinit {
         closeSync()
-        clientLogger.info("QuicClient Deinit")
+        clientLogger.trace("QuicClient Deinit")
     }
 
     nonisolated func closeSync() {

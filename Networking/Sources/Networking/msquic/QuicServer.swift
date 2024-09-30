@@ -60,7 +60,7 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
     nonisolated func closeSync() {
         Task { [weak self] in
             await self?.close() // Using weak self to avoid retain cycle
-            serverLogger.info("QuicServer Deinit")
+            serverLogger.trace("QuicServer Deinit")
         }
     }
 

@@ -61,7 +61,7 @@ public class QuicStream: @unchecked Sendable {
     // Deinitializer to ensure resources are cleaned up
     deinit {
         close()
-        streamLogger.info("QuicStream Deinit")
+        streamLogger.trace("QuicStream Deinit")
     }
 
     // Opens a stream with the specified kind
@@ -97,7 +97,7 @@ public class QuicStream: @unchecked Sendable {
             api?.pointee.StreamClose(stream)
             self.stream = nil
         }
-        streamLogger.info("QuicStream close")
+        streamLogger.debug("QuicStream close")
     }
 
     // Sets the callback handler for the stream
