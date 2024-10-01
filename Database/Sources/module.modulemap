@@ -1,4 +1,4 @@
 module rocksdb {
-  header "rocksdb/include/rocksdb/c.h"
+  header "include/rocksdb.h"
   link "rocksdb"
 }
