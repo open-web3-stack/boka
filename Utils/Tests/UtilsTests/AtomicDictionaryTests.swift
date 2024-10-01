@@ -80,7 +80,8 @@ struct AtomicDictionaryTests {
     @Test func forEach() throws {
         let dict = AtomicDictionary<String, Int>(["one": 1, "two": 2, "three": 3])
         var sum = 0
-        for (_, value) in dict {
+        // swiftformat:disable:next all
+        dict.forEach { _, value in
             sum += value
         }
         #expect(sum == 6)
