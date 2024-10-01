@@ -5,7 +5,7 @@ JAM built with Swift
 ## Development Environment
 
 - Install tools and eps
-  - macos: `brwe install swiftlint swiftformat cmake rocksdb`
+  - macos: `brwe install swiftlint swiftformat rocksdb`
   - linux: `apt-get install librocksdb-dev libzstd-dev libbz2-dev liblz4-dev`
 - Precommit hooks: `make githooks`
 - Pull submodules: `git submodule update --init --recursive`
