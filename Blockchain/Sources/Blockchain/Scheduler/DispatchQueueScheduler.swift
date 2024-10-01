@@ -1,4 +1,5 @@
-@preconcurrency import Foundation
+@preconcurrency import Dispatch
+import Foundation
 import TracingUtils
 
 private let logger = Logger(label: "Scheduler")
