@@ -2,15 +2,15 @@
 
 set -e
 
-release=v1
+release=v6
 
 os=$(uname -s)
 arch=$(uname -m)
 
 if [ "$os" = "Darwin" ]; then
-    filename="macos-15-build.tar.gz"
+    filename="macos-build.tar.gz"
 elif [ "$os" = "Linux" ]; then
-    filename="ubuntu-latest-build.tar.gz"
+    filename="linux-build.tar.gz"
 fi
 
 cd .lib

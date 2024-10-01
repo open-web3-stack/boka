@@ -8,7 +8,7 @@ default: build
 githooks: .git/hooks/pre-commit
 
 .PHONY: deps
-deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a .lib/librocksdb.a .lib/libec.a .lib/libmsquic.a
+deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a .lib/libec.a .lib/libmsquic.a
 
 .lib/libblst.a:
 	./scripts/blst.sh
@@ -18,9 +18,6 @@ deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a .lib/librocksdb.a .lib/libec.a 
 
 .lib/libec.a: $(wildcard Utils/Sources/erasure-coding/src/*)
 	./scripts/erasure-coding.sh
-
-.lib/librocksdb.a:
-	./scripts/external-libs.sh
 
 .lib/libmsquic.a:
 	./scripts/external-libs.sh
