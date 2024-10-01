@@ -1,4 +1,4 @@
 module msquic {
-  header "msquic/src/inc/msquic.h"
+  header "include/msquic.h"
   link "msquic"
 }
