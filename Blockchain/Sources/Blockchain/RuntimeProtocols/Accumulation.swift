@@ -170,10 +170,9 @@ extension Accumulation {
 
         return .init(
             commitments: commitments,
-            // those cannot be nil because priviledge services are always called
-            privilegedServices: newPrivilegedServices!,
-            validatorQueue: newValidatorQueue!,
-            authorizationQueue: newAuthorizationQueue!,
+            privilegedServices: newPrivilegedServices ?? privilegedServices,
+            validatorQueue: newValidatorQueue ?? validatorQueue,
+            authorizationQueue: newAuthorizationQueue ?? authorizationQueue,
             serviceAccounts: newServiceAccounts
         )
     }

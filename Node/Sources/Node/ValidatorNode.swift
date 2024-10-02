@@ -11,10 +11,7 @@ public class ValidatorNode: Node {
     ) async throws {
         try await super.init(genesis: genesis, config: config, eventBus: eventBus)
 
-        let scheduler = DispatchQueueScheduler(
-            timeProvider: timeProvider,
-            queue: DispatchQueue(label: "boka.validator.scheduler", attributes: .concurrent)
-        )
+        let scheduler = DispatchQueueScheduler(timeProvider: timeProvider)
         validator = await Validator(
             blockchain: blockchain,
             keystore: keystore,

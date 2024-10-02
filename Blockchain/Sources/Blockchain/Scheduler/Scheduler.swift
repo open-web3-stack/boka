@@ -1,4 +1,7 @@
 import Foundation
+import TracingUtils
+
+private let logger = Logger(label: "Scheduler")
 
 public final class Cancellable: Sendable, Hashable {
     private let fn: @Sendable () -> Void
@@ -25,7 +28,7 @@ public protocol Scheduler: Sendable {
     func schedule(
         delay: TimeInterval,
         repeats: Bool,
-        task: @escaping @Sendable () -> Void,
+        task: @escaping @Sendable () async -> Void,
         onCancel: (@Sendable () -> Void)?
     ) -> Cancellable
 }
@@ -34,7 +37,7 @@ extension Scheduler {
     func schedule(
         delay: TimeInterval,
         repeats: Bool = false,
-        task: @escaping @Sendable () -> Void,
+        task: @escaping @Sendable () async -> Void,
         onCancel: (@Sendable () -> Void)? = nil
     ) -> Cancellable {
         schedule(delay: delay, repeats: repeats, task: task, onCancel: onCancel)
@@ -42,11 +45,21 @@ extension Scheduler {
 
     public func schedule(
         at timeslot: TimeslotIndex,
-        task: @escaping @Sendable () -> Void,
+        task: @escaping @Sendable () async -> Void,
         onCancel: (@Sendable () -> Void)? = nil
     ) -> Cancellable {
+        let nowTimeslot = timeProvider.getTimeslot()
+        if timeslot == nowTimeslot {
+            return schedule(delay: 0, repeats: false, task: task, onCancel: onCancel)
+        }
+
         let deadline = timeProvider.timeslotToTime(timeslot)
-        return schedule(delay: TimeInterval(deadline - timeProvider.getTime()), repeats: false, task: task, onCancel: onCancel)
+        let now = timeProvider.getTime()
+        if deadline < now {
+            logger.error("scheduling task in the past", metadata: ["deadline": "\(deadline)", "now": "\(now)"])
+            return Cancellable {}
+        }
+        return schedule(delay: TimeInterval(deadline - now), repeats: false, task: task, onCancel: onCancel)
     }
 }
 
