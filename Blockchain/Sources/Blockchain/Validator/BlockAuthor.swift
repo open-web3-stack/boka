@@ -59,7 +59,29 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
             try throwUnreachable("no state for best head")
         }
 
-        let extrinsic = Extrinsic.dummy(config: config)
+        let pendingTickets = await extrinsicPool.pendingTickets
+        let existingTickets = SortedArray(sortedUnchecked: state.value.safroleState.ticketsAccumulator.array.map(\.id))
+        let tickets = pendingTickets.array
+            .lazy
+            .filter { ticket in
+                !existingTickets.contains(ticket.output)
+            }
+            .trimmingPrefix { ticket in
+                guard let last = existingTickets.array.last else {
+                    return true
+                }
+                return ticket.output < last
+            }
+            .prefix(config.value.maxTicketsPerExtrinsic)
+            .map(\.ticket)
+
+        let extrinsic = try Extrinsic(
+            tickets: ExtrinsicTickets(tickets: ConfigLimitedSizeArray(config: config, array: Array(tickets))),
+            judgements: ExtrinsicDisputes.dummy(config: config), // TODO:
+            preimages: ExtrinsicPreimages.dummy(config: config), // TODO:
+            availability: ExtrinsicAvailability.dummy(config: config), // TODO:
+            reports: ExtrinsicGuarantees.dummy(config: config) // TODO:
+        )
 
         let (ticket, publicKey): (TicketItemAndOutput?, Bandersnatch.PublicKey) = switch claim {
         case let .left((ticket, publicKey)):
@@ -118,7 +140,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         let seal = if let ticket {
             try secretKey.ietfVRFSign(
                 vrfInputData: SigningContext.safroleTicketInputData(
-                    entropy: vrfOutput,
+                    entropy: state.value.entropyPool.t3,
                     attempt: ticket.ticket.attempt
                 ),
                 auxData: encodedHeader
