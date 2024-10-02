@@ -296,6 +296,8 @@ public enum Bandersnatch: KeyType {
         ///
         /// Used for tickets submission.
         public func ringVRFSign(vrfInputData: Data, auxData: Data = Data()) throws(Error) -> Data784 {
+            logger.trace("ringVRFSign", metadata: ["vrfInputData": "\(vrfInputData.toHexString())", "auxData": "\(auxData.toHexString())"])
+
             var output = Data(repeating: 0, count: 784)
 
             try call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
@@ -386,6 +388,15 @@ public enum Bandersnatch: KeyType {
         ///
         /// On success returns the VRF output hash.
         public func ringVRFVerify(vrfInputData: Data, auxData: Data = Data(), signature: Data784) throws(Error) -> Data32 {
+            logger.trace(
+                "ringVRFVerify",
+                metadata: [
+                    "vrfInputData": "\(vrfInputData.toHexString())",
+                    "auxData": "\(auxData.toHexString())",
+                    "signature": "\(signature.data.toHexString())",
+                ]
+            )
+
             var output = Data(repeating: 0, count: 32)
 
             try call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in

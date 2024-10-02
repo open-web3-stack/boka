@@ -37,6 +37,11 @@ public struct SortedArray<T: Comparable> {
         return low
     }
 
+    public func contains(_ element: T) -> Bool {
+        let idx = insertIndex(element)
+        return idx < array.count && array[idx] == element
+    }
+
     public mutating func insert(_ element: T) {
         array.insert(element, at: insertIndex(element))
     }
