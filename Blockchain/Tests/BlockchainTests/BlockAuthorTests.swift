@@ -128,4 +128,8 @@ struct BlockAuthorTests {
         // Verify block
         try _ = runtime.apply(block: block.block, state: genesisState, context: .init(timeslot: timeProvider.getTimeslot() + 1))
     }
+
+    // TODO: test including extrinsic tickets from extrinsic pool
+    // TODO: test when ticketsAccumulator is full
+    // TODO: test when none of the items in pool are smaller enough
 }
