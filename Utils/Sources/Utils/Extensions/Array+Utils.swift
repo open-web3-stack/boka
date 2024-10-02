@@ -49,7 +49,7 @@ extension Array {
         var iter = randomness.makeIterator()
         // TODO: confirm this is matching to the defs in GP
         for i in stride(from: count - 1, through: 1, by: -1) {
-            let j = Int(iter.next() ?? 0 % UInt32(i + 1))
+            let j = Int((iter.next() ?? 0) % UInt32(i + 1))
             guard i != j else {
                 continue
             }

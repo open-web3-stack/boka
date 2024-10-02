@@ -30,7 +30,7 @@ public class ServiceBase2: ServiceBase {
     }
 
     @discardableResult
-    public func schedule(delay: TimeInterval, repeats: Bool = false, task: @escaping @Sendable () -> Void) -> Cancellable {
+    public func schedule(delay: TimeInterval, repeats: Bool = false, task: @escaping @Sendable () async -> Void) -> Cancellable {
         let id = Self.idGenerator.loadThenWrappingIncrement(ordering: .relaxed)
         let cancellables = cancellables
         let cancellable = scheduler.schedule(delay: delay, repeats: repeats, task: task, onCancel: {
@@ -41,7 +41,7 @@ public class ServiceBase2: ServiceBase {
     }
 
     @discardableResult
-    public func schedule(at timeslot: TimeslotIndex, task: @escaping @Sendable () -> Void) -> Cancellable {
+    public func schedule(at timeslot: TimeslotIndex, task: @escaping @Sendable () async -> Void) -> Cancellable {
         let id = Self.idGenerator.loadThenWrappingIncrement(ordering: .relaxed)
         let cancellables = cancellables
         let cancellable = scheduler.schedule(at: timeslot, task: task, onCancel: {

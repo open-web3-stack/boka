@@ -1,4 +1,5 @@
 import Codec
+import Foundation
 import Utils
 
 // the STF
@@ -6,7 +7,7 @@ public final class Runtime {
     public enum Error: Swift.Error {
         case safroleError(SafroleError)
         case DisputeError(DisputeError)
-        case invalidTimeslot
+        case invalidTimeslot(got: TimeslotIndex, context: TimeslotIndex)
         case invalidReportAuthorizer
         case encodeError(any Swift.Error)
         case invalidExtrinsicHash
@@ -61,7 +62,7 @@ public final class Runtime {
         }
 
         guard block.header.timeslot <= context.timeslot else {
-            throw Error.invalidTimeslot
+            throw Error.invalidTimeslot(got: block.header.timeslot, context: context.timeslot)
         }
 
         // epoch is validated at apply time by Safrole
@@ -76,7 +77,8 @@ public final class Runtime {
             try Bandersnatch.PublicKey(data: state.value.validatorQueue[Int(block.header.authorIndex)].bandersnatch)
         }.mapError(Error.invalidBlockSeal).get()
         let index = block.header.timeslot % UInt32(config.value.epochLength)
-        let encodedHeader = try Result { try JamEncoder.encode(block.header) }.mapError(Error.invalidBlockSeal).get()
+        let encodedHeader = try Result { try JamEncoder.encode(block.header.unsigned) }.mapError(Error.invalidBlockSeal).get()
+        let entropyVRFInputData: Data
         switch state.value.safroleState.ticketsOrKeys {
         case let .left(tickets):
             let ticket = tickets[Int(index)]
@@ -92,6 +94,8 @@ public final class Runtime {
                 throw Error.notBlockAuthor
             }
 
+            entropyVRFInputData = SigningContext.entropyInputData(entropy: vrfOutput)
+
         case let .right(keys):
             let key = keys[Int(index)]
             guard key == blockAuthorKey.data else {
@@ -105,11 +109,12 @@ public final class Runtime {
                     signature: block.header.seal
                 )
             }.mapError(Error.invalidBlockSeal).get()
+
+            entropyVRFInputData = SigningContext.fallbackSealInputData(entropy: state.value.entropyPool.t3)
         }
 
-        let vrfInputData = SigningContext.entropyInputData(entropy: vrfOutput)
         _ = try Result {
-            try blockAuthorKey.ietfVRFVerify(vrfInputData: vrfInputData, signature: block.header.vrfSignature)
+            try blockAuthorKey.ietfVRFVerify(vrfInputData: entropyVRFInputData, signature: block.header.vrfSignature)
         }.mapError { _ in Error.invalidVrfSignature }.get()
     }
 
