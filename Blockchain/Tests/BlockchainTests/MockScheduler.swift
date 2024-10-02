@@ -1,19 +1,20 @@
 import Atomics
+import Blockchain
 import Foundation
 import Utils
 
-private final class SchedulerTask: Sendable {
+final class SchedulerTask: Sendable {
     let id: Int
     let scheduleTime: UInt32
     let repeats: TimeInterval?
-    let task: @Sendable () -> Void
+    let task: @Sendable () async -> Void
     let cancel: (@Sendable () -> Void)?
 
     init(
         id: Int,
         scheduleTime: UInt32,
         repeats: TimeInterval?,
-        task: @escaping @Sendable () -> Void,
+        task: @escaping @Sendable () async -> Void,
         cancel: (@Sendable () -> Void)?
     ) {
         self.id = id
@@ -24,29 +25,29 @@ private final class SchedulerTask: Sendable {
     }
 }
 
-private struct Storage: Sendable {
+struct Storage: Sendable {
     var tasks: [SchedulerTask] = []
     var prevTime: UInt32 = 0
 }
 
-public final class MockScheduler: Scheduler, Sendable {
+final class MockScheduler: Scheduler, Sendable {
     static let idGenerator = ManagedAtomic<Int>(0)
 
-    private let mockTimeProvider: MockTimeProvider
-    public var timeProvider: TimeProvider {
+    let mockTimeProvider: MockTimeProvider
+    var timeProvider: TimeProvider {
         mockTimeProvider
     }
 
-    private let storage: ThreadSafeContainer<Storage> = .init(.init())
+    let storage: ThreadSafeContainer<Storage> = .init(.init())
 
-    public init(timeProvider: MockTimeProvider) {
+    init(timeProvider: MockTimeProvider) {
         mockTimeProvider = timeProvider
     }
 
-    public func schedule(
+    func schedule(
         delay: TimeInterval,
         repeats: Bool,
-        task: @escaping @Sendable () -> Void,
+        task: @escaping @Sendable () async -> Void,
         onCancel: (@Sendable () -> Void)?
     ) -> Cancellable {
         let now = timeProvider.getTime()
@@ -66,12 +67,12 @@ public final class MockScheduler: Scheduler, Sendable {
         }
     }
 
-    public func advance(by interval: UInt32) {
+    func advance(by interval: UInt32) async {
         mockTimeProvider.advance(by: interval)
-        trigger()
+        await trigger()
     }
 
-    public func trigger() {
+    func trigger() async {
         let now = timeProvider.getTime()
         let tasks = storage.mutate { storage in
             var tasksToDispatch: [SchedulerTask] = []
@@ -102,7 +103,7 @@ public final class MockScheduler: Scheduler, Sendable {
         }
 
         for task in tasks {
-            task.task()
+            await task.task()
         }
     }
 }

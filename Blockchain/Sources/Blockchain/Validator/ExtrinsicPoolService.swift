@@ -34,7 +34,7 @@ private actor ServiceStorage {
     }
 
     func update(state: StateRef, config: ProtocolConfigRef) throws {
-        let epoch = state.value.timeslot.toEpochIndex(config: config)
+        let epoch = state.value.timeslot.timeslotToEpochIndex(config: config)
         if verifier == nil || self.epoch != epoch {
             let commitment = try Bandersnatch.RingCommitment(data: state.value.safroleState.ticketsVerifier)
             let verifier = Bandersnatch.Verifier(ctx: ringContext, commitment: commitment)

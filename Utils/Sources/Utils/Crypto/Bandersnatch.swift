@@ -1,5 +1,8 @@
 import bandersnatch_vrfs
 import Foundation
+import TracingUtils
+
+private let logger = Logger(label: "Bandersnatch")
 
 private func _call<E: Error>(
     data: [Data],
@@ -115,6 +118,8 @@ public enum Bandersnatch: KeyType {
         ///
         /// Used for ticket claiming during block production.
         public func ietfVRFSign(vrfInputData: Data, auxData: Data = Data()) throws -> Data96 {
+            logger.trace("ietfVRFSign", metadata: ["vrfInputData": "\(vrfInputData.toHexString())", "auxData": "\(auxData.toHexString())"])
+
             var output = Data(repeating: 0, count: 96)
 
             try call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
@@ -135,6 +140,8 @@ public enum Bandersnatch: KeyType {
         }
 
         public func getOutput(vrfInputData: Data) throws -> Data32 {
+            logger.trace("getOutput", metadata: ["vrfInputData": "\(vrfInputData.toHexString())"])
+
             var output = Data(repeating: 0, count: 32)
 
             try call(vrfInputData, out: &output) { ptrs, out_buf in
@@ -221,6 +228,15 @@ public enum Bandersnatch: KeyType {
         public func ietfVRFVerify(
             vrfInputData: Data, auxData: Data = Data(), signature: Data96
         ) throws(Error) -> Data32 {
+            logger.trace(
+                "ietfVRFVerify",
+                metadata: [
+                    "vrfInputData": "\(vrfInputData.toHexString())",
+                    "auxData": "\(auxData.toHexString())",
+                    "signature": "\(signature.data.toHexString())",
+                ]
+            )
+
             var output = Data(repeating: 0, count: 32)
 
             try call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in
