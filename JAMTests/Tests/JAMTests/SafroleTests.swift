@@ -98,14 +98,12 @@ enum SafroleTestVariants: String, CaseIterable {
     case tiny
     case full
 
-    static let tinyConfig = {
-        var config = ProtocolConfigRef.mainnet.value
+    static let tinyConfig = ProtocolConfigRef.mainnet.mutate { config in
         config.totalNumberOfValidators = 6
         config.epochLength = 12
         // 10 = 12 * 500/600, not sure what this should be for tiny, but this passes tests
         config.ticketSubmissionEndSlot = 10
-        return Ref(config)
-    }()
+    }
 
     var config: ProtocolConfigRef {
         switch self {
