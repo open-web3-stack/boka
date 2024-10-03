@@ -6,24 +6,25 @@ import Utils
 private let logger = Logger(label: "BlockAuthor")
 
 public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
-    private let blockchain: Blockchain
+    private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore
     private let extrinsicPool: ExtrinsicPoolService
 
     private var tickets: ThreadSafeContainer<[RuntimeEvents.SafroleTicketsGenerated]> = .init([])
 
     public init(
-        blockchain: Blockchain,
+        config: ProtocolConfigRef,
+        dataProvider: BlockchainDataProvider,
         eventBus: EventBus,
         keystore: KeyStore,
         scheduler: Scheduler,
         extrinsicPool: ExtrinsicPoolService
     ) async {
-        self.blockchain = blockchain
+        self.dataProvider = dataProvider
         self.keystore = keystore
         self.extrinsicPool = extrinsicPool
 
-        super.init(blockchain.config, eventBus, scheduler)
+        super.init(config, eventBus, scheduler)
 
         await subscribe(RuntimeEvents.SafroleTicketsGenerated.self) { [weak self] event in
             try await self?.on(safroleTicketsGenerated: event)
@@ -53,13 +54,12 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
     public func createNewBlock(claim: Either<(TicketItemAndOutput, Bandersnatch.PublicKey), Bandersnatch.PublicKey>) async throws
         -> BlockRef
     {
-        let parentHash = blockchain.bestHead
-        let state = try await blockchain.getState(hash: parentHash)
-        guard let state else {
-            try throwUnreachable("no state for best head")
-        }
+        let parentHash = dataProvider.bestHead
+        let state = try await dataProvider.getState(hash: parentHash)
+        let timeslot = timeProvider.getTimeslot()
+        let epoch = timeslot.timeslotToEpochIndex(config: config)
 
-        let pendingTickets = await extrinsicPool.pendingTickets
+        let pendingTickets = await extrinsicPool.getPendingTickets(epoch: epoch)
         let existingTickets = SortedArray(sortedUnchecked: state.value.safroleState.ticketsAccumulator.array.map(\.id))
         let tickets = pendingTickets.array
             .lazy
@@ -113,8 +113,6 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
             try throwUnreachable("author not in current validator")
         }
 
-        let timeslot = timeProvider.getTimeslot()
-
         let safroleResult = try state.value.updateSafrole(
             config: config,
             slot: timeslot,
@@ -164,7 +162,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         await withSpan("BlockAuthor.newBlock", logger: logger) { _ in
             let block = try await createNewBlock(claim: claim)
             logger.info("New block created: \(block.hash)")
-            await publish(RuntimeEvents.BlockAuthored(block: block))
+            publish(RuntimeEvents.BlockAuthored(block: block))
         }
     }
 
@@ -176,11 +174,8 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         await withSpan("BlockAuthor.onBeforeEpoch", logger: logger) { _ in
             tickets.value = []
 
-            let bestHead = blockchain.bestHead
-            let state = try await blockchain.getState(hash: bestHead)
-            guard let state else {
-                try throwUnreachable("no state for best head")
-            }
+            let bestHead = dataProvider.bestHead
+            let state = try await dataProvider.getState(hash: bestHead)
 
             // simulate next block to determine the block authors for next epoch
             let res = try state.value.updateSafrole(

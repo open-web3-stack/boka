@@ -51,7 +51,7 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
     private func generateAndSubmitTickets(state: StateRef) async throws {
         let events = try await generateTicketEvents(state: state)
         for event in events {
-            await publish(event)
+            publish(event)
         }
     }
 
@@ -71,7 +71,7 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
 
             try withSpan("generateTickets") { _ in
                 let tickets = try SafroleService.generateTickets(
-                    count: TicketIndex(config.value.maxTicketsPerExtrinsic),
+                    count: TicketIndex(config.value.ticketEntriesPerValidator),
                     validators: state.value.nextValidators.array,
                     entropy: state.value.entropyPool.t2,
                     ringContext: ringContext,
