@@ -6,10 +6,8 @@ public struct SortedUniqueArray<T: Comparable>: SortedContainer {
         array = unchecked
         array.sort()
 
-        for i in (1 ..< array.count).reversed() {
-            if array[i] == array[i - 1] {
-                array.remove(at: i)
-            }
+        for i in (1 ..< array.count).reversed() where array[i] == array[i - 1] {
+            array.remove(at: i)
         }
     }
 
