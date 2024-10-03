@@ -1,4 +1,7 @@
+import TracingUtils
 import Utils
+
+private let logger = Logger(label: "StoreMiddleware")
 
 struct StoreMiddleware: MiddlewareProtocol {
     let storage: ThreadSafeContainer<[(Sendable, Task<Void, Error>)]> = .init([])
@@ -6,14 +9,19 @@ struct StoreMiddleware: MiddlewareProtocol {
     init() {}
 
     func handle<T: Sendable>(_ event: T, next: @escaping MiddlewareHandler<T>) async throws {
+        logger.debug(">>> dispatching event: \(event)")
         let task = Task { try await next(event) }
         storage.write { storage in
             storage.append((event, task))
         }
         try await task.value
+        logger.debug("<<< event dispatched: \(event)")
     }
 
+    @discardableResult
     func wait() async -> [Sendable] {
+        await Task.yield()
+
         let value = storage.value
 
         for (_, task) in value {

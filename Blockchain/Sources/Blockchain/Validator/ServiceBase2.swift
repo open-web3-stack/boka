@@ -33,9 +33,14 @@ public class ServiceBase2: ServiceBase {
     public func schedule(delay: TimeInterval, repeats: Bool = false, task: @escaping @Sendable () async -> Void) -> Cancellable {
         let id = Self.idGenerator.loadThenWrappingIncrement(ordering: .relaxed)
         let cancellables = cancellables
-        let cancellable = scheduler.schedule(delay: delay, repeats: repeats, task: task, onCancel: {
+        let cancellable = scheduler.schedule(delay: delay, repeats: repeats) {
+            if !repeats {
+                cancellables.write { $0.remove(IdCancellable(id: id, cancellable: nil)) }
+            }
+            await task()
+        } onCancel: {
             cancellables.write { $0.remove(IdCancellable(id: id, cancellable: nil)) }
-        })
+        }
         cancellables.write { $0.insert(IdCancellable(id: id, cancellable: cancellable)) }
         return cancellable
     }
@@ -44,9 +49,12 @@ public class ServiceBase2: ServiceBase {
     public func schedule(at timeslot: TimeslotIndex, task: @escaping @Sendable () async -> Void) -> Cancellable {
         let id = Self.idGenerator.loadThenWrappingIncrement(ordering: .relaxed)
         let cancellables = cancellables
-        let cancellable = scheduler.schedule(at: timeslot, task: task, onCancel: {
+        let cancellable = scheduler.schedule(at: timeslot) {
             cancellables.write { $0.remove(IdCancellable(id: id, cancellable: nil)) }
-        })
+            await task()
+        } onCancel: {
+            cancellables.write { $0.remove(IdCancellable(id: id, cancellable: nil)) }
+        }
         cancellables.write { $0.insert(IdCancellable(id: id, cancellable: cancellable)) }
         return cancellable
     }

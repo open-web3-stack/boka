@@ -7,7 +7,7 @@ private let logger = Logger(label: "ExtrinsicPoolService")
 
 private actor ServiceStorage {
     // sorted array ordered by output
-    var pendingTickets: SortedArray<TicketItemAndOutput> = .init()
+    var pendingTickets: SortedUniqueArray<TicketItemAndOutput> = .init()
     var epoch: EpochIndex = 0
     var verifier: Bandersnatch.Verifier!
     var entropy: Data32 = .init()
@@ -17,8 +17,12 @@ private actor ServiceStorage {
         self.ringContext = ringContext
     }
 
-    func add(tickets: [TicketItem]) {
+    func add(tickets: [TicketItem], config: ProtocolConfigRef) {
         for ticket in tickets {
+            if (try? ticket.validate(config: config)) == nil {
+                logger.info("Received invalid ticket: \(ticket)")
+                continue
+            }
             let inputData = SigningContext.safroleTicketInputData(entropy: entropy, attempt: ticket.attempt)
             let output = try? verifier.ringVRFVerify(vrfInputData: inputData, signature: ticket.signature)
             guard let output else {
@@ -41,29 +45,41 @@ private actor ServiceStorage {
 
             self.epoch = epoch
             self.verifier = verifier
-            entropy = state.value.entropyPool.t2
+            entropy = state.value.entropyPool.t3
             pendingTickets.removeAll()
         }
     }
 
     func removeTickets(tickets: [TicketItem]) {
         pendingTickets.remove { ticket in
-            !tickets.contains { $0 == ticket.ticket }
+            tickets.contains { $0 == ticket.ticket }
+        }
+    }
+
+    func getPendingTickets(epoch: EpochIndex) -> SortedUniqueArray<TicketItemAndOutput> {
+        if epoch != self.epoch {
+            .init()
+        } else {
+            pendingTickets
         }
     }
 }
 
 public final class ExtrinsicPoolService: ServiceBase, @unchecked Sendable {
     private var storage: ServiceStorage
-    private let blockchain: Blockchain
+    private let dataProvider: BlockchainDataProvider
 
-    public init(blockchain: Blockchain, eventBus: EventBus) async {
-        self.blockchain = blockchain
+    public init(
+        config: ProtocolConfigRef,
+        dataProvider: BlockchainDataProvider,
+        eventBus: EventBus
+    ) async {
+        self.dataProvider = dataProvider
 
-        let ringContext = try! Bandersnatch.RingContext(size: UInt(blockchain.config.value.totalNumberOfValidators))
+        let ringContext = try! Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
         storage = ServiceStorage(ringContext: ringContext)
 
-        super.init(blockchain.config, eventBus)
+        super.init(config, eventBus)
 
         await subscribe(RuntimeEvents.SafroleTicketsGenerated.self) { [weak self] event in
             try await self?.on(safroleTicketsGenerated: event)
@@ -82,36 +98,25 @@ public final class ExtrinsicPoolService: ServiceBase, @unchecked Sendable {
         // Safrole VRF commitments only changes every epoch
         // and we should never receive tickets at very beginning and very end of an epoch
         // so it is safe to use best head state without worrying about forks or edge cases
-        let state = try await blockchain.getState(hash: blockchain.bestHead)
-        guard let state else {
-            try throwUnreachable("no state for best head")
-        }
-
-        try await storage.update(state: state, config: blockchain.config)
+        let state = try await dataProvider.getState(hash: dataProvider.bestHead)
+        try await storage.update(state: state, config: config)
         await storage.add(tickets: tickets.items)
     }
 
     private func on(safroleTicketsReceived tickets: RuntimeEvents.SafroleTicketsReceived) async throws {
-        let state = try await blockchain.getState(hash: blockchain.bestHead)
-        guard let state else {
-            try throwUnreachable("no state for best head")
-        }
+        let state = try await dataProvider.getState(hash: dataProvider.bestHead)
 
-        try await storage.update(state: state, config: blockchain.config)
-        await storage.add(tickets: tickets.items)
+        try await storage.update(state: state, config: config)
+        await storage.add(tickets: tickets.items, config: config)
     }
 
     private func on(blockFinalized event: RuntimeEvents.BlockFinalized) async throws {
-        let block = try await blockchain.getBlock(hash: event.hash)
-        guard let block else {
-            try throwUnreachable("no block for finalized head")
-        }
+        let block = try await dataProvider.getBlock(hash: event.hash)
+
         await storage.removeTickets(tickets: block.extrinsic.tickets.tickets.array)
     }
 
-    public var pendingTickets: SortedArray<TicketItemAndOutput> {
-        get async {
-            await storage.pendingTickets
-        }
+    public func getPendingTickets(epoch: EpochIndex) async -> SortedUniqueArray<TicketItemAndOutput> {
+        await storage.getPendingTickets(epoch: epoch)
     }
 }
