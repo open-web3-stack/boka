@@ -1,4 +1,7 @@
+import TracingUtils
 import Utils
+
+private let logger = Logger(label: "BlockchainDataProvider")
 
 private struct BlockchainStorage: Sendable {
     var bestHead: Data32?
@@ -50,6 +53,8 @@ public final class BlockchainDataProvider {
                 storage.bestHeadTimeslot = block.header.timeslot
             }
         }
+
+        logger.debug("block imported: \(block.hash)")
     }
 }
 
