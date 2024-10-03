@@ -1,4 +1,5 @@
 import ConsoleKit
+import Foundation
 import OTel
 import OTLPGRPC
 import ServiceLifecycle
@@ -6,11 +7,17 @@ import TracingUtils
 
 public enum Tracing {
     public static func bootstrap(_ serviceName: String, loggerOnly: Bool = false) async throws -> [Service] {
+        let env = ProcessInfo.processInfo.environment
+        let (logFragment, level) = LogFragment.parse(from: env["LOG_LEVEL"] ?? "") ?? {
+            print("Invalid LOG_LEVEL, using default")
+            return (LogFragment(defaultLevel: .info), .info)
+        }()
+
         // Bootstrap the logging backend with the OTel metadata provider which includes span IDs in logging messages.
         LoggingSystem.bootstrap(
-            fragment: timestampDefaultLoggerFragment(),
+            fragment: logFragment,
             console: Terminal(),
-            level: .trace,
+            level: level,
             metadataProvider: .otel
         )
 
