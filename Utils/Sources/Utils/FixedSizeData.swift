@@ -30,13 +30,15 @@ extension FixedSizeData: Codable {
     }
 }
 
-extension FixedSizeData: CustomStringConvertible, CustomDebugStringConvertible {
+extension FixedSizeData: CustomStringConvertible {
     public var description: String {
-        "0x\(data.map { String(format: "%02x", $0) }.joined())"
-    }
-
-    public var debugDescription: String {
-        description
+        if T.value > 32 {
+            let prefix = data.prefix(8).map { String(format: "%02x", $0) }.joined()
+            let suffix = data.suffix(8).map { String(format: "%02x", $0) }.joined()
+            return "0x\(prefix)...\(suffix)"
+        } else {
+            return "0x\(data.map { String(format: "%02x", $0) }.joined())"
+        }
     }
 }
 

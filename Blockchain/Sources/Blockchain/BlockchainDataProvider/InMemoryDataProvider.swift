@@ -17,7 +17,7 @@ public actor InMemoryDataProvider: Sendable {
     }
 }
 
-extension InMemoryDataProvider: BlockchainDataProvider {
+extension InMemoryDataProvider: BlockchainDataProviderProtocol {
     public func hasBlock(hash: Data32) -> Bool {
         blockByHash[hash] != nil
     }

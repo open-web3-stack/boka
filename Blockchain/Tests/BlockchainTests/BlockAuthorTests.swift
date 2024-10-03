@@ -8,9 +8,8 @@ import Utils
 struct BlockAuthorTests {
     let config: ProtocolConfigRef
     let timeProvider: MockTimeProvider
-    let dataProvider: InMemoryDataProvider
+    let dataProvider: BlockchainDataProvider
     let eventBus: EventBus
-    let blockchain: Blockchain
     let scheduler: MockScheduler
     let keystore: KeyStore
     let blockAuthor: BlockAuthor
@@ -21,38 +20,32 @@ struct BlockAuthorTests {
         config = ProtocolConfigRef.dev
         timeProvider = MockTimeProvider(slotPeriodSeconds: UInt32(config.value.slotPeriodSeconds), time: 1000)
 
-        dataProvider = try await InMemoryDataProvider(genesis: StateRef(State.devGenesis(config: config)))
+        dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesis: StateRef(State.devGenesis(config: config))))
 
         storeMiddleware = StoreMiddleware()
         eventBus = EventBus(eventMiddleware: Middleware(storeMiddleware))
-
-        blockchain = try await Blockchain(
-            config: config,
-            dataProvider: dataProvider,
-            timeProvider: timeProvider,
-            eventBus: eventBus
-        )
 
         scheduler = MockScheduler(timeProvider: timeProvider)
 
         keystore = try await DevKeyStore(devKeysCount: config.value.totalNumberOfValidators)
 
         blockAuthor = await BlockAuthor(
-            blockchain: blockchain,
+            config: config,
+            dataProvider: dataProvider,
             eventBus: eventBus,
             keystore: keystore,
             scheduler: scheduler,
-            extrinsicPool: ExtrinsicPoolService(blockchain: blockchain, eventBus: eventBus)
+            extrinsicPool: ExtrinsicPoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
         )
 
         runtime = Runtime(config: config)
 
-        setupTestLogger()
+        // setupTestLogger()
     }
 
     @Test
     func createNewBlockWithFallbackKey() async throws {
-        let genesisState = try await blockchain.getState(hash: Data32())!
+        let genesisState = try await dataProvider.getState(hash: Data32())
 
         // get the validator key
         let idx = scheduler.timeProvider.getTimeslot() % UInt32(config.value.totalNumberOfValidators)
@@ -67,7 +60,7 @@ struct BlockAuthorTests {
 
     @Test
     func createNewBlockWithTicket() async throws {
-        let genesisState = try await blockchain.getState(hash: Data32())!
+        let genesisState = try await dataProvider.getState(hash: Data32())
         var state = genesisState.value
 
         state.safroleState.ticketsVerifier = try Bandersnatch.RingCommitment(
@@ -81,7 +74,7 @@ struct BlockAuthorTests {
         let secretKey = await keystore.get(Bandersnatch.self, publicKey: devKey.bandersnatch)!
 
         let ticket = try SafroleService.generateTickets(
-            count: TicketIndex(config.value.maxTicketsPerExtrinsic),
+            count: 1,
             validators: state.currentValidators.array,
             entropy: state.entropyPool.t2,
             ringContext: Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators)),
@@ -100,7 +93,7 @@ struct BlockAuthorTests {
 
         let newStateRef = StateRef(state)
         // modify genesis state
-        await dataProvider.add(state: newStateRef)
+        try await dataProvider.add(state: newStateRef)
 
         // Create a new block
         let block = try await blockAuthor.createNewBlock(claim: .left((ticket, devKey.bandersnatch)))
@@ -111,7 +104,7 @@ struct BlockAuthorTests {
 
     @Test
     func scheduleNewBlocks() async throws {
-        let genesisState = try await blockchain.getState(hash: Data32())!
+        let genesisState = try await dataProvider.getState(hash: Data32())
 
         await blockAuthor.on(genesis: genesisState)
 

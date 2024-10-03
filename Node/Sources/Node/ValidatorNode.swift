@@ -4,19 +4,20 @@ import TracingUtils
 import Utils
 
 public class ValidatorNode: Node {
-    private var validator: Validator!
+    private var validator: ValidatorService!
 
     public required init(
         genesis: Genesis, config: Config, eventBus: EventBus, keystore: KeyStore
     ) async throws {
-        try await super.init(genesis: genesis, config: config, eventBus: eventBus)
+        try await super.init(config: config, genesis: genesis, eventBus: eventBus)
 
         let scheduler = DispatchQueueScheduler(timeProvider: timeProvider)
-        validator = await Validator(
+        validator = await ValidatorService(
             blockchain: blockchain,
             keystore: keystore,
             eventBus: eventBus,
-            scheduler: scheduler
+            scheduler: scheduler,
+            dataProvider: dataProvider
         )
 
         let genesisState = try await blockchain.getState(hash: Data32())

@@ -6,6 +6,12 @@ open class Ref<T: Sendable>: @unchecked Sendable, AtomicReference {
     public required init(_ value: T) {
         self.value = value
     }
+
+    public func mutate(fn: (inout T) throws -> Void) rethrows -> Self {
+        var config = value
+        try fn(&config)
+        return Self(config)
+    }
 }
 
 public final class RefMut<T> {

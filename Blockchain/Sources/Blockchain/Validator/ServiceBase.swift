@@ -26,8 +26,8 @@ public class ServiceBase {
         await eventBus.unsubscribe(token: token)
     }
 
-    func publish(_ event: some Event) async {
-        await eventBus.publish(event)
+    func publish(_ event: some Event) {
+        eventBus.publish(event)
     }
 
     deinit {
