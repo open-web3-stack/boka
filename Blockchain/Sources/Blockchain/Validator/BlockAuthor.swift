@@ -206,7 +206,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
                     if timeslot <= now {
                         continue
                     }
-                    logger.info("Scheduling new block task at timeslot \(timeslot))")
+                    logger.debug("Scheduling new block task at timeslot \(timeslot))")
                     schedule(at: timeslot) { [weak self] in
                         if let self {
                             await newBlock(claim: .left(claim))
@@ -222,7 +222,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
                     if timeslot <= now {
                         continue
                     }
-                    logger.info("Scheduling new block task at timeslot \(timeslot))")
+                    logger.debug("Scheduling new block task at timeslot \(timeslot))")
                     schedule(at: timeslot) { [weak self] in
                         if let self {
                             await newBlock(claim: .right(pubkey))

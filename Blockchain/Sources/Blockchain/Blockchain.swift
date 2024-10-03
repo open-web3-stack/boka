@@ -29,12 +29,14 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
     }
 
     public func importBlock(_ block: BlockRef) async throws {
+        logger.debug("importing block: \(block.hash)")
+
         try await withSpan("importBlock") { span in
             span.attributes.blockHash = block.hash.description
 
             let runtime = Runtime(config: config)
             let parent = try await dataProvider.getState(hash: block.header.parentHash)
-            let timeslot = timeProvider.getTime() / UInt32(config.value.slotPeriodSeconds)
+            let timeslot = timeProvider.getTimeslot()
             let state = try runtime.apply(block: block, state: parent, context: .init(timeslot: timeslot))
 
             try await dataProvider.blockImported(block: block, state: state)
@@ -44,6 +46,8 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
     }
 
     public func finalize(hash: Data32) async throws {
+        logger.debug("finalizing block: \(hash)")
+
         // TODO: purge forks
         try await dataProvider.setFinalizedHead(hash: hash)
 
