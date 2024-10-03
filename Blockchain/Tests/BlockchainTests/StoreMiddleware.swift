@@ -11,7 +11,7 @@ struct StoreMiddleware: MiddlewareProtocol {
     func handle<T: Sendable>(_ event: T, next: @escaping MiddlewareHandler<T>) async throws {
         logger.debug(">>> dispatching event: \(event)")
         let task = Task { try await next(event) }
-        storage.write { storage in
+        storage.mutate { storage in
             storage.append((event, task))
         }
         try await task.value
@@ -20,7 +20,7 @@ struct StoreMiddleware: MiddlewareProtocol {
 
     @discardableResult
     func wait() async -> [Sendable] {
-        await Task.yield()
+        try? await Task.sleep(for: .milliseconds(5))
 
         let value = storage.value
 

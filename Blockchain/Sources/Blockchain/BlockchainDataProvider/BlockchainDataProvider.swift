@@ -4,8 +4,8 @@ import Utils
 private let logger = Logger(label: "BlockchainDataProvider")
 
 private struct BlockchainStorage: Sendable {
-    var bestHead: Data32?
-    var bestHeadTimeslot: TimeslotIndex?
+    var bestHead: Data32
+    var bestHeadTimeslot: TimeslotIndex
     var finalizedHead: Data32
 }
 
@@ -27,8 +27,8 @@ public final class BlockchainDataProvider {
         let finalizedHead = try await dataProvider.getFinalizedHead()
 
         storage = ThreadSafeContainer(.init(
-            bestHead: bestHead?.1,
-            bestHeadTimeslot: bestHead?.0.value.timeslot,
+            bestHead: bestHead?.1 ?? Data32(),
+            bestHeadTimeslot: bestHead?.0.value.timeslot ?? 0,
             finalizedHead: finalizedHead
         ))
 
@@ -36,7 +36,7 @@ public final class BlockchainDataProvider {
     }
 
     public var bestHead: Data32 {
-        storage.value.bestHead ?? Data32()
+        storage.value.bestHead
     }
 
     public var finalizedHead: Data32 {
@@ -47,7 +47,7 @@ public final class BlockchainDataProvider {
         try await add(block: block)
         try await add(state: state)
 
-        if block.header.timeslot > storage.value.bestHeadTimeslot ?? 0 {
+        if block.header.timeslot > storage.value.bestHeadTimeslot {
             storage.write { storage in
                 storage.bestHead = block.hash
                 storage.bestHeadTimeslot = block.header.timeslot
