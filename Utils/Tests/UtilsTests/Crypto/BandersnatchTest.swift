@@ -56,7 +56,7 @@ import Testing
         let verifier = Bandersnatch.Verifier(ctx: ctx, commitment: commitment)
 
         for (i, key) in keys.enumerated() {
-            let prover = Bandersnatch.Prover(sercret: keys[i], ring: keys.map(\.publicKey), proverIdx: UInt(i), ctx: ctx)
+            let prover = Bandersnatch.Prover(sercret: key, ring: keys.map(\.publicKey), proverIdx: UInt(i), ctx: ctx)
             let vrfInputData = Data(repeating: UInt8(i), count: 32)
             let sig = try prover.ringVRFSign(vrfInputData: vrfInputData)
             let output = try verifier.ringVRFVerify(vrfInputData: vrfInputData, signature: sig)
