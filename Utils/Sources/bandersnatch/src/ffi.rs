@@ -245,7 +245,18 @@ pub extern "C" fn ring_commitment_new_from_ring(
     let ring_slice: &[*const Public] = unsafe { std::slice::from_raw_parts(ring, ring_len) };
     let ctx: &RingContext = unsafe { &*ctx };
     // Backend currently requires the wrapped type (plain affine points)
-    let pts: Vec<_> = unsafe { ring_slice.iter().map(|pk| (*(*pk)).0).collect() };
+    let pts: Vec<_> = unsafe {
+        ring_slice
+            .iter()
+            .map(|pk| {
+                if pk.is_null() {
+                    ctx.padding_point()
+                } else {
+                    (*(*pk)).0
+                }
+            })
+            .collect()
+    };
     let verifier_key = ctx.verifier_key(&pts);
     let commitment = verifier_key.commitment();
     unsafe {

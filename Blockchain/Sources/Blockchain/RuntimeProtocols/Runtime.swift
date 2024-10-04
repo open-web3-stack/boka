@@ -74,7 +74,7 @@ public final class Runtime {
         // validate block.header.seal
         let vrfOutput: Data32
         let blockAuthorKey = try Result {
-            try Bandersnatch.PublicKey(data: state.value.validatorQueue[Int(block.header.authorIndex)].bandersnatch)
+            try Bandersnatch.PublicKey(data: state.value.currentValidators[Int(block.header.authorIndex)].bandersnatch)
         }.mapError(Error.invalidBlockSeal).get()
         let index = block.header.timeslot % UInt32(config.value.epochLength)
         let encodedHeader = try Result { try JamEncoder.encode(block.header.unsigned) }.mapError(Error.invalidBlockSeal).get()
