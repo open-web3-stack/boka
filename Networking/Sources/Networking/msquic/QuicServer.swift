@@ -64,7 +64,7 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
         }
     }
 
-    private func close() {
+    private func close() async {
         guard let listener else { return }
         listener.close()
         self.listener = nil
@@ -84,7 +84,7 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
     }
 
     // Respond to a message with a specific messageID using Data
-    func respondTo(messageID: Int64, with data: Data, kind: StreamKind? = nil) -> QuicStatus {
+    func respondTo(messageID: Int64, with data: Data, kind: StreamKind? = nil) async -> QuicStatus {
         var status = QuicStatusCode.internalError.rawValue
         if let (_, stream) = pendingMessages[messageID] {
             let streamKind = kind ?? stream.kind

@@ -37,11 +37,11 @@ import Utils
                     eventBus: eventBus
                 )
                 do {
-                    let quicmessage = try await peer.sendMessageToPeer(
-                        message: Message(data: Data("Hello, World!".utf8)),
-                        peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4569)
+                    let message: QuicMessage = try await peer.sendMessage(
+                        to: NetAddr(ipAddress: "127.0.0.1", port: 4569),
+                        with: Message(data: Data("Hello, World!".utf8))
                     )
-                    print("Peer message got: \(quicmessage)")
+                    print("Peer message got: \(message)")
                 } catch {
                     print("Failed to send: \(error)")
                 }
@@ -51,8 +51,8 @@ import Utils
                     print(
                         "Received message from peer messageID: \(event.messageID), message: \(event.message)"
                     )
-                    let status: QuicStatus = await peer.respondTo(
-                        messageID: event.messageID, with: Message(data: event.message.data!)
+                    let status: QuicStatus = await peer.respond(
+                        to: event.messageID, with: Message(data: event.message.data!)
                     )
                     print("Peer sent: \(status)")
                 }
@@ -107,9 +107,7 @@ import Utils
                     print(
                         "Peer1 received message from messageID: \(event.messageID), message: \(event.message)"
                     )
-                    let status: QuicStatus = await peer1.respondTo(
-                        messageID: event.messageID, with: Message(data: event.message.data!)
-                    )
+                    let status: QuicStatus = await peer1.respond(to: event.messageID, with: event.message.data!)
                     print("Peer1 sent response: \(status.isFailed ? "Failed" : "Success")")
                 }
 
@@ -118,9 +116,7 @@ import Utils
                     print(
                         "Peer2 received message from messageID: \(event.messageID), message: \(event.message)"
                     )
-                    let status: QuicStatus = await peer2.respondTo(
-                        messageID: event.messageID, with: Message(data: event.message.data!)
-                    )
+                    let status: QuicStatus = await peer2.respond(to: event.messageID, with: event.message.data!)
                     print("Peer2 sent response: \(status.isFailed ? "Failed" : "Success")")
                 }
 
@@ -129,19 +125,18 @@ import Utils
                     Task {
                         do {
                             for i in 1 ... 1 {
-                                let messageToPeer2 = try await peer1.sendMessageToPeerAsync(
-                                    message: Message(
+                                let messageToPeer2: QuicMessage = try await peer1.sendMessage(
+                                    to: NetAddr(ipAddress: "127.0.0.1", port: 4569),
+                                    with: Message(
                                         data: Data("Hello from Peer1 - Message \(i)".utf8)
-                                    ),
-                                    peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4569)
+                                    )
                                 )
                                 print("Peer1 sent message \(i): \(messageToPeer2)")
-
-                                let messageToPeer1 = try await peer2.sendMessageToPeerAsync(
-                                    message: Message(
+                                let messageToPeer1: QuicMessage = try await peer2.sendMessage(
+                                    to: NetAddr(ipAddress: "127.0.0.1", port: 4568),
+                                    with: Message(
                                         data: Data("Hello from Peer2 - Message \(i)".utf8)
-                                    ),
-                                    peerAddr: NetAddr(ipAddress: "127.0.0.1", port: 4568)
+                                    )
                                 )
                                 print("Peer2 sent message \(i): \(messageToPeer1)")
                             }

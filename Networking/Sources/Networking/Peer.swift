@@ -60,13 +60,13 @@ public actor Peer {
     }
 
     // Respond to a message with a specific messageID using Data
-    func respondTo(messageID: Int64, with data: Data) async -> QuicStatus {
+    func respond(to messageID: Int64, with data: Data) async -> QuicStatus {
         await quicServer?.respondTo(messageID: messageID, with: data)
             ?? QuicStatusCode.internalError.rawValue
     }
 
     // Respond to a message with a specific messageID using PeerMessage
-    func respondTo(messageID: Int64, with message: any PeerMessage) async -> QuicStatus {
+    func respond(to messageID: Int64, with message: any PeerMessage) async -> QuicStatus {
         let messageType = message.getMessageType()
         return await quicServer?
             .respondTo(
@@ -78,7 +78,7 @@ public actor Peer {
     }
 
     // Respond to a message with a specific messageID using PeerMessage (async throws)
-    func respondToPeerMessage(messageID: Int64, with message: any PeerMessage) async throws {
+    func respond(to messageID: Int64, with message: any PeerMessage) async throws {
         let messageType = message.getMessageType()
         _ = try await quicServer?.respondingTo(
             messageID: messageID, with: message.getData(),
@@ -87,22 +87,17 @@ public actor Peer {
     }
 
     // Sends a message to another peer asynchronously
-    func sendMessageToPeerAsync(
-        message: any PeerMessage, peerAddr: NetAddr
-    ) async throws -> QuicMessage {
+    func sendMessage(to peer: NetAddr, with message: any PeerMessage) async throws -> QuicMessage {
         let buffer = message.getData()
         let messageType = message.getMessageType()
-        return try await sendDataToPeer(buffer, to: peerAddr, messageType: messageType)
+        return try await sendDataToPeer(buffer, to: peer, messageType: messageType)
     }
 
     // Sends a message to another peer and returns the status
-    func sendMessageToPeer(
-        message: any PeerMessage, peerAddr: NetAddr
-    ) async throws -> QuicStatus {
+    func sendMessage(to peer: NetAddr, with message: any PeerMessage) async throws -> QuicStatus {
         let buffer = message.getData()
         let messageType = message.getMessageType()
-
-        return try await sendDataToPeer(buffer, to: peerAddr, messageType: messageType)
+        return try await sendDataToPeer(buffer, to: peer, messageType: messageType)
     }
 
     // send message to other peer wait for response quicMessage
