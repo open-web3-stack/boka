@@ -104,8 +104,9 @@ import Utils
 
                 // Subscribe to PeerMessageReceived for peer1
                 let token1 = await eventBus1.subscribe(PeerMessageReceived.self) { event in
+
                     print(
-                        "Peer1 received message from messageID: \(event.messageID), message: \(event.message)"
+                        "Peer1 received message from messageID: \(event.messageID), message: \(String([UInt8](event.message.data!).map { Character(UnicodeScalar($0)) }))"
                     )
                     let status: QuicStatus = await peer1.respond(to: event.messageID, with: event.message.data!)
                     print("Peer1 sent response: \(status.isFailed ? "Failed" : "Success")")
@@ -114,7 +115,7 @@ import Utils
                 // Subscribe to PeerMessageReceived for peer2
                 let token2 = await eventBus2.subscribe(PeerMessageReceived.self) { event in
                     print(
-                        "Peer2 received message from messageID: \(event.messageID), message: \(event.message)"
+                        "Peer2 received message from messageID: \(event.messageID), message: \(String([UInt8](event.message.data!).map { Character(UnicodeScalar($0)) }))"
                     )
                     let status: QuicStatus = await peer2.respond(to: event.messageID, with: event.message.data!)
                     print("Peer2 sent response: \(status.isFailed ? "Failed" : "Success")")
@@ -124,7 +125,7 @@ import Utils
                 _ = try await group.next().scheduleTask(in: .seconds(2)) {
                     Task {
                         do {
-                            for i in 1 ... 1 {
+                            for i in 1 ... 5 {
                                 let messageToPeer2: QuicMessage = try await peer1.sendMessage(
                                     to: NetAddr(ipAddress: "127.0.0.1", port: 4569),
                                     with: Message(
