@@ -46,6 +46,7 @@ public final class BlockchainDataProvider {
     public func blockImported(block: BlockRef, state: StateRef) async throws {
         try await add(block: block)
         try await add(state: state)
+        try await updateHead(hash: block.hash, parent: block.header.parentHash)
 
         if block.header.timeslot > storage.value.bestHeadTimeslot {
             storage.write { storage in
@@ -97,14 +98,20 @@ extension BlockchainDataProvider {
     }
 
     public func add(block: BlockRef) async throws {
+        logger.debug("adding block: \(block.hash)")
+
         try await dataProvider.add(block: block)
     }
 
     public func add(state: StateRef) async throws {
+        logger.debug("adding state: \(state.value.lastBlockHash)")
+
         try await dataProvider.add(state: state)
     }
 
     public func setFinalizedHead(hash: Data32) async throws {
+        logger.debug("setting finalized head: \(hash)")
+
         try await dataProvider.setFinalizedHead(hash: hash)
         storage.write { storage in
             storage.finalizedHead = hash
@@ -112,10 +119,14 @@ extension BlockchainDataProvider {
     }
 
     public func updateHead(hash: Data32, parent: Data32) async throws {
+        logger.debug("updating head: \(hash) with parent: \(parent)")
+
         try await dataProvider.updateHead(hash: hash, parent: parent)
     }
 
     public func remove(hash: Data32) async throws {
+        logger.debug("removing block: \(hash)")
+
         try await dataProvider.remove(hash: hash)
     }
 }
