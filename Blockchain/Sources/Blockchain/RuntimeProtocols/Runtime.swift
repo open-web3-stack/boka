@@ -186,7 +186,7 @@ public final class Runtime {
     public func updateRecentHistory(block: BlockRef, state newState: inout State) throws {
         let workReportHashes = block.extrinsic.reports.guarantees.map(\.workReport.packageSpecification.workPackageHash)
         try newState.recentHistory.update(
-            headerHash: block.header.parentHash,
+            headerHash: block.hash,
             parentStateRoot: block.header.priorStateRoot,
             accumulateRoot: Data32(), // TODO: calculate accumulation result
             workReportHashes: ConfigLimitedSizeArray(config: config, array: workReportHashes)

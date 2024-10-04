@@ -1,7 +1,7 @@
 import Utils
 
-public enum BlockchainDataProviderError: Error {
-    case noData
+public enum BlockchainDataProviderError: Error, Equatable {
+    case noData(hash: Data32)
 }
 
 public protocol BlockchainDataProviderProtocol: Sendable {
