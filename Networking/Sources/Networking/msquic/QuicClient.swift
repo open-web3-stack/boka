@@ -102,27 +102,27 @@ public actor QuicClient: Sendable, QuicConnectionMessageHandler {
     }
 
     public func close() async {
-        clientLogger.info(" [\(getNetAddr())] client close")
+        clientLogger.debug(" [\(getNetAddr())] client close")
 
         guard let connection else { return }
         await connection.close()
         self.connection = nil
-        clientLogger.info(" [\(getNetAddr())] client connection close")
+        clientLogger.debug(" [\(getNetAddr())] client connection close")
 
         guard let configuration else { return }
         api?.pointee.ConfigurationClose(configuration)
         self.configuration = nil
-        clientLogger.info(" [\(getNetAddr())] client configuration close")
+        clientLogger.debug(" [\(getNetAddr())] client configuration close")
 
         guard let registration else { return }
         api?.pointee.RegistrationClose(registration)
         self.registration = nil
-        clientLogger.info(" [\(getNetAddr())] client registration close")
+        clientLogger.debug(" [\(getNetAddr())] client registration close")
 
         guard let api else { return }
         MsQuicClose(api)
         self.api = nil
-        clientLogger.info("[\(getNetAddr())] QuicClient Close")
+        clientLogger.debug("[\(getNetAddr())] QuicClient Close")
     }
 
     public func didReceiveMessage(

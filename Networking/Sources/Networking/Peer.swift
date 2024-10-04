@@ -20,7 +20,7 @@ public protocol PeerMessage: Equatable, Sendable {
 
 extension PeerMessage {
     public func getMessageType() -> PeerMessageType {
-        .commonEphemeral
+        .uniquePersistent
     }
 }
 
@@ -56,12 +56,12 @@ public actor Peer {
         }
         clients.removeAll()
         quicServer?.closeSync()
-        peerLogger.info("Peer Deinit")
+        peerLogger.debug("Peer Deinit")
     }
 
     // Respond to a message with a specific messageID using Data
     func respond(to messageID: Int64, with data: Data) async -> QuicStatus {
-        await quicServer?.respondGetStatus(to: messageID, with: data)
+        await quicServer?.respondGetStatus(to: messageID, with: data, kind: .uniquePersistent)
             ?? QuicStatusCode.internalError.rawValue
     }
 

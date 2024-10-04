@@ -109,7 +109,7 @@ public class QuicConnection: @unchecked Sendable {
     // Deinitializer to ensure resources are cleaned up
     deinit {
         closeSync()
-        logger.info("QuicConnection Deinit")
+        logger.trace("QuicConnection Deinit")
     }
 
     nonisolated func closeSync() {

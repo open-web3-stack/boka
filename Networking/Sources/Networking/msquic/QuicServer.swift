@@ -66,21 +66,21 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
 
     private func close() async {
         guard let listener else { return }
-        listener.close()
+        await listener.close()
         self.listener = nil
-        serverLogger.info("QuicListener close")
+        serverLogger.debug("QuicListener close")
         guard let configuration else { return }
         api?.pointee.ConfigurationClose(configuration)
         self.configuration = nil
-        serverLogger.info("configuration close")
+        serverLogger.debug("configuration close")
         guard let registration else { return }
         api?.pointee.RegistrationClose(registration)
         self.registration = nil
-        serverLogger.info("registration close")
+        serverLogger.debug("registration close")
         guard let api else { return }
         MsQuicClose(api)
         self.api = nil
-        serverLogger.info("QuicServer Close")
+        serverLogger.debug("QuicServer Close")
     }
 
     // Respond to a message with a specific messageID using Data
@@ -104,7 +104,6 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
         -> QuicMessage
     {
         guard let (_, stream) = pendingMessages[messageID] else {
-            serverLogger.error("Message not found")
             throw QuicError.messageNotFound
         }
 

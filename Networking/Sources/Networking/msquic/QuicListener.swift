@@ -5,6 +5,30 @@ import Utils
 
 let listenLogger: Logger = .init(label: "QuicListener")
 
+actor ConnectionsManager {
+    private var connections: [QuicConnection] = []
+
+    func add(_ connection: QuicConnection) {
+        connections.append(connection)
+    }
+
+    func remove(_ connection: QuicConnection) async {
+        await connection.close()
+        connections.removeAll(where: { $0 === connection })
+    }
+
+    func all() -> [QuicConnection] {
+        connections
+    }
+
+    func removeAll() async {
+        for connection in connections {
+            await connection.close()
+        }
+        connections.removeAll()
+    }
+}
+
 public protocol QuicListenerMessageHandler: AnyObject {
     func didReceiveMessage(connection: QuicConnection, stream: QuicStream, message: QuicMessage)
         async
@@ -17,8 +41,8 @@ public class QuicListener: @unchecked Sendable {
     private var configuration: HQuic?
     private var config: QuicConfig
     private var listener: HQuic?
-    private var connections: AtomicArray<QuicConnection> = .init()
     public weak var messageHandler: QuicListenerMessageHandler?
+    private let connectionsManager: ConnectionsManager
 
     public init(
         api: UnsafePointer<QuicApiTable>?,
@@ -32,6 +56,7 @@ public class QuicListener: @unchecked Sendable {
         self.configuration = configuration
         self.config = config
         self.messageHandler = messageHandler
+        connectionsManager = .init()
         try openListener(port: config.port, listener: &listener)
     }
 
@@ -110,7 +135,9 @@ public class QuicListener: @unchecked Sendable {
                 connection: connection,
                 messageHandler: listener
             )
-            listener.connections.append(quicConnection)
+            Task {
+                await listener.connectionsManager.add(quicConnection)
+            }
             status = quicConnection.setCallbackHandler()
 
         default:
@@ -119,21 +146,12 @@ public class QuicListener: @unchecked Sendable {
         return status
     }
 
-    public func close() {
+    public func close() async {
         if let listener {
             api?.pointee.ListenerClose(listener)
             self.listener = nil
         }
-        closeAllConnections()
-    }
-
-    private func closeAllConnections() {
-        for connection in connections {
-            Task {
-                await connection.close()
-            }
-        }
-        connections.removeAll()
+        await connectionsManager.removeAll()
     }
 }
 
@@ -171,7 +189,8 @@ extension QuicListener: QuicConnectionMessageHandler {
     }
 
     private func removeConnection(_ connection: QuicConnection) {
-        connection.closeSync()
-        connections.removeAll(where: { $0 === connection })
+        Task {
+            await connectionsManager.remove(connection)
+        }
     }
 }
