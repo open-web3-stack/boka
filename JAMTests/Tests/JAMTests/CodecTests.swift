@@ -175,8 +175,8 @@ struct CodecTests {
             return [
                 "hash": json["workPackageHash"]!,
                 "len": json["length"]!,
-                "root": json["erasureRoot"]!,
-                "segments": json["segmentRoot"]!,
+                "erasure_root": json["erasureRoot"]!,
+                "exports_root": json["segmentRoot"]!,
             ].json
         }
         if let value = value as? ExtrinsicGuarantees {

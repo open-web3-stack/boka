@@ -26,129 +26,127 @@ public struct AtomicArray<T>: RangeReplaceableCollection {
     }
 
     public func index(after i: Int) -> Int {
-        return array.index(after: i)
+        array.index(after: i)
     }
 
-    fileprivate func _read<R>(_ block: () throws -> R) rethrows -> R {
-        var result: R!
+    fileprivate func read<R>(_ block: () throws -> R) rethrows -> R {
         try queue.sync {
-            result = try block()
+            try block()
         }
-        return result
     }
 
-    fileprivate func _write<R>(_ block: () throws -> R) rethrows -> R {
-        var result: R!
+    fileprivate func write<R>(_ block: () throws -> R) rethrows -> R {
         try queue.sync(flags: .barrier) {
-            result = try block()
+            try block()
         }
-        return result
     }
 
     public mutating func append(_ newElement: AtomicArray.Element) {
-        _write {
+        write {
             array.append(newElement)
         }
     }
 
     public mutating func append<S>(contentsOf newElements: S) where S: Sequence, AtomicArray.Element == S.Element {
-        _write {
+        write {
             array.append(contentsOf: newElements)
         }
     }
 
     public func filter(_ isIncluded: (AtomicArray.Element) throws -> Bool) rethrows -> AtomicArray {
-        return try _read {
+        try read {
             let subArray = try array.filter(isIncluded)
             return AtomicArray(subArray)
         }
     }
 
     public mutating func insert(_ newElement: AtomicArray.Element, at i: AtomicArray.Index) {
-        _write {
+        write {
             array.insert(newElement, at: i)
         }
     }
 
-    public mutating func insert<S>(contentsOf newElements: S, at i: AtomicArray.Index) where S: Collection, AtomicArray.Element == S.Element {
-        _write {
+    public mutating func insert<S>(contentsOf newElements: S, at i: AtomicArray.Index) where S: Collection,
+        AtomicArray.Element == S.Element
+    {
+        write {
             array.insert(contentsOf: newElements, at: i)
         }
     }
 
     @discardableResult
     public mutating func popLast() -> AtomicArray.Element? {
-        return _write {
+        write {
             array.popLast()
         }
     }
 
     @discardableResult
     public mutating func remove(at i: AtomicArray.Index) -> AtomicArray.Element {
-        return _write {
+        write {
             array.remove(at: i)
         }
     }
 
     public mutating func removeAll() {
-        _write {
+        write {
             array.removeAll()
         }
     }
 
     public mutating func removeAll(keepingCapacity keepCapacity: Bool) {
-        _write {
+        write {
             array.removeAll(keepingCapacity: keepCapacity)
         }
     }
 
     public mutating func removeAll(where shouldBeRemoved: (AtomicArray.Element) throws -> Bool) rethrows {
-        try _write {
+        try write {
             try array.removeAll(where: shouldBeRemoved)
         }
     }
 
     @discardableResult
     public mutating func removeFirst() -> AtomicArray.Element {
-        return _write {
+        write {
             array.removeFirst()
         }
     }
 
     public mutating func removeFirst(_ k: Int) {
-        _write {
+        write {
             array.removeFirst(k)
         }
     }
 
     @discardableResult
     public mutating func removeLast() -> AtomicArray.Element {
-        return _write {
+        write {
             array.removeLast()
         }
     }
 
     public mutating func removeLast(_ k: Int) {
-        _write {
+        write {
             array.removeLast(k)
         }
     }
 
     public func forEach(_ body: (Element) throws -> Void) rethrows {
-        try _read {
+        try read {
             try array.forEach(body)
         }
     }
 
     public mutating func removeFirstIfExist(where shouldBeRemoved: (AtomicArray.Element) throws -> Bool) {
-        _write {
+        write {
             guard let index = try? array.firstIndex(where: shouldBeRemoved) else { return }
             array.remove(at: index)
         }
     }
 
     public mutating func removeSubrange(_ bounds: Range<Int>) {
-        _write {
+        write {
             array.removeSubrange(bounds)
         }
     }
@@ -156,98 +154,98 @@ public struct AtomicArray<T>: RangeReplaceableCollection {
     public mutating func replaceSubrange<C, R>(_ subrange: R, with newElements: C) where C: Collection, R: RangeExpression, T == C.Element,
         AtomicArray<Element>.Index == R.Bound
     {
-        _write {
+        write {
             array.replaceSubrange(subrange, with: newElements)
         }
     }
 
     public mutating func reserveCapacity(_ n: Int) {
-        _write {
+        write {
             array.reserveCapacity(n)
         }
     }
 
     public var count: Int {
-        return _read {
+        read {
             array.count
         }
     }
 
     public var isEmpty: Bool {
-        return _read {
+        read {
             array.isEmpty
         }
     }
 
     public var first: AtomicArray.Element? {
-        return _read {
+        read {
             array.first
         }
     }
 
     public func getArray() -> [T] {
-        return _read {
+        read {
             array
         }
     }
 
     public mutating func setArray(_ newArray: [T]) {
-        _write {
+        write {
             array = newArray
         }
     }
 
     public mutating func performRead(_ closure: ([T]) -> Void) {
-        _read {
+        read {
             closure(array)
         }
     }
 
     public mutating func performWrite(_ closure: ([T]) -> ([T])) {
-        _write {
+        write {
             array = closure(array)
         }
     }
 
     public subscript(bounds: Range<AtomicArray.Index>) -> AtomicArray.SubSequence {
-        return _read {
+        read {
             AtomicArray(array[bounds])
         }
     }
 
     public subscript(bounds: AtomicArray.Index) -> AtomicArray.Element {
         get {
-            return _read {
+            read {
                 array[bounds]
             }
         }
         set(value) {
-            _write {
+            write {
                 array[bounds] = value
             }
         }
     }
 
     public static func + <Other>(lhs: Other, rhs: AtomicArray) -> AtomicArray where Other: Sequence, AtomicArray.Element == Other.Element {
-        return AtomicArray(lhs + rhs.getArray())
+        AtomicArray(lhs + rhs.getArray())
     }
 
     public static func + <Other>(lhs: AtomicArray, rhs: Other) -> AtomicArray where Other: Sequence, AtomicArray.Element == Other.Element {
-        return AtomicArray(lhs.getArray() + rhs)
+        AtomicArray(lhs.getArray() + rhs)
     }
 
     public static func + <Other>(lhs: AtomicArray, rhs: Other) -> AtomicArray where Other: RangeReplaceableCollection,
         AtomicArray.Element == Other.Element
     {
-        return AtomicArray(lhs.getArray() + rhs)
+        AtomicArray(lhs.getArray() + rhs)
     }
 
     public static func + (lhs: AtomicArray<Element>, rhs: AtomicArray<Element>) -> AtomicArray {
-        return AtomicArray(lhs.getArray() + rhs.getArray())
+        AtomicArray(lhs.getArray() + rhs.getArray())
     }
 
     public static func += <Other>(lhs: inout AtomicArray, rhs: Other) where Other: Sequence, AtomicArray.Element == Other.Element {
-        lhs._write {
+        lhs.write {
             lhs.array += rhs
         }
     }
@@ -255,7 +253,7 @@ public struct AtomicArray<T>: RangeReplaceableCollection {
 
 extension AtomicArray: CustomStringConvertible {
     public var description: String {
-        return _read {
+        read {
             "\(array)"
         }
     }
@@ -263,19 +261,19 @@ extension AtomicArray: CustomStringConvertible {
 
 extension AtomicArray where Element: Equatable {
     public func split(separator: Element, maxSplits: Int, omittingEmptySubsequences: Bool) -> [ArraySlice<Element>] {
-        return _read {
+        read {
             array.split(separator: separator, maxSplits: maxSplits, omittingEmptySubsequences: omittingEmptySubsequences)
         }
     }
 
     public func firstIndex(of element: Element) -> Int? {
-        return _read {
+        read {
             array.firstIndex(of: element)
         }
     }
 
     public func lastIndex(of element: Element) -> Int? {
-        return _read {
+        read {
             array.lastIndex(of: element)
         }
     }
@@ -283,34 +281,36 @@ extension AtomicArray where Element: Equatable {
     public func starts<PossiblePrefix>(with possiblePrefix: PossiblePrefix) -> Bool where PossiblePrefix: Sequence,
         Element == PossiblePrefix.Element
     {
-        return _read {
+        read {
             array.starts(with: possiblePrefix)
         }
     }
 
-    public func elementsEqual<OtherSequence>(_ other: OtherSequence) -> Bool where OtherSequence: Sequence, Element == OtherSequence.Element {
-        return _read {
+    public func elementsEqual<OtherSequence>(_ other: OtherSequence) -> Bool where OtherSequence: Sequence,
+        Element == OtherSequence.Element
+    {
+        read {
             array.elementsEqual(other)
         }
     }
 
     public func contains(_ element: Element) -> Bool {
-        return _read {
+        read {
             array.contains(element)
         }
     }
 
     public static func != (lhs: AtomicArray<Element>, rhs: AtomicArray<Element>) -> Bool {
-        return lhs._read {
-            rhs._read {
+        lhs.read {
+            rhs.read {
                 lhs.array != rhs.array
             }
         }
     }
 
     public static func == (lhs: AtomicArray<Element>, rhs: AtomicArray<Element>) -> Bool {
-        return lhs._read {
-            rhs._read {
+        lhs.read {
+            rhs.read {
                 lhs.array == rhs.array
             }
         }

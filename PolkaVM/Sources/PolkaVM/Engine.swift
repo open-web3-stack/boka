@@ -1,5 +1,6 @@
 import Foundation
 import TracingUtils
+import Utils
 
 private let logger = Logger(label: "Engine")
 
@@ -15,7 +16,7 @@ public class Engine {
     public func execute(program: ProgramCode, state: VMState) -> ExitReason {
         let context = ExecutionContext(state: state, config: config)
         while true {
-            guard state.getGas() > 0 else {
+            guard state.getGas() > GasInt(0) else {
                 return .outOfGas
             }
             if case let .exit(reason) = step(program: program, context: context) {

@@ -4,11 +4,11 @@ import Utils
 public final class DevKeyStore: KeyStore {
     private let keystore: InMemoryKeyStore
 
-    public init(devKeysCount: UInt32 = 12) async throws {
+    public init(devKeysCount: Int = 12) async throws {
         keystore = InMemoryKeyStore()
 
         for i in 0 ..< devKeysCount {
-            _ = try await addDevKeys(seed: i)
+            _ = try await addDevKeys(seed: UInt32(i))
         }
     }
 

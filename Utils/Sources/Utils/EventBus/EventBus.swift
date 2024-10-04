@@ -66,24 +66,30 @@ public actor EventBus: Sendable {
         }
     }
 
-    public func publish(_ event: some Event) {
+    public nonisolated func publish(_ event: some Event) {
+        Task {
+            await publish(event)
+        }
+    }
+
+    public func publish(_ event: some Event) async {
         let key = ObjectIdentifier(type(of: event))
-        if let eventHandlers = handlers[key] {
-            let eventMiddleware = eventMiddleware
-            let handlerMiddleware = handlerMiddleware
-            Task {
-                do {
-                    try await eventMiddleware.handle(event) { event in
-                        for handler in eventHandlers {
-                            try await handlerMiddleware.handle(event) { evt in
-                                try await handler.handle(evt)
-                            }
-                        }
+        let eventHandlers = handlers[key]
+        let eventMiddleware = eventMiddleware
+        let handlerMiddleware = handlerMiddleware
+        do {
+            try await eventMiddleware.handle(event) { event in
+                guard let eventHandlers else {
+                    return
+                }
+                for handler in eventHandlers {
+                    try await handlerMiddleware.handle(event) { evt in
+                        try await handler.handle(evt)
                     }
-                } catch {
-                    logger.warning("Unhandled error for event: \(event) with error: \(error)")
                 }
             }
+        } catch {
+            logger.warning("Unhandled error for event: \(event) with error: \(error)")
         }
     }
 }

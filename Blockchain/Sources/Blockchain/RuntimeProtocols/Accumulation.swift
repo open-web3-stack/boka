@@ -23,13 +23,24 @@ public struct AccumulationOutput {
 
 public protocol Accumulation {
     var privilegedServices: PrivilegedServices { get }
+    var validatorQueue: ConfigFixedSizeArray<
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+    > { get }
+    var authorizationQueue: ConfigFixedSizeArray<
+        ConfigFixedSizeArray<
+            Data32,
+            ProtocolConfig.MaxAuthorizationsQueueItems
+        >,
+        ProtocolConfig.TotalNumberOfCores
+    > { get }
+    var entropyPool: EntropyPool { get }
     var serviceAccounts: [ServiceIndex: ServiceAccount] { get }
     var accumlateFunction: AccumulateFunction { get }
     var onTransferFunction: OnTransferFunction { get }
 }
 
 extension Accumulation {
-    public func update(config: ProtocolConfigRef, workReports: [WorkReport]) throws -> AccumulationOutput {
+    public func update(config: ProtocolConfigRef, block: BlockRef, workReports: [WorkReport]) throws -> AccumulationOutput {
         var servicesGasRatio: [ServiceIndex: Gas] = [:]
         var servicesGas: [ServiceIndex: Gas] = [:]
 
@@ -38,20 +49,22 @@ extension Accumulation {
             servicesGas[service] = gas
         }
 
-        let totalGasRatio = workReports.flatMap(\.results).reduce(0) { $0 + $1.gasRatio }
+        let totalGasRatio = workReports.flatMap(\.results).reduce(Gas(0)) { $0 + $1.gasRatio }
         let totalMinimalGas = try workReports.flatMap(\.results)
-            .reduce(0) { try $0 + serviceAccounts[$1.serviceIndex].unwrap(orError: AccumulationError.invalidServiceIndex).minAccumlateGas }
+            .reduce(Gas(0)) {
+                try $0 + serviceAccounts[$1.serviceIndex].unwrap(orError: AccumulationError.invalidServiceIndex).minAccumlateGas
+            }
         for report in workReports {
             for result in report.results {
-                servicesGasRatio[result.serviceIndex, default: 0] += result.gasRatio
-                servicesGas[result.serviceIndex, default: 0] += try serviceAccounts[result.serviceIndex]
+                servicesGasRatio[result.serviceIndex, default: Gas(0)] += result.gasRatio
+                servicesGas[result.serviceIndex, default: Gas(0)] += try serviceAccounts[result.serviceIndex]
                     .unwrap(orError: AccumulationError.invalidServiceIndex).minAccumlateGas
             }
         }
         let remainingGas = config.value.coreAccumulationGas - totalMinimalGas
 
         for (service, gas) in servicesGas {
-            servicesGas[service] = gas + servicesGasRatio[service, default: 0] * remainingGas / totalGasRatio
+            servicesGas[service] = gas + servicesGasRatio[service, default: Gas(0)] * remainingGas / totalGasRatio
         }
 
         var serviceArguments: [ServiceIndex: [AccumulateArguments]] = [:]
@@ -100,11 +113,17 @@ extension Accumulation {
             }
             let (ctx, commitment) = try accumlateFunction.invoke(
                 config: config,
-                service: service,
+                serviceIndex: service,
                 code: code,
                 serviceAccounts: serviceAccounts,
                 gas: gas,
-                arguments: arguments
+                arguments: arguments,
+                validatorQueue: validatorQueue,
+                authorizationQueue: authorizationQueue,
+                privilegedServices: privilegedServices,
+                initialIndex: Blake2b256.hash(service.encode(), entropyPool.t0.data, block.header.timeslot.encode())
+                    .data.decode(UInt32.self),
+                timeslot: block.header.timeslot
             )
             if let commitment {
                 commitments.append((service, commitment))
@@ -151,10 +170,9 @@ extension Accumulation {
 
         return .init(
             commitments: commitments,
-            // those cannot be nil because priviledge services are always called
-            privilegedServices: newPrivilegedServices!,
-            validatorQueue: newValidatorQueue!,
-            authorizationQueue: newAuthorizationQueue!,
+            privilegedServices: newPrivilegedServices ?? privilegedServices,
+            validatorQueue: newValidatorQueue ?? validatorQueue,
+            authorizationQueue: newAuthorizationQueue ?? authorizationQueue,
             serviceAccounts: newServiceAccounts
         )
     }

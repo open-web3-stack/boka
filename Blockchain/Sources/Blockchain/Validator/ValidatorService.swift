@@ -1,7 +1,7 @@
 import Foundation
 import Utils
 
-public class Validator {
+public class ValidatorService {
     private let blockchain: Blockchain
     private let keystore: KeyStore
     private let safrole: SafroleService
@@ -12,7 +12,8 @@ public class Validator {
         blockchain: Blockchain,
         keystore: KeyStore,
         eventBus: EventBus,
-        scheduler: Scheduler
+        scheduler: Scheduler,
+        dataProvider: BlockchainDataProvider
     ) async {
         self.blockchain = blockchain
         self.keystore = keystore
@@ -24,12 +25,14 @@ public class Validator {
         )
 
         extrinsicPool = await ExtrinsicPoolService(
-            blockchain: blockchain,
+            config: blockchain.config,
+            dataProvider: dataProvider,
             eventBus: eventBus
         )
 
         blockAuthor = await BlockAuthor(
-            blockchain: blockchain,
+            config: blockchain.config,
+            dataProvider: dataProvider,
             eventBus: eventBus,
             keystore: keystore,
             scheduler: scheduler,

@@ -49,13 +49,13 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
     }
 
     private func generateAndSubmitTickets(state: StateRef) async throws {
-        let events = try await generateTickets(state: state)
+        let events = try await generateTicketEvents(state: state)
         for event in events {
-            await publish(event)
+            publish(event)
         }
     }
 
-    private func generateTickets(state: StateRef) async throws -> [RuntimeEvents.SafroleTicketsGenerated] {
+    private func generateTicketEvents(state: StateRef) async throws -> [RuntimeEvents.SafroleTicketsGenerated] {
         var events = [RuntimeEvents.SafroleTicketsGenerated]()
 
         for (idx, validator) in state.value.nextValidators.enumerated() {
@@ -70,31 +70,17 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
             logger.debug("Generating tickets for validator \(pubkey)")
 
             try withSpan("generateTickets") { _ in
-                let pubkeys = try state.value.nextValidators.map {
-                    try Bandersnatch.PublicKey(data: $0.bandersnatch)
-                }
-
-                let prover = Bandersnatch.Prover(sercret: secret, ring: pubkeys, proverIdx: UInt(idx), ctx: ringContext)
-                let verifier = try Bandersnatch.Verifier(
-                    ctx: ringContext,
-                    commitment: Bandersnatch.RingCommitment(data: state.value.safroleState.ticketsVerifier)
+                let tickets = try SafroleService.generateTickets(
+                    count: TicketIndex(config.value.ticketEntriesPerValidator),
+                    validators: state.value.nextValidators.array,
+                    entropy: state.value.entropyPool.t2,
+                    ringContext: ringContext,
+                    secret: secret,
+                    idx: UInt32(idx)
                 )
 
-                var vrfInputData = SigningContext.safroleTicketInputData(entropy: state.value.entropyPool.t2, attempt: 0)
-
-                let sig1 = try prover.ringVRFSign(vrfInputData: vrfInputData)
-                let out1 = try verifier.ringVRFVerify(vrfInputData: vrfInputData, signature: sig1)
-
-                vrfInputData[vrfInputData.count - 1] = TicketIndex(1)
-
-                let sig2 = try prover.ringVRFSign(vrfInputData: vrfInputData)
-                let out2 = try verifier.ringVRFVerify(vrfInputData: vrfInputData, signature: sig2)
-
                 events.append(.init(
-                    items: [
-                        .init(ticket: .init(attempt: 0, signature: sig1), output: out1),
-                        .init(ticket: .init(attempt: 1, signature: sig2), output: out2),
-                    ],
+                    items: tickets,
                     publicKey: secret.publicKey
                 ))
             }
@@ -105,5 +91,33 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
         }
 
         return events
+    }
+
+    public static func generateTickets(
+        count: TicketIndex,
+        validators: [ValidatorKey],
+        entropy: Data32,
+        ringContext: Bandersnatch.RingContext,
+        secret: Bandersnatch.SecretKey,
+        idx: UInt32
+    ) throws -> [TicketItemAndOutput] {
+        let pubkeys = try validators.map {
+            try Bandersnatch.PublicKey(data: $0.bandersnatch)
+        }
+
+        let prover = Bandersnatch.Prover(sercret: secret, ring: pubkeys, proverIdx: UInt(idx), ctx: ringContext)
+
+        var vrfInputData = SigningContext.safroleTicketInputData(entropy: entropy, attempt: 0)
+
+        var tickets: [TicketItemAndOutput] = []
+
+        for i in 0 ..< count {
+            vrfInputData[vrfInputData.count - 1] = TicketIndex(i)
+            let sig = try prover.ringVRFSign(vrfInputData: vrfInputData)
+            let out = try secret.getOutput(vrfInputData: vrfInputData)
+            tickets.append(.init(ticket: .init(attempt: TicketIndex(i), signature: sig), output: out))
+        }
+
+        return tickets
     }
 }
