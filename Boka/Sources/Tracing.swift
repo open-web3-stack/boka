@@ -36,7 +36,7 @@ public func parse(from: String) -> (
     return (
         filters: filters,
         defaultLevel: defaultLevel ?? .info,
-        minimalLevel: min(lowestLevel, defaultLevel ?? .critical)
+        minimalLevel: min(lowestLevel, defaultLevel ?? .info)
     )
 }
 

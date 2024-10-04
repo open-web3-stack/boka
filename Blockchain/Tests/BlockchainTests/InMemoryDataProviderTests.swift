@@ -23,7 +23,7 @@ struct InMemoryDataProviderTests {
 
         #expect(await (provider.hasBlock(hash: block.hash)) == true)
         #expect(try await (provider.getBlock(hash: block.hash)) == block)
-        await #expect(throws: BlockchainDataProviderError.noData) {
+        await #expect(throws: BlockchainDataProviderError.noData(hash: Data32())) {
             try await provider.getBlock(hash: Data32())
         }
     }
@@ -50,7 +50,7 @@ struct InMemoryDataProviderTests {
 
         #expect(await provider.isHead(hash: newBlock.hash) == true)
         #expect(await provider.isHead(hash: Data32()) == false)
-        await #expect(throws: BlockchainDataProviderError.noData) {
+        await #expect(throws: BlockchainDataProviderError.noData(hash: Data32())) {
             try await provider.updateHead(hash: newBlock.hash, parent: Data32())
         }
     }
