@@ -279,17 +279,17 @@ public enum Bandersnatch: KeyType {
 
     public final class Prover {
         private let secret: SecretKey
-        private let ring: [PublicKey]
+        private let ring: [PublicKey?]
         private let ringPtrs: [OpaquePointer?]
         private let proverIdx: UInt
         private let ctx: RingContext
 
-        public init(sercret: SecretKey, ring: [PublicKey], proverIdx: UInt, ctx: RingContext) {
+        public init(sercret: SecretKey, ring: [PublicKey?], proverIdx: UInt, ctx: RingContext) {
             secret = sercret
             self.ring = ring
             self.proverIdx = proverIdx
             self.ctx = ctx
-            ringPtrs = ring.map(\.ptr)
+            ringPtrs = ring.map { $0?.ptr }
         }
 
         /// Anonymous VRF signature.
@@ -328,8 +328,8 @@ public enum Bandersnatch: KeyType {
         fileprivate let ptr: OpaquePointer
         public let data: Data144
 
-        public init(ring: [PublicKey], ctx: RingContext) throws(Error) {
-            let ringPtrs = ring.map { $0.ptr as OpaquePointer? }
+        public init(ring: [PublicKey?], ctx: RingContext) throws(Error) {
+            let ringPtrs = ring.map { $0?.ptr as OpaquePointer? }
 
             var ptr: OpaquePointer!
             try call { _ in

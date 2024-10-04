@@ -9,8 +9,8 @@ import Utils
 struct SafroleInput: Codable {
     var slot: UInt32
     var entropy: Data32
-    var offenders: [Ed25519PublicKey]
     var extrinsics: ExtrinsicTickets
+    var offenders: [Ed25519PublicKey]
 }
 
 struct OutputMarks: Codable {
@@ -117,7 +117,7 @@ enum SafroleTestVariants: String, CaseIterable {
 
 struct SafroleTests {
     static func loadTests(variant: SafroleTestVariants) throws -> [Testcase] {
-        try TestLoader.getTestcases(path: "safrole/\(variant)", extension: "scale")
+        try TestLoader.getTestcases(path: "safrole/\(variant)", extension: "bin")
     }
 
     func safroleTests(_ input: Testcase, variant: SafroleTestVariants) throws {
@@ -159,15 +159,11 @@ struct SafroleTests {
 
     @Test(arguments: try SafroleTests.loadTests(variant: .tiny))
     func tinyTests(_ testcase: Testcase) throws {
-        withKnownIssue("waiting for codec to be updated", isIntermittent: true) {
-            try safroleTests(testcase, variant: .tiny)
-        }
+        try safroleTests(testcase, variant: .tiny)
     }
 
     @Test(arguments: try SafroleTests.loadTests(variant: .full))
     func fullTests(_ testcase: Testcase) throws {
-        withKnownIssue("waiting for codec to be updated", isIntermittent: true) {
-            try safroleTests(testcase, variant: .full)
-        }
+        try safroleTests(testcase, variant: .full)
     }
 }
