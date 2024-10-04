@@ -68,28 +68,30 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
         guard let listener else { return }
         listener.close()
         self.listener = nil
-        serverLogger.debug("QuicListener close")
+        serverLogger.info("QuicListener close")
         guard let configuration else { return }
         api?.pointee.ConfigurationClose(configuration)
         self.configuration = nil
-        serverLogger.debug("configuration close")
+        serverLogger.info("configuration close")
         guard let registration else { return }
         api?.pointee.RegistrationClose(registration)
         self.registration = nil
-        serverLogger.debug("registration close")
+        serverLogger.info("registration close")
         guard let api else { return }
         MsQuicClose(api)
         self.api = nil
-        serverLogger.debug("QuicServer Close")
+        serverLogger.info("QuicServer Close")
     }
 
     // Respond to a message with a specific messageID using Data
-    func respondTo(messageID: Int64, with data: Data, kind: StreamKind? = nil) async -> QuicStatus {
+    func respondGetStatus(to messageID: Int64, with data: Data, kind: StreamKind? = nil) async
+        -> QuicStatus
+    {
         var status = QuicStatusCode.internalError.rawValue
         if let (_, stream) = pendingMessages[messageID] {
             let streamKind = kind ?? stream.kind
-            status = stream.send(data: data, kind: streamKind)
             pendingMessages.removeValue(forKey: messageID)
+            status = stream.send(data: data, kind: streamKind)
         } else {
             serverLogger.error("Message not found")
         }
@@ -97,7 +99,8 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
     }
 
     // Respond to a message with a specific messageID using Data
-    func respondingTo(messageID: Int64, with data: Data, kind: StreamKind? = nil) async throws
+    func respondGetMessage(to messageID: Int64, with data: Data, kind: StreamKind? = nil)
+        async throws
         -> QuicMessage
     {
         guard let (_, stream) = pendingMessages[messageID] else {
@@ -107,17 +110,13 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
 
         let streamKind = kind ?? stream.kind
         pendingMessages.removeValue(forKey: messageID)
-
-        let quicMessage = try await Task {
-            try await self.sendStreamData(stream: stream, data: data, kind: streamKind)
-        }.value
-        return quicMessage
+        return try await send(stream: stream, with: data, kind: streamKind)
     }
 
-    private nonisolated func sendStreamData(stream: QuicStream, data: Data, kind: StreamKind)
+    private func send(stream: QuicStream, with data: Data, kind: StreamKind)
         async throws -> QuicMessage
     {
-        try await stream.send(buffer: data, kind: kind)
+        try await stream.send(data: data, kind: kind)
     }
 
     public func didReceiveMessage(

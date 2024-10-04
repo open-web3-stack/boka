@@ -125,7 +125,7 @@ import Utils
                 _ = try await group.next().scheduleTask(in: .seconds(2)) {
                     Task {
                         do {
-                            for i in 1 ... 5 {
+                            for i in 1 ... 10 {
                                 let messageToPeer2: QuicMessage = try await peer1.sendMessage(
                                     to: NetAddr(ipAddress: "127.0.0.1", port: 4569),
                                     with: Message(
@@ -147,7 +147,7 @@ import Utils
                     }
                 }.futureResult.get()
 
-                _ = try await group.next().scheduleTask(in: .seconds(5)) {
+                _ = try await group.next().scheduleTask(in: .seconds(10)) {
                     Task {
                         await eventBus1.unsubscribe(token: token1)
                         await eventBus2.unsubscribe(token: token2)

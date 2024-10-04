@@ -20,7 +20,7 @@ public protocol PeerMessage: Equatable, Sendable {
 
 extension PeerMessage {
     public func getMessageType() -> PeerMessageType {
-        .uniquePersistent
+        .commonEphemeral
     }
 }
 
@@ -56,12 +56,12 @@ public actor Peer {
         }
         clients.removeAll()
         quicServer?.closeSync()
-        peerLogger.trace("Peer Deinit")
+        peerLogger.info("Peer Deinit")
     }
 
     // Respond to a message with a specific messageID using Data
     func respond(to messageID: Int64, with data: Data) async -> QuicStatus {
-        await quicServer?.respondTo(messageID: messageID, with: data)
+        await quicServer?.respondGetStatus(to: messageID, with: data)
             ?? QuicStatusCode.internalError.rawValue
     }
 
@@ -69,8 +69,8 @@ public actor Peer {
     func respond(to messageID: Int64, with message: any PeerMessage) async -> QuicStatus {
         let messageType = message.getMessageType()
         return await quicServer?
-            .respondTo(
-                messageID: messageID,
+            .respondGetStatus(
+                to: messageID,
                 with: message.getData(),
                 kind: (messageType == .uniquePersistent) ? .uniquePersistent : .commonEphemeral
             )
@@ -80,10 +80,13 @@ public actor Peer {
     // Respond to a message with a specific messageID using PeerMessage (async throws)
     func respond(to messageID: Int64, with message: any PeerMessage) async throws {
         let messageType = message.getMessageType()
-        _ = try await quicServer?.respondingTo(
-            messageID: messageID, with: message.getData(),
+        let quicMessage = try await quicServer?.respondGetMessage(
+            to: messageID, with: message.getData(),
             kind: (messageType == .uniquePersistent) ? .uniquePersistent : .commonEphemeral
         )
+        if quicMessage?.type != .received {
+            throw QuicError.sendFailed
+        }
     }
 
     // Sends a message to another peer asynchronously

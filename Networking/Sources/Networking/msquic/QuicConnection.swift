@@ -109,6 +109,7 @@ public class QuicConnection: @unchecked Sendable {
     // Deinitializer to ensure resources are cleaned up
     deinit {
         closeSync()
+        logger.info("QuicConnection Deinit")
     }
 
     nonisolated func closeSync() {
@@ -295,13 +296,15 @@ extension QuicConnection: QuicStreamMessageHandler {
         // Call messageHandler safely in the actor context
         Task { [weak self] in
             guard let self else { return }
-            await messageHandler?.didReceiveMessage(connection: self, stream: stream, message: message)
+            await messageHandler?.didReceiveMessage(
+                connection: self, stream: stream, message: message
+            )
         }
     }
 
     // Handles errors received from the stream
     public func didReceiveError(_: QuicStream, error: QuicError) {
         logger.error("Failed to receive message: \(error)")
-//       await  messageHandler?.didReceiveError(connection: self, stream: stream, error: error)
+        //       await  messageHandler?.didReceiveError(connection: self, stream: stream, error: error)
     }
 }

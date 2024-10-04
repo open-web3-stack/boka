@@ -55,7 +55,7 @@ public actor QuicClient: Sendable, QuicConnectionMessageHandler {
 
     deinit {
         closeSync()
-        clientLogger.trace("QuicClient Deinit")
+        clientLogger.info("QuicClient Deinit")
     }
 
     nonisolated func closeSync() {
@@ -80,7 +80,7 @@ public actor QuicClient: Sendable, QuicConnectionMessageHandler {
             } else {
                 try await connection.createCommonEphemeralStream()
             }
-        return try await sendStream.send(buffer: message, kind: streamKind)
+        return try await sendStream.send(data: message, kind: streamKind)
     }
 
     // Send method that returns a QuicStatus

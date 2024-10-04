@@ -44,13 +44,14 @@ public class QuicStream: @unchecked Sendable {
     // Initializer for wrapping an existing stream
     init(
         api: UnsafePointer<QuicApiTable>?, connection: HQuic?, stream: HQuic?,
+        _ streamKind: StreamKind = .commonEphemeral,
         messageHandler: QuicStreamMessageHandler? = nil
     ) {
         self.api = api
         self.connection = connection
         self.messageHandler = messageHandler
         self.stream = stream
-        kind = .commonEphemeral
+        kind = streamKind
         streamCallback = { stream, context, event in
             QuicStream.streamCallback(
                 stream: stream, context: context, event: event
@@ -61,7 +62,7 @@ public class QuicStream: @unchecked Sendable {
     // Deinitializer to ensure resources are cleaned up
     deinit {
         close()
-        streamLogger.trace("QuicStream Deinit")
+        streamLogger.info("QuicStream Deinit")
     }
 
     // Opens a stream with the specified kind
@@ -76,7 +77,6 @@ public class QuicStream: @unchecked Sendable {
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }
-//        streamLogger.info("[\(String(describing: stream))] Stream opened")
     }
 
     // Starts the stream
@@ -86,7 +86,7 @@ public class QuicStream: @unchecked Sendable {
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }
-//        streamLogger.info("[\(String(describing: stream))] Stream started")
+        streamLogger.info("[\(String(describing: stream))] Stream started")
     }
 
     // Closes the stream and cleans up resources
@@ -97,7 +97,7 @@ public class QuicStream: @unchecked Sendable {
             api?.pointee.StreamClose(stream)
             self.stream = nil
         }
-        streamLogger.debug("QuicStream close")
+        streamLogger.info("QuicStream close")
     }
 
     // Sets the callback handler for the stream
@@ -154,10 +154,10 @@ public class QuicStream: @unchecked Sendable {
     }
 
     // Sends data over the stream asynchronously and waits for the response
-    func send(buffer: Data, kind: StreamKind? = nil) async throws -> QuicMessage {
+    func send(data: Data, kind: StreamKind? = nil) async throws -> QuicMessage {
         streamLogger.info("[\(String(describing: stream))] Sending data...")
         var status = QuicStatusCode.success.rawValue
-        let messageLength = buffer.count
+        let messageLength = data.count
 
         let sendBufferRaw = UnsafeMutableRawPointer.allocate(
             byteCount: MemoryLayout<QuicBuffer>.size + messageLength,
@@ -168,7 +168,7 @@ public class QuicStream: @unchecked Sendable {
         let bufferPointer = UnsafeMutablePointer<UInt8>.allocate(
             capacity: messageLength
         )
-        buffer.copyBytes(to: bufferPointer, count: messageLength)
+        data.copyBytes(to: bufferPointer, count: messageLength)
 
         sendBuffer.pointee.Buffer = bufferPointer
         sendBuffer.pointee.Length = UInt32(messageLength)
