@@ -1,6 +1,7 @@
 import Codec
 import Foundation
 import PolkaVM
+import Utils
 
 extension OnTransferFunction {
     public func invoke(
@@ -14,20 +15,20 @@ extension OnTransferFunction {
             throw VMInvocationsError.serviceAccountNotFound
         }
 
-        account.balance += transfers.reduce(0) { $0 + $1.amount }
+        account.balance += transfers.reduce(Balance(0)) { $0 + $1.amount }
 
         if account.codeHash.data.isEmpty || transfers.isEmpty {
             return account
         }
 
         let ctx = OnTransferContext(context: (account, service, serviceAccounts), config: config)
-        let gasLimitSum = transfers.reduce(0) { $0 + $1.gasLimit }
+        let gasLimitSum = transfers.reduce(Balance(0)) { $0 + $1.gasLimit }
         let argument = try JamEncoder.encode(transfers)
 
         _ = invokePVM(
             config: config,
             blob: account.codeHash.data,
-            pc: 3,
+            pc: 15,
             gas: gasLimitSum,
             argumentData: argument,
             ctx: ctx

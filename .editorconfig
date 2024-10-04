@@ -12,3 +12,7 @@ insert_final_newline=true
 [*.swift]
 indent_style=space
 tab_width=4
+
+[*.yml]
+indent_style=tab
+indent_size=2

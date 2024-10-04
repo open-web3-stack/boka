@@ -9,8 +9,8 @@ import Utils
 struct SafroleInput: Codable {
     var slot: UInt32
     var entropy: Data32
-    var offenders: [Ed25519PublicKey]
     var extrinsics: ExtrinsicTickets
+    var offenders: [Ed25519PublicKey]
 }
 
 struct OutputMarks: Codable {
@@ -98,14 +98,12 @@ enum SafroleTestVariants: String, CaseIterable {
     case tiny
     case full
 
-    static let tinyConfig = {
-        var config = ProtocolConfigRef.mainnet.value
+    static let tinyConfig = ProtocolConfigRef.mainnet.mutate { config in
         config.totalNumberOfValidators = 6
         config.epochLength = 12
         // 10 = 12 * 500/600, not sure what this should be for tiny, but this passes tests
         config.ticketSubmissionEndSlot = 10
-        return Ref(config)
-    }()
+    }
 
     var config: ProtocolConfigRef {
         switch self {
@@ -119,7 +117,7 @@ enum SafroleTestVariants: String, CaseIterable {
 
 struct SafroleTests {
     static func loadTests(variant: SafroleTestVariants) throws -> [Testcase] {
-        try TestLoader.getTestcases(path: "safrole/\(variant)", extension: "scale")
+        try TestLoader.getTestcases(path: "safrole/\(variant)", extension: "bin")
     }
 
     func safroleTests(_ input: Testcase, variant: SafroleTestVariants) throws {
@@ -161,15 +159,11 @@ struct SafroleTests {
 
     @Test(arguments: try SafroleTests.loadTests(variant: .tiny))
     func tinyTests(_ testcase: Testcase) throws {
-        withKnownIssue("waiting for codec to be updated", isIntermittent: true) {
-            try safroleTests(testcase, variant: .tiny)
-        }
+        try safroleTests(testcase, variant: .tiny)
     }
 
     @Test(arguments: try SafroleTests.loadTests(variant: .full))
     func fullTests(_ testcase: Testcase) throws {
-        withKnownIssue("waiting for codec to be updated", isIntermittent: true) {
-            try safroleTests(testcase, variant: .full)
-        }
+        try safroleTests(testcase, variant: .full)
     }
 }

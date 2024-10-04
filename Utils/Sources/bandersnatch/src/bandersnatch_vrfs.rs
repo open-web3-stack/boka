@@ -64,7 +64,17 @@ pub fn ring_vrf_sign(
     let output = secret.output(input);
 
     // Backend currently requires the wrapped type (plain affine points)
-    let pts: Vec<_> = unsafe { ring.iter().map(|pk| (*(*pk)).0).collect() };
+    let pts: Vec<_> = unsafe {
+        ring.iter()
+            .map(|pk| {
+                if pk.is_null() {
+                    ctx.padding_point()
+                } else {
+                    (*(*pk)).0
+                }
+            })
+            .collect()
+    };
 
     // Proof construction
     let prover_key = ctx.prover_key(&pts);

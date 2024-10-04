@@ -21,24 +21,22 @@ struct RecentHisoryTestcase: Codable {
 
 struct RecentHistoryTests {
     static func loadTests() throws -> [Testcase] {
-        try TestLoader.getTestcases(path: "history/data", extension: "scale")
+        try TestLoader.getTestcases(path: "history/data", extension: "bin")
     }
 
     @Test(arguments: try loadTests())
     func recentHistory(_ testcase: Testcase) throws {
-        withKnownIssue("wait for codec to be updated") {
-            let config = ProtocolConfigRef.mainnet
-            let testcase = try JamDecoder.decode(RecentHisoryTestcase.self, from: testcase.data, withConfig: config)
+        let config = ProtocolConfigRef.mainnet
+        let testcase = try JamDecoder.decode(RecentHisoryTestcase.self, from: testcase.data, withConfig: config)
 
-            var state = testcase.preState
-            try state.update(
-                headerHash: testcase.input.headerHash,
-                parentStateRoot: testcase.input.parentStateRoot,
-                accumulateRoot: testcase.input.accumulateRoot,
-                workReportHashes: ConfigLimitedSizeArray(config: config, array: testcase.input.workPackages)
-            )
+        var state = testcase.preState
+        try state.update(
+            headerHash: testcase.input.headerHash,
+            parentStateRoot: testcase.input.parentStateRoot,
+            accumulateRoot: testcase.input.accumulateRoot,
+            workReportHashes: ConfigLimitedSizeArray(config: config, array: testcase.input.workPackages)
+        )
 
-            #expect(state == testcase.postState)
-        }
+        #expect(state == testcase.postState)
     }
 }

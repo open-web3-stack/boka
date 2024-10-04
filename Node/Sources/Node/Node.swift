@@ -19,12 +19,17 @@ public class Node {
     public let blockchain: Blockchain
     public let rpcServer: Server
     public let timeProvider: TimeProvider
+    public let dataProvider: BlockchainDataProvider
 
-    public init(genesis: Genesis, config: Config, eventBus: EventBus) async throws {
+    public init(
+        config: Config,
+        genesis: Genesis,
+        eventBus: EventBus
+    ) async throws {
         logger.debug("Initializing node")
 
         let (genesisState, protocolConfig) = try await genesis.load()
-        let dataProvider = await InMemoryDataProvider(genesis: genesisState)
+        dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesis: genesisState))
         timeProvider = SystemTimeProvider(slotPeriodSeconds: UInt32(protocolConfig.value.slotPeriodSeconds))
         blockchain = try await Blockchain(
             config: protocolConfig,

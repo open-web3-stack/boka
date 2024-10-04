@@ -252,7 +252,7 @@ extension Safrole {
 
             let newCommitment = {
                 try Bandersnatch.RingCommitment(
-                    ring: validatorQueueWithoutOffenders.map { try Bandersnatch.PublicKey(data: $0.bandersnatch) },
+                    ring: validatorQueueWithoutOffenders.map { try? Bandersnatch.PublicKey(data: $0.bandersnatch) },
                     ctx: ctx
                 ).data
             }
