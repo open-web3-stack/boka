@@ -19,7 +19,7 @@ public class QuicStream: @unchecked Sendable {
     private var stream: HQuic?
     private let api: UnsafePointer<QuicApiTable>?
     private let connection: HQuic?
-    public let kind: StreamKind
+    public var kind: StreamKind
     private weak var messageHandler: QuicStreamMessageHandler?
     private var streamCallback: StreamCallback?
     private var sendCompletion: CheckedContinuation<QuicMessage, Error>?
@@ -44,7 +44,7 @@ public class QuicStream: @unchecked Sendable {
     // Initializer for wrapping an existing stream
     init(
         api: UnsafePointer<QuicApiTable>?, connection: HQuic?, stream: HQuic?,
-        _ streamKind: StreamKind = .commonEphemeral,
+        _ streamKind: StreamKind = .uniquePersistent,
         messageHandler: QuicStreamMessageHandler? = nil
     ) {
         self.api = api
@@ -117,9 +117,8 @@ public class QuicStream: @unchecked Sendable {
         )
     }
 
-    // Sends data over the stream and returns the status
-    func send(data: Data, kind: StreamKind? = nil) -> QuicStatus {
-        streamLogger.info("[\(String(describing: stream))] Sending data...")
+    func respond(with data: Data, kind: StreamKind? = nil) -> QuicStatus {
+        streamLogger.info("[\(String(describing: stream))] Respond data...")
         var status = QuicStatusCode.success.rawValue
         let messageLength = data.count
 
@@ -140,7 +139,10 @@ public class QuicStream: @unchecked Sendable {
         // Use the provided kind if available, otherwise use the stream's kind
         let effectiveKind = kind ?? self.kind
         let flags = (effectiveKind == .uniquePersistent) ? QUIC_SEND_FLAG_NONE : QUIC_SEND_FLAG_FIN
-
+        streamLogger
+            .info(
+                "[\(String(describing: stream))] flags \((effectiveKind == .uniquePersistent) ? "QUIC_SEND_FLAG_NONE" : "QUIC_SEND_FLAG_FIN")"
+            )
         status = (api?.pointee.StreamSend(stream, sendBuffer, 1, flags, sendBufferRaw)).status
         if status.isFailed {
             streamLogger.error("StreamSend failed, \(status)!")
@@ -176,6 +178,10 @@ public class QuicStream: @unchecked Sendable {
         // Use the provided kind if available, otherwise use the stream's kind
         let effectiveKind = kind ?? self.kind
         let flags = (effectiveKind == .uniquePersistent) ? QUIC_SEND_FLAG_NONE : QUIC_SEND_FLAG_FIN
+        streamLogger
+            .info(
+                "[\(String(describing: stream))] flags \((effectiveKind == .uniquePersistent) ? "QUIC_SEND_FLAG_NONE" : "QUIC_SEND_FLAG_FIN")"
+            )
 
         return try await withCheckedThrowingContinuation { [weak self] continuation in
             guard let self else {
@@ -225,9 +231,6 @@ extension QuicStream {
                 let buffer = buffers![Int(i)]
                 let bufferLength = Int(buffer.Length)
                 let bufferData = Data(bytes: buffer.Buffer, count: bufferLength)
-//                streamLogger.info(
-//                    " Data length \(bufferLength) bytes: \(String([UInt8](bufferData).map { Character(UnicodeScalar($0)) }))"
-//                )
                 receivedData.append(bufferData)
             }
             if receivedData.count > 0 {
@@ -241,11 +244,20 @@ extension QuicStream {
             }
 
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
-//            streamLogger.info("[\(String(describing: stream))] Peer shut down")
-            break
+            streamLogger.info("[\(String(describing: stream))] Peer send shutdown")
+
+            quicStream.messageHandler?.didReceiveMessage(
+                quicStream, message: QuicMessage(type: .sendShutdown, data: nil)
+            )
+            if quicStream.kind == .uniquePersistent {
+                quicStream.kind = .commonEphemeral
+                streamLogger.warning(
+                    "[\(String(describing: stream))] Changing stream to commonEphemeral"
+                )
+            }
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
-            streamLogger.error("[\(String(describing: stream))] Peer aborted")
+            streamLogger.error("[\(String(describing: stream))] Peer send aborted")
             status =
                 (quicStream.api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0))
                     .status

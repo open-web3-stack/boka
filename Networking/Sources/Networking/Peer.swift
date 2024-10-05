@@ -56,12 +56,12 @@ public actor Peer {
         }
         clients.removeAll()
         quicServer?.closeSync()
-        peerLogger.debug("Peer Deinit")
+        peerLogger.info("Peer Deinit")
     }
 
     // Respond to a message with a specific messageID using Data
     func respond(to messageID: Int64, with data: Data) async -> QuicStatus {
-        await quicServer?.respondGetStatus(to: messageID, with: data, kind: .uniquePersistent)
+        await quicServer?.respondGetStatus(to: messageID, with: data)
             ?? QuicStatusCode.internalError.rawValue
     }
 

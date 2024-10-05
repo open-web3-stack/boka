@@ -11,8 +11,19 @@ import Utils
 
     struct Message: PeerMessage {
         public let data: Data
+        public let type: PeerMessageType?
         public init(data: Data) {
             self.data = data
+            type = nil
+        }
+
+        public init(data: Data, type: PeerMessageType) {
+            self.data = data
+            self.type = type
+        }
+
+        public func getMessageType() -> PeerMessageType {
+            type ?? .uniquePersistent
         }
 
         public func getData() -> Data {
@@ -125,18 +136,39 @@ import Utils
                 _ = try await group.next().scheduleTask(in: .seconds(2)) {
                     Task {
                         do {
-                            for i in 1 ... 10 {
+                            for i in 1 ... 5 {
                                 let messageToPeer2: QuicMessage = try await peer1.sendMessage(
                                     to: NetAddr(ipAddress: "127.0.0.1", port: 4569),
                                     with: Message(
-                                        data: Data("Hello from Peer1 - Message \(i)".utf8)
+                                        data: Data("Hello from Peer1 - Message \(i)".utf8),
+                                        type: PeerMessageType.commonEphemeral
+                                    )
+                                )
+                                print("Peer1 got message: \(String([UInt8](messageToPeer2.data!).map { Character(UnicodeScalar($0)) }))")
+                                let messageToPeer1: QuicMessage = try await peer2.sendMessage(
+                                    to: NetAddr(ipAddress: "127.0.0.1", port: 4568),
+                                    with: Message(
+                                        data: Data("Hello from Peer2 - Message \(i)".utf8),
+                                        type: PeerMessageType.commonEphemeral
+                                    )
+                                )
+                                print("Peer2 got message: \(String([UInt8](messageToPeer1.data!).map { Character(UnicodeScalar($0)) }))")
+                            }
+
+                            for i in 6 ... 10 {
+                                let messageToPeer2: QuicMessage = try await peer1.sendMessage(
+                                    to: NetAddr(ipAddress: "127.0.0.1", port: 4569),
+                                    with: Message(
+                                        data: Data("Hello from Peer1 - Message \(i)".utf8),
+                                        type: PeerMessageType.uniquePersistent
                                     )
                                 )
                                 print("Peer1 sent message \(i): \(messageToPeer2)")
                                 let messageToPeer1: QuicMessage = try await peer2.sendMessage(
                                     to: NetAddr(ipAddress: "127.0.0.1", port: 4568),
                                     with: Message(
-                                        data: Data("Hello from Peer2 - Message \(i)".utf8)
+                                        data: Data("Hello from Peer2 - Message \(i)".utf8),
+                                        type: PeerMessageType.uniquePersistent
                                     )
                                 )
                                 print("Peer2 sent message \(i): \(messageToPeer1)")
@@ -147,7 +179,7 @@ import Utils
                     }
                 }.futureResult.get()
 
-                _ = try await group.next().scheduleTask(in: .seconds(10)) {
+                _ = try await group.next().scheduleTask(in: .seconds(100)) {
                     Task {
                         await eventBus1.unsubscribe(token: token1)
                         await eventBus2.unsubscribe(token: token2)

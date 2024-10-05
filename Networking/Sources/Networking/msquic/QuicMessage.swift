@@ -6,6 +6,7 @@ enum QuicMessageType: String, Codable {
     case close
     case connected
     case shutdownComplete
+    case sendShutdown
 }
 
 public struct QuicMessage: Sendable, Equatable, Codable {

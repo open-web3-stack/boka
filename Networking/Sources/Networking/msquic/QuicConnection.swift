@@ -15,47 +15,53 @@ public protocol QuicConnectionMessageHandler: AnyObject {
 }
 
 actor StreamManager {
-    private var uniquePersistentStreams: [StreamKind: QuicStream] = [:]
-    private var commonEphemeralStreams: [QuicStream]
+    private var uniqueStreams: [StreamKind: QuicStream] = [:]
+    private var commonStreams: [QuicStream]
 
     init() {
-        uniquePersistentStreams = [:]
-        commonEphemeralStreams = .init()
+        uniqueStreams = [:]
+        commonStreams = .init()
     }
 
-    func getUniquePersistentStream(kind: StreamKind) -> QuicStream? {
-        uniquePersistentStreams[kind]
+    func getUniqueStream(kind: StreamKind) -> QuicStream? {
+        uniqueStreams[kind]
     }
 
-    func addUniquePersistentStream(kind: StreamKind, stream: QuicStream) {
-        uniquePersistentStreams[kind] = stream
+    func addUniqueStream(kind: StreamKind, stream: QuicStream) {
+        uniqueStreams[kind] = stream
     }
 
-    func removeUniquePersistentStream(kind: StreamKind) {
-        _ = uniquePersistentStreams.removeValue(forKey: kind)
+    func removeUniqueStream(kind: StreamKind) {
+        _ = uniqueStreams.removeValue(forKey: kind)
     }
 
-    func addCommonEphemeralStream(_ stream: QuicStream) {
-        commonEphemeralStreams.append(stream)
+    func addCommonStream(_ stream: QuicStream) {
+        commonStreams.append(stream)
     }
 
-    func removeCommonEphemeralStream(_ stream: QuicStream) {
-        stream.close()
-        commonEphemeralStreams.removeAll(where: { $0 === stream })
+    func removeCommonStream(_ stream: QuicStream) {
+        commonStreams.removeAll(where: { $0 === stream })
     }
 
-    func closeAllCommonEphemeralStreams() {
-        for stream in commonEphemeralStreams {
+    func changeTypeToCommon(_ stream: QuicStream) {
+        stream.kind = .commonEphemeral
+        removeUniqueStream(kind: stream.kind)
+        removeCommonStream(stream)
+        addCommonStream(stream)
+    }
+
+    func closeAllCommonStreams() {
+        for stream in commonStreams {
             stream.close()
         }
-        commonEphemeralStreams.removeAll()
+        commonStreams.removeAll()
     }
 
-    func closeAllUniquePersistentStreams() {
-        for stream in uniquePersistentStreams.values {
+    func closeAllUniqueStreams() {
+        for stream in uniqueStreams.values {
             stream.close()
         }
-        uniquePersistentStreams.removeAll()
+        uniqueStreams.removeAll()
     }
 }
 
@@ -109,7 +115,7 @@ public class QuicConnection: @unchecked Sendable {
     // Deinitializer to ensure resources are cleaned up
     deinit {
         closeSync()
-        logger.trace("QuicConnection Deinit")
+        logger.info("QuicConnection Deinit")
     }
 
     nonisolated func closeSync() {
@@ -155,11 +161,11 @@ public class QuicConnection: @unchecked Sendable {
 
     // Creates or retrieves a unique persistent stream
     func createOrGetUniquePersistentStream(kind: StreamKind) async throws -> QuicStream {
-        if let stream = await streamManager.getUniquePersistentStream(kind: kind) {
+        if let stream = await streamManager.getUniqueStream(kind: kind) {
             return stream
         }
         let stream = try QuicStream(api: api, connection: connection, kind, messageHandler: self)
-        await streamManager.addUniquePersistentStream(kind: kind, stream: stream)
+        await streamManager.addUniqueStream(kind: kind, stream: stream)
         return stream
     }
 
@@ -168,7 +174,7 @@ public class QuicConnection: @unchecked Sendable {
         let stream: QuicStream = try QuicStream(
             api: api, connection: connection, .commonEphemeral, messageHandler: self
         )
-        await streamManager.addCommonEphemeralStream(stream)
+        await streamManager.addCommonStream(stream)
         return stream
     }
 
@@ -176,9 +182,9 @@ public class QuicConnection: @unchecked Sendable {
     func removeStream(stream: QuicStream) async {
         stream.close()
         if stream.kind == .uniquePersistent {
-            await streamManager.removeUniquePersistentStream(kind: stream.kind)
+            await streamManager.removeUniqueStream(kind: stream.kind)
         } else {
-            await streamManager.removeCommonEphemeralStream(stream)
+            await streamManager.removeCommonStream(stream)
         }
     }
 
@@ -186,8 +192,8 @@ public class QuicConnection: @unchecked Sendable {
     func close() async {
         connectionCallback = nil
         messageHandler = nil
-        await streamManager.closeAllCommonEphemeralStreams()
-        await streamManager.closeAllUniquePersistentStreams()
+        await streamManager.closeAllCommonStreams()
+        await streamManager.closeAllUniqueStreams()
         if let connection {
             api?.pointee.ConnectionClose(connection)
             self.connection = nil
@@ -223,7 +229,7 @@ extension QuicConnection {
         let status: QuicStatus = QuicStatusCode.success.rawValue
         switch event.pointee.Type {
         case QUIC_CONNECTION_EVENT_CONNECTED:
-            logger.info("[\(String(describing: connection))] Connected")
+            logger.debug("[\(String(describing: connection))] Connected")
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
             if event.pointee.SHUTDOWN_INITIATED_BY_TRANSPORT.Status
@@ -272,7 +278,7 @@ extension QuicConnection {
             )
             quicStream.setCallbackHandler()
             Task {
-                await quicConnection.streamManager.addCommonEphemeralStream(quicStream)
+                await quicConnection.streamManager.addCommonStream(quicStream)
             }
 
         default:
@@ -289,6 +295,13 @@ extension QuicConnection: QuicStreamMessageHandler {
         case .shutdownComplete:
             Task {
                 await removeStream(stream: stream)
+            }
+        case .sendShutdown:
+            Task {
+                if stream.kind == .uniquePersistent {
+                    await streamManager.changeTypeToCommon(stream)
+                    logger.info("changeStreamType")
+                }
             }
         default:
             break

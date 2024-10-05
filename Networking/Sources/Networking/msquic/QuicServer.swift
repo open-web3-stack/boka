@@ -60,7 +60,7 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
     nonisolated func closeSync() {
         Task { [weak self] in
             await self?.close() // Using weak self to avoid retain cycle
-            serverLogger.trace("QuicServer Deinit")
+            serverLogger.info("QuicServer Deinit")
         }
     }
 
@@ -91,7 +91,8 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
         if let (_, stream) = pendingMessages[messageID] {
             let streamKind = kind ?? stream.kind
             pendingMessages.removeValue(forKey: messageID)
-            status = stream.send(data: data, kind: streamKind)
+
+            status = stream.respond(with: data, kind: streamKind)
         } else {
             serverLogger.error("Message not found")
         }
