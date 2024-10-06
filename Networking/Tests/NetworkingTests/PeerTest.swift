@@ -60,12 +60,12 @@ import Utils
                 // Example subscription to PeerMessageReceived
                 let token1 = await eventBus.subscribe(PeerMessageReceived.self) { event in
                     print(
-                        "Received message from peer messageID: \(event.messageID), message: \(event.message)"
+                        "Received message from peer messageID: \(event.messageID), message: message: \(String([UInt8](event.message.data!).map { Character(UnicodeScalar($0)) }))"
                     )
                     let status: QuicStatus = await peer.respond(
                         to: event.messageID, with: Message(data: event.message.data!)
                     )
-                    print("Peer sent: \(status)")
+                    print("Peer sent status: \(status.isFailed ? "Failed" : "Successed")")
                 }
 
                 // Example subscription to PeerErrorReceived
@@ -75,7 +75,7 @@ import Utils
                     )
                 }
 
-                _ = try await group.next().scheduleTask(in: .seconds(5)) {
+                _ = try await group.next().scheduleTask(in: .seconds(10)) {
                     Task {
                         await eventBus.unsubscribe(token: token1)
                         await eventBus.unsubscribe(token: token2)
@@ -83,7 +83,9 @@ import Utils
                     }
                 }.futureResult.get()
 
-                try await group.next().scheduleTask(in: .seconds(10)) {}.futureResult.get()
+                try await group.next().scheduleTask(in: .seconds(5)) {
+                    print("task end")
+                }.futureResult.get()
 
             } catch {
                 print("Failed to start peer: \(error)")
@@ -179,7 +181,7 @@ import Utils
                     }
                 }.futureResult.get()
 
-                _ = try await group.next().scheduleTask(in: .seconds(100)) {
+                _ = try await group.next().scheduleTask(in: .seconds(5)) {
                     Task {
                         await eventBus1.unsubscribe(token: token1)
                         await eventBus2.unsubscribe(token: token2)

@@ -54,14 +54,7 @@ public actor QuicClient: Sendable, QuicConnectionMessageHandler {
     }
 
     deinit {
-        closeSync()
         clientLogger.info("QuicClient Deinit")
-    }
-
-    nonisolated func closeSync() {
-        Task { [weak self] in
-            await self?.close() // Using weak self to avoid retain cycle
-        }
     }
 
     // Asynchronous send method that waits for a QuicMessage reply
@@ -102,27 +95,27 @@ public actor QuicClient: Sendable, QuicConnectionMessageHandler {
     }
 
     public func close() async {
-        clientLogger.debug(" [\(getNetAddr())] client close")
+        clientLogger.info(" [\(getNetAddr())] client close")
 
         guard let connection else { return }
         await connection.close()
         self.connection = nil
-        clientLogger.debug(" [\(getNetAddr())] client connection close")
+        clientLogger.info(" [\(getNetAddr())] client connection close")
 
         guard let configuration else { return }
         api?.pointee.ConfigurationClose(configuration)
         self.configuration = nil
-        clientLogger.debug(" [\(getNetAddr())] client configuration close")
+        clientLogger.info(" [\(getNetAddr())] client configuration close")
 
         guard let registration else { return }
         api?.pointee.RegistrationClose(registration)
         self.registration = nil
-        clientLogger.debug(" [\(getNetAddr())] client registration close")
+        clientLogger.info(" [\(getNetAddr())] client registration close")
 
         guard let api else { return }
         MsQuicClose(api)
         self.api = nil
-        clientLogger.debug("[\(getNetAddr())] QuicClient Close")
+        clientLogger.info("[\(getNetAddr())] QuicClient Close")
     }
 
     public func didReceiveMessage(

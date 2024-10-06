@@ -51,12 +51,22 @@ public actor Peer {
     }
 
     deinit {
+        closeSync()
+        peerLogger.info("Peer Deinit")
+    }
+
+    nonisolated func closeSync() {
+        Task { [weak self] in
+            await self?.close() // Using weak self to avoid retain cycle
+        }
+    }
+
+    private func close() async {
         for client in clients.values {
-            client.closeSync()
+            await client.close()
         }
         clients.removeAll()
-        quicServer?.closeSync()
-        peerLogger.info("Peer Deinit")
+        await quicServer?.close()
     }
 
     // Respond to a message with a specific messageID using Data

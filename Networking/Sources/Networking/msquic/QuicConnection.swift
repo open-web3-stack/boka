@@ -114,14 +114,7 @@ public class QuicConnection: @unchecked Sendable {
 
     // Deinitializer to ensure resources are cleaned up
     deinit {
-        closeSync()
         logger.info("QuicConnection Deinit")
-    }
-
-    nonisolated func closeSync() {
-        Task { [weak self] in
-            await self?.close() // Using weak self to avoid retain cycle
-        }
     }
 
     // Sets the callback handler for the connection
@@ -296,7 +289,7 @@ extension QuicConnection: QuicStreamMessageHandler {
             Task {
                 await removeStream(stream: stream)
             }
-        case .sendShutdown:
+        case .changeStreamType:
             Task {
                 if stream.kind == .uniquePersistent {
                     await streamManager.changeTypeToCommon(stream)

@@ -61,7 +61,6 @@ public class QuicStream: @unchecked Sendable {
 
     // Deinitializer to ensure resources are cleaned up
     deinit {
-        close()
         streamLogger.info("QuicStream Deinit")
     }
 
@@ -222,8 +221,10 @@ extension QuicStream {
             if let clientContext = event.pointee.SEND_COMPLETE.ClientContext {
                 free(clientContext)
             }
+            streamLogger.info("[\(String(describing: stream))] Stream send completed")
 
         case QUIC_STREAM_EVENT_RECEIVE:
+
             let bufferCount: UInt32 = event.pointee.RECEIVE.BufferCount
             let buffers = event.pointee.RECEIVE.Buffers
             var receivedData = Data()
@@ -233,7 +234,13 @@ extension QuicStream {
                 let bufferData = Data(bytes: buffer.Buffer, count: bufferLength)
                 receivedData.append(bufferData)
             }
+
             if receivedData.count > 0 {
+                if event.pointee.RECEIVE.Flags.rawValue & QUIC_RECEIVE_FLAG_FIN.rawValue != 0 {
+                    streamLogger.warning("[\(String(describing: stream))] FIN received in QUIC stream")
+                    quicStream.messageHandler?.didReceiveMessage(quicStream, message: QuicMessage(type: .changeStreamType, data: nil))
+                    quicStream.kind = .commonEphemeral
+                }
                 if let continuation = quicStream.sendCompletion {
                     continuation.resume(returning: QuicMessage(type: .received, data: receivedData))
                     quicStream.sendCompletion = nil
@@ -244,16 +251,11 @@ extension QuicStream {
             }
 
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
-            streamLogger.info("[\(String(describing: stream))] Peer send shutdown")
-
-            quicStream.messageHandler?.didReceiveMessage(
-                quicStream, message: QuicMessage(type: .sendShutdown, data: nil)
-            )
+            streamLogger.warning("[\(String(describing: stream))] Peer send shutdown")
             if quicStream.kind == .uniquePersistent {
-                quicStream.kind = .commonEphemeral
-                streamLogger.warning(
-                    "[\(String(describing: stream))] Changing stream to commonEphemeral"
-                )
+                status =
+                    (quicStream.api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0))
+                        .status
             }
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
@@ -261,9 +263,6 @@ extension QuicStream {
             status =
                 (quicStream.api?.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0))
                     .status
-            quicStream.messageHandler?.didReceiveError(
-                quicStream, error: QuicError.invalidStatus(status: status.code)
-            )
 
         case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
             streamLogger.info("[\(String(describing: stream))] All done")

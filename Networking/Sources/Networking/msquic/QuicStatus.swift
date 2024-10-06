@@ -20,6 +20,10 @@ extension QuicStatus {
         Int32(bitPattern: self) <= 0
     }
 
+    static var pending: UInt32 {
+        UInt32(bitPattern: -2)
+    }
+
     init(_ value: UInt32?) {
         guard let value else {
             self = QuicStatusCode.unknown.rawValue

@@ -18,7 +18,7 @@ import Testing
                         ipAddress: "127.0.0.1", port: 4568
                     ), messageHandler: self
                 )
-                quicServer.closeSync()
+//                await quicServer.close()
 
                 try await group.next().scheduleTask(in: .seconds(5)) {}.futureResult.get()
             } catch {
