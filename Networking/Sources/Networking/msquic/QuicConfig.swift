@@ -16,7 +16,7 @@ public struct QuicConfig: Sendable {
     ) throws {
         // Initialize QUIC settings
         var settings = QuicSettings()
-        settings.IdleTimeoutMs = 20000
+        settings.IdleTimeoutMs = 3000
         settings.IsSet.IdleTimeoutMs = 1
         settings.ServerResumptionLevel = 2 // QUIC_SERVER_RESUME_AND_ZERORTT
         settings.IsSet.ServerResumptionLevel = 1

@@ -59,8 +59,9 @@ import Utils
 
                 // Example subscription to PeerMessageReceived
                 let token1 = await eventBus.subscribe(PeerMessageReceived.self) { event in
+                    let message = String([UInt8](event.message.data!).map { Character(UnicodeScalar($0)) })
                     print(
-                        "Received message from peer messageID: \(event.messageID), message: message: \(String([UInt8](event.message.data!).map { Character(UnicodeScalar($0)) }))"
+                        "Received message from peer messageID: \(event.messageID), message: \(message))"
                     )
                     let status: QuicStatus = await peer.respond(
                         to: event.messageID, with: Message(data: event.message.data!)
@@ -117,9 +118,9 @@ import Utils
 
                 // Subscribe to PeerMessageReceived for peer1
                 let token1 = await eventBus1.subscribe(PeerMessageReceived.self) { event in
-
+                    let message = String([UInt8](event.message.data!).map { Character(UnicodeScalar($0)) })
                     print(
-                        "Peer1 received message from messageID: \(event.messageID), message: \(String([UInt8](event.message.data!).map { Character(UnicodeScalar($0)) }))"
+                        "Peer1 received message from messageID: \(event.messageID), message: \(message))"
                     )
                     let status: QuicStatus = await peer1.respond(to: event.messageID, with: event.message.data!)
                     print("Peer1 sent response: \(status.isFailed ? "Failed" : "Success")")
@@ -127,8 +128,9 @@ import Utils
 
                 // Subscribe to PeerMessageReceived for peer2
                 let token2 = await eventBus2.subscribe(PeerMessageReceived.self) { event in
+                    let message = String([UInt8](event.message.data!).map { Character(UnicodeScalar($0)) })
                     print(
-                        "Peer2 received message from messageID: \(event.messageID), message: \(String([UInt8](event.message.data!).map { Character(UnicodeScalar($0)) }))"
+                        "Peer2 received message from messageID: \(event.messageID), message: \(message))"
                     )
                     let status: QuicStatus = await peer2.respond(to: event.messageID, with: event.message.data!)
                     print("Peer2 sent response: \(status.isFailed ? "Failed" : "Success")")
@@ -181,7 +183,7 @@ import Utils
                     }
                 }.futureResult.get()
 
-                _ = try await group.next().scheduleTask(in: .seconds(5)) {
+                _ = try await group.next().scheduleTask(in: .seconds(50)) {
                     Task {
                         await eventBus1.unsubscribe(token: token1)
                         await eventBus2.unsubscribe(token: token2)

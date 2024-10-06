@@ -91,21 +91,25 @@ public actor QuicClient: Sendable, QuicConnectionMessageHandler {
     }
 
     public func close() async {
-        guard let connection else { return }
-        await connection.close()
-        self.connection = nil
+        if let connection {
+            await connection.close()
+            self.connection = nil
+        }
 
-        guard let configuration else { return }
-        api?.pointee.ConfigurationClose(configuration)
-        self.configuration = nil
+        if let configuration {
+            api?.pointee.ConfigurationClose(configuration)
+            self.configuration = nil
+        }
 
-        guard let registration else { return }
-        api?.pointee.RegistrationClose(registration)
-        self.registration = nil
+        if let registration {
+            api?.pointee.RegistrationClose(registration)
+            self.registration = nil
+        }
 
-        guard let api else { return }
-        MsQuicClose(api)
-        self.api = nil
+        if let api {
+            MsQuicClose(api)
+            self.api = nil
+        }
     }
 
     public func didReceiveMessage(
