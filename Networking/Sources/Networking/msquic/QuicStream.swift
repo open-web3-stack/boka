@@ -91,7 +91,7 @@ public class QuicStream: @unchecked Sendable {
             api?.pointee.StreamClose(stream)
             self.stream = nil
         }
-        streamLogger.info("QuicStream close")
+        streamLogger.debug("QuicStream close")
     }
 
     // Sets the callback handler for the stream

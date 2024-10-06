@@ -52,7 +52,7 @@ public actor Peer {
 
     deinit {
         closeSync()
-        peerLogger.info("Peer Deinit")
+        peerLogger.trace("Peer Deinit")
     }
 
     nonisolated func closeSync() {

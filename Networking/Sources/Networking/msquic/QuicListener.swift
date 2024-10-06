@@ -156,7 +156,9 @@ extension QuicListener: QuicConnectionMessageHandler {
     ) {
         switch message.type {
         case .shutdownComplete:
-            removeConnection(connection)
+            Task {
+                await connectionsManager.remove(connection)
+            }
         case .received:
             if let stream, let messageHandler {
                 Task {
@@ -180,12 +182,6 @@ extension QuicListener: QuicConnectionMessageHandler {
                     connection: connection, stream: stream, error: error
                 )
             }
-        }
-    }
-
-    private func removeConnection(_ connection: QuicConnection) {
-        Task {
-            await connectionsManager.remove(connection)
         }
     }
 }
