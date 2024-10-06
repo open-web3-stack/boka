@@ -8,19 +8,69 @@ let logger = Logger(label: "QuicConnection")
 public protocol QuicConnectionMessageHandler: AnyObject {
     func didReceiveMessage(
         connection: QuicConnection, stream: QuicStream?, message: QuicMessage
-    )
+    ) async
     func didReceiveError(
         connection: QuicConnection, stream: QuicStream, error: QuicError
-    )
+    ) async
 }
 
-public class QuicConnection {
+actor StreamManager {
+    private var uniqueStreams: [StreamKind: QuicStream] = [:]
+    private var commonStreams: [QuicStream]
+
+    init() {
+        uniqueStreams = [:]
+        commonStreams = .init()
+    }
+
+    func getUniqueStream(kind: StreamKind) -> QuicStream? {
+        uniqueStreams[kind]
+    }
+
+    func addUniqueStream(kind: StreamKind, stream: QuicStream) {
+        uniqueStreams[kind] = stream
+    }
+
+    func removeUniqueStream(kind: StreamKind) {
+        _ = uniqueStreams.removeValue(forKey: kind)
+    }
+
+    func addCommonStream(_ stream: QuicStream) {
+        commonStreams.append(stream)
+    }
+
+    func removeCommonStream(_ stream: QuicStream) {
+        commonStreams.removeAll(where: { $0 === stream })
+    }
+
+    func changeTypeToCommon(_ stream: QuicStream) {
+        stream.kind = .commonEphemeral
+        removeUniqueStream(kind: stream.kind)
+        removeCommonStream(stream)
+        addCommonStream(stream)
+    }
+
+    func closeAllCommonStreams() {
+        for stream in commonStreams {
+            stream.close()
+        }
+        commonStreams.removeAll()
+    }
+
+    func closeAllUniqueStreams() {
+        for stream in uniqueStreams.values {
+            stream.close()
+        }
+        uniqueStreams.removeAll()
+    }
+}
+
+public class QuicConnection: @unchecked Sendable {
     private var connection: HQuic?
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
-    private var uniquePersistentStreams: AtomicDictionary<StreamKind, QuicStream>
-    private var commonEphemeralStreams: AtomicArray<QuicStream>
+    private var streamManager: StreamManager
     private weak var messageHandler: QuicConnectionMessageHandler?
     private var connectionCallback: ConnectionCallback?
 
@@ -35,8 +85,7 @@ public class QuicConnection {
         self.registration = registration
         self.configuration = configuration
         self.messageHandler = messageHandler
-        uniquePersistentStreams = .init()
-        commonEphemeralStreams = .init()
+        streamManager = StreamManager()
         connectionCallback = { connection, context, event in
             QuicConnection.connectionCallback(
                 connection: connection, context: context, event: event
@@ -55,19 +104,12 @@ public class QuicConnection {
         self.configuration = configuration
         self.connection = connection
         self.messageHandler = messageHandler
-        uniquePersistentStreams = .init()
-        commonEphemeralStreams = .init()
+        streamManager = StreamManager()
         connectionCallback = { connection, context, event in
             QuicConnection.connectionCallback(
                 connection: connection, context: context, event: event
             )
         }
-    }
-
-    // Deinitializer to ensure resources are cleaned up
-    deinit {
-        close()
-        logger.trace("QuicConnection Deinit")
     }
 
     // Sets the callback handler for the connection
@@ -106,30 +148,45 @@ public class QuicConnection {
     }
 
     // Creates or retrieves a unique persistent stream
-    func createOrGetUniquePersistentStream(kind: StreamKind) throws -> QuicStream {
-        if let stream = uniquePersistentStreams[kind] {
+    func createOrGetUniquePersistentStream(kind: StreamKind) async throws -> QuicStream {
+        if let stream = await streamManager.getUniqueStream(kind: kind) {
             return stream
         }
         let stream = try QuicStream(api: api, connection: connection, kind, messageHandler: self)
-        uniquePersistentStreams[kind] = stream
+        await streamManager.addUniqueStream(kind: kind, stream: stream)
         return stream
     }
 
     // Creates a common ephemeral stream
-    func createCommonEphemeralStream() throws -> QuicStream {
-        let stream: QuicStream = try QuicStream(api: api, connection: connection, .commonEphemeral, messageHandler: self)
-        commonEphemeralStreams.append(stream)
+    func createCommonEphemeralStream() async throws -> QuicStream {
+        let stream: QuicStream = try QuicStream(
+            api: api, connection: connection, .commonEphemeral, messageHandler: self
+        )
+        await streamManager.addCommonStream(stream)
         return stream
     }
 
     // Removes a stream from the connection
-    func removeStream(stream: QuicStream) {
+    func removeStream(stream: QuicStream) async {
         stream.close()
         if stream.kind == .uniquePersistent {
-            _ = uniquePersistentStreams.removeValue(forKey: stream.kind)
+            await streamManager.removeUniqueStream(kind: stream.kind)
         } else {
-            commonEphemeralStreams.removeAll(where: { $0 === stream })
+            await streamManager.removeCommonStream(stream)
         }
+    }
+
+    // Closes the connection and cleans up resources
+    func close() async {
+        connectionCallback = nil
+        messageHandler = nil
+        await streamManager.closeAllCommonStreams()
+        await streamManager.closeAllUniqueStreams()
+        if let connection {
+            api?.pointee.ConnectionClose(connection)
+            self.connection = nil
+        }
+        logger.debug("QuicConnection Close")
     }
 
     // Starts the connection with the specified IP address and port
@@ -142,25 +199,6 @@ public class QuicConnection {
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }
-    }
-
-    // Closes the connection and cleans up resources
-    func close() {
-        connectionCallback = nil
-        messageHandler = nil
-        for stream in commonEphemeralStreams {
-            stream.close()
-        }
-        commonEphemeralStreams.removeAll()
-        for stream in uniquePersistentStreams.values {
-            stream.close()
-        }
-        uniquePersistentStreams.removeAll()
-        if connection != nil {
-            api?.pointee.ConnectionClose(connection)
-            connection = nil
-        }
-        logger.debug("QuicConnection close")
     }
 }
 
@@ -179,7 +217,7 @@ extension QuicConnection {
         let status: QuicStatus = QuicStatusCode.success.rawValue
         switch event.pointee.Type {
         case QUIC_CONNECTION_EVENT_CONNECTED:
-            logger.info("[\(String(describing: connection))] Connected")
+            logger.debug("[\(String(describing: connection))] Connected")
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
             if event.pointee.SHUTDOWN_INITIATED_BY_TRANSPORT.Status
@@ -203,12 +241,14 @@ extension QuicConnection {
             logger.info("[\(String(describing: connection))] Shutdown all done")
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 if let messageHandler = quicConnection.messageHandler {
-                    messageHandler.didReceiveMessage(
-                        connection: quicConnection,
-                        stream: nil,
-                        message: QuicMessage(type: .shutdownComplete, data: nil)
-                    )
-                    quicConnection.messageHandler = nil
+                    Task {
+                        await messageHandler.didReceiveMessage(
+                            connection: quicConnection,
+                            stream: nil,
+                            message: QuicMessage(type: .shutdownComplete, data: nil)
+                        )
+                        quicConnection.messageHandler = nil
+                    }
                 }
             }
 
@@ -221,10 +261,13 @@ extension QuicConnection {
             logger.info("[\(String(describing: connection))] Peer stream started")
             let stream = event.pointee.PEER_STREAM_STARTED.Stream
             let quicStream = QuicStream(
-                api: quicConnection.api, connection: connection, stream: stream, messageHandler: quicConnection
+                api: quicConnection.api, connection: connection, stream: stream,
+                messageHandler: quicConnection
             )
             quicStream.setCallbackHandler()
-            quicConnection.commonEphemeralStreams.append(quicStream)
+            Task {
+                await quicConnection.streamManager.addCommonStream(quicStream)
+            }
 
         default:
             break
@@ -238,16 +281,31 @@ extension QuicConnection: QuicStreamMessageHandler {
     public func didReceiveMessage(_ stream: QuicStream, message: QuicMessage) {
         switch message.type {
         case .shutdownComplete:
-            removeStream(stream: stream)
+            Task {
+                await removeStream(stream: stream)
+            }
+        case .changeStreamType:
+            Task {
+                if stream.kind == .uniquePersistent {
+                    await streamManager.changeTypeToCommon(stream)
+                    logger.info("changeStreamType")
+                }
+            }
         default:
             break
         }
-        messageHandler?.didReceiveMessage(connection: self, stream: stream, message: message)
+        // Call messageHandler safely in the actor context
+        Task { [weak self] in
+            guard let self else { return }
+            await messageHandler?.didReceiveMessage(
+                connection: self, stream: stream, message: message
+            )
+        }
     }
 
     // Handles errors received from the stream
-    public func didReceiveError(_ stream: QuicStream, error: QuicError) {
+    public func didReceiveError(_: QuicStream, error: QuicError) {
         logger.error("Failed to receive message: \(error)")
-        messageHandler?.didReceiveError(connection: self, stream: stream, error: error)
+        //       await  messageHandler?.didReceiveError(connection: self, stream: stream, error: error)
     }
 }

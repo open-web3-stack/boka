@@ -1,5 +1,8 @@
 import bandersnatch_vrfs
 import Foundation
+import TracingUtils
+
+private let logger = Logger(label: "Bandersnatch")
 
 private func _call<E: Error>(
     data: [Data],
@@ -115,6 +118,8 @@ public enum Bandersnatch: KeyType {
         ///
         /// Used for ticket claiming during block production.
         public func ietfVRFSign(vrfInputData: Data, auxData: Data = Data()) throws -> Data96 {
+            logger.trace("ietfVRFSign", metadata: ["vrfInputData": "\(vrfInputData.toHexString())", "auxData": "\(auxData.toHexString())"])
+
             var output = Data(repeating: 0, count: 96)
 
             try call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
@@ -135,6 +140,8 @@ public enum Bandersnatch: KeyType {
         }
 
         public func getOutput(vrfInputData: Data) throws -> Data32 {
+            logger.trace("getOutput", metadata: ["vrfInputData": "\(vrfInputData.toHexString())"])
+
             var output = Data(repeating: 0, count: 32)
 
             try call(vrfInputData, out: &output) { ptrs, out_buf in
@@ -221,6 +228,15 @@ public enum Bandersnatch: KeyType {
         public func ietfVRFVerify(
             vrfInputData: Data, auxData: Data = Data(), signature: Data96
         ) throws(Error) -> Data32 {
+            logger.trace(
+                "ietfVRFVerify",
+                metadata: [
+                    "vrfInputData": "\(vrfInputData.toHexString())",
+                    "auxData": "\(auxData.toHexString())",
+                    "signature": "\(signature.data.toHexString())",
+                ]
+            )
+
             var output = Data(repeating: 0, count: 32)
 
             try call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in
@@ -263,23 +279,25 @@ public enum Bandersnatch: KeyType {
 
     public final class Prover {
         private let secret: SecretKey
-        private let ring: [PublicKey]
+        private let ring: [PublicKey?]
         private let ringPtrs: [OpaquePointer?]
         private let proverIdx: UInt
         private let ctx: RingContext
 
-        public init(sercret: SecretKey, ring: [PublicKey], proverIdx: UInt, ctx: RingContext) {
+        public init(sercret: SecretKey, ring: [PublicKey?], proverIdx: UInt, ctx: RingContext) {
             secret = sercret
             self.ring = ring
             self.proverIdx = proverIdx
             self.ctx = ctx
-            ringPtrs = ring.map(\.ptr)
+            ringPtrs = ring.map { $0?.ptr }
         }
 
         /// Anonymous VRF signature.
         ///
         /// Used for tickets submission.
         public func ringVRFSign(vrfInputData: Data, auxData: Data = Data()) throws(Error) -> Data784 {
+            logger.trace("ringVRFSign", metadata: ["vrfInputData": "\(vrfInputData.toHexString())", "auxData": "\(auxData.toHexString())"])
+
             var output = Data(repeating: 0, count: 784)
 
             try call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
@@ -310,8 +328,8 @@ public enum Bandersnatch: KeyType {
         fileprivate let ptr: OpaquePointer
         public let data: Data144
 
-        public init(ring: [PublicKey], ctx: RingContext) throws(Error) {
-            let ringPtrs = ring.map { $0.ptr as OpaquePointer? }
+        public init(ring: [PublicKey?], ctx: RingContext) throws(Error) {
+            let ringPtrs = ring.map { $0?.ptr as OpaquePointer? }
 
             var ptr: OpaquePointer!
             try call { _ in
@@ -370,6 +388,15 @@ public enum Bandersnatch: KeyType {
         ///
         /// On success returns the VRF output hash.
         public func ringVRFVerify(vrfInputData: Data, auxData: Data = Data(), signature: Data784) throws(Error) -> Data32 {
+            logger.trace(
+                "ringVRFVerify",
+                metadata: [
+                    "vrfInputData": "\(vrfInputData.toHexString())",
+                    "auxData": "\(auxData.toHexString())",
+                    "signature": "\(signature.data.toHexString())",
+                ]
+            )
+
             var output = Data(repeating: 0, count: 32)
 
             try call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in

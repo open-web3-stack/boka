@@ -13,7 +13,7 @@ import Testing
             let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
             let cert = Bundle.module.path(forResource: "server", ofType: "cert")!
             let keyFile = Bundle.module.path(forResource: "server", ofType: "key")!
-            let quicClient = try QuicClient(
+            let quicClient = try await QuicClient(
                 config: QuicConfig(
                     id: "public-key", cert: cert, key: keyFile, alpn: "sample",
                     ipAddress: "127.0.0.1", port: 4569

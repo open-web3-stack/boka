@@ -1,4 +1,5 @@
 import Codec
+import Foundation
 import Utils
 
 // the STF
@@ -6,7 +7,7 @@ public final class Runtime {
     public enum Error: Swift.Error {
         case safroleError(SafroleError)
         case DisputeError(DisputeError)
-        case invalidTimeslot
+        case invalidTimeslot(got: TimeslotIndex, context: TimeslotIndex)
         case invalidReportAuthorizer
         case encodeError(any Swift.Error)
         case invalidExtrinsicHash
@@ -61,7 +62,7 @@ public final class Runtime {
         }
 
         guard block.header.timeslot <= context.timeslot else {
-            throw Error.invalidTimeslot
+            throw Error.invalidTimeslot(got: block.header.timeslot, context: context.timeslot)
         }
 
         // epoch is validated at apply time by Safrole
@@ -73,10 +74,11 @@ public final class Runtime {
         // validate block.header.seal
         let vrfOutput: Data32
         let blockAuthorKey = try Result {
-            try Bandersnatch.PublicKey(data: state.value.validatorQueue[Int(block.header.authorIndex)].bandersnatch)
+            try Bandersnatch.PublicKey(data: state.value.currentValidators[Int(block.header.authorIndex)].bandersnatch)
         }.mapError(Error.invalidBlockSeal).get()
         let index = block.header.timeslot % UInt32(config.value.epochLength)
-        let encodedHeader = try Result { try JamEncoder.encode(block.header) }.mapError(Error.invalidBlockSeal).get()
+        let encodedHeader = try Result { try JamEncoder.encode(block.header.unsigned) }.mapError(Error.invalidBlockSeal).get()
+        let entropyVRFInputData: Data
         switch state.value.safroleState.ticketsOrKeys {
         case let .left(tickets):
             let ticket = tickets[Int(index)]
@@ -92,6 +94,8 @@ public final class Runtime {
                 throw Error.notBlockAuthor
             }
 
+            entropyVRFInputData = SigningContext.entropyInputData(entropy: vrfOutput)
+
         case let .right(keys):
             let key = keys[Int(index)]
             guard key == blockAuthorKey.data else {
@@ -105,11 +109,12 @@ public final class Runtime {
                     signature: block.header.seal
                 )
             }.mapError(Error.invalidBlockSeal).get()
+
+            entropyVRFInputData = SigningContext.fallbackSealInputData(entropy: state.value.entropyPool.t3)
         }
 
-        let vrfInputData = SigningContext.entropyInputData(entropy: vrfOutput)
         _ = try Result {
-            try blockAuthorKey.ietfVRFVerify(vrfInputData: vrfInputData, signature: block.header.vrfSignature)
+            try blockAuthorKey.ietfVRFVerify(vrfInputData: entropyVRFInputData, signature: block.header.vrfSignature)
         }.mapError { _ in Error.invalidVrfSignature }.get()
     }
 
@@ -149,7 +154,7 @@ public final class Runtime {
 
             // depends on Safrole and Disputes
             let availableReports = try updateReports(block: block, state: &newState)
-            let res = try newState.update(config: config, workReports: availableReports)
+            let res = try newState.update(config: config, block: block, workReports: availableReports)
             newState.privilegedServices = res.privilegedServices
             newState.serviceAccounts = res.serviceAccounts
             newState.authorizationQueue = res.authorizationQueue
@@ -181,7 +186,7 @@ public final class Runtime {
     public func updateRecentHistory(block: BlockRef, state newState: inout State) throws {
         let workReportHashes = block.extrinsic.reports.guarantees.map(\.workReport.packageSpecification.workPackageHash)
         try newState.recentHistory.update(
-            headerHash: block.header.parentHash,
+            headerHash: block.hash,
             parentStateRoot: block.header.priorStateRoot,
             accumulateRoot: Data32(), // TODO: calculate accumulation result
             workReportHashes: ConfigLimitedSizeArray(config: config, array: workReportHashes)

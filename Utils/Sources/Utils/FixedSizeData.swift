@@ -30,13 +30,15 @@ extension FixedSizeData: Codable {
     }
 }
 
-extension FixedSizeData: CustomStringConvertible, CustomDebugStringConvertible {
+extension FixedSizeData: CustomStringConvertible {
     public var description: String {
-        "0x\(data.map { String(format: "%02x", $0) }.joined())"
-    }
-
-    public var debugDescription: String {
-        description
+        if T.value > 32 {
+            let prefix = data.prefix(8).map { String(format: "%02x", $0) }.joined()
+            let suffix = data.suffix(8).map { String(format: "%02x", $0) }.joined()
+            return "0x\(prefix)...\(suffix)"
+        } else {
+            return "0x\(data.map { String(format: "%02x", $0) }.joined())"
+        }
     }
 }
 
@@ -82,10 +84,17 @@ extension FixedSizeData: EncodedSize {
 
 extension FixedSizeData {
     public static func random() -> Self {
-        var data = Data(repeating: 0, count: T.value)
+        var data = Data(count: T.value)
+        var generator = SystemRandomNumberGenerator()
+
         data.withUnsafeMutableBytes { ptr in
-            ptr.baseAddress!.withMemoryRebound(to: UInt8.self, capacity: T.value) { ptr in
-                arc4random_buf(ptr, T.value)
+            for i in stride(from: 0, to: T.value, by: 8) {
+                let randomValue = generator.next()
+                let bytesToCopy = min(8, T.value - i)
+                withUnsafeBytes(of: randomValue) { randomBytes in
+                    UnsafeMutableRawBufferPointer(rebasing: ptr[i ..< (i + bytesToCopy)])
+                        .copyMemory(from: UnsafeRawBufferPointer(rebasing: randomBytes[..<bytesToCopy]))
+                }
             }
         }
 

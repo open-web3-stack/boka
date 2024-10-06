@@ -5,33 +5,59 @@ import Utils
 
 let listenLogger: Logger = .init(label: "QuicListener")
 
-public protocol QuicListenerMessageHandler: AnyObject {
-    func didReceiveMessage(connection: QuicConnection, stream: QuicStream, message: QuicMessage)
-    func didReceiveError(connection: QuicConnection, stream: QuicStream, error: QuicError)
+actor ConnectionsManager {
+    private var connections: [QuicConnection] = []
+
+    func add(_ connection: QuicConnection) {
+        connections.append(connection)
+    }
+
+    func remove(_ connection: QuicConnection) async {
+        await connection.close()
+        connections.removeAll(where: { $0 === connection })
+    }
+
+    func all() -> [QuicConnection] {
+        connections
+    }
+
+    func removeAll() async {
+        for connection in connections {
+            await connection.close()
+        }
+        connections.removeAll()
+    }
 }
 
-public class QuicListener {
+public protocol QuicListenerMessageHandler: AnyObject {
+    func didReceiveMessage(connection: QuicConnection, stream: QuicStream, message: QuicMessage)
+        async
+    func didReceiveError(connection: QuicConnection, stream: QuicStream, error: QuicError) async
+}
+
+public class QuicListener: @unchecked Sendable {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
     private var config: QuicConfig
     private var listener: HQuic?
-    private var connections: AtomicArray<QuicConnection> = .init()
     public weak var messageHandler: QuicListenerMessageHandler?
+    private let connectionsManager: ConnectionsManager
 
     public init(
         api: UnsafePointer<QuicApiTable>?,
         registration: HQuic?,
         configuration: HQuic?,
         config: QuicConfig,
-        messageHandler: QuicListenerMessageHandler? = nil
+        messageHandler: QuicServer? = nil
     ) throws {
         self.api = api
         self.registration = registration
         self.configuration = configuration
         self.config = config
         self.messageHandler = messageHandler
-        // try openListener(port: config.port, listener: &listener)
+        connectionsManager = .init()
+        try openListener(port: config.port, listener: &listener)
     }
 
     private func openListener(port: UInt16, listener: inout HQuic?) throws {
@@ -76,6 +102,10 @@ public class QuicListener {
         }
     }
 
+    func getNetAddr() -> NetAddr {
+        NetAddr(ipAddress: config.ipAddress, port: config.port)
+    }
+
     private static func serverListenerCallback(
         listener _: HQuic?, context: UnsafeMutableRawPointer?,
         event: UnsafePointer<QUIC_LISTENER_EVENT>?
@@ -88,7 +118,6 @@ public class QuicListener {
             .takeUnretainedValue()
         switch event.pointee.Type {
         case QUIC_LISTENER_EVENT_NEW_CONNECTION:
-            listenLogger.debug("New connection")
             let connection: HQuic = event.pointee.NEW_CONNECTION.Connection
             guard let api = listener.api else {
                 return status
@@ -101,7 +130,9 @@ public class QuicListener {
                 connection: connection,
                 messageHandler: listener
             )
-            listener.connections.append(quicConnection)
+            Task {
+                await listener.connectionsManager.add(quicConnection)
+            }
             status = quicConnection.setCallbackHandler()
 
         default:
@@ -110,19 +141,12 @@ public class QuicListener {
         return status
     }
 
-    public func close() {
+    public func close() async {
         if let listener {
             api?.pointee.ListenerClose(listener)
             self.listener = nil
         }
-        closeAllConnections()
-    }
-
-    private func closeAllConnections() {
-        for connection in connections {
-            connection.close()
-        }
-        connections.removeAll()
+        await connectionsManager.removeAll()
     }
 }
 
@@ -132,12 +156,16 @@ extension QuicListener: QuicConnectionMessageHandler {
     ) {
         switch message.type {
         case .shutdownComplete:
-            removeConnection(connection)
+            Task {
+                await connectionsManager.remove(connection)
+            }
         case .received:
-            if let stream {
-                messageHandler?.didReceiveMessage(
-                    connection: connection, stream: stream, message: message
-                )
+            if let stream, let messageHandler {
+                Task {
+                    await messageHandler.didReceiveMessage(
+                        connection: connection, stream: stream, message: message
+                    )
+                }
             }
         default:
             break
@@ -148,11 +176,12 @@ extension QuicListener: QuicConnectionMessageHandler {
         connection: QuicConnection, stream: QuicStream, error: QuicError
     ) {
         listenLogger.error("Failed to receive message: \(error)")
-        messageHandler?.didReceiveError(connection: connection, stream: stream, error: error)
-    }
-
-    private func removeConnection(_ connection: QuicConnection) {
-        connection.close()
-        connections.removeAll(where: { $0 === connection })
+        if let messageHandler {
+            Task {
+                await messageHandler.didReceiveError(
+                    connection: connection, stream: stream, error: error
+                )
+            }
+        }
     }
 }

@@ -9,16 +9,18 @@ import Testing
     import Security
 
     final class QuicServerTests {
-        @Test func start() throws {
+        @Test func start() async throws {
             do {
                 let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
-                _ = try QuicServer(
+                let quicServer = try await QuicServer(
                     config: QuicConfig(
                         id: "public-key", cert: cert, key: keyFile, alpn: "sample",
                         ipAddress: "127.0.0.1", port: 4568
                     ), messageHandler: self
                 )
-                try group.next().scheduleTask(in: .seconds(5)) {}.futureResult.wait()
+//                await quicServer.close()
+
+                try await group.next().scheduleTask(in: .seconds(5)) {}.futureResult.get()
             } catch {
                 print("Failed to start quic server: \(error)")
             }
@@ -26,11 +28,10 @@ import Testing
     }
 
     extension QuicServerTests: QuicServerMessageHandler {
-        func didReceiveMessage(quicServer: QuicServer, messageID: Int64, message: QuicMessage) {
+        func didReceiveMessage(messageID: Int64, message: QuicMessage) async {
             switch message.type {
             case .received:
                 print("Server received message with ID \(messageID): \(message)")
-                _ = quicServer.respondTo(messageID: messageID, with: message.data!)
             case .shutdownComplete:
                 print("Server shutdown complete")
             case .unknown:
@@ -40,7 +41,7 @@ import Testing
             }
         }
 
-        func didReceiveError(quicServer _: QuicServer, messageID _: Int64, error: QuicError) {
+        func didReceiveError(messageID _: Int64, error: QuicError) async {
             print("Server error: \(error)")
         }
     }

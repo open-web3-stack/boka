@@ -248,7 +248,7 @@ extension ProtocolConfig {
         }
     }
 
-    public enum CoreAccumulationGas: ReadUInt64 {
+    public enum CoreAccumulationGas: ReadGas {
         public typealias TConfig = ProtocolConfigRef
         public typealias TOutput = Gas
         public static func read(config: ProtocolConfigRef) -> Gas {
@@ -256,7 +256,7 @@ extension ProtocolConfig {
         }
     }
 
-    public enum WorkPackageAuthorizerGas: ReadUInt64 {
+    public enum WorkPackageAuthorizerGas: ReadGas {
         public typealias TConfig = ProtocolConfigRef
         public typealias TOutput = Gas
         public static func read(config: ProtocolConfigRef) -> Gas {
@@ -264,7 +264,7 @@ extension ProtocolConfig {
         }
     }
 
-    public enum WorkPackageRefineGas: ReadUInt64 {
+    public enum WorkPackageRefineGas: ReadGas {
         public typealias TConfig = ProtocolConfigRef
         public typealias TOutput = Gas
         public static func read(config: ProtocolConfigRef) -> Gas {

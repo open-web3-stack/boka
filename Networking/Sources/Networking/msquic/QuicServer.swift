@@ -1,4 +1,3 @@
-import Atomics
 import Foundation
 import Logging
 import msquic
@@ -6,24 +5,24 @@ import Utils
 
 let serverLogger: Logger = .init(label: "QuicServer")
 
-public protocol QuicServerMessageHandler: AnyObject {
-    func didReceiveMessage(quicServer: QuicServer, messageID: Int64, message: QuicMessage)
-    func didReceiveError(quicServer: QuicServer, messageID: Int64, error: QuicError)
+public protocol QuicServerMessageHandler: AnyObject, Sendable {
+    func didReceiveMessage(messageID: Int64, message: QuicMessage) async
+    func didReceiveError(messageID: Int64, error: QuicError) async
 }
 
-public final class QuicServer: @unchecked Sendable {
+public actor QuicServer: Sendable, QuicListenerMessageHandler {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
     private var listener: QuicListener?
     private let config: QuicConfig
     private weak var messageHandler: QuicServerMessageHandler?
-    private var pendingMessages: AtomicDictionary<Int64, (QuicConnection, QuicStream)>
+    private var pendingMessages: [Int64: (QuicConnection, QuicStream)]
 
-    init(config: QuicConfig, messageHandler: QuicServerMessageHandler? = nil) throws {
+    init(config: QuicConfig, messageHandler: QuicServerMessageHandler? = nil) async throws {
         self.config = config
         self.messageHandler = messageHandler
-        pendingMessages = .init()
+        pendingMessages = [:]
         var rawPointer: UnsafeRawPointer?
         let status: UInt32 = MsQuicOpenVersion(2, &rawPointer)
 
@@ -45,72 +44,83 @@ public final class QuicServer: @unchecked Sendable {
         }
         api = boundPointer
         registration = registrationHandle
-        try loadConfiguration()
+        try config.loadConfiguration(
+            api: api, registration: registration, configuration: &configuration
+        )
         listener = try QuicListener(
             api: api, registration: registration, configuration: configuration, config: config,
             messageHandler: self
         )
     }
 
-    deinit {
-        close()
-        serverLogger.trace("QuicServer Deinit")
-    }
-
-    func close() {
-        if listener != nil {
-            listener?.close()
-            listener = nil
+    public func close() async {
+        if let listener {
+            await listener.close()
+            self.listener = nil
         }
-        if configuration != nil {
+        if let configuration {
             api?.pointee.ConfigurationClose(configuration)
-            configuration = nil
+            self.configuration = nil
         }
-        if registration != nil {
+        if let registration {
             api?.pointee.RegistrationClose(registration)
-            registration = nil
+            self.registration = nil
         }
-        if api != nil {
+        if let api {
             MsQuicClose(api)
-            api = nil
+            self.api = nil
         }
-        serverLogger.trace("QuicServer Close")
     }
 
     // Respond to a message with a specific messageID using Data
-    func respondTo(messageID: Int64, with data: Data, kind: StreamKind? = nil) -> QuicStatus {
+    func respondGetStatus(to messageID: Int64, with data: Data, kind: StreamKind? = nil) async
+        -> QuicStatus
+    {
         var status = QuicStatusCode.internalError.rawValue
         if let (_, stream) = pendingMessages[messageID] {
             let streamKind = kind ?? stream.kind
-            status = stream.send(buffer: data, kind: streamKind)
-            _ = pendingMessages.removeValue(forKey: messageID)
+            pendingMessages.removeValue(forKey: messageID)
+
+            status = stream.respond(with: data, kind: streamKind)
         } else {
-            peerLogger.error("Message not found")
+            serverLogger.error("Message not found")
         }
         return status
     }
 
     // Respond to a message with a specific messageID using Data
-    func respondTo(messageID: Int64, with data: Data, kind: StreamKind? = nil) async throws {
-        if let (_, stream) = pendingMessages[messageID] {
-            let streamKind = kind ?? stream.kind
-            _ = pendingMessages.removeValue(forKey: messageID)
-            let quicMessage = try await stream.send(buffer: data, kind: streamKind)
-            peerLogger.info("Message sent: \(quicMessage)")
-        } else {
-            peerLogger.error("Message not found")
+    func respondGetMessage(to messageID: Int64, with data: Data, kind: StreamKind? = nil)
+        async throws
+        -> QuicMessage
+    {
+        guard let (_, stream) = pendingMessages[messageID] else {
             throw QuicError.messageNotFound
         }
-    }
-}
 
-extension QuicServer: QuicListenerMessageHandler {
+        let streamKind = kind ?? stream.kind
+        pendingMessages.removeValue(forKey: messageID)
+        return try await send(stream: stream, with: data, kind: streamKind)
+    }
+
+    private func send(stream: QuicStream, with data: Data, kind: StreamKind)
+        async throws -> QuicMessage
+    {
+        try await stream.send(data: data, kind: kind)
+    }
+
     public func didReceiveMessage(
         connection: QuicConnection, stream: QuicStream, message: QuicMessage
-    ) {
+    ) async {
         switch message.type {
         case .received:
-            processPendingMessage(connection: connection, stream: stream, message: message)
+            let messageID = Int64(Date().timeIntervalSince1970 * 1000)
+            pendingMessages[messageID] = (connection, stream)
+
+            // Call messageHandler safely in the actor context
+            Task { [weak self] in
+                guard let self else { return }
+                await messageHandler?.didReceiveMessage(messageID: messageID, message: message)
+            }
         default:
             break
         }
@@ -118,21 +128,7 @@ extension QuicServer: QuicListenerMessageHandler {
 
     public func didReceiveError(
         connection _: QuicConnection, stream _: QuicStream, error: QuicError
-    ) {
-        logger.error("Failed to receive message: \(error)")
-    }
-
-    private func processPendingMessage(
-        connection: QuicConnection, stream: QuicStream, message: QuicMessage
-    ) {
-        let messageID = Int64(Date().timeIntervalSince1970 * 1000)
-        pendingMessages[messageID] = (connection, stream)
-        messageHandler?.didReceiveMessage(quicServer: self, messageID: messageID, message: message)
-    }
-}
-
-extension QuicServer {
-    private func loadConfiguration() throws {
-        try config.loadConfiguration(api: api, registration: registration, configuration: &configuration)
+    ) async {
+        serverLogger.error("Failed to receive message: \(error)")
     }
 }

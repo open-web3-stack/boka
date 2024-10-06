@@ -1,20 +1,17 @@
-public enum SortedArrayError: Swift.Error {
-    case invalidData
-}
-
-public struct SortedArray<T: Comparable> {
+// TODO: add tests
+public struct SortedArray<T: Comparable>: SortedContainer {
     public private(set) var array: [T]
 
-    public init(unsorted: [T]) {
+    public init(_ unsorted: [T]) {
         array = unsorted
         array.sort()
     }
 
-    public init(sorted: [T]) throws(SortedArrayError) {
+    public init(sorted: [T]) throws(SortedContainerError) {
         array = sorted
 
         guard array.isSorted() else {
-            throw SortedArrayError.invalidData
+            throw SortedContainerError.invalidData
         }
     }
 
@@ -22,32 +19,11 @@ public struct SortedArray<T: Comparable> {
         array = sortedUnchecked
     }
 
-    /// Use binary search to find the index of the first element equal to or greater than the given element.
-    public func insertIndex(_ element: T, begin: Int = 0, end: Int? = nil) -> Int {
-        var low = begin
-        var high = end ?? array.count
-        while low < high {
-            let mid = (low + high) / 2
-            if array[mid] < element {
-                low = mid + 1
-            } else {
-                high = mid
-            }
-        }
-        return low
-    }
-
     public mutating func insert(_ element: T) {
         array.insert(element, at: insertIndex(element))
     }
 
-    public mutating func append(contentsOf newElements: some Collection<T>) {
-        for element in newElements {
-            insert(element)
-        }
-    }
-
-    public mutating func append(contentsOf other: SortedArray<T>) {
+    public mutating func append(contentsOf other: some SortedContainer<T>) {
         var begin = 0
         for element in other.array {
             let idx = insertIndex(element, begin: begin)
@@ -66,10 +42,6 @@ public struct SortedArray<T: Comparable> {
 
     public mutating func remove(where predicate: (T) throws -> Bool) rethrows {
         try array.removeAll(where: predicate)
-    }
-
-    public var count: Int {
-        array.count
     }
 }
 

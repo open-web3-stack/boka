@@ -5,21 +5,20 @@ import NIO
 
 let clientLogger = Logger(label: "QuicClient")
 
-public protocol QuicClientMessageHandler: AnyObject {
-    func didReceiveMessage(quicClient: QuicClient, message: QuicMessage)
-    // TODO: add error or remove it
-    func didReceiveError(quicClient: QuicClient, error: QuicError)
+public protocol QuicClientMessageHandler: AnyObject, Sendable {
+    func didReceiveMessage(quicClient: QuicClient, message: QuicMessage) async
+    func didReceiveError(quicClient: QuicClient, error: QuicError) async
 }
 
-public class QuicClient: @unchecked Sendable {
+public actor QuicClient: Sendable, QuicConnectionMessageHandler {
     private var api: UnsafePointer<QuicApiTable>?
     private var registration: HQuic?
     private var configuration: HQuic?
     private var connection: QuicConnection?
     private let config: QuicConfig
-    private weak var messageHandler: QuicClientMessageHandler?
+    private weak var messageHandler: Peer?
 
-    init(config: QuicConfig, messageHandler: QuicClientMessageHandler? = nil) throws {
+    public init(config: QuicConfig, messageHandler: Peer? = nil) async throws {
         self.config = config
         self.messageHandler = messageHandler
         var rawPointer: UnsafeRawPointer?
@@ -45,16 +44,9 @@ public class QuicClient: @unchecked Sendable {
 
         api = boundPointer
         registration = registrationHandle
-        try start()
-    }
-
-    deinit {
-        close()
-        clientLogger.trace("QuicClient Deinit")
-    }
-
-    private func start() throws {
-        try loadConfiguration()
+        try config.loadConfiguration(
+            api: api, registration: registration, configuration: &configuration
+        )
         connection = try QuicConnection(
             api: api, registration: registration, configuration: configuration, messageHandler: self
         )
@@ -62,51 +54,45 @@ public class QuicClient: @unchecked Sendable {
     }
 
     // Asynchronous send method that waits for a QuicMessage reply
-    func send(message: Data) async throws -> QuicMessage {
+    public func send(message: Data) async throws -> QuicMessage {
         try await send(message: message, streamKind: .uniquePersistent)
     }
 
-    //  send method that returns a QuicStatus
-    func send(message: Data, streamKind: StreamKind) throws -> QuicStatus {
+    // Send method that returns a QuicStatus
+    public func send(message: Data, streamKind: StreamKind) async throws -> QuicMessage {
         guard let connection else {
             throw QuicError.getConnectionFailed
         }
-        let sendStream: QuicStream // Check if there is an existing stream of the same kind
-            =
-                if streamKind == .uniquePersistent {
-                    // If there is, send the message to the existing stream
-                    try connection.createOrGetUniquePersistentStream(kind: streamKind)
-                } else {
-                    // If there is not, create a new stream
-                    try connection.createCommonEphemeralStream()
-                }
-        return sendStream.send(buffer: message, kind: streamKind)
+        let sendStream: QuicStream =
+            if streamKind == .uniquePersistent {
+                try await connection.createOrGetUniquePersistentStream(kind: streamKind)
+            } else {
+                try await connection.createCommonEphemeralStream()
+            }
+        return try await sendStream.send(data: message, kind: streamKind)
     }
 
-    // Asynchronous send method that waits for a QuicMessage reply
-    func send(message: Data, streamKind: StreamKind = .uniquePersistent) async throws -> QuicMessage {
+    // Send method that returns a QuicStatus
+    public func send(data: Data, streamKind: StreamKind) async throws -> QuicStatus {
         guard let connection else {
             throw QuicError.getConnectionFailed
         }
-        let sendStream: QuicStream // Check if there is an existing stream of the same kind
-            =
-                if streamKind == .uniquePersistent {
-                    // If there is, send the message to the existing stream
-                    try connection.createOrGetUniquePersistentStream(kind: streamKind)
-                } else {
-                    // If there is not, create a new stream
-                    try connection.createCommonEphemeralStream()
-                }
-        return try await sendStream.send(buffer: message)
+        let sendStream: QuicStream =
+            if streamKind == .uniquePersistent {
+                try await connection.createOrGetUniquePersistentStream(kind: streamKind)
+            } else {
+                try await connection.createCommonEphemeralStream()
+            }
+        return sendStream.respond(with: data, kind: streamKind)
     }
 
     func getNetAddr() -> NetAddr {
         NetAddr(ipAddress: config.ipAddress, port: config.port)
     }
 
-    func close() {
+    public func close() async {
         if let connection {
-            connection.close()
+            await connection.close()
             self.connection = nil
         }
 
@@ -120,15 +106,12 @@ public class QuicClient: @unchecked Sendable {
             self.registration = nil
         }
 
-        if api != nil {
+        if let api {
             MsQuicClose(api)
-            api = nil
+            self.api = nil
         }
-        clientLogger.debug("QuicClient Close")
     }
-}
 
-extension QuicClient: QuicConnectionMessageHandler {
     public func didReceiveMessage(
         connection _: QuicConnection, stream _: QuicStream?, message: QuicMessage
     ) {
@@ -140,10 +123,15 @@ extension QuicClient: QuicConnectionMessageHandler {
             )
 
         case .shutdownComplete:
-            // Use [weak self] to avoid strong reference cycle
+            clientLogger.info(
+                "Client[\(getNetAddr())] shutdown"
+            )
+            // Call messageHandler safely in the actor context
             Task { [weak self] in
                 guard let self else { return }
-                close()
+                await messageHandler?.didReceiveMessage(
+                    quicClient: self, message: QuicMessage(type: .shutdownComplete, data: nil)
+                )
             }
 
         default:
@@ -155,13 +143,5 @@ extension QuicClient: QuicConnectionMessageHandler {
         connection _: QuicConnection, stream _: QuicStream, error: QuicError
     ) {
         clientLogger.error("Failed to receive message: \(error)")
-    }
-}
-
-extension QuicClient {
-    private func loadConfiguration() throws {
-        try config.loadConfiguration(
-            api: api, registration: registration, configuration: &configuration
-        )
     }
 }

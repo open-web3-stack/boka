@@ -9,11 +9,11 @@ extension Ref where T == ProtocolConfig {
         serviceMinBalance: 100,
         totalNumberOfCores: 341,
         preimagePurgePeriod: 28800,
-        epochLength: 600,
+        epochLength: 12,
         auditBiasFactor: 2,
-        coreAccumulationGas: 10_000_000, // TODO: check this
-        workPackageAuthorizerGas: 10_000_000, // TODO: check this
-        workPackageRefineGas: 10_000_000, // TODO: check this
+        coreAccumulationGas: Gas(10_000_000), // TODO: check this
+        workPackageAuthorizerGas: Gas(10_000_000), // TODO: check this
+        workPackageRefineGas: Gas(10_000_000), // TODO: check this
         recentHistorySize: 8,
         maxWorkItems: 4,
         maxTicketsPerExtrinsic: 16,
@@ -26,13 +26,13 @@ extension Ref where T == ProtocolConfig {
         coreAssignmentRotationPeriod: 10,
         maxServiceCodeSize: 4_000_000,
         preimageReplacementPeriod: 5,
-        totalNumberOfValidators: 1023,
+        totalNumberOfValidators: 6,
         erasureCodedPieceSize: 684,
         maxWorkPackageManifestEntries: 1 << 11,
         maxEncodedWorkPackageSize: 12 * 1 << 20,
         maxEncodedWorkReportSize: 96 * 1 << 10,
         erasureCodedSegmentSize: 6,
-        ticketSubmissionEndSlot: 500,
+        ticketSubmissionEndSlot: 10,
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
         pvmProgramInitPageSize: 1 << 14,
@@ -48,9 +48,9 @@ extension Ref where T == ProtocolConfig {
         preimagePurgePeriod: 28800,
         epochLength: 600,
         auditBiasFactor: 2,
-        coreAccumulationGas: 10_000_000, // TODO: check this
-        workPackageAuthorizerGas: 10_000_000, // TODO: check this
-        workPackageRefineGas: 10_000_000, // TODO: check this
+        coreAccumulationGas: Gas(10_000_000), // TODO: check this
+        workPackageAuthorizerGas: Gas(10_000_000), // TODO: check this
+        workPackageRefineGas: Gas(10_000_000), // TODO: check this
         recentHistorySize: 8,
         maxWorkItems: 4,
         maxTicketsPerExtrinsic: 16,

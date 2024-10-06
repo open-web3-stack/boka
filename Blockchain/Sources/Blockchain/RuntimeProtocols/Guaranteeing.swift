@@ -93,7 +93,7 @@ extension Guaranteeing {
 
         var workReportHashes = Set<Data32>()
 
-        var totalMinGasRequirement: Gas = 0
+        var totalMinGasRequirement = Gas(0)
 
         for guarantee in extrinsic.guarantees {
             let report = guarantee.workReport

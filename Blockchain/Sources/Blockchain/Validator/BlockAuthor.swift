@@ -6,24 +6,25 @@ import Utils
 private let logger = Logger(label: "BlockAuthor")
 
 public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
-    private let blockchain: Blockchain
+    private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore
     private let extrinsicPool: ExtrinsicPoolService
 
     private var tickets: ThreadSafeContainer<[RuntimeEvents.SafroleTicketsGenerated]> = .init([])
 
     public init(
-        blockchain: Blockchain,
+        config: ProtocolConfigRef,
+        dataProvider: BlockchainDataProvider,
         eventBus: EventBus,
         keystore: KeyStore,
         scheduler: Scheduler,
         extrinsicPool: ExtrinsicPoolService
     ) async {
-        self.blockchain = blockchain
+        self.dataProvider = dataProvider
         self.keystore = keystore
         self.extrinsicPool = extrinsicPool
 
-        super.init(blockchain.config, eventBus, scheduler)
+        super.init(config, eventBus, scheduler)
 
         await subscribe(RuntimeEvents.SafroleTicketsGenerated.self) { [weak self] event in
             try await self?.on(safroleTicketsGenerated: event)
@@ -31,18 +32,16 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
     }
 
     private func scheduleForNextEpoch() async {
-        let now = timeProvider.getTime() / UInt32(config.value.slotPeriodSeconds)
-        let nextEpoch = now.toEpochIndex(config: config) + 1
-        let timeslot = nextEpoch.toTimeslotIndex(config: config)
+        let now = timeProvider.getTimeslot()
+        let nextEpoch = now.timeslotToEpochIndex(config: config) + 1
+        let timeslot = nextEpoch.epochToTimeslotIndex(config: config)
 
         // at end of an epoch, try to determine the block author of next epoch
         // and schedule new block task
         schedule(at: timeslot - 1) { [weak self] in
             if let self {
-                Task {
-                    await self.onBeforeEpoch(timeslot: timeslot)
-                    await self.scheduleForNextEpoch()
-                }
+                await onBeforeEpoch(timeslot: timeslot)
+                await scheduleForNextEpoch()
             }
         }
     }
@@ -55,13 +54,34 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
     public func createNewBlock(claim: Either<(TicketItemAndOutput, Bandersnatch.PublicKey), Bandersnatch.PublicKey>) async throws
         -> BlockRef
     {
-        let parentHash = blockchain.bestHead
-        let state = try await blockchain.getState(hash: parentHash)
-        guard let state else {
-            try throwUnreachable("no state for best head")
-        }
+        let parentHash = dataProvider.bestHead
+        let state = try await dataProvider.getState(hash: parentHash)
+        let timeslot = timeProvider.getTimeslot()
+        let epoch = timeslot.timeslotToEpochIndex(config: config)
 
-        let extrinsic = Extrinsic.dummy(config: config)
+        let pendingTickets = await extrinsicPool.getPendingTickets(epoch: epoch)
+        let existingTickets = SortedArray(sortedUnchecked: state.value.safroleState.ticketsAccumulator.array.map(\.id))
+        let tickets = pendingTickets.array
+            .lazy
+            .filter { ticket in
+                !existingTickets.contains(ticket.output)
+            }
+            .trimmingPrefix { ticket in
+                guard let last = existingTickets.array.last else {
+                    return true
+                }
+                return ticket.output < last
+            }
+            .prefix(config.value.maxTicketsPerExtrinsic)
+            .map(\.ticket)
+
+        let extrinsic = try Extrinsic(
+            tickets: ExtrinsicTickets(tickets: ConfigLimitedSizeArray(config: config, array: Array(tickets))),
+            judgements: ExtrinsicDisputes.dummy(config: config), // TODO:
+            preimages: ExtrinsicPreimages.dummy(config: config), // TODO:
+            availability: ExtrinsicAvailability.dummy(config: config), // TODO:
+            reports: ExtrinsicGuarantees.dummy(config: config) // TODO:
+        )
 
         let (ticket, publicKey): (TicketItemAndOutput?, Bandersnatch.PublicKey) = switch claim {
         case let .left((ticket, publicKey)):
@@ -93,13 +113,21 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
             try throwUnreachable("author not in current validator")
         }
 
+        let safroleResult = try state.value.updateSafrole(
+            config: config,
+            slot: timeslot,
+            entropy: state.value.entropyPool.t0,
+            offenders: state.value.judgements.punishSet,
+            extrinsics: extrinsic.tickets
+        )
+
         let unsignedHeader = Header.Unsigned(
             parentHash: parentHash,
             priorStateRoot: state.stateRoot,
             extrinsicsHash: extrinsic.hash(),
-            timeslot: timeProvider.getTime().toTimeslotIndex(config: config),
-            epoch: nil, // TODO:
-            winningTickets: nil, // TODO:
+            timeslot: timeslot,
+            epoch: safroleResult.epochMark,
+            winningTickets: safroleResult.ticketsMark,
             offendersMarkers: [], // TODO:
             authorIndex: ValidatorIndex(authorIndex),
             vrfSignature: vrfSignature
@@ -110,7 +138,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         let seal = if let ticket {
             try secretKey.ietfVRFSign(
                 vrfInputData: SigningContext.safroleTicketInputData(
-                    entropy: vrfOutput,
+                    entropy: state.value.entropyPool.t3,
                     attempt: ticket.ticket.attempt
                 ),
                 auxData: encodedHeader
@@ -134,7 +162,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         await withSpan("BlockAuthor.newBlock", logger: logger) { _ in
             let block = try await createNewBlock(claim: claim)
             logger.info("New block created: \(block.hash)")
-            await publish(RuntimeEvents.BlockAuthored(block: block))
+            publish(RuntimeEvents.BlockAuthored(block: block))
         }
     }
 
@@ -146,11 +174,8 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         await withSpan("BlockAuthor.onBeforeEpoch", logger: logger) { _ in
             tickets.value = []
 
-            let bestHead = blockchain.bestHead
-            let state = try await blockchain.getState(hash: bestHead)
-            guard let state else {
-                try throwUnreachable("no state for best head")
-            }
+            let bestHead = dataProvider.bestHead
+            let state = try await dataProvider.getState(hash: bestHead)
 
             // simulate next block to determine the block authors for next epoch
             let res = try state.value.updateSafrole(
@@ -167,9 +192,9 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
 
     private func scheduleNewBlocks(ticketsOrKeys: SafroleTicketsOrKeys) async {
         let selfTickets = tickets.value
-        let now = timeProvider.getTime()
-        let epochBase = now.toEpochIndex(config: config)
-        let timeslotBase = epochBase.toTimeslotIndex(config: config)
+        let now = timeProvider.getTimeslot()
+        let epochBase = now.timeslotToEpochIndex(config: config)
+        let timeslotBase = epochBase.epochToTimeslotIndex(config: config)
         switch ticketsOrKeys {
         case let .left(tickets):
             if selfTickets.isEmpty {
@@ -178,12 +203,13 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
             for (idx, ticket) in tickets.enumerated() {
                 if let claim = selfTickets.first(withOutput: ticket.id) {
                     let timeslot = timeslotBase + TimeslotIndex(idx)
-                    logger.info("Scheduling new block task at timeslot \(timeslot))")
+                    if timeslot <= now {
+                        continue
+                    }
+                    logger.debug("Scheduling new block task at timeslot \(timeslot))")
                     schedule(at: timeslot) { [weak self] in
                         if let self {
-                            Task {
-                                await self.newBlock(claim: .left(claim))
-                            }
+                            await newBlock(claim: .left(claim))
                         }
                     }
                 }
@@ -193,12 +219,13 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
                 let pubkey = try? Bandersnatch.PublicKey(data: key)
                 if let pubkey, await keystore.contains(publicKey: pubkey) {
                     let timeslot = timeslotBase + TimeslotIndex(idx)
-                    logger.info("Scheduling new block task at timeslot \(timeslot))")
+                    if timeslot <= now {
+                        continue
+                    }
+                    logger.debug("Scheduling new block task at timeslot \(timeslot))")
                     schedule(at: timeslot) { [weak self] in
                         if let self {
-                            Task {
-                                await self.newBlock(claim: .right(pubkey))
-                            }
+                            await newBlock(claim: .right(pubkey))
                         }
                     }
                 }

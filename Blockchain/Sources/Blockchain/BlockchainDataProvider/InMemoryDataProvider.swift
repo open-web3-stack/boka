@@ -17,7 +17,7 @@ public actor InMemoryDataProvider: Sendable {
     }
 }
 
-extension InMemoryDataProvider: BlockchainDataProvider {
+extension InMemoryDataProvider: BlockchainDataProviderProtocol {
     public func hasBlock(hash: Data32) -> Bool {
         blockByHash[hash] != nil
     }
@@ -32,21 +32,21 @@ extension InMemoryDataProvider: BlockchainDataProvider {
 
     public func getHeader(hash: Data32) throws -> HeaderRef {
         guard let header = blockByHash[hash]?.header.asRef() else {
-            throw BlockchainDataProviderError.noData
+            throw BlockchainDataProviderError.noData(hash: hash)
         }
         return header
     }
 
     public func getBlock(hash: Data32) throws -> BlockRef {
         guard let block = blockByHash[hash] else {
-            throw BlockchainDataProviderError.noData
+            throw BlockchainDataProviderError.noData(hash: hash)
         }
         return block
     }
 
     public func getState(hash: Data32) throws -> StateRef {
         guard let state = stateByBlockHash[hash] else {
-            throw BlockchainDataProviderError.noData
+            throw BlockchainDataProviderError.noData(hash: hash)
         }
         return state
     }
@@ -79,7 +79,7 @@ extension InMemoryDataProvider: BlockchainDataProvider {
 
     public func updateHead(hash: Data32, parent: Data32) throws {
         guard heads.remove(parent) != nil else {
-            throw BlockchainDataProviderError.noData
+            throw BlockchainDataProviderError.noData(hash: parent)
         }
         heads.insert(hash)
     }
