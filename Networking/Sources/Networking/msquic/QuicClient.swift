@@ -53,10 +53,6 @@ public actor QuicClient: Sendable, QuicConnectionMessageHandler {
         try connection?.start(ipAddress: config.ipAddress, port: config.port)
     }
 
-    deinit {
-        clientLogger.info("QuicClient Deinit")
-    }
-
     // Asynchronous send method that waits for a QuicMessage reply
     public func send(message: Data) async throws -> QuicMessage {
         try await send(message: message, streamKind: .uniquePersistent)
@@ -95,27 +91,21 @@ public actor QuicClient: Sendable, QuicConnectionMessageHandler {
     }
 
     public func close() async {
-        clientLogger.info(" [\(getNetAddr())] client close")
-
         guard let connection else { return }
         await connection.close()
         self.connection = nil
-        clientLogger.info(" [\(getNetAddr())] client connection close")
 
         guard let configuration else { return }
         api?.pointee.ConfigurationClose(configuration)
         self.configuration = nil
-        clientLogger.info(" [\(getNetAddr())] client configuration close")
 
         guard let registration else { return }
         api?.pointee.RegistrationClose(registration)
         self.registration = nil
-        clientLogger.info(" [\(getNetAddr())] client registration close")
 
         guard let api else { return }
         MsQuicClose(api)
         self.api = nil
-        clientLogger.info("[\(getNetAddr())] QuicClient Close")
     }
 
     public func didReceiveMessage(

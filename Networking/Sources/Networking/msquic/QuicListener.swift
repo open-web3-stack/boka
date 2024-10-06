@@ -60,10 +60,6 @@ public class QuicListener: @unchecked Sendable {
         try openListener(port: config.port, listener: &listener)
     }
 
-    deinit {
-        listenLogger.trace("QuicListener Deinit")
-    }
-
     private func openListener(port: UInt16, listener: inout HQuic?) throws {
         // Open the listener
         let status =
@@ -122,7 +118,6 @@ public class QuicListener: @unchecked Sendable {
             .takeUnretainedValue()
         switch event.pointee.Type {
         case QUIC_LISTENER_EVENT_NEW_CONNECTION:
-            listenLogger.debug("New connection")
             let connection: HQuic = event.pointee.NEW_CONNECTION.Connection
             guard let api = listener.api else {
                 return status

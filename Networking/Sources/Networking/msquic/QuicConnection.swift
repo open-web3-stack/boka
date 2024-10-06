@@ -112,11 +112,6 @@ public class QuicConnection: @unchecked Sendable {
         }
     }
 
-    // Deinitializer to ensure resources are cleaned up
-    deinit {
-        logger.info("QuicConnection Deinit")
-    }
-
     // Sets the callback handler for the connection
     func setCallbackHandler() -> QuicStatus {
         guard let api, let connection, let configuration else {

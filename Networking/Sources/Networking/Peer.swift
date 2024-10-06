@@ -163,7 +163,6 @@ public actor Peer {
     }
 
     private func removeClient(client: QuicClient) async {
-        peerLogger.info("remove client")
         let peerAddr = await client.getNetAddr()
         await client.close()
         _ = clients.removeValue(forKey: peerAddr)

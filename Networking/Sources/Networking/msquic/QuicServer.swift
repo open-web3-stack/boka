@@ -53,27 +53,19 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
         )
     }
 
-    deinit {
-        serverLogger.info("QuicServer Deinit")
-    }
-
     public func close() async {
         guard let listener else { return }
         await listener.close()
         self.listener = nil
-        serverLogger.debug("QuicListener close")
         guard let configuration else { return }
         api?.pointee.ConfigurationClose(configuration)
         self.configuration = nil
-        serverLogger.debug("configuration close")
         guard let registration else { return }
         api?.pointee.RegistrationClose(registration)
         self.registration = nil
-        serverLogger.debug("registration close")
         guard let api else { return }
         MsQuicClose(api)
         self.api = nil
-        serverLogger.debug("QuicServer Close")
     }
 
     // Respond to a message with a specific messageID using Data

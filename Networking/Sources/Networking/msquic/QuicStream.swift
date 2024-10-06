@@ -59,11 +59,6 @@ public class QuicStream: @unchecked Sendable {
         }
     }
 
-    // Deinitializer to ensure resources are cleaned up
-    deinit {
-        streamLogger.info("QuicStream Deinit")
-    }
-
     // Opens a stream with the specified kind
     private func openStream(_: StreamKind = .commonEphemeral) throws {
         let status =
@@ -138,10 +133,6 @@ public class QuicStream: @unchecked Sendable {
         // Use the provided kind if available, otherwise use the stream's kind
         let effectiveKind = kind ?? self.kind
         let flags = (effectiveKind == .uniquePersistent) ? QUIC_SEND_FLAG_NONE : QUIC_SEND_FLAG_FIN
-        streamLogger
-            .info(
-                "[\(String(describing: stream))] flags \((effectiveKind == .uniquePersistent) ? "QUIC_SEND_FLAG_NONE" : "QUIC_SEND_FLAG_FIN")"
-            )
         status = (api?.pointee.StreamSend(stream, sendBuffer, 1, flags, sendBufferRaw)).status
         if status.isFailed {
             streamLogger.error("StreamSend failed, \(status)!")
@@ -177,11 +168,6 @@ public class QuicStream: @unchecked Sendable {
         // Use the provided kind if available, otherwise use the stream's kind
         let effectiveKind = kind ?? self.kind
         let flags = (effectiveKind == .uniquePersistent) ? QUIC_SEND_FLAG_NONE : QUIC_SEND_FLAG_FIN
-        streamLogger
-            .info(
-                "[\(String(describing: stream))] flags \((effectiveKind == .uniquePersistent) ? "QUIC_SEND_FLAG_NONE" : "QUIC_SEND_FLAG_FIN")"
-            )
-
         return try await withCheckedThrowingContinuation { [weak self] continuation in
             guard let self else {
                 continuation.resume(throwing: QuicError.sendFailed)
