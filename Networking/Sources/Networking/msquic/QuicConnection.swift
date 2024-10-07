@@ -292,7 +292,6 @@ extension QuicConnection: QuicStreamMessageHandler {
             Task {
                 if stream.kind == .uniquePersistent {
                     await streamManager.changeTypeToCommon(stream)
-                    logger.info("changeStreamType")
                 }
             }
         default:
