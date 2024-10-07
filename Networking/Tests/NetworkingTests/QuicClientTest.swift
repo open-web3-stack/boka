@@ -16,7 +16,7 @@ final class QuicClientTests {
         let quicClient = try await QuicClient(
             config: QuicConfig(
                 id: "public-key", cert: cert, key: keyFile, alpn: "sample",
-                ipAddress: "127.0.0.1", port: 4569
+                ipAddress: "127.0.0.1", port: 4563
             )
         )
         do {
