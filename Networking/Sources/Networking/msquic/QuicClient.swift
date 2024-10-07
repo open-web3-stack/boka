@@ -16,7 +16,7 @@ public actor QuicClient: Sendable, QuicConnectionMessageHandler {
     private var configuration: HQuic?
     private var connection: QuicConnection?
     private let config: QuicConfig
-    private weak var messageHandler: Peer?
+    private weak var messageHandler: QuicClientMessageHandler?
 
     public init(config: QuicConfig, messageHandler: Peer? = nil) async throws {
         self.config = config
