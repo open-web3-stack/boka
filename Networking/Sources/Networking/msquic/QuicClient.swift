@@ -11,7 +11,7 @@ public protocol QuicClientMessageHandler: AnyObject, Sendable {
 }
 
 public actor QuicClient: Sendable, QuicConnectionMessageHandler {
-    private var api: UnsafePointer<QuicApiTable>?
+    private var api: UnsafePointer<QuicApiTable>
     private var registration: HQuic?
     private var configuration: HQuic?
     private var connection: QuicConnection?
@@ -97,19 +97,15 @@ public actor QuicClient: Sendable, QuicConnectionMessageHandler {
         }
 
         if let configuration {
-            api?.pointee.ConfigurationClose(configuration)
+            api.pointee.ConfigurationClose(configuration)
             self.configuration = nil
         }
 
         if let registration {
-            api?.pointee.RegistrationClose(registration)
+            api.pointee.RegistrationClose(registration)
             self.registration = nil
         }
-
-        if let api {
-            MsQuicClose(api)
-            self.api = nil
-        }
+        MsQuicClose(api)
     }
 
     public func didReceiveMessage(

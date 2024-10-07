@@ -36,16 +36,16 @@ public protocol QuicListenerMessageHandler: AnyObject {
 }
 
 public class QuicListener: @unchecked Sendable {
-    private var api: UnsafePointer<QuicApiTable>?
-    private var registration: HQuic?
-    private var configuration: HQuic?
+    private let api: UnsafePointer<QuicApiTable>
+    private let registration: HQuic?
+    private let configuration: HQuic?
     private var config: QuicConfig
     private var listener: HQuic?
     public weak var messageHandler: QuicListenerMessageHandler?
     private let connectionsManager: ConnectionsManager
 
     public init(
-        api: UnsafePointer<QuicApiTable>?,
+        api: UnsafePointer<QuicApiTable>,
         registration: HQuic?,
         configuration: HQuic?,
         config: QuicConfig,
@@ -63,7 +63,7 @@ public class QuicListener: @unchecked Sendable {
     private func openListener(port: UInt16, listener: inout HQuic?) throws {
         // Open the listener
         let status =
-            (api?.pointee.ListenerOpen(
+            api.pointee.ListenerOpen(
                 registration,
                 { listener, context, event -> QuicStatus in
                     QuicListener.serverListenerCallback(
@@ -71,7 +71,7 @@ public class QuicListener: @unchecked Sendable {
                     )
                 },
                 UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()), &listener
-            )).status
+            )
 
         guard status.isSucceeded else {
             throw QuicError.invalidStatus(status: status.code)
@@ -94,7 +94,7 @@ public class QuicListener: @unchecked Sendable {
 
             // Start the listener
             let startStatus: QuicStatus =
-                (api?.pointee.ListenerStart(listener, &alpnBuffer, 1, &address)).status
+                api.pointee.ListenerStart(listener, &alpnBuffer, 1, &address)
 
             guard startStatus.isSucceeded else {
                 throw QuicError.invalidStatus(status: startStatus.code)
@@ -119,12 +119,8 @@ public class QuicListener: @unchecked Sendable {
         switch event.pointee.Type {
         case QUIC_LISTENER_EVENT_NEW_CONNECTION:
             let connection: HQuic = event.pointee.NEW_CONNECTION.Connection
-            guard let api = listener.api else {
-                return status
-            }
-
             let quicConnection = QuicConnection(
-                api: api,
+                api: listener.api,
                 registration: listener.registration,
                 configuration: listener.configuration,
                 connection: connection,
@@ -143,7 +139,7 @@ public class QuicListener: @unchecked Sendable {
 
     public func close() async {
         if let listener {
-            api?.pointee.ListenerClose(listener)
+            api.pointee.ListenerClose(listener)
             self.listener = nil
         }
         await connectionsManager.removeAll()

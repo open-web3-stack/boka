@@ -11,7 +11,7 @@ public protocol QuicServerMessageHandler: AnyObject, Sendable {
 }
 
 public actor QuicServer: Sendable, QuicListenerMessageHandler {
-    private var api: UnsafePointer<QuicApiTable>?
+    private var api: UnsafePointer<QuicApiTable>
     private var registration: HQuic?
     private var configuration: HQuic?
     private var listener: QuicListener?
@@ -48,7 +48,7 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
             api: api, registration: registration, configuration: &configuration
         )
         listener = try QuicListener(
-            api: api, registration: registration, configuration: configuration, config: config,
+            api: boundPointer, registration: registration, configuration: configuration, config: config,
             messageHandler: self
         )
     }
@@ -59,17 +59,14 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
             self.listener = nil
         }
         if let configuration {
-            api?.pointee.ConfigurationClose(configuration)
+            api.pointee.ConfigurationClose(configuration)
             self.configuration = nil
         }
         if let registration {
-            api?.pointee.RegistrationClose(registration)
+            api.pointee.RegistrationClose(registration)
             self.registration = nil
         }
-        if let api {
-            MsQuicClose(api)
-            self.api = nil
-        }
+        MsQuicClose(api)
     }
 
     // Respond to a message with a specific messageID using Data

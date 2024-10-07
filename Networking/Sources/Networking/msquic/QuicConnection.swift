@@ -70,7 +70,7 @@ actor StreamManager {
 
 public class QuicConnection: @unchecked Sendable {
     private var connection: HQuic?
-    private var api: UnsafePointer<QuicApiTable>?
+    private let api: UnsafePointer<QuicApiTable>
     private var registration: HQuic?
     private var configuration: HQuic?
     private var streamManager: StreamManager
@@ -79,7 +79,7 @@ public class QuicConnection: @unchecked Sendable {
 
     // Initializer for creating a new connection
     init(
-        api: UnsafePointer<QuicApiTable>?,
+        api: UnsafePointer<QuicApiTable>,
         registration: HQuic?,
         configuration: HQuic?,
         messageHandler: QuicConnectionMessageHandler? = nil
@@ -99,7 +99,7 @@ public class QuicConnection: @unchecked Sendable {
 
     // Initializer for wrapping an existing connection
     init(
-        api: UnsafePointer<QuicApiTable>?, registration: HQuic?, configuration: HQuic?,
+        api: UnsafePointer<QuicApiTable>, registration: HQuic?, configuration: HQuic?,
         connection: HQuic?, messageHandler: QuicConnectionMessageHandler? = nil
     ) {
         self.api = api
@@ -117,10 +117,6 @@ public class QuicConnection: @unchecked Sendable {
 
     // Sets the callback handler for the connection
     func setCallbackHandler() -> QuicStatus {
-        guard let api, let connection, let configuration else {
-            return QuicStatusCode.invalidParameter.rawValue
-        }
-
         let callbackPointer = unsafeBitCast(
             connectionCallback, to: UnsafeMutableRawPointer?.self
         )
@@ -136,15 +132,14 @@ public class QuicConnection: @unchecked Sendable {
 
     // Opens the connection
     private func open() throws {
-        let status =
-            (api?.pointee.ConnectionOpen(
-                registration,
-                { connection, context, event -> QuicStatus in
-                    return QuicConnection.connectionCallback(
-                        connection: connection, context: context, event: event
-                    )
-                }, Unmanaged.passUnretained(self).toOpaque(), &connection
-            )).status
+        let status = api.pointee.ConnectionOpen(
+            registration,
+            { connection, context, event -> QuicStatus in
+                return QuicConnection.connectionCallback(
+                    connection: connection, context: context, event: event
+                )
+            }, Unmanaged.passUnretained(self).toOpaque(), &connection
+        )
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }
@@ -187,7 +182,7 @@ public class QuicConnection: @unchecked Sendable {
         await streamManager.closeAllCommonStreams()
         await streamManager.closeAllUniqueStreams()
         if let connection {
-            api?.pointee.ConnectionClose(connection)
+            api.pointee.ConnectionClose(connection)
             self.connection = nil
         }
         logger.debug("QuicConnection Close")
@@ -195,11 +190,10 @@ public class QuicConnection: @unchecked Sendable {
 
     // Starts the connection with the specified IP address and port
     func start(ipAddress: String, port: UInt16) throws {
-        let status =
-            (api?.pointee.ConnectionStart(
-                connection, configuration, QUIC_ADDRESS_FAMILY(QUIC_ADDRESS_FAMILY_UNSPEC),
-                ipAddress, port
-            )).status
+        let status = api.pointee.ConnectionStart(
+            connection, configuration, QUIC_ADDRESS_FAMILY(QUIC_ADDRESS_FAMILY_UNSPEC),
+            ipAddress, port
+        )
         if status.isFailed {
             throw QuicError.invalidStatus(status: status.code)
         }
