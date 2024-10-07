@@ -39,14 +39,17 @@ actor StreamManager {
         commonStreams.append(stream)
     }
 
+    func commonContains(_ stream: QuicStream) -> Bool {
+        commonStreams.contains { $0 === stream }
+    }
+
     func removeCommonStream(_ stream: QuicStream) {
         commonStreams.removeAll(where: { $0 === stream })
     }
 
     func changeTypeToCommon(_ stream: QuicStream) {
-        stream.kind = .commonEphemeral
-        removeUniqueStream(kind: stream.kind)
         removeCommonStream(stream)
+        stream.kind = .commonEphemeral
         addCommonStream(stream)
     }
 
@@ -169,10 +172,11 @@ public class QuicConnection: @unchecked Sendable {
     // Removes a stream from the connection
     func removeStream(stream: QuicStream) async {
         stream.close()
-        if stream.kind == .uniquePersistent {
-            await streamManager.removeUniqueStream(kind: stream.kind)
-        } else {
+        let cointain = await streamManager.commonContains(stream)
+        if cointain {
             await streamManager.removeCommonStream(stream)
+        } else {
+            await streamManager.removeUniqueStream(kind: stream.kind)
         }
     }
 
