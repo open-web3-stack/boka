@@ -81,15 +81,15 @@ public final class ExtrinsicPoolService: ServiceBase, @unchecked Sendable {
 
         super.init(config, eventBus)
 
-        await subscribe(RuntimeEvents.SafroleTicketsGenerated.self) { [weak self] event in
+        await subscribe(RuntimeEvents.SafroleTicketsGenerated.self, id: "ExtrinsicPool.SafroleTicketsGenerated") { [weak self] event in
             try await self?.on(safroleTicketsGenerated: event)
         }
 
-        await subscribe(RuntimeEvents.BlockFinalized.self) { [weak self] event in
+        await subscribe(RuntimeEvents.BlockFinalized.self, id: "ExtrinsicPool.BlockFinalized") { [weak self] event in
             try await self?.on(blockFinalized: event)
         }
 
-        await subscribe(RuntimeEvents.SafroleTicketsReceived.self) { [weak self] event in
+        await subscribe(RuntimeEvents.SafroleTicketsReceived.self, id: "ExtrinsicPool.SafroleTicketsReceived") { [weak self] event in
             try await self?.on(safroleTicketsReceived: event)
         }
     }

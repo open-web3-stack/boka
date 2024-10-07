@@ -31,7 +31,7 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
 
         super.init(config, eventBus)
 
-        await subscribe(RuntimeEvents.BlockImported.self) { [weak self] event in
+        await subscribe(RuntimeEvents.BlockImported.self, id: "SafroleService.BlockImported") { [weak self] event in
             try await self?.on(blockImported: event)
         }
     }
