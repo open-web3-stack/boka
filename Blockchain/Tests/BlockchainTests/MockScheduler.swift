@@ -3,7 +3,7 @@ import Blockchain
 import Foundation
 import Utils
 
-final class SchedulerTask: Sendable {
+final class SchedulerTask: Sendable, Comparable {
     let id: Int
     let scheduleTime: UInt32
     let repeats: TimeInterval?
@@ -23,11 +23,18 @@ final class SchedulerTask: Sendable {
         self.task = task
         self.cancel = cancel
     }
+
+    static func < (lhs: SchedulerTask, rhs: SchedulerTask) -> Bool {
+        lhs.scheduleTime < rhs.scheduleTime
+    }
+
+    static func == (lhs: SchedulerTask, rhs: SchedulerTask) -> Bool {
+        lhs.scheduleTime == rhs.scheduleTime
+    }
 }
 
 struct Storage: Sendable {
-    var tasks: [SchedulerTask] = []
-    var prevTime: UInt32 = 0
+    var tasks: SortedArray<SchedulerTask> = .init([])
 }
 
 final class MockScheduler: Scheduler, Sendable {
@@ -44,7 +51,7 @@ final class MockScheduler: Scheduler, Sendable {
         mockTimeProvider = timeProvider
     }
 
-    func schedule(
+    func scheduleImpl(
         delay: TimeInterval,
         repeats: Bool,
         task: @escaping @Sendable () async -> Void,
@@ -55,11 +62,11 @@ final class MockScheduler: Scheduler, Sendable {
         let id = Self.idGenerator.loadThenWrappingIncrement(ordering: .relaxed)
         let task = SchedulerTask(id: id, scheduleTime: scheduleTime, repeats: repeats ? delay : nil, task: task, cancel: onCancel)
         storage.write { storage in
-            storage.tasks.append(task)
+            storage.tasks.insert(task)
         }
         return Cancellable {
             self.storage.mutate { storage in
-                if let index = storage.tasks.firstIndex(where: { $0.id == id }) {
+                if let index = storage.tasks.array.firstIndex(where: { $0.id == id }) {
                     let task = storage.tasks.remove(at: index)
                     task.cancel?()
                 }
@@ -68,42 +75,26 @@ final class MockScheduler: Scheduler, Sendable {
     }
 
     func advance(by interval: UInt32) async {
-        mockTimeProvider.advance(by: interval)
-        await trigger()
+        let to = timeProvider.getTime() + interval
+        while await advanceNext(to: to) {}
     }
 
-    func trigger() async {
-        let now = timeProvider.getTime()
-        let tasks = storage.mutate { storage in
-            var tasksToDispatch: [SchedulerTask] = []
-            var remainingTasks: [SchedulerTask] = []
-
-            for task in storage.tasks {
-                if task.scheduleTime <= now {
-                    tasksToDispatch.append(task)
-                } else {
-                    remainingTasks.append(task)
-                }
+    func advanceNext(to time: UInt32) async -> Bool {
+        let task: SchedulerTask? = storage.mutate { storage in
+            if let task = storage.tasks.array.first, task.scheduleTime <= time {
+                storage.tasks.remove(at: 0)
+                return task
             }
-
-            storage.tasks = remainingTasks
-            storage.prevTime = now
-            for task in tasksToDispatch {
-                if let repeats = task.repeats {
-                    storage.tasks.append(SchedulerTask(
-                        id: task.id,
-                        scheduleTime: task.scheduleTime + UInt32(repeats),
-                        repeats: repeats,
-                        task: task.task,
-                        cancel: task.cancel
-                    ))
-                }
-            }
-            return tasksToDispatch
+            return nil
         }
 
-        for task in tasks {
+        if let task {
+            mockTimeProvider.advance(to: task.scheduleTime)
             await task.task()
+
+            return true
         }
+
+        return false
     }
 }
