@@ -5,7 +5,10 @@ import Utils
 @testable import Blockchain
 
 struct DispatchQueueSchedulerTests {
-    let scheduler = DispatchQueueScheduler(timeProvider: SystemTimeProvider(slotPeriodSeconds: 6))
+    let scheduler = DispatchQueueScheduler(
+        timeProvider: SystemTimeProvider(slotPeriodSeconds: 6),
+        queue: .global(qos: .userInteractive) // to get higher priority so results are more deterministic
+    )
 
     @Test func scheduleTaskWithoutDelay() async throws {
         try await confirmation { confirm in
@@ -13,7 +16,7 @@ struct DispatchQueueSchedulerTests {
                 confirm()
             }
 
-            try await Task.sleep(for: .seconds(1))
+            try await Task.sleep(for: .seconds(0.5))
 
             _ = cancel
         }

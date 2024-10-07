@@ -6,9 +6,11 @@ private let logger = Logger(label: "Scheduler")
 
 public final class DispatchQueueScheduler: Scheduler {
     public let timeProvider: TimeProvider
+    public let queue: DispatchQueue
 
-    public init(timeProvider: TimeProvider) {
+    public init(timeProvider: TimeProvider, queue: DispatchQueue = .global()) {
         self.timeProvider = timeProvider
+        self.queue = queue
     }
 
     public func scheduleImpl(
@@ -18,7 +20,7 @@ public final class DispatchQueueScheduler: Scheduler {
         onCancel: (@Sendable () -> Void)?
     ) -> Cancellable {
         logger.trace("scheduling task in \(delay) seconds, repeats: \(repeats)")
-        let timer = DispatchSource.makeTimerSource(queue: .global())
+        let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.setEventHandler {
             Task {
                 await task()
