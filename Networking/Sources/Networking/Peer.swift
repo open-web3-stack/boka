@@ -2,29 +2,18 @@ import Foundation
 import Logging
 import Utils
 
-// Logger for Peer
 let peerLogger = Logger(label: "PeerServer")
 
-// Define message types
 public enum PeerMessageType: Sendable {
-    case uniquePersistent
+    case uniquePersistent // most messages type
     case commonEphemeral
-    case unknown
 }
 
-// Define PeerMessage protocol
 public protocol PeerMessage: Equatable, Sendable {
     func getData() -> Data
     func getMessageType() -> PeerMessageType
 }
 
-extension PeerMessage {
-    public func getMessageType() -> PeerMessageType {
-        .uniquePersistent
-    }
-}
-
-// Define events
 public struct PeerMessageReceived: Event {
     public let messageID: Int64
     public let message: QuicMessage
@@ -39,7 +28,7 @@ public struct PeerErrorReceived: Event {
 // Define the Peer actor
 public actor Peer {
     private let config: QuicConfig
-    private var quicServer: QuicServer?
+    private var quicServer: QuicServer!
     private var clients: [NetAddr: QuicClient]
     private let eventBus: EventBus
 
@@ -66,35 +55,33 @@ public actor Peer {
             await client.close()
         }
         clients.removeAll()
-        await quicServer?.close()
+        await quicServer.close()
     }
 
     // Respond to a message with a specific messageID using Data
     func respond(to messageID: Int64, with data: Data) async -> QuicStatus {
-        await quicServer?.respondGetStatus(to: messageID, with: data)
-            ?? QuicStatusCode.internalError.rawValue
+        await quicServer.respondGetStatus(to: messageID, with: data)
     }
 
     // Respond to a message with a specific messageID using PeerMessage
     func respond(to messageID: Int64, with message: any PeerMessage) async -> QuicStatus {
         let messageType = message.getMessageType()
-        return await quicServer?
+        return await quicServer
             .respondGetStatus(
                 to: messageID,
                 with: message.getData(),
                 kind: (messageType == .uniquePersistent) ? .uniquePersistent : .commonEphemeral
             )
-            ?? QuicStatusCode.internalError.rawValue
     }
 
     // Respond to a message with a specific messageID using PeerMessage (async throws)
     func respond(to messageID: Int64, with message: any PeerMessage) async throws {
         let messageType = message.getMessageType()
-        let quicMessage = try await quicServer?.respondGetMessage(
+        let quicMessage = try await quicServer.respondGetMessage(
             to: messageID, with: message.getData(),
             kind: (messageType == .uniquePersistent) ? .uniquePersistent : .commonEphemeral
         )
-        if quicMessage?.type != .received {
+        if quicMessage.type != .received {
             throw QuicError.sendFailed
         }
     }
@@ -175,23 +162,18 @@ public actor Peer {
 
 // QuicClientMessageHandler methods
 extension Peer: QuicClientMessageHandler {
-    public func didReceiveMessage(quicClient: QuicClient, message: QuicMessage) {
+    public func didReceiveMessage(quicClient: QuicClient, message: QuicMessage) async {
         switch message.type {
         case .shutdownComplete:
-            Task { [weak self] in
-                guard let self else { return }
-                await removeClient(client: quicClient)
-            }
+            await removeClient(client: quicClient)
         default:
             break
         }
     }
 
-    public func didReceiveError(quicClient _: QuicClient, error: QuicError) {
+    public func didReceiveError(quicClient _: QuicClient, error: QuicError) async {
         peerLogger.error("Failed to receive message: \(error)")
-        Task {
-            await eventBus.publish(PeerErrorReceived(messageID: nil, error: error))
-        }
+        await eventBus.publish(PeerErrorReceived(messageID: nil, error: error))
     }
 }
 
@@ -208,10 +190,8 @@ extension Peer: QuicServerMessageHandler {
         }
     }
 
-    public func didReceiveError(messageID: Int64, error: QuicError) {
+    public func didReceiveError(messageID: Int64, error: QuicError) async {
         peerLogger.error("Failed to receive message: \(error)")
-        Task {
-            await eventBus.publish(PeerErrorReceived(messageID: messageID, error: error))
-        }
+        await eventBus.publish(PeerErrorReceived(messageID: messageID, error: error))
     }
 }
