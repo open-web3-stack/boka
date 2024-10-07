@@ -26,7 +26,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
 
         super.init(config, eventBus, scheduler)
 
-        await subscribe(RuntimeEvents.SafroleTicketsGenerated.self) { [weak self] event in
+        await subscribe(RuntimeEvents.SafroleTicketsGenerated.self, id: "BlockAuthor.SafroleTicketsGenerated") { [weak self] event in
             try await self?.on(safroleTicketsGenerated: event)
         }
 
