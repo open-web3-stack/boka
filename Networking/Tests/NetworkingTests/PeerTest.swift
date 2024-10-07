@@ -91,45 +91,42 @@ final actor PeerTests {
             Task {
                 do {
                     for i in 1 ... 5 {
-                        let messageToPeer2: QuicMessage = try await peer1.sendMessage(
+                        let messageStatus2: QuicStatus = try await peer1.sendMessage(
                             to: NetAddr(ipAddress: "127.0.0.1", port: 4569),
                             with: Message(
                                 data: Data("Hello from Peer1 - Message \(i)".utf8),
                                 type: PeerMessageType.commonEphemeral
                             )
                         )
-                        print(
-                            "Peer1 got message: \(String([UInt8](messageToPeer2.data!).map { Character(UnicodeScalar($0)) }))"
-                        )
-                        let messageToPeer1: QuicMessage = try await peer2.sendMessage(
+                        print("Peer1 sent message \(i): \(messageStatus2.isSucceeded ? "Success" : "Failed")")
+
+                        let messageStatus1: QuicStatus = try await peer2.sendMessage(
                             to: NetAddr(ipAddress: "127.0.0.1", port: 4568),
                             with: Message(
                                 data: Data("Hello from Peer2 - Message \(i)".utf8),
                                 type: PeerMessageType.commonEphemeral
                             )
                         )
-                        print(
-                            "Peer2 got message: \(String([UInt8](messageToPeer1.data!).map { Character(UnicodeScalar($0)) }))"
-                        )
+                        print("Peer2 sent message \(i): \(messageStatus1.isSucceeded ? "Success" : "Failed")")
                     }
 
                     for i in 6 ... 10 {
-                        let messageToPeer2: QuicMessage = try await peer1.sendMessage(
+                        let messageStatus2: QuicStatus = try await peer1.sendMessage(
                             to: NetAddr(ipAddress: "127.0.0.1", port: 4569),
                             with: Message(
                                 data: Data("Hello from Peer1 - Message \(i)".utf8),
                                 type: PeerMessageType.uniquePersistent
                             )
                         )
-                        print("Peer1 sent message \(i): \(messageToPeer2)")
-                        let messageToPeer1: QuicMessage = try await peer2.sendMessage(
+                        print("Peer1 sent message \(i): \(messageStatus2.isSucceeded ? "Success" : "Failed")")
+                        let messageStatus1: QuicStatus = try await peer2.sendMessage(
                             to: NetAddr(ipAddress: "127.0.0.1", port: 4568),
                             with: Message(
                                 data: Data("Hello from Peer2 - Message \(i)".utf8),
                                 type: PeerMessageType.uniquePersistent
                             )
                         )
-                        print("Peer2 sent message \(i): \(messageToPeer1)")
+                        print("Peer2 sent message \(i): \(messageStatus1.isSucceeded ? "Success" : "Failed")")
                     }
                 } catch {
                     print("Failed to send message: \(error)")

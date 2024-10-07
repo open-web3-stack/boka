@@ -22,10 +22,14 @@ final class QuicServerTests {
 }
 
 extension QuicServerTests: QuicServerMessageHandler {
-    func didReceiveMessage(messageID: Int64, message: QuicMessage) async {
+    func didReceiveMessage(server: QuicServer, messageID: Int64, message: QuicMessage) async {
         switch message.type {
         case .received:
-            print("Server received message with ID \(messageID): \(message)")
+            let messageString = String(
+                [UInt8](message.data!).map { Character(UnicodeScalar($0)) }
+            )
+            print("Server received message : \(messageString)")
+            _ = await server.respondGetStatus(to: messageID, with: message.data!)
         case .shutdownComplete:
             print("Server shutdown complete")
         case .unknown:
@@ -35,7 +39,7 @@ extension QuicServerTests: QuicServerMessageHandler {
         }
     }
 
-    func didReceiveError(messageID _: Int64, error: QuicError) async {
+    func didReceiveError(server _: QuicServer, messageID _: Int64, error: QuicError) async {
         print("Server error: \(error)")
     }
 }

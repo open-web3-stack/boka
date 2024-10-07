@@ -236,15 +236,13 @@ extension QuicConnection {
         case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
             logger.info("[\(String(describing: connection))] Shutdown all done")
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
-                if let messageHandler = quicConnection.messageHandler {
-                    Task {
-                        await messageHandler.didReceiveMessage(
-                            connection: quicConnection,
-                            stream: nil,
-                            message: QuicMessage(type: .shutdownComplete, data: nil)
-                        )
-                        quicConnection.messageHandler = nil
-                    }
+                Task {
+                    await quicConnection.messageHandler?.didReceiveMessage(
+                        connection: quicConnection,
+                        stream: nil,
+                        message: QuicMessage(type: .shutdownComplete, data: nil)
+                    )
+                    quicConnection.messageHandler = nil
                 }
             }
 

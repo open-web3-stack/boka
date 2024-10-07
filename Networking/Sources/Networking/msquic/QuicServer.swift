@@ -6,8 +6,8 @@ import Utils
 let serverLogger: Logger = .init(label: "QuicServer")
 
 public protocol QuicServerMessageHandler: AnyObject, Sendable {
-    func didReceiveMessage(messageID: Int64, message: QuicMessage) async
-    func didReceiveError(messageID: Int64, error: QuicError) async
+    func didReceiveMessage(server: QuicServer, messageID: Int64, message: QuicMessage) async
+    func didReceiveError(server: QuicServer, messageID: Int64, error: QuicError) async
 }
 
 public actor QuicServer: Sendable, QuicListenerMessageHandler {
@@ -77,32 +77,11 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
         if let (_, stream) = pendingMessages[messageID] {
             let streamKind = kind ?? stream.kind
             pendingMessages.removeValue(forKey: messageID)
-
             status = stream.respond(with: data, kind: streamKind)
         } else {
             serverLogger.error("Message not found")
         }
         return status
-    }
-
-    // Respond to a message with a specific messageID using Data
-    func respondGetMessage(to messageID: Int64, with data: Data, kind: StreamKind? = nil)
-        async throws
-        -> QuicMessage
-    {
-        guard let (_, stream) = pendingMessages[messageID] else {
-            throw QuicError.messageNotFound
-        }
-
-        let streamKind = kind ?? stream.kind
-        pendingMessages.removeValue(forKey: messageID)
-        return try await send(stream: stream, with: data, kind: streamKind)
-    }
-
-    private func send(stream: QuicStream, with data: Data, kind: StreamKind)
-        async throws -> QuicMessage
-    {
-        try await stream.send(data: data, kind: kind)
     }
 
     public func didReceiveMessage(
@@ -116,7 +95,7 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
             // Call messageHandler safely in the actor context
             Task { [weak self] in
                 guard let self else { return }
-                await messageHandler?.didReceiveMessage(messageID: messageID, message: message)
+                await messageHandler?.didReceiveMessage(server: self, messageID: messageID, message: message)
             }
         default:
             break

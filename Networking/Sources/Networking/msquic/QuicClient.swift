@@ -53,25 +53,6 @@ public actor QuicClient: Sendable, QuicConnectionMessageHandler {
         try connection?.start(ipAddress: config.ipAddress, port: config.port)
     }
 
-    // Asynchronous send method that waits for a QuicMessage reply
-    public func send(message: Data) async throws -> QuicMessage {
-        try await send(message: message, streamKind: .uniquePersistent)
-    }
-
-    // Send method that returns a QuicStatus
-    public func send(message: Data, streamKind: StreamKind) async throws -> QuicMessage {
-        guard let connection else {
-            throw QuicError.getConnectionFailed
-        }
-        let sendStream: QuicStream =
-            if streamKind == .uniquePersistent {
-                try await connection.createOrGetUniquePersistentStream(kind: streamKind)
-            } else {
-                try await connection.createCommonEphemeralStream()
-            }
-        return try await sendStream.send(data: message, kind: streamKind)
-    }
-
     // Send method that returns a QuicStatus
     public func send(data: Data, streamKind: StreamKind) async throws -> QuicStatus {
         guard let connection else {
