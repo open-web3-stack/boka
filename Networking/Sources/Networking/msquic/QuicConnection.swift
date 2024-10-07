@@ -47,9 +47,18 @@ actor StreamManager {
         commonStreams.removeAll(where: { $0 === stream })
     }
 
+    func removeStream(_ stream: QuicStream) {
+        let cointain = commonContains(stream)
+        if cointain {
+            removeCommonStream(stream)
+        } else {
+            removeUniqueStream(kind: stream.kind)
+        }
+    }
+
     func changeTypeToCommon(_ stream: QuicStream) {
-        removeCommonStream(stream)
-        stream.kind = .commonEphemeral
+        removeStream(stream)
+        stream.changeTypeToCommon()
         addCommonStream(stream)
     }
 
@@ -164,17 +173,6 @@ public class QuicConnection: @unchecked Sendable {
         return stream
     }
 
-    // Removes a stream from the connection
-    func removeStream(stream: QuicStream) async {
-        stream.close()
-        let cointain = await streamManager.commonContains(stream)
-        if cointain {
-            await streamManager.removeCommonStream(stream)
-        } else {
-            await streamManager.removeUniqueStream(kind: stream.kind)
-        }
-    }
-
     // Closes the connection and cleans up resources
     func close() async {
         connectionCallback = nil
@@ -280,7 +278,8 @@ extension QuicConnection: QuicStreamMessageHandler {
         switch message.type {
         case .shutdownComplete:
             Task {
-                await removeStream(stream: stream)
+                stream.close()
+                await streamManager.removeStream(stream)
             }
         case .changeStreamType:
             Task {
