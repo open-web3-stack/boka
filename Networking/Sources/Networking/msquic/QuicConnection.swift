@@ -52,7 +52,7 @@ actor StreamManager {
         if cointain {
             removeCommonStream(stream)
         } else {
-            removeUniqueStream(kind: stream.kind)
+            removeUniqueStream(kind: stream.getKind())
         }
     }
 
@@ -283,7 +283,7 @@ extension QuicConnection: QuicStreamMessageHandler {
             }
         case .changeStreamType:
             Task {
-                if stream.kind == .uniquePersistent {
+                if stream.getKind() == .uniquePersistent {
                     await streamManager.changeTypeToCommon(stream)
                 }
             }
