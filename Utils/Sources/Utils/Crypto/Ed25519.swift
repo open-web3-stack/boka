@@ -51,7 +51,7 @@ public enum Ed25519: KeyType {
         }
 
         public var description: String {
-            "0x\(data.toHexString())"
+            data.description
         }
 
         public func verify(signature: Data64, message: Data) -> Bool {

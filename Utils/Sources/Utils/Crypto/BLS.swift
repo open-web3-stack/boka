@@ -99,7 +99,7 @@ public enum BLS: KeyType {
         }
 
         public var description: String {
-            "0x\(data.toHexString())"
+            data.description
         }
 
         public func verify(signature: Data96, message: Data) -> Bool {

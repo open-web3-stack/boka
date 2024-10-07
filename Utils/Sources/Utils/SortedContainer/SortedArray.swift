@@ -32,7 +32,8 @@ public struct SortedArray<T: Comparable>: SortedContainer {
         }
     }
 
-    public mutating func remove(at index: Int) {
+    @discardableResult
+    public mutating func remove(at index: Int) -> T {
         array.remove(at: index)
     }
 
