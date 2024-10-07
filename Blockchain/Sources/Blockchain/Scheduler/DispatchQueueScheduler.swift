@@ -11,7 +11,7 @@ public final class DispatchQueueScheduler: Scheduler {
         self.timeProvider = timeProvider
     }
 
-    public func schedule(
+    public func scheduleImpl(
         delay: TimeInterval,
         repeats: Bool,
         task: @escaping @Sendable () async -> Void,

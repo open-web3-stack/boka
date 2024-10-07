@@ -29,26 +29,14 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         await subscribe(RuntimeEvents.SafroleTicketsGenerated.self) { [weak self] event in
             try await self?.on(safroleTicketsGenerated: event)
         }
-    }
 
-    private func scheduleForNextEpoch() async {
-        let now = timeProvider.getTimeslot()
-        let nextEpoch = now.timeslotToEpochIndex(config: config) + 1
-        let timeslot = nextEpoch.epochToTimeslotIndex(config: config)
-
-        // at end of an epoch, try to determine the block author of next epoch
-        // and schedule new block task
-        schedule(at: timeslot - 1) { [weak self] in
-            if let self {
-                await onBeforeEpoch(timeslot: timeslot)
-                await scheduleForNextEpoch()
-            }
+        scheduleForNextEpoch("BlockAuthor.scheduleForNextEpoch") { [weak self] timeslot in
+            await self?.onBeforeEpoch(timeslot: timeslot)
         }
     }
 
     public func on(genesis state: StateRef) async {
         await scheduleNewBlocks(ticketsOrKeys: state.value.safroleState.ticketsOrKeys)
-        await scheduleForNextEpoch()
     }
 
     public func createNewBlock(claim: Either<(TicketItemAndOutput, Bandersnatch.PublicKey), Bandersnatch.PublicKey>) async throws
@@ -161,7 +149,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
     private func newBlock(claim: Either<(TicketItemAndOutput, Bandersnatch.PublicKey), Bandersnatch.PublicKey>) async {
         await withSpan("BlockAuthor.newBlock", logger: logger) { _ in
             let block = try await createNewBlock(claim: claim)
-            logger.info("New block created: \(block.hash)")
+            logger.info("New block created: #\(block.header.timeslot) \(block.hash)")
             publish(RuntimeEvents.BlockAuthored(block: block))
         }
     }
@@ -171,6 +159,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
     }
 
     private func onBeforeEpoch(timeslot: TimeslotIndex) async {
+        logger.debug("scheduling new blocks for epoch \(timeslot.epochToTimeslotIndex(config: config))")
         await withSpan("BlockAuthor.onBeforeEpoch", logger: logger) { _ in
             tickets.value = []
 
@@ -207,7 +196,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
                         continue
                     }
                     logger.debug("Scheduling new block task at timeslot \(timeslot))")
-                    schedule(at: timeslot) { [weak self] in
+                    schedule(id: "BlockAuthor.newBlock", at: timeslot) { [weak self] in
                         if let self {
                             await newBlock(claim: .left(claim))
                         }
@@ -223,7 +212,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
                         continue
                     }
                     logger.debug("Scheduling new block task at timeslot \(timeslot))")
-                    schedule(at: timeslot) { [weak self] in
+                    schedule(id: "BlockAuthor.newBlock", at: timeslot) { [weak self] in
                         if let self {
                             await newBlock(claim: .right(pubkey))
                         }

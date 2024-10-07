@@ -43,11 +43,11 @@ struct ValidatorServiceTests {
             dataProvider: dataProvider
         )
 
-        // setupTestLogger()
+        setupTestLogger()
     }
 
     @Test
-    func testOnGenesis() async throws {
+    func onGenesis() async throws {
         let genesisState = try await dataProvider.getState(hash: Data32())
 
         await validatorService.on(genesis: genesisState)
@@ -63,7 +63,7 @@ struct ValidatorServiceTests {
     }
 
     @Test
-    func testBlockProductionCycle() async throws {
+    func produceBlocks() async throws {
         let genesisState = try await dataProvider.getState(hash: Data32())
 
         await validatorService.on(genesis: genesisState)

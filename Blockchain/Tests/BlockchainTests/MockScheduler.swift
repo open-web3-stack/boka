@@ -3,7 +3,7 @@ import Blockchain
 import Foundation
 import Utils
 
-final class SchedulerTask: Sendable {
+final class SchedulerTask: Sendable, Comparable {
     let id: Int
     let scheduleTime: UInt32
     let repeats: TimeInterval?
@@ -23,10 +23,18 @@ final class SchedulerTask: Sendable {
         self.task = task
         self.cancel = cancel
     }
+
+    static func < (lhs: SchedulerTask, rhs: SchedulerTask) -> Bool {
+        lhs.scheduleTime < rhs.scheduleTime
+    }
+
+    static func == (lhs: SchedulerTask, rhs: SchedulerTask) -> Bool {
+        lhs.scheduleTime == rhs.scheduleTime
+    }
 }
 
 struct Storage: Sendable {
-    var tasks: [SchedulerTask] = []
+    var tasks: SortedArray<SchedulerTask> = .init([])
     var prevTime: UInt32 = 0
 }
 
@@ -44,7 +52,7 @@ final class MockScheduler: Scheduler, Sendable {
         mockTimeProvider = timeProvider
     }
 
-    func schedule(
+    func scheduleImpl(
         delay: TimeInterval,
         repeats: Bool,
         task: @escaping @Sendable () async -> Void,
@@ -55,11 +63,11 @@ final class MockScheduler: Scheduler, Sendable {
         let id = Self.idGenerator.loadThenWrappingIncrement(ordering: .relaxed)
         let task = SchedulerTask(id: id, scheduleTime: scheduleTime, repeats: repeats ? delay : nil, task: task, cancel: onCancel)
         storage.write { storage in
-            storage.tasks.append(task)
+            storage.tasks.insert(task)
         }
         return Cancellable {
             self.storage.mutate { storage in
-                if let index = storage.tasks.firstIndex(where: { $0.id == id }) {
+                if let index = storage.tasks.array.firstIndex(where: { $0.id == id }) {
                     let task = storage.tasks.remove(at: index)
                     task.cancel?()
                 }
@@ -73,37 +81,27 @@ final class MockScheduler: Scheduler, Sendable {
     }
 
     func trigger() async {
+        while await triggerNext() {}
+    }
+
+    func triggerNext() async -> Bool {
         let now = timeProvider.getTime()
-        let tasks = storage.mutate { storage in
-            var tasksToDispatch: [SchedulerTask] = []
-            var remainingTasks: [SchedulerTask] = []
 
-            for task in storage.tasks {
-                if task.scheduleTime <= now {
-                    tasksToDispatch.append(task)
-                } else {
-                    remainingTasks.append(task)
-                }
+        let task: SchedulerTask? = storage.mutate { storage in
+            if let task = storage.tasks.array.first, task.scheduleTime <= now {
+                storage.tasks.remove(at: 0)
+                storage.prevTime = task.scheduleTime
+                return task
             }
-
-            storage.tasks = remainingTasks
-            storage.prevTime = now
-            for task in tasksToDispatch {
-                if let repeats = task.repeats {
-                    storage.tasks.append(SchedulerTask(
-                        id: task.id,
-                        scheduleTime: task.scheduleTime + UInt32(repeats),
-                        repeats: repeats,
-                        task: task.task,
-                        cancel: task.cancel
-                    ))
-                }
-            }
-            return tasksToDispatch
+            return nil
         }
 
-        for task in tasks {
+        if let task {
             await task.task()
+
+            return true
         }
+
+        return false
     }
 }
