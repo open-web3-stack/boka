@@ -17,6 +17,8 @@ struct BlockAuthorTests {
     let storeMiddleware: StoreMiddleware
 
     init() async throws {
+        // setupTestLogger()
+
         config = ProtocolConfigRef.dev
         timeProvider = MockTimeProvider(slotPeriodSeconds: UInt32(config.value.slotPeriodSeconds), time: 1000)
 
@@ -39,8 +41,6 @@ struct BlockAuthorTests {
         )
 
         runtime = Runtime(config: config)
-
-        // setupTestLogger()
     }
 
     @Test
@@ -110,7 +110,7 @@ struct BlockAuthorTests {
 
         #expect(scheduler.storage.value.tasks.count > 0)
 
-        await scheduler.advance(by: 6)
+        await scheduler.advance(by: 1)
 
         let events = await storeMiddleware.wait()
         #expect(events.count == 1)

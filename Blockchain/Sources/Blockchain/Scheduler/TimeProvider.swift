@@ -49,4 +49,8 @@ public final class MockTimeProvider: TimeProvider {
     public func advance(by interval: UInt32) {
         time.write { $0 += interval }
     }
+
+    public func advance(to: UInt32) {
+        time.value = to
+    }
 }

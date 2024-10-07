@@ -35,7 +35,7 @@ extension FixedSizeData: CustomStringConvertible {
         if T.value > 32 {
             let prefix = data.prefix(8).map { String(format: "%02x", $0) }.joined()
             let suffix = data.suffix(8).map { String(format: "%02x", $0) }.joined()
-            return "0x\(prefix)...\(suffix)"
+            return "0x\(prefix)...\(suffix) (\(data.count) bytes)"
         } else {
             return "0x\(data.map { String(format: "%02x", $0) }.joined())"
         }

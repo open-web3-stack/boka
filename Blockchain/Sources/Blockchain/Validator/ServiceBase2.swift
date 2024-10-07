@@ -67,7 +67,7 @@ public class ServiceBase2: ServiceBase, @unchecked Sendable {
     @discardableResult
     public func scheduleForNextEpoch(_ id: UniqueId, fn: @escaping @Sendable (TimeslotIndex) async -> Void) -> Cancellable {
         let now = timeProvider.getTimeslot()
-        let nextEpoch = now.timeslotToEpochIndex(config: config) + 2
+        let nextEpoch = (now + 1).timeslotToEpochIndex(config: config) + 1
         let timeslot = nextEpoch.epochToTimeslotIndex(config: config)
 
         // at end of an epoch, try to determine the block author of next epoch

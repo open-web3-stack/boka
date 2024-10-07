@@ -16,6 +16,8 @@ struct ValidatorServiceTests {
     let storeMiddleware: StoreMiddleware
 
     init() async throws {
+        // setupTestLogger()
+
         config = ProtocolConfigRef.dev
         timeProvider = MockTimeProvider(slotPeriodSeconds: UInt32(config.value.slotPeriodSeconds), time: 1000)
 
@@ -42,8 +44,6 @@ struct ValidatorServiceTests {
             scheduler: scheduler,
             dataProvider: dataProvider
         )
-
-        setupTestLogger()
     }
 
     @Test
@@ -74,7 +74,7 @@ struct ValidatorServiceTests {
         let events = await storeMiddleware.wait()
 
         // Check if a BlockAuthored event was published
-        let blockAuthoredEvent = events.first { $0 is RuntimeEvents.BlockAuthored }
+        let blockAuthoredEvent = events.last { $0 is RuntimeEvents.BlockAuthored }
         #expect(blockAuthoredEvent != nil)
 
         let blockEvent = blockAuthoredEvent as! RuntimeEvents.BlockAuthored
@@ -98,5 +98,20 @@ struct ValidatorServiceTests {
         #expect(try await dataProvider.getBlock(hash: block.hash) == block)
         _ = try await dataProvider.getState(hash: block.hash) // check can get state
         #expect(try await dataProvider.getHeads().contains(block.hash))
+    }
+
+    @Test
+    func makeManyBlocks() async throws {
+        let genesisState = try await dataProvider.getState(hash: Data32())
+
+        await validatorService.on(genesis: genesisState)
+
+        await scheduler.advance(by: UInt32(config.value.slotPeriodSeconds) * 20)
+
+        let events = await storeMiddleware.wait()
+
+        let blockAuthoredEvents = events.filter { $0 is RuntimeEvents.BlockAuthored }
+
+        #expect(blockAuthoredEvents.count == 21)
     }
 }

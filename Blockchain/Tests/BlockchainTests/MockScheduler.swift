@@ -35,7 +35,6 @@ final class SchedulerTask: Sendable, Comparable {
 
 struct Storage: Sendable {
     var tasks: SortedArray<SchedulerTask> = .init([])
-    var prevTime: UInt32 = 0
 }
 
 final class MockScheduler: Scheduler, Sendable {
@@ -76,27 +75,21 @@ final class MockScheduler: Scheduler, Sendable {
     }
 
     func advance(by interval: UInt32) async {
-        mockTimeProvider.advance(by: interval)
-        await trigger()
+        let to = timeProvider.getTime() + interval
+        while await advanceNext(to: to) {}
     }
 
-    func trigger() async {
-        while await triggerNext() {}
-    }
-
-    func triggerNext() async -> Bool {
-        let now = timeProvider.getTime()
-
+    func advanceNext(to time: UInt32) async -> Bool {
         let task: SchedulerTask? = storage.mutate { storage in
-            if let task = storage.tasks.array.first, task.scheduleTime <= now {
+            if let task = storage.tasks.array.first, task.scheduleTime <= time {
                 storage.tasks.remove(at: 0)
-                storage.prevTime = task.scheduleTime
                 return task
             }
             return nil
         }
 
         if let task {
+            mockTimeProvider.advance(to: task.scheduleTime)
             await task.task()
 
             return true

@@ -78,7 +78,7 @@ extension InMemoryDataProvider: BlockchainDataProviderProtocol {
     }
 
     public func updateHead(hash: Data32, parent: Data32) throws {
-        guard heads.remove(parent) != nil else {
+        guard parent == Data32() || heads.remove(parent) != nil else {
             throw BlockchainDataProviderError.noData(hash: parent)
         }
         heads.insert(hash)
