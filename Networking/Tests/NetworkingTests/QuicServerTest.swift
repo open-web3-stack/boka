@@ -10,18 +10,14 @@ import Testing
 #endif
 final class QuicServerTests {
     @Test func start() async throws {
-        do {
-            let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
-            let quicServer = try await QuicServer(
-                config: QuicConfig(
-                    id: "public-key", cert: cert, key: keyFile, alpn: "sample",
-                    ipAddress: "127.0.0.1", port: 4561
-                ), messageHandler: self
-            )
-            try await group.next().scheduleTask(in: .seconds(5)) {}.futureResult.get()
-        } catch {
-            print("Failed to start quic server: \(error)")
-        }
+        let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+        let quicServer = try await QuicServer(
+            config: QuicConfig(
+                id: "public-key", cert: cert, key: keyFile, alpn: "sample",
+                ipAddress: "127.0.0.1", port: 4561
+            ), messageHandler: self
+        )
+        try await group.next().scheduleTask(in: .seconds(5)) {}.futureResult.get()
     }
 }
 
