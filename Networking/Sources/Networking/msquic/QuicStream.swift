@@ -18,7 +18,7 @@ public class QuicStream: @unchecked Sendable {
     private var stream: HQuic?
     private let api: UnsafePointer<QuicApiTable>
     private let connection: HQuic?
-    private var kind: StreamKind
+    public private(set) var kind: StreamKind
     private weak var messageHandler: QuicStreamMessageHandler?
     private var streamCallback: StreamCallback?
     private var sendCompletion: CheckedContinuation<QuicMessage, Error>?
@@ -91,10 +91,6 @@ public class QuicStream: @unchecked Sendable {
             self.stream = nil
         }
         streamLogger.debug("QuicStream close")
-    }
-
-    func getKind() -> StreamKind {
-        kind
     }
 
     func changeTypeToCommon() {

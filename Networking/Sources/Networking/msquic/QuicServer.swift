@@ -75,7 +75,7 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
     {
         var status = QuicStatusCode.internalError.rawValue
         if let (_, stream) = pendingMessages[messageID] {
-            let streamKind = kind ?? stream.getKind()
+            let streamKind = kind ?? stream.kind
             pendingMessages.removeValue(forKey: messageID)
 
             status = stream.respond(with: data, kind: streamKind)
@@ -94,7 +94,7 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
             throw QuicError.messageNotFound
         }
 
-        let streamKind = kind ?? stream.getKind()
+        let streamKind = kind ?? stream.kind
         pendingMessages.removeValue(forKey: messageID)
         return try await send(stream: stream, with: data, kind: streamKind)
     }
