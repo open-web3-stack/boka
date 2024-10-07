@@ -19,7 +19,7 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
 
         super.init(config, eventBus)
 
-        await subscribe(RuntimeEvents.BlockAuthored.self) { [weak self] event in
+        await subscribe(RuntimeEvents.BlockAuthored.self, id: "Blockchain.BlockAuthored") { [weak self] event in
             try await self?.on(blockAuthored: event)
         }
     }
