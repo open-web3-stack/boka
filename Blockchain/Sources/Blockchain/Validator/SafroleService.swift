@@ -44,6 +44,7 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
 
     private func on(blockImported event: RuntimeEvents.BlockImported) async throws {
         if event.isNewEpoch(config: config) {
+            logger.debug("generating tickets for epoch \(event.state.value.timeslot.timeslotToEpochIndex(config: config))")
             try await generateAndSubmitTickets(state: event.state)
         }
     }
