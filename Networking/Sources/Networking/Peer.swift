@@ -40,22 +40,16 @@ public actor Peer {
     }
 
     deinit {
-        closeSync()
-        peerLogger.trace("Peer Deinit")
-    }
-
-    nonisolated func closeSync() {
         Task { [weak self] in
-            await self?.close() // Using weak self to avoid retain cycle
-        }
-    }
+            guard let self else { return }
 
-    private func close() async {
-        for client in clients.values {
-            await client.close()
+            var clients = await self.clients
+            for client in clients.values {
+                await client.close()
+            }
+            clients.removeAll()
+            await self.quicServer.close()
         }
-        clients.removeAll()
-        await quicServer.close()
     }
 
     // Respond to a message with a specific messageID using Data
@@ -66,12 +60,13 @@ public actor Peer {
     // Respond to a message with a specific messageID using PeerMessage
     func respond(to messageID: Int64, with message: any PeerMessage) async -> QuicStatus {
         let messageType = message.getMessageType()
-        return await quicServer
-            .respondGetStatus(
-                to: messageID,
-                with: message.getData(),
-                kind: (messageType == .uniquePersistent) ? .uniquePersistent : .commonEphemeral
-            )
+        return
+            await quicServer
+                .respondGetStatus(
+                    to: messageID,
+                    with: message.getData(),
+                    kind: (messageType == .uniquePersistent) ? .uniquePersistent : .commonEphemeral
+                )
     }
 
     // Respond to a message with a specific messageID using PeerMessage (async throws)
