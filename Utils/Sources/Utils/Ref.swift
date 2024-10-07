@@ -1,6 +1,6 @@
 import Atomics
 
-open class Ref<T: Sendable>: @unchecked Sendable, AtomicReference {
+open class Ref<T: Sendable>: @unchecked Sendable, AtomicReference, CustomStringConvertible {
     public let value: T
 
     public required init(_ value: T) {
@@ -11,6 +11,10 @@ open class Ref<T: Sendable>: @unchecked Sendable, AtomicReference {
         var config = value
         try fn(&config)
         return Self(config)
+    }
+
+    open var description: String {
+        "\(value)"
     }
 }
 

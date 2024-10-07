@@ -17,6 +17,10 @@ public final class BlockRef: Ref<Block>, @unchecked Sendable {
 
     public var header: Header { value.header }
     public var extrinsic: Extrinsic { value.extrinsic }
+
+    override public var description: String {
+        "Block(hash: \(hash), timeslot: \(header.timeslot))"
+    }
 }
 
 extension BlockRef: Codable {

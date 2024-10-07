@@ -118,7 +118,10 @@ public enum Bandersnatch: KeyType {
         ///
         /// Used for ticket claiming during block production.
         public func ietfVRFSign(vrfInputData: Data, auxData: Data = Data()) throws -> Data96 {
-            logger.trace("ietfVRFSign", metadata: ["vrfInputData": "\(vrfInputData.toHexString())", "auxData": "\(auxData.toHexString())"])
+            logger.trace(
+                "ietfVRFSign",
+                metadata: ["vrfInputData": "\(vrfInputData.toDebugHexString())", "auxData": "\(auxData.toDebugHexString())"]
+            )
 
             var output = Data(repeating: 0, count: 96)
 
@@ -140,7 +143,7 @@ public enum Bandersnatch: KeyType {
         }
 
         public func getOutput(vrfInputData: Data) throws -> Data32 {
-            logger.trace("getOutput", metadata: ["vrfInputData": "\(vrfInputData.toHexString())"])
+            logger.trace("getOutput", metadata: ["vrfInputData": "\(vrfInputData.toDebugHexString())"])
 
             var output = Data(repeating: 0, count: 32)
 
@@ -216,7 +219,7 @@ public enum Bandersnatch: KeyType {
         }
 
         public var description: String {
-            "0x\(data.toHexString())"
+            data.description
         }
 
         /// Non-Anonymous VRF signature verification.
@@ -231,9 +234,9 @@ public enum Bandersnatch: KeyType {
             logger.trace(
                 "ietfVRFVerify",
                 metadata: [
-                    "vrfInputData": "\(vrfInputData.toHexString())",
-                    "auxData": "\(auxData.toHexString())",
-                    "signature": "\(signature.data.toHexString())",
+                    "vrfInputData": "\(vrfInputData.toDebugHexString())",
+                    "auxData": "\(auxData.toDebugHexString())",
+                    "signature": "\(signature.data.toDebugHexString())",
                 ]
             )
 
@@ -296,7 +299,10 @@ public enum Bandersnatch: KeyType {
         ///
         /// Used for tickets submission.
         public func ringVRFSign(vrfInputData: Data, auxData: Data = Data()) throws(Error) -> Data784 {
-            logger.trace("ringVRFSign", metadata: ["vrfInputData": "\(vrfInputData.toHexString())", "auxData": "\(auxData.toHexString())"])
+            logger.trace(
+                "ringVRFSign",
+                metadata: ["vrfInputData": "\(vrfInputData.toDebugHexString())", "auxData": "\(auxData.toDebugHexString())"]
+            )
 
             var output = Data(repeating: 0, count: 784)
 
@@ -391,9 +397,9 @@ public enum Bandersnatch: KeyType {
             logger.trace(
                 "ringVRFVerify",
                 metadata: [
-                    "vrfInputData": "\(vrfInputData.toHexString())",
-                    "auxData": "\(auxData.toHexString())",
-                    "signature": "\(signature.data.toHexString())",
+                    "vrfInputData": "\(vrfInputData.toDebugHexString())",
+                    "auxData": "\(auxData.toDebugHexString())",
+                    "signature": "\(signature.data.toDebugHexString())",
                 ]
             )
 

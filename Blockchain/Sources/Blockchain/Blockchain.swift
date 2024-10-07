@@ -29,7 +29,7 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
     }
 
     public func importBlock(_ block: BlockRef) async throws {
-        logger.debug("importing block: \(block.hash)")
+        logger.debug("importing block: #\(block.header.timeslot) \(block.hash)")
 
         try await withSpan("importBlock") { span in
             span.attributes.blockHash = block.hash.description
@@ -42,6 +42,8 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
             try await dataProvider.blockImported(block: block, state: state)
 
             publish(RuntimeEvents.BlockImported(block: block, state: state, parentState: parent))
+
+            logger.info("Block imported: #\(block.header.timeslot) \(block.hash)")
         }
     }
 
