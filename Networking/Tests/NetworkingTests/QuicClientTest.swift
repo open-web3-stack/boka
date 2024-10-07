@@ -30,7 +30,7 @@ final class QuicClientTests {
         for i in 1 ... 10 {
             let messageToPeer2: QuicStatus = try await quicClient.send(
                 data: Data("Hello from Client - Message \(i)".utf8),
-                streamKind: .uniquePersistent
+                streamKind: .commonEphemeral
             )
             print("Client sent message \(i): \(messageToPeer2.isSucceeded ? "Success" : "Failed")")
             let messageToPeer1: QuicStatus = try await quicClient.send(
@@ -40,7 +40,7 @@ final class QuicClientTests {
             print("Client sent message \(i + 10): \(messageToPeer1.isSucceeded ? "Success" : "Failed")")
         }
 
-        try await group.next().scheduleTask(in: .seconds(5)) {
+        try await group.next().scheduleTask(in: .seconds(125)) {
             print("scheduleTask: 5s")
         }.futureResult.get()
     }

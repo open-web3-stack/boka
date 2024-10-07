@@ -181,14 +181,22 @@ extension QuicStream {
             }
             if event.pointee.RECEIVE.Flags.rawValue & QUIC_RECEIVE_FLAG_FIN.rawValue != 0 {
                 streamLogger.warning("[\(String(describing: stream))] FIN received in QUIC stream")
-                quicStream.messageHandler?.didReceiveMessage(quicStream, message: QuicMessage(type: .changeStreamType, data: nil))
-                quicStream.kind = .commonEphemeral
+//                quicStream.messageHandler?.didReceiveMessage(quicStream, message: QuicMessage(type: .changeStreamType, data: nil))
+//                quicStream.kind = .commonEphemeral
             }
+            let messageString = String(
+                [UInt8](receivedData).map { Character(UnicodeScalar($0)) }
+            )
+            streamLogger.info("[\(String(describing: stream))] RECEIVE message \(messageString)")
+
             if receivedData.count > 0 {
                 quicStream.messageHandler?.didReceiveMessage(
                     quicStream, message: QuicMessage(type: .received, data: receivedData)
                 )
             }
+//            streamLogger.info("[\(String(describing: stream))] \(QuicStatus.pending.value)")
+
+//             return QuicStatus.pending
 
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
             streamLogger.warning("[\(String(describing: stream))] Peer send shutdown")
