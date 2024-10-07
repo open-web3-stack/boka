@@ -18,7 +18,7 @@ public actor QuicClient: Sendable, QuicConnectionMessageHandler {
     private let config: QuicConfig
     private weak var messageHandler: QuicClientMessageHandler?
 
-    public init(config: QuicConfig, messageHandler: Peer? = nil) async throws {
+    public init(config: QuicConfig, messageHandler: QuicClientMessageHandler? = nil) async throws {
         self.config = config
         self.messageHandler = messageHandler
         var rawPointer: UnsafeRawPointer?
