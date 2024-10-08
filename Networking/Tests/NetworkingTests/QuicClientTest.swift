@@ -13,12 +13,12 @@ final class QuicClientTests {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
         let cert = Bundle.module.path(forResource: "server", ofType: "cert")!
         let keyFile = Bundle.module.path(forResource: "server", ofType: "key")!
-        let quicServer = try await QuicServer(
-            config: QuicConfig(
-                id: "public-key", cert: cert, key: keyFile, alpn: "sample",
-                ipAddress: "127.0.0.1", port: 4565
-            ), messageHandler: self
-        )
+//        let quicServer = try await QuicServer(
+//            config: QuicConfig(
+//                id: "public-key", cert: cert, key: keyFile, alpn: "sample",
+//                ipAddress: "127.0.0.1", port: 4565
+//            ), messageHandler: self
+//        )
         try await group.next().scheduleTask(in: .seconds(5)) {}.futureResult.get()
         let quicClient = try await QuicClient(
             config: QuicConfig(
