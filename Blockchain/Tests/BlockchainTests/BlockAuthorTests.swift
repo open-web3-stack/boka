@@ -20,7 +20,7 @@ struct BlockAuthorTests {
         // setupTestLogger()
 
         config = ProtocolConfigRef.dev
-        timeProvider = MockTimeProvider(slotPeriodSeconds: UInt32(config.value.slotPeriodSeconds), time: 1000)
+        timeProvider = MockTimeProvider(time: 988)
 
         dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesis: StateRef(State.devGenesis(config: config))))
 
@@ -47,15 +47,17 @@ struct BlockAuthorTests {
     func createNewBlockWithFallbackKey() async throws {
         let genesisState = try await dataProvider.getState(hash: Data32())
 
+        let timeslot = timeProvider.getTime().timeToTimeslot(config: config)
+
         // get the validator key
-        let idx = scheduler.timeProvider.getTimeslot() % UInt32(config.value.totalNumberOfValidators)
+        let idx = timeslot % UInt32(config.value.totalNumberOfValidators)
         let devKey = try DevKeyStore.getDevKey(seed: idx)
 
         // Create a new block
-        let block = try await blockAuthor.createNewBlock(claim: .right(devKey.bandersnatch))
+        let block = try await blockAuthor.createNewBlock(timeslot: timeslot, claim: .right(devKey.bandersnatch))
 
         // Verify block
-        try _ = runtime.apply(block: block, state: genesisState, context: .init(timeslot: timeProvider.getTimeslot() + 1))
+        try _ = runtime.apply(block: block, state: genesisState, context: .init(timeslot: timeslot + 1))
     }
 
     @Test
@@ -68,8 +70,10 @@ struct BlockAuthorTests {
             ctx: Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
         ).data
 
+        let timeslot = timeProvider.getTime().timeToTimeslot(config: config)
+
         // get the validator key
-        let idx = scheduler.timeProvider.getTimeslot() % UInt32(config.value.epochLength)
+        let idx = timeslot % UInt32(config.value.epochLength)
         let devKey = try DevKeyStore.getDevKey(seed: idx % UInt32(config.value.totalNumberOfValidators))
         let secretKey = await keystore.get(Bandersnatch.self, publicKey: devKey.bandersnatch)!
 
@@ -96,10 +100,10 @@ struct BlockAuthorTests {
         try await dataProvider.add(state: newStateRef)
 
         // Create a new block
-        let block = try await blockAuthor.createNewBlock(claim: .left((ticket, devKey.bandersnatch)))
+        let block = try await blockAuthor.createNewBlock(timeslot: timeslot, claim: .left((ticket, devKey.bandersnatch)))
 
         // Verify block
-        try _ = runtime.apply(block: block, state: newStateRef, context: .init(timeslot: timeProvider.getTimeslot() + 1))
+        try _ = runtime.apply(block: block, state: newStateRef, context: .init(timeslot: timeslot + 1))
     }
 
     @Test
@@ -110,7 +114,7 @@ struct BlockAuthorTests {
 
         #expect(scheduler.storage.value.tasks.count > 0)
 
-        await scheduler.advance(by: 1)
+        await scheduler.advance(by: 2)
 
         let events = await storeMiddleware.wait()
         #expect(events.count == 1)
@@ -118,8 +122,10 @@ struct BlockAuthorTests {
 
         let block = events.first as! RuntimeEvents.BlockAuthored
 
+        let timeslot = timeProvider.getTime().timeToTimeslot(config: config)
+
         // Verify block
-        try _ = runtime.apply(block: block.block, state: genesisState, context: .init(timeslot: timeProvider.getTimeslot() + 1))
+        try _ = runtime.apply(block: block.block, state: genesisState, context: .init(timeslot: timeslot + 1))
     }
 
     // TODO: test including extrinsic tickets from extrinsic pool

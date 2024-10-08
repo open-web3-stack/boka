@@ -3,8 +3,6 @@ import Foundation
 import TracingUtils
 import Utils
 
-private let logger = Logger(label: "BlockAuthor")
-
 public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
     private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore
@@ -24,27 +22,32 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         self.keystore = keystore
         self.extrinsicPool = extrinsicPool
 
-        super.init(config, eventBus, scheduler)
+        super.init(logger: Logger(label: "BlockAuthor"), config: config, eventBus: eventBus, scheduler: scheduler)
 
         await subscribe(RuntimeEvents.SafroleTicketsGenerated.self, id: "BlockAuthor.SafroleTicketsGenerated") { [weak self] event in
             try await self?.on(safroleTicketsGenerated: event)
         }
 
-        scheduleForNextEpoch("BlockAuthor.scheduleForNextEpoch") { [weak self] timeslot in
-            await self?.onBeforeEpoch(timeslot: timeslot)
+        scheduleForNextEpoch("BlockAuthor.scheduleForNextEpoch") { [weak self] epoch in
+            await self?.onBeforeEpoch(epoch: epoch)
         }
     }
 
     public func on(genesis state: StateRef) async {
-        await scheduleNewBlocks(ticketsOrKeys: state.value.safroleState.ticketsOrKeys, timeslot: timeProvider.getTimeslot())
+        await scheduleNewBlocks(
+            ticketsOrKeys: state.value.safroleState.ticketsOrKeys,
+            timeslot: timeProvider.getTime().timeToTimeslot(config: config)
+        )
     }
 
-    public func createNewBlock(claim: Either<(TicketItemAndOutput, Bandersnatch.PublicKey), Bandersnatch.PublicKey>) async throws
+    public func createNewBlock(
+        timeslot: TimeslotIndex,
+        claim: Either<(TicketItemAndOutput, Bandersnatch.PublicKey), Bandersnatch.PublicKey>
+    ) async throws
         -> BlockRef
     {
         let parentHash = dataProvider.bestHead
         let state = try await dataProvider.getState(hash: parentHash)
-        let timeslot = timeProvider.getTimeslot()
         let epoch = timeslot.timeslotToEpochIndex(config: config)
 
         let pendingTickets = await extrinsicPool.getPendingTickets(epoch: epoch)
@@ -146,9 +149,13 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         return BlockRef(block)
     }
 
-    private func newBlock(claim: Either<(TicketItemAndOutput, Bandersnatch.PublicKey), Bandersnatch.PublicKey>) async {
+    private func newBlock(
+        timeslot: TimeslotIndex,
+        claim: Either<(TicketItemAndOutput, Bandersnatch.PublicKey), Bandersnatch.PublicKey>
+    ) async {
         await withSpan("BlockAuthor.newBlock", logger: logger) { _ in
-            let block = try await createNewBlock(claim: claim)
+            // TODO: add timeout
+            let block = try await createNewBlock(timeslot: timeslot, claim: claim)
             logger.info("New block created: #\(block.header.timeslot) \(block.hash)")
             publish(RuntimeEvents.BlockAuthored(block: block))
         }
@@ -158,10 +165,11 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         tickets.write { $0.append(event) }
     }
 
-    private func onBeforeEpoch(timeslot: TimeslotIndex) async {
-        logger.debug("scheduling new blocks for epoch \(timeslot.timeslotToEpochIndex(config: config))")
+    private func onBeforeEpoch(epoch: EpochIndex) async {
+        logger.debug("scheduling new blocks for epoch \(epoch)")
         await withSpan("BlockAuthor.onBeforeEpoch", logger: logger) { _ in
             tickets.value = []
+            let timeslot = epoch.epochToTimeslotIndex(config: config)
 
             let bestHead = dataProvider.bestHead
             let state = try await dataProvider.getState(hash: bestHead)
@@ -179,10 +187,11 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         }
     }
 
-    private func scheduleNewBlocks(ticketsOrKeys: SafroleTicketsOrKeys, timeslot now: TimeslotIndex) async {
+    private func scheduleNewBlocks(ticketsOrKeys: SafroleTicketsOrKeys, timeslot base: TimeslotIndex) async {
         let selfTickets = tickets.value
-        let epochBase = now.timeslotToEpochIndex(config: config)
+        let epochBase = base.timeslotToEpochIndex(config: config)
         let timeslotBase = epochBase.epochToTimeslotIndex(config: config)
+        let now = timeProvider.getTimeInterval()
         switch ticketsOrKeys {
         case let .left(tickets):
             if selfTickets.isEmpty {
@@ -191,13 +200,15 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
             for (idx, ticket) in tickets.enumerated() {
                 if let claim = selfTickets.first(withOutput: ticket.id) {
                     let timeslot = timeslotBase + TimeslotIndex(idx)
-                    if timeslot <= now {
+                    let time = config.scheduleTimeForAuthoring(timeslot: timeslot)
+                    let delay = time - now
+                    if delay < 0 {
                         continue
                     }
                     logger.debug("Scheduling new block task at timeslot \(timeslot)")
-                    schedule(id: "BlockAuthor.newBlock", at: timeslot) { [weak self] in
+                    schedule(id: "BlockAuthor.newBlock", delay: delay) { [weak self] in
                         if let self {
-                            await newBlock(claim: .left(claim))
+                            await newBlock(timeslot: timeslot, claim: .left(claim))
                         }
                     }
                 }
@@ -207,13 +218,15 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
                 let pubkey = try? Bandersnatch.PublicKey(data: key)
                 if let pubkey, await keystore.contains(publicKey: pubkey) {
                     let timeslot = timeslotBase + TimeslotIndex(idx)
-                    if timeslot < now {
+                    let time = config.scheduleTimeForAuthoring(timeslot: timeslot)
+                    let delay = time - now
+                    if delay < 0 {
                         continue
                     }
                     logger.debug("Scheduling new block task at timeslot \(timeslot)")
-                    schedule(id: "BlockAuthor.newBlock", at: timeslot) { [weak self] in
+                    schedule(id: "BlockAuthor.newBlock", delay: delay) { [weak self] in
                         if let self {
-                            await newBlock(claim: .right(pubkey))
+                            await newBlock(timeslot: timeslot, claim: .right(pubkey))
                         }
                     }
                 }
