@@ -16,7 +16,7 @@ struct ValidatorServiceTests {
     let storeMiddleware: StoreMiddleware
 
     init() async throws {
-        setupTestLogger()
+        // setupTestLogger()
 
         config = ProtocolConfigRef.dev
         timeProvider = MockTimeProvider(time: 988)
