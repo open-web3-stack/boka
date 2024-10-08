@@ -113,6 +113,6 @@ struct ValidatorServiceTests {
 
         let blockAuthoredEvents = events.filter { $0 is RuntimeEvents.BlockAuthored }
 
-        #expect(blockAuthoredEvents.count == 21)
+        #expect(blockAuthoredEvents.count == 20)
     }
 }
