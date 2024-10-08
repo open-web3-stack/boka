@@ -132,7 +132,6 @@ public class QuicStream: @unchecked Sendable {
         // Use the provided kind if available, otherwise use the stream's kind
         let effectiveKind = kind ?? self.kind
         let flags = (effectiveKind == .uniquePersistent) ? QUIC_SEND_FLAG_NONE : QUIC_SEND_FLAG_FIN
-//        streamLogger.info("stream response flags: \((effectiveKind == .uniquePersistent) ? "QUIC_SEND_FLAG_NONE" : "QUIC_SEND_FLAG_FIN")")
         status = api.pointee.StreamSend(stream, sendBuffer, 1, QUIC_SEND_FLAG_NONE, sendBufferRaw)
         if status.isFailed {
             streamLogger.error("StreamSend failed, \(status)!")
