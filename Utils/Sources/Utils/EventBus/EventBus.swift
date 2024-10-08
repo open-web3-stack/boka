@@ -5,10 +5,8 @@ import TracingUtils
 private let logger = Logger(label: "EventBus")
 
 public actor EventBus: Sendable {
-    private static let idGenerator = ManagedAtomic<Int>(0)
-
     public struct SubscriptionToken: Hashable, Sendable {
-        fileprivate let id: Int
+        fileprivate let id: UniqueId
         fileprivate let eventTypeId: ObjectIdentifier
 
         public func hash(into hasher: inout Hasher) {
@@ -46,9 +44,13 @@ public actor EventBus: Sendable {
         self.handlerMiddleware = handlerMiddleware
     }
 
-    public func subscribe<T: Event>(_ eventType: T.Type, handler: @escaping @Sendable (T) async throws -> Void) -> SubscriptionToken {
+    public func subscribe<T: Event>(
+        _ eventType: T.Type,
+        id: UniqueId = "",
+        handler: @escaping @Sendable (T) async throws -> Void
+    ) -> SubscriptionToken {
         let key = ObjectIdentifier(eventType)
-        let token = SubscriptionToken(id: EventBus.idGenerator.loadThenWrappingIncrement(ordering: .relaxed), eventTypeId: key)
+        let token = SubscriptionToken(id: id, eventTypeId: key)
 
         handlers[key, default: []].append(AnyEventHandler(token, handler))
 
@@ -83,8 +85,12 @@ public actor EventBus: Sendable {
                     return
                 }
                 for handler in eventHandlers {
-                    try await handlerMiddleware.handle(event) { evt in
-                        try await handler.handle(evt)
+                    do {
+                        try await handlerMiddleware.handle(event) { evt in
+                            try await handler.handle(evt)
+                        }
+                    } catch {
+                        logger.warning("Unhandled error for event: \(event) with error: \(error) and handler: \(handler.token.id)")
                     }
                 }
             }

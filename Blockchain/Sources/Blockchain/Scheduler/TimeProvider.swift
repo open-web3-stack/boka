@@ -2,55 +2,39 @@ import Foundation
 import Utils
 
 public protocol TimeProvider: Sendable {
-    var slotPeriodSeconds: UInt32 { get }
-
-    func getTime() -> UInt32
+    func getTimeInterval() -> TimeInterval
 }
 
 extension TimeProvider {
-    public func getTimeslot() -> TimeslotIndex {
-        timeToTimeslot(getTime())
-    }
-
-    public func timeslotToTime(_ timeslot: TimeslotIndex) -> UInt32 {
-        timeslot * slotPeriodSeconds
-    }
-
-    public func timeToTimeslot(_ time: UInt32) -> TimeslotIndex {
-        time / slotPeriodSeconds
+    public func getTime() -> UInt32 {
+        UInt32(getTimeInterval())
     }
 }
 
 public final class SystemTimeProvider: TimeProvider {
-    public let slotPeriodSeconds: UInt32
+    public init() {}
 
-    public init(slotPeriodSeconds: UInt32) {
-        self.slotPeriodSeconds = slotPeriodSeconds
-    }
-
-    public func getTime() -> UInt32 {
+    public func getTimeInterval() -> TimeInterval {
         Date().timeIntervalSinceJamCommonEra
     }
 }
 
 public final class MockTimeProvider: TimeProvider {
-    public let slotPeriodSeconds: UInt32
-    public let time: ThreadSafeContainer<UInt32>
+    public let time: ThreadSafeContainer<TimeInterval>
 
-    public init(slotPeriodSeconds: UInt32, time: UInt32 = 0) {
-        self.slotPeriodSeconds = slotPeriodSeconds
+    public init(time: TimeInterval = 0) {
         self.time = ThreadSafeContainer(time)
     }
 
-    public func getTime() -> UInt32 {
+    public func getTimeInterval() -> TimeInterval {
         time.value
     }
 
-    public func advance(by interval: UInt32) {
+    public func advance(by interval: TimeInterval) {
         time.write { $0 += interval }
     }
 
-    public func advance(to: UInt32) {
+    public func advance(to: TimeInterval) {
         time.value = to
     }
 }

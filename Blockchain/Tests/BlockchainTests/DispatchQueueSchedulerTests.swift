@@ -6,7 +6,7 @@ import Utils
 
 struct DispatchQueueSchedulerTests {
     let scheduler = DispatchQueueScheduler(
-        timeProvider: SystemTimeProvider(slotPeriodSeconds: 6),
+        timeProvider: SystemTimeProvider(),
         queue: .global(qos: .userInteractive) // to get higher priority so results are more deterministic
     )
 

@@ -5,14 +5,14 @@ import Utils
 
 final class SchedulerTask: Sendable, Comparable {
     let id: Int
-    let scheduleTime: UInt32
+    let scheduleTime: TimeInterval
     let repeats: TimeInterval?
     let task: @Sendable () async -> Void
     let cancel: (@Sendable () -> Void)?
 
     init(
         id: Int,
-        scheduleTime: UInt32,
+        scheduleTime: TimeInterval,
         repeats: TimeInterval?,
         task: @escaping @Sendable () async -> Void,
         cancel: (@Sendable () -> Void)?
@@ -57,8 +57,8 @@ final class MockScheduler: Scheduler, Sendable {
         task: @escaping @Sendable () async -> Void,
         onCancel: (@Sendable () -> Void)?
     ) -> Cancellable {
-        let now = timeProvider.getTime()
-        let scheduleTime = now + UInt32(delay)
+        let now = timeProvider.getTimeInterval()
+        let scheduleTime = now + delay
         let id = Self.idGenerator.loadThenWrappingIncrement(ordering: .relaxed)
         let task = SchedulerTask(id: id, scheduleTime: scheduleTime, repeats: repeats ? delay : nil, task: task, cancel: onCancel)
         storage.write { storage in
@@ -74,12 +74,12 @@ final class MockScheduler: Scheduler, Sendable {
         }
     }
 
-    func advance(by interval: UInt32) async {
-        let to = timeProvider.getTime() + interval
+    func advance(by interval: TimeInterval) async {
+        let to = timeProvider.getTimeInterval() + interval
         while await advanceNext(to: to) {}
     }
 
-    func advanceNext(to time: UInt32) async -> Bool {
+    func advanceNext(to time: TimeInterval) async -> Bool {
         let task: SchedulerTask? = storage.mutate { storage in
             if let task = storage.tasks.array.first, task.scheduleTime <= time {
                 storage.tasks.remove(at: 0)
