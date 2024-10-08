@@ -7,9 +7,9 @@ extension Date {
         1_704_110_400
     }
 
-    public var timeIntervalSinceJamCommonEra: UInt32 {
+    public var timeIntervalSinceJamCommonEra: TimeInterval {
         let beginning = Double(Date.jamCommonEraBeginning)
         let now = timeIntervalSince1970
-        return UInt32(now - beginning)
+        return now - beginning
     }
 }

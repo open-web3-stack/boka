@@ -19,7 +19,7 @@ struct ExtrinsicPoolServiceTests {
         config = ProtocolConfigRef.dev.mutate { config in
             config.ticketEntriesPerValidator = 4
         }
-        timeProvider = MockTimeProvider(slotPeriodSeconds: UInt32(config.value.slotPeriodSeconds), time: 1000)
+        timeProvider = MockTimeProvider(time: 1000)
 
         dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesis: StateRef(State.devGenesis(config: config))))
 

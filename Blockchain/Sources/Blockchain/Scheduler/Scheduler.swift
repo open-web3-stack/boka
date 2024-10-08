@@ -42,35 +42,19 @@ extension Scheduler {
         task: @escaping @Sendable () async -> Void,
         onCancel: (@Sendable () -> Void)? = nil
     ) -> Cancellable {
-        logger.trace("scheduling task: \(id)", metadata: ["delay": "\(delay)", "repeats": "\(repeats)"])
+        guard delay >= 0 else {
+            logger.error("scheduling task with negative delay", metadata: ["id": "\(id)", "delay": "\(delay)", "repeats": "\(repeats)"])
+            return Cancellable {}
+        }
+        logger.trace("scheduling task", metadata: ["id": "\(id)", "delay": "\(delay)", "repeats": "\(repeats)"])
         let cancellable = scheduleImpl(delay: delay, repeats: repeats, task: {
-            logger.trace("executing task: \(id)")
+            logger.trace("executing task", metadata: ["id": "\(id)"])
             await task()
         }, onCancel: onCancel)
         return Cancellable {
-            logger.trace("cancelling task: \(id)")
+            logger.trace("cancelling task", metadata: ["id": "\(id)"])
             cancellable.cancel()
         }
-    }
-
-    public func schedule(
-        id: UniqueId = "",
-        at timeslot: TimeslotIndex,
-        task: @escaping @Sendable () async -> Void,
-        onCancel: (@Sendable () -> Void)? = nil
-    ) -> Cancellable {
-        let nowTimeslot = timeProvider.getTimeslot()
-        if timeslot == nowTimeslot {
-            return schedule(id: id, delay: 0, repeats: false, task: task, onCancel: onCancel)
-        }
-
-        let deadline = timeProvider.timeslotToTime(timeslot)
-        let now = timeProvider.getTime()
-        if deadline < now {
-            logger.error("scheduling task in the past", metadata: ["deadline": "\(deadline)", "now": "\(now)"])
-            return Cancellable {}
-        }
-        return schedule(id: id, delay: TimeInterval(deadline - now), repeats: false, task: task, onCancel: onCancel)
     }
 }
 
