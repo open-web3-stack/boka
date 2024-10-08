@@ -35,7 +35,7 @@ struct Message: PeerMessage {
 let cert = Bundle.module.path(forResource: "server", ofType: "cert")!
 let keyFile = Bundle.module.path(forResource: "server", ofType: "key")!
 
-final actor PeerTests {
+final class PeerTests {
     @Test func testPeerCommunication() async throws {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
         let eventBus1 = EventBus()
