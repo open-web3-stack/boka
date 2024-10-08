@@ -6,8 +6,8 @@ import Utils
 let serverLogger: Logger = .init(label: "QuicServer")
 
 public protocol QuicServerMessageHandler: AnyObject, Sendable {
-    func didReceiveMessage(server: QuicServer, messageID: Int64, message: QuicMessage) async
-    func didReceiveError(server: QuicServer, messageID: Int64, error: QuicError) async
+    func didReceiveMessage(server: QuicServer, messageID: String, message: QuicMessage) async
+    func didReceiveError(server: QuicServer, messageID: String, error: QuicError) async
 }
 
 public actor QuicServer: Sendable, QuicListenerMessageHandler {
@@ -17,7 +17,7 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
     private var listener: QuicListener?
     private let config: QuicConfig
     private weak var messageHandler: QuicServerMessageHandler?
-    private var pendingMessages: [Int64: (QuicConnection, QuicStream)]
+    private var pendingMessages: [String: (QuicConnection, QuicStream)]
 
     init(config: QuicConfig, messageHandler: QuicServerMessageHandler? = nil) async throws {
         self.config = config
@@ -70,14 +70,14 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
     }
 
     // Respond to a message with a specific messageID using Data
-    func respondGetStatus(to messageID: Int64, with data: Data, kind: StreamKind? = nil) async
+    func respondGetStatus(to messageID: String, with data: Data, kind: StreamKind? = nil) async
         -> QuicStatus
     {
         var status = QuicStatusCode.internalError.rawValue
         if let (_, stream) = pendingMessages[messageID] {
             let streamKind = kind ?? stream.kind
             pendingMessages.removeValue(forKey: messageID)
-            status = stream.respond(with: data, kind: streamKind)
+            status = stream.send(with: data, kind: streamKind)
         } else {
             serverLogger.error("Message not found")
         }
@@ -89,9 +89,8 @@ public actor QuicServer: Sendable, QuicListenerMessageHandler {
     ) async {
         switch message.type {
         case .received:
-            let messageID = Int64(Date().timeIntervalSince1970 * 1000)
+            let messageID = UUID().uuidString
             pendingMessages[messageID] = (connection, stream)
-
             // Call messageHandler safely in the actor context
             Task { [weak self] in
                 guard let self else { return }

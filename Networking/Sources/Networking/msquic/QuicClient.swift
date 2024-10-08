@@ -64,7 +64,7 @@ public actor QuicClient: Sendable, QuicConnectionMessageHandler {
             } else {
                 try await connection.createCommonEphemeralStream()
             }
-        return sendStream.respond(with: data, kind: streamKind)
+        return sendStream.send(with: data, kind: streamKind)
     }
 
     func getNetAddr() -> NetAddr {

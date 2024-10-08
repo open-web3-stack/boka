@@ -56,12 +56,6 @@ actor StreamManager {
         }
     }
 
-    func changeTypeToCommon(_ stream: QuicStream) {
-        removeStream(stream)
-        stream.changeTypeToCommon()
-        addCommonStream(stream)
-    }
-
     func closeAllCommonStreams() {
         for stream in commonStreams {
             stream.close()
@@ -242,7 +236,6 @@ extension QuicConnection {
                         stream: nil,
                         message: QuicMessage(type: .shutdownComplete, data: nil)
                     )
-                    quicConnection.messageHandler = nil
                 }
             }
 
@@ -279,12 +272,6 @@ extension QuicConnection: QuicStreamMessageHandler {
                 stream.close()
                 await streamManager.removeStream(stream)
             }
-        case .changeStreamType:
-            Task {
-                if stream.kind == .uniquePersistent {
-                    await streamManager.changeTypeToCommon(stream)
-                }
-            }
         default:
             break
         }
@@ -298,8 +285,11 @@ extension QuicConnection: QuicStreamMessageHandler {
     }
 
     // Handles errors received from the stream
-    public func didReceiveError(_: QuicStream, error: QuicError) {
+    public func didReceiveError(_ stream: QuicStream, error: QuicError) {
         logger.error("Failed to receive message: \(error)")
-        //       await  messageHandler?.didReceiveError(connection: self, stream: stream, error: error)
+        Task { [weak self] in
+            guard let self else { return }
+            await messageHandler?.didReceiveError(connection: self, stream: stream, error: error)
+        }
     }
 }

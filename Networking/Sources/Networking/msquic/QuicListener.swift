@@ -130,7 +130,6 @@ public class QuicListener: @unchecked Sendable {
                 await listener.connectionsManager.add(quicConnection)
             }
             status = quicConnection.setCallbackHandler()
-
         default:
             break
         }

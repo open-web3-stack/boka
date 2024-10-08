@@ -18,7 +18,7 @@ public class QuicStream: @unchecked Sendable {
     private var stream: HQuic?
     private let api: UnsafePointer<QuicApiTable>
     private let connection: HQuic?
-    public private(set) var kind: StreamKind
+    public let kind: StreamKind
     private weak var messageHandler: QuicStreamMessageHandler?
     private var streamCallback: StreamCallback?
     //    private var sendCompletion: CheckedContinuation<QuicMessage, Error>?
@@ -93,10 +93,6 @@ public class QuicStream: @unchecked Sendable {
         streamLogger.debug("QuicStream close")
     }
 
-    func changeTypeToCommon() {
-        kind = .commonEphemeral
-    }
-
     // Sets the callback handler for the stream
     func setCallbackHandler() {
         guard let stream else {
@@ -114,8 +110,8 @@ public class QuicStream: @unchecked Sendable {
         )
     }
 
-    func respond(with data: Data, kind: StreamKind? = nil) -> QuicStatus {
-        streamLogger.info("[\(String(describing: stream))] Respond data...")
+    func send(with data: Data, kind: StreamKind? = nil) -> QuicStatus {
+        streamLogger.info("[\(String(describing: stream))] Sending data...")
         var status = QuicStatusCode.success.rawValue
         let messageLength = data.count
 
@@ -136,8 +132,8 @@ public class QuicStream: @unchecked Sendable {
         // Use the provided kind if available, otherwise use the stream's kind
         let effectiveKind = kind ?? self.kind
         let flags = (effectiveKind == .uniquePersistent) ? QUIC_SEND_FLAG_NONE : QUIC_SEND_FLAG_FIN
-        streamLogger.info("stream response flags: \((effectiveKind == .uniquePersistent) ? "QUIC_SEND_FLAG_NONE" : "QUIC_SEND_FLAG_FIN")")
-        status = api.pointee.StreamSend(stream, sendBuffer, 1, flags, sendBufferRaw)
+//        streamLogger.info("stream response flags: \((effectiveKind == .uniquePersistent) ? "QUIC_SEND_FLAG_NONE" : "QUIC_SEND_FLAG_FIN")")
+        status = api.pointee.StreamSend(stream, sendBuffer, 1, QUIC_SEND_FLAG_NONE, sendBufferRaw)
         if status.isFailed {
             streamLogger.error("StreamSend failed, \(status)!")
             let shutdown: QuicStatus =
@@ -181,29 +177,18 @@ extension QuicStream {
             }
             if event.pointee.RECEIVE.Flags.rawValue & QUIC_RECEIVE_FLAG_FIN.rawValue != 0 {
                 streamLogger.warning("[\(String(describing: stream))] FIN received in QUIC stream")
-//                quicStream.messageHandler?.didReceiveMessage(quicStream, message: QuicMessage(type: .changeStreamType, data: nil))
-//                quicStream.kind = .commonEphemeral
             }
-            let messageString = String(
-                [UInt8](receivedData).map { Character(UnicodeScalar($0)) }
-            )
-            streamLogger.info("[\(String(describing: stream))] RECEIVE message \(messageString)")
 
             if receivedData.count > 0 {
                 quicStream.messageHandler?.didReceiveMessage(
                     quicStream, message: QuicMessage(type: .received, data: receivedData)
                 )
             }
-//            streamLogger.info("[\(String(describing: stream))] \(QuicStatus.pending.value)")
-
-//             return QuicStatus.pending
 
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
             streamLogger.warning("[\(String(describing: stream))] Peer send shutdown")
-            if quicStream.kind == .uniquePersistent {
-                status =
-                    quicStream.api.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0)
-            }
+            status =
+                quicStream.api.pointee.StreamShutdown(stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0)
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
             streamLogger.error("[\(String(describing: stream))] Peer send aborted")

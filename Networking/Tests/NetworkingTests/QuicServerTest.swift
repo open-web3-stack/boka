@@ -22,7 +22,7 @@ final class QuicServerTests {
 }
 
 extension QuicServerTests: QuicServerMessageHandler {
-    func didReceiveMessage(server: QuicServer, messageID: Int64, message: QuicMessage) async {
+    func didReceiveMessage(server: QuicServer, messageID: String, message: QuicMessage) async {
         switch message.type {
         case .received:
             let messageString = String(
@@ -39,7 +39,7 @@ extension QuicServerTests: QuicServerMessageHandler {
         }
     }
 
-    func didReceiveError(server _: QuicServer, messageID _: Int64, error: QuicError) async {
+    func didReceiveError(server _: QuicServer, messageID _: String, error: QuicError) async {
         print("Server error: \(error)")
     }
 }

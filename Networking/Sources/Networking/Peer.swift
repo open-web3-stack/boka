@@ -15,13 +15,13 @@ public protocol PeerMessage: Equatable, Sendable {
 }
 
 public struct PeerMessageReceived: Event {
-    public let messageID: Int64
+    public let messageID: String
     public let message: QuicMessage
 }
 
 // TODO: add error or remove it
 public struct PeerErrorReceived: Event {
-    public let messageID: Int64?
+    public let messageID: String?
     public let error: QuicError
 }
 
@@ -53,12 +53,12 @@ public actor Peer {
     }
 
     // Respond to a message with a specific messageID using Data
-    func respond(to messageID: Int64, with data: Data) async -> QuicStatus {
+    func respond(to messageID: String, with data: Data) async -> QuicStatus {
         await quicServer.respondGetStatus(to: messageID, with: data)
     }
 
     // Respond to a message with a specific messageID using PeerMessage
-    func respond(to messageID: Int64, with message: any PeerMessage) async -> QuicStatus {
+    func respond(to messageID: String, with message: any PeerMessage) async -> QuicStatus {
         let messageType = message.getMessageType()
         return
             await quicServer
@@ -69,56 +69,12 @@ public actor Peer {
                 )
     }
 
-//    // Respond to a message with a specific messageID using PeerMessage (async throws)
-//    func respond(to messageID: Int64, with message: any PeerMessage) async throws {
-//        let messageType = message.getMessageType()
-//        let quicMessage = try await quicServer.respondGetMessage(
-//            to: messageID, with: message.getData(),
-//            kind: (messageType == .uniquePersistent) ? .uniquePersistent : .commonEphemeral
-//        )
-//        if quicMessage.type != .received {
-//            throw QuicError.sendFailed
-//        }
-//    }
-
-//    // Sends a message to another peer asynchronously
-//    func sendMessage(to peer: NetAddr, with message: any PeerMessage) async throws -> QuicMessage {
-//        let buffer = message.getData()
-//        let messageType = message.getMessageType()
-//        return try await sendDataToPeer(buffer, to: peer, messageType: messageType)
-//    }
-
     // Sends a message to another peer and returns the status
     func sendMessage(to peer: NetAddr, with message: any PeerMessage) async throws -> QuicStatus {
         let buffer = message.getData()
         let messageType = message.getMessageType()
         return try await sendDataToPeer(buffer, to: peer, messageType: messageType)
     }
-
-//    // send message to other peer wait for response quicMessage
-//    private func sendDataToPeer(_ data: Data, to peerAddr: NetAddr, messageType: PeerMessageType)
-//        async throws -> QuicMessage
-//    {
-//        if let client = clients[peerAddr] {
-//            // Client already exists, use it to send the data
-//            return try await client.send(
-//                message: data,
-//                streamKind: messageType == .uniquePersistent ? .uniquePersistent : .commonEphemeral
-//            )
-//        } else {
-//            let config = QuicConfig(
-//                id: config.id, cert: config.cert, key: config.key, alpn: config.alpn,
-//                ipAddress: peerAddr.ipAddress, port: peerAddr.port
-//            )
-//            // Client does not exist, create a new one
-//            let client = try await QuicClient(config: config, messageHandler: self)
-//            clients[peerAddr] = client
-//            return try await client.send(
-//                message: data,
-//                streamKind: messageType == .uniquePersistent ? .uniquePersistent : .commonEphemeral
-//            )
-//        }
-//    }
 
     private func sendDataToPeer(_ data: Data, to peerAddr: NetAddr, messageType: PeerMessageType)
         async throws -> QuicStatus
@@ -174,7 +130,7 @@ extension Peer: QuicClientMessageHandler {
 
 // QuicServerMessageHandler methods
 extension Peer: QuicServerMessageHandler {
-    public func didReceiveMessage(server _: QuicServer, messageID: Int64, message: QuicMessage) async {
+    public func didReceiveMessage(server _: QuicServer, messageID: String, message: QuicMessage) async {
         switch message.type {
         case .received:
             await eventBus.publish(PeerMessageReceived(messageID: messageID, message: message))
@@ -185,7 +141,7 @@ extension Peer: QuicServerMessageHandler {
         }
     }
 
-    public func didReceiveError(server _: QuicServer, messageID: Int64, error: QuicError) async {
+    public func didReceiveError(server _: QuicServer, messageID: String, error: QuicError) async {
         peerLogger.error("Failed to receive message: \(error)")
         await eventBus.publish(PeerErrorReceived(messageID: messageID, error: error))
     }

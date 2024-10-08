@@ -16,11 +16,11 @@ public struct QuicConfig: Sendable {
     ) throws {
         // Initialize QUIC settings
         var settings = QuicSettings()
-        settings.IdleTimeoutMs = 10000
+        settings.IdleTimeoutMs = 30000
         settings.IsSet.IdleTimeoutMs = 1
         settings.ServerResumptionLevel = 2 // QUIC_SERVER_RESUME_AND_ZERORTT
         settings.IsSet.ServerResumptionLevel = 1
-        settings.PeerBidiStreamCount = 1
+        settings.PeerBidiStreamCount = 100
         settings.IsSet.PeerBidiStreamCount = 1
 
         // Use withCString to avoid manual memory management
