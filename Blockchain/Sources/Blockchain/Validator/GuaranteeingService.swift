@@ -2,8 +2,6 @@ import Foundation
 import TracingUtils
 import Utils
 
-private let logger = Logger(label: "BlockAuthor")
-
 // find out when and which core we are guaranteeing for and schedule a task for it
 // get work package from the pool
 // try to guarantee the work package
@@ -30,7 +28,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         self.runtime = runtime
         self.extrinsicPool = extrinsicPool
 
-        super.init(config, eventBus, scheduler)
+        super.init(logger: Logger(label: "BlockAuthor"), config: config, eventBus: eventBus, scheduler: scheduler)
     }
 
     public func on(genesis _: StateRef) async {}

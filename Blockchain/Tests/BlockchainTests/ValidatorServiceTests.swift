@@ -16,10 +16,10 @@ struct ValidatorServiceTests {
     let storeMiddleware: StoreMiddleware
 
     init() async throws {
-        // setupTestLogger()
+        setupTestLogger()
 
         config = ProtocolConfigRef.dev
-        timeProvider = MockTimeProvider(slotPeriodSeconds: UInt32(config.value.slotPeriodSeconds), time: 1000)
+        timeProvider = MockTimeProvider(time: 988)
 
         dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesis: StateRef(State.devGenesis(config: config))))
 
@@ -69,7 +69,7 @@ struct ValidatorServiceTests {
         await validatorService.on(genesis: genesisState)
 
         // Advance time to trigger block production
-        await scheduler.advance(by: UInt32(config.value.slotPeriodSeconds))
+        await scheduler.advance(by: TimeInterval(config.value.slotPeriodSeconds))
 
         let events = await storeMiddleware.wait()
 
@@ -80,7 +80,8 @@ struct ValidatorServiceTests {
         let blockEvent = blockAuthoredEvent as! RuntimeEvents.BlockAuthored
         // Verify the produced block
         let block = blockEvent.block
-        #expect(block.header.timeslot == timeProvider.getTimeslot())
+        // we produce block before the timeslot starts
+        #expect(block.header.timeslot == timeProvider.getTime().timeToTimeslot(config: config) + 1)
         #expect(block.header.parentHash == genesisState.value.lastBlockHash)
 
         // Check if the block author is one of the validators
@@ -106,7 +107,7 @@ struct ValidatorServiceTests {
 
         await validatorService.on(genesis: genesisState)
 
-        await scheduler.advance(by: UInt32(config.value.slotPeriodSeconds) * 20)
+        await scheduler.advance(by: TimeInterval(config.value.slotPeriodSeconds) * 20)
 
         let events = await storeMiddleware.wait()
 
