@@ -1,6 +1,5 @@
 import Utils
 
-// TODO: add tests
 public actor InMemoryDataProvider: Sendable {
     public private(set) var heads: Set<Data32>
     public private(set) var finalizedHead: Data32
