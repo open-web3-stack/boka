@@ -3,9 +3,9 @@ import Utils
 
 private typealias TicketItem = ExtrinsicTickets.TicketItem
 
-private let logger = Logger(label: "ExtrinsicPoolService")
-
 private actor ServiceStorage {
+    let logger: Logger
+
     // sorted array ordered by output
     var pendingTickets: SortedUniqueArray<TicketItemAndOutput> = .init()
     var epoch: EpochIndex = 0
@@ -13,7 +13,8 @@ private actor ServiceStorage {
     var entropy: Data32 = .init()
     let ringContext: Bandersnatch.RingContext
 
-    init(ringContext: Bandersnatch.RingContext) {
+    init(logger: Logger, ringContext: Bandersnatch.RingContext) {
+        self.logger = logger
         self.ringContext = ringContext
     }
 
@@ -76,20 +77,22 @@ public final class ExtrinsicPoolService: ServiceBase, @unchecked Sendable {
     ) async {
         self.dataProvider = dataProvider
 
+        let logger = Logger(label: "ExtrinsicPoolService")
+
         let ringContext = try! Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
-        storage = ServiceStorage(ringContext: ringContext)
+        storage = ServiceStorage(logger: logger, ringContext: ringContext)
 
-        super.init(config, eventBus)
+        super.init(logger: logger, config: config, eventBus: eventBus)
 
-        await subscribe(RuntimeEvents.SafroleTicketsGenerated.self) { [weak self] event in
+        await subscribe(RuntimeEvents.SafroleTicketsGenerated.self, id: "ExtrinsicPool.SafroleTicketsGenerated") { [weak self] event in
             try await self?.on(safroleTicketsGenerated: event)
         }
 
-        await subscribe(RuntimeEvents.BlockFinalized.self) { [weak self] event in
+        await subscribe(RuntimeEvents.BlockFinalized.self, id: "ExtrinsicPool.BlockFinalized") { [weak self] event in
             try await self?.on(blockFinalized: event)
         }
 
-        await subscribe(RuntimeEvents.SafroleTicketsReceived.self) { [weak self] event in
+        await subscribe(RuntimeEvents.SafroleTicketsReceived.self, id: "ExtrinsicPool.SafroleTicketsReceived") { [weak self] event in
             try await self?.on(safroleTicketsReceived: event)
         }
     }

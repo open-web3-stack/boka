@@ -1,17 +1,30 @@
+import TracingUtils
 import Utils
 
 public class ServiceBase {
+    public let logger: Logger
     public let config: ProtocolConfigRef
     private let eventBus: EventBus
     private let subscriptionTokens: ThreadSafeContainer<[EventBus.SubscriptionToken]> = .init([])
 
-    init(_ config: ProtocolConfigRef, _ eventBus: EventBus) {
+    init(logger: Logger, config: ProtocolConfigRef, eventBus: EventBus) {
+        self.logger = logger
         self.config = config
         self.eventBus = eventBus
     }
 
+    deinit {
+        let eventBus = self.eventBus
+        let subscriptionTokens = self.subscriptionTokens
+        Task {
+            for token in subscriptionTokens.value {
+                await eventBus.unsubscribe(token: token)
+            }
+        }
+    }
+
     @discardableResult
-    func subscribe<T: Event>(_ eventType: T.Type, handler: @escaping @Sendable (T) async throws -> Void) async -> EventBus
+    func subscribe<T: Event>(_ eventType: T.Type, id _: UniqueId, handler: @escaping @Sendable (T) async throws -> Void) async -> EventBus
         .SubscriptionToken
     {
         let token = await eventBus.subscribe(eventType, handler: handler)
@@ -28,15 +41,5 @@ public class ServiceBase {
 
     func publish(_ event: some Event) {
         eventBus.publish(event)
-    }
-
-    deinit {
-        let eventBus = self.eventBus
-        let subscriptionTokens = self.subscriptionTokens
-        Task {
-            for token in subscriptionTokens.value {
-                await eventBus.unsubscribe(token: token)
-            }
-        }
     }
 }

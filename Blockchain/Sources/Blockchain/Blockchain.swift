@@ -2,8 +2,6 @@ import Foundation
 import TracingUtils
 import Utils
 
-private let logger = Logger(label: "Blockchain")
-
 public final class Blockchain: ServiceBase, @unchecked Sendable {
     public let dataProvider: BlockchainDataProvider
     public let timeProvider: TimeProvider
@@ -17,9 +15,9 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
         self.dataProvider = dataProvider
         self.timeProvider = timeProvider
 
-        super.init(config, eventBus)
+        super.init(logger: Logger(label: "Blockchain"), config: config, eventBus: eventBus)
 
-        await subscribe(RuntimeEvents.BlockAuthored.self) { [weak self] event in
+        await subscribe(RuntimeEvents.BlockAuthored.self, id: "Blockchain.BlockAuthored") { [weak self] event in
             try await self?.on(blockAuthored: event)
         }
     }
@@ -36,8 +34,9 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
 
             let runtime = Runtime(config: config)
             let parent = try await dataProvider.getState(hash: block.header.parentHash)
-            let timeslot = timeProvider.getTimeslot()
-            let state = try runtime.apply(block: block, state: parent, context: .init(timeslot: timeslot))
+            let timeslot = timeProvider.getTime().timeToTimeslot(config: config)
+            // TODO: figure out what is the best way to deal with block received a bit too early
+            let state = try runtime.apply(block: block, state: parent, context: .init(timeslot: timeslot + 1))
 
             try await dataProvider.blockImported(block: block, state: state)
 

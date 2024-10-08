@@ -30,7 +30,7 @@ public class Node {
 
         let (genesisState, protocolConfig) = try await genesis.load()
         dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesis: genesisState))
-        timeProvider = SystemTimeProvider(slotPeriodSeconds: UInt32(protocolConfig.value.slotPeriodSeconds))
+        timeProvider = SystemTimeProvider()
         blockchain = try await Blockchain(
             config: protocolConfig,
             dataProvider: dataProvider,

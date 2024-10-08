@@ -1,5 +1,6 @@
 import Atomics
 import Foundation
+import TracingUtils
 import Utils
 
 private struct IdCancellable: Hashable, Sendable {
@@ -19,9 +20,9 @@ public class ServiceBase2: ServiceBase, @unchecked Sendable {
     private let scheduler: Scheduler
     private let cancellables: ThreadSafeContainer<Set<IdCancellable>> = .init([])
 
-    public init(_ config: ProtocolConfigRef, _ eventBus: EventBus, _ scheduler: Scheduler) {
+    public init(logger: Logger, config: ProtocolConfigRef, eventBus: EventBus, scheduler: Scheduler) {
         self.scheduler = scheduler
-        super.init(config, eventBus)
+        super.init(logger: logger, config: config, eventBus: eventBus)
     }
 
     deinit {
@@ -35,9 +36,12 @@ public class ServiceBase2: ServiceBase, @unchecked Sendable {
     }
 
     @discardableResult
-    public func schedule(id: UniqueId, delay: TimeInterval, repeats: Bool = false,
-                         task: @escaping @Sendable () async -> Void) -> Cancellable
-    {
+    public func schedule(
+        id: UniqueId,
+        delay: TimeInterval,
+        repeats: Bool = false,
+        task: @escaping @Sendable () async -> Void
+    ) -> Cancellable {
         let cancellables = cancellables
         let cancellable = scheduler.schedule(id: id, delay: delay, repeats: repeats) {
             if !repeats {
@@ -52,30 +56,29 @@ public class ServiceBase2: ServiceBase, @unchecked Sendable {
     }
 
     @discardableResult
-    public func schedule(id: UniqueId, at timeslot: TimeslotIndex, task: @escaping @Sendable () async -> Void) -> Cancellable {
-        let cancellables = cancellables
-        let cancellable = scheduler.schedule(id: id, at: timeslot) {
-            cancellables.write { $0.remove(IdCancellable(id: id, cancellable: nil)) }
-            await task()
-        } onCancel: {
-            cancellables.write { $0.remove(IdCancellable(id: id, cancellable: nil)) }
-        }
-        cancellables.write { $0.insert(IdCancellable(id: id, cancellable: cancellable)) }
-        return cancellable
+    public func scheduleForNextEpoch(_ id: UniqueId, fn: @escaping @Sendable (EpochIndex) async -> Void) -> Cancellable {
+        let now = timeProvider.getTimeInterval()
+        let nowTimeslot = UInt32(now).timeToTimeslot(config: config)
+        let nextEpoch = (nowTimeslot + 1).timeslotToEpochIndex(config: config) + 1
+        return scheduleFor(epoch: nextEpoch, id: id, fn: fn)
     }
 
     @discardableResult
-    public func scheduleForNextEpoch(_ id: UniqueId, fn: @escaping @Sendable (TimeslotIndex) async -> Void) -> Cancellable {
-        let now = timeProvider.getTimeslot()
-        let nextEpoch = (now + 1).timeslotToEpochIndex(config: config) + 1
-        let timeslot = nextEpoch.epochToTimeslotIndex(config: config)
-
-        // at end of an epoch, try to determine the block author of next epoch
-        // and schedule new block task
-        return schedule(id: id, at: timeslot - 1) { [weak self] in
+    private func scheduleFor(epoch: EpochIndex, id: UniqueId, fn: @escaping @Sendable (EpochIndex) async -> Void) -> Cancellable {
+        let scheduleTime = config.scheduleTimeForPrepareEpoch(epoch: epoch)
+        let now = timeProvider.getTimeInterval()
+        let delay = scheduleTime - now
+        if delay < 0 {
+            // too late / current epoch is about to end
+            // schedule for the one after
+            logger.debug("\(id): skipping epoch \(epoch) because it is too late")
+            return scheduleFor(epoch: epoch + 1, id: id, fn: fn)
+        }
+        logger.trace("\(id): scheduling epoch \(epoch) in \(delay)")
+        return schedule(id: id, delay: delay) { [weak self] in
             if let self {
-                scheduleForNextEpoch(id, fn: fn)
-                await fn(timeslot)
+                scheduleFor(epoch: epoch + 1, id: id, fn: fn)
+                await fn(epoch)
             }
         }
     }
