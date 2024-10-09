@@ -2,7 +2,7 @@
 
 set -e
 
-release=v6
+release=v7
 
 os=$(uname -s)
 arch=$(uname -m)
@@ -15,7 +15,7 @@ fi
 
 cd .lib
 
-curl -L -o "$filename" "https://github.com/AcalaNetwork/boka-external-libs/releases/download/$release/$filename"
+curl -L -o "$filename" "https://github.com/open-web3-stack/boka-external-libs/releases/download/$release/$filename"
 
 tar -xvf "$filename"
 
