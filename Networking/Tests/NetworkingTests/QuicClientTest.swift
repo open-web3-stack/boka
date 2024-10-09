@@ -7,45 +7,93 @@ import Testing
 #if os(macOS)
     import CoreFoundation
     import Security
+#endif
+final class QuicClientTests {
+    @Test func start() async throws {
+        let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+//        let quicServer = try await QuicServer(
+//            config: QuicConfig(
+//                id: "public-key", cert: cert, key: keyFile, alpn: "sample",
+//                ipAddress: "127.0.0.1", port: 4563
+//            ), messageHandler: self
+//        )
+        try await group.next().scheduleTask(in: .seconds(5)) {}.futureResult.get()
+        let quicClient = try await QuicClient(
+            config: QuicConfig(
+                id: "public-key", cert: cert, key: keyFile, alpn: "sample",
+                ipAddress: "127.0.0.1", port: 4563
+            ),
+            messageHandler: self
+        )
 
-    final class QuicClientTests {
-        @Test func start() async throws {
-            do {
-                let cert = Bundle.module.path(forResource: "server", ofType: "cert")!
-                let keyFile = Bundle.module.path(forResource: "server", ofType: "key")!
-                let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
-                let quicClient = try QuicClient(
-                    config: QuicConfig(
-                        id: "public-key", cert: cert, key: keyFile, alpn: "sample",
-                        ipAddress: "127.0.0.1", port: 4569
+        _ = try await group.next().scheduleTask(in: .seconds(2)) {
+            Task {
+                for i in 1 ... 10 {
+                    let messageToPeer2: QuicStatus = try await quicClient.send(
+                        data: Data("Hello from Client - Message \(i)".utf8),
+                        streamKind: .commonEphemeral
                     )
-                )
-                let status = try quicClient.start()
-                print(status)
-                let message1 = try await quicClient.send(
-                    message: Data("Hello, World!".utf8), streamKind: .uniquePersistent
-                )
-                print("Client received 1: \(message1)")
-                let message2 = try await quicClient.send(
-                    message: Data("Hello, swift!".utf8), streamKind: .commonEphemeral
-                )
-                print("Client received 2: \(message2)")
-                let message3 = try await quicClient.send(
-                    message: Data("Hello, how are you!".utf8), streamKind: .uniquePersistent
-                )
-                print("Client received 3: \(message3)")
-                let message4 = try await quicClient.send(
-                    message: Data("Hello, i am fine!".utf8), streamKind: .commonEphemeral
-                )
-                print("Client received 4: \(message4)")
-
-                try await group.next().scheduleTask(in: .seconds(5)) {
-                    print("scheduleTask: 5s")
-                }.futureResult.get()
-            } catch {
-                // Handle the error if sending the message fails or if the connection fails
-                print("Failed about quic client: \(error)")
+                    print("Client sent message \(i): \(messageToPeer2.isSucceeded ? "Success" : "Failed")")
+                    let messageToPeer1: QuicStatus = try await quicClient.send(
+                        data: Data("Hello from Client - Message \(i + 10)".utf8),
+                        streamKind: .commonEphemeral
+                    )
+                    print("Client sent message \(i + 10): \(messageToPeer1.isSucceeded ? "Success" : "Failed")")
+                }
             }
+        }.futureResult.get()
+
+        try await group.next().scheduleTask(in: .seconds(10)) {
+            print("scheduleTask: 5s")
+        }.futureResult.get()
+    }
+}
+
+extension QuicClientTests: QuicClientMessageHandler {
+    func didReceiveMessage(quicClient _: QuicClient, message: QuicMessage) async {
+        switch message.type {
+        case .received:
+            let messageString = String(
+                [UInt8](message.data!).map { Character(UnicodeScalar($0)) }
+            )
+            print("Client received message : \(messageString)")
+        case .shutdownComplete:
+            print("Client shutdown complete")
+        case .unknown:
+            print("Client unknown")
+        default:
+            break
         }
     }
-#endif
+
+    func didReceiveError(quicClient _: QuicClient, error: QuicError) async {
+        print("Client error: \(error)")
+    }
+}
+
+extension QuicClientTests: QuicServerMessageHandler {
+    func didReceiveMessage(server: QuicServer, messageID: String, message: QuicMessage) async {
+        switch message.type {
+        case .received:
+            let messageString = String(
+                [UInt8](message.data!).map { Character(UnicodeScalar($0)) }
+            )
+            print("Server received message : \(messageString)")
+            let status = await server.respondGetStatus(to: messageID, with: message.data!)
+            print("Server response message : \(status.isSucceeded ? "Success" : "Failed")")
+            if status.isFailed {
+                print("Server response failed with messageID: \(messageID) \nmessage: \(messageString) ")
+            }
+        case .shutdownComplete:
+            print("Server shutdown complete")
+        case .unknown:
+            print("Server unknown")
+        default:
+            break
+        }
+    }
+
+    func didReceiveError(server _: QuicServer, messageID _: String, error: QuicError) async {
+        print("Server error: \(error)")
+    }
+}
