@@ -1,7 +1,7 @@
 import Foundation
 import msquic
 
-public struct QuicConfig {
+public struct QuicConfig: Sendable {
     public let id: String
     public let cert: String
     public let key: String
@@ -20,7 +20,7 @@ public struct QuicConfig {
         settings.IsSet.IdleTimeoutMs = 1
         settings.ServerResumptionLevel = 2 // QUIC_SERVER_RESUME_AND_ZERORTT
         settings.IsSet.ServerResumptionLevel = 1
-        settings.PeerBidiStreamCount = 1
+        settings.PeerBidiStreamCount = 100
         settings.IsSet.PeerBidiStreamCount = 1
 
         // Use withCString to avoid manual memory management
@@ -38,11 +38,11 @@ public struct QuicConfig {
                         QuicCredentialConfig.__Unnamed_union___Anonymous_field2(
                             CertificateFile: certFilePointer
                         ),
-                        Principal: nil, // Not needed in this context
-                        Reserved: nil, // Not needed in this context
-                        AsyncHandler: nil, // Not needed in this context
-                        AllowedCipherSuites: QUIC_ALLOWED_CIPHER_SUITE_NONE, // Default value
-                        CaCertificateFile: nil // Not needed in this context
+                        Principal: nil,
+                        Reserved: nil,
+                        AsyncHandler: nil,
+                        AllowedCipherSuites: QUIC_ALLOWED_CIPHER_SUITE_NONE,
+                        CaCertificateFile: nil
                     )
 
                     // Convert ALPN to data buffer
