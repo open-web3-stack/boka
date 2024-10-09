@@ -19,7 +19,7 @@ WORKDIR /boka/Boka
 
 RUN swift build -c release
 
-RUN cp $(swift build --show-bin-path)/Boka /boka/boka-bin
+RUN cp $(swift build --show-bin-path -c release)/Boka /boka/boka-bin
 
 WORKDIR /boka
 
