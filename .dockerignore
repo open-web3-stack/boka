@@ -1,0 +1,5 @@
+**/.build
+.lib
+.git
+.vscode
+*.Dockerfile
