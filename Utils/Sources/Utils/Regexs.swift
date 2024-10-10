@@ -11,12 +11,12 @@ public enum Regexs {
         let ipWithPortRegex = try NSRegularExpression(pattern: ipWithPortPattern)
         let matches = ipWithPortRegex.matches(in: address, range: NSRange(location: 0, length: address.utf16.count))
 
-        guard let match = matches.first, match.numberOfRanges == 3 else {
+        guard let match: NSTextCheckingResult = matches.first, match.numberOfRanges == 3 else {
             throw RegexsError.invalidFormat
         }
 
         let ipRange = Range(match.range(at: 1), in: address)!
-        let portRange = Range(match.range(at: 2), in: address)!
+        let portRange: Range<String.Index> = Range(match.range(at: 2), in: address)!
 
         var ip = String(address[ipRange])
         let portString = String(address[portRange])
@@ -27,7 +27,7 @@ public enum Regexs {
         }
 
         guard let port = Int(portString), port > 0 else {
-            throw RegexError.invalidPort
+            throw RegexsError.invalidPort
         }
 
         return (ip, port)
