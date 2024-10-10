@@ -72,6 +72,7 @@ struct Boka: AsyncParsableCommand {
         if let p2pListenAddress {
             logger.info("P2P Listen Address: \(p2pListenAddress)")
         }
+        let (rpcAddress, rpcPort) = try Regexs.parseAddress(rpcListenAddress)
         if !p2pPeers.isEmpty {
             logger.info("P2P Peers: \(p2pPeers.joined(separator: ", "))")
         }
@@ -86,7 +87,7 @@ struct Boka: AsyncParsableCommand {
         logger.info("Starting Boka...")
 
         let config = Node.Config(
-            rpc: RPCConfig(listenAddress: "127.0.0.1", port: 9955)
+            rpc: RPCConfig(listenAddress: rpcAddress, port: rpcPort)
         )
         let eventBus = EventBus(
             eventMiddleware: .serial(
