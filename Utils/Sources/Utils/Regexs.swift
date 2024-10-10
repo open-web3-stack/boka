@@ -6,6 +6,7 @@ public enum RegexsError: Error {
 }
 
 public enum Regexs {
+    // support ipv4 and ipv6 address
     public static func parseAddress(_ address: String) throws -> (ip: String, port: Int) {
         let ipWithPortPattern = #"^((?:[0-9]{1,3}\.){3}[0-9]{1,3}|(?:\[[0-9a-fA-F:]+\])):([0-9]{1,5})$"#
         let ipWithPortRegex = try NSRegularExpression(pattern: ipWithPortPattern)
