@@ -26,7 +26,7 @@ public class ProgramCode {
     // parsed stuff
     public private(set) var basicBlockIndices: Set<UInt32> = []
     private var skipCache: [UInt32: UInt32] = [:]
-    private var instCache: [Int: Instruction] = [:]
+    private var instCache: [UInt32: Instruction] = [:]
     private var blockGasCosts: [UInt32: Gas] = [:]
 
     public init(_ blob: Data) throws(Error) {
@@ -76,15 +76,14 @@ public class ProgramCode {
     private func parseCode(code: Data, bitmask: Data) throws(Error) {
         var i = UInt32(0)
         basicBlockIndices.insert(0)
-        var currentBlockStart: UInt32 = 0
+        var currentBlockStart = i
         var currentBlockGasCost = Gas(0)
         while i < code.count {
             let skip = ProgramCode.skip(start: i, bitmask: bitmask)
             skipCache[i] = skip
 
-            let startIdx = code.startIndex + Int(i)
-            let inst = try parseInstruction(startIndex: startIdx, skip: skip)
-            instCache[startIdx] = inst
+            let inst = try parseInstruction(startIndex: code.startIndex + Int(i), skip: skip)
+            instCache[i] = inst
             currentBlockGasCost += inst.gasCost()
 
             let opcode = code[relative: Int(i)]
@@ -98,8 +97,11 @@ public class ProgramCode {
             }
             i += skip + 1
         }
+        blockGasCosts[currentBlockStart] = currentBlockGasCost
         // trap at the end
-        instCache[code.endIndex] = Instructions.Trap()
+        instCache[i] = Instructions.Trap()
+        basicBlockIndices.insert(i)
+        blockGasCosts[i] = Instructions.Trap().gasCost()
     }
 
     private func parseInstruction(startIndex: Int, skip: UInt32) throws(Error) -> Instruction {
@@ -115,12 +117,16 @@ public class ProgramCode {
         return inst
     }
 
-    public func getInstructionAt(index: Int) -> Instruction? {
-        instCache[index]
+    public func getInstructionAt(pc: UInt32) -> Instruction? {
+        instCache[pc]
     }
 
-    public func skip(_ start: UInt32) -> UInt32 {
-        skipCache[start] ?? 0
+    public func getBlockGasCosts(pc: UInt32) -> Gas {
+        blockGasCosts[pc] ?? Gas(0)
+    }
+
+    public func skip(_ pc: UInt32) -> UInt32 {
+        skipCache[pc] ?? 0
     }
 
     public static func skip(start: UInt32, bitmask: Data) -> UInt32 {
