@@ -23,6 +23,24 @@
             "name": "Release Boka (Boka)",
             "program": "${workspaceFolder:boka}/Boka/.build/release/Boka",
             "preLaunchTask": "swift: Build Release Boka (Boka)"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:boka}/Cli",
+            "name": "Debug Cli (Cli)",
+            "program": "${workspaceFolder:boka}/Cli/.build/debug/Cli",
+            "preLaunchTask": "swift: Build Debug Cli (Cli)"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:boka}/Cli",
+            "name": "Release Cli (Cli)",
+            "program": "${workspaceFolder:boka}/Cli/.build/release/Cli",
+            "preLaunchTask": "swift: Build Release Cli (Cli)"
         }
     ]
 }
