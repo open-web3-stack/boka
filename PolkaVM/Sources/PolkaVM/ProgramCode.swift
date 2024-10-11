@@ -7,6 +7,7 @@ public class ProgramCode {
         case invalidJumpTableEncodeSize
         case invalidCodeLength
         case invalidDataLength
+        case invalidInstruction
     }
 
     public enum Constants {
@@ -22,7 +23,11 @@ public class ProgramCode {
     public let code: Data
     private let bitmask: Data
 
-    public let basicBlockIndices: Set<UInt32>
+    // parsed stuff
+    public private(set) var basicBlockIndices: Set<UInt32> = []
+    private var skipCache: [UInt32: UInt32] = [:]
+    private var instCache: [Int: Instruction] = [:]
+    private var blockGasCosts: [UInt32: Gas] = [:]
 
     public init(_ blob: Data) throws(Error) {
         self.blob = blob
@@ -64,7 +69,58 @@ public class ProgramCode {
 
         bitmask = blob[codeEndIndex ..< slice.endIndex]
 
-        basicBlockIndices = ProgramCode.getBasicBlockIndices(code: code, bitmask: bitmask)
+        try parseCode(code: code, bitmask: bitmask)
+    }
+
+    /// traverse the program code, collect basic block indices, cache skips and gas costs
+    private func parseCode(code: Data, bitmask: Data) throws(Error) {
+        var i = UInt32(0)
+        basicBlockIndices.insert(0)
+        var currentBlockStart: UInt32 = 0
+        var currentBlockGasCost = Gas(0)
+        while i < code.count {
+            let skip = ProgramCode.skip(start: i, bitmask: bitmask)
+            skipCache[i] = skip
+
+            let startIdx = code.startIndex + Int(i)
+            let inst = try parseInstruction(startIndex: startIdx, skip: skip)
+            instCache[startIdx] = inst
+            currentBlockGasCost += inst.gasCost()
+
+            let opcode = code[relative: Int(i)]
+            if BASIC_BLOCK_INSTRUCTIONS.contains(opcode) {
+                // block end
+                blockGasCosts[currentBlockStart] = currentBlockGasCost
+                // next block
+                basicBlockIndices.insert(i + skip + 1)
+                currentBlockStart = i + skip + 1
+                currentBlockGasCost = Gas(0)
+            }
+            i += skip + 1
+        }
+        // trap at the end
+        instCache[code.endIndex] = Instructions.Trap()
+    }
+
+    private func parseInstruction(startIndex: Int, skip: UInt32) throws(Error) -> Instruction {
+        let endIndex = startIndex + Int(skip) + 1
+        let data = if endIndex <= code.endIndex {
+            code[startIndex ..< endIndex]
+        } else {
+            code[startIndex ..< min(code.endIndex, endIndex)] + Data(repeating: 0, count: endIndex - code.endIndex)
+        }
+        guard let inst = InstructionTable.parse(data) else {
+            throw Error.invalidInstruction
+        }
+        return inst
+    }
+
+    public func getInstructionAt(index: Int) -> Instruction? {
+        instCache[index]
+    }
+
+    public func skip(_ start: UInt32) -> UInt32 {
+        skipCache[start] ?? 0
     }
 
     public static func skip(start: UInt32, bitmask: Data) -> UInt32 {
@@ -90,26 +146,6 @@ public class ProgramCode {
         let idx = min(UInt32((value >> offsetBits).trailingZeroBitCount), Constants.maxInstructionLength)
 
         return idx
-    }
-
-    public func skip(_ start: UInt32) -> UInt32 {
-        ProgramCode.skip(start: start, bitmask: bitmask)
-    }
-
-    /// traverse the program code and collect basic block indices
-    private static func getBasicBlockIndices(code: Data, bitmask: Data) -> Set<UInt32> {
-        // TODO: parse the instructions here and so we don't need to do skip calculation multiple times
-        var res: Set<UInt32> = [0]
-        var i = UInt32(0)
-        while i < code.count {
-            let opcode = code[relative: Int(i)]
-            let skip = ProgramCode.skip(start: i, bitmask: bitmask)
-            if BASIC_BLOCK_INSTRUCTIONS.contains(opcode) {
-                res.insert(i + skip + 1)
-            }
-            i += skip + 1
-        }
-        return res
     }
 }
 

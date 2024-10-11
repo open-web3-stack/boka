@@ -32,7 +32,7 @@ public enum Instructions {
     public struct Trap: Instruction {
         public static var opcode: UInt8 { 0 }
 
-        public init(data _: Data) {}
+        public init(data _: Data = .init()) {}
 
         public func _executeImpl(context _: ExecutionContext) -> ExecOutcome {
             .exit(.panic(.trap))
