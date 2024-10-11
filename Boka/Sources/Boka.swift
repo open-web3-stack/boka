@@ -72,12 +72,23 @@ struct Boka: AsyncParsableCommand {
         if let p2pListenAddress {
             logger.info("P2P Listen Address: \(p2pListenAddress)")
         }
+        if rpcListenAddress.lowercased() == "false" {
+            logger.warning("TODO: RPC server is disabled")
+            rpcListenAddress = "127.0.0.1:9955"
+        }
         let (rpcAddress, rpcPort) = try Regexs.parseAddress(rpcListenAddress)
+
         if !p2pPeers.isEmpty {
             logger.info("P2P Peers: \(p2pPeers.joined(separator: ", "))")
         }
         logger.info("Validator: \(validator ? "Enabled" : "Disabled")")
-        logger.info("Operator RPC Listen Address: \(operatorRpcListenAddress)")
+
+        if operatorRpcListenAddress.lowercased() == "false" {
+            logger.warning("TODO:  Operator RPC server is disabled")
+        } else {
+            logger.info("Operator RPC Listen Address: \(operatorRpcListenAddress)")
+        }
+
         if let devSeed {
             logger.info("Dev Seed: \(devSeed)")
         }
