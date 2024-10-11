@@ -64,12 +64,6 @@ struct PolkaVMTestcase: Codable, CustomStringConvertible {
 
 private let logger = Logger(label: "PVMTests")
 
-// TODO: pass these
-let knownFailedTestCases = [
-    "inst_ret_halt",
-    "inst_ret_invalid",
-]
-
 struct PVMTests {
     init() {
         setupTestLogger()
@@ -105,19 +99,15 @@ struct PVMTests {
             .trap
         }
 
-        try withKnownIssue("not yet implemented", isIntermittent: true) {
-            #expect(exitReason2 == testCase.expectedStatus)
-            #expect(vmState.getRegisters() == Registers(testCase.expectedRegs))
-            #expect(vmState.pc == testCase.expectedPC)
-            for chunk in testCase.expectedMemory {
-                for (offset, byte) in chunk.contents.enumerated() {
-                    let value = try vmState.getMemory().read(address: chunk.address + UInt32(offset))
-                    #expect(value == byte)
-                }
+        #expect(exitReason2 == testCase.expectedStatus)
+        #expect(vmState.getRegisters() == Registers(testCase.expectedRegs))
+        #expect(vmState.pc == testCase.expectedPC)
+        for chunk in testCase.expectedMemory {
+            for (offset, byte) in chunk.contents.enumerated() {
+                let value = try vmState.getMemory().read(address: chunk.address + UInt32(offset))
+                #expect(value == byte)
             }
-            #expect(vmState.getGas() == testCase.expectedGas)
-        } when: {
-            knownFailedTestCases.contains(testCase.name)
         }
+        #expect(vmState.getGas() == testCase.expectedGas)
     }
 }
