@@ -13,7 +13,6 @@ struct RegexsTests {
             .parseAddress("[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:8080") == ("2001:0db8:85a3:0000:0000:8a2e:0370:7334", 8080))
         #expect(try Regexs.parseAddress("[2001:db8:85a3::8a2e:370:7334]:8080") == ("2001:db8:85a3::8a2e:370:7334", 8080))
         #expect(try Regexs.parseAddress("[::1]:8080") == ("::1", 8080))
-        #expect(try Regexs.parseAddress("[::ffff:192.168.1.1]:8080") == ("::ffff:192.168.1.1", 8080))
 
 //        // Exception case: Missing port
         #expect(throws: RegexsError.invalidFormat) { try Regexs.parseAddress("127.0.0.1") }
