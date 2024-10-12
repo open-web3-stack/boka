@@ -2,7 +2,7 @@ import PolkaVM
 import Utils
 
 // constants defined in the graypaper
-public struct ProtocolConfig: Sendable {
+public struct ProtocolConfig: Sendable, Codable {
     // A = 8: The period, in seconds, between audit tranches.
     public var auditTranchePeriod: Int
 
@@ -189,6 +189,151 @@ extension Ref: @retroactive PvmConfig where T == ProtocolConfig {
     public var pvmProgramInitInputDataSize: Int { value.pvmProgramInitInputDataSize }
     public var pvmProgramInitPageSize: Int { value.pvmProgramInitPageSize }
     public var pvmProgramInitSegmentSize: Int { value.pvmProgramInitSegmentSize }
+}
+
+extension ProtocolConfig {
+    public func merged(with other: ProtocolConfig) -> ProtocolConfig {
+        ProtocolConfig(
+            auditTranchePeriod: other.auditTranchePeriod != 0
+                ? other.auditTranchePeriod : auditTranchePeriod,
+            additionalMinBalancePerStateItem: other.additionalMinBalancePerStateItem != 0
+                ? other.additionalMinBalancePerStateItem : additionalMinBalancePerStateItem,
+            additionalMinBalancePerStateByte: other.additionalMinBalancePerStateByte != 0
+                ? other.additionalMinBalancePerStateByte : additionalMinBalancePerStateByte,
+            serviceMinBalance: other.serviceMinBalance != 0
+                ? other.serviceMinBalance : serviceMinBalance,
+            totalNumberOfCores: other.totalNumberOfCores != 0
+                ? other.totalNumberOfCores : totalNumberOfCores,
+            preimagePurgePeriod: other.preimagePurgePeriod != 0
+                ? other.preimagePurgePeriod : preimagePurgePeriod,
+            epochLength: other.epochLength != 0 ? other.epochLength : epochLength,
+            auditBiasFactor: other.auditBiasFactor != 0
+                ? other.auditBiasFactor : auditBiasFactor,
+            coreAccumulationGas: other.coreAccumulationGas.value != 0
+                ? other.coreAccumulationGas : coreAccumulationGas,
+            workPackageAuthorizerGas: other.workPackageAuthorizerGas.value != 0
+                ? other.workPackageAuthorizerGas : workPackageAuthorizerGas,
+            workPackageRefineGas: other.workPackageRefineGas.value != 0
+                ? other.workPackageRefineGas : workPackageRefineGas,
+            recentHistorySize: other.recentHistorySize != 0
+                ? other.recentHistorySize : recentHistorySize,
+            maxWorkItems: other.maxWorkItems != 0 ? other.maxWorkItems : maxWorkItems,
+            maxTicketsPerExtrinsic: other.maxTicketsPerExtrinsic != 0
+                ? other.maxTicketsPerExtrinsic : maxTicketsPerExtrinsic,
+            maxLookupAnchorAge: other.maxLookupAnchorAge != 0
+                ? other.maxLookupAnchorAge : maxLookupAnchorAge,
+            transferMemoSize: other.transferMemoSize != 0
+                ? other.transferMemoSize : transferMemoSize,
+            ticketEntriesPerValidator: other.ticketEntriesPerValidator != 0
+                ? other.ticketEntriesPerValidator : ticketEntriesPerValidator,
+            maxAuthorizationsPoolItems: other.maxAuthorizationsPoolItems != 0
+                ? other.maxAuthorizationsPoolItems : maxAuthorizationsPoolItems,
+            slotPeriodSeconds: other.slotPeriodSeconds != 0
+                ? other.slotPeriodSeconds : slotPeriodSeconds,
+            maxAuthorizationsQueueItems: other.maxAuthorizationsQueueItems != 0
+                ? other.maxAuthorizationsQueueItems : maxAuthorizationsQueueItems,
+            coreAssignmentRotationPeriod: other.coreAssignmentRotationPeriod != 0
+                ? other.coreAssignmentRotationPeriod : coreAssignmentRotationPeriod,
+            maxServiceCodeSize: other.maxServiceCodeSize != 0
+                ? other.maxServiceCodeSize : maxServiceCodeSize,
+            preimageReplacementPeriod: other.preimageReplacementPeriod != 0
+                ? other.preimageReplacementPeriod : preimageReplacementPeriod,
+            totalNumberOfValidators: other.totalNumberOfValidators != 0
+                ? other.totalNumberOfValidators : totalNumberOfValidators,
+            erasureCodedPieceSize: other.erasureCodedPieceSize != 0
+                ? other.erasureCodedPieceSize : erasureCodedPieceSize,
+            maxWorkPackageManifestEntries: other.maxWorkPackageManifestEntries != 0
+                ? other.maxWorkPackageManifestEntries : maxWorkPackageManifestEntries,
+            maxEncodedWorkPackageSize: other.maxEncodedWorkPackageSize != 0
+                ? other.maxEncodedWorkPackageSize : maxEncodedWorkPackageSize,
+            maxEncodedWorkReportSize: other.maxEncodedWorkReportSize != 0
+                ? other.maxEncodedWorkReportSize : maxEncodedWorkReportSize,
+            erasureCodedSegmentSize: other.erasureCodedSegmentSize != 0
+                ? other.erasureCodedSegmentSize : erasureCodedSegmentSize,
+            ticketSubmissionEndSlot: other.ticketSubmissionEndSlot != 0
+                ? other.ticketSubmissionEndSlot : ticketSubmissionEndSlot,
+            pvmDynamicAddressAlignmentFactor: other.pvmDynamicAddressAlignmentFactor != 0
+                ? other.pvmDynamicAddressAlignmentFactor : pvmDynamicAddressAlignmentFactor,
+            pvmProgramInitInputDataSize: other.pvmProgramInitInputDataSize != 0
+                ? other.pvmProgramInitInputDataSize : pvmProgramInitInputDataSize,
+            pvmProgramInitPageSize: other.pvmProgramInitPageSize != 0
+                ? other.pvmProgramInitPageSize : pvmProgramInitPageSize,
+            pvmProgramInitSegmentSize: other.pvmProgramInitSegmentSize != 0
+                ? other.pvmProgramInitSegmentSize : pvmProgramInitSegmentSize
+        )
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        auditTranchePeriod =
+            try container.decodeIfPresent(Int.self, forKey: .auditTranchePeriod) ?? 0
+        additionalMinBalancePerStateItem =
+            try container.decodeIfPresent(Int.self, forKey: .additionalMinBalancePerStateItem) ?? 0
+        additionalMinBalancePerStateByte =
+            try container.decodeIfPresent(Int.self, forKey: .additionalMinBalancePerStateByte) ?? 0
+        serviceMinBalance =
+            try container.decodeIfPresent(Int.self, forKey: .serviceMinBalance) ?? 0
+        totalNumberOfCores =
+            try container.decodeIfPresent(Int.self, forKey: .totalNumberOfCores) ?? 0
+        preimagePurgePeriod =
+            try container.decodeIfPresent(Int.self, forKey: .preimagePurgePeriod) ?? 0
+        epochLength = try container.decodeIfPresent(Int.self, forKey: .epochLength) ?? 0
+        auditBiasFactor =
+            try container.decodeIfPresent(Int.self, forKey: .auditBiasFactor) ?? 0
+        coreAccumulationGas =
+            try container.decodeIfPresent(Gas.self, forKey: .coreAccumulationGas) ?? Gas(0)
+        workPackageAuthorizerGas =
+            try container.decodeIfPresent(Gas.self, forKey: .workPackageAuthorizerGas)
+                ?? Gas(0)
+        workPackageRefineGas =
+            try container.decodeIfPresent(Gas.self, forKey: .workPackageRefineGas) ?? Gas(0)
+        recentHistorySize =
+            try container.decodeIfPresent(Int.self, forKey: .recentHistorySize) ?? 0
+        maxWorkItems = try container.decodeIfPresent(Int.self, forKey: .maxWorkItems) ?? 0
+        maxTicketsPerExtrinsic =
+            try container.decodeIfPresent(Int.self, forKey: .maxTicketsPerExtrinsic) ?? 0
+        maxLookupAnchorAge =
+            try container.decodeIfPresent(Int.self, forKey: .maxLookupAnchorAge) ?? 0
+        transferMemoSize =
+            try container.decodeIfPresent(Int.self, forKey: .transferMemoSize) ?? 0
+        ticketEntriesPerValidator =
+            try container.decodeIfPresent(Int.self, forKey: .ticketEntriesPerValidator) ?? 0
+        maxAuthorizationsPoolItems =
+            try container.decodeIfPresent(Int.self, forKey: .maxAuthorizationsPoolItems) ?? 0
+        slotPeriodSeconds =
+            try container.decodeIfPresent(Int.self, forKey: .slotPeriodSeconds) ?? 0
+        maxAuthorizationsQueueItems =
+            try container.decodeIfPresent(Int.self, forKey: .maxAuthorizationsQueueItems) ?? 0
+        coreAssignmentRotationPeriod =
+            try container.decodeIfPresent(Int.self, forKey: .coreAssignmentRotationPeriod) ?? 0
+        maxServiceCodeSize =
+            try container.decodeIfPresent(Int.self, forKey: .maxServiceCodeSize) ?? 0
+        preimageReplacementPeriod =
+            try container.decodeIfPresent(Int.self, forKey: .preimageReplacementPeriod) ?? 0
+        totalNumberOfValidators =
+            try container.decodeIfPresent(Int.self, forKey: .totalNumberOfValidators) ?? 0
+        erasureCodedPieceSize =
+            try container.decodeIfPresent(Int.self, forKey: .erasureCodedPieceSize) ?? 0
+        maxWorkPackageManifestEntries =
+            try container.decodeIfPresent(Int.self, forKey: .maxWorkPackageManifestEntries) ?? 0
+        maxEncodedWorkPackageSize =
+            try container.decodeIfPresent(Int.self, forKey: .maxEncodedWorkPackageSize) ?? 0
+        maxEncodedWorkReportSize =
+            try container.decodeIfPresent(Int.self, forKey: .maxEncodedWorkReportSize) ?? 0
+        erasureCodedSegmentSize =
+            try container.decodeIfPresent(Int.self, forKey: .erasureCodedSegmentSize) ?? 0
+        ticketSubmissionEndSlot =
+            try container.decodeIfPresent(Int.self, forKey: .ticketSubmissionEndSlot) ?? 0
+        pvmDynamicAddressAlignmentFactor =
+            try container.decodeIfPresent(Int.self, forKey: .pvmDynamicAddressAlignmentFactor) ?? 0
+        pvmProgramInitInputDataSize =
+            try container.decodeIfPresent(Int.self, forKey: .pvmProgramInitInputDataSize) ?? 0
+        pvmProgramInitPageSize =
+            try container.decodeIfPresent(Int.self, forKey: .pvmProgramInitPageSize) ?? 0
+        pvmProgramInitSegmentSize =
+            try container.decodeIfPresent(Int.self, forKey: .pvmProgramInitSegmentSize) ?? 0
+    }
 }
 
 extension ProtocolConfig {
