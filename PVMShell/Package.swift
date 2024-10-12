@@ -8,23 +8,18 @@ let package = Package(
     platforms: [
         .macOS(.v14),
     ],
-    products: [
-        .library(
-            name: "PVMShell",
-            targets: ["PVMShell"]
-        ),
-    ],
     dependencies: [
         .package(path: "../PolkaVM"),
+        .package(path: "../Utils"),
     ],
     targets: [
-        .target(
+        .executableTarget(
             name: "PVMShell",
             dependencies: [
                 "PolkaVM",
+                "Utils",
             ]
-
         ),
     ],
-    swiftLanguageVersions: [.version("6")]
+    swiftLanguageModes: [.version("6")]
 )

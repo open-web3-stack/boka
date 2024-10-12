@@ -1,5 +1,6 @@
 import Foundation
 import PolkaVM
+import Utils
 
 /// Export a wasm file for using in https://pvm.fluffylabs.dev/ debugger
 /// see <https://github.com/FluffyLabs/pvm-debugger/issues/81> for more details
@@ -15,7 +16,7 @@ private class PVM {
             pageMap: [],
             chunks: []
         )
-        vmState = VMState(program: program, pc: 0, registers: registers, gas: UInt64(gas), memory: memory)
+        vmState = VMState(program: program, pc: 0, registers: registers, gas: Gas(UInt64(gas)), memory: memory)
         engine = Engine(config: DefaultPvmConfig())
     }
 }
@@ -29,8 +30,8 @@ private enum Status: UInt8 {
     case pageFault = 5
 }
 
-@MainActor private var PVMInstance: PVM?
-@MainActor private var PVMStatus: Status = .halt
+private var PVMInstance: PVM?
+private var PVMStatus: Status = .halt
 
 @MainActor private func withPvm<R>(f: (inout PVM) -> R, defaultVal: R) -> R {
     if var pvm = PVMInstance {
@@ -93,7 +94,7 @@ private enum Status: UInt8 {
 // @_cdecl("getGasLeft")
 @MainActor public func getGasLeft() throws -> Int64 {
     withPvm(f: { pvm in
-        pvm.vmState.getGas()
+        pvm.vmState.getGas().value
     }, defaultVal: 0)
 }
 

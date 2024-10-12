@@ -27,9 +27,6 @@ let package = Package(
                 "Utils",
                 "TracingUtils",
                 .product(name: "Logging", package: "swift-log"),
-            ],
-            swiftSettings: [
-                .unsafeFlags(["-Xswiftc", "-DEXCLUDE_STATIC_LIB"]),
             ]
         ),
         .testTarget(

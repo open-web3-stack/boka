@@ -56,7 +56,7 @@ public class Engine {
         }
     }
 
-    func step(program: ProgramCode, context: ExecutionContext) -> ExecOutcome {
+    public func step(program: ProgramCode, context: ExecutionContext) -> ExecOutcome {
         let pc = context.state.pc
         let skip = program.skip(pc)
         let startIndex = program.code.startIndex + Int(pc)

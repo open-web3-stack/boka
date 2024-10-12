@@ -40,10 +40,33 @@ JAM built with Swift
 
 ## Compile PVM to Wasm
 
-Go to [swiftwasm book](https://book.swiftwasm.org/getting-started/setup.html) and install the latest swiftwasm toolchain. Note that using `--swift-sdk` with a swiftwasm sdk does not work due to some dependencies build issues.
+Go to [swiftwasm book](https://book.swiftwasm.org/getting-started/setup.html) for docs.
+
+First install the latest [swiftwasm](https://github.com/swiftwasm/swift/releases). There are 2 options for installing, *install as toolchain* or *install as sdk*.
+
+
+**If install as toolchain:**
+
+`/Library/Developer/Toolchains/` should contain the installed toolchains. (To uninstall, just delete the toolchain)
 
 ```bash
-# build without switch toolchains
-cd PVMShell
-/Library/Developer/Toolchains/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-09-06-a.xctoolchain/usr/bin/swift build
+# check swiftwasm toolchain version
+env TOOLCHAINS=swiftwasm swift --version
+
+# build wasm
+env TOOLCHAINS=swiftwasm swift build --package-path PVMShell --triple wasm32-unknown-wasi
+
+# output is in `.build/wasm32-unknown-wasi/debug`
 ```
+
+**If install as sdk:**
+
+```bash
+# list sdk
+swift sdk list
+
+swift build --package-path PVMShell --swift-sdk 6.0-SNAPSHOT-2024-10-10-a-wasm32-unknown-wasi
+```
+
+Both have same error now:
+- `_Float16 is not supported on this target` (from swift-numerics)
