@@ -1,9 +1,9 @@
 import Utils
 
-public typealias Balance = UInt64
+public typealias Balance = Utils.Balance
 public typealias ServiceIndex = UInt32
-public typealias TimeslotIndex = UInt32
-public typealias Gas = UInt64
+public typealias TimeslotIndex = UInt32 // TODO: use new type
+public typealias Gas = Utils.Gas
 public typealias DataLength = UInt32
 
 public typealias ValidatorIndex = UInt16
@@ -18,3 +18,21 @@ public typealias BandersnatchSignature = Data96
 public typealias BandersnatchRingVRFProof = Data784
 public typealias BandersnatchRingVRFRoot = Data144
 public typealias BLSKey = Data144
+
+extension UInt32 {
+    public func timeslotToEpochIndex(config: ProtocolConfigRef) -> EpochIndex {
+        self / EpochIndex(config.value.epochLength)
+    }
+
+    public func epochToTimeslotIndex(config: ProtocolConfigRef) -> TimeslotIndex {
+        self * TimeslotIndex(config.value.epochLength)
+    }
+
+    public func timeslotToTime(config: ProtocolConfigRef) -> UInt32 {
+        self * UInt32(config.value.slotPeriodSeconds)
+    }
+
+    public func timeToTimeslot(config: ProtocolConfigRef) -> UInt32 {
+        self / UInt32(config.value.slotPeriodSeconds)
+    }
+}

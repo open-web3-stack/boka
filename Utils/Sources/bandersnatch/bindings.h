@@ -7,94 +7,99 @@
 
 typedef struct Public Public;
 typedef struct Secret Secret;
+typedef struct RingContext RingContext;
+typedef struct RingCommitment RingCommitment;
 
 
-typedef enum RingSize {
-  Tiny,
-  Full,
-} RingSize;
+intptr_t secret_new(const uint8_t *seed, uintptr_t seed_len, Secret **out_ptr);
 
-typedef struct Prover Prover;
+intptr_t secret_output(const Secret *secret,
+                       const uint8_t *input,
+                       uintptr_t input_len,
+                       uint8_t *out,
+                       uintptr_t out_len);
 
-typedef struct Verifier Verifier;
+void secret_free(Secret *secret);
 
-typedef struct CPublic {
-  uint8_t _0[32];
-} CPublic;
+intptr_t public_new_from_secret(const Secret *secret, Public **out_ptr);
 
-typedef struct CSecret {
-  uint8_t _0[96];
-} CSecret;
+intptr_t public_new_from_data(const uint8_t *data, uintptr_t len, Public **out_ptr);
 
-struct CPublic *public_deserialize_compressed(const uint8_t *data, uintptr_t len);
+void public_free(Public *public_);
 
-struct CSecret *secret_new_from_seed(const uint8_t *seed, uintptr_t seed_len);
+intptr_t public_serialize_compressed(const Public *public_, uint8_t *out, uintptr_t out_len);
 
-const struct CPublic *secret_get_public(const struct CSecret *secret);
+intptr_t ring_context_new(uintptr_t size, RingContext **out_ptr);
 
-struct Prover *prover_new(const struct CPublic *ring,
-                          uintptr_t ring_len,
-                          enum RingSize ring_size,
-                          uintptr_t prover_idx,
-                          bool *success);
-
-void prover_free(struct Prover *prover);
+void ring_context_free(RingContext *ctx);
 
 /**
  * out is 784 bytes
  */
-bool prover_ring_vrf_sign(uint8_t *out,
-                          const struct Prover *prover,
-                          const uint8_t *vrf_input_data,
-                          uintptr_t vrf_input_len,
-                          const uint8_t *aux_data,
-                          uintptr_t aux_data_len);
+intptr_t prover_ring_vrf_sign(const Secret *secret,
+                              const Public *const *ring,
+                              uintptr_t ring_len,
+                              uintptr_t prover_idx,
+                              const RingContext *ctx,
+                              const uint8_t *vrf_input_data,
+                              uintptr_t vrf_input_len,
+                              const uint8_t *aux_data,
+                              uintptr_t aux_data_len,
+                              uint8_t *out,
+                              uintptr_t out_len);
 
 /**
  * out is 96 bytes
  */
-bool prover_ietf_vrf_sign(uint8_t *out,
-                          const struct Prover *prover,
-                          const uint8_t *vrf_input_data,
-                          uintptr_t vrf_input_len,
-                          const uint8_t *aux_data,
-                          uintptr_t aux_data_len);
+intptr_t prover_ietf_vrf_sign(const Secret *secret,
+                              const uint8_t *vrf_input_data,
+                              uintptr_t vrf_input_len,
+                              const uint8_t *aux_data,
+                              uintptr_t aux_data_len,
+                              uint8_t *out,
+                              uintptr_t out_len);
 
-struct Verifier *verifier_new(const struct CPublic *ring,
-                              uintptr_t ring_len,
-                              enum RingSize ring_size,
-                              bool *success);
+intptr_t ring_commitment_new_from_ring(const Public *const *ring,
+                                       uintptr_t ring_len,
+                                       const RingContext *ctx,
+                                       RingCommitment **out);
 
-void verifier_free(struct Verifier *verifier);
+intptr_t ring_commitment_new_from_data(const uint8_t *data, uintptr_t len, RingCommitment **out);
+
+void ring_commitment_free(RingCommitment *commitment);
 
 /**
  * Ring Commitment: the Bandersnatch ring root in GP
  *
  * out is 144 bytes
  */
-bool verifier_commitment(uint8_t *out, struct Verifier *verifier);
+intptr_t ring_commitment_serialize(const RingCommitment *commitment,
+                                   uint8_t *out,
+                                   uintptr_t out_len);
 
 /**
  * out is 32 bytes
  */
-bool verifier_ring_vrf_verify(uint8_t *out,
-                              const struct Verifier *verifier,
-                              const uint8_t *vrf_input_data,
-                              uintptr_t vrf_input_len,
-                              const uint8_t *aux_data,
-                              uintptr_t aux_data_len,
-                              const uint8_t *signature,
-                              uintptr_t signature_len);
+intptr_t verifier_ring_vrf_verify(const RingContext *ctx,
+                                  const RingCommitment *commitment,
+                                  const uint8_t *vrf_input_data,
+                                  uintptr_t vrf_input_len,
+                                  const uint8_t *aux_data,
+                                  uintptr_t aux_data_len,
+                                  const uint8_t *signature,
+                                  uintptr_t signature_len,
+                                  uint8_t *out,
+                                  uintptr_t out_len);
 
 /**
  * out is 32 bytes
  */
-bool verifier_ietf_vrf_verify(uint8_t *out,
-                              const struct Verifier *verifier,
-                              const uint8_t *vrf_input_data,
-                              uintptr_t vrf_input_len,
-                              const uint8_t *aux_data,
-                              uintptr_t aux_data_len,
-                              const uint8_t *signature,
-                              uintptr_t signature_len,
-                              uintptr_t signer_key_index);
+intptr_t verifier_ietf_vrf_verify(const Public *public_,
+                                  const uint8_t *vrf_input_data,
+                                  uintptr_t vrf_input_len,
+                                  const uint8_t *aux_data,
+                                  uintptr_t aux_data_len,
+                                  const uint8_t *signature,
+                                  uintptr_t signature_len,
+                                  uint8_t *out,
+                                  uintptr_t out_len);

@@ -134,12 +134,11 @@ struct ConfigLimitedSizeArrayTests {
         #expect(array1 != array3)
     }
 
-    // TODO: Codable
-    // @Test func codable() throws {
-    //     let config = 0
-    //     let array = try ConfigLimitedSizeArray<Int, MinLength3, MaxLength5>(config: config, array: [1, 2, 3])
-    //     let encoded = try JamEncoder.encode(array)
-    //     let decoded = try JamDecoder.decode(ConfigLimitedSizeArray<Int, MinLength3, MaxLength5>.self, from: encoded, withConfig: config)
-    //     #expect(decoded == array)
-    // }
+    @Test func codable() throws {
+        let config = 0
+        let array = try ConfigLimitedSizeArray<Int, MinLength3, MaxLength5>(config: config, array: [1, 2, 3])
+        let encoded = try JamEncoder.encode(array)
+        let decoded = try JamDecoder.decode(ConfigLimitedSizeArray<Int, MinLength3, MaxLength5>.self, from: encoded, withConfig: config)
+        #expect(decoded == array)
+    }
 }

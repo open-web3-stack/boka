@@ -14,3 +14,9 @@ target
 # static lib files
 .lib/
 tasks.json
+
+*.d
+*.swiftdeps
+*.swiftdeps~
+Package.resolved
+contents.xcworkspacedata

@@ -53,7 +53,7 @@ extension Instructions {
         let end = start + entrySize
         var targetAlignedData = context.state.program.jumpTable[relative: start ..< end]
         guard let targetAligned = targetAlignedData.decode() else {
-            fatalError("unreachable: jump table entry should be valid")
+            return .exit(.panic(.trap))
         }
 
         guard isDjumpValid(context: context, target: target, targetAligned: UInt32(truncatingIfNeeded: targetAligned)) else {

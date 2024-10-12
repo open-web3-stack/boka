@@ -36,5 +36,5 @@ let package = Package(
             dependencies: ["Boka"]
         ),
     ],
-    swiftLanguageVersions: [.version("6")]
+    swiftLanguageModes: [.version("6")]
 )

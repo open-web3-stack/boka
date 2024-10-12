@@ -107,6 +107,7 @@ extension ExtrinsicDisputes: Validate {
         case judgementsNotSorted
         case invalidCulpritSignature
         case invalidFaultSignature
+        case invalidPublicKey
     }
 
     public func validate(config _: Config) throws(Error) {
@@ -130,7 +131,10 @@ extension ExtrinsicDisputes: Validate {
 
         for culprit in culprits {
             let payload = SigningContext.guarantee + culprit.reportHash.data
-            guard Ed25519.verify(signature: culprit.signature, message: payload, publicKey: culprit.validatorKey) else {
+            let pubkey = try Result { try Ed25519.PublicKey(from: culprit.validatorKey) }
+                .mapError { _ in Error.invalidPublicKey }
+                .get()
+            guard pubkey.verify(signature: culprit.signature, message: payload) else {
                 throw .invalidCulpritSignature
             }
         }
@@ -138,7 +142,10 @@ extension ExtrinsicDisputes: Validate {
         for fault in faults {
             let prefix = fault.vote ? SigningContext.valid : SigningContext.invalid
             let payload = prefix + fault.reportHash.data
-            guard Ed25519.verify(signature: fault.signature, message: payload, publicKey: fault.validatorKey) else {
+            let pubkey = try Result { try Ed25519.PublicKey(from: fault.validatorKey) }
+                .mapError { _ in Error.invalidPublicKey }
+                .get()
+            guard pubkey.verify(signature: fault.signature, message: payload) else {
                 throw .invalidFaultSignature
             }
         }

@@ -4,8 +4,10 @@ import Utils
 @testable import Blockchain
 
 struct InMemoryDataProviderTests {
+    let config = ProtocolConfigRef.mainnet
+
     @Test func testInitialization() async throws {
-        let genesis = StateRef(State.dummy(config: ProtocolConfigRef.mainnet))
+        let genesis = StateRef(State.dummy(config: config))
         let provider = await InMemoryDataProvider(genesis: genesis)
 
         #expect(await (provider.getHeads()) == [Data32()])
@@ -13,24 +15,24 @@ struct InMemoryDataProviderTests {
     }
 
     @Test func testAddAndRetrieveBlock() async throws {
-        let genesis = StateRef(State.dummy(config: ProtocolConfigRef.mainnet))
+        let genesis = StateRef(State.dummy(config: config))
         let provider = await InMemoryDataProvider(genesis: genesis)
 
-        let block = BlockRef(Block.dummy(config: ProtocolConfigRef.mainnet))
+        let block = BlockRef(Block.dummy(config: config))
         await provider.add(block: block)
 
         #expect(await (provider.hasBlock(hash: block.hash)) == true)
         #expect(try await (provider.getBlock(hash: block.hash)) == block)
-        await #expect(throws: BlockchainDataProviderError.noData) {
+        await #expect(throws: BlockchainDataProviderError.noData(hash: Data32())) {
             try await provider.getBlock(hash: Data32())
         }
     }
 
     @Test func testAddAndRetrieveState() async throws {
-        let genesis = StateRef(State.dummy(config: ProtocolConfigRef.mainnet))
+        let genesis = StateRef(State.dummy(config: config))
         let provider = await InMemoryDataProvider(genesis: genesis)
 
-        let state = StateRef(State.dummy(config: ProtocolConfigRef.mainnet))
+        let state = StateRef(State.dummy(config: config))
         await provider.add(state: state)
 
         #expect(await (provider.hasState(hash: state.value.lastBlockHash)) == true)
@@ -38,26 +40,28 @@ struct InMemoryDataProviderTests {
     }
 
     @Test func testUpdateHead() async throws {
-        let genesis = StateRef(State.dummy(config: ProtocolConfigRef.mainnet))
+        let genesis = StateRef(State.dummy(config: config))
         let provider = await InMemoryDataProvider(genesis: genesis)
 
-        let newBlock = BlockRef(Block.dummy(config: ProtocolConfigRef.mainnet))
+        let newBlock = BlockRef(Block.dummy(config: config))
 
         await provider.add(block: newBlock)
         try await provider.updateHead(hash: newBlock.hash, parent: Data32())
 
         #expect(await provider.isHead(hash: newBlock.hash) == true)
         #expect(await provider.isHead(hash: Data32()) == false)
-        await #expect(throws: BlockchainDataProviderError.noData) {
-            try await provider.updateHead(hash: newBlock.hash, parent: Data32())
+
+        let hash = Data32.random()
+        await #expect(throws: BlockchainDataProviderError.noData(hash: hash)) {
+            try await provider.updateHead(hash: newBlock.hash, parent: hash)
         }
     }
 
     @Test func testSetFinalizedHead() async throws {
-        let genesis = StateRef(State.dummy(config: ProtocolConfigRef.mainnet))
+        let genesis = StateRef(State.dummy(config: config))
         let provider = await InMemoryDataProvider(genesis: genesis)
 
-        let block = BlockRef(Block.dummy(config: ProtocolConfigRef.mainnet))
+        let block = BlockRef(Block.dummy(config: config))
         await provider.add(block: block)
         await provider.setFinalizedHead(hash: block.hash)
 
@@ -65,7 +69,7 @@ struct InMemoryDataProviderTests {
     }
 
     @Test func testRemoveHash() async throws {
-        let genesis = StateRef(State.dummy(config: ProtocolConfigRef.mainnet))
+        let genesis = StateRef(State.dummy(config: config))
         let provider = await InMemoryDataProvider(genesis: genesis)
 
         let state = StateRef(State.dummy(config: ProtocolConfigRef.dev))

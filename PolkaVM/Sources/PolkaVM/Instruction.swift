@@ -1,5 +1,6 @@
 import Foundation
 import TracingUtils
+import Utils
 
 private let logger = Logger(label: "Instruction")
 
@@ -8,7 +9,7 @@ public protocol Instruction {
 
     init(data: Data) throws
 
-    func gasCost() -> UInt64
+    func gasCost() -> Gas
     func updatePC(context: ExecutionContext, skip: UInt32) -> ExecOutcome
 
     // protected method
@@ -39,6 +40,7 @@ extension Instruction {
         } catch let e as Memory.Error {
             // this passes test vector
             context.state.consumeGas(gasCost())
+            logger.debug("memory error: \(e)")
             return .exit(.pageFault(e.address))
         } catch let e {
             // other unknown errors
@@ -47,8 +49,8 @@ extension Instruction {
         }
     }
 
-    public func gasCost() -> UInt64 {
-        1
+    public func gasCost() -> Gas {
+        Gas(1)
     }
 
     public func updatePC(context: ExecutionContext, skip: UInt32) -> ExecOutcome {

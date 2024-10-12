@@ -29,6 +29,16 @@ extension Data {
         map { String(format: "%02x", $0) }.joined()
     }
 
+    public func toDebugHexString() -> String {
+        if count > 32 {
+            let prefix = prefix(8).map { String(format: "%02x", $0) }.joined()
+            let suffix = suffix(8).map { String(format: "%02x", $0) }.joined()
+            return "0x\(prefix)...\(suffix) (\(count) bytes)"
+        } else {
+            return "0x\(map { String(format: "%02x", $0) }.joined())"
+        }
+    }
+
     public func decode<T: FixedWidthInteger>(_: T.Type) -> T {
         assert(MemoryLayout<T>.size <= count)
         return withUnsafeBytes { ptr in

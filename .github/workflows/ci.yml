@@ -25,20 +25,19 @@ jobs:
   test:
     name: Build and Test
     runs-on: [self-hosted, linux]
-
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
       with:
         submodules: recursive
+    - run: sudo apt-get update
+    - uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
     - name: Get blst submodule commit hash
       id: blst-commit-hash
       run: |
         echo "commit-hash=$(git submodule status Utils/Sources/blst/ | cut -c2-41)" >> $GITHUB_OUTPUT
-    - name: Get rocksdb submodule commit hash
-      id: rocksdb-commit-hash
-      run: |
-        echo "commit-hash=$(git submodule status Database/Sources/rocksdb/ | cut -c2-41)" >> $GITHUB_OUTPUT
     - name: Cache SPM
       uses: actions/cache@v4
       with:
@@ -70,13 +69,6 @@ jobs:
         key: ${{ runner.os }}-libs-libbandersnatch-${{ hashFiles('Utils/Sources/bandersnatch/**') }}
         restore-keys: |
             ${{ runner.os }}-libs-libbandersnatch
-    - name: Cache rocksdb static lib
-      uses: actions/cache@v4
-      with:
-        path: .lib/librocksdb.a
-        key: ${{ runner.os }}-libs-librocksdb-${{ steps.rocksdb-commit-hash.outputs.commit-hash }}
-        restore-keys: |
-            ${{ runner.os }}-libs-librocksdb
     - name: Cache erasure-coding static lib
       uses: actions/cache@v4
       with:
@@ -86,9 +78,6 @@ jobs:
             ${{ runner.os }}-libs-libec
     - name: Setup Swift
       uses: SwiftyLab/setup-swift@latest
-      with:
-        swift-version: '6.0'
-        development: true
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@nightly
       with:
@@ -98,4 +87,4 @@ jobs:
     - name: Build
       run: make build
     - name: Test
-      run: make test
+      run: make test-all

@@ -1,4 +1,5 @@
 import Foundation
+import Utils
 
 public class VMState {
     public let program: ProgramCode
@@ -6,32 +7,32 @@ public class VMState {
     public private(set) var pc: UInt32
 
     private var registers: Registers
-    private var gas: Int64
+    private var gas: GasInt
     private var memory: Memory
 
-    public init(program: ProgramCode, pc: UInt32, registers: Registers, gas: UInt64, memory: Memory) {
+    public init(program: ProgramCode, pc: UInt32, registers: Registers, gas: Gas, memory: Memory) {
         self.program = program
         self.pc = pc
         self.registers = registers
-        self.gas = Int64(gas)
+        self.gas = GasInt(gas)
         self.memory = memory
     }
 
     /// Initialize from a standard program blob
-    public init(standardProgramBlob blob: Data, pc: UInt32, gas: UInt64, argumentData: Data?) throws {
+    public init(standardProgramBlob blob: Data, pc: UInt32, gas: Gas, argumentData: Data?) throws {
         let program = try StandardProgram(blob: blob, argumentData: argumentData)
         self.program = program.code
         registers = program.initialRegisters
         memory = program.initialMemory
         self.pc = pc
-        self.gas = Int64(gas)
+        self.gas = GasInt(gas)
     }
 
     public func getRegisters() -> Registers {
         registers
     }
 
-    public func getGas() -> Int64 {
+    public func getGas() -> GasInt {
         gas
     }
 
@@ -47,6 +48,14 @@ public class VMState {
         try memory.read(address: address, length: length)
     }
 
+    public func isMemoryReadable(address: UInt32, length: Int) -> Bool {
+        memory.isReadable(address: address, length: length)
+    }
+
+    public func isMemoryWritable(address: UInt32, length: Int) -> Bool {
+        memory.isWritable(address: address, length: length)
+    }
+
     public func writeMemory(address: UInt32, value: UInt8) throws {
         try memory.write(address: address, value: value)
     }
@@ -59,9 +68,8 @@ public class VMState {
         try memory.sbrk(increment)
     }
 
-    public func consumeGas(_ amount: UInt64) {
-        // TODO: use saturating subtraction
-        gas -= Int64(amount)
+    public func consumeGas(_ amount: Gas) {
+        gas -= GasInt(amount)
     }
 
     public func increasePC(_ amount: UInt32) {
@@ -80,6 +88,10 @@ public class VMState {
 
     public func readRegister(_ index: Registers.Index, _ index2: Registers.Index) -> (UInt32, UInt32) {
         (registers[index], registers[index2])
+    }
+
+    public func readRegisters(in range: Range<UInt8>) -> [UInt32] {
+        range.map { registers[Registers.Index(raw: $0)] }
     }
 
     public func writeRegister(_ index: Registers.Index, _ value: UInt32) {

@@ -8,7 +8,7 @@ default: build
 githooks: .git/hooks/pre-commit
 
 .PHONY: deps
-deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a .lib/librocksdb.a .lib/libec.a
+deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a .lib/libec.a .lib/libmsquic.a
 
 .lib/libblst.a:
 	./scripts/blst.sh
@@ -19,12 +19,19 @@ deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a .lib/librocksdb.a .lib/libec.a
 .lib/libec.a: $(wildcard Utils/Sources/erasure-coding/src/*)
 	./scripts/erasure-coding.sh
 
-.lib/librocksdb.a:
-	./scripts/rocksdb.sh
+.lib/libmsquic.a:
+	./scripts/external-libs.sh
 
 .PHONY: test
 test: githooks deps
 	./scripts/runTests.sh test
+
+.PHONY: test-cargo
+test-cargo:
+	cargo test --manifest-path Utils/Sources/bandersnatch/Cargo.toml
+
+.PHONY: test-all
+test-all: test test-cargo
 
 .PHONY: build
 build: githooks deps
@@ -56,6 +63,13 @@ lint: githooks
 .PHONY: format
 format: githooks
 	swiftformat .
+
+.PHONY: format-cargo
+format-cargo:
+	cargo fmt --manifest-path Utils/Sources/bandersnatch/Cargo.toml
+
+.PHONY: format-all
+format-all: format format-cargo
 
 .PHONY: run
 run: githooks

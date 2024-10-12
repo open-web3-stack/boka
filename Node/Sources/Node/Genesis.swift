@@ -7,12 +7,15 @@ public enum Genesis {
 }
 
 extension Genesis {
-    public func toState(config: ProtocolConfigRef) throws -> StateRef {
+    public func load() async throws -> (StateRef, ProtocolConfigRef) {
         switch self {
         case .file:
             fatalError("TODO: not implemented")
         case .dev:
-            StateRef.dummy(config: config)
+            let config = ProtocolConfigRef.dev
+            let state = try State.devGenesis(config: config)
+
+            return (StateRef(state), config)
         }
     }
 }

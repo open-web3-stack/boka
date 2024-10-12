@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "Database",
     platforms: [
-        .macOS(.v14),
+        .macOS(.v15),
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
@@ -27,9 +27,11 @@ let package = Package(
                 "rocksdb",
             ],
             linkerSettings: [
-                .unsafeFlags(["-L../.lib"]),
+                .unsafeFlags(["-L../.lib", "-L/opt/homebrew/lib"]),
                 .linkedLibrary("z"),
                 .linkedLibrary("bz2"),
+                .linkedLibrary("zstd"),
+                .linkedLibrary("lz4"),
             ]
         ),
         .systemLibrary(
@@ -44,5 +46,5 @@ let package = Package(
             ]
         ),
     ],
-    swiftLanguageVersions: [.version("6")]
+    swiftLanguageModes: [.version("6")]
 )

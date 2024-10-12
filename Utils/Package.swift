@@ -17,10 +17,12 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../Codec"),
+        .package(path: "../TracingUtils"),
         .package(url: "https://github.com/tesseract-one/Blake2.swift.git", from: "0.2.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0" ..< "4.0.0"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
         .package(url: "https://github.com/apple/swift-atomics.git", from: "1.2.0"),
+        .package(url: "https://github.com/apple/swift-numerics.git", branch: "main"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -29,9 +31,11 @@ let package = Package(
             name: "Utils",
             dependencies: [
                 "Codec",
+                "TracingUtils",
                 .product(name: "Blake2", package: "Blake2.swift"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Atomics", package: "swift-atomics"),
+                .product(name: "Numerics", package: "swift-numerics"),
                 "blst",
                 "bandersnatch_vrfs",
                 "erasure_coding",
@@ -71,5 +75,5 @@ let package = Package(
             resources: [.copy("TestData")]
         ),
     ],
-    swiftLanguageVersions: [.version("6")]
+    swiftLanguageModes: [.version("6")]
 )

@@ -1,0 +1,4 @@
+module msquic {
+  header "include/msquic.h"
+  link "msquic"
+}

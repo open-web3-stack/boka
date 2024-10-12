@@ -60,12 +60,11 @@ struct LimitedSizeArrayTests {
         #expect(array1 != array3)
     }
 
-    // TODO: Codable
-    // @Test func codable() throws {
-    //     let array: LimitedSizeArray<Int, ConstInt5, ConstInt10> = [1, 2, 3, 4, 5]
-    //     let encoded = try JamEncoder.encode(array)
-    //     let decoded = try JamDecoder.decode(LimitedSizeArray<Int, ConstInt5, ConstInt10>.self, from: encoded, withConfig: ())
+    @Test func codable() throws {
+        let array: LimitedSizeArray<Int, ConstInt5, ConstInt10> = [1, 2, 3, 4, 5]
+        let encoded = try JamEncoder.encode(array)
+        let decoded = try JamDecoder.decode(LimitedSizeArray<Int, ConstInt5, ConstInt10>.self, from: encoded, withConfig: ())
 
-    //     #expect(decoded == array)
-    // }
+        #expect(decoded == array)
+    }
 }

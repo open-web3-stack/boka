@@ -1,4 +1,5 @@
 import Foundation
+import Utils
 
 public enum SigningContext {
     /// XA = $jam_available: Ed25519 Availability assurances.
@@ -30,4 +31,25 @@ public enum SigningContext {
 
     /// X_bot = $jam_invalid: Ed25519 Judgements for invalid work-reports.
     public static let invalid = Data("jam_invalid".utf8)
+}
+
+extension SigningContext {
+    public static func safroleTicketInputData(entropy: Data32, attempt: TicketIndex) -> Data {
+        var vrfInputData = SigningContext.ticketSeal
+        vrfInputData.append(entropy.data)
+        vrfInputData.append(attempt)
+        return vrfInputData
+    }
+
+    public static func fallbackSealInputData(entropy: Data32) -> Data {
+        var vrfInputData = SigningContext.fallbackSeal
+        vrfInputData.append(entropy.data)
+        return vrfInputData
+    }
+
+    public static func entropyInputData(entropy: Data32) -> Data {
+        var vrfInputData = SigningContext.entropy
+        vrfInputData.append(entropy.data)
+        return vrfInputData
+    }
 }

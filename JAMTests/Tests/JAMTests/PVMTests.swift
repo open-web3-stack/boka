@@ -34,13 +34,13 @@ struct PolkaVMTestcase: Codable, CustomStringConvertible {
     var initialPC: UInt32
     var initialPageMap: [PageMap]
     var initialMemory: [MemoryChunk]
-    var initialGas: Int64
+    var initialGas: Gas
     var program: [UInt8]
     var expectedStatus: Status
     var expectedRegs: [UInt32]
     var expectedPC: UInt32
     var expectedMemory: [MemoryChunk]
-    var expectedGas: Int64
+    var expectedGas: GasInt
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -64,12 +64,6 @@ struct PolkaVMTestcase: Codable, CustomStringConvertible {
 
 private let logger = Logger(label: "PVMTests")
 
-// TODO: pass these
-let knownFailedTestCases = [
-    "inst_ret_halt",
-    "inst_ret_invalid",
-]
-
 struct PVMTests {
     init() {
         setupTestLogger()
@@ -92,7 +86,7 @@ struct PVMTests {
             program: program,
             pc: testCase.initialPC,
             registers: Registers(testCase.initialRegs),
-            gas: UInt64(testCase.initialGas),
+            gas: testCase.initialGas,
             memory: memory
         )
         let engine = Engine(config: DefaultPvmConfig())
@@ -105,19 +99,15 @@ struct PVMTests {
             .trap
         }
 
-        try withKnownIssue("not yet implemented", isIntermittent: true) {
-            #expect(exitReason2 == testCase.expectedStatus)
-            #expect(vmState.getRegisters() == Registers(testCase.expectedRegs))
-            #expect(vmState.pc == testCase.expectedPC)
-            for chunk in testCase.expectedMemory {
-                for (offset, byte) in chunk.contents.enumerated() {
-                    let value = try vmState.getMemory().read(address: chunk.address + UInt32(offset))
-                    #expect(value == byte)
-                }
+        #expect(exitReason2 == testCase.expectedStatus)
+        #expect(vmState.getRegisters() == Registers(testCase.expectedRegs))
+        #expect(vmState.pc == testCase.expectedPC)
+        for chunk in testCase.expectedMemory {
+            for (offset, byte) in chunk.contents.enumerated() {
+                let value = try vmState.getMemory().read(address: chunk.address + UInt32(offset))
+                #expect(value == byte)
             }
-            #expect(vmState.getGas() == testCase.expectedGas)
-        } when: {
-            knownFailedTestCases.contains(testCase.name)
         }
+        #expect(vmState.getGas() == testCase.expectedGas)
     }
 }
