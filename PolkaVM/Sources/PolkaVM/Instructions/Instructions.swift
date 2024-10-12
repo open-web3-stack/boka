@@ -1178,7 +1178,7 @@ public enum Instructions {
     // MARK: Instruction with Arguments of Two Registers and Two Immediates (5.11)
 
     public struct LoadImmJumpInd: Instruction {
-        public static var opcode: UInt8 { 10 }
+        public static var opcode: UInt8 { 42 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index

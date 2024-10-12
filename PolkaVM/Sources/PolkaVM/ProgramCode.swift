@@ -67,7 +67,15 @@ public class ProgramCode {
             throw Error.invalidDataLength
         }
 
-        bitmask = blob[codeEndIndex ..< slice.endIndex]
+        // mark bitmask bits longer than codeLength as 1
+        var bitmaskData = blob[codeEndIndex ..< slice.endIndex]
+        let fullBytes = Int(codeLength) / 8
+        let remainingBits = Int(codeLength) % 8
+        if remainingBits > 0 {
+            let mask: UInt8 = ~0 << remainingBits
+            bitmaskData[codeEndIndex + fullBytes] |= mask
+        }
+        bitmask = bitmaskData
 
         try parseCode(code: code, bitmask: bitmask)
     }
