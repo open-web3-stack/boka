@@ -32,13 +32,23 @@ extension Genesis {
             return (StateRef(state), config)
         case let .file(path):
             let genesis = try GenesisFileHandler().readAndValidateGenesis(from: path)
-            if let config = genesis.config {
-                let state = try State.devGenesis(config: Ref(config))
-                return (StateRef(state), Ref(config))
+            var config: ProtocolConfig
+            switch genesis.preset?.lowercased() {
+            case "dev":
+                config = ProtocolConfigRef.dev.value
+                if let genesisConfig = genesis.config {
+                    config = config.merged(with: genesisConfig)
+                }
+            case "mainnet":
+                config = ProtocolConfigRef.mainnet.value
+                if let genesisConfig = genesis.config {
+                    config = config.merged(with: genesisConfig)
+                }
+            default:
+                config = genesis.config!
             }
-            let config = ProtocolConfigRef.dev
-            let state = try State.fileGenesis(config: config)
-            return (StateRef(state), config)
+            let state = try State.devGenesis(config: Ref(config))
+            return (StateRef(state), Ref(config))
         }
     }
 }
@@ -49,6 +59,7 @@ struct GenesisData: Sendable, Codable {
     var bootnodes: [String]
     var preset: String?
     var config: ProtocolConfig?
+    // TODO: check he deal with state
     var state: String
 
     init(from decoder: Decoder) throws {
