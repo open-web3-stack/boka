@@ -24,7 +24,9 @@ public struct MMR: Sendable, Equatable, Codable {
         }
     }
 
-    public func hash() -> Data32 {
-        try! JamEncoder.encode(self).keccakHash()
-    }
+    #if !EXCLUDE_STATIC_LIB
+        public func hash() -> Data32 {
+            try! JamEncoder.encode(self).keccakHash()
+        }
+    #endif
 }

@@ -27,3 +27,46 @@ JAM built with Swift
   - Provide the networking interface for the blockchain node. Used by `Node`.
 - Utils
   - Provide the common utilities for the blockchain node.
+- TracingUtils
+  - Provide the tracing utilities.
+- Codec
+  - Implements JAM Codec.
+- PolkaVM
+  - Implements the Polka Virtual Machine.
+- PVMShell
+  - A module that can be compiled to Wasm for use in [debugger](https://pvm.fluffylabs.dev/).
+- JAMTests
+  - Integrate the JAM test vectors.
+
+## Compile PVM to Wasm
+
+Go to [swiftwasm book](https://book.swiftwasm.org/getting-started/setup.html) for docs.
+
+First install the latest [swiftwasm](https://github.com/swiftwasm/swift/releases). There are 2 options for installing, *install as toolchain* or *install as sdk*.
+
+
+**If install as toolchain:**
+
+`/Library/Developer/Toolchains/` should contain the installed toolchains. (To uninstall, just delete the toolchain)
+
+```bash
+# check swiftwasm toolchain version
+env TOOLCHAINS=swiftwasm swift --version
+
+# build wasm
+env TOOLCHAINS=swiftwasm swift build --package-path PVMShell --triple wasm32-unknown-wasi
+
+# output is in `.build/wasm32-unknown-wasi/debug`
+```
+
+**If install as sdk:**
+
+```bash
+# list sdk
+swift sdk list
+
+swift build --package-path PVMShell --swift-sdk 6.0-SNAPSHOT-2024-10-10-a-wasm32-unknown-wasi
+```
+
+Both have same error now:
+- `_Float16 is not supported on this target` (from swift-numerics)

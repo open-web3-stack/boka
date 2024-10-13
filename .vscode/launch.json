@@ -41,6 +41,24 @@
             "name": "Release Cli (Cli)",
             "program": "${workspaceFolder:boka}/Cli/.build/release/Cli",
             "preLaunchTask": "swift: Build Release Cli (Cli)"
+        },
+        {
+            "type": "swift-lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:boka}/PVMShell",
+            "name": "Debug PVMShell (PVMShell)",
+            "program": "${workspaceFolder:boka}/PVMShell/.build/debug/PVMShell",
+            "preLaunchTask": "swift: Build Debug PVMShell (PVMShell)"
+        },
+        {
+            "type": "swift-lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:boka}/PVMShell",
+            "name": "Release PVMShell (PVMShell)",
+            "program": "${workspaceFolder:boka}/PVMShell/.build/release/PVMShell",
+            "preLaunchTask": "swift: Build Release PVMShell (PVMShell)"
         }
     ]
 }

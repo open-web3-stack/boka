@@ -1,6 +1,10 @@
 import Foundation
 
 public struct Registers: Equatable {
+    public enum Error: Swift.Error {
+        case invalidInitDataLength
+    }
+
     public struct Index {
         public let value: UInt8
         public init(ra: UInt8) {
@@ -35,6 +39,16 @@ public struct Registers: Equatable {
     public var reg13: UInt32 = 0
 
     public init() {}
+
+    public init(data: Data) throws {
+        guard data.count == 13 * MemoryLayout<UInt32>.size else {
+            throw Error.invalidInitDataLength
+        }
+        let values = data.withUnsafeBytes {
+            Array($0.bindMemory(to: UInt32.self))
+        }
+        self.init(values)
+    }
 
     public init(_ values: [UInt32]) {
         assert(values.count == 13)
