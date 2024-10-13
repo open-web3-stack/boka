@@ -1,0 +1,11 @@
+{
+    "name": "MainNet",
+    "id": "mainnet-456",
+    "bootnodes": [
+      "node1.mainnet.com",
+      "node2.mainnet.com"
+    ],
+    "preset": "devnet",
+    "state": "0x1234567890abcdef"
+  }
+  

@@ -38,7 +38,10 @@ struct Boka: AsyncParsableCommand {
     @Option(name: [.customLong("p2p"), .long], help: "Listen address for P2P protocol.")
     var p2pListenAddress: String?
 
-    @Option(name: [.customLong("peers"), .long], parsing: .upToNextOption, help: "Specify peer P2P addresses.")
+    @Option(
+        name: [.customLong("peers"), .long], parsing: .upToNextOption,
+        help: "Specify peer P2P addresses."
+    )
     var p2pPeers: [String] = []
 
     @Flag(name: .long, help: "Run as a validator.")
@@ -107,21 +110,24 @@ struct Boka: AsyncParsableCommand {
             ),
             handlerMiddleware: .tracing(prefix: "Handler")
         )
+        let keystore = try await DevKeyStore()
         do {
-            let keystore = try await DevKeyStore()
+            logger.info("Starting ValidatorNode...")
             let node = try await ValidatorNode(
                 genesis: .dev, config: config, eventBus: eventBus, keystore: keystore
             )
+            logger.info("ValidatorNode started successfully.")
 
             for service in services {
                 Task {
                     try await service.run()
                 }
             }
-
             try await node.wait()
+        } catch {
+            logger.error("Failed to start ValidatorNode: \(error.localizedDescription)")
+            throw error
         }
-
         logger.info("Exiting...")
     }
 }
