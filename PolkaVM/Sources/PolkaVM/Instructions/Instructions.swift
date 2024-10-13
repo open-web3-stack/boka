@@ -32,7 +32,7 @@ public enum Instructions {
     public struct Trap: Instruction {
         public static var opcode: UInt8 { 0 }
 
-        public init(data _: Data) {}
+        public init(data _: Data = .init()) {}
 
         public func _executeImpl(context _: ExecutionContext) -> ExecOutcome {
             .exit(.panic(.trap))
@@ -1178,7 +1178,7 @@ public enum Instructions {
     // MARK: Instruction with Arguments of Two Registers and Two Immediates (5.11)
 
     public struct LoadImmJumpInd: Instruction {
-        public static var opcode: UInt8 { 10 }
+        public static var opcode: UInt8 { 42 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
