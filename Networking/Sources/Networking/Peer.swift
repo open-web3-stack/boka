@@ -49,7 +49,7 @@ public final class Peer: Sendable {
 
         let registration = try QuicRegistration()
         let configuration = try QuicConfiguration(
-            registration: registration, pkcs12: config.pkcs12, alpn: config.alpn.data, settings: config.settings
+            registration: registration, pkcs12: config.pkcs12, alpn: config.alpn.data, client: false, settings: config.settings
         )
 
         listener = try QuicListener(

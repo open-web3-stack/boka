@@ -10,7 +10,7 @@ public final class QuicConfiguration: Sendable {
         _ptr.value
     }
 
-    public init(registration: QuicRegistration, pkcs12: Data, alpn: Data, settings: QuicSettings) throws {
+    public init(registration: QuicRegistration, pkcs12: Data, alpn: Data, client: Bool, settings: QuicSettings) throws {
         self.registration = registration
 
         var ptr: HQUIC?
@@ -38,11 +38,14 @@ public final class QuicConfiguration: Sendable {
             cert.Asn1BlobLength = UInt32(pkcs12ptr.count)
             cert.PrivateKeyPassword = nil
 
-            let flags =
+            let flags = 0
+                | (client ? QUIC_CREDENTIAL_FLAG_CLIENT.rawValue : 0)
+                // we validates it ourselves
+                | QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION.rawValue
                 // we need custom validation of the certificate
-                QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED.rawValue |
+                | QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED.rawValue
                 // so we don't need to deal with openssl objects
-                QUIC_CREDENTIAL_FLAG_USE_PORTABLE_CERTIFICATES.rawValue
+                | QUIC_CREDENTIAL_FLAG_USE_PORTABLE_CERTIFICATES.rawValue
 
             try withUnsafeMutablePointer(to: &cert) { certPtr in
                 var credConfig = QUIC_CREDENTIAL_CONFIG(
