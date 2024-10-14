@@ -18,6 +18,7 @@ let package = Package(
     dependencies: [
         .package(path: "../Utils"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.0"),
+        .package(url: "https://github.com/apple/swift-certificates.git", from: "1.5.0"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
     ],
     targets: [
@@ -26,6 +27,7 @@ let package = Package(
             dependencies: [
                 "MsQuicSwift",
                 .product(name: "Logging", package: "swift-log"),
+                .product(name: "X509", package: "swift-certificates"),
             ]
         ),
         .target(

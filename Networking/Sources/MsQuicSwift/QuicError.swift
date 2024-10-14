@@ -6,6 +6,7 @@ public enum QuicError: Error, Equatable, Sendable {
     case alreadyClosed
     case notStarted
     case invalidAddress(NetAddr)
+    case unableToGetRemoteAddress
 }
 
 // App specific error codes

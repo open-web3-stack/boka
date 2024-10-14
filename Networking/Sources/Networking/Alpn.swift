@@ -1,7 +1,7 @@
 import Foundation
 import Utils
 
-public struct Alpn {
+public struct Alpn: Sendable {
     public let data: Data
     private static let headerPrefixLength = 8
     init(_ protocolName: String = "jamnp-s", version: String = "0", genesisHeader: Data32) {

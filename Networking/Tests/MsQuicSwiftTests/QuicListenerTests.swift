@@ -19,14 +19,14 @@ struct QuicListenerTests {
     let registration: QuicRegistration
 
     init() throws {
-        // setupTestLogger()
+        setupTestLogger()
         registration = try QuicRegistration()
     }
 
     @Test
     func connectAndSendReceive() async throws {
-        let serverEventStore = StoreMiddleware()
-        let clientEventStore = StoreMiddleware()
+        let serverHandler = MockQuicEventHandler()
+        let clientHandler = MockQuicEventHandler()
 
         // create listener
 
@@ -39,7 +39,7 @@ struct QuicListenerTests {
         )
 
         let listener = try QuicListener(
-            eventBus: EventBus(eventMiddleware: Middleware(serverEventStore)),
+            handler: serverHandler,
             registration: registration,
             configuration: configuration,
             listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0),
@@ -53,9 +53,9 @@ struct QuicListenerTests {
         // create connection to listener
 
         let clientConnection = try QuicConnection(
+            handler: clientHandler,
             registration: registration,
-            configuration: configuration,
-            eventBus: EventBus(eventMiddleware: Middleware(clientEventStore))
+            configuration: configuration
         )
 
         try clientConnection.connect(to: listenAddress)
@@ -64,27 +64,62 @@ struct QuicListenerTests {
 
         try stream1.send(with: Data("test data 1".utf8))
 
-        let serverEvents = await serverEventStore.wait()
-        let serverConnection = serverEvents.ofType(QuicEvents.ConnectionAccepted.self)[0].connection
+        try? await Task.sleep(for: .milliseconds(50))
+        let serverConnection = serverHandler.events.value.compactMap {
+            switch $0 {
+            case let .newConnection(_, connection):
+                connection as QuicConnection?
+            default:
+                nil
+            }
+        }.first!
 
         let stream2 = try serverConnection.createStream()
         try stream2.send(with: Data("other test data 2".utf8))
 
-        let clientEvents = await clientEventStore.wait()
-        let remoteStream1 = clientEvents.ofType(QuicEvents.StreamStarted.self)[0].stream
+        try? await Task.sleep(for: .milliseconds(5))
+        let remoteStream1 = clientHandler.events.value.compactMap {
+            switch $0 {
+            case let .streamStarted(_, stream):
+                stream as QuicStream?
+            default:
+                nil
+            }
+        }.first!
         try remoteStream1.send(with: Data("replay to 1".utf8))
 
-        let remoteStream2 = await serverEventStore.wait().ofType(QuicEvents.StreamStarted.self)[0].stream
+        try? await Task.sleep(for: .milliseconds(5))
+        let remoteStream2 = serverHandler.events.value.compactMap {
+            switch $0 {
+            case let .streamStarted(_, stream):
+                stream as QuicStream?
+            default:
+                nil
+            }
+        }.first!
         try remoteStream2.send(with: Data("another replay to 2".utf8))
 
-        let receivedData = await serverEventStore.wait().ofType(QuicEvents.StreamReceived.self).map(\.data)
-        print(receivedData)
+        try? await Task.sleep(for: .milliseconds(5))
+        let receivedData = serverHandler.events.value.compactMap {
+            switch $0 {
+            case let .dataReceived(_, data):
+                data
+            default:
+                nil
+            }
+        }
         #expect(receivedData.count == 2)
         #expect(receivedData[0] == Data("test data 1".utf8))
         #expect(receivedData[1] == Data("replay to 1".utf8))
 
-        let receivedData2 = await clientEventStore.wait().ofType(QuicEvents.StreamReceived.self).map(\.data)
-        print(receivedData2)
+        let receivedData2 = clientHandler.events.value.compactMap {
+            switch $0 {
+            case let .dataReceived(_, data):
+                data
+            default:
+                nil
+            }
+        }
         #expect(receivedData2.count == 2)
         #expect(receivedData2[0] == Data("other test data 2".utf8))
         #expect(receivedData2[1] == Data("another replay to 2".utf8))

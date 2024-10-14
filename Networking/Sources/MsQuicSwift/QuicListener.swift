@@ -6,24 +6,20 @@ import Utils
 public final class QuicListener: Sendable {
     private let logger: Logger
 
-    fileprivate let eventBus: EventBus
+    fileprivate let handler: QuicEventHandler
     fileprivate let registration: QuicRegistration
     fileprivate let configuration: QuicConfiguration
     private let ptr: SendableOpaquePointer
 
-    public var events: some Subscribable {
-        eventBus
-    }
-
     public init(
-        eventBus: EventBus,
+        handler: QuicEventHandler,
         registration: QuicRegistration,
         configuration: QuicConfiguration,
         listenAddress: NetAddr,
         alpn: Data
     ) throws {
         logger = Logger(label: "QuicListener".uniqueId)
-        self.eventBus = eventBus
+        self.handler = handler
         self.registration = registration
         self.configuration = configuration
 
@@ -120,10 +116,10 @@ private final class ListenerHandle: Sendable {
             }
 
             let connection = try? QuicConnection(
+                handler: listener.handler,
                 registration: listener.registration,
                 configuration: listener.configuration,
-                connection: ptr!,
-                eventBus: listener.eventBus
+                connection: ptr!
             )
 
             guard let connection else {
@@ -131,7 +127,7 @@ private final class ListenerHandle: Sendable {
                 return .code(.aborted)
             }
 
-            listener.eventBus.publish(QuicEvents.ConnectionAccepted(connection: connection))
+            listener.handler.newConnection(listener, connection: connection)
 
         case QUIC_LISTENER_EVENT_STOP_COMPLETE:
             logger.debug("Stop complete")

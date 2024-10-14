@@ -38,10 +38,16 @@ public final class QuicConfiguration: Sendable {
             cert.Asn1BlobLength = UInt32(pkcs12ptr.count)
             cert.PrivateKeyPassword = nil
 
+            let flags =
+                // we need custom validation of the certificate
+                QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED.rawValue |
+                // so we don't need to deal with openssl objects
+                QUIC_CREDENTIAL_FLAG_USE_PORTABLE_CERTIFICATES.rawValue
+
             try withUnsafeMutablePointer(to: &cert) { certPtr in
                 var credConfig = QUIC_CREDENTIAL_CONFIG(
                     Type: QUIC_CREDENTIAL_TYPE_CERTIFICATE_PKCS12,
-                    Flags: QUIC_CREDENTIAL_FLAG_NONE,
+                    Flags: QUIC_CREDENTIAL_FLAGS(flags),
                     QUIC_CREDENTIAL_CONFIG.__Unnamed_union___Anonymous_field2(
                         CertificatePkcs12: certPtr
                     ),

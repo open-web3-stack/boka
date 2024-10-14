@@ -13,19 +13,15 @@ private struct Storage {
 public final class QuicStream: Sendable {
     private let logger: Logger
     private let storage: ThreadSafeContainer<Storage?>
-    fileprivate let eventBus: EventBus
-
-    public var events: some Subscribable {
-        eventBus
-    }
+    fileprivate let handler: QuicEventHandler
 
     // create new stream from local
     init(
         connection: QuicConnection,
-        eventBus: EventBus
+        handler: QuicEventHandler
     ) throws(QuicError) {
         logger = Logger(label: "QuicStream".uniqueId)
-        self.eventBus = eventBus
+        self.handler = handler
 
         let api = connection.api!
 
@@ -58,10 +54,10 @@ public final class QuicStream: Sendable {
     init(
         connection: QuicConnection,
         stream: HQUIC,
-        eventBus: EventBus
+        handler: QuicEventHandler
     ) {
         logger = Logger(label: "QuicStream".uniqueId)
-        self.eventBus = eventBus
+        self.handler = handler
 
         let handle = StreamHandle(logger: logger, ptr: stream, api: connection.api!)
 
@@ -74,7 +70,7 @@ public final class QuicStream: Sendable {
     }
 
     public func shutdown(errorCode: QuicErrorCode = .success) throws {
-        logger.debug("closing stream")
+        logger.debug("closing stream \(errorCode)")
 
         try storage.mutate { storage in
             guard let storage2 = storage else {
@@ -195,7 +191,7 @@ private class StreamHandle {
 
             if totalSize > 0 {
                 if let stream {
-                    stream.eventBus.publish(QuicEvents.StreamReceived(stream: stream, data: receivedData))
+                    stream.handler.dataReceived(stream, data: receivedData)
                 } else {
                     logger.warning("Stream received data but it is already gone?")
                 }
@@ -212,12 +208,10 @@ private class StreamHandle {
 
             let evtData = event.pointee.SHUTDOWN_COMPLETE
             if let stream {
-                stream.eventBus.publish(
-                    QuicEvents.StreamClosed(
-                        stream: stream,
-                        errorCode: .init(evtData.ConnectionErrorCode),
-                        closeStatus: .init(rawValue: evtData.ConnectionCloseStatus)
-                    )
+                stream.handler.closed(
+                    stream,
+                    status: .init(rawValue: evtData.ConnectionCloseStatus),
+                    code: .init(evtData.ConnectionErrorCode)
                 )
             }
 

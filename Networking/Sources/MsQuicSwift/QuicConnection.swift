@@ -19,7 +19,7 @@ private enum State {
 public final class QuicConnection: Sendable {
     private let logger: Logger
     private let storage: ThreadSafeContainer<Storage?>
-    fileprivate let eventBus: EventBus
+    fileprivate let handler: QuicEventHandler
 
     var ptr: OpaquePointer? {
         storage.read { $0?.handle.ptr }
@@ -29,26 +29,22 @@ public final class QuicConnection: Sendable {
         storage.read { $0?.registration.api }
     }
 
-    public var events: some Subscribable {
-        eventBus
-    }
-
     // create new connection from local
     public init(
+        handler: QuicEventHandler,
         registration: QuicRegistration,
-        configuration: QuicConfiguration,
-        eventBus: EventBus
+        configuration: QuicConfiguration
     ) throws(QuicError) {
         logger = Logger(label: "QuicConnection".uniqueId)
-        self.eventBus = eventBus
+        self.handler = handler
 
         let registrationPtr = registration.ptr
         var ptr: HQUIC?
-        let handler: QUIC_CONNECTION_CALLBACK_HANDLER = connectionCallback
+        let callback: QUIC_CONNECTION_CALLBACK_HANDLER = connectionCallback
         try registration.api.call("ConnectionOpen") { api in
             api.pointee.ConnectionOpen(
                 registrationPtr,
-                handler,
+                callback,
                 nil,
                 &ptr
             )
@@ -68,13 +64,13 @@ public final class QuicConnection: Sendable {
 
     // wrapping a remote connection initiated by peer
     init(
+        handler: QuicEventHandler,
         registration: QuicRegistration,
         configuration: QuicConfiguration,
-        connection: HQUIC,
-        eventBus: EventBus
+        connection: HQUIC
     ) throws(QuicError) {
         logger = Logger(label: "QuicConnection".uniqueId)
-        self.eventBus = eventBus
+        self.handler = handler
 
         let handle = ConnectionHandle(logger: logger, ptr: connection, api: registration.api)
 
@@ -140,6 +136,7 @@ public final class QuicConnection: Sendable {
                     errorCode.code
                 )
             }
+            self.handler.shutdownInitiated(self, reason: .byLocal(code: errorCode))
             storage = nil
         }
     }
@@ -152,8 +149,25 @@ public final class QuicConnection: Sendable {
                 throw QuicError.notStarted
             }
 
-            return try QuicStream(connection: self, eventBus: eventBus)
+            return try QuicStream(connection: self, handler: handler)
         }
+    }
+
+    public func getRemoteAddress() throws -> NetAddr {
+        var addr = QUIC_ADDR()
+        var size = UInt32(MemoryLayout<QUIC_ADDR>.size)
+        let res: ()? = try? api?.call("GetParam") { api in
+            api.pointee.GetParam(
+                ptr,
+                UInt32(QUIC_PARAM_CONN_REMOTE_ADDRESS),
+                &size,
+                &addr
+            )
+        }
+        if res == nil {
+            throw QuicError.unableToGetRemoteAddress
+        }
+        return NetAddr(quicAddr: addr)
     }
 }
 
@@ -185,43 +199,58 @@ private class ConnectionHandle {
 
     fileprivate func callbackHandler(event: UnsafePointer<QUIC_CONNECTION_EVENT>) -> QuicStatus {
         switch event.pointee.Type {
+        case QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED:
+            logger.trace("Peer certificate received")
+            if let connection {
+                let evtData = event.pointee.PEER_CERTIFICATE_RECEIVED
+                let data: Data?
+                if let certPtr = evtData.Certificate {
+                    let cert = certPtr.assumingMemoryBound(to: QUIC_BUFFER.self)
+                    data = Data(bytes: cert.pointee.Buffer, count: Int(cert.pointee.Length))
+                } else {
+                    data = nil
+                }
+
+                if connection.handler.shouldOpen(connection, certificate: data) {
+                    return .code(.success)
+                } else {
+                    logger.debug("Peer certificate rejected")
+                    return .code(.connectionRefused)
+                }
+            }
+
         case QUIC_CONNECTION_EVENT_CONNECTED:
             logger.trace("Connected")
             if let connection {
-                var addr = QUIC_ADDR()
-                var size = UInt32(MemoryLayout<QUIC_ADDR>.size)
-                let res: ()? = try? api.call("GetParam") { api in
-                    api.pointee.GetParam(
-                        ptr,
-                        UInt32(QUIC_PARAM_CONN_REMOTE_ADDRESS),
-                        &size,
-                        &addr
-                    )
-                }
-                if res == nil {
-                    logger.warning("Failed to get remote address")
-                }
-                let remoteAddress = NetAddr(quicAddr: addr)
-                connection.eventBus.publish(QuicEvents.ConnectionConnected(connection: connection, remoteAddress: remoteAddress))
+                connection.handler.connected(connection)
             }
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
             let evtData = event.pointee.SHUTDOWN_INITIATED_BY_TRANSPORT
             if evtData.Status == QuicStatusCode.connectionIdle.rawValue {
                 logger.trace("Successfully shut down on idle.")
+                if let connection {
+                    connection.handler.shutdownInitiated(connection, reason: .idle)
+                }
             } else {
                 logger.debug("Shut down by transport. Status: \(evtData.Status) Error: \(evtData.ErrorCode)")
+                if let connection {
+                    connection.handler.shutdownInitiated(
+                        connection,
+                        reason: .transport(status: QuicStatus(rawValue: evtData.Status), code: QuicErrorCode(evtData.ErrorCode))
+                    )
+                }
             }
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
             logger.debug("Shut down by peer. Error: \(event.pointee.SHUTDOWN_INITIATED_BY_PEER.ErrorCode)")
+            if let connection {
+                let errorCode = QuicErrorCode(event.pointee.SHUTDOWN_INITIATED_BY_PEER.ErrorCode)
+                connection.handler.shutdownInitiated(connection, reason: .byPeer(code: errorCode))
+            }
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
             logger.trace("Shutdown complete")
-            if let connection {
-                connection.eventBus.publish(QuicEvents.ConnectionShutdown(connection: connection))
-            }
-
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 // avoid closing twice
                 api.call { api in
@@ -234,10 +263,10 @@ private class ConnectionHandle {
             logger.debug("Peer stream started")
             let streamPtr = event.pointee.PEER_STREAM_STARTED.Stream
             if let connection {
-                let stream = QuicStream(connection: connection, stream: streamPtr!, eventBus: connection.eventBus)
-                connection.eventBus.publish(QuicEvents.StreamStarted(connection: connection, stream: stream))
+                let stream = QuicStream(connection: connection, stream: streamPtr!, handler: connection.handler)
+                connection.handler.streamStarted(connection, stream: stream)
             } else {
-                logger.warning("Stream started but connection is going")
+                logger.warning("Stream started but connection is gone?")
                 api.call { api in
                     api.pointee.StreamClose(streamPtr)
                 }

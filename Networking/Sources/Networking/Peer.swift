@@ -14,7 +14,7 @@ public protocol Message {
     func encode() -> Data
 }
 
-public struct PeerConfiguration {
+public struct PeerConfiguration: Sendable {
     public var listenAddress: NetAddr
     public var alpn: Alpn
     public var pkcs12: Data
@@ -32,12 +32,12 @@ public struct PeerConfiguration {
 // - distinguish connection types (e.g. validators, work package builders)
 // - limit max connections per connection type
 // - manage peer reputation and rotate connections when full
-public actor Peer {
+public final class Peer: Sendable {
     private let config: PeerConfiguration
     private let eventBus: EventBus
     private let listener: QuicListener
-    private var connections: [NetAddr: QuicConnection] = [:]
-    private var streams: [NetAddr: [QuicStream]] = [:]
+    private let connections: ThreadSafeContainer<[NetAddr: QuicConnection]> = .init([:])
+    private let streams: ThreadSafeContainer<[NetAddr: [QuicStream]]> = .init([:])
 
     public var events: some Subscribable {
         eventBus
@@ -53,7 +53,7 @@ public actor Peer {
         )
 
         listener = try QuicListener(
-            eventBus: eventBus,
+            handler: PeerEventHandler(),
             registration: registration,
             configuration: configuration,
             listenAddress: config.listenAddress,
@@ -61,3 +61,5 @@ public actor Peer {
         )
     }
 }
+
+public final class PeerEventHandler: QuicEventHandler {}
