@@ -40,8 +40,9 @@ extension Genesis {
             default:
                 config = genesis.config!
             }
-            let state = try State.devGenesis(config: Ref(config))
-            return (StateRef(state), Ref(config))
+            let configRef = Ref(config)
+            let state = try State.devGenesis(config: configRef)
+            return (StateRef(state), configRef)
         }
     }
 
