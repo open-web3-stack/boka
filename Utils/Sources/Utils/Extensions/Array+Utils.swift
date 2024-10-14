@@ -75,3 +75,9 @@ extension Array where Element: Comparable {
         insertSorted(elements) { $0 < $1 }
     }
 }
+
+extension Array {
+    public func ofType<T>(_: T.Type) -> [T] {
+        compactMap { $0 as? T }
+    }
+}

@@ -1,1 +1,1 @@
-public protocol Event: Sendable, Codable {}
+public protocol Event: Sendable {}

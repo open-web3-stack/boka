@@ -1,4 +1,5 @@
 import Atomics
+import TracingUtils
 
 public struct UniqueId: Sendable {
     private static let idGenerator: ManagedAtomic<Int> = ManagedAtomic(0)
@@ -38,12 +39,18 @@ extension UniqueId: ExpressibleByStringLiteral {
 
 extension UniqueId: CustomStringConvertible {
     public var description: String {
-        "\(name)#\(id)"
+        "\(name)#\(String(id, radix: 16))"
     }
 }
 
 extension String {
     public var uniqueId: UniqueId {
         UniqueId(self)
+    }
+}
+
+extension Logger {
+    public init(label: UniqueId) {
+        self.init(label: label.description)
     }
 }
