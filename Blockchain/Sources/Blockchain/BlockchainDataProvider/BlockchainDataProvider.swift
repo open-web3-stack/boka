@@ -9,7 +9,7 @@ private struct BlockchainStorage: Sendable {
     var finalizedHead: Data32
 }
 
-public final class BlockchainDataProvider {
+public final class BlockchainDataProvider: Sendable {
     private let storage: ThreadSafeContainer<BlockchainStorage>
     private let dataProvider: BlockchainDataProviderProtocol
 

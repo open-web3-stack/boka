@@ -1,5 +1,5 @@
 {
-  "originHash" : "1983aff92fc95ce4913c3cc7907ebe17a0b29b1041bb5c359d4ade488640ded6",
+  "originHash" : "47e2af6bfda504977277ddca98e4101bce9ec9e241cd666da6b97c6dade33a15",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -74,6 +74,15 @@
       }
     },
     {
+      "identity" : "swift-asn1",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-asn1.git",
+      "state" : {
+        "revision" : "df5d2fcd22e3f480e3ef85bf23e277a4a0ef524d",
+        "version" : "1.2.0"
+      }
+    },
+    {
       "identity" : "swift-async-algorithms",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-async-algorithms.git",
@@ -89,6 +98,15 @@
       "state" : {
         "revision" : "cd142fd2f64be2100422d658e7411e39489da985",
         "version" : "1.2.0"
+      }
+    },
+    {
+      "identity" : "swift-certificates",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-certificates.git",
+      "state" : {
+        "revision" : "2f797305c1b5b982acaa6005d8a9f970cc4e97ff",
+        "version" : "1.5.0"
       }
     },
     {
@@ -177,8 +195,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio-ssl.git",
       "state" : {
-        "revision" : "a9fa5efd86e7ce2e5c1b6de113262e58035ca251",
-        "version" : "2.27.1"
+        "revision" : "7b84abbdcef69cc3be6573ac12440220789dcd69",
+        "version" : "2.27.2"
       }
     },
     {

@@ -1,6 +1,6 @@
 import Foundation
 
-public final class ThreadSafeContainer<T: Sendable>: @unchecked Sendable {
+public final class ThreadSafeContainer<T>: @unchecked Sendable {
     private var storage: T
     private let queue: DispatchQueue
 
@@ -9,8 +9,8 @@ public final class ThreadSafeContainer<T: Sendable>: @unchecked Sendable {
         queue = DispatchQueue(label: label, attributes: .concurrent)
     }
 
-    public func read<U>(_ action: (T) -> U) -> U {
-        queue.sync { action(self.storage) }
+    public func read<U>(_ action: (T) throws -> U) rethrows -> U {
+        try queue.sync { try action(self.storage) }
     }
 
     public func write(_ action: @escaping @Sendable (inout T) -> Void) {
@@ -24,7 +24,20 @@ public final class ThreadSafeContainer<T: Sendable>: @unchecked Sendable {
             try action(&self.storage)
         }
     }
+}
 
+extension ThreadSafeContainer {
+    public var value: T {
+        get {
+            read { $0 }
+        }
+        set {
+            mutate { $0 = newValue }
+        }
+    }
+}
+
+extension ThreadSafeContainer where T: Sendable {
     public var value: T {
         get {
             read { $0 }

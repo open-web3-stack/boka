@@ -59,7 +59,7 @@ struct GenesisData: Sendable, Codable {
     var bootnodes: [String]
     var preset: String?
     var config: ProtocolConfig?
-    // TODO: check he deal with state
+    // TODO: check & deal with state
     var state: String
 
     init(from decoder: Decoder) throws {
