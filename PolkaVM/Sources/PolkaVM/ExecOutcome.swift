@@ -1,7 +1,7 @@
 public enum ExitReason {
     public enum PanicReason {
         case trap
-        case invalidInstruction
+        case invalidInstructionIndex
         case invalidDynamicJump
         case invalidBranch
     }
