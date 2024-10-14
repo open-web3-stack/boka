@@ -33,14 +33,10 @@ extension Genesis {
         case let .file(path):
             let genesis = try GenesisFileHandler().readAndValidateGenesis(from: path)
             var config: ProtocolConfig
-            switch genesis.preset?.lowercased() {
-            case "dev":
-                config = ProtocolConfigRef.dev.value
-                if let genesisConfig = genesis.config {
-                    config = config.merged(with: genesisConfig)
-                }
-            case "mainnet":
-                config = ProtocolConfigRef.mainnet.value
+            let preset = genesis.preset?.lowercased()
+            switch preset {
+            case "dev", "mainnet":
+                config = (preset == "dev" ? ProtocolConfigRef.dev.value : ProtocolConfigRef.mainnet.value)
                 if let genesisConfig = genesis.config {
                     config = config.merged(with: genesisConfig)
                 }
