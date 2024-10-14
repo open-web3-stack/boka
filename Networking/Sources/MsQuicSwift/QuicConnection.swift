@@ -211,12 +211,7 @@ private class ConnectionHandle {
                     data = nil
                 }
 
-                if connection.handler.shouldOpen(connection, certificate: data) {
-                    return .code(.success)
-                } else {
-                    logger.debug("Peer certificate rejected")
-                    return .code(.connectionRefused)
-                }
+                return connection.handler.shouldOpen(connection, certificate: data)
             }
 
         case QUIC_CONNECTION_EVENT_CONNECTED:

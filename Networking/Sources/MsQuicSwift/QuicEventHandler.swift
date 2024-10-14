@@ -8,12 +8,26 @@ public enum ConnectionCloseReason: Equatable, Sendable {
     case byLocal(code: QuicErrorCode)
 }
 
+public struct ConnectionInfo: Sendable {
+    public let localAddress: NetAddr
+    public let remoteAddress: NetAddr
+    public let negotiatedAlpn: Data
+    public let serverName: String
+
+    public init(localAddress: NetAddr, remoteAddress: NetAddr, negotiatedAlpn: Data, serverName: String) {
+        self.localAddress = localAddress
+        self.remoteAddress = remoteAddress
+        self.negotiatedAlpn = negotiatedAlpn
+        self.serverName = serverName
+    }
+}
+
 public protocol QuicEventHandler: Sendable {
     // listener events
-    func newConnection(_ listener: QuicListener, connection: QuicConnection)
+    func newConnection(_ listener: QuicListener, connection: QuicConnection, info: ConnectionInfo) -> QuicStatus
 
     // connection events
-    func shouldOpen(_ connection: QuicConnection, certificate: Data?) -> Bool
+    func shouldOpen(_ connection: QuicConnection, certificate: Data?) -> QuicStatus
     func connected(_ connection: QuicConnection)
     func shutdownInitiated(_ connection: QuicConnection, reason: ConnectionCloseReason)
     func streamStarted(_ connect: QuicConnection, stream: QuicStream)
@@ -25,10 +39,12 @@ public protocol QuicEventHandler: Sendable {
 
 // default implementations
 extension QuicEventHandler {
-    public func newConnection(_: QuicListener, connection _: QuicConnection) {}
+    public func newConnection(_: QuicListener, connection _: QuicConnection, info _: ConnectionInfo) -> QuicStatus {
+        .code(.success)
+    }
 
-    public func shouldOpen(_: QuicConnection, certificate _: Data?) -> Bool {
-        true
+    public func shouldOpen(_: QuicConnection, certificate _: Data?) -> QuicStatus {
+        .code(.success)
     }
 
     public func connected(_: QuicConnection) {}
@@ -44,7 +60,7 @@ extension QuicEventHandler {
 
 public final class MockQuicEventHandler: QuicEventHandler {
     public enum EventType {
-        case newConnection(listener: QuicListener, connection: QuicConnection)
+        case newConnection(listener: QuicListener, connection: QuicConnection, info: ConnectionInfo)
         case shouldOpen(connection: QuicConnection, certificate: Data?)
         case connected(connection: QuicConnection)
         case shutdownInitiated(connection: QuicConnection, reason: ConnectionCloseReason)
@@ -57,17 +73,19 @@ public final class MockQuicEventHandler: QuicEventHandler {
 
     public init() {}
 
-    public func newConnection(_ listener: QuicListener, connection: QuicConnection) {
+    public func newConnection(_ listener: QuicListener, connection: QuicConnection, info: ConnectionInfo) -> QuicStatus {
         events.write { events in
-            events.append(.newConnection(listener: listener, connection: connection))
+            events.append(.newConnection(listener: listener, connection: connection, info: info))
         }
+
+        return .code(.success)
     }
 
-    public func shouldOpen(_ connection: QuicConnection, certificate: Data?) -> Bool {
+    public func shouldOpen(_ connection: QuicConnection, certificate: Data?) -> QuicStatus {
         events.write { events in
             events.append(.shouldOpen(connection: connection, certificate: certificate))
         }
-        return true
+        return .code(.success)
     }
 
     public func connected(_ connection: QuicConnection) {

@@ -16,7 +16,7 @@ public final class QuicListener: Sendable {
         registration: QuicRegistration,
         configuration: QuicConfiguration,
         listenAddress: NetAddr,
-        alpn: Data
+        alpns: [Data]
     ) throws {
         logger = Logger(label: "QuicListener".uniqueId)
         self.handler = handler
@@ -44,16 +44,17 @@ public final class QuicListener: Sendable {
             throw QuicError.invalidAddress(listenAddress)
         }
 
-        try alpn.withUnsafeBytes { alpnPtr in
-            var buffer = QUIC_BUFFER(
-                Length: UInt32(alpnPtr.count),
-                Buffer: UnsafeMutablePointer(
+        try alpns.withContentUnsafeBytes { alpnPtrs in
+            var buffer = [QUIC_BUFFER](repeating: QUIC_BUFFER(), count: alpnPtrs.count)
+            for (i, alpnPtr) in alpnPtrs.enumerated() {
+                buffer[i].Length = UInt32(alpnPtr.count)
+                buffer[i].Buffer = UnsafeMutablePointer(
                     mutating: alpnPtr.bindMemory(to: UInt8.self).baseAddress!
                 )
-            )
+            }
 
             try registration.api.call("ListenerStart") { api in
-                api.pointee.ListenerStart(ptr, &buffer, 1, &address)
+                api.pointee.ListenerStart(ptr, &buffer, UInt32(alpnPtrs.count), &address)
             }
         }
     }
@@ -108,8 +109,8 @@ private final class ListenerHandle: Sendable {
         case QUIC_LISTENER_EVENT_NEW_CONNECTION:
             logger.debug("New connection")
 
-            // TODO: be able to reject connection
-            let ptr = event.pointee.NEW_CONNECTION.Connection
+            let evtData = event.pointee.NEW_CONNECTION
+            let ptr = evtData.Connection
             guard let listener = listener.value else {
                 logger.warning("New connection but listener is going")
                 return .code(.aborted)
@@ -127,7 +128,18 @@ private final class ListenerHandle: Sendable {
                 return .code(.aborted)
             }
 
-            listener.handler.newConnection(listener, connection: connection)
+            let evtInfo = evtData.Info!
+            let info = ConnectionInfo(
+                localAddress: NetAddr(quicAddr: evtInfo.pointee.LocalAddress.pointee),
+                remoteAddress: NetAddr(quicAddr: evtInfo.pointee.RemoteAddress.pointee),
+                negotiatedAlpn: Data(bytes: evtInfo.pointee.NegotiatedAlpn, count: Int(evtInfo.pointee.NegotiatedAlpnLength)),
+                serverName: String(
+                    bytes: Data(bytes: evtInfo.pointee.ServerName, count: Int(evtInfo.pointee.ServerNameLength)),
+                    encoding: .utf8
+                ) ?? ""
+            )
+
+            return listener.handler.newConnection(listener, connection: connection, info: info)
 
         case QUIC_LISTENER_EVENT_STOP_COMPLETE:
             logger.debug("Stop complete")

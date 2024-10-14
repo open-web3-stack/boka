@@ -22,7 +22,7 @@ struct PKCS12Tests {
         let serverConfiguration = try QuicConfiguration(
             registration: registration,
             pkcs12: cert,
-            alpn: Data("testalpn".utf8),
+            alpns: [Data("testalpn".utf8)],
             client: false,
             settings: quicSettings
         )
@@ -32,7 +32,7 @@ struct PKCS12Tests {
             registration: registration,
             configuration: serverConfiguration,
             listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0),
-            alpn: Data("testalpn".utf8)
+            alpns: [Data("testalpn".utf8)]
         )
 
         let listenAddress = try listener.listenAddress()
@@ -42,7 +42,7 @@ struct PKCS12Tests {
         let clientConfiguration = try QuicConfiguration(
             registration: registration,
             pkcs12: cert,
-            alpn: Data("testalpn".utf8),
+            alpns: [Data("testalpn".utf8)],
             client: true,
             settings: quicSettings
         )
