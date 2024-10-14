@@ -32,7 +32,7 @@ public enum Instructions {
     public struct Trap: Instruction {
         public static var opcode: UInt8 { 0 }
 
-        public init(data _: Data) {}
+        public init(data _: Data = .init()) {}
 
         public func _executeImpl(context _: ExecutionContext) -> ExecOutcome {
             .exit(.panic(.trap))
@@ -157,7 +157,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(ra: data.at(relative: 0))
-            offset = try Instructions.decodeImmediate(data.at(relative: 1...))
+            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context _: ExecutionContext) -> ExecOutcome { .continued }
@@ -176,7 +176,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(ra: data.at(relative: 0))
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -193,7 +193,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(ra: data.at(relative: 0))
-            address = try Instructions.decodeImmediate(data.at(relative: 1...))
+            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -211,7 +211,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(ra: data.at(relative: 0))
-            address = try Instructions.decodeImmediate(data.at(relative: 1...))
+            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -229,7 +229,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(ra: data.at(relative: 0))
-            address = try Instructions.decodeImmediate(data.at(relative: 1...))
+            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -248,7 +248,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(ra: data.at(relative: 0))
-            address = try Instructions.decodeImmediate(data.at(relative: 1...))
+            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -267,7 +267,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(ra: data.at(relative: 0))
-            address = try Instructions.decodeImmediate(data.at(relative: 1...))
+            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -286,7 +286,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(ra: data.at(relative: 0))
-            address = try Instructions.decodeImmediate(data.at(relative: 1...))
+            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -304,7 +304,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(ra: data.at(relative: 0))
-            address = try Instructions.decodeImmediate(data.at(relative: 1...))
+            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -322,7 +322,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             register = try Registers.Index(ra: data.at(relative: 0))
-            address = try Instructions.decodeImmediate(data.at(relative: 1...))
+            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -576,7 +576,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (src, dest) = try Instructions.deocdeRegisters(data)
-            offset = try Instructions.decodeImmediate(data.at(relative: 1...))
+            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -595,7 +595,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (src, dest) = try Instructions.deocdeRegisters(data)
-            offset = try Instructions.decodeImmediate(data.at(relative: 1...))
+            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -614,7 +614,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (src, dest) = try Instructions.deocdeRegisters(data)
-            offset = try Instructions.decodeImmediate(data.at(relative: 1...))
+            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -633,7 +633,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (dest, src) = try Instructions.deocdeRegisters(data)
-            offset = try Instructions.decodeImmediate(data.at(relative: 1...))
+            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -652,7 +652,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (dest, src) = try Instructions.deocdeRegisters(data)
-            offset = try Instructions.decodeImmediate(data.at(relative: 1...))
+            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -671,7 +671,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (dest, src) = try Instructions.deocdeRegisters(data)
-            offset = try Instructions.decodeImmediate(data.at(relative: 1...))
+            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -691,7 +691,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (dest, src) = try Instructions.deocdeRegisters(data)
-            offset = try Instructions.decodeImmediate(data.at(relative: 1...))
+            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -711,7 +711,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (dest, src) = try Instructions.deocdeRegisters(data)
-            offset = try Instructions.decodeImmediate(data.at(relative: 1...))
+            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -731,7 +731,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -750,7 +750,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -769,7 +769,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -788,7 +788,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -807,7 +807,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -826,7 +826,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -848,7 +848,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -867,7 +867,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -886,7 +886,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -905,7 +905,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -925,7 +925,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -945,7 +945,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -965,7 +965,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -984,7 +984,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -1003,7 +1003,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -1022,7 +1022,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -1042,7 +1042,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -1062,7 +1062,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -1082,7 +1082,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -1103,7 +1103,7 @@ public enum Instructions {
 
         public init(data: Data) throws {
             (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = try Instructions.decodeImmediate(data.at(relative: 1...))
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
         }
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -1178,7 +1178,7 @@ public enum Instructions {
     // MARK: Instruction with Arguments of Two Registers and Two Immediates (5.11)
 
     public struct LoadImmJumpInd: Instruction {
-        public static var opcode: UInt8 { 10 }
+        public static var opcode: UInt8 { 42 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
