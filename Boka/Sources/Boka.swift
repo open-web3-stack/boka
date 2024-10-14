@@ -70,14 +70,6 @@ struct Boka: AsyncCommand {
             context.console.info("Base path: \(basePath)")
         }
 
-        if let chain = signature.chain {
-            context.console.info("Chain: \(chain)")
-        }
-
-        if let configFile = signature.configFile {
-            context.console.info("Config file: \(configFile)")
-        }
-
         if let p2p = signature.p2p {
             context.console.info("P2P listen address: \(p2p)")
         }
@@ -122,7 +114,14 @@ struct Boka: AsyncCommand {
             handlerMiddleware: .tracing(prefix: "Handler")
         )
         let keystore = try await DevKeyStore()
-        let node = try await ValidatorNode(genesis: .dev, config: config, eventBus: eventBus, keystore: keystore)
+        var genesis: Genesis = .dev
+        if let configFile = signature.configFile {
+            context.console.info("Config file: \(configFile)")
+            genesis = .file(path: configFile)
+        }
+        let node: ValidatorNode = try await ValidatorNode(
+            genesis: genesis, config: config, eventBus: eventBus, keystore: keystore
+        )
         for service in services {
             Task {
                 try await service.run()

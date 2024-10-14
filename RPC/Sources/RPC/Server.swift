@@ -23,8 +23,8 @@ public class Server {
     public init(config: Config, source: DataSource) throws {
         self.config = config
         self.source = source
-
-        let env = try Environment.detect()
+        // TODO: add env to arguments
+        let env = try Environment.detect(arguments: ["--env"])
         app = Application(env)
 
         var handlers: [String: JSONRPCHandler] = SystemHandler.getHandlers()

@@ -5,7 +5,7 @@
       "node1.mainnet.com",
       "node2.mainnet.com"
     ],
-    "preset": "devnet",
+    "preset": "dev",
     "state": "0x1234567890abcdef"
   }
   
