@@ -5,7 +5,7 @@ JAM built with Swift
 ## Development Environment
 
 - Install tools and deps
-  - macos: `brwe install swiftlint swiftformat rocksdb openssl`
+  - macos: `brew install swiftlint swiftformat rocksdb openssl`
   - linux: `apt-get install librocksdb-dev libzstd-dev libbz2-dev liblz4-dev libssl-dev`
 - Precommit hooks: `make githooks`
 - Pull submodules: `git submodule update --init --recursive`
