@@ -100,6 +100,7 @@ struct Boka: AsyncCommand {
         if let devSeed = signature.devSeed {
             context.console.info("Dev seed: \(devSeed)")
         }
+
         var rpcListenAddress = "127.0.0.1:9955"
         if let rpc = signature.rpc {
             if rpc.lowercased() == "false" {
@@ -109,6 +110,7 @@ struct Boka: AsyncCommand {
             }
             context.console.info("RPC listen address: \(rpc)")
         }
+
         let (rpcAddress, rpcPort) = try Regexs.parseAddress(rpcListenAddress)
         let services = try await Tracing.bootstrap("Boka", loggerOnly: true)
         let config = Node.Config(rpc: RPCConfig(listenAddress: rpcAddress, port: rpcPort))
