@@ -10,22 +10,24 @@ public final class QuicConfiguration: Sendable {
         _ptr.value
     }
 
-    public init(registration: QuicRegistration, pkcs12: Data, alpn: Data, client: Bool, settings: QuicSettings) throws {
+    public init(registration: QuicRegistration, pkcs12: Data, alpns: [Data], client: Bool, settings: QuicSettings) throws {
         self.registration = registration
 
         var ptr: HQUIC?
         var settings = settings
-        try alpn.withUnsafeBytes { alpnPtr throws in
-            var alpnBuffer = QUIC_BUFFER(
-                Length: UInt32(alpnPtr.count),
-                Buffer: UnsafeMutablePointer(
+
+        try alpns.withContentUnsafeBytes { alpnPtrs in
+            var buffer = [QUIC_BUFFER](repeating: QUIC_BUFFER(), count: alpnPtrs.count)
+            for (i, alpnPtr) in alpnPtrs.enumerated() {
+                buffer[i].Length = UInt32(alpnPtr.count)
+                buffer[i].Buffer = UnsafeMutablePointer(
                     mutating: alpnPtr.bindMemory(to: UInt8.self).baseAddress!
                 )
-            )
+            }
 
             try registration.api.call("ConfigurationOpen") { api in
                 api.pointee.ConfigurationOpen(
-                    registration.ptr, &alpnBuffer, 1, &settings, UInt32(MemoryLayout.size(ofValue: settings)), nil, &ptr
+                    registration.ptr, &buffer, UInt32(alpnPtrs.count), &settings, UInt32(MemoryLayout.size(ofValue: settings)), nil, &ptr
                 )
             }
         }

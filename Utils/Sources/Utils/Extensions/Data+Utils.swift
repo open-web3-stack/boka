@@ -59,3 +59,20 @@ extension FixedSizeData {
         data.toHexString()
     }
 }
+
+extension [Data] {
+    public func withContentUnsafeBytes<R>(_ fn: ([UnsafeRawBufferPointer]) throws -> R) rethrows -> R {
+        func helper(data: ArraySlice<Data>, ptr: [UnsafeRawBufferPointer]) throws -> R {
+            if data.isEmpty {
+                return try fn(ptr)
+            }
+            let rest = data.dropFirst()
+            let first = data.first!
+            return try first.withUnsafeBytes { (bufferPtr: UnsafeRawBufferPointer) -> R in
+                return try helper(data: rest, ptr: ptr + [bufferPtr])
+            }
+        }
+
+        return try helper(data: self[...], ptr: [])
+    }
+}

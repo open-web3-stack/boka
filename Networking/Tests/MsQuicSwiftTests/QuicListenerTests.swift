@@ -34,7 +34,7 @@ struct QuicListenerTests {
         let serverConfiguration = try QuicConfiguration(
             registration: registration,
             pkcs12: pkcs12Data,
-            alpn: Data("testalpn".utf8),
+            alpns: [Data("testalpn".utf8)],
             client: false,
             settings: quicSettings
         )
@@ -44,7 +44,7 @@ struct QuicListenerTests {
             registration: registration,
             configuration: serverConfiguration,
             listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0),
-            alpn: Data("testalpn".utf8)
+            alpns: [Data("testalpn".utf8)]
         )
 
         let listenAddress = try listener.listenAddress()
@@ -56,7 +56,7 @@ struct QuicListenerTests {
         let clientConfiguration = try QuicConfiguration(
             registration: registration,
             pkcs12: pkcs12Data,
-            alpn: Data("testalpn".utf8),
+            alpns: [Data("testalpn".utf8)],
             client: true,
             settings: quicSettings
         )
@@ -74,14 +74,19 @@ struct QuicListenerTests {
         try stream1.send(with: Data("test data 1".utf8))
 
         try? await Task.sleep(for: .milliseconds(100))
-        let serverConnection = serverHandler.events.value.compactMap {
+        let (serverConnection, info) = serverHandler.events.value.compactMap {
             switch $0 {
-            case let .newConnection(_, connection):
-                connection as QuicConnection?
+            case let .newConnection(_, connection, info):
+                (connection, info) as (QuicConnection, ConnectionInfo)?
             default:
                 nil
             }
         }.first!
+
+        #expect(info.negotiatedAlpn == Data("testalpn".utf8))
+        #expect(info.serverName == "127.0.0.1")
+        #expect(info.localAddress == listenAddress)
+        #expect(info.remoteAddress.ipAddress == "127.0.0.1")
 
         let stream2 = try serverConnection.createStream()
         try stream2.send(with: Data("other test data 2".utf8))
