@@ -99,12 +99,13 @@ class GenesisFileHandler {
             throw GenesisError.invalidFormat("Invalid or missing 'bootnodes'")
         }
         if genesis.state.isEmpty {
-            throw GenesisError.invalidFormat("Invalid or missing 'state'")
+            throw GenesisError.invalidFormat("Invalid or missing 'state'") bjnii
         }
-        if let preset = genesis.preset, !["dev", "mainnet"].contains(preset.lowercased()) {
+        let preset = genesis.preset?.lowercased()
+        if preset != nil, !["dev", "mainnet"].contains(preset!) {
             throw GenesisError.invalidFormat("Invalid preset value. Must be 'dev' or 'mainnet'.")
         }
-        if genesis.preset == nil, genesis.missConfigFiled() {
+        if preset == nil, genesis.missConfigFiled() {
             throw GenesisError.invalidFormat("Missing 'preset' or 'config' field.")
         }
     }

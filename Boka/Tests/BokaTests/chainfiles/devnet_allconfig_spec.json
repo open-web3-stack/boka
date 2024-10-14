@@ -2,7 +2,6 @@
 	"name": "Devnet",
 	"id": "devnet-1",
 	"bootnodes": ["127.0.0.1:9955"],
-	"preset": null,
 	"config": {
 		"auditTranchePeriod": 10,
 		"additionalMinBalancePerStateItem": 1,
