@@ -1,3 +1,4 @@
+import CHelpers
 import Foundation
 import msquic
 #if canImport(Glibc)
@@ -51,9 +52,9 @@ extension NetAddr: CustomStringConvertible {
 func parseQuicAddr(_ addr: QUIC_ADDR) -> (String, UInt16, Bool)? {
     let ipv6 = addr.Ip.sa_family == QUIC_ADDRESS_FAMILY(QUIC_ADDRESS_FAMILY_INET6)
     let port = if ipv6 {
-        CFSwapInt16BigToHost(addr.Ipv6.sin6_port)
+        helper_ntohs(addr.Ipv6.sin6_port)
     } else {
-        CFSwapInt16BigToHost(addr.Ipv4.sin_port)
+        helper_ntohs(addr.Ipv4.sin_port)
     }
     var addr = addr
     if ipv6 {

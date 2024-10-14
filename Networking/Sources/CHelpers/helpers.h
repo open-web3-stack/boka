@@ -1,4 +1,5 @@
 #include <stddef.h>
+#include <arpa/inet.h>
 
 int generate_self_signed_cert_and_pkcs12(
     const unsigned char *private_key_buf,
@@ -9,3 +10,7 @@ int generate_self_signed_cert_and_pkcs12(
 );
 
 char *get_error_string(int error);
+
+inline uint16_t helper_ntohs(in_port_t netport) {
+    return ntohs(netport);
+}
