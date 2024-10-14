@@ -65,10 +65,7 @@ struct PKCS12Tests {
                 nil
             }
         }
-        print(111_111_111)
-        print(data)
 
-        print(clientHandler.events.value)
-        print(serverHandler.events.value)
+        #expect(data.first!.count > 0)
     }
 }
