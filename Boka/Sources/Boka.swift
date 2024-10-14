@@ -1,108 +1,117 @@
-// The Swift Programming Language
-// https://docs.swift.org/swift-book
-//
-// Swift Argument Parser
-// https://swiftpackageindex.com/apple/swift-argument-parser/documentation
-
-import ArgumentParser
 import Blockchain
+import ConsoleKit
 import Foundation
 import Node
 import ServiceLifecycle
 import TracingUtils
 import Utils
 
-@main
-struct Boka: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(
-        abstract: "A command-line tool for Boka.",
-        version: "1.0.0"
-    )
+struct Boka: AsyncCommand {
+    struct Signature: CommandSignature {
+        @Option(name: "base-path", short: "d", help: "Base path to database files.")
+        var basePath: String?
 
-    @Option(name: [.customShort("d"), .long], help: "Base path to database files.")
-    var basePath: String?
+        @Option(name: "chain", short: "c", help: "Path to chain spec file.")
+        var chain: String?
 
-    @Option(name: [.customShort("c"), .long], help: "Path to chain spec file.")
-    var chain: String?
+        @Option(name: "config-file", short: "f", help: "Path to config file.")
+        var configFile: String?
 
-    @Option(name: [.customShort("f"), .long], help: "Path to config file.")
-    var configFile: String?
+        @Option(
+            name: "rpc",
+            help:
+            "Listen address for RPC server. Pass 'false' to disable RPC server. Default to 127.0.0.1:9955."
+        )
+        var rpc: String?
 
-    @Option(
-        name: [.customLong("rpc"), .long],
-        help:
-        "Listen address for RPC server. Pass 'false' to disable RPC server. Default to 127.0.0.1:9955."
-    )
-    var rpcListenAddress: String = "127.0.0.1:9955"
+        @Option(name: "p2p", help: "Listen address for P2P protocol.")
+        var p2p: String?
 
-    @Option(name: [.customLong("p2p"), .long], help: "Listen address for P2P protocol.")
-    var p2pListenAddress: String?
+        @Option(name: "peers", help: "Specify peer P2P addresses separated by commas.")
+        var peers: String?
 
-    @Option(
-        name: [.customLong("peers"), .long], parsing: .upToNextOption,
-        help: "Specify peer P2P addresses."
-    )
-    var p2pPeers: [String] = []
+        @Flag(name: "validator", help: "Run as a validator.")
+        var validator: Bool
 
-    @Flag(name: .long, help: "Run as a validator.")
-    var validator: Bool = false
+        @Option(
+            name: "operator-rpc",
+            help:
+            "Listen address for operator RPC server. Pass 'false' to disable operator RPC server. Default to false."
+        )
+        var operatorRpc: String?
 
-    @Option(
-        name: [.customLong("operator-rpc"), .long],
-        help:
-        "Listen address for operator RPC server. Pass 'false' to disable operator RPC server. Default to false."
-    )
-    var operatorRpcListenAddress: String = "false"
+        @Option(name: "dev-seed", help: "For development only. Seed for validator keys.")
+        var devSeed: String?
 
-    @Option(name: .long, help: "For development only. Seed for validator keys.")
-    var devSeed: String?
+        @Flag(name: "version", help: "Show the version.")
+        var version: Bool
 
-    mutating func run() async throws {
-        let logger = Logger(label: "boka")
+        @Flag(name: "help", short: "h", help: "Show help information.")
+        var help: Bool
+    }
 
-        if let basePath {
-            logger.info("Base Path: \(basePath)")
-        }
-        if let chain {
-            logger.info("Chain: \(chain)")
-        }
-        if let configFile {
-            logger.info("Config File: \(configFile)")
+    var help: String {
+        "A command-line tool for Boka."
+    }
+
+    func run(using context: CommandContext, signature: Signature) async throws {
+        if signature.help {
+            context.console.info(help)
+            return
         }
 
-        logger.info("RPC Listen Address: \(rpcListenAddress)")
-
-        if let p2pListenAddress {
-            logger.info("P2P Listen Address: \(p2pListenAddress)")
+        if signature.version {
+            context.console.info("Boka version 1.0.0")
+            return
         }
-        if rpcListenAddress.lowercased() == "false" {
-            logger.warning("TODO: RPC server is disabled")
-            rpcListenAddress = "127.0.0.1:9955"
+
+        // Handle other options and flags
+        if let basePath = signature.basePath {
+            context.console.info("Base path: \(basePath)")
+        }
+
+        if let chain = signature.chain {
+            context.console.info("Chain: \(chain)")
+        }
+
+        if let configFile = signature.configFile {
+            context.console.info("Config file: \(configFile)")
+        }
+
+        if let p2p = signature.p2p {
+            context.console.info("P2P listen address: \(p2p)")
+        }
+
+        if let peers = signature.peers {
+            let peerList = peers.split(separator: ",").map {
+                $0.trimmingCharacters(in: .whitespaces)
+            }
+            context.console.info("Peers: \(peerList.joined(separator: ", "))")
+        }
+
+        if signature.validator {
+            context.console.info("Running as validator")
+        }
+
+        if let operatorRpc = signature.operatorRpc {
+            context.console.info("Operator RPC listen address: \(operatorRpc)")
+        }
+
+        if let devSeed = signature.devSeed {
+            context.console.info("Dev seed: \(devSeed)")
+        }
+        var rpcListenAddress = "127.0.0.1:9955"
+        if let rpc = signature.rpc {
+            if rpc.lowercased() == "false" {
+                context.console.warning("RPC server is disabled")
+            } else {
+                rpcListenAddress = rpc
+            }
+            context.console.info("RPC listen address: \(rpc)")
         }
         let (rpcAddress, rpcPort) = try Regexs.parseAddress(rpcListenAddress)
-
-        if !p2pPeers.isEmpty {
-            logger.info("P2P Peers: \(p2pPeers.joined(separator: ", "))")
-        }
-        logger.info("Validator: \(validator ? "Enabled" : "Disabled")")
-
-        if operatorRpcListenAddress.lowercased() == "false" {
-            logger.warning("TODO:  Operator RPC server is disabled")
-        } else {
-            logger.info("Operator RPC Listen Address: \(operatorRpcListenAddress)")
-        }
-
-        if let devSeed {
-            logger.info("Dev Seed: \(devSeed)")
-        }
-
         let services = try await Tracing.bootstrap("Boka", loggerOnly: true)
-
-        logger.info("Starting Boka...")
-
-        let config = Node.Config(
-            rpc: RPCConfig(listenAddress: rpcAddress, port: rpcPort)
-        )
+        let config = Node.Config(rpc: RPCConfig(listenAddress: rpcAddress, port: rpcPort))
         let eventBus = EventBus(
             eventMiddleware: .serial(
                 .log(logger: Logger(label: "EventBus")),
@@ -111,23 +120,12 @@ struct Boka: AsyncParsableCommand {
             handlerMiddleware: .tracing(prefix: "Handler")
         )
         let keystore = try await DevKeyStore()
-        do {
-            logger.info("Starting ValidatorNode...")
-            let node = try await ValidatorNode(
-                genesis: .dev, config: config, eventBus: eventBus, keystore: keystore
-            )
-            logger.info("ValidatorNode started successfully.")
-
-            for service in services {
-                Task {
-                    try await service.run()
-                }
+        let node = try await ValidatorNode(genesis: .dev, config: config, eventBus: eventBus, keystore: keystore)
+        for service in services {
+            Task {
+                try await service.run()
             }
-            try await node.wait()
-        } catch {
-            logger.error("Failed to start ValidatorNode: \(error.localizedDescription)")
-            throw error
         }
-        logger.info("Exiting...")
+        try await node.wait()
     }
 }
