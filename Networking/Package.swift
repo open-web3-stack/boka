@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "Networking",
     platforms: [
-        .macOS(.v14),
+        .macOS(.v15),
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
@@ -19,24 +19,33 @@ let package = Package(
         .package(path: "../Utils"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.0"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"),
     ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "Networking",
-
+            dependencies: [
+                "MsQuicSwift",
+                .product(name: "Logging", package: "swift-log"),
+            ]
+        ),
+        .target(
+            name: "CHelpers",
+            dependencies: [
+                "openssl",
+            ],
+            sources: ["helpers.h", "helpers.c"],
+            publicHeadersPath: ".",
+            cSettings: [
+                .headerSearchPath("../include"),
+            ]
+        ),
+        .target(
+            name: "MsQuicSwift",
             dependencies: [
                 "msquic",
                 "Utils",
-                .product(name: "NIO", package: "swift-nio"),
-                .product(name: "NIOCore", package: "swift-nio"),
-                .product(name: "NIOPosix", package: "swift-nio"),
+                "CHelpers",
                 .product(name: "Logging", package: "swift-log"),
-            ],
-            resources: [
-                .process("assets"),
             ],
             linkerSettings: [
                 .unsafeFlags(["-L../.lib"]),
@@ -46,10 +55,21 @@ let package = Package(
             name: "msquic",
             path: "Sources"
         ),
+        .systemLibrary(
+            name: "openssl",
+            path: "Sources"
+        ),
         .testTarget(
             name: "NetworkingTests",
             dependencies: [
                 "Networking",
+                .product(name: "Testing", package: "swift-testing"),
+            ]
+        ),
+        .testTarget(
+            name: "MsQuicSwiftTests",
+            dependencies: [
+                "MsQuicSwift",
                 .product(name: "Testing", package: "swift-testing"),
             ]
         ),

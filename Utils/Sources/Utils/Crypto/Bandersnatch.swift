@@ -93,8 +93,8 @@ public enum Bandersnatch: KeyType {
         case getOutputFailed(Int)
     }
 
-    public final class SecretKey: SecretKeyProtocol, @unchecked Sendable {
-        fileprivate let ptr: OpaquePointer
+    public final class SecretKey: SecretKeyProtocol, Sendable {
+        fileprivate let ptr: SendableOpaquePointer
         public let publicKey: PublicKey
 
         public init(from seed: Data32) throws(Error) {
@@ -106,12 +106,12 @@ public enum Bandersnatch: KeyType {
                 throw .createSecretFailed(err)
             }
 
-            self.ptr = ptr
+            self.ptr = ptr.asSendable
             publicKey = try PublicKey(secretKey: ptr)
         }
 
         deinit {
-            secret_free(ptr)
+            secret_free(ptr.value)
         }
 
         /// Non-Anonymous VRF signature.
@@ -127,7 +127,7 @@ public enum Bandersnatch: KeyType {
 
             try call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
                 prover_ietf_vrf_sign(
-                    ptr,
+                    ptr.value,
                     ptrs[0].ptr,
                     ptrs[0].count,
                     ptrs[1].ptr,
@@ -149,7 +149,7 @@ public enum Bandersnatch: KeyType {
 
             try call(vrfInputData, out: &output) { ptrs, out_buf in
                 secret_output(
-                    ptr,
+                    ptr.value,
                     ptrs[0].ptr,
                     ptrs[0].count,
                     out_buf.ptr,
@@ -163,8 +163,8 @@ public enum Bandersnatch: KeyType {
         }
     }
 
-    public final class PublicKey: PublicKeyProtocol, Hashable, @unchecked Sendable, CustomStringConvertible {
-        fileprivate let ptr: OpaquePointer
+    public final class PublicKey: PublicKeyProtocol, Hashable, Sendable, CustomStringConvertible {
+        fileprivate let ptr: SendableOpaquePointer
         public let data: Data32
 
         public init(data: Data32) throws(Error) {
@@ -174,7 +174,7 @@ public enum Bandersnatch: KeyType {
             } onErr: { err throws(Error) in
                 throw .createPublicKeyFailed(err)
             }
-            self.ptr = ptr
+            self.ptr = ptr.asSendable
             self.data = data
         }
 
@@ -191,12 +191,12 @@ public enum Bandersnatch: KeyType {
                 public_serialize_compressed(ptr, out_buf.ptr, out_buf.count)
             }
 
-            self.ptr = ptr
+            self.ptr = ptr.asSendable
             self.data = Data32(data)!
         }
 
         deinit {
-            public_free(ptr)
+            public_free(ptr.value)
         }
 
         public convenience init(from decoder: Decoder) throws {
@@ -244,7 +244,7 @@ public enum Bandersnatch: KeyType {
 
             try call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in
                 verifier_ietf_vrf_verify(
-                    ptr,
+                    ptr.value,
                     ptrs[0].ptr,
                     ptrs[0].count,
                     ptrs[1].ptr,
@@ -262,8 +262,8 @@ public enum Bandersnatch: KeyType {
         }
     }
 
-    public final class RingContext: @unchecked Sendable {
-        fileprivate let ptr: OpaquePointer
+    public final class RingContext: Sendable {
+        fileprivate let ptr: SendableOpaquePointer
 
         public init(size: UInt) throws(Error) {
             var ptr: OpaquePointer!
@@ -272,11 +272,11 @@ public enum Bandersnatch: KeyType {
             } onErr: { err throws(Error) in
                 throw .createRingContextFailed(err)
             }
-            self.ptr = ptr
+            self.ptr = ptr.asSendable
         }
 
         deinit {
-            ring_context_free(ptr)
+            ring_context_free(ptr.value)
         }
     }
 
@@ -292,7 +292,7 @@ public enum Bandersnatch: KeyType {
             self.ring = ring
             self.proverIdx = proverIdx
             self.ctx = ctx
-            ringPtrs = ring.map { $0?.ptr }
+            ringPtrs = ring.map { $0?.ptr.value }
         }
 
         /// Anonymous VRF signature.
@@ -309,11 +309,11 @@ public enum Bandersnatch: KeyType {
             try call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
                 ringPtrs.withUnsafeBufferPointer { ringPtrs in
                     prover_ring_vrf_sign(
-                        secret.ptr,
+                        secret.ptr.value,
                         ringPtrs.baseAddress,
                         UInt(ringPtrs.count),
                         proverIdx,
-                        ctx.ptr,
+                        ctx.ptr.value,
                         ptrs[0].ptr,
                         ptrs[0].count,
                         ptrs[1].ptr,
@@ -330,12 +330,12 @@ public enum Bandersnatch: KeyType {
         }
     }
 
-    public final class RingCommitment: @unchecked Sendable {
-        fileprivate let ptr: OpaquePointer
+    public final class RingCommitment: Sendable {
+        fileprivate let ptr: SendableOpaquePointer
         public let data: Data144
 
         public init(ring: [PublicKey?], ctx: RingContext) throws(Error) {
-            let ringPtrs = ring.map { $0?.ptr as OpaquePointer? }
+            let ringPtrs = ring.map { $0?.ptr.value as OpaquePointer? }
 
             var ptr: OpaquePointer!
             try call { _ in
@@ -343,7 +343,7 @@ public enum Bandersnatch: KeyType {
                     ring_commitment_new_from_ring(
                         ringPtrs.baseAddress,
                         UInt(ringPtrs.count),
-                        ctx.ptr,
+                        ctx.ptr.value,
                         &ptr
                     )
                 }
@@ -359,7 +359,7 @@ public enum Bandersnatch: KeyType {
                 throw .serializeRingCommitmentFailed(err)
             }
 
-            self.ptr = ptr
+            self.ptr = ptr.asSendable
             data = Data144(out)!
         }
 
@@ -370,12 +370,12 @@ public enum Bandersnatch: KeyType {
             } onErr: { err throws(Error) in
                 throw .createRingCommitmentFailed(err)
             }
-            self.ptr = ptr
+            self.ptr = ptr.asSendable
             self.data = data
         }
 
         deinit {
-            ring_commitment_free(ptr)
+            ring_commitment_free(ptr.value)
         }
     }
 
@@ -407,8 +407,8 @@ public enum Bandersnatch: KeyType {
 
             try call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in
                 verifier_ring_vrf_verify(
-                    ctx.ptr,
-                    commitment.ptr,
+                    ctx.ptr.value,
+                    commitment.ptr.value,
                     ptrs[0].ptr,
                     ptrs[0].count,
                     ptrs[1].ptr,
