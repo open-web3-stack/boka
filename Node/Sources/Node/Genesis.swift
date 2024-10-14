@@ -99,7 +99,7 @@ class GenesisFileHandler {
             throw GenesisError.invalidFormat("Invalid or missing 'bootnodes'")
         }
         if genesis.state.isEmpty {
-            throw GenesisError.invalidFormat("Invalid or missing 'state'") bjnii
+            throw GenesisError.invalidFormat("Invalid or missing 'state'")
         }
         let preset = genesis.preset?.lowercased()
         if preset != nil, !["dev", "mainnet"].contains(preset!) {
