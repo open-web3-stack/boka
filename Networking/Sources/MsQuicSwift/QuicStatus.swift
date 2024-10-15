@@ -85,4 +85,12 @@ public enum QuicStatusCode: UInt32, Equatable, Sendable, Codable {
     case internalError = 5
     case tlsError = 126
     case streamLimitReached = 86
+
+    case closeNotify = 0xBEBC300
+    case badCert = 0xBEBC32A
+    case unsupportedCert = 0xBEBC32B
+    case revokedCert = 0xBEBC32C
+    case expiredCert = 0xBEBC32D
+    case unknownCert = 0xBEBC32E
+    case requiredCert = 0xBEBC374
 }

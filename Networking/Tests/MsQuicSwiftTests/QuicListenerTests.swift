@@ -19,7 +19,7 @@ struct QuicListenerTests {
     let registration: QuicRegistration
 
     init() throws {
-        setupTestLogger()
+        // setupTestLogger()
         registration = try QuicRegistration()
     }
 
@@ -31,19 +31,20 @@ struct QuicListenerTests {
         // create listener
 
         let quicSettings = QuicSettings.defaultSettings
-        let configuration = try QuicConfiguration(
+        let serverConfiguration = try QuicConfiguration(
             registration: registration,
             pkcs12: pkcs12Data,
-            alpn: Data("testalpn".utf8),
+            alpns: [Data("testalpn".utf8)],
+            client: false,
             settings: quicSettings
         )
 
         let listener = try QuicListener(
             handler: serverHandler,
             registration: registration,
-            configuration: configuration,
+            configuration: serverConfiguration,
             listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0),
-            alpn: Data("testalpn".utf8)
+            alpns: [Data("testalpn".utf8)]
         )
 
         let listenAddress = try listener.listenAddress()
@@ -52,10 +53,18 @@ struct QuicListenerTests {
 
         // create connection to listener
 
+        let clientConfiguration = try QuicConfiguration(
+            registration: registration,
+            pkcs12: pkcs12Data,
+            alpns: [Data("testalpn".utf8)],
+            client: true,
+            settings: quicSettings
+        )
+
         let clientConnection = try QuicConnection(
             handler: clientHandler,
             registration: registration,
-            configuration: configuration
+            configuration: clientConfiguration
         )
 
         try clientConnection.connect(to: listenAddress)
@@ -64,20 +73,25 @@ struct QuicListenerTests {
 
         try stream1.send(with: Data("test data 1".utf8))
 
-        try? await Task.sleep(for: .milliseconds(50))
-        let serverConnection = serverHandler.events.value.compactMap {
+        try? await Task.sleep(for: .milliseconds(100))
+        let (serverConnection, info) = serverHandler.events.value.compactMap {
             switch $0 {
-            case let .newConnection(_, connection):
-                connection as QuicConnection?
+            case let .newConnection(_, connection, info):
+                (connection, info) as (QuicConnection, ConnectionInfo)?
             default:
                 nil
             }
         }.first!
 
+        #expect(info.negotiatedAlpn == Data("testalpn".utf8))
+        #expect(info.serverName == "127.0.0.1")
+        #expect(info.localAddress == listenAddress)
+        #expect(info.remoteAddress.ipAddress == "127.0.0.1")
+
         let stream2 = try serverConnection.createStream()
         try stream2.send(with: Data("other test data 2".utf8))
 
-        try? await Task.sleep(for: .milliseconds(5))
+        try? await Task.sleep(for: .milliseconds(100))
         let remoteStream1 = clientHandler.events.value.compactMap {
             switch $0 {
             case let .streamStarted(_, stream):
@@ -88,7 +102,7 @@ struct QuicListenerTests {
         }.first!
         try remoteStream1.send(with: Data("replay to 1".utf8))
 
-        try? await Task.sleep(for: .milliseconds(5))
+        try? await Task.sleep(for: .milliseconds(100))
         let remoteStream2 = serverHandler.events.value.compactMap {
             switch $0 {
             case let .streamStarted(_, stream):
@@ -99,7 +113,7 @@ struct QuicListenerTests {
         }.first!
         try remoteStream2.send(with: Data("another replay to 2".utf8))
 
-        try? await Task.sleep(for: .milliseconds(5))
+        try? await Task.sleep(for: .milliseconds(100))
         let receivedData = serverHandler.events.value.compactMap {
             switch $0 {
             case let .dataReceived(_, data):

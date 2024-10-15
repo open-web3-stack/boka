@@ -16,13 +16,13 @@ public protocol Message {
 
 public struct PeerConfiguration: Sendable {
     public var listenAddress: NetAddr
-    public var alpn: Alpn
+    public var alpns: [Alpn]
     public var pkcs12: Data
     public var settings: QuicSettings
 
-    public init(listenAddress: NetAddr, alpn: Alpn, pkcs12: Data, settings: QuicSettings = .defaultSettings) {
+    public init(listenAddress: NetAddr, alpns: [Alpn], pkcs12: Data, settings: QuicSettings = .defaultSettings) {
         self.listenAddress = listenAddress
-        self.alpn = alpn
+        self.alpns = alpns
         self.pkcs12 = pkcs12
         self.settings = settings
     }
@@ -47,9 +47,11 @@ public final class Peer: Sendable {
         self.config = config
         self.eventBus = eventBus
 
+        let alpns = config.alpns.map(\.data)
+
         let registration = try QuicRegistration()
         let configuration = try QuicConfiguration(
-            registration: registration, pkcs12: config.pkcs12, alpn: config.alpn.data, settings: config.settings
+            registration: registration, pkcs12: config.pkcs12, alpns: alpns, client: false, settings: config.settings
         )
 
         listener = try QuicListener(
@@ -57,7 +59,7 @@ public final class Peer: Sendable {
             registration: registration,
             configuration: configuration,
             listenAddress: config.listenAddress,
-            alpn: config.alpn.data
+            alpns: alpns
         )
     }
 }

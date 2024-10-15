@@ -37,9 +37,9 @@ int generate_self_signed_cert_and_pkcs12(
     // Set serial number (you might want to generate this randomly)
     ASN1_INTEGER_set(X509_get_serialNumber(cert), 1);
 
-    // // Set validity period (1 year)
-    // X509_gmtime_adj(X509_get_notBefore(cert), 0);
-    // X509_gmtime_adj(X509_get_notAfter(cert), 31536000L);
+    // Set validity period (1 year)
+    X509_gmtime_adj(X509_get_notBefore(cert), 0);
+    X509_gmtime_adj(X509_get_notAfter(cert), 31536000L);
 
     // Set subject and issuer (self-signed, so they're the same)
     X509_NAME *name = X509_get_subject_name(cert);
