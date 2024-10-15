@@ -91,7 +91,10 @@ extension KeyedDecodingContainer {
         return try ProtocolConfig(from: nestedDecoder, required)
     }
 
-    func decodeIfPresent(_: ProtocolConfig.Type, forKey key: K, _ required: Bool = false) throws -> ProtocolConfig {
+    func decodeIfPresent(_: ProtocolConfig.Type, forKey key: K, _ required: Bool = false) throws -> ProtocolConfig? {
+        guard contains(key), try !decodeNil(forKey: key) else {
+            return nil
+        }
         let nestedDecoder = try superDecoder(forKey: key)
         return try ProtocolConfig(from: nestedDecoder, required)
     }
