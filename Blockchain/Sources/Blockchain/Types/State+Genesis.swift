@@ -34,4 +34,6 @@ extension State {
 
         return state
     }
+    // TODO: add file genesis
+    // public static func fileGenesis(config: ProtocolConfigRef) throws -> State
 }

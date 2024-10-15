@@ -1,0 +1,26 @@
+{
+  "name": "Mainnet",
+  "id": "mainnet-1",
+  "bootnodes": [
+    "127.0.0.1:9955"
+  ],
+  "preset": "mainnet",
+  "config": {
+    "auditTranchePeriod": 100,
+    "additionalMinBalancePerStateItem": 10,
+    "additionalMinBalancePerStateByte": 1,
+    "serviceMinBalance": 1000,
+    "totalNumberOfCores": 4,
+    "preimagePurgePeriod": 1000,
+    "epochLength": 10000,
+    "auditBiasFactor": 5,
+    "coreAccumulationGas": 100,
+    "workPackageAuthorizerGas": 50,
+    "workPackageRefineGas": 20,
+    "recentHistorySize": 100,
+    "maxWorkItems": 10,
+    "maxTicketsPerExtrinsic": 5,
+    "maxLookupAnchorAge": 100
+  },
+  "state": "0xabcdef"
+}
