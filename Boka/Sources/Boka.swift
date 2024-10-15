@@ -59,7 +59,7 @@ struct Boka: AsyncCommand {
             context.console.info(help)
             return
         }
-
+        // TODO: fix version number issue #168
         if signature.version {
             context.console.info("Boka version 1.0.0")
             return

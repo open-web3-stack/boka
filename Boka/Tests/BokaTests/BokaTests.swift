@@ -29,6 +29,14 @@ final class BokaTests {
         }
     }
 
+    @Test func commandWithWrongFilePath() async throws {
+        let sepc = "/path/to/wrong/file.json"
+        let input = CommandInput(arguments: ["Boka", "--config-file", sepc])
+        await #expect(throws: Error.self) {
+            try await console.run(boka, input: input)
+        }
+    }
+
     @Test func commandWithAllConfig() async throws {
         let sepc = ResourceLoader.loadResource(named: "devnet_allconfig_spec.json")!.path()
         let genesis: Genesis = .file(path: sepc)
@@ -53,13 +61,5 @@ final class BokaTests {
         let (_, protocolConfig) = try await genesis.load()
         #expect(protocolConfig.value.maxWorkItems == config.maxWorkItems)
         #expect(protocolConfig.value.serviceMinBalance == config.serviceMinBalance)
-    }
-
-    @Test func commandWithWrongFilePath() async throws {
-        let sepc = "/path/to/wrong/file.json"
-        let input = CommandInput(arguments: ["Boka", "--config-file", sepc])
-        await #expect(throws: Error.self) {
-            try await console.run(boka, input: input)
-        }
     }
 }
