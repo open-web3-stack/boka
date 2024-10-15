@@ -191,19 +191,6 @@ extension Ref: @retroactive PvmConfig where T == ProtocolConfig {
     public var pvmProgramInitSegmentSize: Int { value.pvmProgramInitSegmentSize }
 }
 
-extension KeyedDecodingContainer {
-    func decode(_: ProtocolConfig.Type, forKey key: K) throws -> ProtocolConfig {
-        let nestedDecoder = try superDecoder(forKey: key)
-        return try ProtocolConfig(from: nestedDecoder, true)
-    }
-
-    func decodeIfPresent(_: ProtocolConfig.Type, forKey key: K, required _: Bool) throws -> ProtocolConfig? {
-        guard contains(key) else { return nil }
-        let nestedDecoder = try superDecoder(forKey: key)
-        return try ProtocolConfig(from: nestedDecoder)
-    }
-}
-
 extension ProtocolConfig {
     public func merged(with other: ProtocolConfig) -> ProtocolConfig {
         ProtocolConfig(

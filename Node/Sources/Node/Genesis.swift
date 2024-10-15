@@ -86,15 +86,13 @@ extension Genesis {
 }
 
 extension KeyedDecodingContainer {
-    func decode(_: ProtocolConfig.Type, forKey key: K, _ required: Bool = true) throws -> ProtocolConfig {
+    func decode(_: ProtocolConfig.Type, forKey key: K, required: Bool = true) throws -> ProtocolConfig {
         let nestedDecoder = try superDecoder(forKey: key)
         return try ProtocolConfig(from: nestedDecoder, required)
     }
 
-    func decodeIfPresent(_: ProtocolConfig.Type, forKey key: K, _ required: Bool = false) throws -> ProtocolConfig? {
-        guard contains(key), try !decodeNil(forKey: key) else {
-            return nil
-        }
+    func decodeIfPresent(_: ProtocolConfig.Type, forKey key: K, required: Bool = false) throws -> ProtocolConfig? {
+        guard contains(key) else { return nil }
         let nestedDecoder = try superDecoder(forKey: key)
         return try ProtocolConfig(from: nestedDecoder, required)
     }
@@ -116,9 +114,9 @@ struct GenesisData: Sendable, Codable {
         bootnodes = try container.decode([String].self, forKey: .bootnodes)
         preset = try container.decodeIfPresent(String.self, forKey: .preset)
         if preset == nil || !["dev", "mainnet"].contains(preset) {
-            config = try container.decode(ProtocolConfig.self, forKey: .config, true)
+            config = try container.decode(ProtocolConfig.self, forKey: .config, required: true)
         } else {
-            config = try container.decodeIfPresent(ProtocolConfig.self, forKey: .config, false)
+            config = try container.decodeIfPresent(ProtocolConfig.self, forKey: .config, required: false)
         }
         state = try container.decode(String.self, forKey: .state)
     }
