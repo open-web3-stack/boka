@@ -33,11 +33,14 @@ extension Genesis {
             let preset = genesis.preset?.lowercased()
             switch preset {
             case "dev", "mainnet":
-                config = (preset == "dev" ? ProtocolConfigRef.dev.value : ProtocolConfigRef.mainnet.value)
+                config =
+                    (preset == "dev"
+                        ? ProtocolConfigRef.dev.value : ProtocolConfigRef.mainnet.value)
                 if let genesisConfig = genesis.config {
                     config = config.merged(with: genesisConfig)
                 }
             default:
+                // In this case, genesis.config has been verified to be non-nil
                 config = genesis.config!
             }
             let configRef = Ref(config)
@@ -64,9 +67,6 @@ extension Genesis {
         if preset != nil, !["dev", "mainnet"].contains(preset!) {
             throw GenesisError.invalidFormat("Invalid preset value. Must be 'dev' or 'mainnet'.")
         }
-        if preset == nil, genesis.validateConfig() {
-            throw GenesisError.invalidFormat("Missing 'preset' or 'config' field.")
-        }
     }
 
     func readAndValidateGenesis(from filePath: String) throws -> GenesisData {
@@ -85,6 +85,18 @@ extension Genesis {
     }
 }
 
+extension KeyedDecodingContainer {
+    func decode(_: ProtocolConfig.Type, forKey key: K, _ required: Bool = true) throws -> ProtocolConfig {
+        let nestedDecoder = try superDecoder(forKey: key)
+        return try ProtocolConfig(from: nestedDecoder, required)
+    }
+
+    func decodeIfPresent(_: ProtocolConfig.Type, forKey key: K, _ required: Bool = false) throws -> ProtocolConfig {
+        let nestedDecoder = try superDecoder(forKey: key)
+        return try ProtocolConfig(from: nestedDecoder, required)
+    }
+}
+
 struct GenesisData: Sendable, Codable {
     var name: String
     var id: String
@@ -100,23 +112,11 @@ struct GenesisData: Sendable, Codable {
         id = try container.decode(String.self, forKey: .id)
         bootnodes = try container.decode([String].self, forKey: .bootnodes)
         preset = try container.decodeIfPresent(String.self, forKey: .preset)
-        config = try container.decodeIfPresent(ProtocolConfig.self, forKey: .config)
+        if preset == nil || !["dev", "mainnet"].contains(preset) {
+            config = try container.decode(ProtocolConfig.self, forKey: .config, true)
+        } else {
+            config = try container.decodeIfPresent(ProtocolConfig.self, forKey: .config, false)
+        }
         state = try container.decode(String.self, forKey: .state)
-    }
-
-    func validateConfig() -> Bool {
-        guard let config: ProtocolConfig else {
-            return true
-        }
-        let mirror = Mirror(reflecting: config)
-        for child in mirror.children {
-            if let value = child.value as? Int, value == 0 {
-                return true
-            }
-            if let value = child.value as? Gas, value.value == 0 {
-                return true
-            }
-        }
-        return false
     }
 }

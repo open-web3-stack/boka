@@ -191,6 +191,19 @@ extension Ref: @retroactive PvmConfig where T == ProtocolConfig {
     public var pvmProgramInitSegmentSize: Int { value.pvmProgramInitSegmentSize }
 }
 
+extension KeyedDecodingContainer {
+    func decode(_: ProtocolConfig.Type, forKey key: K) throws -> ProtocolConfig {
+        let nestedDecoder = try superDecoder(forKey: key)
+        return try ProtocolConfig(from: nestedDecoder, true)
+    }
+
+    func decodeIfPresent(_: ProtocolConfig.Type, forKey key: K, required _: Bool) throws -> ProtocolConfig? {
+        guard contains(key) else { return nil }
+        let nestedDecoder = try superDecoder(forKey: key)
+        return try ProtocolConfig(from: nestedDecoder)
+    }
+}
+
 extension ProtocolConfig {
     public func merged(with other: ProtocolConfig) -> ProtocolConfig {
         ProtocolConfig(
@@ -263,76 +276,93 @@ extension ProtocolConfig {
         )
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder, _ required: Bool = false) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
-        auditTranchePeriod =
-            try container.decodeIfPresent(Int.self, forKey: .auditTranchePeriod) ?? 0
-        additionalMinBalancePerStateItem =
-            try container.decodeIfPresent(Int.self, forKey: .additionalMinBalancePerStateItem) ?? 0
-        additionalMinBalancePerStateByte =
-            try container.decodeIfPresent(Int.self, forKey: .additionalMinBalancePerStateByte) ?? 0
-        serviceMinBalance =
-            try container.decodeIfPresent(Int.self, forKey: .serviceMinBalance) ?? 0
-        totalNumberOfCores =
-            try container.decodeIfPresent(Int.self, forKey: .totalNumberOfCores) ?? 0
-        preimagePurgePeriod =
-            try container.decodeIfPresent(Int.self, forKey: .preimagePurgePeriod) ?? 0
-        epochLength = try container.decodeIfPresent(Int.self, forKey: .epochLength) ?? 0
-        auditBiasFactor =
-            try container.decodeIfPresent(Int.self, forKey: .auditBiasFactor) ?? 0
-        coreAccumulationGas =
-            try container.decodeIfPresent(Gas.self, forKey: .coreAccumulationGas) ?? Gas(0)
-        workPackageAuthorizerGas =
-            try container.decodeIfPresent(Gas.self, forKey: .workPackageAuthorizerGas)
-                ?? Gas(0)
-        workPackageRefineGas =
-            try container.decodeIfPresent(Gas.self, forKey: .workPackageRefineGas) ?? Gas(0)
-        recentHistorySize =
-            try container.decodeIfPresent(Int.self, forKey: .recentHistorySize) ?? 0
-        maxWorkItems = try container.decodeIfPresent(Int.self, forKey: .maxWorkItems) ?? 0
-        maxTicketsPerExtrinsic =
-            try container.decodeIfPresent(Int.self, forKey: .maxTicketsPerExtrinsic) ?? 0
-        maxLookupAnchorAge =
-            try container.decodeIfPresent(Int.self, forKey: .maxLookupAnchorAge) ?? 0
-        transferMemoSize =
-            try container.decodeIfPresent(Int.self, forKey: .transferMemoSize) ?? 0
-        ticketEntriesPerValidator =
-            try container.decodeIfPresent(Int.self, forKey: .ticketEntriesPerValidator) ?? 0
-        maxAuthorizationsPoolItems =
-            try container.decodeIfPresent(Int.self, forKey: .maxAuthorizationsPoolItems) ?? 0
-        slotPeriodSeconds =
-            try container.decodeIfPresent(Int.self, forKey: .slotPeriodSeconds) ?? 0
-        maxAuthorizationsQueueItems =
-            try container.decodeIfPresent(Int.self, forKey: .maxAuthorizationsQueueItems) ?? 0
-        coreAssignmentRotationPeriod =
-            try container.decodeIfPresent(Int.self, forKey: .coreAssignmentRotationPeriod) ?? 0
-        maxServiceCodeSize =
-            try container.decodeIfPresent(Int.self, forKey: .maxServiceCodeSize) ?? 0
-        preimageReplacementPeriod =
-            try container.decodeIfPresent(Int.self, forKey: .preimageReplacementPeriod) ?? 0
-        totalNumberOfValidators =
-            try container.decodeIfPresent(Int.self, forKey: .totalNumberOfValidators) ?? 0
-        erasureCodedPieceSize =
-            try container.decodeIfPresent(Int.self, forKey: .erasureCodedPieceSize) ?? 0
-        maxWorkPackageManifestEntries =
-            try container.decodeIfPresent(Int.self, forKey: .maxWorkPackageManifestEntries) ?? 0
-        maxEncodedWorkPackageSize =
-            try container.decodeIfPresent(Int.self, forKey: .maxEncodedWorkPackageSize) ?? 0
-        maxEncodedWorkReportSize =
-            try container.decodeIfPresent(Int.self, forKey: .maxEncodedWorkReportSize) ?? 0
-        erasureCodedSegmentSize =
-            try container.decodeIfPresent(Int.self, forKey: .erasureCodedSegmentSize) ?? 0
-        ticketSubmissionEndSlot =
-            try container.decodeIfPresent(Int.self, forKey: .ticketSubmissionEndSlot) ?? 0
-        pvmDynamicAddressAlignmentFactor =
-            try container.decodeIfPresent(Int.self, forKey: .pvmDynamicAddressAlignmentFactor) ?? 0
-        pvmProgramInitInputDataSize =
-            try container.decodeIfPresent(Int.self, forKey: .pvmProgramInitInputDataSize) ?? 0
-        pvmProgramInitPageSize =
-            try container.decodeIfPresent(Int.self, forKey: .pvmProgramInitPageSize) ?? 0
-        pvmProgramInitSegmentSize =
-            try container.decodeIfPresent(Int.self, forKey: .pvmProgramInitSegmentSize) ?? 0
+        func decode<T: Decodable>(_ key: CodingKeys, defaultValue: T, required: Bool) throws -> T {
+            if required {
+                try container.decode(T.self, forKey: key)
+            } else {
+                try container.decodeIfPresent(T.self, forKey: key) ?? defaultValue
+            }
+        }
+
+        auditTranchePeriod = try decode(.auditTranchePeriod, defaultValue: 0, required: required)
+        additionalMinBalancePerStateItem = try decode(
+            .additionalMinBalancePerStateItem, defaultValue: 0, required: required
+        )
+        additionalMinBalancePerStateByte = try decode(
+            .additionalMinBalancePerStateByte, defaultValue: 0, required: required
+        )
+        serviceMinBalance = try decode(.serviceMinBalance, defaultValue: 0, required: required)
+        totalNumberOfCores = try decode(.totalNumberOfCores, defaultValue: 0, required: required)
+        preimagePurgePeriod = try decode(.preimagePurgePeriod, defaultValue: 0, required: required)
+        epochLength = try decode(.epochLength, defaultValue: 0, required: required)
+        auditBiasFactor = try decode(.auditBiasFactor, defaultValue: 0, required: required)
+        coreAccumulationGas = try decode(
+            .coreAccumulationGas, defaultValue: Gas(0), required: required
+        )
+        workPackageAuthorizerGas = try decode(
+            .workPackageAuthorizerGas, defaultValue: Gas(0), required: required
+        )
+        workPackageRefineGas = try decode(
+            .workPackageRefineGas, defaultValue: Gas(0), required: required
+        )
+        recentHistorySize = try decode(.recentHistorySize, defaultValue: 0, required: required)
+        maxWorkItems = try decode(.maxWorkItems, defaultValue: 0, required: required)
+        maxTicketsPerExtrinsic = try decode(
+            .maxTicketsPerExtrinsic, defaultValue: 0, required: required
+        )
+        maxLookupAnchorAge = try decode(.maxLookupAnchorAge, defaultValue: 0, required: required)
+        transferMemoSize = try decode(.transferMemoSize, defaultValue: 0, required: required)
+        ticketEntriesPerValidator = try decode(
+            .ticketEntriesPerValidator, defaultValue: 0, required: required
+        )
+        maxAuthorizationsPoolItems = try decode(
+            .maxAuthorizationsPoolItems, defaultValue: 0, required: required
+        )
+        slotPeriodSeconds = try decode(.slotPeriodSeconds, defaultValue: 0, required: required)
+        maxAuthorizationsQueueItems = try decode(
+            .maxAuthorizationsQueueItems, defaultValue: 0, required: required
+        )
+        coreAssignmentRotationPeriod = try decode(
+            .coreAssignmentRotationPeriod, defaultValue: 0, required: required
+        )
+        maxServiceCodeSize = try decode(.maxServiceCodeSize, defaultValue: 0, required: required)
+        preimageReplacementPeriod = try decode(
+            .preimageReplacementPeriod, defaultValue: 0, required: required
+        )
+        totalNumberOfValidators = try decode(
+            .totalNumberOfValidators, defaultValue: 0, required: required
+        )
+        erasureCodedPieceSize = try decode(.erasureCodedPieceSize, defaultValue: 0, required: required)
+        maxWorkPackageManifestEntries = try decode(
+            .maxWorkPackageManifestEntries, defaultValue: 0, required: required
+        )
+        maxEncodedWorkPackageSize = try decode(
+            .maxEncodedWorkPackageSize, defaultValue: 0, required: required
+        )
+        maxEncodedWorkReportSize = try decode(
+            .maxEncodedWorkReportSize, defaultValue: 0, required: required
+        )
+        erasureCodedSegmentSize = try decode(
+            .erasureCodedSegmentSize, defaultValue: 0, required: required
+        )
+        ticketSubmissionEndSlot = try decode(
+            .ticketSubmissionEndSlot, defaultValue: 0, required: required
+        )
+        pvmDynamicAddressAlignmentFactor = try decode(
+            .pvmDynamicAddressAlignmentFactor, defaultValue: 0, required: required
+        )
+        pvmProgramInitInputDataSize = try decode(
+            .pvmProgramInitInputDataSize, defaultValue: 0, required: required
+        )
+        pvmProgramInitPageSize = try decode(
+            .pvmProgramInitPageSize, defaultValue: 0, required: required
+        )
+        pvmProgramInitSegmentSize = try decode(
+            .pvmProgramInitSegmentSize, defaultValue: 0, required: required
+        )
     }
 }
 

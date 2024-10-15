@@ -4,6 +4,7 @@
   "bootnodes": [
     "127.0.0.1:9955"
   ],
+  "preset": "mainnet",
   "config": {
     "auditTranchePeriod": 100,
     "additionalMinBalancePerStateItem": 10,
