@@ -19,6 +19,15 @@ final class BokaTests {
         boka = Boka()
     }
 
+    @Test func missCommand() async throws {
+        let sepc = ResourceLoader.loadResource(named: "devnet_allconfig_spec.json")!.path()
+        print("path = \(sepc)")
+        let input = CommandInput(arguments: ["Boka", "-m", sepc])
+        await #expect(throws: Error.self) {
+            try await console.run(boka, input: input)
+        }
+    }
+
     @Test func commandWithAllConfig() async throws {
         let sepc = ResourceLoader.loadResource(named: "devnet_allconfig_spec.json")!.path()
         print("path = \(sepc)")

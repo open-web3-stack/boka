@@ -104,7 +104,6 @@ struct Boka: AsyncCommand {
         }
 
         let (rpcAddress, rpcPort) = try Regexs.parseAddress(rpcListenAddress)
-        let services = try await Tracing.bootstrap("Boka", loggerOnly: true)
         let config = Node.Config(rpc: RPCConfig(listenAddress: rpcAddress, port: rpcPort))
         let eventBus = EventBus(
             eventMiddleware: .serial(
@@ -122,6 +121,7 @@ struct Boka: AsyncCommand {
         let node: ValidatorNode = try await ValidatorNode(
             genesis: genesis, config: config, eventBus: eventBus, keystore: keystore
         )
+        let services = try await Tracing.bootstrap("Boka", loggerOnly: true)
         for service in services {
             Task {
                 try await service.run()
