@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Boka}",
+            "name": "Debug Boka",
+            "program": "${workspaceFolder:Boka}/.build/debug/Boka",
+            "preLaunchTask": "swift: Build Debug Boka"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Boka}",
+            "name": "Release Boka",
+            "program": "${workspaceFolder:Boka}/.build/release/Boka",
+            "preLaunchTask": "swift: Build Release Boka"
+        }
+    ]
+}
