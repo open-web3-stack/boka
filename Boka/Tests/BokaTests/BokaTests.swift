@@ -1,13 +1,36 @@
-import XCTest
+import ConsoleKit
+import Foundation
+import Testing
 
 @testable import Boka
 
-final class BokaTests: XCTestCase {
-    func testExample() throws {
-        // XCTest Documentation
-        // https://developer.apple.com/documentation/xctest
+enum ResourceLoader {
+    static func loadResource(named name: String) -> URL? {
+        let bundle = Bundle.module
+        return bundle.url(forResource: name, withExtension: nil, subdirectory: "chainfiles")
+    }
+}
 
-        // Defining Test Cases and Test Methods
-        // https://developer.apple.com/documentation/xctest/defining_test_cases_and_test_methods
+final class BokaTests {
+    var console: Terminal
+    var boka: Boka
+    init() {
+        console = Terminal()
+        boka = Boka()
+    }
+
+    @Test func commandWithAllConfig() async throws {
+        let sepc = ResourceLoader.loadResource(named: "devnet_allconfig_spec.json")!.path()
+        print("path = \(sepc)")
+        let input = CommandInput(arguments: ["Boka", "-f", sepc])
+        try await console.run(boka, input: input)
+    }
+
+    @Test func commandWithWrongFilePath() async throws {
+        let sepc = "/path/to/wrong/file.json"
+        let input = CommandInput(arguments: ["Boka", "--config-file", sepc])
+        await #expect(throws: Error.self) {
+            try await console.run(boka, input: input)
+        }
     }
 }

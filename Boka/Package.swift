@@ -14,6 +14,7 @@ let package = Package(
         .package(url: "https://github.com/slashmo/swift-otel.git", from: "0.9.0"),
         .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.6.0"),
         .package(url: "https://github.com/vapor/console-kit.git", from: "4.15.0"),
+        .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -27,11 +28,15 @@ let package = Package(
                 .product(name: "OTel", package: "swift-otel"),
                 .product(name: "OTLPGRPC", package: "swift-otel"),
                 .product(name: "ConsoleKit", package: "console-kit"),
-            ]
+            ],
+            resources: [.copy("../chainfiles")]
         ),
         .testTarget(
             name: "BokaTests",
-            dependencies: ["Boka"]
+            dependencies: [
+                "Boka",
+                .product(name: "Testing", package: "swift-testing"),
+            ]
         ),
     ],
     swiftLanguageModes: [.version("6")]
