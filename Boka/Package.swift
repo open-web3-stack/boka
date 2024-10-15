@@ -28,14 +28,16 @@ let package = Package(
                 .product(name: "OTel", package: "swift-otel"),
                 .product(name: "OTLPGRPC", package: "swift-otel"),
                 .product(name: "ConsoleKit", package: "console-kit"),
-            ],
-            resources: [.copy("../chainfiles")]
+            ]
         ),
         .testTarget(
             name: "BokaTests",
             dependencies: [
                 "Boka",
                 .product(name: "Testing", package: "swift-testing"),
+            ],
+            resources: [
+                .copy("chainfiles"),
             ]
         ),
     ],
