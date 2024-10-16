@@ -16,6 +16,7 @@ public struct NetAddr: Hashable, Sendable {
         self.ipAddress = ipAddress
         self.port = port
         self.ipv4 = ipv4
+        // TODO: automatically determine the ip address family
     }
 
     public init(quicAddr: QUIC_ADDR) {

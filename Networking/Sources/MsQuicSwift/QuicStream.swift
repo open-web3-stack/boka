@@ -72,7 +72,7 @@ public final class QuicStream: Sendable {
     public func shutdown(errorCode: QuicErrorCode = .success) throws {
         logger.debug("closing stream \(errorCode)")
 
-        try storage.mutate { storage in
+        try storage.write { storage in
             guard let storage2 = storage else {
                 throw QuicError.alreadyClosed
             }
@@ -88,7 +88,7 @@ public final class QuicStream: Sendable {
         }
     }
 
-    public func send(with data: Data, startStream: Bool = false, closeStream: Bool = false) throws {
+    public func send(data: Data, startStream: Bool = false, closeStream: Bool = false) throws {
         logger.trace("Sending \(data.count) bytes")
 
         try storage.read { storage in
@@ -240,4 +240,14 @@ private func streamCallback(
         .takeUnretainedValue()
 
     return handle.callbackHandler(event: event!).rawValue
+}
+
+extension QuicStream: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(ObjectIdentifier(self))
+    }
+
+    public static func == (lhs: QuicStream, rhs: QuicStream) -> Bool {
+        ObjectIdentifier(lhs) == ObjectIdentifier(rhs)
+    }
 }

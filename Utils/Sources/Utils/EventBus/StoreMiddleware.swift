@@ -12,7 +12,7 @@ public struct StoreMiddleware: MiddlewareProtocol {
     public func handle<T: Sendable>(_ event: T, next: @escaping MiddlewareHandler<T>) async throws {
         logger.debug(">>> dispatching event: \(event)")
         let task = Task { try await next(event) }
-        storage.mutate { storage in
+        storage.write { storage in
             storage.append((event, task))
         }
         try await task.value

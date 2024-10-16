@@ -23,7 +23,7 @@ public enum QuicStatus: Equatable, Sendable, Codable, RawRepresentable {
 }
 
 extension QuicStatus {
-    var isSucceeded: Bool {
+    public var isSucceeded: Bool {
         switch self {
         case let .code(code):
             Int32(bitPattern: code.rawValue) <= 0

@@ -65,7 +65,7 @@ final class MockScheduler: Scheduler, Sendable {
             storage.tasks.insert(task)
         }
         return Cancellable {
-            self.storage.mutate { storage in
+            self.storage.write { storage in
                 if let index = storage.tasks.array.firstIndex(where: { $0.id == id }) {
                     let task = storage.tasks.remove(at: index)
                     task.cancel?()
@@ -80,7 +80,7 @@ final class MockScheduler: Scheduler, Sendable {
     }
 
     func advanceNext(to time: TimeInterval) async -> Bool {
-        let task: SchedulerTask? = storage.mutate { storage in
+        let task: SchedulerTask? = storage.write { storage in
             if let task = storage.tasks.array.first, task.scheduleTime <= time {
                 storage.tasks.remove(at: 0)
                 return task

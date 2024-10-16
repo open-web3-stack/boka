@@ -20,12 +20,14 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.0"),
         .package(url: "https://github.com/apple/swift-certificates.git", from: "1.5.0"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
+        .package(url: "https://github.com/gh123man/Async-Channels.git", from: "1.0.0"),
     ],
     targets: [
         .target(
             name: "Networking",
             dependencies: [
                 "MsQuicSwift",
+                .product(name: "AsyncChannels", package: "Async-Channels"),
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "X509", package: "swift-certificates"),
             ]
