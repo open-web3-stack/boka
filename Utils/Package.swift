@@ -36,7 +36,7 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Atomics", package: "swift-atomics"),
                 .product(name: "Numerics", package: "swift-numerics"),
-                "blst",
+                "bls",
                 "bandersnatch_vrfs",
                 "erasure_coding",
                 "SHA3IUF",
@@ -54,7 +54,7 @@ let package = Package(
             publicHeadersPath: "."
         ),
         .systemLibrary(
-            name: "blst",
+            name: "bls",
             path: "Sources"
         ),
         .systemLibrary(

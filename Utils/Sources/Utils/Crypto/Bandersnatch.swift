@@ -4,81 +4,6 @@ import TracingUtils
 
 private let logger = Logger(label: "Bandersnatch")
 
-private func _call<E: Error>(
-    data: [Data],
-    out: inout Data?,
-    fn: ([(ptr: UnsafeRawPointer, count: UInt)], (ptr: UnsafeMutableRawPointer, count: UInt)?) -> Int,
-    onErr: (Int) throws(E) -> Void
-) throws(E) {
-    func helper(data: ArraySlice<Data>, ptr: [(ptr: UnsafeRawPointer, count: UInt)]) -> Int {
-        if data.isEmpty {
-            if var outData = out {
-                let res = outData.withUnsafeMutableBytes { (bufferPtr: UnsafeMutableRawBufferPointer) -> Int in
-                    guard let bufferAddress = bufferPtr.baseAddress else {
-                        fatalError("unreachable: bufferPtr.baseAddress is nil")
-                    }
-                    return fn(ptr, (ptr: bufferAddress, count: UInt(bufferPtr.count)))
-                }
-                out = outData
-                return res
-            }
-            return fn(ptr, nil)
-        }
-        let rest = data.dropFirst()
-        let first = data.first!
-        return first.withUnsafeBytes { (bufferPtr: UnsafeRawBufferPointer) -> Int in
-            guard let bufferAddress = bufferPtr.baseAddress else {
-                fatalError("unreachable: bufferPtr.baseAddress is nil")
-            }
-            return helper(data: rest, ptr: ptr + [(bufferAddress, UInt(bufferPtr.count))])
-        }
-    }
-
-    let ret = helper(data: data[...], ptr: [])
-
-    if ret != 0 {
-        try onErr(ret)
-    }
-}
-
-private func call<E: Error>(
-    _ data: Data...,
-    fn: ([(ptr: UnsafeRawPointer, count: UInt)]) -> Int,
-    onErr: (Int) throws(E) -> Void
-) throws(E) {
-    var out: Data?
-    try _call(data: data, out: &out, fn: { ptrs, _ in fn(ptrs) }, onErr: onErr)
-}
-
-private func call(
-    _ data: Data...,
-    fn: ([(ptr: UnsafeRawPointer, count: UInt)]) -> Int
-) {
-    var out: Data?
-    _call(data: data, out: &out, fn: { ptrs, _ in fn(ptrs) }, onErr: { err in fatalError("unreachable: \(err)") })
-}
-
-private func call<E: Error>(
-    _ data: Data...,
-    out: inout Data,
-    fn: ([(ptr: UnsafeRawPointer, count: UInt)], (ptr: UnsafeMutableRawPointer, count: UInt)) -> Int,
-    onErr: (Int) throws(E) -> Void
-) throws(E) {
-    var out2: Data? = out
-    try _call(data: data, out: &out2, fn: { ptrs, out_buf in fn(ptrs, out_buf!) }, onErr: onErr)
-    out = out2!
-}
-
-private func call(
-    _ data: Data...,
-    out: inout Data,
-    fn: ([(ptr: UnsafeRawPointer, count: UInt)], (ptr: UnsafeMutableRawPointer, count: UInt)) -> Int
-) {
-    var out2: Data? = out
-    _call(data: data, out: &out2, fn: { ptrs, out_buf in fn(ptrs, out_buf!) }, onErr: { err in fatalError("unreachable: \(err)") })
-    out = out2!
-}
-
 public enum Bandersnatch: KeyType {
     public enum Error: Swift.Error {
         case createSecretFailed(Int)
@@ -100,7 +25,7 @@ public enum Bandersnatch: KeyType {
         public init(from seed: Data32) throws(Error) {
             var ptr: OpaquePointer!
 
-            try call(seed.data) { ptrs in
+            try FFIUtils.call(seed.data) { ptrs in
                 secret_new(ptrs[0].ptr, ptrs[0].count, &ptr)
             } onErr: { err throws(Error) in
                 throw .createSecretFailed(err)
@@ -125,7 +50,7 @@ public enum Bandersnatch: KeyType {
 
             var output = Data(repeating: 0, count: 96)
 
-            try call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
+            try FFIUtils.call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
                 prover_ietf_vrf_sign(
                     ptr.value,
                     ptrs[0].ptr,
@@ -147,7 +72,7 @@ public enum Bandersnatch: KeyType {
 
             var output = Data(repeating: 0, count: 32)
 
-            try call(vrfInputData, out: &output) { ptrs, out_buf in
+            try FFIUtils.call(vrfInputData, out: &output) { ptrs, out_buf in
                 secret_output(
                     ptr.value,
                     ptrs[0].ptr,
@@ -169,7 +94,7 @@ public enum Bandersnatch: KeyType {
 
         public init(data: Data32) throws(Error) {
             var ptr: OpaquePointer!
-            try call(data.data) { ptrs in
+            try FFIUtils.call(data.data) { ptrs in
                 public_new_from_data(ptrs[0].ptr, ptrs[0].count, &ptr)
             } onErr: { err throws(Error) in
                 throw .createPublicKeyFailed(err)
@@ -180,14 +105,14 @@ public enum Bandersnatch: KeyType {
 
         fileprivate init(secretKey: OpaquePointer) throws(Error) {
             var ptr: OpaquePointer!
-            try call { _ in
+            try FFIUtils.call { _ in
                 public_new_from_secret(secretKey, &ptr)
             } onErr: { err throws(Error) in
                 throw .createRingContextFailed(err)
             }
 
             var data = Data(repeating: 0, count: 32)
-            call(out: &data) { _, out_buf in
+            FFIUtils.call(out: &data) { _, out_buf in
                 public_serialize_compressed(ptr, out_buf.ptr, out_buf.count)
             }
 
@@ -242,7 +167,7 @@ public enum Bandersnatch: KeyType {
 
             var output = Data(repeating: 0, count: 32)
 
-            try call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in
+            try FFIUtils.call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in
                 verifier_ietf_vrf_verify(
                     ptr.value,
                     ptrs[0].ptr,
@@ -267,7 +192,7 @@ public enum Bandersnatch: KeyType {
 
         public init(size: UInt) throws(Error) {
             var ptr: OpaquePointer!
-            try call { _ in
+            try FFIUtils.call { _ in
                 ring_context_new(size, &ptr)
             } onErr: { err throws(Error) in
                 throw .createRingContextFailed(err)
@@ -306,7 +231,7 @@ public enum Bandersnatch: KeyType {
 
             var output = Data(repeating: 0, count: 784)
 
-            try call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
+            try FFIUtils.call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
                 ringPtrs.withUnsafeBufferPointer { ringPtrs in
                     prover_ring_vrf_sign(
                         secret.ptr.value,
@@ -338,7 +263,7 @@ public enum Bandersnatch: KeyType {
             let ringPtrs = ring.map { $0?.ptr.value as OpaquePointer? }
 
             var ptr: OpaquePointer!
-            try call { _ in
+            try FFIUtils.call { _ in
                 ringPtrs.withUnsafeBufferPointer { ringPtrs in
                     ring_commitment_new_from_ring(
                         ringPtrs.baseAddress,
@@ -353,7 +278,7 @@ public enum Bandersnatch: KeyType {
             }
 
             var out = Data(repeating: 0, count: 144)
-            try call(out: &out) { _, out_buf in
+            try FFIUtils.call(out: &out) { _, out_buf in
                 ring_commitment_serialize(ptr, out_buf.ptr, out_buf.count)
             } onErr: { err throws(Error) in
                 throw .serializeRingCommitmentFailed(err)
@@ -365,7 +290,7 @@ public enum Bandersnatch: KeyType {
 
         public init(data: Data144) throws(Error) {
             var ptr: OpaquePointer!
-            try call(data.data) { ptrs in
+            try FFIUtils.call(data.data) { ptrs in
                 ring_commitment_new_from_data(ptrs[0].ptr, ptrs[0].count, &ptr)
             } onErr: { err throws(Error) in
                 throw .createRingCommitmentFailed(err)
@@ -405,7 +330,7 @@ public enum Bandersnatch: KeyType {
 
             var output = Data(repeating: 0, count: 32)
 
-            try call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in
+            try FFIUtils.call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in
                 verifier_ring_vrf_verify(
                     ctx.ptr.value,
                     commitment.ptr.value,
