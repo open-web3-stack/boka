@@ -4,6 +4,7 @@ import msquic
 import Utils
 
 public final class QuicListener: Sendable {
+    public let id: UniqueId
     private let logger: Logger
 
     fileprivate let handler: QuicEventHandler
@@ -18,7 +19,8 @@ public final class QuicListener: Sendable {
         listenAddress: NetAddr,
         alpns: [Data]
     ) throws {
-        logger = Logger(label: "QuicListener".uniqueId)
+        id = "QuicListener".uniqueId
+        logger = Logger(label: id)
         self.handler = handler
         self.registration = registration
         self.configuration = configuration
