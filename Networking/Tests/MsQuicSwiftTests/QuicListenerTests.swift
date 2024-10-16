@@ -71,7 +71,7 @@ struct QuicListenerTests {
 
         let stream1 = try clientConnection.createStream()
 
-        try stream1.send(with: Data("test data 1".utf8))
+        try stream1.send(data: Data("test data 1".utf8))
 
         try? await Task.sleep(for: .milliseconds(100))
         let (serverConnection, info) = serverHandler.events.value.compactMap {
@@ -89,7 +89,7 @@ struct QuicListenerTests {
         #expect(info.remoteAddress.ipAddress == "127.0.0.1")
 
         let stream2 = try serverConnection.createStream()
-        try stream2.send(with: Data("other test data 2".utf8))
+        try stream2.send(data: Data("other test data 2".utf8))
 
         try? await Task.sleep(for: .milliseconds(100))
         let remoteStream1 = clientHandler.events.value.compactMap {
@@ -100,7 +100,7 @@ struct QuicListenerTests {
                 nil
             }
         }.first!
-        try remoteStream1.send(with: Data("replay to 1".utf8))
+        try remoteStream1.send(data: Data("replay to 1".utf8))
 
         try? await Task.sleep(for: .milliseconds(100))
         let remoteStream2 = serverHandler.events.value.compactMap {
@@ -111,7 +111,7 @@ struct QuicListenerTests {
                 nil
             }
         }.first!
-        try remoteStream2.send(with: Data("another replay to 2".utf8))
+        try remoteStream2.send(data: Data("another replay to 2".utf8))
 
         try? await Task.sleep(for: .milliseconds(100))
         let receivedData = serverHandler.events.value.compactMap {

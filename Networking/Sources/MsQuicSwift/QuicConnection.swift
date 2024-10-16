@@ -285,3 +285,13 @@ private func connectionCallback(
 
     return handle.callbackHandler(event: event!).rawValue
 }
+
+extension QuicConnection: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(ObjectIdentifier(self))
+    }
+
+    public static func == (lhs: QuicConnection, rhs: QuicConnection) -> Bool {
+        ObjectIdentifier(lhs) == ObjectIdentifier(rhs)
+    }
+}
