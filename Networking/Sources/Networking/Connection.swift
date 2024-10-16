@@ -23,7 +23,7 @@ public final class Connection: Sendable {
         let stream = presistentStreams.read { presistentStreams in
             presistentStreams[kind]
         }
-        return try stream ?? presistentStreams.mutate { presistentStreams in
+        return try stream ?? presistentStreams.write { presistentStreams in
             if let stream = presistentStreams[kind] {
                 return stream
             }
@@ -54,7 +54,7 @@ public final class Connection: Sendable {
             }
             if let upKind = UniquePresistentStreamKind(rawValue: byte) {
                 // TODO: handle duplicated UP streams
-                presistentStreams.mutate { presistentStreams in
+                presistentStreams.write { presistentStreams in
                     presistentStreams[upKind] = stream
                 }
                 return

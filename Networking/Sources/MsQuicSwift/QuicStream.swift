@@ -72,7 +72,7 @@ public final class QuicStream: Sendable {
     public func shutdown(errorCode: QuicErrorCode = .success) throws {
         logger.debug("closing stream \(errorCode)")
 
-        try storage.mutate { storage in
+        try storage.write { storage in
             guard let storage2 = storage else {
                 throw QuicError.alreadyClosed
             }

@@ -107,7 +107,7 @@ public final class Peer: Sendable {
         let conn = impl.connections.read { connections in
             connections.byType[mode]?[address]
         }
-        return try conn ?? impl.connections.mutate { connections in
+        return try conn ?? impl.connections.write { connections in
             let curr = connections.byType[mode, default: [:]][address]
             if let curr {
                 return curr
@@ -170,7 +170,7 @@ final class PeerImpl: Sendable {
     }
 
     func addConnection(_ connection: QuicConnection, addr: NetAddr, mode: PeerMode) -> Bool {
-        connections.mutate { connections in
+        connections.write { connections in
             if mode == .builder {
                 let currentCount = connections.byType[mode]?.count ?? 0
                 if currentCount >= self.settings.maxBuilderConnections {
@@ -191,7 +191,7 @@ final class PeerImpl: Sendable {
     }
 
     func addStream(_ stream: Stream) {
-        streams.mutate { streams in
+        streams.write { streams in
             if streams[stream.stream] != nil {
                 self.logger.warning("stream already exists")
             }
@@ -237,7 +237,7 @@ private final class PeerEventHandler: QuicEventHandler {
     func connected(_: QuicConnection) {}
 
     func shutdownInitiated(_ connection: QuicConnection, reason _: ConnectionCloseReason) {
-        impl.connections.mutate { connections in
+        impl.connections.write { connections in
             if let conn = connections.byId[connection] {
                 connections.byId.removeValue(forKey: connection)
                 connections.byType[conn.mode]?.removeValue(forKey: conn.remoteAddress)
