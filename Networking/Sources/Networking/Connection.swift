@@ -5,25 +5,36 @@ import Utils
 
 private let logger = Logger(label: "Connection")
 
-public final class Connection: Sendable {
+public final class Connection<Handler: StreamHandler>: Sendable {
     let connection: QuicConnection
-    let impl: PeerImpl
+    let impl: PeerImpl<Handler>
     let mode: PeerMode
     let remoteAddress: NetAddr
-    let presistentStreams: ThreadSafeContainer<[UniquePresistentStreamKind: Stream]> = .init([:])
+    let presistentStreams: ThreadSafeContainer<
+        [Handler.PresistentHandler.StreamKind: Stream<Handler>]
+    > = .init([:])
+    let initiatedByLocal: Bool
 
-    init(_ connection: QuicConnection, impl: PeerImpl, mode: PeerMode, remoteAddress: NetAddr) {
+    public var id: UniqueId {
+        connection.id
+    }
+
+    init(_ connection: QuicConnection, impl: PeerImpl<Handler>, mode: PeerMode, remoteAddress: NetAddr, initiatedByLocal: Bool) {
         self.connection = connection
         self.impl = impl
         self.mode = mode
         self.remoteAddress = remoteAddress
+        self.initiatedByLocal = initiatedByLocal
     }
 
-    public func getStream(kind: UniquePresistentStreamKind) throws -> Stream {
+    func createPreistentStream(kind: Handler.PresistentHandler.StreamKind) throws -> Stream<Handler>? {
         let stream = presistentStreams.read { presistentStreams in
             presistentStreams[kind]
         }
-        return try stream ?? presistentStreams.write { presistentStreams in
+        if let stream {
+            return stream
+        }
+        let newStream = try presistentStreams.write { presistentStreams in
             if let stream = presistentStreams[kind] {
                 return stream
             }
@@ -31,16 +42,18 @@ public final class Connection: Sendable {
             presistentStreams[kind] = stream
             return stream
         }
+        try impl.presistentStreamHandler.streamOpened(stream: newStream, kind: kind)
+        return newStream
     }
 
-    private func createStream(kind: UInt8) throws -> Stream {
+    func createStream(kind: UInt8) throws -> Stream<Handler> {
         let stream = try Stream(connection.createStream(), impl: impl)
         impl.addStream(stream)
         try stream.send(data: Data([kind]))
         return stream
     }
 
-    public func createStream(kind: CommonEphemeralStreamKind) throws -> Stream {
+    func createStream(kind: Handler.EphemeralHandler.StreamKind) throws -> Stream<Handler> {
         try createStream(kind: kind.rawValue)
     }
 
@@ -52,14 +65,14 @@ public final class Connection: Sendable {
                 logger.debug("stream closed without receiving kind. status: \(stream.status)")
                 return
             }
-            if let upKind = UniquePresistentStreamKind(rawValue: byte) {
+            if let upKind = Handler.PresistentHandler.StreamKind(rawValue: byte) {
                 // TODO: handle duplicated UP streams
                 presistentStreams.write { presistentStreams in
                     presistentStreams[upKind] = stream
                 }
                 return
             }
-            if let ceKind = CommonEphemeralStreamKind(rawValue: byte) {
+            if let ceKind = Handler.EphemeralHandler.StreamKind(rawValue: byte) {
                 logger.debug("stream opened. kind: \(ceKind)")
                 // TODO: handle requests
             }
