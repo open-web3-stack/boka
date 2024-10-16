@@ -17,6 +17,7 @@ private enum State {
 }
 
 public final class QuicConnection: Sendable {
+    public let id: UniqueId
     private let logger: Logger
     private let storage: ThreadSafeContainer<Storage?>
     fileprivate let handler: QuicEventHandler
@@ -35,7 +36,8 @@ public final class QuicConnection: Sendable {
         registration: QuicRegistration,
         configuration: QuicConfiguration
     ) throws(QuicError) {
-        logger = Logger(label: "QuicConnection".uniqueId)
+        id = "QuicConnection".uniqueId
+        logger = Logger(label: id)
         self.handler = handler
 
         let registrationPtr = registration.ptr
@@ -69,7 +71,8 @@ public final class QuicConnection: Sendable {
         configuration: QuicConfiguration,
         connection: HQUIC
     ) throws(QuicError) {
-        logger = Logger(label: "QuicConnection".uniqueId)
+        id = "QuicConnection".uniqueId
+        logger = Logger(label: id)
         self.handler = handler
 
         let handle = ConnectionHandle(logger: logger, ptr: connection, api: registration.api)

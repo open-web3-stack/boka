@@ -3,14 +3,13 @@ import Logging
 import msquic
 import Utils
 
-private let logger = Logger(label: "QuicStream")
-
 private struct Storage {
     let handle: StreamHandle
     let connection: QuicConnection
 }
 
 public final class QuicStream: Sendable {
+    public let id: UniqueId
     private let logger: Logger
     private let storage: ThreadSafeContainer<Storage?>
     fileprivate let handler: QuicEventHandler
@@ -20,7 +19,8 @@ public final class QuicStream: Sendable {
         connection: QuicConnection,
         handler: QuicEventHandler
     ) throws(QuicError) {
-        logger = Logger(label: "QuicStream".uniqueId)
+        id = "QuicStream".uniqueId
+        logger = Logger(label: id)
         self.handler = handler
 
         let api = connection.api!
@@ -56,7 +56,8 @@ public final class QuicStream: Sendable {
         stream: HQUIC,
         handler: QuicEventHandler
     ) {
-        logger = Logger(label: "QuicStream".uniqueId)
+        id = "QuicStream".uniqueId
+        logger = Logger(label: id)
         self.handler = handler
 
         let handle = StreamHandle(logger: logger, ptr: stream, api: connection.api!)
