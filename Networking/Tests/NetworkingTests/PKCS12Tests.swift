@@ -57,7 +57,7 @@ struct PKCS12Tests {
 
         try? await Task.sleep(for: .milliseconds(50))
 
-        let data = clientHandler.events.value.compactMap {
+        let clientData = clientHandler.events.value.compactMap {
             switch $0 {
             case let .shouldOpen(_, certificate):
                 certificate as Data?
@@ -66,6 +66,17 @@ struct PKCS12Tests {
             }
         }
 
-        #expect(data.first!.count > 0)
+        #expect(clientData.first!.count > 0)
+
+        let serverData = serverHandler.events.value.compactMap {
+            switch $0 {
+            case let .shouldOpen(_, certificate):
+                certificate as Data?
+            default:
+                nil
+            }
+        }
+
+        #expect(serverData.first!.count > 0)
     }
 }

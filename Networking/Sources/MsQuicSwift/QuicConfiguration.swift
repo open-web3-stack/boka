@@ -42,6 +42,7 @@ public final class QuicConfiguration: Sendable {
 
             let flags = 0
                 | (client ? QUIC_CREDENTIAL_FLAG_CLIENT.rawValue : 0)
+                | (client ? 0 : QUIC_CREDENTIAL_FLAG_REQUIRE_CLIENT_AUTHENTICATION.rawValue)
                 // we validates it ourselves
                 | QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION.rawValue
                 // we need custom validation of the certificate
