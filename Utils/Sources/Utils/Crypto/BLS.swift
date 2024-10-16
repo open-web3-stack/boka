@@ -63,7 +63,7 @@ public enum BLS: KeyType {
         public init(data: Data144) throws(Error) {
             var ptr: OpaquePointer!
             try FFIUtils.call(data.data) { ptrs in
-                public_new_from_data(ptrs[0].ptr, ptrs[0].count, &ptr)
+                public_new_from_bytes(ptrs[0].ptr, ptrs[0].count, &ptr)
             } onErr: { err throws(Error) in
                 throw .createPublicKeyFailed(err)
             }
@@ -89,7 +89,7 @@ public enum BLS: KeyType {
         }
 
         deinit {
-            public_free(ptr.value)
+            bls_public_free(ptr.value)
         }
 
         public convenience init(from decoder: Decoder) throws {

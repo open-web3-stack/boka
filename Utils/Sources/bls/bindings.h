@@ -24,11 +24,11 @@ intptr_t keypair_sign(KeyPair *key_pair,
 
 intptr_t public_new_from_keypair(const KeyPair *key_pair, Public **out_ptr);
 
-intptr_t public_new_from_data(const uint8_t *data, uintptr_t len, Public **out_ptr);
+intptr_t public_new_from_bytes(const uint8_t *data, uintptr_t len, Public **out_ptr);
 
 intptr_t public_serialize(const Public *public_, uint8_t *out, uintptr_t out_len);
 
-void public_free(Public *public_);
+void bls_public_free(Public *public_);
 
 intptr_t public_verify(const Public *public_,
                        const uint8_t *signature,

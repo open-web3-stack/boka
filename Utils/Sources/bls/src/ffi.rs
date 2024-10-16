@@ -85,7 +85,7 @@ pub extern "C" fn public_new_from_keypair(
 }
 
 #[no_mangle]
-pub extern "C" fn public_new_from_data(
+pub extern "C" fn public_new_from_bytes(
     data: *const u8,
     len: usize,
     out_ptr: *mut *mut Public,
@@ -111,13 +111,16 @@ pub extern "C" fn public_serialize(public: *const Public, out: *mut u8, out_len:
         return 2;
     }
     let public: &Public = unsafe { &*public };
+    let res = public.to_bytes();
+    println!("res: {:?}, len: {}", res, res.len());
     let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
-    out_slice.copy_from_slice(&public.to_bytes());
+    out_slice.copy_from_slice(&res);
+    // out_slice.copy_from_slice(&public.to_bytes());
     0
 }
 
 #[no_mangle]
-pub extern "C" fn public_free(public: *mut Public) {
+pub extern "C" fn bls_public_free(public: *mut Public) {
     if !public.is_null() {
         unsafe {
             drop(Box::from_raw(public));
