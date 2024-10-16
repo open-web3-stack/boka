@@ -245,23 +245,21 @@ private final class PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             connections.byId[connection]
         }
         guard let conn else {
-            logger.warning("\(connection.id) Connected but connection is gone?")
+            logger.warning("Connected but connection is gone?", metadata: ["connectionId": "\(connection.id)"])
             return
         }
 
         if conn.initiatedByLocal {
             for kind in Handler.PresistentHandler.StreamKind.allCases {
-                if let stream = try? conn.createPreistentStream(kind: kind) {
-                    presistentStreamRunLoop(
-                        kind: kind,
-                        logger: logger,
-                        handler: impl.presistentStreamHandler,
-                        connection: conn,
-                        stream: stream
+                do {
+                    try conn.createPreistentStream(kind: kind)
+                } catch {
+                    logger.warning(
+                        "\(connection.id) Failed to create presistent stream. Closing...",
+                        metadata: ["kind": "\(kind)", "error": "\(error)"]
                     )
-                } else {
-                    logger.warning("\(connection.id) Failed to create presistent stream \(kind). Closing...")
                     try? connection.shutdown(errorCode: 1) // TODO: define some error code
+                    break
                 }
             }
         }
@@ -300,31 +298,6 @@ private final class PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         }
         if let stream {
             stream.closed(abort: !status.isSucceeded)
-        }
-    }
-}
-
-func presistentStreamRunLoop<Handler: StreamHandler>(
-    kind: Handler.PresistentHandler.StreamKind,
-    logger: Logger,
-    handler: Handler.PresistentHandler,
-    connection: Connection<Handler>,
-    stream: Stream<Handler>
-) {
-    Task.detached {
-        do {
-            try stream.send(data: Data([kind.rawValue]))
-            try handler.streamOpened(stream: stream, kind: kind)
-        } catch {
-            logger.debug("\(connection.id) Failed to setup presistent stream \(stream.id) kind: \(kind) error: \(error)")
-        }
-        do {
-            while let data = await stream.receive() {
-                try handler.dataReceived(stream: stream, kind: kind, data: data)
-            }
-        } catch {
-            logger.debug("\(connection.id) Failed to handle presistent stream data \(stream.id) kind: \(kind) error: \(error)")
-            stream.close(abort: true)
         }
     }
 }
