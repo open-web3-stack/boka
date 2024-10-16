@@ -100,7 +100,7 @@ public final class QuicConnection: Sendable {
 
     public func connect(to address: NetAddr) throws {
         logger.debug("connecting to \(address)")
-        try storage.mutate { storage in
+        try storage.write { storage in
             guard var storage2 = storage else {
                 throw QuicError.alreadyClosed
             }
@@ -122,7 +122,7 @@ public final class QuicConnection: Sendable {
 
     public func shutdown(errorCode: QuicErrorCode = .success) throws {
         logger.debug("closing connection")
-        try storage.mutate { storage in
+        try storage.write { storage in
             guard let storage2 = storage else {
                 throw QuicError.alreadyClosed
             }
@@ -284,4 +284,14 @@ private func connectionCallback(
         .takeUnretainedValue()
 
     return handle.callbackHandler(event: event!).rawValue
+}
+
+extension QuicConnection: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(ObjectIdentifier(self))
+    }
+
+    public static func == (lhs: QuicConnection, rhs: QuicConnection) -> Bool {
+        ObjectIdentifier(lhs) == ObjectIdentifier(rhs)
+    }
 }
