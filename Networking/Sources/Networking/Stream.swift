@@ -62,21 +62,27 @@ public final class Stream: Sendable {
     }
 
     public func receive() async -> Data? {
-        if let data = nextData.value {
-            nextData.value = nil
+        if let data = nextData.exchange(nil) {
             return data
         }
         return await channel.receive()
     }
 
     public func receiveByte() async -> UInt8? {
-        if var data = nextData.value {
-            let byte = data.removeFirst()
-            if data.isEmpty {
-                nextData.value = nil
+        let byte = nextData.write { nextData -> UInt8? in
+            if var data = nextData {
+                let byte = data.removeFirst()
+                if data.isEmpty {
+                    nextData = nil
+                } else {
+                    nextData = data
+                }
+                return byte
             } else {
-                nextData.value = data
+                return nil
             }
+        }
+        if let byte {
             return byte
         }
 
@@ -86,7 +92,14 @@ public final class Stream: Sendable {
 
         let byte = data.removeFirst()
         if !data.isEmpty {
-            nextData.value = data
+            // TODO: this can append data in wrong order if receiveByte is called concurrently
+            nextData.write { nextData in
+                if let currentData = nextData {
+                    nextData = currentData + data
+                } else {
+                    nextData = data
+                }
+            }
         }
         return byte
     }
