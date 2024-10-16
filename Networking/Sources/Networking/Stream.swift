@@ -90,7 +90,7 @@ public final class Stream: Sendable {
             return nil
         }
 
-        let byte = data.removeFirst()
+        let byte2 = data.removeFirst()
         if !data.isEmpty {
             // TODO: this can append data in wrong order if receiveByte is called concurrently
             nextData.write { nextData in
@@ -101,6 +101,6 @@ public final class Stream: Sendable {
                 }
             }
         }
-        return byte
+        return byte2
     }
 }
