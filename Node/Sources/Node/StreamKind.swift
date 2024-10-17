@@ -1,8 +1,10 @@
-public enum UniquePresistentStreamKind: UInt8, Sendable, Hashable, CaseIterable {
+import Networking
+
+public enum UniquePresistentStreamKind: UInt8, StreamKindProtocol {
     case blockAnnouncement = 0
 }
 
-public enum CommonEphemeralStreamKind: UInt8, Sendable, Hashable, CaseIterable {
+public enum CommonEphemeralStreamKind: UInt8, StreamKindProtocol {
     case blockRequest = 128
     case stateRequest = 129
     case safroleTicket1 = 131

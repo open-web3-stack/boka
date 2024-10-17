@@ -11,6 +11,10 @@ public struct UniqueId: Sendable {
         id = UniqueId.idGenerator.loadThenWrappingIncrement(ordering: .relaxed)
         self.name = name
     }
+
+    public var idString: String {
+        String(id, radix: 16)
+    }
 }
 
 extension UniqueId: Equatable {
@@ -39,7 +43,7 @@ extension UniqueId: ExpressibleByStringLiteral {
 
 extension UniqueId: CustomStringConvertible {
     public var description: String {
-        "\(name)#\(String(id, radix: 16))"
+        "\(name)#\(idString)"
     }
 }
 
