@@ -11,7 +11,7 @@ extension State {
             devKeys.append(ValidatorKey(
                 bandersnatch: keySet.bandersnatch.data,
                 ed25519: keySet.ed25519.data,
-                bls: Data144(),
+                bls: keySet.bls.data,
                 metadata: Data128()
             ))
         }

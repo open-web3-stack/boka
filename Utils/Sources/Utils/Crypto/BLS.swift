@@ -16,8 +16,8 @@ public enum BLS: KeyType {
         case aggregatedVerifyFailed(Int)
     }
 
-    public final class SecretKey: SecretKeyProtocol, @unchecked Sendable {
-        fileprivate let keyPairPtr: SendableOpaquePointer
+    public final class SecretKey: SecretKeyProtocol, Sendable {
+        fileprivate let keyPairPtr: SafePointer
         public let publicKey: PublicKey
 
         public init(from seed: Data32) throws(Error) {
@@ -29,20 +29,17 @@ public enum BLS: KeyType {
                 throw .createSecretFailed(err)
             }
 
-            keyPairPtr = ptr.asSendable
-            publicKey = try PublicKey(keyPair: ptr)
-        }
-
-        deinit {
-            keypair_free(keyPairPtr.value)
+            // use SafePointer to ensure keypair is freed even `try PublicKey` throws
+            keyPairPtr = SafePointer(ptr: ptr.asSendable, free: keypair_free)
+            publicKey = try PublicKey(keyPair: keyPairPtr.ptr.value)
         }
 
         public func sign(message: Data) throws(Error) -> Data {
-            var output = Data(repeating: 0, count: 160)
+            var output = Data(repeating: 0, count: Int(BLS_SIGNATURE_SERIALIZED_SIZE))
 
             try FFIUtils.call(message, out: &output) { ptrs, out_buf in
                 keypair_sign(
-                    keyPairPtr.value,
+                    keyPairPtr.ptr.value,
                     ptrs[0].ptr,
                     ptrs[0].count,
                     out_buf.ptr,
@@ -56,7 +53,7 @@ public enum BLS: KeyType {
         }
     }
 
-    public final class PublicKey: PublicKeyProtocol, @unchecked Sendable {
+    public final class PublicKey: PublicKeyProtocol, Sendable {
         fileprivate let ptr: SendableOpaquePointer
         public let data: Data144
 
@@ -79,7 +76,7 @@ public enum BLS: KeyType {
                 throw .createPublicKeyFailed(err)
             }
 
-            var data = Data(repeating: 0, count: 144)
+            var data = Data(repeating: 0, count: Int(BLS_PUBLICKEY_SERIALIZED_SIZE))
             FFIUtils.call(out: &data) { _, out_buf in
                 public_serialize(ptr, out_buf.ptr, out_buf.count)
             }
@@ -116,25 +113,20 @@ public enum BLS: KeyType {
         }
 
         public func verify(signature: Data, message: Data) throws(Error) -> Bool {
-            var output = Data(repeating: 0, count: 1)
+            var output = false
 
-            try FFIUtils.call(signature, message, out: &output) { ptrs, out_buf in
+            FFIUtils.call(signature, message) { ptrs in
                 public_verify(
                     ptr.value,
                     ptrs[0].ptr,
                     ptrs[0].count,
                     ptrs[1].ptr,
                     ptrs[1].count,
-                    out_buf.ptr,
-                    out_buf.count
+                    &output
                 )
-            } onErr: { err throws(Error) in
-                if err != 2 {
-                    throw .signatureVerifyFailed(err)
-                }
             }
 
-            return output[0] == 1
+            return output
         }
     }
 
@@ -184,9 +176,9 @@ public enum BLS: KeyType {
 
         keyPtrs = publicKeys.map(\.ptr.value)
 
-        var output = Data(repeating: 0, count: 1)
+        var output = false
 
-        try FFIUtils.call(out: &output) { _, out_buf in
+        try FFIUtils.call { _ in
             keyPtrs.withUnsafeBufferPointer { keyPtrs in
                 sigPtrs.withUnsafeBufferPointer { sigPtrs in
                     aggeregated_verify(
@@ -195,8 +187,7 @@ public enum BLS: KeyType {
                         UInt(sigPtrs.count),
                         keyPtrs.baseAddress!,
                         UInt(keyPtrs.count),
-                        out_buf.ptr,
-                        out_buf.count
+                        &output
                     )
                 }
             }
@@ -204,6 +195,6 @@ public enum BLS: KeyType {
             throw .aggregatedVerifyFailed(err)
         }
 
-        return output[0] == 1
+        return output
     }
 }

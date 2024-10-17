@@ -12,6 +12,10 @@ typedef struct Sig Sig;
 typedef struct Message Message;
 
 
+extern const uintptr_t BLS_PUBLICKEY_SERIALIZED_SIZE;
+
+extern const uintptr_t BLS_SIGNATURE_SERIALIZED_SIZE;
+
 intptr_t keypair_new(const uint8_t *seed, uintptr_t seed_len, KeyPair **out_ptr);
 
 void keypair_free(KeyPair *keypair);
@@ -35,8 +39,7 @@ intptr_t public_verify(const Public *public_,
                        uintptr_t signature_len,
                        const uint8_t *msg_data,
                        uintptr_t msg_data_len,
-                       uint8_t *out,
-                       uintptr_t out_len);
+                       bool *out);
 
 intptr_t message_new_from_bytes(const uint8_t *msg_data, uintptr_t msg_data_len, Message **out_ptr);
 
@@ -51,5 +54,4 @@ intptr_t aggeregated_verify(const Message *msg,
                             uintptr_t signatures_len,
                             const Public *const *publickeys,
                             uintptr_t publickeys_len,
-                            uint8_t *out,
-                            uintptr_t out_len);
+                            bool *out);

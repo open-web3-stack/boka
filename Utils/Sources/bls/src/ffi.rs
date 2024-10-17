@@ -1,10 +1,11 @@
+use sha2::Sha256;
 use w3f_bls::{
     single_pop_aggregator::SignatureAggregatorAssumingPoP, DoublePublicKey, DoublePublicKeyScheme,
-    DoubleSignature, EngineBLS, Keypair, Message, PublicKey, PublicKeyInSignatureGroup, SecretKey,
+    DoubleSignature, Keypair, Message, PublicKey, PublicKeyInSignatureGroup, SecretKey,
     SerializableToBytes, Signature,
 };
 
-use crate::bls::{aggregated_verify, key_pair_sign, signature_verify, Engine};
+use crate::bls::{key_pair_sign, Engine};
 
 /// cbindgen:ignore
 pub type KeyPair = Keypair<Engine>;
@@ -14,6 +15,11 @@ pub type Public = DoublePublicKey<Engine>;
 pub type Secret = SecretKey<Engine>;
 /// cbindgen:ignore
 pub type Sig = DoubleSignature<Engine>;
+
+#[no_mangle]
+pub static BLS_PUBLICKEY_SERIALIZED_SIZE: usize = Public::SERIALIZED_BYTES_SIZE;
+#[no_mangle]
+pub static BLS_SIGNATURE_SERIALIZED_SIZE: usize = Sig::SERIALIZED_BYTES_SIZE;
 
 #[no_mangle]
 pub extern "C" fn keypair_new(
@@ -56,7 +62,7 @@ pub extern "C" fn keypair_sign(
     if key_pair.is_null() || msg_data.is_null() || out.is_null() {
         return 1;
     }
-    if out_len < Engine::SIGNATURE_SERIALIZED_SIZE {
+    if out_len < Sig::SERIALIZED_BYTES_SIZE {
         return 2;
     }
     let key_pair: &mut Keypair<Engine> = unsafe { &mut *key_pair };
@@ -108,7 +114,7 @@ pub extern "C" fn public_serialize(public: *const Public, out: *mut u8, out_len:
     if public.is_null() || out.is_null() {
         return 1;
     }
-    if out_len < Engine::PUBLICKEY_SERIALIZED_SIZE {
+    if out_len < Public::SERIALIZED_BYTES_SIZE {
         return 2;
     }
     let public: &Public = unsafe { &*public };
@@ -134,8 +140,7 @@ pub extern "C" fn public_verify(
     signature_len: usize,
     msg_data: *const u8,
     msg_data_len: usize,
-    out: *mut u8,
-    out_len: usize,
+    out: *mut bool,
 ) -> isize {
     if public.is_null() || signature.is_null() || msg_data.is_null() || out.is_null() {
         return 1;
@@ -148,11 +153,9 @@ pub extern "C" fn public_verify(
     };
     let msg_data_slice = unsafe { std::slice::from_raw_parts(msg_data, msg_data_len) };
     let msg = Message::from(msg_data_slice);
-    let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
-    match signature_verify(&sig, &msg, &public, out_slice) {
-        Ok(_) => 0,
-        Err(_) => 3,
-    }
+    let res = sig.verify(&msg, &public);
+    unsafe { *out = res };
+    0
 }
 
 #[no_mangle]
@@ -188,7 +191,7 @@ pub extern "C" fn signature_new_from_bytes(
     if bytes.is_null() || out_ptr.is_null() {
         return 1;
     }
-    if len < Engine::SIGNATURE_SERIALIZED_SIZE {
+    if len < Sig::SERIALIZED_BYTES_SIZE {
         return 2;
     }
     let bytes_slice = unsafe { std::slice::from_raw_parts(bytes, len) };
@@ -216,14 +219,10 @@ pub extern "C" fn aggeregated_verify(
     signatures_len: usize,
     publickeys: *const *const Public,
     publickeys_len: usize,
-    out: *mut u8,
-    out_len: usize,
+    out: *mut bool,
 ) -> isize {
     if signatures.is_null() || msg.is_null() || publickeys.is_null() || out.is_null() {
         return 1;
-    }
-    if out_len < 1 {
-        return 2;
     }
 
     let message = unsafe { &*msg };
@@ -241,9 +240,7 @@ pub extern "C" fn aggeregated_verify(
         aggregator.add_auxiliary_public_key(&PublicKeyInSignatureGroup::<Engine>(public_key.0));
     }
 
-    let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
-    match aggregated_verify(aggregator, out_slice) {
-        Ok(_) => 0,
-        Err(_) => 3,
-    }
+    let res = aggregator.verify_using_aggregated_auxiliary_public_keys::<Sha256>();
+    unsafe { *out = res };
+    0
 }

@@ -19,7 +19,7 @@ public enum Bandersnatch: KeyType {
     }
 
     public final class SecretKey: SecretKeyProtocol, Sendable {
-        fileprivate let ptr: SendableOpaquePointer
+        fileprivate let ptr: SafePointer
         public let publicKey: PublicKey
 
         public init(from seed: Data32) throws(Error) {
@@ -31,12 +31,8 @@ public enum Bandersnatch: KeyType {
                 throw .createSecretFailed(err)
             }
 
-            self.ptr = ptr.asSendable
-            publicKey = try PublicKey(secretKey: ptr)
-        }
-
-        deinit {
-            secret_free(ptr.value)
+            self.ptr = SafePointer(ptr: ptr.asSendable, free: secret_free)
+            publicKey = try PublicKey(secretKey: self.ptr.ptr.value)
         }
 
         /// Non-Anonymous VRF signature.
@@ -52,7 +48,7 @@ public enum Bandersnatch: KeyType {
 
             try FFIUtils.call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
                 prover_ietf_vrf_sign(
-                    ptr.value,
+                    ptr.ptr.value,
                     ptrs[0].ptr,
                     ptrs[0].count,
                     ptrs[1].ptr,
@@ -74,7 +70,7 @@ public enum Bandersnatch: KeyType {
 
             try FFIUtils.call(vrfInputData, out: &output) { ptrs, out_buf in
                 secret_output(
-                    ptr.value,
+                    ptr.ptr.value,
                     ptrs[0].ptr,
                     ptrs[0].count,
                     out_buf.ptr,
@@ -234,7 +230,7 @@ public enum Bandersnatch: KeyType {
             try FFIUtils.call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
                 ringPtrs.withUnsafeBufferPointer { ringPtrs in
                     prover_ring_vrf_sign(
-                        secret.ptr.value,
+                        secret.ptr.ptr.value,
                         ringPtrs.baseAddress,
                         UInt(ringPtrs.count),
                         proverIdx,

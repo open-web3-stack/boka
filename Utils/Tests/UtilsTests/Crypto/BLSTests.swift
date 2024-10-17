@@ -1,3 +1,4 @@
+import bls
 import Foundation
 import Testing
 
@@ -7,10 +8,10 @@ import Testing
     @Test func BLSSignatureWorks() throws {
         let bls = try BLS.SecretKey(from: Data32())
         let publicKey1 = bls.publicKey
-        #expect(publicKey1.data.data.count == 144)
+        #expect(publicKey1.data.data.count == Int(BLS_PUBLICKEY_SERIALIZED_SIZE))
         let message1 = Data("test1".utf8)
         let signature1 = try bls.sign(message: message1)
-        #expect(signature1.count == 160)
+        #expect(signature1.count == Int(BLS_SIGNATURE_SERIALIZED_SIZE))
 
         #expect(
             try publicKey1.verify(signature: signature1, message: message1)
