@@ -1,3 +1,4 @@
 --extensionacl on-declarations
 --maxwidth 140
 --asynccapturing debugCheck
+--closurevoid preserve

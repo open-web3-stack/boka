@@ -45,16 +45,18 @@ public class ServiceBase2: ServiceBase, @unchecked Sendable {
         let cancellables = cancellables
         let cancellable = scheduler.schedule(id: id, delay: delay, repeats: repeats) {
             if !repeats {
-                cancellables.write {
-                    $0.remove(IdCancellable(id: id, cancellable: nil))
+                cancellables.write { c -> Void in
+                    c.remove(IdCancellable(id: id, cancellable: nil))
                 }
             }
             await task()
         } onCancel: {
-            cancellables.write { $0.remove(IdCancellable(id: id, cancellable: nil)) }
+            cancellables.write { c -> Void in
+                c.remove(IdCancellable(id: id, cancellable: nil))
+            }
         }
-        cancellables.write {
-            $0.insert(IdCancellable(id: id, cancellable: cancellable))
+        cancellables.write { c -> Void in
+            c.insert(IdCancellable(id: id, cancellable: cancellable))
         }
         return cancellable
     }
