@@ -89,7 +89,7 @@ public final class QuicStream: Sendable {
         }
     }
 
-    public func send(data: Data, startStream: Bool = false, closeStream: Bool = false) throws {
+    public func send(data: Data, start: Bool = false, finish: Bool = false) throws {
         logger.trace("Sending \(data.count) bytes")
 
         try storage.read { storage in
@@ -112,10 +112,10 @@ public final class QuicStream: Sendable {
             sendBuffer.pointee.Length = UInt32(messageLength)
 
             var sendFlag = QUIC_SEND_FLAG_NONE.rawValue
-            if startStream {
+            if start {
                 sendFlag |= QUIC_SEND_FLAG_START.rawValue
             }
-            if closeStream {
+            if finish {
                 sendFlag |= QUIC_SEND_FLAG_FIN.rawValue
             }
 
@@ -241,14 +241,4 @@ private func streamCallback(
         .takeUnretainedValue()
 
     return handle.callbackHandler(event: event!).rawValue
-}
-
-extension QuicStream: Hashable {
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(ObjectIdentifier(self))
-    }
-
-    public static func == (lhs: QuicStream, rhs: QuicStream) -> Bool {
-        ObjectIdentifier(lhs) == ObjectIdentifier(rhs)
-    }
 }

@@ -119,7 +119,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
                 initiatedByLocal: true
             )
             connections.byType[mode, default: [:]][address] = conn
-            connections.byId[conn.connection] = conn
+            connections.byId[conn.id] = conn
             return conn
         }
     }
@@ -128,7 +128,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
 final class PeerImpl<Handler: StreamHandler>: Sendable {
     struct ConnectionStorage {
         var byType: [PeerMode: [NetAddr: Connection<Handler>]] = [:]
-        var byId: [QuicConnection: Connection<Handler>] = [:]
+        var byId: [UniqueId: Connection<Handler>] = [:]
     }
 
     fileprivate let logger: Logger
@@ -140,7 +140,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
     fileprivate let clientConfiguration: QuicConfiguration
 
     fileprivate let connections: ThreadSafeContainer<ConnectionStorage> = .init(.init())
-    fileprivate let streams: ThreadSafeContainer<[QuicStream: Stream<Handler>]> = .init([:])
+    fileprivate let streams: ThreadSafeContainer<[UniqueId: Stream<Handler>]> = .init([:])
 
     let presistentStreamHandler: Handler.PresistentHandler
     let ephemeralStreamHandler: Handler.EphemeralHandler
@@ -191,17 +191,17 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                 initiatedByLocal: false
             )
             connections.byType[mode, default: [:]][addr] = conn
-            connections.byId[connection] = conn
+            connections.byId[connection.id] = conn
             return true
         }
     }
 
     func addStream(_ stream: Stream<Handler>) {
         streams.write { streams in
-            if streams[stream.stream] != nil {
+            if streams[stream.id] != nil {
                 self.logger.warning("stream already exists")
             }
-            streams[stream.stream] = stream
+            streams[stream.id] = stream
         }
     }
 }
@@ -242,7 +242,7 @@ private final class PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
 
     func connected(_ connection: QuicConnection) {
         let conn = impl.connections.read { connections in
-            connections.byId[connection]
+            connections.byId[connection.id]
         }
         guard let conn else {
             logger.warning("Connected but connection is gone?", metadata: ["connectionId": "\(connection.id)"])
@@ -267,8 +267,8 @@ private final class PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
 
     func shutdownInitiated(_ connection: QuicConnection, reason _: ConnectionCloseReason) {
         impl.connections.write { connections in
-            if let conn = connections.byId[connection] {
-                connections.byId.removeValue(forKey: connection)
+            if let conn = connections.byId[connection.id] {
+                connections.byId.removeValue(forKey: connection.id)
                 connections.byType[conn.mode]?.removeValue(forKey: conn.remoteAddress)
             }
         }
@@ -276,7 +276,7 @@ private final class PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
 
     func streamStarted(_ connection: QuicConnection, stream: QuicStream) {
         let conn = impl.connections.read { connections in
-            connections.byId[connection]
+            connections.byId[connection.id]
         }
         if let conn {
             conn.streamStarted(stream: stream)
@@ -285,19 +285,28 @@ private final class PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
 
     func dataReceived(_ stream: QuicStream, data: Data) {
         let stream = impl.streams.read { streams in
-            streams[stream]
+            streams[stream.id]
         }
         if let stream {
             stream.received(data: data)
         }
     }
 
-    func closed(_ stream: QuicStream, status: QuicStatus, code _: QuicErrorCode) {
+    func closed(_ quicStream: QuicStream, status: QuicStatus, code _: QuicErrorCode) {
         let stream = impl.streams.read { streams in
-            streams[stream]
+            streams[quicStream.id]
         }
         if let stream {
-            stream.closed(abort: !status.isSucceeded)
+            let connection = impl.connections.read { connections in
+                connections.byId[stream.connectionId]
+            }
+            if let connection {
+                connection.streamClosed(stream: stream, abort: !status.isSucceeded)
+            } else {
+                logger.warning("Stream closed but connection is gone?", metadata: ["streamId": "\(stream.id)"])
+            }
+        } else {
+            logger.warning("Stream closed but stream is gone?", metadata: ["streamId": "\(quicStream.id)"])
         }
     }
 }

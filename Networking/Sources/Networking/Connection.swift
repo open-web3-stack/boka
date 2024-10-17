@@ -27,6 +27,22 @@ public final class Connection<Handler: StreamHandler>: Sendable {
         self.initiatedByLocal = initiatedByLocal
     }
 
+    public func close(abort: Bool = false) {
+        try? connection.shutdown(errorCode: abort ? 1 : 0) // TODO: define some error code
+    }
+
+    public func request(_ request: Handler.EphemeralHandler.Request) async throws -> Data {
+        let data = request.encode()
+        let kind = request.kind
+        let stream = try createStream(kind: kind)
+        try stream.send(data: data)
+        var response = Data()
+        while let nextData = await stream.receive() {
+            response.append(nextData)
+        }
+        return response
+    }
+
     @discardableResult
     func createPreistentStream(kind: Handler.PresistentHandler.StreamKind) throws -> Stream<Handler>? {
         let stream = presistentStreams.read { presistentStreams in
@@ -39,21 +55,19 @@ public final class Connection<Handler: StreamHandler>: Sendable {
             if let stream = presistentStreams[kind] {
                 return stream
             }
-            let stream = try self.createStream(kind: kind.rawValue)
+            let stream = try self.createStream(kind: kind)
             presistentStreams[kind] = stream
             return stream
         }
-        runPresistentStreamLoop(initiatedByLocal: true, stream: newStream, kind: kind)
+        runPresistentStreamLoop(stream: newStream, kind: kind)
         return newStream
     }
 
     func runPresistentStreamLoop(
-        initiatedByLocal: Bool,
         stream: Stream<Handler>,
         kind: Handler.PresistentHandler.StreamKind
     ) {
         presistentStreamRunLoop(
-            initiatedByLocal: initiatedByLocal,
             kind: kind,
             logger: logger,
             handler: impl.presistentStreamHandler,
@@ -62,19 +76,23 @@ public final class Connection<Handler: StreamHandler>: Sendable {
         )
     }
 
-    func createStream(kind: UInt8) throws -> Stream<Handler> {
-        let stream = try Stream(connection.createStream(), impl: impl)
+    func createStream(kind: UInt8, presistentKind: Handler.PresistentHandler.StreamKind?) throws -> Stream<Handler> {
+        let stream = try Stream(connection.createStream(), connectionId: id, impl: impl, kind: presistentKind)
         impl.addStream(stream)
         try stream.send(data: Data([kind]))
         return stream
     }
 
+    func createStream(kind: Handler.PresistentHandler.StreamKind) throws -> Stream<Handler> {
+        try createStream(kind: kind.rawValue, presistentKind: kind)
+    }
+
     func createStream(kind: Handler.EphemeralHandler.StreamKind) throws -> Stream<Handler> {
-        try createStream(kind: kind.rawValue)
+        try createStream(kind: kind.rawValue, presistentKind: nil)
     }
 
     func streamStarted(stream: QuicStream) {
-        let stream = Stream(stream, impl: impl)
+        let stream = Stream(stream, connectionId: id, impl: impl)
         impl.addStream(stream)
         Task {
             guard let byte = await stream.receiveByte() else {
@@ -86,7 +104,7 @@ public final class Connection<Handler: StreamHandler>: Sendable {
                 presistentStreams.write { presistentStreams in
                     presistentStreams[upKind] = stream
                 }
-                runPresistentStreamLoop(initiatedByLocal: false, stream: stream, kind: upKind)
+                runPresistentStreamLoop(stream: stream, kind: upKind)
                 return
             }
             if let ceKind = Handler.EphemeralHandler.StreamKind(rawValue: byte) {
@@ -95,10 +113,18 @@ public final class Connection<Handler: StreamHandler>: Sendable {
             }
         }
     }
+
+    func streamClosed(stream: Stream<Handler>, abort: Bool) {
+        stream.closed(abort: abort)
+        if let kind = stream.kind {
+            presistentStreams.write { presistentStreams in
+                presistentStreams[kind] = nil
+            }
+        }
+    }
 }
 
 func presistentStreamRunLoop<Handler: StreamHandler>(
-    initiatedByLocal: Bool,
     kind: Handler.PresistentHandler.StreamKind,
     logger: Logger,
     handler: Handler.PresistentHandler,
@@ -107,9 +133,6 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
 ) {
     Task.detached {
         do {
-            if initiatedByLocal {
-                try stream.send(data: Data([kind.rawValue]))
-            }
             try handler.streamOpened(stream: stream, kind: kind)
         } catch {
             logger.debug(
@@ -122,9 +145,14 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
             metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)"]
         )
         do {
+            let decoder = handler.createDecoder(kind: kind)
             while let data = await stream.receive() {
-                try handler.dataReceived(stream: stream, kind: kind, data: data)
+                if let message = try decoder.decode(data: data) {
+                    try handler.handle(message: message)
+                }
             }
+            // it is ok if there are some leftover data
+            _ = decoder.finish()
             logger.debug(
                 "Ending presistent stream run loop",
                 metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)"]

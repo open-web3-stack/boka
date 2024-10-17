@@ -12,13 +12,18 @@ enum StreamError: Error {
     case notOpen
 }
 
-public protocol StreamProtocol {
+public protocol StreamProtocol<Message> {
+    associatedtype Message: MessageProtocol
+
+    var id: UniqueId { get }
     var status: StreamStatus { get }
-    func send(data: Data) throws
+    func send(message: Message) throws
     func close(abort: Bool)
 }
 
 final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
+    typealias Message = Handler.PresistentHandler.Message
+
     private let logger: Logger
 
     let stream: QuicStream
@@ -27,6 +32,8 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
     // TODO: https://github.com/gh123man/Async-Channels/issues/12
     private let nextData: ThreadSafeContainer<Data?> = .init(nil)
     private let _status: ThreadSafeContainer<StreamStatus> = .init(.open)
+    let connectionId: UniqueId
+    let kind: Handler.PresistentHandler.StreamKind?
 
     public var id: UniqueId {
         stream.id
@@ -41,17 +48,23 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         }
     }
 
-    init(_ stream: QuicStream, impl: PeerImpl<Handler>) {
+    init(_ stream: QuicStream, connectionId: UniqueId, impl: PeerImpl<Handler>, kind: Handler.PresistentHandler.StreamKind? = nil) {
         logger = Logger(label: "Stream#\(stream.id.idString)")
         self.stream = stream
+        self.connectionId = connectionId
         self.impl = impl
+        self.kind = kind
     }
 
-    public func send(data: Data) throws {
+    public func send(message: Handler.PresistentHandler.Message) throws {
+        try send(data: message.encode(), finish: true)
+    }
+
+    func send(data: Data, finish: Bool = false) throws {
         guard status == .open else {
             throw StreamError.notOpen
         }
-        try stream.send(data: data)
+        try stream.send(data: data, finish: finish)
     }
 
     func received(data: Data) {
@@ -73,7 +86,7 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         }
         status = abort ? .aborted : .closed
         channel.close()
-        try? stream.shutdown(errorCode: abort ? 1 : 0)
+        try? stream.shutdown(errorCode: abort ? 1 : 0) // TODO: define some error code
     }
 
     // remote initiated close
