@@ -22,9 +22,9 @@ intptr_t keypair_sign(KeyPair *key_pair,
                       uint8_t *out,
                       uintptr_t out_len);
 
-intptr_t public_new_from_keypair(const KeyPair *key_pair, Public **out_ptr);
-
 intptr_t public_new_from_bytes(const uint8_t *data, uintptr_t len, Public **out_ptr);
+
+intptr_t public_new_from_keypair(const KeyPair *key_pair, Public **out_ptr);
 
 intptr_t public_serialize(const Public *public_, uint8_t *out, uintptr_t out_len);
 
@@ -46,16 +46,10 @@ intptr_t signature_new_from_bytes(const uint8_t *bytes, uintptr_t len, Sig **out
 
 void signature_free(Sig *sigs);
 
-intptr_t aggeregated_verify(const Sig *const *signatures,
+intptr_t aggeregated_verify(const Message *msg,
+                            const Sig *const *signatures,
                             uintptr_t signatures_len,
-                            const Message *const *msgs,
-                            uintptr_t msgs_len,
                             const Public *const *publickeys,
                             uintptr_t publickeys_len,
                             uint8_t *out,
                             uintptr_t out_len);
-
-intptr_t aggregate_signatures(const Sig *const *sigs_raw,
-                              uintptr_t sigs_len,
-                              uint8_t *out,
-                              uintptr_t out_len);

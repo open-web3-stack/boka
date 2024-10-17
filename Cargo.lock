@@ -326,6 +326,7 @@ version = "0.1.0"
 dependencies = [
  "cbindgen 0.27.0",
  "hex-literal",
+ "sha2",
  "w3f-bls",
 ]
 

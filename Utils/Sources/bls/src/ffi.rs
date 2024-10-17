@@ -1,6 +1,7 @@
 use w3f_bls::{
-    distinct::DistinctMessages, Keypair, Message, PublicKey, SecretKey, SerializableToBytes,
-    Signature, Signed, ZBLS,
+    single_pop_aggregator::SignatureAggregatorAssumingPoP, DoublePublicKey, DoublePublicKeyScheme,
+    DoubleSignature, EngineBLS, Keypair, Message, PublicKey, PublicKeyInSignatureGroup, SecretKey,
+    SerializableToBytes, Signature, ZBLS,
 };
 
 use crate::bls::{aggregated_verify, key_pair_sign, signature_verify};
@@ -8,11 +9,11 @@ use crate::bls::{aggregated_verify, key_pair_sign, signature_verify};
 /// cbindgen:ignore
 pub type KeyPair = Keypair<ZBLS>;
 /// cbindgen:ignore
-pub type Public = PublicKey<ZBLS>;
+pub type Public = DoublePublicKey<ZBLS>;
 /// cbindgen:ignore
 pub type Secret = SecretKey<ZBLS>;
 /// cbindgen:ignore
-pub type Sig = Signature<ZBLS>;
+pub type Sig = DoubleSignature<ZBLS>;
 
 #[no_mangle]
 pub extern "C" fn keypair_new(
@@ -55,7 +56,7 @@ pub extern "C" fn keypair_sign(
     if key_pair.is_null() || msg_data.is_null() || out.is_null() {
         return 1;
     }
-    if out_len < 96 {
+    if out_len < ZBLS::SIGNATURE_SERIALIZED_SIZE {
         return 2;
     }
     let key_pair: &mut Keypair<ZBLS> = unsafe { &mut *key_pair };
@@ -66,22 +67,6 @@ pub extern "C" fn keypair_sign(
         Ok(_) => 0,
         Err(_) => 3,
     }
-}
-
-#[no_mangle]
-pub extern "C" fn public_new_from_keypair(
-    key_pair: *const KeyPair,
-    out_ptr: *mut *mut Public,
-) -> isize {
-    if key_pair.is_null() || out_ptr.is_null() {
-        return 1;
-    }
-    let key_pair: &KeyPair = unsafe { &*key_pair };
-    let public = Box::new(key_pair.public);
-    unsafe {
-        *out_ptr = Box::into_raw(public);
-    }
-    0
 }
 
 #[no_mangle]
@@ -103,19 +88,33 @@ pub extern "C" fn public_new_from_bytes(
 }
 
 #[no_mangle]
+pub extern "C" fn public_new_from_keypair(
+    key_pair: *const KeyPair,
+    out_ptr: *mut *mut Public,
+) -> isize {
+    if key_pair.is_null() || out_ptr.is_null() {
+        return 1;
+    }
+    let key_pair: &KeyPair = unsafe { &*key_pair };
+    let public = Box::new(key_pair.into_double_public_key());
+    unsafe {
+        *out_ptr = Box::into_raw(public);
+    }
+    0
+}
+
+#[no_mangle]
 pub extern "C" fn public_serialize(public: *const Public, out: *mut u8, out_len: usize) -> isize {
     if public.is_null() || out.is_null() {
         return 1;
     }
-    if out_len < 144 {
+    if out_len < ZBLS::PUBLICKEY_SERIALIZED_SIZE {
         return 2;
     }
     let public: &Public = unsafe { &*public };
     let res = public.to_bytes();
-    println!("res: {:?}, len: {}", res, res.len());
     let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
     out_slice.copy_from_slice(&res);
-    // out_slice.copy_from_slice(&public.to_bytes());
     0
 }
 
@@ -143,7 +142,7 @@ pub extern "C" fn public_verify(
     }
     let public: &Public = unsafe { &*public };
     let signature_slice = unsafe { std::slice::from_raw_parts(signature, signature_len) };
-    let sig = match Signature::from_bytes(signature_slice) {
+    let sig = match DoubleSignature::from_bytes(signature_slice) {
         Ok(sig) => Box::new(sig),
         Err(_) => return 2,
     };
@@ -164,9 +163,6 @@ pub extern "C" fn message_new_from_bytes(
 ) -> isize {
     if msg_data.is_null() || out_ptr.is_null() {
         return 1;
-    }
-    if msg_data_len < 96 {
-        return 2;
     }
     let msg_data_slice = unsafe { std::slice::from_raw_parts(msg_data, msg_data_len) };
     let msg = Message::from(msg_data_slice);
@@ -192,11 +188,11 @@ pub extern "C" fn signature_new_from_bytes(
     if bytes.is_null() || out_ptr.is_null() {
         return 1;
     }
-    if len < 96 {
+    if len < ZBLS::SIGNATURE_SERIALIZED_SIZE {
         return 2;
     }
     let bytes_slice = unsafe { std::slice::from_raw_parts(bytes, len) };
-    let sig = match Signature::from_bytes(bytes_slice) {
+    let sig = match DoubleSignature::from_bytes(bytes_slice) {
         Ok(sig) => Box::new(sig),
         Err(_) => return 3,
     };
@@ -215,72 +211,70 @@ pub extern "C" fn signature_free(sigs: *mut Sig) {
 
 #[no_mangle]
 pub extern "C" fn aggeregated_verify(
+    msg: *const Message,
     signatures: *const *const Sig,
     signatures_len: usize,
-    msgs: *const *const Message,
-    msgs_len: usize,
     publickeys: *const *const Public,
     publickeys_len: usize,
     out: *mut u8,
     out_len: usize,
 ) -> isize {
-    if signatures.is_null() || msgs.is_null() || publickeys.is_null() || out.is_null() {
+    if signatures.is_null() || msg.is_null() || publickeys.is_null() || out.is_null() {
         return 1;
     }
     if out_len < 1 {
         return 2;
     }
+
+    let message = unsafe { &*msg };
     let signatures_slice = unsafe { std::slice::from_raw_parts(signatures, signatures_len) };
-    let msgs_slice = unsafe { std::slice::from_raw_parts(msgs, msgs_len) };
     let publickeys_slice = unsafe { std::slice::from_raw_parts(publickeys, publickeys_len) };
 
-    let mut dms = DistinctMessages::<ZBLS>::new();
-    for &sig_ptr in signatures_slice.iter() {
-        let sig = unsafe { &*sig_ptr };
-        dms.add_signature(sig);
-    }
-    let aggregated_signature = <&DistinctMessages<ZBLS> as Signed>::signature(&&dms);
+    // TODO: check if this is the correct way to aggregate
+    // TODO: do pop here, DoubleSignature has the stuff needed
 
-    let mut dms = DistinctMessages::<ZBLS>::new();
-    for (&message_ptr, &publickey_ptr) in msgs_slice.iter().zip(publickeys_slice.iter()) {
-        let message = unsafe { (*message_ptr).clone() };
-        let publickey = unsafe { *publickey_ptr };
-        dms = match dms.add_message_n_publickey(message, publickey) {
-            Ok(dms) => dms,
-            Err(_) => return 3, // AttackViaDuplicateMessages
-        }
+    let mut aggregator = SignatureAggregatorAssumingPoP::<ZBLS>::new(message.clone());
+    for &sig in signatures_slice {
+        let sig = unsafe { &*sig };
+        aggregator.add_signature(&Signature::<ZBLS>(sig.0));
     }
-    dms.add_signature(&aggregated_signature);
+    for &public_key in publickeys_slice {
+        let public_key = unsafe { &*public_key };
+        // aggregated_public_key.0 += public_key.1;
+        aggregator.add_publickey(&PublicKey::<ZBLS>(public_key.1));
+        aggregator.add_auxiliary_public_key(&PublicKeyInSignatureGroup::<ZBLS>(public_key.0));
+    }
+
     let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
-    match aggregated_verify(&dms, out_slice) {
+    match aggregated_verify(aggregator, out_slice) {
         Ok(_) => 0,
-        Err(_) => 4,
+        Err(_) => 3,
     }
 }
 
-#[no_mangle]
-pub extern "C" fn aggregate_signatures(
-    sigs_raw: *const *const Sig,
-    sigs_len: usize,
-    out: *mut u8,
-    out_len: usize,
-) -> isize {
-    if sigs_raw.is_null() || out.is_null() {
-        return 1;
-    }
-    if out_len < 96 {
-        return 2;
-    }
+// #[no_mangle]
+// pub extern "C" fn aggregate_signatures(
+//     sigs_raw: *const *const Sig,
+//     sigs_len: usize,
+//     out: *mut u8,
+//     out_len: usize,
+// ) -> isize {
+//     if sigs_raw.is_null() || out.is_null() {
+//         return 1;
+//     }
+//     if out_len < 96 {
+//         return 2;
+//     }
 
-    let sigs_slice = unsafe { std::slice::from_raw_parts(sigs_raw, sigs_len) };
-    let mut dms = DistinctMessages::<ZBLS>::new();
-    for &sig_ptr in sigs_slice.iter() {
-        let sig = unsafe { &*sig_ptr };
-        dms.add_signature(sig);
-    }
-    let signature = <&DistinctMessages<ZBLS> as Signed>::signature(&&dms);
+//     let sigs_slice = unsafe { std::slice::from_raw_parts(sigs_raw, sigs_len) };
+//     let mut dms = DistinctMessages::<ZBLS>::new();
+//     for &sig_ptr in sigs_slice.iter() {
+//         let sig = unsafe { &*sig_ptr };
+//         dms.add_signature(sig);
+//     }
+//     let signature = <&DistinctMessages<ZBLS> as Signed>::signature(&&dms);
 
-    let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
-    out_slice.copy_from_slice(&signature.to_bytes());
-    0
-}
+//     let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
+//     out_slice.copy_from_slice(&signature.to_bytes());
+//     0
+// }

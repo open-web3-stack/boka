@@ -37,8 +37,8 @@ public enum BLS: KeyType {
             keypair_free(keyPairPtr.value)
         }
 
-        public func sign(message: Data) throws(Error) -> Data96 {
-            var output = Data(repeating: 0, count: 96)
+        public func sign(message: Data) throws(Error) -> Data {
+            var output = Data(repeating: 0, count: 160)
 
             try FFIUtils.call(message, out: &output) { ptrs, out_buf in
                 keypair_sign(
@@ -52,7 +52,7 @@ public enum BLS: KeyType {
                 throw .keypairSignFailed(err)
             }
 
-            return Data96(Data(output))!
+            return Data(output)
         }
     }
 
@@ -115,10 +115,10 @@ public enum BLS: KeyType {
             data.description
         }
 
-        public func verify(signature: Data96, message: Data) throws(Error) -> Bool {
+        public func verify(signature: Data, message: Data) throws(Error) -> Bool {
             var output = Data(repeating: 0, count: 1)
 
-            try FFIUtils.call(signature.data, message, out: &output) { ptrs, out_buf in
+            try FFIUtils.call(signature, message, out: &output) { ptrs, out_buf in
                 public_verify(
                     ptr.value,
                     ptrs[0].ptr,
@@ -129,7 +129,9 @@ public enum BLS: KeyType {
                     out_buf.count
                 )
             } onErr: { err throws(Error) in
-                throw .signatureVerifyFailed(err)
+                if err != 2 {
+                    throw .signatureVerifyFailed(err)
+                }
             }
 
             return output[0] == 1
@@ -137,42 +139,39 @@ public enum BLS: KeyType {
     }
 
     public static func aggregateVerify(
-        signatures: [Data96], messages: [Data], publicKeys: [PublicKey]
+        message: Data, signatures: [Data], publicKeys: [PublicKey]
     ) throws(Error) -> Bool {
-        if messages.count != publicKeys.count {
+        if signatures.count != publicKeys.count {
             return false
         }
 
-        var msgPtrs: [OpaquePointer?] = []
         var keyPtrs: [OpaquePointer?] = []
         var sigPtrs: [OpaquePointer?] = []
+        var msgPtr: OpaquePointer?
 
         defer {
-            for msgPtr in msgPtrs {
+            if let msgPtr {
                 message_free(msgPtr)
             }
             for sigPtr in sigPtrs {
                 signature_free(sigPtr)
             }
-            // do not free public keys here as they're owned externally
         }
 
-        for msg in messages {
-            var msgPtr: OpaquePointer?
-            try FFIUtils.call(msg) { ptrs in
-                message_new_from_bytes(
-                    ptrs[0].ptr,
-                    ptrs[0].count,
-                    &msgPtr
-                )
-            } onErr: { err throws(Error) in
-                throw .createMessageFailed(err)
-            }
-            msgPtrs.append(msgPtr)
+        // single message
+        try FFIUtils.call(message) { ptrs in
+            message_new_from_bytes(
+                ptrs[0].ptr,
+                ptrs[0].count,
+                &msgPtr
+            )
+        } onErr: { err throws(Error) in
+            throw .createMessageFailed(err)
         }
+
         for signature in signatures {
             var sigPtr: OpaquePointer?
-            try FFIUtils.call(signature.data) { ptrs in
+            try FFIUtils.call(signature) { ptrs in
                 signature_new_from_bytes(
                     ptrs[0].ptr,
                     ptrs[0].count,
@@ -189,20 +188,17 @@ public enum BLS: KeyType {
         var output = Data(repeating: 0, count: 1)
 
         try FFIUtils.call(out: &output) { _, out_buf in
-            msgPtrs.withUnsafeBufferPointer { msgPtrs in
-                keyPtrs.withUnsafeBufferPointer { keyPtrs in
-                    sigPtrs.withUnsafeBufferPointer { sigPtrs in
-                        aggeregated_verify(
-                            sigPtrs.baseAddress,
-                            UInt(sigPtrs.count),
-                            msgPtrs.baseAddress,
-                            UInt(msgPtrs.count),
-                            keyPtrs.baseAddress,
-                            UInt(keyPtrs.count),
-                            out_buf.ptr,
-                            out_buf.count
-                        )
-                    }
+            keyPtrs.withUnsafeBufferPointer { keyPtrs in
+                sigPtrs.withUnsafeBufferPointer { sigPtrs in
+                    aggeregated_verify(
+                        msgPtr,
+                        sigPtrs.baseAddress!,
+                        UInt(sigPtrs.count),
+                        keyPtrs.baseAddress!,
+                        UInt(keyPtrs.count),
+                        out_buf.ptr,
+                        out_buf.count
+                    )
                 }
             }
         } onErr: { err throws(Error) in
@@ -213,42 +209,42 @@ public enum BLS: KeyType {
     }
 
     // TODO: maybe we don't need this method
-    public static func aggregateSignatures(signatures: [Data96]) throws -> Data96 {
-        let sigPtrs: [OpaquePointer?] = []
-        defer {
-            for sigPtr in sigPtrs {
-                signature_free(sigPtr)
-            }
-        }
+    // public static func aggregateSignatures(signatures: [Data96]) throws -> Data96 {
+    //     let sigPtrs: [OpaquePointer?] = []
+    //     defer {
+    //         for sigPtr in sigPtrs {
+    //             signature_free(sigPtr)
+    //         }
+    //     }
 
-        for signature in signatures {
-            var sigPtr: OpaquePointer?
-            try FFIUtils.call(signature.data) { ptrs in
-                signature_new_from_bytes(
-                    ptrs[0].ptr,
-                    ptrs[0].count,
-                    &sigPtr
-                )
-            } onErr: { err throws(Error) in
-                throw .createSignatureFailed(err)
-            }
-        }
+    //     for signature in signatures {
+    //         var sigPtr: OpaquePointer?
+    //         try FFIUtils.call(signature.data) { ptrs in
+    //             signature_new_from_bytes(
+    //                 ptrs[0].ptr,
+    //                 ptrs[0].count,
+    //                 &sigPtr
+    //             )
+    //         } onErr: { err throws(Error) in
+    //             throw .createSignatureFailed(err)
+    //         }
+    //     }
 
-        var output = Data(repeating: 0, count: 96)
+    //     var output = Data(repeating: 0, count: 96)
 
-        try FFIUtils.call(out: &output) { _, out_buf in
-            sigPtrs.withUnsafeBufferPointer { sigPtrs in
-                aggregate_signatures(
-                    sigPtrs.baseAddress,
-                    UInt(sigPtrs.count),
-                    out_buf.ptr,
-                    out_buf.count
-                )
-            }
-        } onErr: { err throws(Error) in
-            throw .aggregateSigsFailed(err)
-        }
+    //     try FFIUtils.call(out: &output) { _, out_buf in
+    //         sigPtrs.withUnsafeBufferPointer { sigPtrs in
+    //             aggregate_signatures(
+    //                 sigPtrs.baseAddress,
+    //                 UInt(sigPtrs.count),
+    //                 out_buf.ptr,
+    //                 out_buf.count
+    //             )
+    //         }
+    //     } onErr: { err throws(Error) in
+    //         throw .aggregateSigsFailed(err)
+    //     }
 
-        return Data96(Data(output))!
-    }
+    //     return Data96(Data(output))!
+    // }
 }
