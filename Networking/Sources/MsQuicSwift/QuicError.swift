@@ -19,3 +19,9 @@ public struct QuicErrorCode: Sendable, Equatable {
 
     public static let success: QuicErrorCode = .init(0)
 }
+
+extension QuicErrorCode: ExpressibleByIntegerLiteral {
+    public init(integerLiteral value: UInt64) {
+        self.init(value)
+    }
+}
