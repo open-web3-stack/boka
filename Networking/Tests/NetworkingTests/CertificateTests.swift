@@ -7,7 +7,9 @@ import Utils
 
 struct CertificateTests {
     @Test func certCheck() async throws {
-        let certificate = try parseCertificate(data: certData)
+        let privateKey = try Ed25519.SecretKey(from: Data32())
+        let cert = try generateSelfSignedCertificate(privateKey: privateKey)
+        let certificate = try parseCertificate(data: cert)
         print("ParsedCertificate \(certificate.alternativeName)")
     }
 }

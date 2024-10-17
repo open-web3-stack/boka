@@ -3,7 +3,6 @@
 #include <openssl/evp.h>
 #include <openssl/pkcs12.h>
 #include <openssl/ssl3.h>
-#include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
 #include "helpers.h"
@@ -33,14 +32,14 @@ int parse_pkcs12_certificate(const unsigned char *data, size_t length,
     }
     PKCS12_free(p12);
 
-//    // Check if the key is ED25519
-//    if (EVP_PKEY_base_id(pkey) != EVP_PKEY_ED25519)
-//    {
-//        EVP_PKEY_free(pkey);
-//        X509_free(cert);
-//        sk_X509_pop_free(ca, X509_free);
-//        return -4;
-//    }
+	// Check if the key is ED25519
+	int sig_alg = X509_get_signature_nid(cert);
+	if (sig_alg != NID_ED25519)
+	{
+		X509_free(cert);
+		return -4;
+
+	}
 
     // Extract public key
     if (EVP_PKEY_get_raw_public_key(pkey, NULL, &public_key_len) <= 0)
