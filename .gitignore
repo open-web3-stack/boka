@@ -20,3 +20,6 @@ tasks.json
 *.swiftdeps~
 Package.resolved
 contents.xcworkspacedata
+launch.json
+settings.json
+c_cpp_properties.json

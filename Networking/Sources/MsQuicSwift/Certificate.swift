@@ -6,23 +6,28 @@ public struct ParsedCertificate {
     public let alternativeName: String
 }
 
+enum CertificateError: Error {
+    case parseFailed
+}
+
 public func parseCertificate(data: Data) throws -> ParsedCertificate {
     var publicKeyPointer: UnsafeMutablePointer<UInt8>?
-    var publicKeyLen = 0
+    let publicKeyLen = 32
     var altNamePointer: UnsafeMutablePointer<Int8>?
 
     let result = data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
-        parse_certificate(
+        parse_pkcs12_certificate(
             bytes.baseAddress!.assumingMemoryBound(to: UInt8.self),
             data.count,
             &publicKeyPointer,
-            &publicKeyLen,
+            publicKeyLen,
             &altNamePointer
         )
     }
+    print("result: \(result)")
 
     guard result == 0 else {
-        throw NSError(domain: "CertificateParsingError", code: 1, userInfo: nil)
+        throw CertificateError.parseFailed
     }
 
     let publicKeyData = Data(bytes: publicKeyPointer!, count: publicKeyLen)
