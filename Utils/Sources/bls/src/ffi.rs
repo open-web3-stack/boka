@@ -230,9 +230,6 @@ pub extern "C" fn aggeregated_verify(
     let signatures_slice = unsafe { std::slice::from_raw_parts(signatures, signatures_len) };
     let publickeys_slice = unsafe { std::slice::from_raw_parts(publickeys, publickeys_len) };
 
-    // TODO: check if this is the correct way to aggregate
-    // TODO: do pop here, DoubleSignature has the stuff needed
-
     let mut aggregator = SignatureAggregatorAssumingPoP::<ZBLS>::new(message.clone());
     for &sig in signatures_slice {
         let sig = unsafe { &*sig };
@@ -240,7 +237,6 @@ pub extern "C" fn aggeregated_verify(
     }
     for &public_key in publickeys_slice {
         let public_key = unsafe { &*public_key };
-        // aggregated_public_key.0 += public_key.1;
         aggregator.add_publickey(&PublicKey::<ZBLS>(public_key.1));
         aggregator.add_auxiliary_public_key(&PublicKeyInSignatureGroup::<ZBLS>(public_key.0));
     }
@@ -251,30 +247,3 @@ pub extern "C" fn aggeregated_verify(
         Err(_) => 3,
     }
 }
-
-// #[no_mangle]
-// pub extern "C" fn aggregate_signatures(
-//     sigs_raw: *const *const Sig,
-//     sigs_len: usize,
-//     out: *mut u8,
-//     out_len: usize,
-// ) -> isize {
-//     if sigs_raw.is_null() || out.is_null() {
-//         return 1;
-//     }
-//     if out_len < 96 {
-//         return 2;
-//     }
-
-//     let sigs_slice = unsafe { std::slice::from_raw_parts(sigs_raw, sigs_len) };
-//     let mut dms = DistinctMessages::<ZBLS>::new();
-//     for &sig_ptr in sigs_slice.iter() {
-//         let sig = unsafe { &*sig_ptr };
-//         dms.add_signature(sig);
-//     }
-//     let signature = <&DistinctMessages<ZBLS> as Signed>::signature(&&dms);
-
-//     let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
-//     out_slice.copy_from_slice(&signature.to_bytes());
-//     0
-// }

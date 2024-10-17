@@ -158,7 +158,6 @@ public enum BLS: KeyType {
             }
         }
 
-        // single message
         try FFIUtils.call(message) { ptrs in
             message_new_from_bytes(
                 ptrs[0].ptr,
@@ -207,44 +206,4 @@ public enum BLS: KeyType {
 
         return output[0] == 1
     }
-
-    // TODO: maybe we don't need this method
-    // public static func aggregateSignatures(signatures: [Data96]) throws -> Data96 {
-    //     let sigPtrs: [OpaquePointer?] = []
-    //     defer {
-    //         for sigPtr in sigPtrs {
-    //             signature_free(sigPtr)
-    //         }
-    //     }
-
-    //     for signature in signatures {
-    //         var sigPtr: OpaquePointer?
-    //         try FFIUtils.call(signature.data) { ptrs in
-    //             signature_new_from_bytes(
-    //                 ptrs[0].ptr,
-    //                 ptrs[0].count,
-    //                 &sigPtr
-    //             )
-    //         } onErr: { err throws(Error) in
-    //             throw .createSignatureFailed(err)
-    //         }
-    //     }
-
-    //     var output = Data(repeating: 0, count: 96)
-
-    //     try FFIUtils.call(out: &output) { _, out_buf in
-    //         sigPtrs.withUnsafeBufferPointer { sigPtrs in
-    //             aggregate_signatures(
-    //                 sigPtrs.baseAddress,
-    //                 UInt(sigPtrs.count),
-    //                 out_buf.ptr,
-    //                 out_buf.count
-    //             )
-    //         }
-    //     } onErr: { err throws(Error) in
-    //         throw .aggregateSigsFailed(err)
-    //     }
-
-    //     return Data96(Data(output))!
-    // }
 }
