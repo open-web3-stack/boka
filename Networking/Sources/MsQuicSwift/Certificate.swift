@@ -1,34 +1,35 @@
-import CryptoKit
+import CHelpers
 import Foundation
-import X509
 
-func parseCertificate(_ data: Data) throws -> ParsedCertificate? {
-    let binary = Array(data)
-    let certificate = try Certificate(derEncoded: binary)
-    // Verify the signature algorithm is Ed25519
-    // Extract the public key
-    let publicKey = certificate.publicKey
-    let signatureAlgorithm = certificate.signatureAlgorithm
-    let altName = ""
-    // Extract the alternative name
+public struct ParsedCertificate {
+    public let publicKey: Data
+    public let alternativeName: String
+}
+
+public func parseCertificate(data: Data) throws -> ParsedCertificate {
+    var publicKeyPointer: UnsafeMutablePointer<UInt8>?
+    var publicKeyLen = 0
+    var altNamePointer: UnsafeMutablePointer<Int8>?
+
+    let result = data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+        parse_certificate(
+            bytes.baseAddress!.assumingMemoryBound(to: UInt8.self),
+            data.count,
+            &publicKeyPointer,
+            &publicKeyLen,
+            &altNamePointer
+        )
+    }
+
+    guard result == 0 else {
+        throw NSError(domain: "CertificateParsingError", code: 1, userInfo: nil)
+    }
+
+    let publicKeyData = Data(bytes: publicKeyPointer!, count: publicKeyLen)
+    let alternativeName = String(cString: altNamePointer!)
+
     return ParsedCertificate(
-        signatureAlgorithm: .ed25519,
-        publicKey: PublicKey(algorithm: .ed25519, key: publicKey.description.data(using: .utf8)!),
-        alternativeName: altName
+        publicKey: publicKeyData,
+        alternativeName: alternativeName
     )
-}
-
-struct PublicKey {
-    var algorithm: SignatureAlgorithm
-    var key: Data
-}
-
-struct ParsedCertificate {
-    var signatureAlgorithm: SignatureAlgorithm
-    var publicKey: PublicKey?
-    var alternativeName: String?
-}
-
-enum SignatureAlgorithm {
-    case ed25519
 }
