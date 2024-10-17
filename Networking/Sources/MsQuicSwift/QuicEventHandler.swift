@@ -14,7 +14,9 @@ public struct ConnectionInfo: Sendable {
     public let negotiatedAlpn: Data
     public let serverName: String
 
-    public init(localAddress: NetAddr, remoteAddress: NetAddr, negotiatedAlpn: Data, serverName: String) {
+    public init(
+        localAddress: NetAddr, remoteAddress: NetAddr, negotiatedAlpn: Data, serverName: String
+    ) {
         self.localAddress = localAddress
         self.remoteAddress = remoteAddress
         self.negotiatedAlpn = negotiatedAlpn
@@ -24,7 +26,8 @@ public struct ConnectionInfo: Sendable {
 
 public protocol QuicEventHandler: Sendable {
     // listener events
-    func newConnection(_ listener: QuicListener, connection: QuicConnection, info: ConnectionInfo) -> QuicStatus
+    func newConnection(_ listener: QuicListener, connection: QuicConnection, info: ConnectionInfo)
+        -> QuicStatus
 
     // connection events
     func shouldOpen(_ connection: QuicConnection, certificate: Data?) -> QuicStatus
@@ -39,7 +42,9 @@ public protocol QuicEventHandler: Sendable {
 
 // default implementations
 extension QuicEventHandler {
-    public func newConnection(_: QuicListener, connection _: QuicConnection, info _: ConnectionInfo) -> QuicStatus {
+    public func newConnection(_: QuicListener, connection _: QuicConnection, info _: ConnectionInfo)
+        -> QuicStatus
+    {
         .code(.success)
     }
 
@@ -73,7 +78,9 @@ public final class MockQuicEventHandler: QuicEventHandler {
 
     public init() {}
 
-    public func newConnection(_ listener: QuicListener, connection: QuicConnection, info: ConnectionInfo) -> QuicStatus {
+    public func newConnection(
+        _ listener: QuicListener, connection: QuicConnection, info: ConnectionInfo
+    ) -> QuicStatus {
         events.write { events in
             events.append(.newConnection(listener: listener, connection: connection, info: info))
         }
@@ -85,6 +92,40 @@ public final class MockQuicEventHandler: QuicEventHandler {
         events.write { events in
             events.append(.shouldOpen(connection: connection, certificate: certificate))
         }
+        // Ensure a certificate is provided
+        guard let certificate else {
+            return .code(.requiredCert) // No certificate provided
+        }
+
+//        // Parse the certificate (assuming you have a method to parse X.509 certificates)
+//        guard let parsedCertificate = parseCertificate(certificate) else {
+//            return .code(.badCert)  // Invalid certificate format
+//        }
+//
+//        // Verify the signature algorithm is Ed25519
+//        guard parsedCertificate.signatureAlgorithm == .ed25519 else {
+//            return .code(.badCert)  // Wrong signature algorithm
+//        }
+//
+//        // Extract the public key from the certificate
+//        guard let publicKey = parsedCertificate.publicKey, publicKey.algorithm == .ed25519 else {
+//            return .code(.badCert)  // Invalid or missing Ed25519 public key
+//        }
+//
+//        // Verify the alternative name
+//        guard let altName = parsedCertificate.alternativeName else {
+//            return .code(.badCert)  // Missing alternative name
+//        }
+//
+//        // Check if the alternative name is correctly formatted
+//        let expectedAltName = "e" + publicKey.base32EncodedString()
+//        if altName != expectedAltName {
+//            return .code(.badCert)  // Alternative name does not match
+//        }
+
+        // Additional checks for validators (if applicable)
+        // e.g., verify if the key is published on chain if it's a validator
+
         return .code(.success)
     }
 
