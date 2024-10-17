@@ -4,6 +4,33 @@ import Utils
 
 enum CryptoError: Error {
     case generateFailed(String)
+    case parseFailed(String)
+}
+
+public func parseCertificate(data: Data) throws -> (publicKey: Data, alternativeName: String) {
+    var publicKeyPointer: UnsafeMutablePointer<UInt8>!
+    let publicKeyLen = 32
+    var altNamePointer: UnsafeMutablePointer<Int8>!
+    var errorMessage: UnsafeMutablePointer<Int8>?
+
+    let result = data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+        parse_pkcs12_certificate(
+            bytes.baseAddress!.assumingMemoryBound(to: UInt8.self),
+            data.count,
+            &publicKeyPointer,
+            publicKeyLen,
+            &altNamePointer,
+            &errorMessage
+        )
+    }
+
+    guard result == 0 else {
+        throw CryptoError.parseFailed(String(cString: errorMessage!))
+    }
+
+    let publicKeyData = Data(bytesNoCopy: publicKeyPointer, count: Int(publicKeyLen), deallocator: .free)
+    let alternativeName = String(cString: altNamePointer)
+    return (publicKey: publicKeyData, alternativeName: alternativeName)
 }
 
 public func generateSelfSignedCertificate(privateKey: Ed25519.SecretKey) throws -> Data {

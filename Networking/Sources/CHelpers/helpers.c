@@ -10,76 +10,55 @@
 // Function to parse certificate and extract public key and alternative name
 int parse_pkcs12_certificate(const unsigned char *data, size_t length,
                              unsigned char **public_key, size_t public_key_len,
-                             char **alt_name)
-{
-    BIO *bio = BIO_new_mem_buf(data, (int)length);
-    if (!bio)
-        return -1;
-
-    PKCS12 *p12 = d2i_PKCS12_bio(bio, NULL);
-    BIO_free(bio);
-    if (!p12)
-        return -2;
-
+                             char **alt_name, char **error_message) {
+    int ret = -1;
+    BIO *bio = NULL;
+    PKCS12 *p12 = NULL;
     EVP_PKEY *pkey = NULL;
     X509 *cert = NULL;
     STACK_OF(X509) *ca = NULL;
+    STACK_OF(GENERAL_NAME) *alt_names = NULL;
 
-    if (!PKCS12_parse(p12, NULL, &pkey, &cert, &ca))
-    {
-        PKCS12_free(p12);
-        return -3;
+    bio = BIO_new_mem_buf(data, (int)length);
+    if (!bio) {
+        *error_message = strdup("Failed to create BIO.");
+        goto cleanup;
     }
-    PKCS12_free(p12);
+    p12 = d2i_PKCS12_bio(bio, NULL);
+    if (!p12) {
+        *error_message = strdup("Failed to parse PKCS12.");
+        goto cleanup;
+    }
 
-	// Check if the key is ED25519
-	int sig_alg = X509_get_signature_nid(cert);
-	if (sig_alg != NID_ED25519)
-	{
-		X509_free(cert);
-		return -4;
+    if (!PKCS12_parse(p12, NULL, &pkey, &cert, &ca)) {
+        *error_message = strdup("Failed to parse PKCS12 structure.");
+        goto cleanup;
+    }
 
-	}
+    // Check if the key is ED25519
+    int sig_alg = X509_get_signature_nid(cert);
+    if (sig_alg != NID_ED25519) {
+        *error_message = strdup("Certificate signature algorithm is not ED25519.");
+        goto cleanup;
+    }
 
     // Extract public key
-    if (EVP_PKEY_get_raw_public_key(pkey, NULL, &public_key_len) <= 0)
-    {
-        EVP_PKEY_free(pkey);
-        X509_free(cert);
-        sk_X509_pop_free(ca, X509_free);
-        return -5;
-    }
-
     *public_key = (unsigned char *)malloc(public_key_len);
-    if (!*public_key)
-    {
-        EVP_PKEY_free(pkey);
-        X509_free(cert);
-        sk_X509_pop_free(ca, X509_free);
-        return -6;
+    if (!*public_key) {
+        *error_message = strdup("Failed to allocate memory for public key.");
+        goto cleanup;
     }
-
-    if (EVP_PKEY_get_raw_public_key(pkey, *public_key, &public_key_len) <= 0)
-    {
-        free(*public_key);
-        EVP_PKEY_free(pkey);
-        X509_free(cert);
-        sk_X509_pop_free(ca, X509_free);
-        return -7;
+	if (EVP_PKEY_get_raw_public_key(pkey, *public_key, &public_key_len) <= 0){
+        *error_message = strdup("Failed to extract public key.");
+        goto cleanup;
     }
-
-    EVP_PKEY_free(pkey);
 
     // Extract alternative name
-    STACK_OF(GENERAL_NAME) *alt_names =
-        X509_get_ext_d2i(cert, NID_subject_alt_name, NULL, NULL);
-    if (alt_names)
-    {
-        for (int i = 0; i < sk_GENERAL_NAME_num(alt_names); i++)
-        {
+    alt_names = X509_get_ext_d2i(cert, NID_subject_alt_name, NULL, NULL);
+    if (alt_names) {
+        for (int i = 0; i < sk_GENERAL_NAME_num(alt_names); i++) {
             GENERAL_NAME *gen_name = sk_GENERAL_NAME_value(alt_names, i);
-            if (gen_name->type == GEN_DNS)
-            {
+            if (gen_name->type == GEN_DNS) {
                 ASN1_STRING *name = gen_name->d.dNSName;
                 *alt_name = strdup((char *)ASN1_STRING_get0_data(name));
                 break;
@@ -88,10 +67,22 @@ int parse_pkcs12_certificate(const unsigned char *data, size_t length,
         sk_GENERAL_NAME_pop_free(alt_names, GENERAL_NAME_free);
     }
 
+    if (!*alt_name) {
+        *error_message = strdup("No alternative name found.");
+        goto cleanup;
+    }
+
+    ret = EXIT_SUCCESS; // Success
+
+cleanup:
+    BIO_free(bio);
+    PKCS12_free(p12);
+    EVP_PKEY_free(pkey);
+	free(*public_key);
     X509_free(cert);
     sk_X509_pop_free(ca, X509_free);
 
-    return 0;
+    return ret;
 }
 
 int generate_self_signed_cert_and_pkcs12(
