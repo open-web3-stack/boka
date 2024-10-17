@@ -324,6 +324,7 @@ dependencies = [
 name = "bls"
 version = "0.1.0"
 dependencies = [
+ "ark-bls12-381",
  "cbindgen 0.27.0",
  "hex-literal",
  "sha2",

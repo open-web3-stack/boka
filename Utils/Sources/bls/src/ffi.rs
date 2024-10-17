@@ -1,19 +1,19 @@
 use w3f_bls::{
     single_pop_aggregator::SignatureAggregatorAssumingPoP, DoublePublicKey, DoublePublicKeyScheme,
     DoubleSignature, EngineBLS, Keypair, Message, PublicKey, PublicKeyInSignatureGroup, SecretKey,
-    SerializableToBytes, Signature, ZBLS,
+    SerializableToBytes, Signature,
 };
 
-use crate::bls::{aggregated_verify, key_pair_sign, signature_verify};
+use crate::bls::{aggregated_verify, key_pair_sign, signature_verify, Engine};
 
 /// cbindgen:ignore
-pub type KeyPair = Keypair<ZBLS>;
+pub type KeyPair = Keypair<Engine>;
 /// cbindgen:ignore
-pub type Public = DoublePublicKey<ZBLS>;
+pub type Public = DoublePublicKey<Engine>;
 /// cbindgen:ignore
-pub type Secret = SecretKey<ZBLS>;
+pub type Secret = SecretKey<Engine>;
 /// cbindgen:ignore
-pub type Sig = DoubleSignature<ZBLS>;
+pub type Sig = DoubleSignature<Engine>;
 
 #[no_mangle]
 pub extern "C" fn keypair_new(
@@ -25,7 +25,7 @@ pub extern "C" fn keypair_new(
         return 1;
     }
     let seed_bytes = unsafe { std::slice::from_raw_parts(seed, seed_len) };
-    let secret = SecretKey::<ZBLS>::from_seed(seed_bytes);
+    let secret = SecretKey::<Engine>::from_seed(seed_bytes);
     let keypair = Box::new(Keypair {
         public: secret.into_public(),
         secret,
@@ -56,10 +56,10 @@ pub extern "C" fn keypair_sign(
     if key_pair.is_null() || msg_data.is_null() || out.is_null() {
         return 1;
     }
-    if out_len < ZBLS::SIGNATURE_SERIALIZED_SIZE {
+    if out_len < Engine::SIGNATURE_SERIALIZED_SIZE {
         return 2;
     }
-    let key_pair: &mut Keypair<ZBLS> = unsafe { &mut *key_pair };
+    let key_pair: &mut Keypair<Engine> = unsafe { &mut *key_pair };
     let msg_data_slice = unsafe { std::slice::from_raw_parts(msg_data, msg_data_len) };
     let msg = Message::from(msg_data_slice);
     let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
@@ -108,7 +108,7 @@ pub extern "C" fn public_serialize(public: *const Public, out: *mut u8, out_len:
     if public.is_null() || out.is_null() {
         return 1;
     }
-    if out_len < ZBLS::PUBLICKEY_SERIALIZED_SIZE {
+    if out_len < Engine::PUBLICKEY_SERIALIZED_SIZE {
         return 2;
     }
     let public: &Public = unsafe { &*public };
@@ -188,7 +188,7 @@ pub extern "C" fn signature_new_from_bytes(
     if bytes.is_null() || out_ptr.is_null() {
         return 1;
     }
-    if len < ZBLS::SIGNATURE_SERIALIZED_SIZE {
+    if len < Engine::SIGNATURE_SERIALIZED_SIZE {
         return 2;
     }
     let bytes_slice = unsafe { std::slice::from_raw_parts(bytes, len) };
@@ -230,15 +230,15 @@ pub extern "C" fn aggeregated_verify(
     let signatures_slice = unsafe { std::slice::from_raw_parts(signatures, signatures_len) };
     let publickeys_slice = unsafe { std::slice::from_raw_parts(publickeys, publickeys_len) };
 
-    let mut aggregator = SignatureAggregatorAssumingPoP::<ZBLS>::new(message.clone());
+    let mut aggregator = SignatureAggregatorAssumingPoP::<Engine>::new(message.clone());
     for &sig in signatures_slice {
         let sig = unsafe { &*sig };
-        aggregator.add_signature(&Signature::<ZBLS>(sig.0));
+        aggregator.add_signature(&Signature::<Engine>(sig.0));
     }
     for &public_key in publickeys_slice {
         let public_key = unsafe { &*public_key };
-        aggregator.add_publickey(&PublicKey::<ZBLS>(public_key.1));
-        aggregator.add_auxiliary_public_key(&PublicKeyInSignatureGroup::<ZBLS>(public_key.0));
+        aggregator.add_publickey(&PublicKey::<Engine>(public_key.1));
+        aggregator.add_auxiliary_public_key(&PublicKeyInSignatureGroup::<Engine>(public_key.0));
     }
 
     let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
