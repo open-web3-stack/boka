@@ -115,7 +115,7 @@ public enum BLS: KeyType {
         public func verify(signature: Data, message: Data) throws(Error) -> Bool {
             var output = false
 
-            FFIUtils.call(signature, message) { ptrs in
+            try FFIUtils.call(signature, message) { ptrs in
                 public_verify(
                     ptr.value,
                     ptrs[0].ptr,
@@ -124,6 +124,9 @@ public enum BLS: KeyType {
                     ptrs[1].count,
                     &output
                 )
+            } onErr: { err throws(Error) in
+                // no need to throw here, but still need to catch errors
+                logger.debug("PublicKey.verify failed: \(err)")
             }
 
             return output
