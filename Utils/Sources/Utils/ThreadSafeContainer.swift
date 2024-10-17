@@ -12,12 +12,6 @@ public final class ThreadSafeContainer<T>: @unchecked Sendable {
         try lock.withReadLock { try action(self.storage) }
     }
 
-    public func write(_ action: (inout T) throws -> Void) rethrows {
-        try lock.withWriteLock {
-            try action(&self.storage)
-        }
-    }
-
     public func write<U>(_ action: (inout T) throws -> U) rethrows -> U {
         try lock.withWriteLock {
             try action(&self.storage)

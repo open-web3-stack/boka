@@ -14,15 +14,13 @@ public enum PeerMode: Sendable, Hashable {
     // case proxy // not yet specified
 }
 
-public protocol Message {
-    func encode() -> Data
-}
-
-public struct PeerOptions: Sendable {
+public struct PeerOptions<Handler: StreamHandler>: Sendable {
     public var mode: PeerMode
     public var listenAddress: NetAddr
     public var genesisHeader: Data32
     public var secretKey: Ed25519.SecretKey
+    public var presistentStreamHandler: Handler.PresistentHandler
+    public var ephemeralStreamHandler: Handler.EphemeralHandler
     public var serverSettings: QuicSettings
     public var clientSettings: QuicSettings
     public var peerSettings: PeerSettings
@@ -32,6 +30,8 @@ public struct PeerOptions: Sendable {
         listenAddress: NetAddr,
         genesisHeader: Data32,
         secretKey: Ed25519.SecretKey,
+        presistentStreamHandler: Handler.PresistentHandler,
+        ephemeralStreamHandler: Handler.EphemeralHandler,
         serverSettings: QuicSettings = .defaultSettings,
         clientSettings: QuicSettings = .defaultSettings,
         peerSettings: PeerSettings = .defaultSettings
@@ -40,32 +40,26 @@ public struct PeerOptions: Sendable {
         self.listenAddress = listenAddress
         self.genesisHeader = genesisHeader
         self.secretKey = secretKey
+        self.presistentStreamHandler = presistentStreamHandler
+        self.ephemeralStreamHandler = ephemeralStreamHandler
         self.serverSettings = serverSettings
         self.clientSettings = clientSettings
         self.peerSettings = peerSettings
     }
 }
 
-// TODO: implement a connection pool that is able to:
-// - distinguish connection types (e.g. validators, work package builders)
-// - limit max connections per connection type
-// - manage peer reputation and rotate connections when full
-public final class Peer: Sendable {
-    private let impl: PeerImpl
+// TODO: reconnects, reopen UP stream, peer reputation system to ban peers not following the protocol
+public final class Peer<Handler: StreamHandler>: Sendable {
+    private let impl: PeerImpl<Handler>
 
     private let listener: QuicListener
-
-    public var events: some Subscribable {
-        impl.eventBus
-    }
 
     private var logger: Logger {
         impl.logger
     }
 
-    public init(options: PeerOptions, eventBus: EventBus) throws {
+    public init(options: PeerOptions<Handler>) throws {
         let logger = Logger(label: "Peer".uniqueId)
-        let eventBus = eventBus
 
         let alpns = [
             PeerMode.validator: Alpn(genesisHeader: options.genesisHeader, builder: false).data,
@@ -87,11 +81,12 @@ public final class Peer: Sendable {
 
         impl = PeerImpl(
             logger: logger,
-            eventBus: eventBus,
             mode: options.mode,
             settings: options.peerSettings,
             alpns: alpns,
-            clientConfiguration: clientConfiguration
+            clientConfiguration: clientConfiguration,
+            presistentStreamHandler: options.presistentStreamHandler,
+            ephemeralStreamHandler: options.ephemeralStreamHandler
         )
 
         listener = try QuicListener(
@@ -103,7 +98,7 @@ public final class Peer: Sendable {
         )
     }
 
-    public func connect(to address: NetAddr, mode: PeerMode) throws -> Connection {
+    public func connect(to address: NetAddr, mode: PeerMode) throws -> Connection<Handler> {
         let conn = impl.connections.read { connections in
             connections.byType[mode]?[address]
         }
@@ -120,23 +115,23 @@ public final class Peer: Sendable {
                 ),
                 impl: self.impl,
                 mode: mode,
-                remoteAddress: address
+                remoteAddress: address,
+                initiatedByLocal: true
             )
             connections.byType[mode, default: [:]][address] = conn
-            connections.byId[conn.connection] = conn
+            connections.byId[conn.id] = conn
             return conn
         }
     }
 }
 
-struct ConnectionStorage {
-    var byType: [PeerMode: [NetAddr: Connection]] = [:]
-    var byId: [QuicConnection: Connection] = [:]
-}
+final class PeerImpl<Handler: StreamHandler>: Sendable {
+    struct ConnectionStorage {
+        var byType: [PeerMode: [NetAddr: Connection<Handler>]] = [:]
+        var byId: [UniqueId: Connection<Handler>] = [:]
+    }
 
-final class PeerImpl: Sendable {
     fileprivate let logger: Logger
-    fileprivate let eventBus: EventBus
     fileprivate let mode: PeerMode
     fileprivate let settings: PeerSettings
     fileprivate let alpns: [PeerMode: Data]
@@ -145,22 +140,27 @@ final class PeerImpl: Sendable {
     fileprivate let clientConfiguration: QuicConfiguration
 
     fileprivate let connections: ThreadSafeContainer<ConnectionStorage> = .init(.init())
-    fileprivate let streams: ThreadSafeContainer<[QuicStream: Stream]> = .init([:])
+    fileprivate let streams: ThreadSafeContainer<[UniqueId: Stream<Handler>]> = .init([:])
 
-    init(
+    let presistentStreamHandler: Handler.PresistentHandler
+    let ephemeralStreamHandler: Handler.EphemeralHandler
+
+    fileprivate init(
         logger: Logger,
-        eventBus: EventBus,
         mode: PeerMode,
         settings: PeerSettings,
         alpns: [PeerMode: Data],
-        clientConfiguration: QuicConfiguration
+        clientConfiguration: QuicConfiguration,
+        presistentStreamHandler: Handler.PresistentHandler,
+        ephemeralStreamHandler: Handler.EphemeralHandler
     ) {
         self.logger = logger
-        self.eventBus = eventBus
         self.mode = mode
         self.settings = settings
         self.alpns = alpns
         self.clientConfiguration = clientConfiguration
+        self.presistentStreamHandler = presistentStreamHandler
+        self.ephemeralStreamHandler = ephemeralStreamHandler
 
         var alpnLookup = [Data: PeerMode]()
         for (mode, alpn) in alpns {
@@ -183,31 +183,37 @@ final class PeerImpl: Sendable {
                 self.logger.warning("connection already exists")
                 return false
             }
-            let conn = Connection(connection, impl: self, mode: mode, remoteAddress: addr)
+            let conn = Connection(
+                connection,
+                impl: self,
+                mode: mode,
+                remoteAddress: addr,
+                initiatedByLocal: false
+            )
             connections.byType[mode, default: [:]][addr] = conn
-            connections.byId[connection] = conn
+            connections.byId[connection.id] = conn
             return true
         }
     }
 
-    func addStream(_ stream: Stream) {
+    func addStream(_ stream: Stream<Handler>) {
         streams.write { streams in
-            if streams[stream.stream] != nil {
+            if streams[stream.id] != nil {
                 self.logger.warning("stream already exists")
             }
-            streams[stream.stream] = stream
+            streams[stream.id] = stream
         }
     }
 }
 
-private final class PeerEventHandler: QuicEventHandler {
-    private let impl: PeerImpl
+private final class PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
+    private let impl: PeerImpl<Handler>
 
     private var logger: Logger {
         impl.logger
     }
 
-    init(_ impl: PeerImpl) {
+    init(_ impl: PeerImpl<Handler>) {
         self.impl = impl
     }
 
@@ -234,12 +240,35 @@ private final class PeerEventHandler: QuicEventHandler {
         .code(.success)
     }
 
-    func connected(_: QuicConnection) {}
+    func connected(_ connection: QuicConnection) {
+        let conn = impl.connections.read { connections in
+            connections.byId[connection.id]
+        }
+        guard let conn else {
+            logger.warning("Connected but connection is gone?", metadata: ["connectionId": "\(connection.id)"])
+            return
+        }
+
+        if conn.initiatedByLocal {
+            for kind in Handler.PresistentHandler.StreamKind.allCases {
+                do {
+                    try conn.createPreistentStream(kind: kind)
+                } catch {
+                    logger.warning(
+                        "\(connection.id) Failed to create presistent stream. Closing...",
+                        metadata: ["kind": "\(kind)", "error": "\(error)"]
+                    )
+                    try? connection.shutdown(errorCode: 1) // TODO: define some error code
+                    break
+                }
+            }
+        }
+    }
 
     func shutdownInitiated(_ connection: QuicConnection, reason _: ConnectionCloseReason) {
         impl.connections.write { connections in
-            if let conn = connections.byId[connection] {
-                connections.byId.removeValue(forKey: connection)
+            if let conn = connections.byId[connection.id] {
+                connections.byId.removeValue(forKey: connection.id)
                 connections.byType[conn.mode]?.removeValue(forKey: conn.remoteAddress)
             }
         }
@@ -247,7 +276,7 @@ private final class PeerEventHandler: QuicEventHandler {
 
     func streamStarted(_ connection: QuicConnection, stream: QuicStream) {
         let conn = impl.connections.read { connections in
-            connections.byId[connection]
+            connections.byId[connection.id]
         }
         if let conn {
             conn.streamStarted(stream: stream)
@@ -256,23 +285,28 @@ private final class PeerEventHandler: QuicEventHandler {
 
     func dataReceived(_ stream: QuicStream, data: Data) {
         let stream = impl.streams.read { streams in
-            streams[stream]
+            streams[stream.id]
         }
         if let stream {
             stream.received(data: data)
         }
     }
 
-    func closed(_ stream: QuicStream, status: QuicStatus, code _: QuicErrorCode) {
+    func closed(_ quicStream: QuicStream, status: QuicStatus, code _: QuicErrorCode) {
         let stream = impl.streams.read { streams in
-            streams[stream]
+            streams[quicStream.id]
         }
         if let stream {
-            if status.isSucceeded {
-                stream.close()
-            } else {
-                stream.abort()
+            let connection = impl.connections.read { connections in
+                connections.byId[stream.connectionId]
             }
+            if let connection {
+                connection.streamClosed(stream: stream, abort: !status.isSucceeded)
+            } else {
+                logger.warning("Stream closed but connection is gone?", metadata: ["streamId": "\(stream.id)"])
+            }
+        } else {
+            logger.warning("Stream closed but stream is gone?", metadata: ["streamId": "\(quicStream.id)"])
         }
     }
 }
