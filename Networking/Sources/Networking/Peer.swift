@@ -3,6 +3,8 @@ import Logging
 import MsQuicSwift
 import Utils
 
+public typealias NetAddr = MsQuicSwift.NetAddr
+
 public enum StreamType: Sendable {
     case uniquePersistent
     case commonEphemeral
@@ -206,7 +208,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
     }
 }
 
-private final class PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
+private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
     private let impl: PeerImpl<Handler>
 
     private var logger: Logger {
