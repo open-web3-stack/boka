@@ -12,7 +12,7 @@ public func parseCertificate(data: Data) throws -> (publicKey: Data, alternative
     var publicKeyLen = 0
     var altNamePointer: UnsafeMutablePointer<Int8>!
     var errorMessage: UnsafeMutablePointer<Int8>?
-
+    defer { free(altNamePointer) }
     let result = data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
         parse_pkcs12_certificate(
             bytes.baseAddress!.assumingMemoryBound(to: UInt8.self),
