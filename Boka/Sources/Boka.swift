@@ -69,6 +69,13 @@ struct Boka: AsyncCommand {
             return
         }
 
+        let services = try await Tracing.bootstrap("Boka", loggerOnly: true)
+        for service in services {
+            Task {
+                try await service.run()
+            }
+        }
+
         // Handle other options and flags
         if let basePath = signature.basePath {
             context.console.info("Base path: \(basePath)")
@@ -164,12 +171,8 @@ struct Boka: AsyncCommand {
             )
         }
 
-        let services = try await Tracing.bootstrap("Boka", loggerOnly: true)
-        for service in services {
-            Task {
-                try await service.run()
-            }
-        }
         try await node.wait()
+
+        console.info("Shutting down...")
     }
 }
