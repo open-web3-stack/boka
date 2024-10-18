@@ -1,7 +1,7 @@
 import Utils
 
 extension State {
-    public static func devGenesis(config: ProtocolConfigRef) throws -> State {
+    public static func devGenesis(config: ProtocolConfigRef) throws -> (StateRef, BlockRef) {
         var devKeys = [ValidatorKey]()
 
         var state = State.dummy(config: config)
@@ -32,7 +32,15 @@ extension State {
         )
         state.safroleState.ticketsVerifier = commitment.data
 
-        return state
+        let block = BlockRef(Block.dummy(config: config))
+        try state.recentHistory.items.append(RecentHistory.HistoryItem(
+            headerHash: block.hash,
+            mmr: MMR([]),
+            stateRoot: Data32(),
+            workReportHashes: ConfigLimitedSizeArray(config: config)
+        ))
+
+        return (StateRef(state), block)
     }
     // TODO: add file genesis
     // public static func fileGenesis(config: ProtocolConfigRef) throws -> State

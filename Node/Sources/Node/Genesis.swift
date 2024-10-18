@@ -21,12 +21,12 @@ public enum GenesisError: Error {
 }
 
 extension Genesis {
-    public func load() async throws -> (StateRef, ProtocolConfigRef) {
+    public func load() async throws -> (StateRef, BlockRef, ProtocolConfigRef) {
         switch self {
         case .dev:
             let config = ProtocolConfigRef.dev
-            let state = try State.devGenesis(config: config)
-            return (StateRef(state), config)
+            let (state, block) = try State.devGenesis(config: config)
+            return (state, block, config)
         case let .file(path):
             let genesis = try readAndValidateGenesis(from: path)
             var config: ProtocolConfig
@@ -44,8 +44,8 @@ extension Genesis {
                 config = genesis.config!
             }
             let configRef = Ref(config)
-            let state = try State.devGenesis(config: configRef)
-            return (StateRef(state), configRef)
+            let (state, block) = try State.devGenesis(config: configRef)
+            return (state, block, configRef)
         }
     }
 

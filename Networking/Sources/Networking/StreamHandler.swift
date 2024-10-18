@@ -27,8 +27,8 @@ public protocol PresistentStreamHandler: Sendable {
     associatedtype Message: MessageProtocol
 
     func createDecoder(kind: StreamKind, onResult: @escaping @Sendable (Result<Message, Error>) -> Void) -> any MessageDecoder<Message>
-    func streamOpened(connection: any ConnectionInfoProtocol, stream: any StreamProtocol, kind: StreamKind) throws
-    func handle(connection: any ConnectionInfoProtocol, message: Message) throws
+    func streamOpened(connection: any ConnectionInfoProtocol, stream: any StreamProtocol, kind: StreamKind) async throws
+    func handle(connection: any ConnectionInfoProtocol, message: Message) async throws
 }
 
 public protocol EphemeralStreamHandler: Sendable {

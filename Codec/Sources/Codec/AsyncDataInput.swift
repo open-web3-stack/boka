@@ -1,6 +1,6 @@
+import Atomics
 import Dispatch
 import Foundation
-import Synchronization
 
 /// A async data input
 /// NOTE: the reading operation are blocking when buffer is empty
@@ -8,7 +8,7 @@ import Synchronization
 /// This should only be used with single producer and single consumer
 public final class AsyncDataInput: Sendable {
     private let chunks: Mutex<[Data]> = .init([])
-    private let closed: Atomic<Bool> = .init(false)
+    private let closed: ManagedAtomic<Bool> = .init(false)
 
     // every push do signal
     // every pop do wait

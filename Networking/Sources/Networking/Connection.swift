@@ -170,7 +170,7 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
 ) {
     Task.detached {
         do {
-            try handler.streamOpened(connection: connection, stream: stream, kind: kind)
+            try await handler.streamOpened(connection: connection, stream: stream, kind: kind)
         } catch {
             logger.debug(
                 "Failed to setup presistent stream",
@@ -186,7 +186,7 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
             case let .success(message):
                 Task {
                     do {
-                        try handler.handle(connection: connection, message: message)
+                        try await handler.handle(connection: connection, message: message)
                     } catch {
                         logger.debug(
                             "Failed to handle presistent stream data",

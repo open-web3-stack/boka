@@ -7,12 +7,15 @@ public actor InMemoryDataProvider: Sendable {
     private var blockByHash: [Data32: BlockRef] = [:]
     private var stateByBlockHash: [Data32: StateRef] = [:]
     private var hashByTimeslot: [TimeslotIndex: Set<Data32>] = [:]
+    public let genesisBlockHash: Data32
 
-    public init(genesis: StateRef) async {
-        heads = [Data32()]
-        finalizedHead = Data32()
+    public init(genesisState: StateRef, genesisBlock: BlockRef) async {
+        genesisBlockHash = genesisBlock.hash
+        heads = [genesisBlockHash]
+        finalizedHead = genesisBlockHash
 
-        add(state: genesis)
+        add(block: genesisBlock)
+        add(state: genesisState)
     }
 }
 

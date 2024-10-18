@@ -6,10 +6,10 @@ import Utils
 public class ValidatorNode: Node {
     private var validator: ValidatorService!
 
-    public required init(
-        genesis: Genesis, config: Config, eventBus: EventBus, keystore: KeyStore
+    override public required init(
+        config: Config, genesis: Genesis, eventBus: EventBus, keystore: KeyStore
     ) async throws {
-        try await super.init(config: config, genesis: genesis, eventBus: eventBus)
+        try await super.init(config: config, genesis: genesis, eventBus: eventBus, keystore: keystore)
 
         let scheduler = DispatchQueueScheduler(timeProvider: timeProvider)
         validator = await ValidatorService(

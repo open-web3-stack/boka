@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "Boka",
     platforms: [
-        .macOS(.v15),
+        .macOS(.v14),
     ],
     dependencies: [
         .package(path: "../Node"),

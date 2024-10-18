@@ -125,6 +125,32 @@ public final class Peer<Handler: StreamHandler>: Sendable {
             return conn
         }
     }
+
+    public func broadcast(kind: Handler.PresistentHandler.StreamKind, message: any MessageProtocol) {
+        let connections = impl.connections.read { connections in
+            connections.byId.values
+        }
+
+        guard let messageData = try? message.encode() else {
+            impl.logger.warning("Failed to encode message: \(message)")
+            return
+        }
+        for connection in connections {
+            if let stream = try? connection.createPreistentStream(kind: kind) {
+                let res = Result(catching: { try stream.send(data: messageData) })
+                switch res {
+                case .success:
+                    break
+                case let .failure(error):
+                    impl.logger.warning("Failed to send message", metadata: [
+                        "connectionId": "\(connection.id)",
+                        "kind": "\(kind)",
+                        "error": "\(error)",
+                    ])
+                }
+            }
+        }
+    }
 }
 
 final class PeerImpl<Handler: StreamHandler>: Sendable {
