@@ -73,7 +73,8 @@ format-all: format format-cargo
 
 .PHONY: format-clang
 format-clang:
-	find . -type f \( -name "*.c" -o -name "*.h" \) -exec clang-format -i {} +
+	find . -name "*.c" -exec clang-format -i {} +
+	find . -name "helpers.h" -exec clang-format -i {} +
 .PHONY: run
 run: githooks
 	swift run --package-path Boka
