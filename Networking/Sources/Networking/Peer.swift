@@ -232,6 +232,7 @@ private final class PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         }
     }
 
+    // TODO: implement a peer and test this
     func shouldOpen(_: QuicConnection, certificate: Data?) -> QuicStatus {
         guard let certificate else {
             return .code(.requiredCert)

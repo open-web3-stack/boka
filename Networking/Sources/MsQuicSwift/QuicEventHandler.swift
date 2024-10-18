@@ -92,7 +92,6 @@ public final class MockQuicEventHandler: QuicEventHandler {
         events.write { events in
             events.append(.shouldOpen(connection: connection, certificate: certificate))
         }
-
         return .code(.success)
     }
 

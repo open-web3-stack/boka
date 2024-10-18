@@ -8,9 +8,4 @@ import Utils
 
 final class PeerTests {
     init() throws {}
-
-    // TODO: add shouldOpen tests
-    @Test func vailidShouldOpen() throws {}
-
-    @Test func invailidShouldOpen() throws {}
 }
