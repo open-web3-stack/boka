@@ -2,7 +2,7 @@ import Logging
 
 let logger = Logger(label: "tracing-utils.assertions")
 
-enum AssertionError: Error {
+public enum AssertionError: Error {
     case unreachable(String)
 }
 

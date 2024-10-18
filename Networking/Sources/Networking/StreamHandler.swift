@@ -2,8 +2,8 @@ import Foundation
 
 public protocol StreamKindProtocol: Sendable, Hashable, RawRepresentable<UInt8>, CaseIterable {}
 
-public protocol MessageProtocol {
-    func encode() -> Data
+public protocol MessageProtocol: Sendable {
+    func encode() throws -> Data
 }
 
 public protocol RequestProtocol<StreamKind>: MessageProtocol {
@@ -17,30 +17,35 @@ public protocol MessageDecoder<Message> {
 
     // return nil if need more data
     // data will be kept in internal buffer
-    func decode(data: Data) throws -> Message?
+    mutating func decode(data: Data) throws
 
-    // return leftover data
-    func finish() -> Data?
+    consuming func finish()
 }
 
 public protocol PresistentStreamHandler: Sendable {
     associatedtype StreamKind: StreamKindProtocol
     associatedtype Message: MessageProtocol
 
-    func createDecoder(kind: StreamKind) -> any MessageDecoder<Message>
-    func streamOpened(stream: any StreamProtocol, kind: StreamKind) throws
-    func handle(message: Message) throws
+    func createDecoder(kind: StreamKind, onResult: @escaping @Sendable (Result<Message, Error>) -> Void) -> any MessageDecoder<Message>
+    func streamOpened(connection: any ConnectionInfoProtocol, stream: any StreamProtocol, kind: StreamKind) throws
+    func handle(connection: any ConnectionInfoProtocol, message: Message) throws
 }
 
 public protocol EphemeralStreamHandler: Sendable {
     associatedtype StreamKind: StreamKindProtocol
     associatedtype Request: RequestProtocol<StreamKind>
 
-    func createDecoder(kind: StreamKind) -> any MessageDecoder<Request>
-    func handle(request: Request) async throws -> Data
+    func createDecoder(kind: StreamKind, onResult: @escaping @Sendable (Result<Request, Error>) -> Void) -> any MessageDecoder<Request>
+    func handle(connection: any ConnectionInfoProtocol, request: Request) async throws -> Data
 }
 
 public protocol StreamHandler: Sendable {
     associatedtype PresistentHandler: PresistentStreamHandler
     associatedtype EphemeralHandler: EphemeralStreamHandler
+}
+
+extension Data: MessageProtocol {
+    public func encode() -> Data {
+        self
+    }
 }

@@ -16,7 +16,13 @@ public final class AsyncDataInput: Sendable {
 
     public init() {}
 
-    public func append(data: Data) {
+    public func append(data: Data) throws {
+        if closed.load(ordering: .acquiring) {
+            throw DecodingError.dataCorrupted(DecodingError.Context(
+                codingPath: [],
+                debugDescription: "Input is closed"
+            ))
+        }
         if data.isEmpty {
             return
         }
@@ -26,9 +32,14 @@ public final class AsyncDataInput: Sendable {
         semphore.signal()
     }
 
-    public func close() {
+    // return true if all data was consumed
+    @discardableResult
+    public func close() -> Bool {
         closed.store(true, ordering: .releasing)
         semphore.signal()
+        return chunks.withLock { chunks in
+            chunks.isEmpty
+        }
     }
 }
 

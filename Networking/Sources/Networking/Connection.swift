@@ -1,3 +1,4 @@
+import AsyncChannels
 import Foundation
 import MsQuicSwift
 import TracingUtils
@@ -117,19 +118,35 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
             if let ceKind = Handler.EphemeralHandler.StreamKind(rawValue: byte) {
                 logger.debug("stream opened. kind: \(ceKind)")
 
-                var decoder = impl.ephemeralStreamHandler.createDecoder(kind: ceKind)
-                while let data = await stream.receive() {
-                    if let request = try decoder.decode(data: data) {
-                        let remaining = decoder.finish()
-                        guard remaining == nil || remaining!.isEmpty else {
-                            // invalid request
-                            stream.close(abort: true)
-                            return
+                let complete = Channel<Void>()
+                var decoder = impl.ephemeralStreamHandler.createDecoder(kind: ceKind) { result in
+                    switch result {
+                    case let .success(request):
+                        Task {
+                            await complete.receive()
+                            do {
+                                let resp = try await self.impl.ephemeralStreamHandler.handle(connection: self, request: request)
+                                try stream.send(data: resp, finish: true)
+                            } catch {
+                                logger.debug("Failed to handle request: \(error)")
+                                stream.close(abort: true)
+                            }
                         }
-                        let resp = try await impl.ephemeralStreamHandler.handle(connection: self, request: request)
-                        try stream.send(data: resp, finish: true)
+                    case let .failure(error):
+                        logger.debug("Failed to decode request: \(error)")
+                        stream.close(abort: true)
                     }
                 }
+                do {
+                    while let data = await stream.receive() {
+                        try decoder.decode(data: data)
+                    }
+                    decoder.finish()
+                } catch {
+                    logger.debug("Failed to decode request: \(error)")
+                    stream.close(abort: true)
+                }
+                await complete.send(())
             }
         }
     }
@@ -164,25 +181,37 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
             "Starting presistent stream run loop",
             metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)"]
         )
-        do {
-            var decoder = handler.createDecoder(kind: kind)
-            while let data = await stream.receive() {
-                if let message = try decoder.decode(data: data) {
-                    try handler.handle(connection: connection, message: message)
+        var decoder = handler.createDecoder(kind: kind) { result in
+            switch result {
+            case let .success(message):
+                Task {
+                    do {
+                        try handler.handle(connection: connection, message: message)
+                    } catch {
+                        logger.debug(
+                            "Failed to handle presistent stream data",
+                            metadata: [
+                                "connectionId": "\(connection.id)",
+                                "streamId": "\(stream.id)",
+                                "kind": "\(kind)",
+                                "error": "\(error)",
+                            ]
+                        )
+                        stream.close(abort: true)
+                    }
                 }
+            case let .failure(error):
+                logger.debug("Failed to decode message: \(error)")
             }
-            // it is ok if there are some leftover data
-            _ = decoder.finish()
-            logger.debug(
-                "Ending presistent stream run loop",
-                metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)"]
-            )
-        } catch {
-            logger.debug(
-                "Failed to handle presistent stream data",
-                metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)", "error": "\(error)"]
-            )
-            stream.close(abort: true)
         }
+        while let data = await stream.receive() {
+            try decoder.decode(data: data)
+        }
+
+        decoder.finish()
+        logger.debug(
+            "Ending presistent stream run loop",
+            metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)"]
+        )
     }
 }
