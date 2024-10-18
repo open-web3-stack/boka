@@ -232,12 +232,27 @@ private final class PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         }
     }
 
-    func shouldOpen(_: QuicConnection, certificate _: Data?) -> QuicStatus {
-        // TODO: verify certificate
-        // - Require a certificate
-        // - Verify the alt name matches to the public key
-        // - Check connection mode and if validator, verify if it is current or next validator
-        .code(.success)
+    func shouldOpen(_: QuicConnection, certificate: Data?) -> QuicStatus {
+        guard let certificate else {
+            return .code(.requiredCert)
+        }
+        do {
+            let (publicKey, alternativeName) = try parseCertificate(data: certificate)
+            logger.debug(
+                "Certificate parsed",
+                metadata: ["publicKey": "\(publicKey.toHexString())", "alternativeName": "\(alternativeName)"]
+            )
+            if alternativeName != generateSubjectAlternativeName(pubkey: publicKey) {
+                return .code(.badCert)
+            }
+            if impl.mode == PeerMode.validator {
+                // TODO: verify if it is current or next validator
+            }
+        } catch {
+            logger.error("Failed to parse certificate", metadata: ["error": "\(error)"])
+            return .code(.badCert)
+        }
+        return .code(.success)
     }
 
     func connected(_ connection: QuicConnection) {

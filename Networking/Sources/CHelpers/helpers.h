@@ -2,7 +2,7 @@
 #include <arpa/inet.h>
 
 int parse_pkcs12_certificate(const unsigned char *data, size_t length,
-                             unsigned char **public_key, size_t public_key_len,
+                             unsigned char **public_key, size_t *public_key_len,
                              char **alt_name, char **error_message);
 
 int generate_self_signed_cert_and_pkcs12(

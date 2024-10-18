@@ -22,9 +22,6 @@ struct PKCS12Tests {
         let cert = try generateSelfSignedCertificate(privateKey: privateKey)
         let (publicKey, alternativeName) = try parseCertificate(data: cert)
         #expect(alternativeName == generateSubjectAlternativeName(publicKey: privateKey.publicKey))
-        print("publicKey get: \(publicKey.toHexString())")
-        print("publicKey data: \(privateKey.publicKey.data.toHexString())")
-
         #expect(Data32(publicKey) == privateKey.publicKey.data)
     }
 

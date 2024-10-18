@@ -9,7 +9,7 @@ enum CryptoError: Error {
 
 public func parseCertificate(data: Data) throws -> (publicKey: Data, alternativeName: String) {
     var publicKeyPointer: UnsafeMutablePointer<UInt8>!
-    let publicKeyLen = 32
+    var publicKeyLen = 0
     var altNamePointer: UnsafeMutablePointer<Int8>!
     var errorMessage: UnsafeMutablePointer<Int8>?
 
@@ -18,7 +18,7 @@ public func parseCertificate(data: Data) throws -> (publicKey: Data, alternative
             bytes.baseAddress!.assumingMemoryBound(to: UInt8.self),
             data.count,
             &publicKeyPointer,
-            publicKeyLen,
+            &publicKeyLen,
             &altNamePointer,
             &errorMessage
         )
@@ -28,7 +28,9 @@ public func parseCertificate(data: Data) throws -> (publicKey: Data, alternative
         throw CryptoError.parseFailed(String(cString: errorMessage!))
     }
 
-    let publicKeyData = Data(bytesNoCopy: publicKeyPointer, count: Int(publicKeyLen), deallocator: .free)
+    let publicKeyData = Data(
+        bytesNoCopy: publicKeyPointer, count: Int(publicKeyLen), deallocator: .free
+    )
     let alternativeName = String(cString: altNamePointer)
     return (publicKey: publicKeyData, alternativeName: alternativeName)
 }
@@ -65,6 +67,11 @@ public func generateSelfSignedCertificate(privateKey: Ed25519.SecretKey) throws 
 
 func generateSubjectAlternativeName(publicKey: Ed25519.PublicKey) -> String {
     let base32Encoded = base32Encode(publicKey.data.data)
+    return "DNS:e\(base32Encoded)"
+}
+
+func generateSubjectAlternativeName(pubkey: Data) -> String {
+    let base32Encoded = base32Encode(pubkey)
     return "DNS:e\(base32Encoded)"
 }
 
