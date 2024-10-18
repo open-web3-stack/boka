@@ -52,20 +52,20 @@ private final class MessageDecoderImpl: Sendable {
     }
 }
 
-public class RequestMessageDecoder: MessageDecoder {
-    public typealias Message = Request
+class UPMessageDecoder: MessageDecoder {
+    typealias Message = UPMessage
 
     private let decoder: MessageDecoderImpl
 
-    init(config: ProtocolConfigRef, kind: CommonEphemeralStreamKind, onResult: @escaping @Sendable (Result<Request, Error>) -> Void) {
+    init(config: ProtocolConfigRef, kind: UniquePresistentStreamKind, onResult: @escaping @Sendable (Result<Message, Error>) -> Void) {
         decoder = MessageDecoderImpl(
             config: config,
-            type: Request.getType(kind: kind),
-            repeats: false,
+            type: UPMessage.getType(kind: kind),
+            repeats: true,
             onResult: { result in
                 switch result {
                 case let .success(req):
-                    let req = Request.from(kind: kind, data: req)
+                    let req = UPMessage.from(kind: kind, data: req)
                     guard let req else {
                         onResult(.failure(AssertionError.unreachable("invalid request")))
                         return
@@ -78,11 +78,46 @@ public class RequestMessageDecoder: MessageDecoder {
         )
     }
 
-    public func decode(data: Data) throws {
+    func decode(data: Data) throws {
         try decoder.append(data: data)
     }
 
-    public func finish() {
+    func finish() {
+        decoder.finish()
+    }
+}
+
+class CEMessageDecoder: MessageDecoder {
+    typealias Message = CERequest
+
+    private let decoder: MessageDecoderImpl
+
+    init(config: ProtocolConfigRef, kind: CommonEphemeralStreamKind, onResult: @escaping @Sendable (Result<Message, Error>) -> Void) {
+        decoder = MessageDecoderImpl(
+            config: config,
+            type: CERequest.getType(kind: kind),
+            repeats: false,
+            onResult: { result in
+                switch result {
+                case let .success(req):
+                    let req = CERequest.from(kind: kind, data: req)
+                    guard let req else {
+                        onResult(.failure(AssertionError.unreachable("invalid request")))
+                        return
+                    }
+                    onResult(.success(req))
+                case let .failure(error):
+                    onResult(.failure(error))
+                }
+            }
+        )
+    }
+
+    func decode(data: Data) throws {
+        try decoder.append(data: data)
+    }
+
+    func finish() {
         decoder.finish()
     }
 }

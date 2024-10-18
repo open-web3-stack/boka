@@ -67,14 +67,15 @@ private final class NetworkImpl: Sendable {
 
 struct PresistentStreamHandlerImpl: PresistentStreamHandler {
     typealias StreamKind = UniquePresistentStreamKind
-    typealias Message = Data // TODO: use real type
+    typealias Message = UPMessage
 
     fileprivate let impl: NetworkImpl
 
-    func createDecoder(kind _: StreamKind,
-                       onResult _: @escaping @Sendable (Result<Message, Error>) -> Void) -> any MessageDecoder<Message>
-    {
-        fatalError("unimplemented")
+    func createDecoder(
+        kind: StreamKind,
+        onResult: @escaping @Sendable (Result<Message, Error>) -> Void
+    ) -> any MessageDecoder<Message> {
+        UPMessageDecoder(config: impl.config, kind: kind, onResult: onResult)
     }
 
     func streamOpened(connection _: any ConnectionInfoProtocol, stream _: any StreamProtocol, kind _: StreamKind) throws {
@@ -86,16 +87,14 @@ struct PresistentStreamHandlerImpl: PresistentStreamHandler {
     }
 }
 
-typealias RequestDisambiguated = Request
-
 struct EphemeralStreamHandlerImpl: EphemeralStreamHandler {
     typealias StreamKind = CommonEphemeralStreamKind
-    typealias Request = RequestDisambiguated
+    typealias Request = CERequest
 
     fileprivate let impl: NetworkImpl
 
     func createDecoder(kind: StreamKind, onResult: @escaping @Sendable (Result<Request, Error>) -> Void) -> any MessageDecoder<Request> {
-        RequestMessageDecoder(config: impl.config, kind: kind, onResult: onResult)
+        CEMessageDecoder(config: impl.config, kind: kind, onResult: onResult)
     }
 
     func handle(connection: any ConnectionInfoProtocol, request: Request) async throws -> Data {

@@ -3,12 +3,12 @@ import Codec
 import Foundation
 import Networking
 
-public enum Request: Sendable {
+public enum CERequest: Sendable {
     case safroleTicket1(SafroleTicketMessage)
     case safroleTicket2(SafroleTicketMessage)
 }
 
-extension Request: RequestProtocol {
+extension CERequest: RequestProtocol {
     public typealias StreamKind = CommonEphemeralStreamKind
 
     public func encode() throws -> Data {
@@ -40,7 +40,7 @@ extension Request: RequestProtocol {
         }
     }
 
-    static func from(kind: CommonEphemeralStreamKind, data: any Decodable) -> Request? {
+    static func from(kind: CommonEphemeralStreamKind, data: any Decodable) -> CERequest? {
         switch kind {
         case .safroleTicket1:
             guard let message = data as? SafroleTicketMessage else {
