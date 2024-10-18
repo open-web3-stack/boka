@@ -49,7 +49,7 @@ public enum BLS: KeyType {
                 throw .keypairSignFailed(err)
             }
 
-            return Data(output)
+            return output
         }
     }
 
@@ -195,7 +195,7 @@ public enum BLS: KeyType {
                 }
             }
         } onErr: { err throws(Error) in
-            throw .aggregatedVerifyFailed(err)
+            logger.debug("aggregateVerify failed: \(err)")
         }
 
         return output
