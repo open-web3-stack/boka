@@ -1,0 +1,23 @@
+[package]
+name = "bls"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[build-dependencies]
+cbindgen = "0.27.0"
+
+[dependencies]
+w3f-bls = { git = "https://github.com/w3f/bls", rev = "c19bbe8", features = [
+	"experimental",
+] }
+sha2 = { version = "0.10", default-features = false }
+ark-bls12-381 = { version = "0.4.0", default-features = false, features = [
+	"curve",
+] }
+
+
+[dev-dependencies]
+hex-literal = "0.4.1"
