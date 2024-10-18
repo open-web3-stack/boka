@@ -1,4 +1,5 @@
 import Blockchain
+import Codec
 import Foundation
 import Networking
 import TracingUtils
@@ -6,7 +7,6 @@ import Utils
 
 public final class Network: Sendable {
     public struct Config {
-        public var protocolConfig: ProtocolConfigRef
         public var mode: PeerMode
         public var listenAddress: NetAddr
         public var genesisHeader: Data32
@@ -19,14 +19,13 @@ public final class Network: Sendable {
     public init(
         config: Config,
         key: Ed25519.SecretKey,
-        eventBus: EventBus
+        blockchain: Blockchain
     ) throws {
         let logger = Logger(label: "Network".uniqueId)
 
         impl = NetworkImpl(
             logger: logger,
-            eventBus: eventBus,
-            config: config.protocolConfig
+            blockchain: blockchain
         )
 
         let option = PeerOptions<HandlerDef>(
@@ -54,14 +53,16 @@ struct HandlerDef: StreamHandler {
 }
 
 private final class NetworkImpl: Sendable {
-    fileprivate let logger: Logger
-    fileprivate let eventBus: EventBus
-    fileprivate let config: ProtocolConfigRef
+    let logger: Logger
+    let blockchain: Blockchain
 
-    init(logger: Logger, eventBus: EventBus, config: ProtocolConfigRef) {
+    var config: ProtocolConfigRef {
+        blockchain.config
+    }
+
+    init(logger: Logger, blockchain: Blockchain) {
         self.logger = logger
-        self.eventBus = eventBus
-        self.config = config
+        self.blockchain = blockchain
     }
 }
 
@@ -99,6 +100,10 @@ struct EphemeralStreamHandlerImpl: EphemeralStreamHandler {
 
     func handle(connection: any ConnectionInfoProtocol, request: Request) async throws -> Data {
         impl.logger.debug("handling request: \(request) from \(connection.id)")
+        let resp = try await request.handle(blockchain: impl.blockchain)
+        if let resp {
+            return try JamEncoder.encode(resp)
+        }
         return Data()
     }
 }

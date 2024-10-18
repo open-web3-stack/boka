@@ -20,6 +20,10 @@ public enum RuntimeEvents {
     // New safrole ticket received from network
     public struct SafroleTicketsReceived: Event {
         public let items: [ExtrinsicTickets.TicketItem]
+
+        public init(items: [ExtrinsicTickets.TicketItem]) {
+            self.items = items
+        }
     }
 
     // New block authored by BlockAuthor service

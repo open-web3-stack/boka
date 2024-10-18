@@ -57,3 +57,31 @@ extension CERequest: RequestProtocol {
         }
     }
 }
+
+extension CERequest {
+    public func handle(blockchain: Blockchain) async throws -> (any Encodable)? {
+        switch self {
+        case let .safroleTicket1(message):
+            blockchain.publish(event: RuntimeEvents.SafroleTicketsReceived(
+                items: [
+                    ExtrinsicTickets.TicketItem(
+                        attempt: message.attempt,
+                        signature: message.proof
+                    ),
+                ]
+            ))
+            // TODO: rebroadcast to other peers after some time
+            return nil
+        case let .safroleTicket2(message):
+            blockchain.publish(event: RuntimeEvents.SafroleTicketsReceived(
+                items: [
+                    ExtrinsicTickets.TicketItem(
+                        attempt: message.attempt,
+                        signature: message.proof
+                    ),
+                ]
+            ))
+            return nil
+        }
+    }
+}
