@@ -1,0 +1,19 @@
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 100
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  SplitEmptyFunction: false
+  AfterControlStatement: false
+  AfterClass: false
+  AfterStruct: false
+  BeforeElse: false
+  IndentBraces: false
+AllowShortFunctionsOnASingleLine: false
+BinPackParameters: false
+BinPackArguments: false
+AlignAfterOpenBracket: AlwaysBreak
+AlignTrailingComments: true
+AllowAllParametersOfDeclarationOnNextLine: false
+PenaltyBreakBeforeFirstCallParameter: 0
