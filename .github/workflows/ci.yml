@@ -34,10 +34,6 @@ jobs:
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
-    - name: Get blst submodule commit hash
-      id: blst-commit-hash
-      run: |
-        echo "commit-hash=$(git submodule status Utils/Sources/blst/ | cut -c2-41)" >> $GITHUB_OUTPUT
     - name: Cache SPM
       uses: actions/cache@v4
       with:
@@ -53,15 +49,8 @@ jobs:
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
-          Utils/Sources/bandersnatch/target/
+          target/
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-    - name: Cache blst static lib
-      uses: actions/cache@v4
-      with:
-        path: .lib/libblst.a
-        key: ${{ runner.os }}-libs-blst-${{ steps.blst-commit-hash.outputs.commit-hash }}
-        restore-keys: |
-            ${{ runner.os }}-libs-blst
     - name: Cache bandersnatch_vrfs static lib
       uses: actions/cache@v4
       with:
@@ -69,6 +58,13 @@ jobs:
         key: ${{ runner.os }}-libs-libbandersnatch-${{ hashFiles('Utils/Sources/bandersnatch/**') }}
         restore-keys: |
             ${{ runner.os }}-libs-libbandersnatch
+    - name: Cache bls static lib
+      uses: actions/cache@v4
+      with:
+        path: .lib/libbls.a
+        key: ${{ runner.os }}-libs-libbls-${{ hashFiles('Utils/Sources/bls/**') }}
+        restore-keys: |
+            ${{ runner.os }}-libs-libbls
     - name: Cache erasure-coding static lib
       uses: actions/cache@v4
       with:
@@ -83,7 +79,7 @@ jobs:
       with:
         components: rustfmt
     - name: Check rust format
-      run: cargo +nightly fmt --all --manifest-path Utils/Sources/bandersnatch/Cargo.toml -- --check
+      run: cargo +nightly fmt --all -- --check
     - name: Build
       run: make build
     - name: Test

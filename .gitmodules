@@ -1,6 +1,3 @@
 [submodule "JAMTests/jamtestvectors"]
 	path = JAMTests/jamtestvectors
 	url = https://github.com/AcalaNetwork/jamtestvectors.git
-[submodule "blst"]
-	path = Utils/Sources/blst
-	url = https://github.com/supranational/blst.git
