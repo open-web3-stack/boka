@@ -12,6 +12,4 @@ int generate_self_signed_cert_and_pkcs12(
 
 char *get_error_string(int error);
 
-static inline uint16_t helper_ntohs(in_port_t netport) {
-  return ntohs(netport);
-}
+static inline uint16_t helper_ntohs(in_port_t netport) { return ntohs(netport); }
