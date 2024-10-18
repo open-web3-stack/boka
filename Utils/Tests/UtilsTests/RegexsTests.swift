@@ -14,7 +14,7 @@ struct RegexsTests {
         #expect(try Regexs.parseAddress("[2001:db8:85a3::8a2e:370:7334]:8080") == ("2001:db8:85a3::8a2e:370:7334", 8080))
         #expect(try Regexs.parseAddress("[::1]:8080") == ("::1", 8080))
 
-//        // Exception case: Missing port
+        // Exception case: Missing port
         #expect(throws: RegexsError.invalidFormat) { try Regexs.parseAddress("127.0.0.1") }
         #expect(throws: RegexsError.invalidFormat) { try Regexs.parseAddress("abcd:::") }
         // Exception case: Invalid port
