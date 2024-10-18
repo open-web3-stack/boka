@@ -26,40 +26,40 @@ int parse_pkcs12_certificate(
 
     bio = BIO_new_mem_buf(data, (int)length);
     if (!bio) {
-        *error_message = strdup("Failed to create BIO.");
+		*error_message = "Failed to create BIO.";
         goto cleanup;
     }
     p12 = d2i_PKCS12_bio(bio, NULL);
     if (!p12) {
-        *error_message = strdup("Failed to parse PKCS12.");
+		*error_message = "Failed to parse PKCS12.";
         goto cleanup;
     }
 
     if (!PKCS12_parse(p12, NULL, &pkey, &cert, &ca)) {
-        *error_message = strdup("Failed to parse PKCS12 structure.");
+		*error_message = "Failed to parse PKCS12 structure.";
         goto cleanup;
     }
 
     // Check if the key is ED25519
     int sig_alg = X509_get_signature_nid(cert);
     if (sig_alg != NID_ED25519) {
-        *error_message = strdup("Certificate signature algorithm is not ED25519.");
+		*error_message = "Certificate signature algorithm is not ED25519.";
         goto cleanup;
     }
 
     // Extract public key
     if (EVP_PKEY_get_raw_public_key(pkey, NULL, public_key_len) <= 0) {
-        *error_message = strdup("Failed to get public key length.");
+		*error_message = "Failed to get public key length.";
         goto cleanup;
     }
     *public_key = (unsigned char *)malloc(*public_key_len);
     if (!*public_key) {
-        *error_message = strdup("Failed to allocate memory for public key.");
+		*error_message = "Failed to allocate memory for public key.";
         goto cleanup;
     }
 
     if (EVP_PKEY_get_raw_public_key(pkey, *public_key, public_key_len) <= 0) {
-        *error_message = strdup("Failed to extract public key.");
+		*error_message = "Failed to extract public key.";
         goto cleanup;
     }
 
@@ -78,7 +78,7 @@ int parse_pkcs12_certificate(
     }
 
     if (!*alt_name) {
-        *error_message = strdup("No alternative name found.");
+		*error_message = "No alternative name found.";
         goto cleanup;
     }
 
