@@ -83,8 +83,8 @@ extension InMemoryDataProvider: BlockchainDataProviderProtocol {
         // parent needs to be either
         // - existing head
         // - known block
-        // - genesis / all zeros
-        guard heads.remove(parent) != nil || hasBlock(hash: parent) || parent == Data32() else {
+        // - genesis
+        guard heads.remove(parent) != nil || hasBlock(hash: parent) || parent == genesisBlockHash else {
             throw BlockchainDataProviderError.noData(hash: parent)
         }
         heads.insert(hash)

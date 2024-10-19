@@ -124,7 +124,7 @@ public struct State: Sendable, Equatable, Codable {
 
 extension State {
     public var lastBlockHash: Data32 {
-        recentHistory.items.last.map(\.headerHash) ?? Data32()
+        recentHistory.items.last.map(\.headerHash)!
     }
 }
 
