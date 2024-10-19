@@ -93,11 +93,8 @@ struct PresistentStreamHandlerImpl: PresistentStreamHandler {
 
     fileprivate let impl: NetworkImpl
 
-    func createDecoder(
-        kind: StreamKind,
-        onResult: @escaping @Sendable (Result<Message, Error>) -> Void
-    ) -> any MessageDecoder<Message> {
-        UPMessageDecoder(config: impl.config, kind: kind, onResult: onResult)
+    func createDecoder(kind: StreamKind) -> any MessageDecoder<Message> {
+        UPMessageDecoder(config: impl.config, kind: kind)
     }
 
     func streamOpened(connection _: any ConnectionInfoProtocol, stream _: any StreamProtocol, kind _: StreamKind) throws {
@@ -117,8 +114,8 @@ struct EphemeralStreamHandlerImpl: EphemeralStreamHandler {
 
     fileprivate let impl: NetworkImpl
 
-    func createDecoder(kind: StreamKind, onResult: @escaping @Sendable (Result<Request, Error>) -> Void) -> any MessageDecoder<Request> {
-        CEMessageDecoder(config: impl.config, kind: kind, onResult: onResult)
+    func createDecoder(kind: StreamKind) -> any MessageDecoder<Request> {
+        CEMessageDecoder(config: impl.config, kind: kind)
     }
 
     func handle(connection: any ConnectionInfoProtocol, request: Request) async throws -> Data {
