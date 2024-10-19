@@ -118,35 +118,33 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
             if let ceKind = Handler.EphemeralHandler.StreamKind(rawValue: byte) {
                 logger.debug("stream opened. kind: \(ceKind)")
 
-                let complete = Channel<Void>()
-                var decoder = impl.ephemeralStreamHandler.createDecoder(kind: ceKind) { result in
-                    switch result {
-                    case let .success(request):
-                        Task {
-                            await complete.receive()
-                            do {
-                                let resp = try await self.impl.ephemeralStreamHandler.handle(connection: self, request: request)
-                                try stream.send(data: resp, finish: true)
-                            } catch {
-                                logger.debug("Failed to handle request: \(error)")
-                                stream.close(abort: true)
-                            }
-                        }
-                    case let .failure(error):
-                        logger.debug("Failed to decode request: \(error)")
-                        stream.close(abort: true)
-                    }
-                }
-                do {
-                    while let data = await stream.receive() {
-                        try decoder.decode(data: data)
-                    }
-                    decoder.finish()
-                } catch {
-                    logger.debug("Failed to decode request: \(error)")
+                var decoder = impl.ephemeralStreamHandler.createDecoder(kind: ceKind)
+
+                let lengthData = await stream.receive(count: 4)
+                guard let lengthData else {
                     stream.close(abort: true)
+                    logger.debug("Invalid request length")
+                    return
                 }
-                await complete.send(())
+                let length = UInt32(littleEndian: lengthData.withUnsafeBytes { $0.load(as: UInt32.self) })
+                // sanity check for length
+                // TODO: pick better value
+                guard length < 1024 * 1024 * 10 else {
+                    stream.close(abort: true)
+                    logger.debug("Invalid request length: \(length)")
+                    // TODO: report bad peer
+                    return
+                }
+                let data = await stream.receive(count: Int(length))
+                guard let data else {
+                    stream.close(abort: true)
+                    logger.debug("Invalid request data")
+                    // TODO: report bad peer
+                    return
+                }
+                let request = try decoder.decode(data: data)
+                let resp = try await impl.ephemeralStreamHandler.handle(connection: self, request: request)
+                try stream.send(data: resp, finish: true)
             }
         }
     }
@@ -181,34 +179,34 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
             "Starting presistent stream run loop",
             metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)"]
         )
-        var decoder = handler.createDecoder(kind: kind) { result in
-            switch result {
-            case let .success(message):
-                Task {
-                    do {
-                        try await handler.handle(connection: connection, message: message)
-                    } catch {
-                        logger.debug(
-                            "Failed to handle presistent stream data",
-                            metadata: [
-                                "connectionId": "\(connection.id)",
-                                "streamId": "\(stream.id)",
-                                "kind": "\(kind)",
-                                "error": "\(error)",
-                            ]
-                        )
-                        stream.close(abort: true)
-                    }
+        var decoder = handler.createDecoder(kind: kind)
+        do {
+            while true {
+                let lengthData = await stream.receive(count: 4)
+                guard let lengthData else {
+                    break
                 }
-            case let .failure(error):
-                logger.debug("Failed to decode message: \(error)")
+                let length = UInt32(littleEndian: lengthData.withUnsafeBytes { $0.load(as: UInt32.self) })
+                // sanity check for length
+                // TODO: pick better value
+                guard length < 1024 * 1024 * 10 else {
+                    stream.close(abort: true)
+                    logger.debug("Invalid message length: \(length)")
+                    // TODO: report bad peer
+                    return
+                }
+                let data = await stream.receive(count: Int(length))
+                guard let data else {
+                    break
+                }
+                let msg = try decoder.decode(data: data)
+                try await handler.handle(connection: connection, message: msg)
             }
-        }
-        while let data = await stream.receive() {
-            try decoder.decode(data: data)
+        } catch {
+            logger.debug("UP stream run loop failed: \(error)")
+            stream.close(abort: true)
         }
 
-        decoder.finish()
         logger.debug(
             "Ending presistent stream run loop",
             metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)"]

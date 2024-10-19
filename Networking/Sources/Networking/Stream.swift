@@ -1,6 +1,7 @@
 import AsyncChannels
 import Foundation
 import MsQuicSwift
+import Synchronization
 import TracingUtils
 import Utils
 
@@ -29,8 +30,7 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
     let stream: QuicStream
     let impl: PeerImpl<Handler>
     private let channel: Channel<Data> = .init(capacity: 100)
-    // TODO: https://github.com/gh123man/Async-Channels/issues/12
-    private let nextData: ThreadSafeContainer<Data?> = .init(nil)
+    private let nextData: Mutex<Data?> = .init(nil)
     private let _status: ThreadSafeContainer<StreamStatus> = .init(.open)
     let connectionId: UniqueId
     let kind: Handler.PresistentHandler.StreamKind?
@@ -95,32 +95,37 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
     }
 
     func receive() async -> Data? {
-        if let data = nextData.value {
-            nextData.value = nil
+        let data = nextData.withLock {
+            let ret = $0
+            $0 = nil
+            return ret
+        }
+        if let data {
             return data
         }
         return await channel.receive()
     }
 
-    func receiveByte() async -> UInt8? {
-        if var data = nextData.value {
-            let byte = data.removeFirst()
-            if data.isEmpty {
-                nextData.value = nil
-            } else {
-                nextData.value = data
-            }
-            return byte
-        }
-
-        guard var data = await receive() else {
+    func receive(count: Int) async -> Data? {
+        guard var result = await receive() else {
             return nil
         }
-
-        let byte = data.removeFirst()
-        if !data.isEmpty {
-            nextData.value = data
+        if result.count < count {
+            guard let more = await receive(count: count - result.count) else {
+                return nil
+            }
+            result.append(more)
+            return result
+        } else {
+            let ret = result.prefix(count)
+            nextData.withLock {
+                $0 = result.dropFirst(count)
+            }
+            return ret
         }
-        return byte
+    }
+
+    func receiveByte() async -> UInt8? {
+        await receive(count: 1)?.first
     }
 }
