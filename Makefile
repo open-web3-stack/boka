@@ -8,16 +8,16 @@ default: build
 githooks: .git/hooks/pre-commit
 
 .PHONY: deps
-deps: .lib/libblst.a .lib/libbandersnatch_vrfs.a .lib/libec.a .lib/libmsquic.a
+deps: .lib/libbls.a .lib/libbandersnatch_vrfs.a .lib/libec.a .lib/libmsquic.a
 
-.lib/libblst.a:
-	./scripts/blst.sh
+.lib/libbls.a: $(wildcard Utils/Sources/bls/src/*)
+	./scripts/build-rust-libs.sh
 
 .lib/libbandersnatch_vrfs.a: $(wildcard Utils/Sources/bandersnatch/src/*)
-	./scripts/bandersnatch.sh
+	./scripts/build-rust-libs.sh
 
 .lib/libec.a: $(wildcard Utils/Sources/erasure-coding/src/*)
-	./scripts/erasure-coding.sh
+	./scripts/build-rust-libs.sh
 
 .lib/libmsquic.a:
 	./scripts/external-libs.sh
@@ -71,6 +71,10 @@ format-cargo:
 .PHONY: format-all
 format-all: format format-cargo
 
+.PHONY: format-clang
+format-clang:
+	find . \( -name "*.c" -o -name "helpers.h" \) -exec clang-format -i {} +
+	
 .PHONY: run
 run: githooks
 	swift run --package-path Boka

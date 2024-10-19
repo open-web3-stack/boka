@@ -18,6 +18,14 @@ public final class ThreadSafeContainer<T>: @unchecked Sendable {
         }
     }
 
+    public func exchange(_ value: T) -> T {
+        lock.withWriteLock {
+            let ret = self.storage
+            self.storage = value
+            return ret
+        }
+    }
+
     public var value: T {
         get {
             read { $0 }
