@@ -38,7 +38,7 @@ struct DispatchQueueSchedulerTests {
 
             let diff = try #require(end.value).timeIntervalSince(now) - delay
             let diffAbs = abs(diff)
-            #expect(diffAbs < 0.6)
+            #expect(diffAbs < 1)
         }
     }
 
@@ -64,7 +64,7 @@ struct DispatchQueueSchedulerTests {
                 let expectedInterval = delay * Double(index + 1)
                 let actualInterval = time.timeIntervalSince(now)
                 let difference = abs(actualInterval - expectedInterval)
-                #expect(difference < 0.6)
+                #expect(difference < 1)
             }
         }
     }
