@@ -40,7 +40,7 @@ final class BokaTests {
     @Test func commandWithAllConfig() async throws {
         let sepc = ResourceLoader.loadResource(named: "devnet_allconfig_spec.json")!.path()
         let genesis: Genesis = .file(path: sepc)
-        let (_, protocolConfig) = try await genesis.load()
+        let (_, _, protocolConfig) = try await genesis.load()
         #expect(protocolConfig.value.maxWorkItems == 2)
         #expect(protocolConfig.value.serviceMinBalance == 100)
     }
@@ -49,7 +49,7 @@ final class BokaTests {
         let sepc = ResourceLoader.loadResource(named: "mainnet_someconfig_spec.json")!.path()
         let genesis: Genesis = .file(path: sepc)
         let config = ProtocolConfigRef.mainnet.value
-        let (_, protocolConfig) = try await genesis.load()
+        let (_, _, protocolConfig) = try await genesis.load()
         #expect(protocolConfig.value.auditTranchePeriod == 100)
         #expect(protocolConfig.value.pvmProgramInitSegmentSize == config.pvmProgramInitSegmentSize)
     }
@@ -58,7 +58,7 @@ final class BokaTests {
         let sepc = ResourceLoader.loadResource(named: "devnet_noconfig_spec.json")!.path()
         let genesis: Genesis = .file(path: sepc)
         let config = ProtocolConfigRef.dev.value
-        let (_, protocolConfig) = try await genesis.load()
+        let (_, _, protocolConfig) = try await genesis.load()
         #expect(protocolConfig.value.maxWorkItems == config.maxWorkItems)
         #expect(protocolConfig.value.serviceMinBalance == config.serviceMinBalance)
     }

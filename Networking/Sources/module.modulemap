@@ -5,7 +5,5 @@ module msquic {
 
 module openssl {
 	header "include/openssl/ssl3.h"
-	link "ssl"
-	link "crypto"
 	export *
 }

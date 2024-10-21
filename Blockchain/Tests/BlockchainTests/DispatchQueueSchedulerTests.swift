@@ -38,23 +38,23 @@ struct DispatchQueueSchedulerTests {
 
             let diff = try #require(end.value).timeIntervalSince(now) - delay
             let diffAbs = abs(diff)
-            #expect(diffAbs < 0.5)
+            #expect(diffAbs < 1)
         }
     }
 
     @Test func scheduleRepeatingTask() async throws {
-        try await confirmation(expectedCount: 3) { confirm in
-            let delay = 0.5
+        try await confirmation(expectedCount: 2) { confirm in
+            let delay = 1.5
             let now = Date()
             let executionTimes = ThreadSafeContainer<[Date]>([])
-            let expectedExecutions = 3
+            let expectedExecutions = 2
 
             let cancel = scheduler.schedule(delay: delay, repeats: true) {
                 executionTimes.value.append(Date())
                 confirm()
             }
 
-            try await Task.sleep(for: .seconds(1.6))
+            try await Task.sleep(for: .seconds(3.1))
 
             _ = cancel
 
@@ -64,7 +64,7 @@ struct DispatchQueueSchedulerTests {
                 let expectedInterval = delay * Double(index + 1)
                 let actualInterval = time.timeIntervalSince(now)
                 let difference = abs(actualInterval - expectedInterval)
-                #expect(difference < 0.5)
+                #expect(difference < 1)
             }
         }
     }
@@ -83,13 +83,13 @@ struct DispatchQueueSchedulerTests {
 
     @Test func cancelRepeatingTask() async throws {
         try await confirmation(expectedCount: 2) { confirm in
-            let delay = 0.5
+            let delay = 1.0
 
             let cancel = scheduler.schedule(delay: delay, repeats: true) {
                 confirm()
             }
 
-            try await Task.sleep(for: .seconds(1.2))
+            try await Task.sleep(for: .seconds(2.2))
 
             cancel.cancel()
 

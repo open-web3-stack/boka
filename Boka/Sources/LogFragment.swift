@@ -1,6 +1,5 @@
 import ConsoleKit
 import Logging
-import Utils
 
 private struct SourceLocationFragment: LoggerFragment {
     public func write(_ record: inout LogRecord, to output: inout FragmentOutput) {
@@ -42,22 +41,23 @@ private struct InnerFragment: LoggerFragment {
     }
 }
 
-public final class LogFragment: LoggerFragment {
-    private let inner: LoggerFragment
+// TODO: renable after this issue is fixed: https://github.com/swiftlang/swift/issues/76690
+// public final class LogFragment: LoggerFragment {
+//     private let inner: LoggerFragment
 
-    public init() {
-        inner = TimestampFragment()
-            .and(InnerFragment().separated(" "))
-            .and(MessageFragment().separated(" "))
-            .and(MetadataFragment().separated(" "))
-            .and(SourceLocationFragment().separated(" ").maxLevel(.debug))
-    }
+//     public init() {
+//         inner = TimestampFragment()
+//             .and(InnerFragment().separated(" "))
+//             .and(MessageFragment().separated(" "))
+//             .and(MetadataFragment().separated(" "))
+//             .and(SourceLocationFragment().separated(" ").maxLevel(.debug))
+//     }
 
-    public func hasContent(record: inout LogRecord) -> Bool {
-        inner.hasContent(record: &record)
-    }
+//     public func hasContent(record: inout LogRecord) -> Bool {
+//         inner.hasContent(record: &record)
+//     }
 
-    public func write(_ record: inout LogRecord, to: inout FragmentOutput) {
-        inner.write(&record, to: &to)
-    }
-}
+//     public func write(_ record: inout LogRecord, to: inout FragmentOutput) {
+//         inner.write(&record, to: &to)
+//     }
+// }

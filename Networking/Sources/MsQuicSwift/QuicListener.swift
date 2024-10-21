@@ -41,10 +41,7 @@ public final class QuicListener: Sendable {
 
         _ = ListenerHandle(logger: logger, ptr: ptr!, api: registration.api, listener: self)
 
-        let address = listenAddress.toQuicAddr()
-        guard var address else {
-            throw QuicError.invalidAddress(listenAddress)
-        }
+        var address = listenAddress.quicAddr
 
         try alpns.withContentUnsafeBytes { alpnPtrs in
             var buffer = [QUIC_BUFFER](repeating: QUIC_BUFFER(), count: alpnPtrs.count)
