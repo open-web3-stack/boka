@@ -34,7 +34,15 @@ public struct RecentHistory: Sendable, Equatable, Codable {
 extension RecentHistory: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> RecentHistory {
-        RecentHistory(items: try! ConfigLimitedSizeArray(config: config))
+        RecentHistory(items: try! ConfigLimitedSizeArray(
+            config: config,
+            array: [HistoryItem(
+                headerHash: Data32(),
+                mmr: MMR([]),
+                stateRoot: Data32(),
+                workReportHashes: ConfigLimitedSizeArray(config: config)
+            )]
+        ))
     }
 }
 

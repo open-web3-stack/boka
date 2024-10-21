@@ -187,6 +187,7 @@ struct ExtrinsicPoolServiceTests {
 
         let newBlock = BlockRef.dummy(config: config).mutate {
             $0.header.unsigned.timeslot = nextTimeslot
+            $0.header.unsigned.parentHash = dataProvider.bestHead
         }
 
         let oldEntropyPool = state.value.entropyPool
