@@ -43,7 +43,7 @@ extension NetAddr: Equatable {
     public static func == (lhs: NetAddr, rhs: NetAddr) -> Bool {
         var addr1 = lhs.quicAddr
         var addr2 = rhs.quicAddr
-        return QuicAddrCompare(&addr1, &addr2) == 0
+        return QuicAddrCompare(&addr1, &addr2) == 1
     }
 }
 
