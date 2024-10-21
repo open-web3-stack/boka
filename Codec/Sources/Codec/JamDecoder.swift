@@ -100,7 +100,7 @@ private class DecodeContext: Decoder {
     }
 
     fileprivate func decodeData(codingPath: @autoclosure () -> [CodingKey]) throws -> Data {
-        let length = try input.decode()
+        let length = try input.decodeUInt64()
         // sanity check: length must be less than 4gb
         guard length < 0x1_0000_0000 else {
             throw DecodingError.dataCorrupted(
@@ -115,7 +115,7 @@ private class DecodeContext: Decoder {
     }
 
     fileprivate func decodeData(codingPath: @autoclosure () -> [CodingKey]) throws -> [UInt8] {
-        let length = try input.decode()
+        let length = try input.decodeUInt64()
         // sanity check: length must be less than 4gb
         guard length < 0x1_0000_0000 else {
             throw DecodingError.dataCorrupted(
@@ -130,7 +130,7 @@ private class DecodeContext: Decoder {
     }
 
     fileprivate func decodeArray<T: ArrayWrapper>(_ type: T.Type, key: CodingKey?) throws -> T {
-        let length = try input.decode()
+        let length = try input.decodeUInt64()
         // sanity check: length can't be unreasonably large
         guard length < 0xFFFFFF else {
             throw DecodingError.dataCorrupted(

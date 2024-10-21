@@ -10,10 +10,10 @@ public protocol DataInput {
 
 extension DataInput {
     public mutating func read() throws -> UInt8 {
-        try read(length: 1)[0]
+        try read(length: 1).first!
     }
 
-    public mutating func decode() throws -> UInt64 {
+    public mutating func decodeUInt64() throws -> UInt64 {
         // TODO: improve this by use `read(minLength: 8)` to avoid read byte by byte
         let res = try IntegerCodec.decode { try self.read() }
         guard let res else {
