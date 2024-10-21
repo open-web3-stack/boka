@@ -113,6 +113,7 @@ private func parseIpv6Addr(_ address: String) -> (String, UInt16)? {
 }
 
 private func parseIpv4Addr(_ address: String) -> (String, UInt16)? {
+    print(address)
     let parts = address.split(separator: ":")
     guard parts.count == 2 else {
         return nil

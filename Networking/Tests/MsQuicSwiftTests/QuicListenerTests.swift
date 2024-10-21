@@ -42,13 +42,14 @@ struct QuicListenerTests {
             handler: serverHandler,
             registration: registration,
             configuration: serverConfiguration,
-            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0),
+            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
             alpns: [Data("testalpn".utf8)]
         )
 
         let listenAddress = try listener.listenAddress()
-        #expect(listenAddress.ipAddress == "127.0.0.1")
-        #expect(listenAddress.port != 0)
+        let (ipAddress, port) = listenAddress.getAddressAndPort()
+        #expect(ipAddress == "127.0.0.1")
+        #expect(port != 0)
 
         // create connection to listener
 
@@ -82,10 +83,12 @@ struct QuicListenerTests {
             }
         }.first!
 
+        let (ipAddress2, _) = info.remoteAddress.getAddressAndPort()
+
         #expect(info.negotiatedAlpn == Data("testalpn".utf8))
         #expect(info.serverName == "127.0.0.1")
         #expect(info.localAddress == listenAddress)
-        #expect(info.remoteAddress.ipAddress == "127.0.0.1")
+        #expect(ipAddress2 == "127.0.0.1")
 
         let stream2 = try serverConnection.createStream()
         try stream2.send(data: Data("other test data 2".utf8))
