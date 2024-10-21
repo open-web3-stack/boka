@@ -21,7 +21,7 @@ struct SafroleServiceTests {
         }
         timeProvider = MockTimeProvider(time: 1000)
 
-        genesisState = try StateRef(State.devGenesis(config: config))
+        (genesisState, _) = try State.devGenesis(config: config)
 
         storeMiddleware = StoreMiddleware()
         eventBus = EventBus(eventMiddleware: Middleware(storeMiddleware))
