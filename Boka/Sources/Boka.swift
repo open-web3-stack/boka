@@ -6,6 +6,10 @@ import ServiceLifecycle
 import TracingUtils
 import Utils
 
+enum InvalidArgumentError: Error {
+    case invalidArgument(String)
+}
+
 struct Boka: AsyncCommand {
     struct Signature: CommandSignature {
         @Option(name: "base-path", short: "d", help: "Base path to database files.")
@@ -65,13 +69,16 @@ struct Boka: AsyncCommand {
             return
         }
 
+        let services = try await Tracing.bootstrap("Boka", loggerOnly: true)
+        for service in services {
+            Task {
+                try await service.run()
+            }
+        }
+
         // Handle other options and flags
         if let basePath = signature.basePath {
             context.console.info("Base path: \(basePath)")
-        }
-
-        if let p2p = signature.p2p {
-            context.console.info("P2P listen address: \(p2p)")
         }
 
         if let peers = signature.peers {
@@ -89,22 +96,55 @@ struct Boka: AsyncCommand {
             context.console.info("Operator RPC listen address: \(operatorRpc)")
         }
 
-        if let devSeed = signature.devSeed {
-            context.console.info("Dev seed: \(devSeed)")
-        }
-
-        var rpcListenAddress = "127.0.0.1:9955"
+        var rpcListenAddress = NetAddr(ipAddress: "127.0.0.1", port: 9955)
         if let rpc = signature.rpc {
             if rpc.lowercased() == "false" {
-                context.console.warning("RPC server is disabled")
+                context.console.info("RPC server is disabled")
+                rpcListenAddress = nil
             } else {
-                rpcListenAddress = rpc
+                if let addr = NetAddr(address: rpc) {
+                    rpcListenAddress = addr
+                } else {
+                    throw InvalidArgumentError.invalidArgument("Invalid RPC address")
+                }
             }
-            context.console.info("RPC listen address: \(rpc)")
         }
 
-        let (rpcAddress, rpcPort) = try Regexs.parseAddress(rpcListenAddress)
-        let config = Node.Config(rpc: RPCConfig(listenAddress: rpcAddress, port: rpcPort))
+        let rpcConfig = rpcListenAddress.map { rpcListenAddress in
+            let (rpcAddress, rpcPort) = rpcListenAddress.getAddressAndPort()
+            return RPCConfig(listenAddress: rpcAddress, port: Int(rpcPort))
+        }
+
+        var p2pListenAddress = NetAddr(ipAddress: "127.0.0.1", port: 19955)!
+        if let p2p = signature.p2p {
+            if let addr = NetAddr(address: p2p) {
+                p2pListenAddress = addr
+            } else {
+                throw InvalidArgumentError.invalidArgument("Invalid P2P address")
+            }
+        }
+
+        let keystore = try await DevKeyStore()
+
+        var devKey: KeySet?
+        let networkKey: Ed25519.SecretKey
+        if let devSeed = signature.devSeed {
+            guard let val = UInt32(devSeed) else {
+                throw InvalidArgumentError.invalidArgument("devSeed is not a valid hex string")
+            }
+            devKey = try await keystore.addDevKeys(seed: val)
+            networkKey = await keystore.get(Ed25519.self, publicKey: devKey!.ed25519)!
+        } else {
+            // TODO: only generate network key if keystore is empty
+            networkKey = try await keystore.generate(Ed25519.self)
+        }
+
+        let networkConfig = NetworkConfig(
+            mode: signature.validator ? .validator : .builder,
+            listenAddress: p2pListenAddress,
+            key: networkKey
+        )
+
         let eventBus = EventBus(
             eventMiddleware: .serial(
                 .log(logger: Logger(label: "EventBus")),
@@ -112,21 +152,27 @@ struct Boka: AsyncCommand {
             ),
             handlerMiddleware: .tracing(prefix: "Handler")
         )
-        let keystore = try await DevKeyStore()
+
         var genesis: Genesis = .dev
         if let configFile = signature.configFile {
             context.console.info("Config file: \(configFile)")
             genesis = .file(path: configFile)
         }
-        let node: ValidatorNode = try await ValidatorNode(
-            genesis: genesis, config: config, eventBus: eventBus, keystore: keystore
-        )
-        let services = try await Tracing.bootstrap("Boka", loggerOnly: true)
-        for service in services {
-            Task {
-                try await service.run()
-            }
+
+        let config = Node.Config(rpc: rpcConfig, network: networkConfig)
+
+        let node: Node = if signature.validator {
+            try await ValidatorNode(
+                config: config, genesis: genesis, eventBus: eventBus, keystore: keystore
+            )
+        } else {
+            try await Node(
+                config: config, genesis: genesis, eventBus: eventBus, keystore: keystore
+            )
         }
+
         try await node.wait()
+
+        console.info("Shutting down...")
     }
 }

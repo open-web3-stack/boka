@@ -34,4 +34,6 @@ public protocol BlockchainDataProviderProtocol: Sendable {
 
     /// remove header, block and state
     func remove(hash: Data32) async throws
+
+    var genesisBlockHash: Data32 { get }
 }

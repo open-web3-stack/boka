@@ -55,7 +55,7 @@ final class PeerTests {
             handler: serverHandler,
             registration: registration,
             configuration: serverConfiguration,
-            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0),
+            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
             alpns: [Data("testalpn".utf8)]
         )
 
@@ -115,7 +115,7 @@ final class PeerTests {
             handler: serverHandler,
             registration: registration,
             configuration: serverConfiguration,
-            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0),
+            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
             alpns: [Data("testalpn".utf8)]
         )
 

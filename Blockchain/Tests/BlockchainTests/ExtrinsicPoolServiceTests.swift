@@ -21,7 +21,8 @@ struct ExtrinsicPoolServiceTests {
         }
         timeProvider = MockTimeProvider(time: 1000)
 
-        dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesis: StateRef(State.devGenesis(config: config))))
+        let (genesisState, genesisBlock) = try State.devGenesis(config: config)
+        dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
 
         storeMiddleware = StoreMiddleware()
         eventBus = EventBus(eventMiddleware: Middleware(storeMiddleware))
@@ -186,6 +187,7 @@ struct ExtrinsicPoolServiceTests {
 
         let newBlock = BlockRef.dummy(config: config).mutate {
             $0.header.unsigned.timeslot = nextTimeslot
+            $0.header.unsigned.parentHash = dataProvider.bestHead
         }
 
         let oldEntropyPool = state.value.entropyPool

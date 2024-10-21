@@ -21,7 +21,8 @@ struct ValidatorServiceTests {
         config = ProtocolConfigRef.dev
         timeProvider = MockTimeProvider(time: 988)
 
-        dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesis: StateRef(State.devGenesis(config: config))))
+        let (genesisState, genesisBlock) = try State.devGenesis(config: config)
+        dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
 
         storeMiddleware = StoreMiddleware()
         eventBus = EventBus(eventMiddleware: Middleware(storeMiddleware))
@@ -48,7 +49,7 @@ struct ValidatorServiceTests {
 
     @Test
     func onGenesis() async throws {
-        let genesisState = try await dataProvider.getState(hash: Data32())
+        let genesisState = try await dataProvider.getState(hash: dataProvider.genesisBlockHash)
 
         await validatorService.on(genesis: genesisState)
 
@@ -64,7 +65,7 @@ struct ValidatorServiceTests {
 
     @Test
     func produceBlocks() async throws {
-        let genesisState = try await dataProvider.getState(hash: Data32())
+        let genesisState = try await dataProvider.getState(hash: dataProvider.genesisBlockHash)
 
         await validatorService.on(genesis: genesisState)
 
@@ -103,7 +104,7 @@ struct ValidatorServiceTests {
 
     @Test
     func makeManyBlocks() async throws {
-        let genesisState = try await dataProvider.getState(hash: Data32())
+        let genesisState = try await dataProvider.getState(hash: dataProvider.genesisBlockHash)
 
         await validatorService.on(genesis: genesisState)
 

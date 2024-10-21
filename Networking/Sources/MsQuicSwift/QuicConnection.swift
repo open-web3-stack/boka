@@ -110,12 +110,13 @@ public final class QuicConnection: Sendable {
             guard storage2.state == .opened else {
                 throw QuicError.alreadyStarted
             }
+            let (host, port) = address.getAddressAndPort()
             try storage2.registration.api.call("ConnectionStart") { api in
                 api.pointee.ConnectionStart(
                     storage2.handle.ptr,
                     storage2.configuration.ptr,
                     QUIC_ADDRESS_FAMILY(QUIC_ADDRESS_FAMILY_UNSPEC),
-                    address.ipAddress, address.port
+                    host, port
                 )
             }
             storage2.state = .started

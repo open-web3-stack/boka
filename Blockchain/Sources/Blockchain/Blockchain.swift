@@ -54,4 +54,8 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
 
         publish(RuntimeEvents.BlockFinalized(hash: hash))
     }
+
+    public func publish(event: some Event) {
+        publish(event)
+    }
 }

@@ -21,6 +21,7 @@ let package = Package(
         .package(path: "../RPC"),
         .package(path: "../TracingUtils"),
         .package(path: "../Utils"),
+        .package(url: "https://github.com/gh123man/Async-Channels.git", from: "1.0.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -32,6 +33,7 @@ let package = Package(
                 "RPC",
                 "TracingUtils",
                 "Utils",
+                .product(name: "AsyncChannels", package: "Async-Channels"),
             ]
         ),
         .testTarget(

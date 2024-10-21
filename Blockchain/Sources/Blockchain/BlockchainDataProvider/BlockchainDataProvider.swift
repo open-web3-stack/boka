@@ -17,9 +17,7 @@ public final class BlockchainDataProvider: Sendable {
         let heads = try await dataProvider.getHeads()
         var bestHead: (HeaderRef, Data32)?
         for head in heads {
-            guard let header = try? await dataProvider.getHeader(hash: head) else {
-                continue
-            }
+            let header = try await dataProvider.getHeader(hash: head)
             if bestHead == nil || header.value.timeslot > bestHead!.0.value.timeslot {
                 bestHead = (header, head)
             }
@@ -27,7 +25,7 @@ public final class BlockchainDataProvider: Sendable {
         let finalizedHead = try await dataProvider.getFinalizedHead()
 
         storage = ThreadSafeContainer(.init(
-            bestHead: bestHead?.1 ?? Data32(),
+            bestHead: bestHead?.1 ?? dataProvider.genesisBlockHash,
             bestHeadTimeslot: bestHead?.0.value.timeslot ?? 0,
             finalizedHead: finalizedHead
         ))
@@ -128,5 +126,9 @@ extension BlockchainDataProvider {
         logger.debug("removing block: \(hash)")
 
         try await dataProvider.remove(hash: hash)
+    }
+
+    public var genesisBlockHash: Data32 {
+        dataProvider.genesisBlockHash
     }
 }

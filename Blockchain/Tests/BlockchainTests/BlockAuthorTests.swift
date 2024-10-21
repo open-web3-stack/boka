@@ -22,7 +22,8 @@ struct BlockAuthorTests {
         config = ProtocolConfigRef.dev
         timeProvider = MockTimeProvider(time: 988)
 
-        dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesis: StateRef(State.devGenesis(config: config))))
+        let (genesisState, genesisBlock) = try State.devGenesis(config: config)
+        dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
 
         storeMiddleware = StoreMiddleware()
         eventBus = EventBus(eventMiddleware: Middleware(storeMiddleware))
@@ -45,7 +46,7 @@ struct BlockAuthorTests {
 
     @Test
     func createNewBlockWithFallbackKey() async throws {
-        let genesisState = try await dataProvider.getState(hash: Data32())
+        let genesisState = try await dataProvider.getState(hash: dataProvider.genesisBlockHash)
 
         let timeslot = timeProvider.getTime().timeToTimeslot(config: config)
 
@@ -62,7 +63,7 @@ struct BlockAuthorTests {
 
     @Test
     func createNewBlockWithTicket() async throws {
-        let genesisState = try await dataProvider.getState(hash: Data32())
+        let genesisState = try await dataProvider.getState(hash: dataProvider.genesisBlockHash)
         var state = genesisState.value
 
         state.safroleState.ticketsVerifier = try Bandersnatch.RingCommitment(
@@ -108,7 +109,7 @@ struct BlockAuthorTests {
 
     @Test
     func scheduleNewBlocks() async throws {
-        let genesisState = try await dataProvider.getState(hash: Data32())
+        let genesisState = try await dataProvider.getState(hash: dataProvider.genesisBlockHash)
 
         await blockAuthor.on(genesis: genesisState)
 

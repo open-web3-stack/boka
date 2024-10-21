@@ -97,6 +97,7 @@ public final class QuicStream: Sendable {
                 throw QuicError.alreadyClosed
             }
 
+            // TODO: improve the case when data is empty
             let messageLength = data.count
 
             let sendBufferRaw = UnsafeMutableRawPointer.allocate( // !! allocate
