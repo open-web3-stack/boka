@@ -89,7 +89,6 @@ struct ValidatorServiceTests {
     }
 
     // try different genesis time offset to ensure edge cases are covered
-    // @Test(arguments: [1020])
     @Test(arguments: [988, 1000, 1003, 1020])
     func makeManyBlocks(time: Int) async throws {
         let (services, validatorService) = try await setup(time: TimeInterval(time))

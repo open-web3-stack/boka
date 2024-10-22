@@ -115,8 +115,6 @@ struct BlockAuthorTests {
 
         #expect(scheduler.storage.value.tasks.count > 0)
 
-        // await scheduler.advance(by: 2)
-
         let events = await storeMiddleware.wait()
         #expect(events.count == 1)
         #expect(events.first is RuntimeEvents.BlockAuthored)
