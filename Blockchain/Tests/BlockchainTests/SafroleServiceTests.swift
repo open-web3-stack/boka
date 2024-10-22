@@ -24,7 +24,7 @@ struct SafroleServiceTests {
         (genesisState, _) = try State.devGenesis(config: config)
 
         storeMiddleware = StoreMiddleware()
-        eventBus = EventBus(eventMiddleware: Middleware(storeMiddleware))
+        eventBus = EventBus(eventMiddleware: .serial(Middleware(storeMiddleware), .noError), handlerMiddleware: .noError)
 
         keystore = try await DevKeyStore(devKeysCount: 2)
 

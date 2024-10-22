@@ -30,7 +30,7 @@ extension FixedSizeData: Codable {
     }
 }
 
-extension FixedSizeData: CustomStringConvertible {
+extension FixedSizeData: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String {
         if T.value > 32 {
             let prefix = data.prefix(8).map { String(format: "%02x", $0) }.joined()
@@ -39,6 +39,10 @@ extension FixedSizeData: CustomStringConvertible {
         } else {
             return "0x\(data.map { String(format: "%02x", $0) }.joined())"
         }
+    }
+
+    public var debugDescription: String {
+        "Data\(T.value)(\(description))"
     }
 }
 

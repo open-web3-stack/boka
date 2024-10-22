@@ -26,7 +26,7 @@ struct BlockAuthorTests {
         dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
 
         storeMiddleware = StoreMiddleware()
-        eventBus = EventBus(eventMiddleware: Middleware(storeMiddleware))
+        eventBus = EventBus(eventMiddleware: .serial(Middleware(storeMiddleware), .noError), handlerMiddleware: .noError)
 
         scheduler = MockScheduler(timeProvider: timeProvider)
 
@@ -108,14 +108,14 @@ struct BlockAuthorTests {
     }
 
     @Test
-    func scheduleNewBlocks() async throws {
+    func firstBlock() async throws {
         let genesisState = try await dataProvider.getState(hash: dataProvider.genesisBlockHash)
 
         await blockAuthor.on(genesis: genesisState)
 
         #expect(scheduler.storage.value.tasks.count > 0)
 
-        await scheduler.advance(by: 2)
+        // await scheduler.advance(by: 2)
 
         let events = await storeMiddleware.wait()
         #expect(events.count == 1)

@@ -7,7 +7,7 @@ public struct UniqueId: Sendable {
     public let id: Int
     public let name: String
 
-    public init(_ name: String) {
+    public init(_ name: String = "") {
         id = UniqueId.idGenerator.loadThenWrappingIncrement(ordering: .relaxed)
         self.name = name
     }

@@ -22,6 +22,10 @@ public final class StateRef: Ref<State>, @unchecked Sendable {
     public var stateRoot: Data32 {
         lazyStateRoot.value.value
     }
+
+    override public var description: String {
+        "StateRef(\(stateRoot.toHexString()))"
+    }
 }
 
 extension StateRef: Codable {
