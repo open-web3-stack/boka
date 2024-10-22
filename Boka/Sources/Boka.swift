@@ -6,8 +6,6 @@ import ServiceLifecycle
 import TracingUtils
 import Utils
 
-private let logger = Logger(label: "cli")
-
 extension Genesis: @retroactive ExpressibleByArgument {
     public init?(argument: String) {
         if let preset = GenesisPreset(rawValue: argument) {
@@ -80,6 +78,9 @@ struct Boka: AsyncParsableCommand {
     @Option(name: .long, help: "For development only. Seed for validator keys.")
     var devSeed: UInt32?
 
+    @Option(name: .long, help: "Node name. For telemetry only.")
+    var name: String?
+
     mutating func run() async throws {
         let services = try await Tracing.bootstrap("Boka", loggerOnly: true)
         for service in services {
@@ -88,21 +89,32 @@ struct Boka: AsyncParsableCommand {
             }
         }
 
+        let logger = Logger(label: "cli")
+
+        logger.info("Starting Boka. Chain: \(chain)")
+
+        if let name {
+            logger.info("Node name: \(name)")
+        }
+
         if let basePath {
             logger.info("Base path: \(basePath)")
         }
 
-        print("Peers: \(peers)")
+        logger.info("Peers: \(peers)")
 
         if validator {
-            print("Running as validator")
+            logger.info("Running as validator")
+        } else {
+            logger.info("Running as fullnode")
         }
 
         if let operatorRpc {
-            print("Operator RPC listen address: \(operatorRpc)")
+            logger.info("Operator RPC listen address: \(operatorRpc)")
         }
 
         let rpcConfig = rpc.asOptional.map { addr -> RPCConfig in
+            logger.info("RPC listen address: \(addr)")
             let (address, port) = addr.getAddressAndPort()
             return RPCConfig(listenAddress: address, port: Int(port))
         }
@@ -146,6 +158,6 @@ struct Boka: AsyncParsableCommand {
 
         try await node.wait()
 
-        print("Shutting down...")
+        logger.notice("Shutting down...")
     }
 }

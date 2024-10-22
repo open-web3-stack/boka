@@ -28,5 +28,5 @@ do
     create_node $i
 done
 
-# Attach to the tmux session
+# Attach to the tmux session, -CC for iTerm2 integration
 tmux -CC attach-session -t boka
