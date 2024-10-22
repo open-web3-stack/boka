@@ -89,7 +89,7 @@ struct ValidatorServiceTests {
     }
 
     // try different genesis time offset to ensure edge cases are covered
-    @Test(arguments: [988, 1000, 1003, 1020])
+    @Test(arguments: [988, 1000, 1003, 1021])
     func makeManyBlocks(time: Int) async throws {
         let (services, validatorService) = try await setup(time: TimeInterval(time))
         let genesisState = services.genesisState
@@ -101,7 +101,10 @@ struct ValidatorServiceTests {
 
         await storeMiddleware.wait()
 
-        await scheduler.advance(by: TimeInterval(config.value.slotPeriodSeconds) * 25 - 1)
+        for _ in 0 ..< 25 {
+            await scheduler.advance(by: TimeInterval(config.value.slotPeriodSeconds))
+            await storeMiddleware.wait() // let events to be processed
+        }
 
         let events = await storeMiddleware.wait()
 

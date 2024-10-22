@@ -42,7 +42,7 @@ extension FixedSizeData: CustomStringConvertible, CustomDebugStringConvertible {
     }
 
     public var debugDescription: String {
-        "Data\(T.value)(\(description))"
+        description
     }
 }
 
