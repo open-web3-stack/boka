@@ -5,7 +5,7 @@ import Utils
 
 @testable import Networking
 
-final class PeerTests {
+final class MockPeerEventTests {
     let registration: QuicRegistration
     let certData: Data
     let badCertData: Data
