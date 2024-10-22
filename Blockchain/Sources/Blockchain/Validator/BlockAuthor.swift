@@ -23,7 +23,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         self.keystore = keystore
         self.extrinsicPool = extrinsicPool
 
-        super.init(logger: Logger(label: "BlockAuthor"), config: config, eventBus: eventBus, scheduler: scheduler)
+        super.init(id: "BlockAuthor", config: config, eventBus: eventBus, scheduler: scheduler)
 
         await subscribe(RuntimeEvents.SafroleTicketsGenerated.self, id: "BlockAuthor.SafroleTicketsGenerated") { [weak self] event in
             try await self?.on(safroleTicketsGenerated: event)

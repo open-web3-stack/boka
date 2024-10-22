@@ -27,7 +27,7 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
         self.keystore = keystore
         ringContext = try! Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
 
-        super.init(logger: Logger(label: "SafroleService"), config: config, eventBus: eventBus)
+        super.init(id: "SafroleService", config: config, eventBus: eventBus)
 
         await subscribe(RuntimeEvents.BlockImported.self, id: "SafroleService.BlockImported") { [weak self] event in
             try await self?.on(blockImported: event)

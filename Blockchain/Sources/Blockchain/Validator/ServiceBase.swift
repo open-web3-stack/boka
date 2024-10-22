@@ -2,13 +2,15 @@ import TracingUtils
 import Utils
 
 public class ServiceBase {
-    public let logger: Logger
+    public let id: UniqueId
+    let logger: Logger
     public let config: ProtocolConfigRef
     private let eventBus: EventBus
     private let subscriptionTokens: ThreadSafeContainer<[EventBus.SubscriptionToken]> = .init([])
 
-    init(logger: Logger, config: ProtocolConfigRef, eventBus: EventBus) {
-        self.logger = logger
+    init(id: UniqueId, config: ProtocolConfigRef, eventBus: EventBus) {
+        self.id = id
+        logger = Logger(label: id)
         self.config = config
         self.eventBus = eventBus
     }

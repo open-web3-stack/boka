@@ -20,9 +20,9 @@ public class ServiceBase2: ServiceBase, @unchecked Sendable {
     private let scheduler: Scheduler
     private let cancellables: ThreadSafeContainer<Set<IdCancellable>> = .init([])
 
-    public init(logger: Logger, config: ProtocolConfigRef, eventBus: EventBus, scheduler: Scheduler) {
+    public init(id: UniqueId, config: ProtocolConfigRef, eventBus: EventBus, scheduler: Scheduler) {
         self.scheduler = scheduler
-        super.init(logger: logger, config: config, eventBus: eventBus)
+        super.init(id: id, config: config, eventBus: eventBus)
     }
 
     deinit {
