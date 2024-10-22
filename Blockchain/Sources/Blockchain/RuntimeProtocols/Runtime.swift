@@ -25,7 +25,8 @@ public final class Runtime {
         case preimagesNotSorted
         case invalidPreimageServiceIndex
         case duplicatedPreimage
-        case notBlockAuthor
+        case invalidAuthorTicket
+        case invalidAuthorKey
         case invalidBlockSeal(any Swift.Error)
         case invalidVrfSignature
         case other(any Swift.Error)
@@ -95,7 +96,7 @@ public final class Runtime {
                 )
             }.mapError(Error.invalidBlockSeal).get()
             guard ticket.id == vrfOutput else {
-                throw Error.notBlockAuthor
+                throw Error.invalidAuthorTicket
             }
 
             entropyVRFInputData = SigningContext.entropyInputData(entropy: vrfOutput)
@@ -104,7 +105,7 @@ public final class Runtime {
             let key = keys[Int(index)]
             guard key == blockAuthorKey.data else {
                 logger.debug("expected key: \(key.toHexString()), got key: \(blockAuthorKey.data.toHexString())")
-                throw Error.notBlockAuthor
+                throw Error.invalidAuthorKey
             }
             let vrfInputData = SigningContext.fallbackSealInputData(entropy: state.entropyPool.t3)
             vrfOutput = try Result {

@@ -10,7 +10,7 @@ struct BlockAuthorTests {
         // setupTestLogger()
 
         let services = await BlockchainServices()
-        let blockAuthor = await services.blockAuthor()
+        let blockAuthor = await services.blockAuthor
         let runtime = Runtime(config: services.config)
         return (services, blockAuthor, runtime)
     }

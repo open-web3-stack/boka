@@ -66,8 +66,6 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
                 continue
             }
 
-            logger.debug("Generating tickets for validator \(pubkey)")
-
             try withSpan("generateTickets") { _ in
                 let tickets = try SafroleService.generateTickets(
                     count: TicketIndex(config.value.ticketEntriesPerValidator),
@@ -86,7 +84,7 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
         }
 
         if events.isEmpty {
-            logger.debug("Not in next validators")
+            logger.trace("Not in next validators")
         }
 
         return events

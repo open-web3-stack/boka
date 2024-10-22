@@ -1,7 +1,7 @@
 import Blockchain
 import Utils
 
-struct BlockchainServices {
+class BlockchainServices {
     let config: ProtocolConfigRef
     let timeProvider: MockTimeProvider
     let dataProvider: BlockchainDataProvider
@@ -11,6 +11,12 @@ struct BlockchainServices {
     let storeMiddleware: StoreMiddleware
     let genesisBlock: BlockRef
     let genesisState: StateRef
+
+    private var _blockchain: Blockchain?
+    private weak var _blockchainRef: Blockchain?
+
+    private var _blockAuthor: BlockAuthor?
+    private weak var _blockAuthorRef: BlockAuthor?
 
     init(
         config: ProtocolConfigRef = .dev,
@@ -32,23 +38,50 @@ struct BlockchainServices {
         keystore = try! await DevKeyStore()
     }
 
-    func blockchain() async -> Blockchain {
-        try! await Blockchain(
-            config: config,
-            dataProvider: dataProvider,
-            timeProvider: timeProvider,
-            eventBus: eventBus
-        )
+    deinit {
+        _blockchain = nil
+        _blockAuthor = nil
+
+        if let _blockchainRef {
+            fatalError("BlockchainServices: blockchain still alive. retain count: \(_getRetainCount(_blockchainRef))")
+        }
+
+        if let _blockAuthorRef {
+            fatalError("BlockchainServices: blockAuthor still alive. retain count: \(_getRetainCount(_blockAuthorRef))")
+        }
     }
 
-    func blockAuthor() async -> BlockAuthor {
-        await BlockAuthor(
-            config: config,
-            dataProvider: dataProvider,
-            eventBus: eventBus,
-            keystore: keystore,
-            scheduler: scheduler,
-            extrinsicPool: ExtrinsicPoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
-        )
+    var blockchain: Blockchain {
+        get async {
+            if let _blockchain {
+                return _blockchain
+            }
+            _blockchain = try! await Blockchain(
+                config: config,
+                dataProvider: dataProvider,
+                timeProvider: timeProvider,
+                eventBus: eventBus
+            )
+            _blockchainRef = _blockchain
+            return _blockchain!
+        }
+    }
+
+    var blockAuthor: BlockAuthor {
+        get async {
+            if let _blockAuthor {
+                return _blockAuthor
+            }
+            _blockAuthor = await BlockAuthor(
+                config: config,
+                dataProvider: dataProvider,
+                eventBus: eventBus,
+                keystore: keystore,
+                scheduler: scheduler,
+                extrinsicPool: ExtrinsicPoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
+            )
+            _blockAuthorRef = _blockAuthor
+            return _blockAuthor!
+        }
     }
 }
