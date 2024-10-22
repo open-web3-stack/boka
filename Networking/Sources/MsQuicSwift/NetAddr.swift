@@ -1,6 +1,7 @@
 import CHelpers
 import Foundation
 import msquic
+
 #if canImport(Glibc)
     import Glibc
 #elseif canImport(Darwin)
@@ -74,11 +75,12 @@ extension NetAddr: CustomStringConvertible {
 
 private func parseQuicAddr(_ addr: QUIC_ADDR) -> (String, UInt16, Bool)? {
     let ipv6 = addr.Ip.sa_family == QUIC_ADDRESS_FAMILY(QUIC_ADDRESS_FAMILY_INET6)
-    let port = if ipv6 {
-        helper_ntohs(addr.Ipv6.sin6_port)
-    } else {
-        helper_ntohs(addr.Ipv4.sin_port)
-    }
+    let port =
+        if ipv6 {
+            helper_ntohs(addr.Ipv6.sin6_port)
+        } else {
+            helper_ntohs(addr.Ipv4.sin_port)
+        }
     var addr = addr
     if ipv6 {
         addr.Ipv6.sin6_port = 0
@@ -99,29 +101,62 @@ private func parseQuicAddr(_ addr: QUIC_ADDR) -> (String, UInt16, Bool)? {
     return (ipAddr, port, ipv6)
 }
 
-private func parseIpv6Addr(_ address: String) -> (String, UInt16)? {
-    let parts = address.split(separator: "]:")
-    guard parts.count == 2 else {
-        return nil
+private func parseIpv4Addr(_ address: String) -> (String, UInt16)? {
+    let ipv4Pattern =
+        #"((?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"#
+    let ipv4WithPortPattern = #"(\#(ipv4Pattern)):(\d{1,5})"#
+
+    let regex = try? NSRegularExpression(pattern: ipv4WithPortPattern, options: [])
+    let range = NSRange(location: 0, length: address.utf16.count)
+
+    if let match = regex?.firstMatch(in: address, options: [], range: range) {
+        let ipRange = Range(match.range(at: 1), in: address)!
+        let portRange = Range(match.range(at: 3), in: address)!
+
+        let ip = String(address[ipRange])
+        let portString = String(address[portRange])
+
+        if let port = UInt16(portString) {
+            return (ip, port)
+        }
     }
-    let host = String(parts[0])
-    let port = parts[1].dropFirst()
-    guard let portNum = UInt16(port, radix: 10) else {
-        return nil
-    }
-    return (host, portNum)
+    return nil
 }
 
-private func parseIpv4Addr(_ address: String) -> (String, UInt16)? {
-    print(address)
-    let parts = address.split(separator: ":")
-    guard parts.count == 2 else {
-        return nil
+private func parseIpv6Addr(_ address: String) -> (String, UInt16)? {
+    let ipv6Pattern = [
+        "(?:",
+        "(?:(?:[0-9A-Fa-f]{1,4}:){6}",
+        "|::(?:[0-9A-Fa-f]{1,4}:){5}",
+        "|(?:[0-9A-Fa-f]{1,4})?::(?:[0-9A-Fa-f]{1,4}:){4}",
+        "|(?:(?:[0-9A-Fa-f]{1,4}:){0,1}[0-9A-Fa-f]{1,4})?::(?:[0-9A-Fa-f]{1,4}:){3}",
+        "|(?:(?:[0-9A-Fa-f]{1,4}:){0,2}[0-9A-Fa-f]{1,4})?::(?:[0-9A-Fa-f]{1,4}:){2}",
+        "|(?:(?:[0-9A-Fa-f]{1,4}:){0,3}[0-9A-Fa-f]{1,4})?::[0-9A-Fa-f]{1,4}:",
+        "|(?:(?:[0-9A-Fa-f]{1,4}:){0,4}[0-9A-Fa-f]{1,4})?::)",
+        "(?:",
+        "[0-9A-Fa-f]{1,4}:[0-9A-Fa-f]{1,4}",
+        "|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}",
+        "(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)",
+        ")",
+        "|(?:(?:[0-9A-Fa-f]{1,4}:){0,5}[0-9A-Fa-f]{1,4})?::[0-9A-Fa-f]{1,4}",
+        "|(?:(?:[0-9A-Fa-f]{1,4}:){0,6}[0-9A-Fa-f]{1,4})?::",
+        ")",
+    ].reduce("", +)
+    let ipv6WithPortPattern = #"\[(\#(ipv6Pattern))\]:(\d{1,5})"#
+
+    let regex = try? NSRegularExpression(pattern: ipv6WithPortPattern, options: [])
+    let range = NSRange(location: 0, length: address.utf16.count)
+
+    if let match = regex?.firstMatch(in: address, options: [], range: range) {
+        let ipRange = Range(match.range(at: 1), in: address)!
+        let portRange = Range(match.range(at: 2), in: address)!
+
+        let ip = String(address[ipRange])
+        let portString = String(address[portRange])
+
+        if let port = UInt16(portString) {
+            return (ip, port)
+        }
     }
-    let host = String(parts[0])
-    let port = parts[1].dropFirst()
-    guard let portNum = UInt16(port, radix: 10) else {
-        return nil
-    }
-    return (host, portNum)
+    return nil
 }
