@@ -7,7 +7,7 @@ import Utils
 
 struct BlockAuthorTests {
     func setup() async -> (BlockchainServices, BlockAuthor, Runtime) {
-        setupTestLogger()
+        // setupTestLogger()
 
         let services = await BlockchainServices()
         let blockAuthor = await services.blockAuthor()
@@ -84,6 +84,7 @@ struct BlockAuthorTests {
         )
 
         state.safroleState.ticketsOrKeys = try .left(ConfigFixedSizeArray(config: config, array: validatorTickets))
+        state.timeslot = timeslot - 1
 
         let newStateRef = StateRef(state)
         // modify genesis state
