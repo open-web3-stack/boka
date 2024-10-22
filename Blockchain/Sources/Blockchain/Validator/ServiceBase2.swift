@@ -20,9 +20,9 @@ public class ServiceBase2: ServiceBase, @unchecked Sendable {
     private let scheduler: Scheduler
     private let cancellables: ThreadSafeContainer<Set<IdCancellable>> = .init([])
 
-    public init(logger: Logger, config: ProtocolConfigRef, eventBus: EventBus, scheduler: Scheduler) {
+    public init(id: UniqueId, config: ProtocolConfigRef, eventBus: EventBus, scheduler: Scheduler) {
         self.scheduler = scheduler
-        super.init(logger: logger, config: config, eventBus: eventBus)
+        super.init(id: id, config: config, eventBus: eventBus)
     }
 
     deinit {
@@ -63,8 +63,8 @@ public class ServiceBase2: ServiceBase, @unchecked Sendable {
 
     @discardableResult
     public func scheduleForNextEpoch(_ id: UniqueId, fn: @escaping @Sendable (EpochIndex) async -> Void) -> Cancellable {
-        let now = timeProvider.getTimeInterval()
-        let nowTimeslot = UInt32(now).timeToTimeslot(config: config)
+        let now = timeProvider.getTime()
+        let nowTimeslot = now.timeToTimeslot(config: config)
         let nextEpoch = (nowTimeslot + 1).timeslotToEpochIndex(config: config) + 1
         return scheduleFor(epoch: nextEpoch, id: id, fn: fn)
     }
@@ -73,12 +73,10 @@ public class ServiceBase2: ServiceBase, @unchecked Sendable {
     private func scheduleFor(epoch: EpochIndex, id: UniqueId, fn: @escaping @Sendable (EpochIndex) async -> Void) -> Cancellable {
         let scheduleTime = config.scheduleTimeForPrepareEpoch(epoch: epoch)
         let now = timeProvider.getTimeInterval()
-        let delay = scheduleTime - now
+        var delay = scheduleTime - now
         if delay < 0 {
-            // too late / current epoch is about to end
-            // schedule for the one after
-            logger.debug("\(id): skipping epoch \(epoch) because it is too late")
-            return scheduleFor(epoch: epoch + 1, id: id, fn: fn)
+            logger.debug("\(id): late epoch start \(epoch), expectedDelay \(delay)")
+            delay = 0
         }
         logger.trace("\(id): scheduling epoch \(epoch) in \(delay)")
         return schedule(id: id, delay: delay) { [weak self] in
