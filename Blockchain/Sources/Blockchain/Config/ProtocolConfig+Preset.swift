@@ -2,6 +2,44 @@ import Utils
 
 extension Ref where T == ProtocolConfig {
     // TODO: pick some good numbers for dev env
+    public static let minimal = Ref(ProtocolConfig(
+        auditTranchePeriod: 8,
+        additionalMinBalancePerStateItem: 10,
+        additionalMinBalancePerStateByte: 1,
+        serviceMinBalance: 100,
+        totalNumberOfCores: 1,
+        preimagePurgePeriod: 28800,
+        epochLength: 6,
+        auditBiasFactor: 2,
+        coreAccumulationGas: Gas(10_000_000), // TODO: check this
+        workPackageAuthorizerGas: Gas(10_000_000), // TODO: check this
+        workPackageRefineGas: Gas(10_000_000), // TODO: check this
+        recentHistorySize: 8,
+        maxWorkItems: 4,
+        maxTicketsPerExtrinsic: 4,
+        maxLookupAnchorAge: 14400,
+        transferMemoSize: 128,
+        ticketEntriesPerValidator: 2,
+        maxAuthorizationsPoolItems: 8,
+        slotPeriodSeconds: 4,
+        maxAuthorizationsQueueItems: 10,
+        coreAssignmentRotationPeriod: 6,
+        maxServiceCodeSize: 4_000_000,
+        preimageReplacementPeriod: 5,
+        totalNumberOfValidators: 3,
+        erasureCodedPieceSize: 684,
+        maxWorkPackageManifestEntries: 1 << 11,
+        maxEncodedWorkPackageSize: 12 * 1 << 20,
+        maxEncodedWorkReportSize: 96 * 1 << 10,
+        erasureCodedSegmentSize: 6,
+        ticketSubmissionEndSlot: 2,
+        pvmDynamicAddressAlignmentFactor: 2,
+        pvmProgramInitInputDataSize: 1 << 24,
+        pvmProgramInitPageSize: 1 << 14,
+        pvmProgramInitSegmentSize: 1 << 16
+    ))
+
+    // TODO: pick some good numbers for dev env
     public static let dev = Ref(ProtocolConfig(
         auditTranchePeriod: 8,
         additionalMinBalancePerStateItem: 10,
