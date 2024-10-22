@@ -64,7 +64,7 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "--validator --dev-seed 1 --config=tiny"
+            argument = "--validator"
             isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>
