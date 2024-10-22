@@ -20,10 +20,16 @@ struct ChainHandler {
                 throw JSONError(code: -32602, message: "Invalid block hash")
             }
             let block = try await source.getBlock(hash: data32)
-            return block.map { ["hash": $0.hash.description, "parentHash": $0.header.parentHash.description] }
+            return block.map { [
+                "hash": $0.hash.description,
+                "parentHash": $0.header.parentHash.description,
+            ] }
         } else {
             let block = try await source.getBestBlock()
-            return ["hash": block.hash.description, "parentHash": block.header.parentHash.description]
+            return [
+                "hash": block.hash.description,
+                "parentHash": block.header.parentHash.description,
+            ]
         }
     }
 }
