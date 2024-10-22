@@ -28,7 +28,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         self.runtime = runtime
         self.extrinsicPool = extrinsicPool
 
-        super.init(logger: Logger(label: "BlockAuthor"), config: config, eventBus: eventBus, scheduler: scheduler)
+        super.init(id: "BlockAuthor", config: config, eventBus: eventBus, scheduler: scheduler)
     }
 
     public func on(genesis _: StateRef) async {}

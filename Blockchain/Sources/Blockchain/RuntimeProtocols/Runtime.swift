@@ -1,6 +1,9 @@
 import Codec
 import Foundation
+import TracingUtils
 import Utils
+
+private let logger = Logger(label: "Runtime")
 
 // the STF
 public final class Runtime {
@@ -22,7 +25,8 @@ public final class Runtime {
         case preimagesNotSorted
         case invalidPreimageServiceIndex
         case duplicatedPreimage
-        case notBlockAuthor
+        case invalidAuthorTicket
+        case invalidAuthorKey
         case invalidBlockSeal(any Swift.Error)
         case invalidVrfSignature
         case other(any Swift.Error)
@@ -70,19 +74,20 @@ public final class Runtime {
         // winning tickets is validated at apply time by Safrole
 
         // offendersMarkers is validated at apply time by Disputes
+    }
 
-        // validate block.header.seal
+    public func validateHeaderSeal(block: BlockRef, state: inout State) throws(Error) {
         let vrfOutput: Data32
         let blockAuthorKey = try Result {
-            try Bandersnatch.PublicKey(data: state.value.currentValidators[Int(block.header.authorIndex)].bandersnatch)
+            try Bandersnatch.PublicKey(data: state.currentValidators[Int(block.header.authorIndex)].bandersnatch)
         }.mapError(Error.invalidBlockSeal).get()
         let index = block.header.timeslot % UInt32(config.value.epochLength)
         let encodedHeader = try Result { try JamEncoder.encode(block.header.unsigned) }.mapError(Error.invalidBlockSeal).get()
         let entropyVRFInputData: Data
-        switch state.value.safroleState.ticketsOrKeys {
+        switch state.safroleState.ticketsOrKeys {
         case let .left(tickets):
             let ticket = tickets[Int(index)]
-            let vrfInputData = SigningContext.safroleTicketInputData(entropy: state.value.entropyPool.t3, attempt: ticket.attempt)
+            let vrfInputData = SigningContext.safroleTicketInputData(entropy: state.entropyPool.t3, attempt: ticket.attempt)
             vrfOutput = try Result {
                 try blockAuthorKey.ietfVRFVerify(
                     vrfInputData: vrfInputData,
@@ -91,7 +96,7 @@ public final class Runtime {
                 )
             }.mapError(Error.invalidBlockSeal).get()
             guard ticket.id == vrfOutput else {
-                throw Error.notBlockAuthor
+                throw Error.invalidAuthorTicket
             }
 
             entropyVRFInputData = SigningContext.entropyInputData(entropy: vrfOutput)
@@ -99,9 +104,10 @@ public final class Runtime {
         case let .right(keys):
             let key = keys[Int(index)]
             guard key == blockAuthorKey.data else {
-                throw Error.notBlockAuthor
+                logger.debug("expected key: \(key.toHexString()), got key: \(blockAuthorKey.data.toHexString())")
+                throw Error.invalidAuthorKey
             }
-            let vrfInputData = SigningContext.fallbackSealInputData(entropy: state.value.entropyPool.t3)
+            let vrfInputData = SigningContext.fallbackSealInputData(entropy: state.entropyPool.t3)
             vrfOutput = try Result {
                 try blockAuthorKey.ietfVRFVerify(
                     vrfInputData: vrfInputData,
@@ -110,7 +116,7 @@ public final class Runtime {
                 )
             }.mapError(Error.invalidBlockSeal).get()
 
-            entropyVRFInputData = SigningContext.fallbackSealInputData(entropy: state.value.entropyPool.t3)
+            entropyVRFInputData = SigningContext.fallbackSealInputData(entropy: state.entropyPool.t3)
         }
 
         _ = try Result {
@@ -149,6 +155,8 @@ public final class Runtime {
 
         do {
             try updateSafrole(block: block, state: &newState)
+
+            try validateHeaderSeal(block: block, state: &newState)
 
             try updateDisputes(block: block, state: &newState)
 

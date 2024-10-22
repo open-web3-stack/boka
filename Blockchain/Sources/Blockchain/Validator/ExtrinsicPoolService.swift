@@ -4,7 +4,7 @@ import Utils
 private typealias TicketItem = ExtrinsicTickets.TicketItem
 
 private actor ServiceStorage {
-    let logger: Logger
+    var logger: Logger!
 
     // sorted array ordered by output
     var pendingTickets: SortedUniqueArray<TicketItemAndOutput> = .init()
@@ -13,9 +13,12 @@ private actor ServiceStorage {
     var entropy: Data32 = .init()
     let ringContext: Bandersnatch.RingContext
 
-    init(logger: Logger, ringContext: Bandersnatch.RingContext) {
-        self.logger = logger
+    init(ringContext: Bandersnatch.RingContext) {
         self.ringContext = ringContext
+    }
+
+    func setLogger(_ logger: Logger) {
+        self.logger = logger
     }
 
     func add(tickets: [TicketItem], config: ProtocolConfigRef) {
@@ -77,12 +80,12 @@ public final class ExtrinsicPoolService: ServiceBase, @unchecked Sendable {
     ) async {
         self.dataProvider = dataProvider
 
-        let logger = Logger(label: "ExtrinsicPoolService")
-
         let ringContext = try! Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
-        storage = ServiceStorage(logger: logger, ringContext: ringContext)
+        storage = ServiceStorage(ringContext: ringContext)
 
-        super.init(logger: logger, config: config, eventBus: eventBus)
+        super.init(id: "ExtrinsicPoolService", config: config, eventBus: eventBus)
+
+        await storage.setLogger(logger)
 
         await subscribe(RuntimeEvents.SafroleTicketsGenerated.self, id: "ExtrinsicPool.SafroleTicketsGenerated") { [weak self] event in
             try await self?.on(safroleTicketsGenerated: event)
