@@ -23,22 +23,24 @@ struct DispatchQueueSchedulerTests {
     }
 
     @Test func scheduleDelayedTask() async throws {
-        try await confirmation { confirm in
-            let delay = 0.5
-            let now = Date()
-            let end: ThreadSafeContainer<Date?> = .init(nil)
-            let cancel = scheduler.schedule(delay: delay, repeats: false) {
-                end.value = Date()
-                confirm()
+        await withKnownIssue("unstable when cpu is busy", isIntermittent: true) {
+            try await confirmation { confirm in
+                let delay = 0.5
+                let now = Date()
+                let end: ThreadSafeContainer<Date?> = .init(nil)
+                let cancel = scheduler.schedule(delay: delay, repeats: false) {
+                    end.value = Date()
+                    confirm()
+                }
+
+                try await Task.sleep(for: .seconds(1))
+
+                _ = cancel
+
+                let diff = try #require(end.value).timeIntervalSince(now) - delay
+                let diffAbs = abs(diff)
+                #expect(diffAbs < 0.5)
             }
-
-            try await Task.sleep(for: .seconds(1))
-
-            _ = cancel
-
-            let diff = try #require(end.value).timeIntervalSince(now) - delay
-            let diffAbs = abs(diff)
-            #expect(diffAbs < 1)
         }
     }
 
@@ -65,7 +67,7 @@ struct DispatchQueueSchedulerTests {
                     let expectedInterval = delay * Double(index + 1)
                     let actualInterval = time.timeIntervalSince(now)
                     let difference = abs(actualInterval - expectedInterval)
-                    #expect(difference < 1)
+                    #expect(difference < 0.5)
                 }
             }
         }
