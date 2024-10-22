@@ -6,50 +6,29 @@ import Utils
 @testable import Blockchain
 
 struct ValidatorServiceTests {
-    let config: ProtocolConfigRef
-    let timeProvider: MockTimeProvider
-    let dataProvider: BlockchainDataProvider
-    let eventBus: EventBus
-    let scheduler: MockScheduler
-    let keystore: KeyStore
-    let validatorService: ValidatorService
-    let storeMiddleware: StoreMiddleware
+    func setup(time: TimeInterval = 988) async throws -> (BlockchainServices, ValidatorService) {
+        setupTestLogger()
 
-    init() async throws {
-        // setupTestLogger()
-
-        config = ProtocolConfigRef.dev
-        timeProvider = MockTimeProvider(time: 988)
-
-        let (genesisState, genesisBlock) = try State.devGenesis(config: config)
-        dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
-
-        storeMiddleware = StoreMiddleware()
-        eventBus = EventBus(eventMiddleware: Middleware(storeMiddleware))
-
-        scheduler = MockScheduler(timeProvider: timeProvider)
-
-        keystore = try await DevKeyStore(devKeysCount: config.value.totalNumberOfValidators)
-
-        let blockchain = try await Blockchain(
-            config: config,
-            dataProvider: dataProvider,
-            timeProvider: timeProvider,
-            eventBus: eventBus
+        let services = await BlockchainServices(
+            timeProvider: MockTimeProvider(time: time)
         )
-
-        validatorService = await ValidatorService(
-            blockchain: blockchain,
-            keystore: keystore,
-            eventBus: eventBus,
-            scheduler: scheduler,
-            dataProvider: dataProvider
+        let validatorService = await ValidatorService(
+            blockchain: services.blockchain,
+            keystore: services.keystore,
+            eventBus: services.eventBus,
+            scheduler: services.scheduler,
+            dataProvider: services.dataProvider
         )
+        return (services, validatorService)
     }
 
     @Test
     func onGenesis() async throws {
-        let genesisState = try await dataProvider.getState(hash: dataProvider.genesisBlockHash)
+        let (services, validatorService) = try await setup()
+        let genesisState = services.genesisState
+        let storeMiddleware = services.storeMiddleware
+        let config = services.config
+        let scheduler = services.scheduler
 
         await validatorService.on(genesis: genesisState)
 
@@ -65,7 +44,14 @@ struct ValidatorServiceTests {
 
     @Test
     func produceBlocks() async throws {
-        let genesisState = try await dataProvider.getState(hash: dataProvider.genesisBlockHash)
+        let (services, validatorService) = try await setup()
+        let genesisState = services.genesisState
+        let storeMiddleware = services.storeMiddleware
+        let config = services.config
+        let scheduler = services.scheduler
+        let timeProvider = services.timeProvider
+        let keystore = services.keystore
+        let dataProvider = services.dataProvider
 
         await validatorService.on(genesis: genesisState)
 
@@ -102,18 +88,28 @@ struct ValidatorServiceTests {
         #expect(try await dataProvider.getHeads().contains(block.hash))
     }
 
-    @Test
-    func makeManyBlocks() async throws {
-        let genesisState = try await dataProvider.getState(hash: dataProvider.genesisBlockHash)
+    // try different genesis time offset to ensure edge cases are covered
+    @Test(arguments: [988, 1000, 1003, 1021])
+    func makeManyBlocks(time: Int) async throws {
+        let (services, validatorService) = try await setup(time: TimeInterval(time))
+        let genesisState = services.genesisState
+        let storeMiddleware = services.storeMiddleware
+        let config = services.config
+        let scheduler = services.scheduler
 
         await validatorService.on(genesis: genesisState)
 
-        await scheduler.advance(by: TimeInterval(config.value.slotPeriodSeconds) * 20)
+        await storeMiddleware.wait()
+
+        for _ in 0 ..< 25 {
+            await scheduler.advance(by: TimeInterval(config.value.slotPeriodSeconds))
+            await storeMiddleware.wait() // let events to be processed
+        }
 
         let events = await storeMiddleware.wait()
 
         let blockAuthoredEvents = events.filter { $0 is RuntimeEvents.BlockAuthored }
 
-        #expect(blockAuthoredEvents.count == 20)
+        #expect(blockAuthoredEvents.count == 25)
     }
 }

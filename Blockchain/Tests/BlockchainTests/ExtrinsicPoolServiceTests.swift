@@ -25,7 +25,7 @@ struct ExtrinsicPoolServiceTests {
         dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
 
         storeMiddleware = StoreMiddleware()
-        eventBus = EventBus(eventMiddleware: Middleware(storeMiddleware))
+        eventBus = EventBus(eventMiddleware: .serial(Middleware(storeMiddleware), .noError), handlerMiddleware: .noError)
 
         keystore = try await DevKeyStore(devKeysCount: config.value.totalNumberOfValidators)
 

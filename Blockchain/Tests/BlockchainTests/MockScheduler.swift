@@ -1,17 +1,19 @@
-import Atomics
 import Blockchain
 import Foundation
+import TracingUtils
 import Utils
 
+private let logger = Logger(label: "MockScheduler")
+
 final class SchedulerTask: Sendable, Comparable {
-    let id: Int
+    let id: UniqueId
     let scheduleTime: TimeInterval
     let repeats: TimeInterval?
     let task: @Sendable () async -> Void
     let cancel: (@Sendable () -> Void)?
 
     init(
-        id: Int,
+        id: UniqueId,
         scheduleTime: TimeInterval,
         repeats: TimeInterval?,
         task: @escaping @Sendable () async -> Void,
@@ -38,8 +40,6 @@ struct Storage: Sendable {
 }
 
 final class MockScheduler: Scheduler, Sendable {
-    static let idGenerator = ManagedAtomic<Int>(0)
-
     let mockTimeProvider: MockTimeProvider
     var timeProvider: TimeProvider {
         mockTimeProvider
@@ -59,7 +59,7 @@ final class MockScheduler: Scheduler, Sendable {
     ) -> Cancellable {
         let now = timeProvider.getTimeInterval()
         let scheduleTime = now + delay
-        let id = Self.idGenerator.loadThenWrappingIncrement(ordering: .relaxed)
+        let id = UniqueId()
         let task = SchedulerTask(id: id, scheduleTime: scheduleTime, repeats: repeats ? delay : nil, task: task, cancel: onCancel)
         storage.write { storage in
             storage.tasks.insert(task)
@@ -90,6 +90,7 @@ final class MockScheduler: Scheduler, Sendable {
 
         if let task {
             mockTimeProvider.advance(to: task.scheduleTime)
+            logger.debug("executing task \(task.id) at time \(task.scheduleTime)")
             await task.task()
 
             return true

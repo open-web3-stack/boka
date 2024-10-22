@@ -187,6 +187,16 @@ extension ConfigLimitedSizeArray {
     }
 }
 
+extension ConfigLimitedSizeArray: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String {
+        array.description
+    }
+
+    public var debugDescription: String {
+        "ConfigLimitedSizeArray<\(T.self), \(minLength), \(maxLength)>(\(description))"
+    }
+}
+
 public typealias ConfigFixedSizeArray<T, TLength: ReadInt> = ConfigLimitedSizeArray<T, TLength, TLength>
 
 extension ConfigLimitedSizeArray: Decodable where T: Decodable {

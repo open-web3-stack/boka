@@ -1,5 +1,6 @@
 import Codec
 import Foundation
+import Synchronization
 import TracingUtils
 import Utils
 
@@ -8,7 +9,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
     private let keystore: KeyStore
     private let extrinsicPool: ExtrinsicPoolService
 
-    private var tickets: ThreadSafeContainer<[RuntimeEvents.SafroleTicketsGenerated]> = .init([])
+    private let tickets: ThreadSafeContainer<[RuntimeEvents.SafroleTicketsGenerated]> = .init([])
 
     public init(
         config: ProtocolConfigRef,
@@ -22,7 +23,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         self.keystore = keystore
         self.extrinsicPool = extrinsicPool
 
-        super.init(logger: Logger(label: "BlockAuthor"), config: config, eventBus: eventBus, scheduler: scheduler)
+        super.init(id: "BlockAuthor", config: config, eventBus: eventBus, scheduler: scheduler)
 
         await subscribe(RuntimeEvents.SafroleTicketsGenerated.self, id: "BlockAuthor.SafroleTicketsGenerated") { [weak self] event in
             try await self?.on(safroleTicketsGenerated: event)
@@ -33,11 +34,11 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         }
     }
 
-    public func on(genesis state: StateRef) async {
-        await scheduleNewBlocks(
-            ticketsOrKeys: state.value.safroleState.ticketsOrKeys,
-            timeslot: timeProvider.getTime().timeToTimeslot(config: config)
-        )
+    public func on(genesis _: StateRef) async {
+        let nowTimeslot = timeProvider.getTime().timeToTimeslot(config: config)
+        // schedule for current epoch
+        let epoch = (nowTimeslot + 1).timeslotToEpochIndex(config: config)
+        await onBeforeEpoch(epoch: epoch)
     }
 
     public func createNewBlock(
@@ -47,6 +48,9 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         -> BlockRef
     {
         let parentHash = dataProvider.bestHead
+
+        logger.trace("creating new block for timeslot: \(timeslot) with parent hash: \(parentHash)")
+
         let state = try await dataProvider.getState(hash: parentHash)
         let epoch = timeslot.timeslotToEpochIndex(config: config)
 
@@ -156,7 +160,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         await withSpan("BlockAuthor.newBlock", logger: logger) { _ in
             // TODO: add timeout
             let block = try await createNewBlock(timeslot: timeslot, claim: claim)
-            logger.info("New block created: #\(block.header.timeslot) \(block.hash)")
+            logger.info("New block created: #\(block.header.timeslot) \(block.hash) on parent #\(block.header.parentHash)")
             publish(RuntimeEvents.BlockAuthored(block: block))
         }
     }
@@ -205,7 +209,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
                     if delay < 0 {
                         continue
                     }
-                    logger.debug("Scheduling new block task at timeslot \(timeslot)")
+                    logger.trace("Scheduling new block task at timeslot \(timeslot) for claim \(claim.1.data.toHexString())")
                     schedule(id: "BlockAuthor.newBlock", delay: delay) { [weak self] in
                         if let self {
                             await newBlock(timeslot: timeslot, claim: .left(claim))
@@ -223,7 +227,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
                     if delay < 0 {
                         continue
                     }
-                    logger.debug("Scheduling new block task at timeslot \(timeslot)")
+                    logger.trace("Scheduling new block task at timeslot \(timeslot) for key \(pubkey.data.toHexString())")
                     schedule(id: "BlockAuthor.newBlock", delay: delay) { [weak self] in
                         if let self {
                             await newBlock(timeslot: timeslot, claim: .right(pubkey))
