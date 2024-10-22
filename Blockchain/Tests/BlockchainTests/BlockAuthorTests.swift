@@ -6,56 +6,39 @@ import Utils
 @testable import Blockchain
 
 struct BlockAuthorTests {
-    let config: ProtocolConfigRef
-    let timeProvider: MockTimeProvider
-    let dataProvider: BlockchainDataProvider
-    let eventBus: EventBus
-    let scheduler: MockScheduler
-    let keystore: KeyStore
-    let blockAuthor: BlockAuthor
-    let runtime: Runtime
-    let storeMiddleware: StoreMiddleware
+    func setup() async -> (BlockchainServices, BlockAuthor, Runtime) {
+        setupTestLogger()
 
-    init() async throws {
-        // setupTestLogger()
-
-        config = ProtocolConfigRef.dev
-        timeProvider = MockTimeProvider(time: 988)
-
-        let (genesisState, genesisBlock) = try State.devGenesis(config: config)
-        dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
-
-        storeMiddleware = StoreMiddleware()
-        eventBus = EventBus(eventMiddleware: .serial(Middleware(storeMiddleware), .noError), handlerMiddleware: .noError)
-
-        scheduler = MockScheduler(timeProvider: timeProvider)
-
-        keystore = try await DevKeyStore(devKeysCount: config.value.totalNumberOfValidators)
-
-        blockAuthor = await BlockAuthor(
-            config: config,
-            dataProvider: dataProvider,
-            eventBus: eventBus,
-            keystore: keystore,
-            scheduler: scheduler,
-            extrinsicPool: ExtrinsicPoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
-        )
-
-        runtime = Runtime(config: config)
+        let services = await BlockchainServices()
+        let blockAuthor = await services.blockAuthor()
+        let runtime = Runtime(config: services.config)
+        return (services, blockAuthor, runtime)
     }
 
     @Test
     func createNewBlockWithFallbackKey() async throws {
-        let genesisState = try await dataProvider.getState(hash: dataProvider.genesisBlockHash)
+        let (services, blockAuthor, runtime) = await setup()
+        let config = services.config
+        let timeProvider = services.timeProvider
+        let genesisState = services.genesisState
 
         let timeslot = timeProvider.getTime().timeToTimeslot(config: config)
 
-        // get the validator key
-        let idx = timeslot % UInt32(config.value.totalNumberOfValidators)
-        let devKey = try DevKeyStore.getDevKey(seed: idx)
+        // dry run Safrole to get the validator key
+        let res = try genesisState.value.updateSafrole(
+            config: config,
+            slot: timeslot,
+            entropy: Data32(),
+            offenders: [],
+            extrinsics: .dummy(config: config)
+        )
+
+        let idx = timeslot % UInt32(config.value.epochLength)
+        let key = res.state.ticketsOrKeys.right!.array[Int(idx)]
+        let pubkey = try! Bandersnatch.PublicKey(data: key)
 
         // Create a new block
-        let block = try await blockAuthor.createNewBlock(timeslot: timeslot, claim: .right(devKey.bandersnatch))
+        let block = try await blockAuthor.createNewBlock(timeslot: timeslot, claim: .right(pubkey))
 
         // Verify block
         try _ = runtime.apply(block: block, state: genesisState, context: .init(timeslot: timeslot + 1))
@@ -63,7 +46,13 @@ struct BlockAuthorTests {
 
     @Test
     func createNewBlockWithTicket() async throws {
-        let genesisState = try await dataProvider.getState(hash: dataProvider.genesisBlockHash)
+        let (services, blockAuthor, runtime) = await setup()
+        let config = services.config
+        let timeProvider = services.timeProvider
+        let genesisState = services.genesisState
+        let keystore = services.keystore
+        let dataProvider = services.dataProvider
+
         var state = genesisState.value
 
         state.safroleState.ticketsVerifier = try Bandersnatch.RingCommitment(
@@ -109,11 +98,18 @@ struct BlockAuthorTests {
 
     @Test
     func firstBlock() async throws {
-        let genesisState = try await dataProvider.getState(hash: dataProvider.genesisBlockHash)
+        let (services, blockAuthor, runtime) = await setup()
+        let config = services.config
+        let timeProvider = services.timeProvider
+        let genesisState = services.genesisState
+        let scheduler = services.scheduler
+        let storeMiddleware = services.storeMiddleware
 
         await blockAuthor.on(genesis: genesisState)
 
         #expect(scheduler.storage.value.tasks.count > 0)
+
+        await scheduler.advance(by: TimeInterval(2))
 
         let events = await storeMiddleware.wait()
         #expect(events.count == 1)

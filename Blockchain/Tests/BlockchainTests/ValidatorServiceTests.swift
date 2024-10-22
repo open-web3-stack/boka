@@ -9,11 +9,11 @@ struct ValidatorServiceTests {
     func setup(time: TimeInterval = 988) async throws -> (BlockchainServices, ValidatorService) {
         // setupTestLogger()
 
-        let services = try await BlockchainServices(
+        let services = await BlockchainServices(
             timeProvider: MockTimeProvider(time: time)
         )
         let validatorService = await ValidatorService(
-            blockchain: services.blockchain,
+            blockchain: services.blockchain(),
             keystore: services.keystore,
             eventBus: services.eventBus,
             scheduler: services.scheduler,
