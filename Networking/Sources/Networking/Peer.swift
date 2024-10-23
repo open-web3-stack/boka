@@ -272,23 +272,22 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         guard let certificate else {
             return .code(.requiredCert)
         }
-        logger.trace("Received certificate", metadata: ["cert": "\(certificate.toHexString())"])
-        // do {
-        //     let (publicKey, alternativeName) = try parseCertificate(data: certificate)
-        //     logger.debug(
-        //         "Certificate parsed",
-        //         metadata: ["publicKey": "\(publicKey.toHexString())", "alternativeName": "\(alternativeName)"]
-        //     )
-        //     if alternativeName != generateSubjectAlternativeName(pubkey: publicKey) {
-        //         return .code(.badCert)
-        //     }
-        //     if impl.mode == PeerMode.validator {
-        //         // TODO: verify if it is current or next validator
-        //     }
-        // } catch {
-        //     logger.error("Failed to parse certificate", metadata: ["error": "\(error)"])
-        //     return .code(.badCert)
-        // }
+        do {
+            let (publicKey, alternativeName) = try parseCertificate(data: certificate, type: .x509)
+            logger.debug(
+                "Certificate parsed",
+                metadata: ["publicKey": "\(publicKey.toHexString())", "alternativeName": "\(alternativeName)"]
+            )
+            if alternativeName != generateSubjectAlternativeName(pubkey: publicKey) {
+                return .code(.badCert)
+            }
+            if impl.mode == PeerMode.validator {
+                // TODO: verify if it is current or next validator
+            }
+        } catch {
+            logger.error("Failed to parse certificate", metadata: ["error": "\(error)"])
+            return .code(.badCert)
+        }
         return .code(.success)
     }
 
@@ -394,7 +393,7 @@ public final class MockPeerEventHandler: QuicEventHandler {
             return .code(.requiredCert)
         }
         do {
-            let (publicKey, alternativeName) = try parseCertificate(data: certificate)
+            let (publicKey, alternativeName) = try parseCertificate(data: certificate, type: .x509)
             if alternativeName != generateSubjectAlternativeName(pubkey: publicKey) {
                 return .code(.badCert)
             }

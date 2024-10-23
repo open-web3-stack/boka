@@ -100,7 +100,7 @@ private func parseQuicAddr(_ addr: QUIC_ADDR) -> (String, UInt16, Bool)? {
 private func parseIpv4Addr(_ address: String) -> (String, UInt16)? {
     let ipv4Pattern =
         #"((?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"#
-    let ipv4WithPortPattern = #"(\#(ipv4Pattern)):(\d{1,5})"#
+    let ipv4WithPortPattern = #"(\#(ipv4Pattern)):(\d{1,5})(?=\s*$|\s+)"#
 
     let regex = try? NSRegularExpression(pattern: ipv4WithPortPattern, options: [])
     let range = NSRange(location: 0, length: address.utf16.count)
@@ -138,7 +138,7 @@ private func parseIpv6Addr(_ address: String) -> (String, UInt16)? {
         "|(?:(?:[0-9A-Fa-f]{1,4}:){0,6}[0-9A-Fa-f]{1,4})?::",
         ")",
     ].reduce("", +)
-    let ipv6WithPortPattern = #"\[(\#(ipv6Pattern))\]:(\d{1,5})"#
+    let ipv6WithPortPattern = #"\[(\#(ipv6Pattern))\]:(\d{1,5})(?=\s*$|\s+)"#
 
     let regex = try? NSRegularExpression(pattern: ipv6WithPortPattern, options: [])
     let range = NSRange(location: 0, length: address.utf16.count)
