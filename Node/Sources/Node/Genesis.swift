@@ -2,8 +2,25 @@ import Blockchain
 import Foundation
 import Utils
 
-public enum Genesis {
+public enum GenesisPreset: String, Codable, CaseIterable {
+    case minimal
     case dev
+    case mainnet
+
+    public var config: ProtocolConfigRef {
+        switch self {
+        case .minimal:
+            ProtocolConfigRef.minimal
+        case .dev:
+            ProtocolConfigRef.dev
+        case .mainnet:
+            ProtocolConfigRef.mainnet
+        }
+    }
+}
+
+public enum Genesis {
+    case preset(GenesisPreset)
     case file(path: String)
 }
 
@@ -23,24 +40,20 @@ public enum GenesisError: Error {
 extension Genesis {
     public func load() async throws -> (StateRef, BlockRef, ProtocolConfigRef) {
         switch self {
-        case .dev:
-            let config = ProtocolConfigRef.dev
+        case let .preset(preset):
+            let config = preset.config
             let (state, block) = try State.devGenesis(config: config)
             return (state, block, config)
         case let .file(path):
             let genesis = try readAndValidateGenesis(from: path)
             var config: ProtocolConfig
-            let preset = genesis.preset?.lowercased()
-            switch preset {
-            case "dev", "mainnet":
-                config =
-                    (preset == "dev"
-                        ? ProtocolConfigRef.dev.value : ProtocolConfigRef.mainnet.value)
+            if let preset = genesis.preset {
+                config = preset.config.value
                 if let genesisConfig = genesis.config {
                     config = config.merged(with: genesisConfig)
                 }
-            default:
-                // In this case, genesis.config has been verified to be non-nil
+            } else {
+                // The decoder ensures that genesis.config is non-nil when there is no preset
                 config = genesis.config!
             }
             let configRef = Ref(config)
@@ -62,10 +75,6 @@ extension Genesis {
         }
         if genesis.state.isEmpty {
             throw GenesisError.invalidFormat("Invalid or missing 'state'")
-        }
-        let preset = genesis.preset?.lowercased()
-        if preset != nil, !["dev", "mainnet"].contains(preset!) {
-            throw GenesisError.invalidFormat("Invalid preset value. Must be 'dev' or 'mainnet'.")
         }
     }
 
@@ -98,22 +107,23 @@ extension KeyedDecodingContainer {
     }
 }
 
-struct GenesisData: Sendable, Codable {
+struct GenesisData: Codable {
     var name: String
     var id: String
     var bootnodes: [String]
-    var preset: String?
+    var preset: GenesisPreset?
     var config: ProtocolConfig?
     // TODO: check & deal with state
     var state: String
 
+    // ensure one of preset or config is present
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         name = try container.decode(String.self, forKey: .name)
         id = try container.decode(String.self, forKey: .id)
         bootnodes = try container.decode([String].self, forKey: .bootnodes)
-        preset = try container.decodeIfPresent(String.self, forKey: .preset)
-        if preset == nil || !["dev", "mainnet"].contains(preset) {
+        preset = try container.decodeIfPresent(GenesisPreset.self, forKey: .preset)
+        if preset == nil {
             config = try container.decode(ProtocolConfig.self, forKey: .config, required: true)
         } else {
             config = try container.decodeIfPresent(ProtocolConfig.self, forKey: .config, required: false)
