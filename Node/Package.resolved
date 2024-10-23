@@ -1,13 +1,13 @@
 {
-  "originHash" : "00297367819962d99ceeff8fa5ed585a6024d83f81bd714777c40d0fc4c7dad0",
+  "originHash" : "7dcc3c8ac80d868e86196be8e7bbe367d44c35130f5b194c66eec8cb296fa12b",
   "pins" : [
     {
       "identity" : "async-channels",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/gh123man/Async-Channels.git",
       "state" : {
-        "revision" : "37d32cfc70f08b72a38a2c40f65338ee023afa45",
-        "version" : "1.0.1"
+        "revision" : "e4c71cd0364532d34b27e76f4ab7229abaaaefb4",
+        "version" : "1.0.2"
       }
     },
     {
