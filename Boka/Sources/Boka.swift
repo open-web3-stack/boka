@@ -27,7 +27,7 @@ enum MaybeEnabled<T: ExpressibleByArgument>: ExpressibleByArgument {
     case disabled
 
     init?(argument: String) {
-        if argument.lowercased() == "false" {
+        if argument.lowercased() == "no" {
             self = .disabled
         } else {
             guard let argument = T(argument: argument) else {
@@ -60,11 +60,11 @@ struct Boka: AsyncParsableCommand {
     @Option(name: .long, help: "A preset config or path to chain config file.")
     var chain: Genesis = .preset(.dev)
 
-    @Option(name: .long, help: "Listen address for RPC server. Pass 'false' to disable RPC server. Default to 127.0.0.1:9955.")
+    @Option(name: .long, help: "Listen address for RPC server. Pass 'no' to disable RPC server. Default to 127.0.0.1:9955.")
     var rpc: MaybeEnabled<NetAddr> = .enabled(NetAddr(address: "127.0.0.1:9955")!)
 
     @Option(name: .long, help: "Listen address for P2P protocol.")
-    var p2p: NetAddr = .init(address: "127.0.0.1:19955")!
+    var p2p: NetAddr = .init(address: "127.0.0.1:0")!
 
     @Option(name: .long, help: "Specify peer P2P addresses.")
     var peers: [NetAddr] = []
@@ -114,12 +114,11 @@ struct Boka: AsyncParsableCommand {
         }
 
         let rpcConfig = rpc.asOptional.map { addr -> RPCConfig in
-            logger.info("RPC listen address: \(addr)")
             let (address, port) = addr.getAddressAndPort()
             return RPCConfig(listenAddress: address, port: Int(port))
         }
 
-        let keystore = try await DevKeyStore()
+        let keystore = try await DevKeyStore(devKeysCount: devSeed == nil ? 12 : 0)
 
         let networkKey: Ed25519.SecretKey = try await {
             if let devSeed {
@@ -130,6 +129,7 @@ struct Boka: AsyncParsableCommand {
             }
         }()
 
+        logger.info("Network key: \(networkKey.publicKey.data.toHexString())")
         let networkConfig = NetworkConfig(
             mode: validator ? .validator : .builder,
             listenAddress: p2p,
@@ -144,7 +144,7 @@ struct Boka: AsyncParsableCommand {
             handlerMiddleware: .tracing(prefix: "Handler")
         )
 
-        let config = Node.Config(rpc: rpcConfig, network: networkConfig)
+        let config = Node.Config(rpc: rpcConfig, network: networkConfig, peers: peers)
 
         let node: Node = if validator {
             try await ValidatorNode(

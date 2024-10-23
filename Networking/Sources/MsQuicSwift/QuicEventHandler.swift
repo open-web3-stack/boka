@@ -33,6 +33,7 @@ public protocol QuicEventHandler: Sendable {
     func shouldOpen(_ connection: QuicConnection, certificate: Data?) -> QuicStatus
     func connected(_ connection: QuicConnection)
     func shutdownInitiated(_ connection: QuicConnection, reason: ConnectionCloseReason)
+    func shutdownComplete(_ connection: QuicConnection)
     func streamStarted(_ connect: QuicConnection, stream: QuicStream)
 
     // stream events
@@ -55,6 +56,7 @@ extension QuicEventHandler {
     public func connected(_: QuicConnection) {}
 
     public func shutdownInitiated(_: QuicConnection, reason _: ConnectionCloseReason) {}
+    public func shutdownComplete(_: QuicConnection) {}
 
     public func streamStarted(_: QuicConnection, stream _: QuicStream) {}
 
@@ -69,6 +71,7 @@ public final class MockQuicEventHandler: QuicEventHandler {
         case shouldOpen(connection: QuicConnection, certificate: Data?)
         case connected(connection: QuicConnection)
         case shutdownInitiated(connection: QuicConnection, reason: ConnectionCloseReason)
+        case shutdownComplete(connection: QuicConnection)
         case streamStarted(connection: QuicConnection, stream: QuicStream)
         case dataReceived(stream: QuicStream, data: Data)
         case closed(stream: QuicStream, status: QuicStatus, code: QuicErrorCode)
@@ -104,6 +107,12 @@ public final class MockQuicEventHandler: QuicEventHandler {
     public func shutdownInitiated(_ connection: QuicConnection, reason: ConnectionCloseReason) {
         events.write { events in
             events.append(.shutdownInitiated(connection: connection, reason: reason))
+        }
+    }
+
+    public func shutdownComplete(_ connection: QuicConnection) {
+        events.write { events in
+            events.append(.shutdownComplete(connection: connection))
         }
     }
 

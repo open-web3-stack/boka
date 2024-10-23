@@ -126,7 +126,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                     logger.debug("Invalid request length")
                     return
                 }
-                let length = UInt32(littleEndian: lengthData.withUnsafeBytes { $0.load(as: UInt32.self) })
+                let length = UInt32(littleEndian: lengthData.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) })
                 // sanity check for length
                 // TODO: pick better value
                 guard length < 1024 * 1024 * 10 else {

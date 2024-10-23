@@ -77,6 +77,7 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
                 )
 
                 events.append(.init(
+                    epochIndex: state.value.timeslot.timeslotToEpochIndex(config: config),
                     items: tickets,
                     publicKey: secret.publicKey
                 ))
