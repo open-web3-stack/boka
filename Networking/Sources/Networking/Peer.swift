@@ -266,7 +266,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             return .code(.requiredCert)
         }
         do {
-            let (publicKey, alternativeName) = try parseCertificate(data: certificate)
+            let (publicKey, alternativeName) = try parseCertificate(data: certificate, type: .x509)
             logger.debug(
                 "Certificate parsed",
                 metadata: ["publicKey": "\(publicKey.toHexString())", "alternativeName": "\(alternativeName)"]
@@ -385,7 +385,7 @@ public final class MockPeerEventHandler: QuicEventHandler {
             return .code(.requiredCert)
         }
         do {
-            let (publicKey, alternativeName) = try parseCertificate(data: certificate)
+            let (publicKey, alternativeName) = try parseCertificate(data: certificate, type: .x509)
             if alternativeName != generateSubjectAlternativeName(pubkey: publicKey) {
                 return .code(.badCert)
             }
