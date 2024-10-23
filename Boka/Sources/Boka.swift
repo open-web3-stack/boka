@@ -64,7 +64,7 @@ struct Boka: AsyncParsableCommand {
     var rpc: MaybeEnabled<NetAddr> = .enabled(NetAddr(address: "127.0.0.1:9955")!)
 
     @Option(name: .long, help: "Listen address for P2P protocol.")
-    var p2p: NetAddr = .init(address: "127.0.0.1:19955")!
+    var p2p: NetAddr = .init(address: "127.0.0.1:0")!
 
     @Option(name: .long, help: "Specify peer P2P addresses.")
     var peers: [NetAddr] = []

@@ -113,12 +113,14 @@ public final class Peer<Handler: StreamHandler>: Sendable {
             if let curr {
                 return curr
             }
-            let conn = try Connection(
-                QuicConnection(
-                    handler: PeerEventHandler(self.impl),
-                    registration: self.impl.clientConfiguration.registration,
-                    configuration: self.impl.clientConfiguration
-                ),
+            let quicConn = try QuicConnection(
+                handler: PeerEventHandler(self.impl),
+                registration: self.impl.clientConfiguration.registration,
+                configuration: self.impl.clientConfiguration
+            )
+            try quicConn.connect(to: address)
+            let conn = Connection(
+                quicConn,
                 impl: self.impl,
                 mode: mode,
                 remoteAddress: address,
@@ -266,25 +268,27 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
 
     // TODO: implement a peer and test this
     func shouldOpen(_: QuicConnection, certificate: Data?) -> QuicStatus {
+        // TODO: enable certificate validation logic once parsing logic is fixed
         guard let certificate else {
             return .code(.requiredCert)
         }
-        do {
-            let (publicKey, alternativeName) = try parseCertificate(data: certificate)
-            logger.debug(
-                "Certificate parsed",
-                metadata: ["publicKey": "\(publicKey.toHexString())", "alternativeName": "\(alternativeName)"]
-            )
-            if alternativeName != generateSubjectAlternativeName(pubkey: publicKey) {
-                return .code(.badCert)
-            }
-            if impl.mode == PeerMode.validator {
-                // TODO: verify if it is current or next validator
-            }
-        } catch {
-            logger.error("Failed to parse certificate", metadata: ["error": "\(error)"])
-            return .code(.badCert)
-        }
+        logger.trace("Received certificate", metadata: ["cert": "\(certificate.toHexString())"])
+        // do {
+        //     let (publicKey, alternativeName) = try parseCertificate(data: certificate)
+        //     logger.debug(
+        //         "Certificate parsed",
+        //         metadata: ["publicKey": "\(publicKey.toHexString())", "alternativeName": "\(alternativeName)"]
+        //     )
+        //     if alternativeName != generateSubjectAlternativeName(pubkey: publicKey) {
+        //         return .code(.badCert)
+        //     }
+        //     if impl.mode == PeerMode.validator {
+        //         // TODO: verify if it is current or next validator
+        //     }
+        // } catch {
+        //     logger.error("Failed to parse certificate", metadata: ["error": "\(error)"])
+        //     return .code(.badCert)
+        // }
         return .code(.success)
     }
 
@@ -313,7 +317,8 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         }
     }
 
-    func shutdownInitiated(_ connection: QuicConnection, reason _: ConnectionCloseReason) {
+    func shutdownComplete(_ connection: QuicConnection) {
+        logger.trace("connection shutdown complete", metadata: ["connectionId": "\(connection.id)"])
         impl.connections.write { connections in
             if let conn = connections.byId[connection.id] {
                 connections.byId.removeValue(forKey: connection.id)
