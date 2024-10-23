@@ -7,21 +7,43 @@ enum CryptoError: Error {
     case parseFailed(String)
 }
 
-public func parseCertificate(data: Data) throws -> (publicKey: Data, alternativeName: String) {
+public enum CertificateType {
+    case x509
+    case p12
+}
+
+public func parseCertificate(data: Data, type: CertificateType) throws -> (
+    publicKey: Data, alternativeName: String
+) {
     var publicKeyPointer: UnsafeMutablePointer<UInt8>!
     var publicKeyLen = 0
     var altNamePointer: UnsafeMutablePointer<Int8>!
     var errorMessage: UnsafeMutablePointer<Int8>?
     defer { free(altNamePointer) }
-    let result = data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
-        parse_pkcs12_certificate(
-            bytes.baseAddress!.assumingMemoryBound(to: UInt8.self),
-            data.count,
-            &publicKeyPointer,
-            &publicKeyLen,
-            &altNamePointer,
-            &errorMessage
-        )
+
+    let result: Int32 = switch type {
+    case .x509:
+        data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+            parse_certificate(
+                bytes.baseAddress!.assumingMemoryBound(to: UInt8.self),
+                data.count,
+                &publicKeyPointer,
+                &publicKeyLen,
+                &altNamePointer,
+                &errorMessage
+            )
+        }
+    case .p12:
+        data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+            parse_pkcs12_certificate(
+                bytes.baseAddress!.assumingMemoryBound(to: UInt8.self),
+                data.count,
+                &publicKeyPointer,
+                &publicKeyLen,
+                &altNamePointer,
+                &errorMessage
+            )
+        }
     }
 
     guard result == 0 else {
