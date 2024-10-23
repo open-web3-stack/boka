@@ -21,30 +21,31 @@ public func parseCertificate(data: Data, type: CertificateType) throws -> (
     var errorMessage: UnsafeMutablePointer<Int8>?
     defer { free(altNamePointer) }
 
-    let result: Int32 = switch type {
-    case .x509:
-        data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
-            parse_certificate(
-                bytes.baseAddress!.assumingMemoryBound(to: UInt8.self),
-                data.count,
-                &publicKeyPointer,
-                &publicKeyLen,
-                &altNamePointer,
-                &errorMessage
-            )
+    let result: Int32 =
+        switch type {
+        case .x509:
+            data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+                parse_certificate(
+                    bytes.baseAddress!.assumingMemoryBound(to: UInt8.self),
+                    data.count,
+                    &publicKeyPointer,
+                    &publicKeyLen,
+                    &altNamePointer,
+                    &errorMessage
+                )
+            }
+        case .p12:
+            data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+                parse_pkcs12_certificate(
+                    bytes.baseAddress!.assumingMemoryBound(to: UInt8.self),
+                    data.count,
+                    &publicKeyPointer,
+                    &publicKeyLen,
+                    &altNamePointer,
+                    &errorMessage
+                )
+            }
         }
-    case .p12:
-        data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
-            parse_pkcs12_certificate(
-                bytes.baseAddress!.assumingMemoryBound(to: UInt8.self),
-                data.count,
-                &publicKeyPointer,
-                &publicKeyLen,
-                &altNamePointer,
-                &errorMessage
-            )
-        }
-    }
 
     guard result == 0 else {
         throw CryptoError.parseFailed(String(cString: errorMessage!))
