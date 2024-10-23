@@ -68,6 +68,10 @@ public final class Network: Sendable {
     public func broadcast(kind: UniquePresistentStreamKind, message: any MessageProtocol) {
         peer.broadcast(kind: kind, message: message)
     }
+
+    public func listenAddress() throws -> NetAddr {
+        try peer.listenAddress()
+    }
 }
 
 struct HandlerDef: StreamHandler {

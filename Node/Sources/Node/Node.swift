@@ -11,12 +11,14 @@ public typealias NetworkConfig = Network.Config
 
 public class Node {
     public struct Config {
-        public var rpc: Server.Config?
-        public var network: Network.Config
+        public var rpc: RPCConfig?
+        public var network: NetworkConfig
+        public var peers: [NetAddr]
 
-        public init(rpc: Server.Config?, network: Network.Config) {
+        public init(rpc: RPCConfig?, network: NetworkConfig, peers: [NetAddr] = []) {
             self.rpc = rpc
             self.network = network
+            self.peers = peers
         }
     }
 
@@ -33,8 +35,6 @@ public class Node {
         eventBus: EventBus,
         keystore: KeyStore
     ) async throws {
-        logger.debug("Initializing node")
-
         let (genesisState, genesisBlock, protocolConfig) = try await genesis.load()
         dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
         timeProvider = SystemTimeProvider()
@@ -50,7 +50,8 @@ public class Node {
 
         network = try NetworkManager(
             config: config.network,
-            blockchain: blockchain
+            blockchain: blockchain,
+            devPeers: Set(config.peers)
         )
 
         rpcServer = try config.rpc.map {

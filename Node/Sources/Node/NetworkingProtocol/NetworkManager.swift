@@ -1,5 +1,6 @@
 import Blockchain
 import Foundation
+import MsQuicSwift
 import TracingUtils
 import Utils
 
@@ -9,9 +10,9 @@ public final class NetworkManager: Sendable {
     private let network: Network
     // This is for development only
     // Will assume those peers are also validators
-    private let devPeers: Set<NetAddr> = []
+    private let devPeers: Set<NetAddr>
 
-    public init(config: Network.Config, blockchain: Blockchain) throws {
+    public init(config: Network.Config, blockchain: Blockchain, devPeers: Set<NetAddr>) throws {
         let handler = HandlerImpl(blockchain: blockchain)
         network = try Network(
             config: config,
@@ -19,6 +20,13 @@ public final class NetworkManager: Sendable {
             genesisHeader: blockchain.dataProvider.genesisBlockHash,
             handler: handler
         )
+        self.devPeers = devPeers
+
+        for peer in devPeers {
+            _ = try network.connect(to: peer, mode: .validator)
+        }
+
+        logger.info("P2P Listening on \(try! network.listenAddress())")
     }
 }
 

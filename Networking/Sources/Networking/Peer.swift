@@ -100,6 +100,10 @@ public final class Peer<Handler: StreamHandler>: Sendable {
         )
     }
 
+    public func listenAddress() throws -> NetAddr {
+        try listener.listenAddress()
+    }
+
     public func connect(to address: NetAddr, mode: PeerMode) throws -> Connection<Handler> {
         let conn = impl.connections.read { connections in
             connections.byType[mode]?[address]

@@ -8,7 +8,7 @@ import msquic
     import Darwin
 #endif
 
-public struct NetAddr: Sendable {
+public struct NetAddr: Sendable, Equatable, Hashable {
     var quicAddr: QUIC_ADDR
 
     public init?(address: String) {
@@ -38,17 +38,13 @@ public struct NetAddr: Sendable {
         let (host, port, _) = parseQuicAddr(quicAddr) ?? ("::dead:beef", 0, false)
         return (host, port)
     }
-}
 
-extension NetAddr: Equatable {
     public static func == (lhs: NetAddr, rhs: NetAddr) -> Bool {
         var addr1 = lhs.quicAddr
         var addr2 = rhs.quicAddr
         return QuicAddrCompare(&addr1, &addr2) == 1
     }
-}
 
-extension NetAddr: Hashable {
     public func hash(into hasher: inout Hasher) {
         var addr = quicAddr
         let hash = QuicAddrHash(&addr)

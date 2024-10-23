@@ -114,7 +114,6 @@ struct Boka: AsyncParsableCommand {
         }
 
         let rpcConfig = rpc.asOptional.map { addr -> RPCConfig in
-            logger.info("RPC listen address: \(addr)")
             let (address, port) = addr.getAddressAndPort()
             return RPCConfig(listenAddress: address, port: Int(port))
         }
@@ -130,6 +129,7 @@ struct Boka: AsyncParsableCommand {
             }
         }()
 
+        logger.info("Network key: \(networkKey.publicKey.data.toHexString())")
         let networkConfig = NetworkConfig(
             mode: validator ? .validator : .builder,
             listenAddress: p2p,
@@ -144,7 +144,7 @@ struct Boka: AsyncParsableCommand {
             handlerMiddleware: .tracing(prefix: "Handler")
         )
 
-        let config = Node.Config(rpc: rpcConfig, network: networkConfig)
+        let config = Node.Config(rpc: rpcConfig, network: networkConfig, peers: peers)
 
         let node: Node = if validator {
             try await ValidatorNode(
