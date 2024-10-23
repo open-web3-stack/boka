@@ -8,14 +8,14 @@ private let logger = Logger(label: "Connection")
 
 public protocol ConnectionInfoProtocol {
     var id: UniqueId { get }
-    var mode: PeerMode { get }
+    var role: PeerRole { get }
     var remoteAddress: NetAddr { get }
 }
 
 public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoProtocol {
     let connection: QuicConnection
     let impl: PeerImpl<Handler>
-    public let mode: PeerMode
+    public let role: PeerRole
     public let remoteAddress: NetAddr
     let presistentStreams: ThreadSafeContainer<
         [Handler.PresistentHandler.StreamKind: Stream<Handler>]
@@ -26,10 +26,10 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         connection.id
     }
 
-    init(_ connection: QuicConnection, impl: PeerImpl<Handler>, mode: PeerMode, remoteAddress: NetAddr, initiatedByLocal: Bool) {
+    init(_ connection: QuicConnection, impl: PeerImpl<Handler>, role: PeerRole, remoteAddress: NetAddr, initiatedByLocal: Bool) {
         self.connection = connection
         self.impl = impl
-        self.mode = mode
+        self.role = role
         self.remoteAddress = remoteAddress
         self.initiatedByLocal = initiatedByLocal
     }

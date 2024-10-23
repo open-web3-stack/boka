@@ -1,6 +1,7 @@
 import Blockchain
 import Codec
 import Foundation
+import Networking
 import TracingUtils
 import Utils
 
@@ -32,7 +33,7 @@ public final class NetworkManager: Sendable {
         self.devPeers = devPeers
 
         for peer in devPeers {
-            _ = try network.connect(to: peer, mode: .validator)
+            _ = try network.connect(to: peer, role: .validator)
         }
 
         logger.info("P2P Listening on \(try! network.listenAddress())")
@@ -142,4 +143,7 @@ struct HandlerImpl: NetworkProtocolHandler {
             // TODO: handle it
         }
     }
+
+    func handle(connection _: some ConnectionInfoProtocol, stream _: some StreamProtocol,
+                kind _: UniquePresistentStreamKind) async throws {}
 }

@@ -131,7 +131,7 @@ struct Boka: AsyncParsableCommand {
 
         logger.info("Network key: \(networkKey.publicKey.data.toHexString())")
         let networkConfig = NetworkConfig(
-            mode: validator ? .validator : .builder,
+            role: validator ? .validator : .builder,
             listenAddress: p2p,
             key: networkKey
         )
