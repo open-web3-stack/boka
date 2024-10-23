@@ -51,9 +51,15 @@ struct NetAddrTests {
 
     @Test
     func parseInvalidFormat() async throws {
-        let address = "abcd:::"
-        let netAddr = NetAddr(address: address)
-        #expect(netAddr == nil)
+        let address1 = "abcd:::"
+        let netAddr1 = NetAddr(address: address1)
+        #expect(netAddr1 == nil)
+        let address2 = "127.0.0.1:12,awef"
+        let netAddr2 = NetAddr(address: address2)
+        #expect(netAddr2 == nil)
+        let address3 = "[2001:db8:85a3::8a2e:370:7334]:8080,8081,8082"
+        let netAddr3 = NetAddr(address: address3)
+        #expect(netAddr3 == nil)
     }
 
     @Test

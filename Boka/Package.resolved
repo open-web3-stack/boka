@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/gh123man/Async-Channels.git",
       "state" : {
-        "revision" : "37d32cfc70f08b72a38a2c40f65338ee023afa45",
-        "version" : "1.0.1"
+        "revision" : "e4c71cd0364532d34b27e76f4ab7229abaaaefb4",
+        "version" : "1.0.2"
       }
     },
     {

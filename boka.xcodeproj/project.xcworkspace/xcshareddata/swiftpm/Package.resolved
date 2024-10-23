@@ -1,13 +1,13 @@
 {
-  "originHash" : "15c8990c2a71904ae0fb2311d87b37d53447f70bb359a55f0a30906bb5dcd56f",
+  "originHash" : "a1c5a905aa50d79012ebf1996304b1c1eb89ff484b4c2fb93ed061eca43155f6",
   "pins" : [
     {
       "identity" : "async-channels",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/gh123man/Async-Channels.git",
       "state" : {
-        "revision" : "37d32cfc70f08b72a38a2c40f65338ee023afa45",
-        "version" : "1.0.1"
+        "revision" : "e4c71cd0364532d34b27e76f4ab7229abaaaefb4",
+        "version" : "1.0.2"
       }
     },
     {
@@ -87,8 +87,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-asn1.git",
       "state" : {
-        "revision" : "df5d2fcd22e3f480e3ef85bf23e277a4a0ef524d",
-        "version" : "1.2.0"
+        "revision" : "7faebca1ea4f9aaf0cda1cef7c43aecd2311ddf6",
+        "version" : "1.3.0"
       }
     },
     {
@@ -114,8 +114,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-certificates.git",
       "state" : {
-        "revision" : "2f797305c1b5b982acaa6005d8a9f970cc4e97ff",
-        "version" : "1.5.0"
+        "revision" : "1fbb6ef21f1525ed5faf4c95207b9c11bea27e94",
+        "version" : "1.6.1"
       }
     },
     {
