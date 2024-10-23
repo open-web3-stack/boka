@@ -104,6 +104,10 @@ public final class NetworkManager: Sendable {
             )
         }
     }
+
+    public func getPeersCount() -> Int {
+        network.getPeersCount()
+    }
 }
 
 struct HandlerImpl: NetworkProtocolHandler {

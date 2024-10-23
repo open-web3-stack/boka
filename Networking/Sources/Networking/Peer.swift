@@ -157,6 +157,11 @@ public final class Peer<Handler: StreamHandler>: Sendable {
             }
         }
     }
+
+    // there should be only one connection per peer
+    public func getPeersCount() -> Int {
+        impl.connections.value.byId.values.count
+    }
 }
 
 final class PeerImpl<Handler: StreamHandler>: Sendable {
