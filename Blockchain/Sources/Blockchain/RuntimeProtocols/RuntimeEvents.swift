@@ -13,6 +13,7 @@ public enum RuntimeEvents {
 
     // New safrole ticket generated from SafroleService
     public struct SafroleTicketsGenerated: Event {
+        public let epochIndex: EpochIndex
         public let items: [TicketItemAndOutput]
         public let publicKey: Bandersnatch.PublicKey
     }

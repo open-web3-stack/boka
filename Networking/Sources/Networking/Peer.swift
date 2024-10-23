@@ -100,6 +100,10 @@ public final class Peer<Handler: StreamHandler>: Sendable {
         )
     }
 
+    public func listenAddress() throws -> NetAddr {
+        try listener.listenAddress()
+    }
+
     public func connect(to address: NetAddr, mode: PeerMode) throws -> Connection<Handler> {
         let conn = impl.connections.read { connections in
             connections.byType[mode]?[address]
@@ -109,12 +113,14 @@ public final class Peer<Handler: StreamHandler>: Sendable {
             if let curr {
                 return curr
             }
-            let conn = try Connection(
-                QuicConnection(
-                    handler: PeerEventHandler(self.impl),
-                    registration: self.impl.clientConfiguration.registration,
-                    configuration: self.impl.clientConfiguration
-                ),
+            let quicConn = try QuicConnection(
+                handler: PeerEventHandler(self.impl),
+                registration: self.impl.clientConfiguration.registration,
+                configuration: self.impl.clientConfiguration
+            )
+            try quicConn.connect(to: address)
+            let conn = Connection(
+                quicConn,
                 impl: self.impl,
                 mode: mode,
                 remoteAddress: address,
@@ -126,7 +132,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
         }
     }
 
-    public func broadcast(kind: Handler.PresistentHandler.StreamKind, message: any MessageProtocol) {
+    public func broadcast(kind: Handler.PresistentHandler.StreamKind, message: Handler.PresistentHandler.Message) {
         let connections = impl.connections.read { connections in
             connections.byId.values
         }
@@ -261,16 +267,18 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
     }
 
     // TODO: implement a peer and test this
-    func shouldOpen(_: QuicConnection, certificate: Data?) -> QuicStatus {
+    func shouldOpen(_ connection: QuicConnection, certificate: Data?) -> QuicStatus {
+        // TODO: enable certificate validation logic once parsing logic is fixed
         guard let certificate else {
             return .code(.requiredCert)
         }
         do {
             let (publicKey, alternativeName) = try parseCertificate(data: certificate, type: .x509)
-            logger.debug(
-                "Certificate parsed",
-                metadata: ["publicKey": "\(publicKey.toHexString())", "alternativeName": "\(alternativeName)"]
-            )
+            logger.trace("Certificate parsed", metadata: [
+                "connectionId": "\(connection.id)",
+                "publicKey": "\(publicKey.toHexString())",
+                "alternativeName": "\(alternativeName)",
+            ])
             if alternativeName != generateSubjectAlternativeName(pubkey: publicKey) {
                 return .code(.badCert)
             }
@@ -278,7 +286,9 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 // TODO: verify if it is current or next validator
             }
         } catch {
-            logger.error("Failed to parse certificate", metadata: ["error": "\(error)"])
+            logger.warning("Failed to parse certificate", metadata: [
+                "connectionId": "\(connection.id)",
+                "error": "\(error)"])
             return .code(.badCert)
         }
         return .code(.success)
@@ -309,7 +319,8 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         }
     }
 
-    func shutdownInitiated(_ connection: QuicConnection, reason _: ConnectionCloseReason) {
+    func shutdownComplete(_ connection: QuicConnection) {
+        logger.trace("connection shutdown complete", metadata: ["connectionId": "\(connection.id)"])
         impl.connections.write { connections in
             if let conn = connections.byId[connection.id] {
                 connections.byId.removeValue(forKey: connection.id)
