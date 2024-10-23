@@ -71,17 +71,17 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         if data.isEmpty {
             return
         }
-        // TODO: backpressure handling
-        // https://github.com/gh123man/Async-Channels/issues/11
-        Task {
-            await channel.send(data)
+
+        if !channel.syncSend(data) {
+            logger.warning("stream \(id) is full")
+            // TODO: backpressure handling
         }
     }
 
     // initiate stream close
     public func close(abort: Bool = false) {
         if status != .open {
-            logger.warning("Trying to close stream \(stream.id) in status \(status)")
+            logger.warning("Trying to close stream \(id) in status \(status)")
             return
         }
         status = abort ? .aborted : .closed

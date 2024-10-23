@@ -3,6 +3,20 @@ import Codec
 public enum Either<Left, Right> {
     case left(Left)
     case right(Right)
+
+    public var left: Left? {
+        if case let .left(left) = self {
+            return left
+        }
+        return nil
+    }
+
+    public var right: Right? {
+        if case let .right(right) = self {
+            return right
+        }
+        return nil
+    }
 }
 
 extension Either: Equatable where Left: Equatable, Right: Equatable {}

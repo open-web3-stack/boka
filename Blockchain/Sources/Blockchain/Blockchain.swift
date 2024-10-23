@@ -15,7 +15,7 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
         self.dataProvider = dataProvider
         self.timeProvider = timeProvider
 
-        super.init(logger: Logger(label: "Blockchain"), config: config, eventBus: eventBus)
+        super.init(id: "Blockchain", config: config, eventBus: eventBus)
 
         await subscribe(RuntimeEvents.BlockAuthored.self, id: "Blockchain.BlockAuthored") { [weak self] event in
             try await self?.on(blockAuthored: event)

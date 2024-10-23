@@ -1,74 +1,87 @@
+import ArgumentParser
 import Blockchain
-import ConsoleKit
 import Foundation
 import Node
 import ServiceLifecycle
 import TracingUtils
 import Utils
 
-enum InvalidArgumentError: Error {
-    case invalidArgument(String)
+extension Genesis: @retroactive ExpressibleByArgument {
+    public init?(argument: String) {
+        if let preset = GenesisPreset(rawValue: argument) {
+            self = .preset(preset)
+        } else {
+            self = .file(path: argument)
+        }
+    }
 }
 
-struct Boka: AsyncCommand {
-    struct Signature: CommandSignature {
-        @Option(name: "base-path", short: "d", help: "Base path to database files.")
-        var basePath: String?
+extension NetAddr: @retroactive ExpressibleByArgument {
+    public init?(argument: String) {
+        self.init(address: argument)
+    }
+}
 
-        @Option(name: "chain", short: "c", help: "Path to chain spec file.")
-        var chain: String?
+enum MaybeEnabled<T: ExpressibleByArgument>: ExpressibleByArgument {
+    case enabled(T)
+    case disabled
 
-        @Option(name: "config-file", short: "f", help: "Path to config file.")
-        var configFile: String?
-
-        @Option(
-            name: "rpc",
-            help:
-            "Listen address for RPC server. Pass 'false' to disable RPC server. Default to 127.0.0.1:9955."
-        )
-        var rpc: String?
-
-        @Option(name: "p2p", help: "Listen address for P2P protocol.")
-        var p2p: String?
-
-        @Option(name: "peers", help: "Specify peer P2P addresses separated by commas.")
-        var peers: String?
-
-        @Flag(name: "validator", help: "Run as a validator.")
-        var validator: Bool
-
-        @Option(
-            name: "operator-rpc",
-            help:
-            "Listen address for operator RPC server. Pass 'false' to disable operator RPC server. Default to false."
-        )
-        var operatorRpc: String?
-
-        @Option(name: "dev-seed", help: "For development only. Seed for validator keys.")
-        var devSeed: String?
-
-        @Flag(name: "version", help: "Show the version.")
-        var version: Bool
-
-        @Flag(name: "help", short: "h", help: "Show help information.")
-        var help: Bool
+    init?(argument: String) {
+        if argument.lowercased() == "no" {
+            self = .disabled
+        } else {
+            guard let argument = T(argument: argument) else {
+                return nil
+            }
+            self = .enabled(argument)
+        }
     }
 
-    var help: String {
-        "A command-line tool for Boka."
+    var asOptional: T? {
+        switch self {
+        case let .enabled(value):
+            value
+        case .disabled:
+            nil
+        }
     }
+}
 
-    func run(using context: CommandContext, signature: Signature) async throws {
-        if signature.help {
-            context.console.info(help)
-            return
-        }
-        // TODO: fix version number issue #168
-        if signature.version {
-            context.console.info("Boka version 1.0.0")
-            return
-        }
+@main
+struct Boka: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "JAM built with Swift",
+        version: "0.0.1"
+    )
 
+    @Option(name: .shortAndLong, help: "Base path to database files.")
+    var basePath: String?
+
+    @Option(name: .long, help: "A preset config or path to chain config file.")
+    var chain: Genesis = .preset(.dev)
+
+    @Option(name: .long, help: "Listen address for RPC server. Pass 'no' to disable RPC server. Default to 127.0.0.1:9955.")
+    var rpc: MaybeEnabled<NetAddr> = .enabled(NetAddr(address: "127.0.0.1:9955")!)
+
+    @Option(name: .long, help: "Listen address for P2P protocol.")
+    var p2p: NetAddr = .init(address: "127.0.0.1:0")!
+
+    @Option(name: .long, help: "Specify peer P2P addresses.")
+    var peers: [NetAddr] = []
+
+    @Flag(name: .long, help: "Run as a validator.")
+    var validator = false
+
+    @Option(name: .long, help: "Listen address for operator RPC server. Pass 'false' to disable operator RPC server. Default to false.")
+    var operatorRpc: NetAddr?
+
+    @Option(name: .long, help: "For development only. Seed for validator keys.")
+    var devSeed: UInt32?
+
+    @Option(name: .long, help: "Node name. For telemetry only.")
+    var name: String?
+
+    mutating func run() async throws {
         let services = try await Tracing.bootstrap("Boka", loggerOnly: true)
         for service in services {
             Task {
@@ -76,72 +89,50 @@ struct Boka: AsyncCommand {
             }
         }
 
-        // Handle other options and flags
-        if let basePath = signature.basePath {
-            context.console.info("Base path: \(basePath)")
+        let logger = Logger(label: "cli")
+
+        logger.info("Starting Boka. Chain: \(chain)")
+
+        if let name {
+            logger.info("Node name: \(name)")
         }
 
-        if let peers = signature.peers {
-            let peerList = peers.split(separator: ",").map {
-                $0.trimmingCharacters(in: .whitespaces)
-            }
-            context.console.info("Peers: \(peerList.joined(separator: ", "))")
+        if let basePath {
+            logger.info("Base path: \(basePath)")
         }
 
-        if signature.validator {
-            context.console.info("Running as validator")
-        }
+        logger.info("Peers: \(peers)")
 
-        if let operatorRpc = signature.operatorRpc {
-            context.console.info("Operator RPC listen address: \(operatorRpc)")
-        }
-
-        var rpcListenAddress = NetAddr(ipAddress: "127.0.0.1", port: 9955)
-        if let rpc = signature.rpc {
-            if rpc.lowercased() == "false" {
-                context.console.info("RPC server is disabled")
-                rpcListenAddress = nil
-            } else {
-                if let addr = NetAddr(address: rpc) {
-                    rpcListenAddress = addr
-                } else {
-                    throw InvalidArgumentError.invalidArgument("Invalid RPC address")
-                }
-            }
-        }
-
-        let rpcConfig = rpcListenAddress.map { rpcListenAddress in
-            let (rpcAddress, rpcPort) = rpcListenAddress.getAddressAndPort()
-            return RPCConfig(listenAddress: rpcAddress, port: Int(rpcPort))
-        }
-
-        var p2pListenAddress = NetAddr(ipAddress: "127.0.0.1", port: 19955)!
-        if let p2p = signature.p2p {
-            if let addr = NetAddr(address: p2p) {
-                p2pListenAddress = addr
-            } else {
-                throw InvalidArgumentError.invalidArgument("Invalid P2P address")
-            }
-        }
-
-        let keystore = try await DevKeyStore()
-
-        var devKey: KeySet?
-        let networkKey: Ed25519.SecretKey
-        if let devSeed = signature.devSeed {
-            guard let val = UInt32(devSeed) else {
-                throw InvalidArgumentError.invalidArgument("devSeed is not a valid hex string")
-            }
-            devKey = try await keystore.addDevKeys(seed: val)
-            networkKey = await keystore.get(Ed25519.self, publicKey: devKey!.ed25519)!
+        if validator {
+            logger.info("Running as validator")
         } else {
-            // TODO: only generate network key if keystore is empty
-            networkKey = try await keystore.generate(Ed25519.self)
+            logger.info("Running as fullnode")
         }
 
+        if let operatorRpc {
+            logger.info("Operator RPC listen address: \(operatorRpc)")
+        }
+
+        let rpcConfig = rpc.asOptional.map { addr -> RPCConfig in
+            let (address, port) = addr.getAddressAndPort()
+            return RPCConfig(listenAddress: address, port: Int(port))
+        }
+
+        let keystore = try await DevKeyStore(devKeysCount: devSeed == nil ? 12 : 0)
+
+        let networkKey: Ed25519.SecretKey = try await {
+            if let devSeed {
+                let key = try await keystore.addDevKeys(seed: devSeed)
+                return await keystore.get(Ed25519.self, publicKey: key.ed25519)!
+            } else {
+                return try await keystore.generate(Ed25519.self)
+            }
+        }()
+
+        logger.info("Network key: \(networkKey.publicKey.data.toHexString())")
         let networkConfig = NetworkConfig(
-            mode: signature.validator ? .validator : .builder,
-            listenAddress: p2pListenAddress,
+            mode: validator ? .validator : .builder,
+            listenAddress: p2p,
             key: networkKey
         )
 
@@ -153,26 +144,20 @@ struct Boka: AsyncCommand {
             handlerMiddleware: .tracing(prefix: "Handler")
         )
 
-        var genesis: Genesis = .dev
-        if let configFile = signature.configFile {
-            context.console.info("Config file: \(configFile)")
-            genesis = .file(path: configFile)
-        }
+        let config = Node.Config(rpc: rpcConfig, network: networkConfig, peers: peers)
 
-        let config = Node.Config(rpc: rpcConfig, network: networkConfig)
-
-        let node: Node = if signature.validator {
+        let node: Node = if validator {
             try await ValidatorNode(
-                config: config, genesis: genesis, eventBus: eventBus, keystore: keystore
+                config: config, genesis: chain, eventBus: eventBus, keystore: keystore
             )
         } else {
             try await Node(
-                config: config, genesis: genesis, eventBus: eventBus, keystore: keystore
+                config: config, genesis: chain, eventBus: eventBus, keystore: keystore
             )
         }
 
         try await node.wait()
 
-        console.info("Shutting down...")
+        logger.notice("Shutting down...")
     }
 }

@@ -2,8 +2,6 @@ import bandersnatch_vrfs
 import Foundation
 import TracingUtils
 
-private let logger = Logger(label: "Bandersnatch")
-
 public enum Bandersnatch: KeyType {
     public enum Error: Swift.Error {
         case createSecretFailed(Int)
@@ -39,11 +37,6 @@ public enum Bandersnatch: KeyType {
         ///
         /// Used for ticket claiming during block production.
         public func ietfVRFSign(vrfInputData: Data, auxData: Data = Data()) throws -> Data96 {
-            logger.trace(
-                "ietfVRFSign",
-                metadata: ["vrfInputData": "\(vrfInputData.toDebugHexString())", "auxData": "\(auxData.toDebugHexString())"]
-            )
-
             var output = Data(repeating: 0, count: 96)
 
             try FFIUtils.call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
@@ -64,8 +57,6 @@ public enum Bandersnatch: KeyType {
         }
 
         public func getOutput(vrfInputData: Data) throws -> Data32 {
-            logger.trace("getOutput", metadata: ["vrfInputData": "\(vrfInputData.toDebugHexString())"])
-
             var output = Data(repeating: 0, count: 32)
 
             try FFIUtils.call(vrfInputData, out: &output) { ptrs, out_buf in
@@ -152,15 +143,6 @@ public enum Bandersnatch: KeyType {
         public func ietfVRFVerify(
             vrfInputData: Data, auxData: Data = Data(), signature: Data96
         ) throws(Error) -> Data32 {
-            logger.trace(
-                "ietfVRFVerify",
-                metadata: [
-                    "vrfInputData": "\(vrfInputData.toDebugHexString())",
-                    "auxData": "\(auxData.toDebugHexString())",
-                    "signature": "\(signature.data.toDebugHexString())",
-                ]
-            )
-
             var output = Data(repeating: 0, count: 32)
 
             try FFIUtils.call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in
@@ -220,11 +202,6 @@ public enum Bandersnatch: KeyType {
         ///
         /// Used for tickets submission.
         public func ringVRFSign(vrfInputData: Data, auxData: Data = Data()) throws(Error) -> Data784 {
-            logger.trace(
-                "ringVRFSign",
-                metadata: ["vrfInputData": "\(vrfInputData.toDebugHexString())", "auxData": "\(auxData.toDebugHexString())"]
-            )
-
             var output = Data(repeating: 0, count: 784)
 
             try FFIUtils.call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
@@ -315,15 +292,6 @@ public enum Bandersnatch: KeyType {
         ///
         /// On success returns the VRF output hash.
         public func ringVRFVerify(vrfInputData: Data, auxData: Data = Data(), signature: Data784) throws(Error) -> Data32 {
-            logger.trace(
-                "ringVRFVerify",
-                metadata: [
-                    "vrfInputData": "\(vrfInputData.toDebugHexString())",
-                    "auxData": "\(auxData.toDebugHexString())",
-                    "signature": "\(signature.data.toDebugHexString())",
-                ]
-            )
-
             var output = Data(repeating: 0, count: 32)
 
             try FFIUtils.call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in

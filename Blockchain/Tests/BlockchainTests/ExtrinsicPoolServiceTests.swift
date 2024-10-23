@@ -25,7 +25,7 @@ struct ExtrinsicPoolServiceTests {
         dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
 
         storeMiddleware = StoreMiddleware()
-        eventBus = EventBus(eventMiddleware: Middleware(storeMiddleware))
+        eventBus = EventBus(eventMiddleware: .serial(Middleware(storeMiddleware), .noError), handlerMiddleware: .noError)
 
         keystore = try await DevKeyStore(devKeysCount: config.value.totalNumberOfValidators)
 
@@ -56,7 +56,11 @@ struct ExtrinsicPoolServiceTests {
 
             allTickets.append(contentsOf: tickets)
 
-            let event = RuntimeEvents.SafroleTicketsGenerated(items: tickets, publicKey: secretKey.publicKey)
+            let event = RuntimeEvents.SafroleTicketsGenerated(
+                epochIndex: state.value.timeslot.timeslotToEpochIndex(config: config),
+                items: tickets,
+                publicKey: secretKey.publicKey
+            )
             await eventBus.publish(event)
 
             // Wait for the event to be processed
@@ -126,7 +130,11 @@ struct ExtrinsicPoolServiceTests {
             idx: 0
         )
 
-        let addEvent = RuntimeEvents.SafroleTicketsGenerated(items: tickets, publicKey: secretKey.publicKey)
+        let addEvent = RuntimeEvents.SafroleTicketsGenerated(
+            epochIndex: state.value.timeslot.timeslotToEpochIndex(config: config),
+            items: tickets,
+            publicKey: secretKey.publicKey
+        )
         await eventBus.publish(addEvent)
 
         // Wait for the event to be processed
@@ -173,7 +181,11 @@ struct ExtrinsicPoolServiceTests {
             idx: 0
         )
 
-        let addEvent = RuntimeEvents.SafroleTicketsGenerated(items: oldTickets, publicKey: secretKey.publicKey)
+        let addEvent = RuntimeEvents.SafroleTicketsGenerated(
+            epochIndex: state.value.timeslot.timeslotToEpochIndex(config: config),
+            items: oldTickets,
+            publicKey: secretKey.publicKey
+        )
         await eventBus.publish(addEvent)
         await storeMiddleware.wait()
 
@@ -216,7 +228,11 @@ struct ExtrinsicPoolServiceTests {
         )
 
         // Ensure new tickets are accepted
-        let newAddEvent = RuntimeEvents.SafroleTicketsGenerated(items: newTickets, publicKey: secretKey.publicKey)
+        let newAddEvent = RuntimeEvents.SafroleTicketsGenerated(
+            epochIndex: newState.value.timeslot.timeslotToEpochIndex(config: config),
+            items: newTickets,
+            publicKey: secretKey.publicKey
+        )
         await eventBus.publish(newAddEvent)
         await storeMiddleware.wait()
 

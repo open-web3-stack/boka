@@ -64,7 +64,11 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "--validator --dev-seed 1"
+            argument = "--validator"
+            isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "--chain=minimal"
             isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>

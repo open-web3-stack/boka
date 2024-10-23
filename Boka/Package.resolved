@@ -1,13 +1,13 @@
 {
-  "originHash" : "cee187bf5c40292c311294a895cbf00f2bef24f9ce8e07d377d38db947218bc0",
+  "originHash" : "4c744cc14f723e954bb1925a42ca80b040439968821616ed067388fcd416689a",
   "pins" : [
     {
       "identity" : "async-channels",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/gh123man/Async-Channels.git",
       "state" : {
-        "revision" : "37d32cfc70f08b72a38a2c40f65338ee023afa45",
-        "version" : "1.0.1"
+        "revision" : "e4c71cd0364532d34b27e76f4ab7229abaaaefb4",
+        "version" : "1.0.2"
       }
     },
     {
@@ -80,6 +80,15 @@
       "state" : {
         "revision" : "f6919dfc309e7f1b56224378b11e28bab5bccc42",
         "version" : "1.2.0"
+      }
+    },
+    {
+      "identity" : "swift-argument-parser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-argument-parser.git",
+      "state" : {
+        "revision" : "41982a3656a71c768319979febd796c6fd111d5c",
+        "version" : "1.5.0"
       }
     },
     {
@@ -220,7 +229,7 @@
     {
       "identity" : "swift-numerics",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-numerics.git",
+      "location" : "https://github.com/apple/swift-numerics",
       "state" : {
         "branch" : "main",
         "revision" : "e30276bff2ff5ed80566fbdca49f50aa160b0e83"

@@ -250,6 +250,9 @@ private class ConnectionHandle {
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
             logger.trace("Shutdown complete")
+            if let connection {
+                connection.handler.shutdownComplete(connection)
+            }
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 // avoid closing twice
                 api.call { api in
