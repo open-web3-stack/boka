@@ -42,12 +42,18 @@ struct ChainHandler {
             }
             let state = try await source.getState(hash: data32)
             // return state root for now
-            return ["stateRoot": state?.stateRoot.description]
+            return [
+                "stateRoot": state?.stateRoot.description,
+                "blockHash": hash.description,
+            ]
         } else {
             // return best block state by default
             let block = try await source.getBestBlock()
             let state = try await source.getState(hash: block.hash)
-            return ["stateRoot": state?.stateRoot.description]
+            return [
+                "stateRoot": state?.stateRoot.description,
+                "blockHash": block.hash.description,
+            ]
         }
     }
 }
