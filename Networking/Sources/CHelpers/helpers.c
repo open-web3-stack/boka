@@ -7,6 +7,89 @@
 
 #include "helpers.h"
 
+int parse_certificate(
+	const unsigned char *data,
+	size_t length,
+	unsigned char **public_key,
+	size_t *public_key_len,
+	char **alt_name,
+	char **error_message)
+{
+	int ret = -1;
+	BIO *bio = NULL;
+	X509 *cert = NULL;
+	STACK_OF(GENERAL_NAME) *alt_names = NULL;
+
+	// Create BIO from certificate data
+	bio = BIO_new_mem_buf(data, (int)length);
+	if (!bio) {
+		*error_message = "Failed to create BIO.";
+		goto cleanup;
+	}
+
+	// Parse the X509 certificate from the BIO
+	cert = d2i_X509_bio(bio, NULL);
+	if (!cert) {
+		*error_message = "Failed to parse X509 certificate.";
+		goto cleanup;
+	}
+
+	// Extract the public key from the certificate
+	EVP_PKEY *pkey = X509_get_pubkey(cert);
+	if (!pkey) {
+		*error_message = "Failed to get public key from certificate.";
+		goto cleanup;
+	}
+
+	// Get the raw public key
+	if (EVP_PKEY_get_raw_public_key(pkey, NULL, public_key_len) <= 0) {
+		*error_message = "Failed to get public key length.";
+		goto cleanup;
+	}
+	*public_key = (unsigned char *)malloc(*public_key_len);
+	if (!*public_key) {
+		*error_message = "Failed to allocate memory for public key.";
+		goto cleanup;
+	}
+
+	if (EVP_PKEY_get_raw_public_key(pkey, *public_key, public_key_len) <= 0) {
+		*error_message = "Failed to extract public key.";
+		goto cleanup;
+	}
+
+	// Extract the alternative name from the certificate (if present)
+	alt_names = X509_get_ext_d2i(cert, NID_subject_alt_name, NULL, NULL);
+	if (alt_names) {
+		for (int i = 0; i < sk_GENERAL_NAME_num(alt_names); i++) {
+			GENERAL_NAME *gen_name = sk_GENERAL_NAME_value(alt_names, i);
+			if (gen_name->type == GEN_DNS) {
+				ASN1_STRING *name = gen_name->d.dNSName;
+				*alt_name = strdup((char *)ASN1_STRING_get0_data(name));
+				break;
+			}
+		}
+		sk_GENERAL_NAME_pop_free(alt_names, GENERAL_NAME_free);
+	}
+
+	if (!*alt_name) {
+		*error_message = "No alternative name found.";
+		goto cleanup;
+	}
+
+	ret = EXIT_SUCCESS; // Success
+
+cleanup:
+	if (ret != 0 && *public_key) {
+		free(*public_key);
+		*public_key = NULL;
+	}
+	BIO_free(bio);
+	EVP_PKEY_free(pkey);
+	X509_free(cert);
+
+	return ret;
+}
+
 // Function to parse certificate and extract public key and alternative name
 int parse_pkcs12_certificate(
     const unsigned char *data,

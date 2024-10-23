@@ -8,14 +8,14 @@ import Utils
 struct PKCS12Tests {
     @Test func invalidParseCertificate() async throws {
         #expect(throws: CryptoError.self) {
-            _ = try parseCertificate(data: Data("wrong cert data".utf8))
+            _ = try parseCertificate(data: Data("wrong cert data".utf8), type: .p12)
         }
     }
 
-    @Test func vailidParseCertificate() async throws {
+    @Test func vailidParseP12Certificate() async throws {
         let privateKey = try Ed25519.SecretKey(from: Data32())
         let cert = try generateSelfSignedCertificate(privateKey: privateKey)
-        let (publicKey, alternativeName) = try parseCertificate(data: cert)
+        let (publicKey, alternativeName) = try parseCertificate(data: cert, type: .p12)
         #expect(alternativeName == generateSubjectAlternativeName(publicKey: privateKey.publicKey))
         #expect(Data32(publicKey) == privateKey.publicKey.data)
     }
