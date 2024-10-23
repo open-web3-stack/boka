@@ -47,7 +47,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
     ) async throws
         -> BlockRef
     {
-        let parentHash = dataProvider.bestHead
+        let parentHash = await dataProvider.bestHead.hash
 
         logger.trace("creating new block for timeslot: \(timeslot) with parent hash: \(parentHash)")
 
@@ -175,7 +175,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
             tickets.value = []
             let timeslot = epoch.epochToTimeslotIndex(config: config)
 
-            let bestHead = dataProvider.bestHead
+            let bestHead = await dataProvider.bestHead.hash
             let state = try await dataProvider.getState(hash: bestHead)
 
             // simulate next block to determine the block authors for next epoch

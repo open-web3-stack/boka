@@ -4,6 +4,8 @@ public actor InMemoryDataProvider: Sendable {
     public private(set) var heads: Set<Data32>
     public private(set) var finalizedHead: Data32
 
+    private var hashByNumber: [UInt32: Set<Data32>] = [:]
+    private var numberByHash: [Data32: UInt32] = [:]
     private var blockByHash: [Data32: BlockRef] = [:]
     private var stateByBlockHash: [Data32: StateRef] = [:]
     private var hashByTimeslot: [TimeslotIndex: Set<Data32>] = [:]
@@ -30,6 +32,13 @@ extension InMemoryDataProvider: BlockchainDataProviderProtocol {
 
     public func isHead(hash: Data32) -> Bool {
         heads.contains(hash)
+    }
+
+    public func getBlockNumber(hash: Data32) async throws -> UInt32 {
+        guard let number = numberByHash[hash] else {
+            throw BlockchainDataProviderError.noData(hash: hash)
+        }
+        return number
     }
 
     public func getHeader(hash: Data32) throws -> HeaderRef {
@@ -65,6 +74,10 @@ extension InMemoryDataProvider: BlockchainDataProviderProtocol {
         hashByTimeslot[timeslot] ?? Set()
     }
 
+    public func getBlockHash(byNumber number: UInt32) -> Set<Data32> {
+        hashByNumber[number] ?? Set()
+    }
+
     public func add(state: StateRef) {
         stateByBlockHash[state.value.lastBlockHash] = state
         hashByTimeslot[state.value.timeslot, default: Set()].insert(state.value.lastBlockHash)
@@ -73,6 +86,11 @@ extension InMemoryDataProvider: BlockchainDataProviderProtocol {
     public func add(block: BlockRef) {
         blockByHash[block.hash] = block
         hashByTimeslot[block.header.timeslot, default: Set()].insert(block.hash)
+        if let number = numberByHash[block.header.parentHash] {
+            numberByHash[block.hash] = number + 1
+        } else {
+            numberByHash[block.hash] = 0
+        }
     }
 
     public func setFinalizedHead(hash: Data32) {
@@ -95,6 +113,12 @@ extension InMemoryDataProvider: BlockchainDataProviderProtocol {
 
         if let timeslot {
             hashByTimeslot[timeslot]?.remove(hash)
+        }
+
+        let number = numberByHash.removeValue(forKey: hash)
+
+        if let number {
+            hashByNumber[number]?.remove(hash)
         }
     }
 }

@@ -104,13 +104,13 @@ public final class ExtrinsicPoolService: ServiceBase, @unchecked Sendable {
         // Safrole VRF commitments only changes every epoch
         // and we should never receive tickets at very beginning and very end of an epoch
         // so it is safe to use best head state without worrying about forks or edge cases
-        let state = try await dataProvider.getState(hash: dataProvider.bestHead)
+        let state = try await dataProvider.getBestState()
         try await storage.update(state: state, config: config)
         await storage.add(tickets: tickets.items)
     }
 
     private func on(safroleTicketsReceived tickets: RuntimeEvents.SafroleTicketsReceived) async throws {
-        let state = try await dataProvider.getState(hash: dataProvider.bestHead)
+        let state = try await dataProvider.getBestState()
 
         try await storage.update(state: state, config: config)
         await storage.add(tickets: tickets.items, config: config)

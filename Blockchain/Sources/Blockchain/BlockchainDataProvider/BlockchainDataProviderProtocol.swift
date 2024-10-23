@@ -2,12 +2,15 @@ import Utils
 
 public enum BlockchainDataProviderError: Error, Equatable {
     case noData(hash: Data32)
+    case uncanonical(hash: Data32)
 }
 
 public protocol BlockchainDataProviderProtocol: Sendable {
     func hasBlock(hash: Data32) async throws -> Bool
     func hasState(hash: Data32) async throws -> Bool
     func isHead(hash: Data32) async throws -> Bool
+
+    func getBlockNumber(hash: Data32) async throws -> UInt32
 
     /// throw BlockchainDataProviderError.noData if not found
     func getHeader(hash: Data32) async throws -> HeaderRef
@@ -24,6 +27,8 @@ public protocol BlockchainDataProviderProtocol: Sendable {
 
     /// return empty set if not found
     func getBlockHash(byTimeslot timeslot: TimeslotIndex) async throws -> Set<Data32>
+    /// return empty set if not found
+    func getBlockHash(byNumber number: UInt32) async throws -> Set<Data32>
 
     func add(block: BlockRef) async throws
     func add(state: StateRef) async throws
