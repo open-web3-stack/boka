@@ -267,17 +267,18 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
     }
 
     // TODO: implement a peer and test this
-    func shouldOpen(_: QuicConnection, certificate: Data?) -> QuicStatus {
+    func shouldOpen(_ connection: QuicConnection, certificate: Data?) -> QuicStatus {
         // TODO: enable certificate validation logic once parsing logic is fixed
         guard let certificate else {
             return .code(.requiredCert)
         }
         do {
             let (publicKey, alternativeName) = try parseCertificate(data: certificate, type: .x509)
-            logger.debug(
-                "Certificate parsed",
-                metadata: ["publicKey": "\(publicKey.toHexString())", "alternativeName": "\(alternativeName)"]
-            )
+            logger.trace("Certificate parsed", metadata: [
+                "connectionId": "\(connection.id)",
+                "publicKey": "\(publicKey.toHexString())",
+                "alternativeName": "\(alternativeName)",
+            ])
             if alternativeName != generateSubjectAlternativeName(pubkey: publicKey) {
                 return .code(.badCert)
             }
@@ -285,7 +286,9 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 // TODO: verify if it is current or next validator
             }
         } catch {
-            logger.error("Failed to parse certificate", metadata: ["error": "\(error)"])
+            logger.warning("Failed to parse certificate", metadata: [
+                "connectionId": "\(connection.id)",
+                "error": "\(error)"])
             return .code(.badCert)
         }
         return .code(.success)
