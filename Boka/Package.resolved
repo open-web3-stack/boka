@@ -1,5 +1,5 @@
 {
-  "originHash" : "cee187bf5c40292c311294a895cbf00f2bef24f9ce8e07d377d38db947218bc0",
+  "originHash" : "60a8204ece9450dc69d2c41c6386c74b8d08e6a44261244fb5adeadc19c30e03",
   "pins" : [
     {
       "identity" : "async-channels",
@@ -80,6 +80,15 @@
       "state" : {
         "revision" : "f6919dfc309e7f1b56224378b11e28bab5bccc42",
         "version" : "1.2.0"
+      }
+    },
+    {
+      "identity" : "swift-argument-parser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-argument-parser",
+      "state" : {
+        "revision" : "41982a3656a71c768319979febd796c6fd111d5c",
+        "version" : "1.5.0"
       }
     },
     {
@@ -220,7 +229,7 @@
     {
       "identity" : "swift-numerics",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-numerics.git",
+      "location" : "https://github.com/apple/swift-numerics",
       "state" : {
         "branch" : "main",
         "revision" : "e30276bff2ff5ed80566fbdca49f50aa160b0e83"

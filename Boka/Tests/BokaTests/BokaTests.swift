@@ -1,5 +1,4 @@
 import Blockchain
-import ConsoleKit
 import Foundation
 import Node
 import Testing
@@ -13,27 +12,12 @@ enum ResourceLoader {
     }
 }
 
-final class BokaTests {
-    var console: Terminal
-    var boka: Boka
-    init() {
-        console = Terminal()
-        boka = Boka()
-    }
-
-    @Test func missCommand() async throws {
-        let sepc = ResourceLoader.loadResource(named: "devnet_allconfig_spec.json")!.path()
-        let input = CommandInput(arguments: ["Boka", "-m", sepc])
-        await #expect(throws: Error.self) {
-            try await console.run(boka, input: input)
-        }
-    }
-
+struct BokaTests {
     @Test func commandWithWrongFilePath() async throws {
         let sepc = "/path/to/wrong/file.json"
-        let input = CommandInput(arguments: ["Boka", "--config-file", sepc])
-        await #expect(throws: Error.self) {
-            try await console.run(boka, input: input)
+        var boka = try Boka.parseAsRoot(["--chain", sepc]) as! Boka
+        await #expect(throws: GenesisError.self) {
+            try await boka.run()
         }
     }
 

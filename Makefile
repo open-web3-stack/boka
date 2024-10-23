@@ -74,7 +74,11 @@ format-all: format format-cargo
 .PHONY: format-clang
 format-clang:
 	find . \( -name "*.c" -o -name "helpers.h" \) -exec clang-format -i {} +
-	
+
 .PHONY: run
 run: githooks
-	swift run --package-path Boka
+	swift run --package-path Boka Boka --validator
+
+.PHONY: devnet
+devnet:
+	./scripts/devnet.sh
