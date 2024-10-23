@@ -65,7 +65,12 @@ public final class Network: Sendable {
         try peer.connect(to: to, mode: mode)
     }
 
-    public func broadcast(kind: UniquePresistentStreamKind, message: any MessageProtocol) {
+    public func send(to: NetAddr, message: CERequest) async throws -> Data {
+        let conn = try peer.connect(to: to, mode: .builder)
+        return try await conn.request(message)
+    }
+
+    public func broadcast(kind: UniquePresistentStreamKind, message: UPMessage) {
         peer.broadcast(kind: kind, message: message)
     }
 

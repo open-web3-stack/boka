@@ -51,6 +51,7 @@ public class Node {
         network = try NetworkManager(
             config: config.network,
             blockchain: blockchain,
+            eventBus: eventBus,
             devPeers: Set(config.peers)
         )
 

@@ -27,7 +27,7 @@ enum MaybeEnabled<T: ExpressibleByArgument>: ExpressibleByArgument {
     case disabled
 
     init?(argument: String) {
-        if argument.lowercased() == "false" {
+        if argument.lowercased() == "no" {
             self = .disabled
         } else {
             guard let argument = T(argument: argument) else {
@@ -60,7 +60,7 @@ struct Boka: AsyncParsableCommand {
     @Option(name: .long, help: "A preset config or path to chain config file.")
     var chain: Genesis = .preset(.dev)
 
-    @Option(name: .long, help: "Listen address for RPC server. Pass 'false' to disable RPC server. Default to 127.0.0.1:9955.")
+    @Option(name: .long, help: "Listen address for RPC server. Pass 'no' to disable RPC server. Default to 127.0.0.1:9955.")
     var rpc: MaybeEnabled<NetAddr> = .enabled(NetAddr(address: "127.0.0.1:9955")!)
 
     @Option(name: .long, help: "Listen address for P2P protocol.")
@@ -118,7 +118,7 @@ struct Boka: AsyncParsableCommand {
             return RPCConfig(listenAddress: address, port: Int(port))
         }
 
-        let keystore = try await DevKeyStore()
+        let keystore = try await DevKeyStore(devKeysCount: devSeed == nil ? 12 : 0)
 
         let networkKey: Ed25519.SecretKey = try await {
             if let devSeed {

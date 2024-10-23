@@ -132,7 +132,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
         }
     }
 
-    public func broadcast(kind: Handler.PresistentHandler.StreamKind, message: any MessageProtocol) {
+    public func broadcast(kind: Handler.PresistentHandler.StreamKind, message: Handler.PresistentHandler.Message) {
         let connections = impl.connections.read { connections in
             connections.byId.values
         }
