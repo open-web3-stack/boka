@@ -22,7 +22,6 @@ struct BlockchainDataProviderTests {
     @Test func testInitialization() async throws {
         #expect(await provider.bestHead.hash == genesisBlock.hash)
         #expect(await provider.finalizedHead.hash == genesisBlock.hash)
-        #expect(try await provider.getFinalizedHead() == genesisBlock.hash)
         #expect(try await provider.getHeads() == [genesisBlock.hash])
     }
 

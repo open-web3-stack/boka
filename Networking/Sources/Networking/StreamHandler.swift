@@ -23,7 +23,7 @@ public protocol PresistentStreamHandler: Sendable {
     associatedtype Message: MessageProtocol
 
     func createDecoder(kind: StreamKind) -> any MessageDecoder<Message>
-    func streamOpened(connection: any ConnectionInfoProtocol, stream: any StreamProtocol, kind: StreamKind) async throws
+    func streamOpened(connection: any ConnectionInfoProtocol, stream: any StreamProtocol<Message>, kind: StreamKind) async throws
     func handle(connection: any ConnectionInfoProtocol, message: Message) async throws
 }
 

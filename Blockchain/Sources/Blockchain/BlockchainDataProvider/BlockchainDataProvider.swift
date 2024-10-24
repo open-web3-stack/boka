@@ -81,10 +81,6 @@ extension BlockchainDataProvider {
         try await dataProvider.getState(hash: hash)
     }
 
-    public func getFinalizedHead() async throws -> Data32 {
-        try await dataProvider.getFinalizedHead()
-    }
-
     public func getHeads() async throws -> Set<Data32> {
         try await dataProvider.getHeads()
     }

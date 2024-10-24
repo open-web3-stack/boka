@@ -8,14 +8,14 @@ private let logger = Logger(label: "Connection")
 
 public protocol ConnectionInfoProtocol {
     var id: UniqueId { get }
-    var mode: PeerMode { get }
+    var role: PeerRole { get }
     var remoteAddress: NetAddr { get }
 }
 
 public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoProtocol {
     let connection: QuicConnection
     let impl: PeerImpl<Handler>
-    public let mode: PeerMode
+    public let role: PeerRole
     public let remoteAddress: NetAddr
     let presistentStreams: ThreadSafeContainer<
         [Handler.PresistentHandler.StreamKind: Stream<Handler>]
@@ -26,10 +26,10 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         connection.id
     }
 
-    init(_ connection: QuicConnection, impl: PeerImpl<Handler>, mode: PeerMode, remoteAddress: NetAddr, initiatedByLocal: Bool) {
+    init(_ connection: QuicConnection, impl: PeerImpl<Handler>, role: PeerRole, remoteAddress: NetAddr, initiatedByLocal: Bool) {
         self.connection = connection
         self.impl = impl
-        self.mode = mode
+        self.role = role
         self.remoteAddress = remoteAddress
         self.initiatedByLocal = initiatedByLocal
     }
@@ -42,7 +42,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         let data = try request.encode()
         let kind = request.kind
         let stream = try createStream(kind: kind)
-        try stream.send(data: data)
+        try stream.send(message: data)
         // TODO: pipe this to decoder directly to be able to reject early
         var response = Data()
         while let nextData = await stream.receive() {
@@ -144,7 +144,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                 }
                 let request = try decoder.decode(data: data)
                 let resp = try await impl.ephemeralStreamHandler.handle(connection: self, request: request)
-                try stream.send(data: resp, finish: true)
+                try stream.send(message: resp, finish: true)
             }
         }
     }
@@ -186,7 +186,7 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
                 guard let lengthData else {
                     break
                 }
-                let length = UInt32(littleEndian: lengthData.withUnsafeBytes { $0.load(as: UInt32.self) })
+                let length = UInt32(littleEndian: lengthData.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) })
                 // sanity check for length
                 // TODO: pick better value
                 guard length < 1024 * 1024 * 10 else {
