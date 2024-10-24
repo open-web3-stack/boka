@@ -37,3 +37,17 @@ extension StateRef: Codable {
         try value.encode(to: encoder)
     }
 }
+
+extension StateRef {
+    public static func dummy(config: ProtocolConfigRef, block: BlockRef) -> StateRef {
+        dummy(config: config).mutate {
+            $0.recentHistory.items.safeAppend(RecentHistory.HistoryItem(
+                headerHash: block.hash,
+                mmr: MMR([]),
+                stateRoot: Data32(),
+                workReportHashes: try! ConfigLimitedSizeArray(config: config)
+            ))
+            $0.timeslot = block.header.timeslot + 1
+        }
+    }
+}

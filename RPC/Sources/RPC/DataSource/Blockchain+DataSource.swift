@@ -3,7 +3,7 @@ import Utils
 
 extension Blockchain: DataSource {
     public func getBestBlock() async throws -> BlockRef {
-        try await dataProvider.getBlock(hash: dataProvider.bestHead)
+        try await dataProvider.getBlock(hash: dataProvider.bestHead.hash)
     }
 
     public func getBlock(hash: Data32) async throws -> BlockRef? {
