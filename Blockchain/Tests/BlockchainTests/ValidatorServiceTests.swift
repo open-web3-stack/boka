@@ -7,7 +7,7 @@ import Utils
 
 struct ValidatorServiceTests {
     func setup(time: TimeInterval = 988) async throws -> (BlockchainServices, ValidatorService) {
-        setupTestLogger()
+        // setupTestLogger()
 
         let services = await BlockchainServices(
             timeProvider: MockTimeProvider(time: time)
@@ -79,7 +79,7 @@ struct ValidatorServiceTests {
         #expect(await keystore.contains(publicKey: publicKey))
 
         // Check the blockchain head is updated
-        #expect(dataProvider.bestHead == block.hash)
+        #expect(await dataProvider.bestHead.hash == block.hash)
 
         // Check block is stored in database
         #expect(try await dataProvider.hasBlock(hash: block.hash))

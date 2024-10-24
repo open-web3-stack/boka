@@ -3,61 +3,55 @@ import Utils
 
 private let logger = Logger(label: "BlockchainDataProvider")
 
-private struct BlockchainStorage: Sendable {
-    var bestHead: Data32
-    var bestHeadTimeslot: TimeslotIndex
-    var finalizedHead: Data32
+public struct HeadInfo: Sendable {
+    public var hash: Data32
+    public var timeslot: TimeslotIndex
+    public var number: UInt32
 }
 
-public final class BlockchainDataProvider: Sendable {
-    private let storage: ThreadSafeContainer<BlockchainStorage>
+public actor BlockchainDataProvider: Sendable {
+    public private(set) var bestHead: HeadInfo
+    public private(set) var finalizedHead: HeadInfo
     private let dataProvider: BlockchainDataProviderProtocol
 
     public init(_ dataProvider: BlockchainDataProviderProtocol) async throws {
         let heads = try await dataProvider.getHeads()
-        var bestHead: (HeaderRef, Data32)?
+        var bestHead = HeadInfo(hash: dataProvider.genesisBlockHash, timeslot: 0, number: 0)
         for head in heads {
             let header = try await dataProvider.getHeader(hash: head)
-            if bestHead == nil || header.value.timeslot > bestHead!.0.value.timeslot {
-                bestHead = (header, head)
+            if header.value.timeslot > bestHead.timeslot {
+                let number = try await dataProvider.getBlockNumber(hash: head)
+                bestHead = HeadInfo(hash: head, timeslot: header.value.timeslot, number: number)
             }
         }
-        let finalizedHead = try await dataProvider.getFinalizedHead()
 
-        storage = ThreadSafeContainer(.init(
-            bestHead: bestHead?.1 ?? dataProvider.genesisBlockHash,
-            bestHeadTimeslot: bestHead?.0.value.timeslot ?? 0,
-            finalizedHead: finalizedHead
-        ))
+        self.bestHead = bestHead
+
+        let finalizedHeadHash = try await dataProvider.getFinalizedHead()
+
+        finalizedHead = try await HeadInfo(
+            hash: finalizedHeadHash,
+            timeslot: dataProvider.getHeader(hash: finalizedHeadHash).value.timeslot,
+            number: dataProvider.getBlockNumber(hash: finalizedHeadHash)
+        )
 
         self.dataProvider = dataProvider
-    }
-
-    public var bestHead: Data32 {
-        storage.value.bestHead
-    }
-
-    public var finalizedHead: Data32 {
-        storage.value.finalizedHead
     }
 
     public func blockImported(block: BlockRef, state: StateRef) async throws {
         try await add(block: block)
         try await add(state: state)
-        try await updateHead(hash: block.hash, parent: block.header.parentHash)
+        try await dataProvider.updateHead(hash: block.hash, parent: block.header.parentHash)
 
-        if block.header.timeslot > storage.value.bestHeadTimeslot {
-            storage.write { storage in
-                storage.bestHead = block.hash
-                storage.bestHeadTimeslot = block.header.timeslot
-            }
+        if block.header.timeslot > bestHead.timeslot {
+            let number = try await dataProvider.getBlockNumber(hash: block.hash)
+            bestHead = HeadInfo(hash: block.hash, timeslot: block.header.timeslot, number: number)
         }
 
         logger.debug("block imported: \(block.hash)")
     }
 }
 
-// expose BlockchainDataProviderProtocol
 extension BlockchainDataProvider {
     public func hasBlock(hash: Data32) async throws -> Bool {
         try await dataProvider.hasBlock(hash: hash)
@@ -69,6 +63,10 @@ extension BlockchainDataProvider {
 
     public func isHead(hash: Data32) async throws -> Bool {
         try await dataProvider.isHead(hash: hash)
+    }
+
+    public func getBlockNumber(hash: Data32) async throws -> UInt32 {
+        try await dataProvider.getBlockNumber(hash: hash)
     }
 
     public func getHeader(hash: Data32) async throws -> HeaderRef {
@@ -95,31 +93,56 @@ extension BlockchainDataProvider {
         try await dataProvider.getBlockHash(byTimeslot: timeslot)
     }
 
+    public func getBlockHash(byNumber number: UInt32) async throws -> Set<Data32> {
+        try await dataProvider.getBlockHash(byNumber: number)
+    }
+
+    // add forks of finalized head is not allowed
     public func add(block: BlockRef) async throws {
         logger.debug("adding block: \(block.hash)")
+
+        // require parent exists (i.e. not purged) and block is not fork of any finalized block
+        guard try await hasBlock(hash: block.header.parentHash), block.header.timeslot > finalizedHead.timeslot else {
+            throw BlockchainDataProviderError.uncanonical(hash: block.hash)
+        }
 
         try await dataProvider.add(block: block)
     }
 
+    /// only allow to add state if the corresponding block is added
     public func add(state: StateRef) async throws {
         logger.debug("adding state: \(state.value.lastBlockHash)")
+
+        // if block exists, that means it passed the canonicalization check
+        guard try await hasBlock(hash: state.value.lastBlockHash) else {
+            throw BlockchainDataProviderError.noData(hash: state.value.lastBlockHash)
+        }
 
         try await dataProvider.add(state: state)
     }
 
+    /// Also purge fork of all finalized blocks
     public func setFinalizedHead(hash: Data32) async throws {
         logger.debug("setting finalized head: \(hash)")
 
-        try await dataProvider.setFinalizedHead(hash: hash)
-        storage.write { storage in
-            storage.finalizedHead = hash
+        let oldFinalizedHead = finalizedHead
+        let number = try await dataProvider.getBlockNumber(hash: hash)
+
+        var hashToCheck = hash
+        var hashToCheckNumber = number
+        while hashToCheck != oldFinalizedHead.hash {
+            let hashes = try await dataProvider.getBlockHash(byNumber: hashToCheckNumber)
+            for hash in hashes where hash != hashToCheck {
+                logger.trace("purge block: \(hash)")
+                try await dataProvider.remove(hash: hash)
+            }
+            hashToCheck = try await dataProvider.getHeader(hash: hashToCheck).value.parentHash
+            hashToCheckNumber -= 1
         }
-    }
 
-    public func updateHead(hash: Data32, parent: Data32) async throws {
-        logger.debug("updating head: \(hash) with parent: \(parent)")
-
-        try await dataProvider.updateHead(hash: hash, parent: parent)
+        let header = try await dataProvider.getHeader(hash: hash)
+        finalizedHead = HeadInfo(hash: hash, timeslot: header.value.timeslot, number: number)
+        try await dataProvider.setFinalizedHead(hash: hash)
     }
 
     public func remove(hash: Data32) async throws {
@@ -130,5 +153,9 @@ extension BlockchainDataProvider {
 
     public var genesisBlockHash: Data32 {
         dataProvider.genesisBlockHash
+    }
+
+    public func getBestState() async throws -> StateRef {
+        try await dataProvider.getState(hash: bestHead.hash)
     }
 }

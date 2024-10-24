@@ -48,7 +48,7 @@ public class Node {
 
         self.keystore = keystore
 
-        network = try NetworkManager(
+        network = try await NetworkManager(
             config: config.network,
             blockchain: blockchain,
             eventBus: eventBus,
