@@ -77,6 +77,7 @@ final class MockScheduler: Scheduler, Sendable {
     func advance(by interval: TimeInterval) async {
         let to = timeProvider.getTimeInterval() + interval
         while await advanceNext(to: to) {}
+        mockTimeProvider.advance(to: to)
     }
 
     func advanceNext(to time: TimeInterval) async -> Bool {
