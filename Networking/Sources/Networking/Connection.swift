@@ -47,6 +47,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         var response = Data()
         while let nextData = await stream.receive() {
             response.append(nextData)
+            break
         }
         return response
     }
