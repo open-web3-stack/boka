@@ -18,7 +18,7 @@ public final class NodeDataSource: DataSource {
     }
 
     public func getBestBlock() async throws -> BlockRef {
-        try await chainDataProvider.getBlock(hash: chainDataProvider.bestHead)
+        try await chainDataProvider.getBlock(hash: chainDataProvider.bestHead.hash)
     }
 
     public func getBlock(hash: Data32) async throws -> BlockRef? {
