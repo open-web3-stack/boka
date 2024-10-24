@@ -10,14 +10,14 @@ public enum StreamType: Sendable {
     case commonEphemeral
 }
 
-public enum PeerMode: Sendable, Hashable {
+public enum PeerRole: Sendable, Hashable {
     case validator
     case builder
     // case proxy // not yet specified
 }
 
 public struct PeerOptions<Handler: StreamHandler>: Sendable {
-    public var mode: PeerMode
+    public var role: PeerRole
     public var listenAddress: NetAddr
     public var genesisHeader: Data32
     public var secretKey: Ed25519.SecretKey
@@ -28,7 +28,7 @@ public struct PeerOptions<Handler: StreamHandler>: Sendable {
     public var peerSettings: PeerSettings
 
     public init(
-        mode: PeerMode,
+        role: PeerRole,
         listenAddress: NetAddr,
         genesisHeader: Data32,
         secretKey: Ed25519.SecretKey,
@@ -38,7 +38,7 @@ public struct PeerOptions<Handler: StreamHandler>: Sendable {
         clientSettings: QuicSettings = .defaultSettings,
         peerSettings: PeerSettings = .defaultSettings
     ) {
-        self.mode = mode
+        self.role = role
         self.listenAddress = listenAddress
         self.genesisHeader = genesisHeader
         self.secretKey = secretKey
@@ -64,8 +64,8 @@ public final class Peer<Handler: StreamHandler>: Sendable {
         let logger = Logger(label: "Peer".uniqueId)
 
         let alpns = [
-            PeerMode.validator: Alpn(genesisHeader: options.genesisHeader, builder: false).data,
-            PeerMode.builder: Alpn(genesisHeader: options.genesisHeader, builder: true).data,
+            PeerRole.validator: Alpn(genesisHeader: options.genesisHeader, builder: false).data,
+            PeerRole.builder: Alpn(genesisHeader: options.genesisHeader, builder: true).data,
         ]
         let allAlpns = Array(alpns.values)
 
@@ -76,14 +76,14 @@ public final class Peer<Handler: StreamHandler>: Sendable {
             registration: registration, pkcs12: pkcs12, alpns: allAlpns, client: false, settings: options.serverSettings
         )
 
-        let clientAlpn = alpns[options.mode]!
+        let clientAlpn = alpns[options.role]!
         let clientConfiguration = try QuicConfiguration(
             registration: registration, pkcs12: pkcs12, alpns: [clientAlpn], client: true, settings: options.clientSettings
         )
 
         impl = PeerImpl(
             logger: logger,
-            mode: options.mode,
+            role: options.role,
             settings: options.peerSettings,
             alpns: alpns,
             clientConfiguration: clientConfiguration,
@@ -104,12 +104,13 @@ public final class Peer<Handler: StreamHandler>: Sendable {
         try listener.listenAddress()
     }
 
-    public func connect(to address: NetAddr, mode: PeerMode) throws -> Connection<Handler> {
+    // TODO: see if we can remove the role parameter
+    public func connect(to address: NetAddr, role: PeerRole) throws -> Connection<Handler> {
         let conn = impl.connections.read { connections in
-            connections.byType[mode]?[address]
+            connections.byType[role]?[address]
         }
         return try conn ?? impl.connections.write { connections in
-            let curr = connections.byType[mode, default: [:]][address]
+            let curr = connections.byType[role, default: [:]][address]
             if let curr {
                 return curr
             }
@@ -122,11 +123,11 @@ public final class Peer<Handler: StreamHandler>: Sendable {
             let conn = Connection(
                 quicConn,
                 impl: self.impl,
-                mode: mode,
+                role: role,
                 remoteAddress: address,
                 initiatedByLocal: true
             )
-            connections.byType[mode, default: [:]][address] = conn
+            connections.byType[role, default: [:]][address] = conn
             connections.byId[conn.id] = conn
             return conn
         }
@@ -166,15 +167,15 @@ public final class Peer<Handler: StreamHandler>: Sendable {
 
 final class PeerImpl<Handler: StreamHandler>: Sendable {
     struct ConnectionStorage {
-        var byType: [PeerMode: [NetAddr: Connection<Handler>]] = [:]
+        var byType: [PeerRole: [NetAddr: Connection<Handler>]] = [:]
         var byId: [UniqueId: Connection<Handler>] = [:]
     }
 
     fileprivate let logger: Logger
-    fileprivate let mode: PeerMode
+    fileprivate let role: PeerRole
     fileprivate let settings: PeerSettings
-    fileprivate let alpns: [PeerMode: Data]
-    fileprivate let alpnLookup: [Data: PeerMode]
+    fileprivate let alpns: [PeerRole: Data]
+    fileprivate let alpnLookup: [Data: PeerRole]
 
     fileprivate let clientConfiguration: QuicConfiguration
 
@@ -186,50 +187,50 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
 
     fileprivate init(
         logger: Logger,
-        mode: PeerMode,
+        role: PeerRole,
         settings: PeerSettings,
-        alpns: [PeerMode: Data],
+        alpns: [PeerRole: Data],
         clientConfiguration: QuicConfiguration,
         presistentStreamHandler: Handler.PresistentHandler,
         ephemeralStreamHandler: Handler.EphemeralHandler
     ) {
         self.logger = logger
-        self.mode = mode
+        self.role = role
         self.settings = settings
         self.alpns = alpns
         self.clientConfiguration = clientConfiguration
         self.presistentStreamHandler = presistentStreamHandler
         self.ephemeralStreamHandler = ephemeralStreamHandler
 
-        var alpnLookup = [Data: PeerMode]()
-        for (mode, alpn) in alpns {
-            alpnLookup[alpn] = mode
+        var alpnLookup = [Data: PeerRole]()
+        for (role, alpn) in alpns {
+            alpnLookup[alpn] = role
         }
         self.alpnLookup = alpnLookup
     }
 
-    func addConnection(_ connection: QuicConnection, addr: NetAddr, mode: PeerMode) -> Bool {
+    func addConnection(_ connection: QuicConnection, addr: NetAddr, role: PeerRole) -> Bool {
         connections.write { connections in
-            if mode == .builder {
-                let currentCount = connections.byType[mode]?.count ?? 0
+            if role == .builder {
+                let currentCount = connections.byType[role]?.count ?? 0
                 if currentCount >= self.settings.maxBuilderConnections {
                     self.logger.warning("max builder connections reached")
                     // TODO: consider connection rotation strategy
                     return false
                 }
             }
-            if connections.byType[mode, default: [:]][addr] != nil {
+            if connections.byType[role, default: [:]][addr] != nil {
                 self.logger.warning("connection already exists")
                 return false
             }
             let conn = Connection(
                 connection,
                 impl: self,
-                mode: mode,
+                role: role,
                 remoteAddress: addr,
                 initiatedByLocal: false
             )
-            connections.byType[mode, default: [:]][addr] = conn
+            connections.byType[role, default: [:]][addr] = conn
             connections.byId[connection.id] = conn
             return true
         }
@@ -258,22 +259,20 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
 
     func newConnection(_: QuicListener, connection: QuicConnection, info: ConnectionInfo) -> QuicStatus {
         let addr = info.remoteAddress
-        let mode = impl.alpnLookup[info.negotiatedAlpn]
-        guard let mode else {
+        let role = impl.alpnLookup[info.negotiatedAlpn]
+        guard let role else {
             logger.warning("unknown alpn: \(String(data: info.negotiatedAlpn, encoding: .utf8) ?? info.negotiatedAlpn.toDebugHexString())")
             return .code(.alpnNegFailure)
         }
-        logger.debug("new connection: \(addr) mode: \(mode)")
-        if impl.addConnection(connection, addr: addr, mode: mode) {
+        logger.debug("new connection: \(addr) role: \(role)")
+        if impl.addConnection(connection, addr: addr, role: role) {
             return .code(.success)
         } else {
             return .code(.connectionRefused)
         }
     }
 
-    // TODO: implement a peer and test this
     func shouldOpen(_ connection: QuicConnection, certificate: Data?) -> QuicStatus {
-        // TODO: enable certificate validation logic once parsing logic is fixed
         guard let certificate else {
             return .code(.requiredCert)
         }
@@ -287,7 +286,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             if alternativeName != generateSubjectAlternativeName(pubkey: publicKey) {
                 return .code(.badCert)
             }
-            if impl.mode == PeerMode.validator {
+            if impl.role == PeerRole.validator {
                 // TODO: verify if it is current or next validator
             }
         } catch {
@@ -329,7 +328,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         impl.connections.write { connections in
             if let conn = connections.byId[connection.id] {
                 connections.byId.removeValue(forKey: connection.id)
-                connections.byType[conn.mode]?.removeValue(forKey: conn.remoteAddress)
+                connections.byType[conn.role]?.removeValue(forKey: conn.remoteAddress)
             }
         }
     }
@@ -367,79 +366,6 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             }
         } else {
             logger.warning("Stream closed but stream is gone?", metadata: ["streamId": "\(quicStream.id)"])
-        }
-    }
-}
-
-public final class MockPeerEventHandler: QuicEventHandler {
-    public enum EventType {
-        case newConnection(listener: QuicListener, connection: QuicConnection, info: ConnectionInfo)
-        case shouldOpen(connection: QuicConnection, certificate: Data?)
-        case connected(connection: QuicConnection)
-        case shutdownInitiated(connection: QuicConnection, reason: ConnectionCloseReason)
-        case streamStarted(connection: QuicConnection, stream: QuicStream)
-        case dataReceived(stream: QuicStream, data: Data)
-        case closed(stream: QuicStream, status: QuicStatus, code: QuicErrorCode)
-    }
-
-    public let events: ThreadSafeContainer<[EventType]> = .init([])
-
-    public init() {}
-
-    public func newConnection(
-        _ listener: QuicListener, connection: QuicConnection, info: ConnectionInfo
-    ) -> QuicStatus {
-        events.write { events in
-            events.append(.newConnection(listener: listener, connection: connection, info: info))
-        }
-
-        return .code(.success)
-    }
-
-    public func shouldOpen(_: QuicConnection, certificate: Data?) -> QuicStatus {
-        guard let certificate else {
-            return .code(.requiredCert)
-        }
-        do {
-            let (publicKey, alternativeName) = try parseCertificate(data: certificate, type: .x509)
-            if alternativeName != generateSubjectAlternativeName(pubkey: publicKey) {
-                return .code(.badCert)
-            }
-        } catch {
-            return .code(.badCert)
-        }
-        return .code(.success)
-    }
-
-    public func connected(_ connection: QuicConnection) {
-        events.write { events in
-            events.append(.connected(connection: connection))
-        }
-    }
-
-    public func shutdownInitiated(_ connection: QuicConnection, reason: ConnectionCloseReason) {
-        print("shutdownInitiated \(connection.id) with reason \(reason)")
-        events.write { events in
-            events.append(.shutdownInitiated(connection: connection, reason: reason))
-        }
-    }
-
-    public func streamStarted(_ connect: QuicConnection, stream: QuicStream) {
-        events.write { events in
-            events.append(.streamStarted(connection: connect, stream: stream))
-        }
-    }
-
-    public func dataReceived(_ stream: QuicStream, data: Data) {
-        events.write { events in
-            events.append(.dataReceived(stream: stream, data: data))
-        }
-    }
-
-    public func closed(_ stream: QuicStream, status: QuicStatus, code: QuicErrorCode) {
-        print("closed stream \(stream.id) with status \(status) and code \(code)")
-        events.write { events in
-            events.append(.closed(stream: stream, status: status, code: code))
         }
     }
 }

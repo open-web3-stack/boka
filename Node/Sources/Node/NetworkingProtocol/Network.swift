@@ -7,23 +7,29 @@ import Utils
 
 public protocol NetworkProtocolHandler: Sendable {
     func handle(ceRequest: CERequest) async throws -> (any Encodable)?
-    func handle(upMessage: UPMessage) async throws
+    func handle(connection: some ConnectionInfoProtocol, upMessage: UPMessage) async throws
+
+    func handle(
+        connection: some ConnectionInfoProtocol,
+        stream: some StreamProtocol<UPMessage>,
+        kind: UniquePresistentStreamKind
+    ) async throws
 }
 
 public final class Network: Sendable {
     public struct Config {
-        public var mode: PeerMode
+        public var role: PeerRole
         public var listenAddress: NetAddr
         public var key: Ed25519.SecretKey
         public var peerSettings: PeerSettings
 
         public init(
-            mode: PeerMode,
+            role: PeerRole,
             listenAddress: NetAddr,
             key: Ed25519.SecretKey,
             peerSettings: PeerSettings = .defaultSettings
         ) {
-            self.mode = mode
+            self.role = role
             self.listenAddress = listenAddress
             self.key = key
             self.peerSettings = peerSettings
@@ -48,7 +54,7 @@ public final class Network: Sendable {
         )
 
         let option = PeerOptions<HandlerDef>(
-            mode: config.mode,
+            role: config.role,
             listenAddress: config.listenAddress,
             genesisHeader: genesisHeader,
             secretKey: config.key,
@@ -61,12 +67,12 @@ public final class Network: Sendable {
         peer = try Peer(options: option)
     }
 
-    public func connect(to: NetAddr, mode: PeerMode) throws -> some ConnectionInfoProtocol {
-        try peer.connect(to: to, mode: mode)
+    public func connect(to: NetAddr, role: PeerRole) throws -> some ConnectionInfoProtocol {
+        try peer.connect(to: to, role: role)
     }
 
     public func send(to: NetAddr, message: CERequest) async throws -> Data {
-        let conn = try peer.connect(to: to, mode: .builder)
+        let conn = try peer.connect(to: to, role: .builder)
         return try await conn.request(message)
     }
 
@@ -107,17 +113,20 @@ struct PresistentStreamHandlerImpl: PresistentStreamHandler {
     fileprivate let impl: NetworkImpl
 
     func createDecoder(kind: StreamKind) -> any MessageDecoder<Message> {
-        UPMessageDecoder(config: impl.config, kind: kind)
+        switch kind {
+        case .blockAnnouncement:
+            BlockAnnouncementDecoder(config: impl.config, kind: kind)
+        }
     }
 
-    func streamOpened(connection _: any ConnectionInfoProtocol, stream _: any StreamProtocol, kind _: StreamKind) throws {
-        // TODO: send handshake
+    func streamOpened(connection: any ConnectionInfoProtocol, stream: any StreamProtocol<Message>, kind: StreamKind) async throws {
+        try await impl.handler.handle(connection: connection, stream: stream, kind: kind)
     }
 
     func handle(connection: any ConnectionInfoProtocol, message: Message) async throws {
         impl.logger.trace("handling message: \(message) from \(connection.id)")
 
-        try await impl.handler.handle(upMessage: message)
+        try await impl.handler.handle(connection: connection, upMessage: message)
     }
 }
 

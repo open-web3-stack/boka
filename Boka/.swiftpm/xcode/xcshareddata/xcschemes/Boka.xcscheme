@@ -64,6 +64,10 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
+            argument = "--p2p 127.0.0.1:19001"
+            isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
             argument = "--validator"
             isEnabled = "YES">
          </CommandLineArgument>
@@ -75,7 +79,7 @@
       <EnvironmentVariables>
          <EnvironmentVariable
             key = "LOG_LEVEL"
-            value = "trace,bandersnatch=info"
+            value = "trace"
             isEnabled = "YES">
          </EnvironmentVariable>
       </EnvironmentVariables>

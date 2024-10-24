@@ -36,6 +36,9 @@ public class Node {
         keystore: KeyStore
     ) async throws {
         let (genesisState, genesisBlock, protocolConfig) = try await genesis.load()
+
+        logger.info("Genesis: \(genesisBlock.hash)")
+
         dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
         timeProvider = SystemTimeProvider()
         let blockchain = try await Blockchain(

@@ -91,7 +91,9 @@ struct Boka: AsyncParsableCommand {
 
         let logger = Logger(label: "cli")
 
-        logger.info("Starting Boka. Chain: \(chain)")
+        logger.info("Starting Boka.")
+
+        logger.info("Chain: \(chain)")
 
         if let name {
             logger.info("Node name: \(name)")
@@ -131,7 +133,7 @@ struct Boka: AsyncParsableCommand {
 
         logger.info("Network key: \(networkKey.publicKey.data.toHexString())")
         let networkConfig = NetworkConfig(
-            mode: validator ? .validator : .builder,
+            role: validator ? .validator : .builder,
             listenAddress: p2p,
             key: networkKey
         )

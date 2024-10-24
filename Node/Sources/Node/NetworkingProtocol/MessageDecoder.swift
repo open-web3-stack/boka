@@ -6,11 +6,12 @@ import Networking
 import Synchronization
 import TracingUtils
 
-class UPMessageDecoder: MessageDecoder {
+class BlockAnnouncementDecoder: MessageDecoder {
     typealias Message = UPMessage
 
     private let config: ProtocolConfigRef
     private let kind: UniquePresistentStreamKind
+    private var handshakeReceived = false
 
     init(config: ProtocolConfigRef, kind: UniquePresistentStreamKind) {
         self.config = config
@@ -18,15 +19,16 @@ class UPMessageDecoder: MessageDecoder {
     }
 
     func decode(data: Data) throws -> Message {
-        let type = UPMessage.getType(kind: kind)
-        let payload = try JamDecoder.decode(type, from: data, withConfig: config)
-        guard let message = UPMessage.from(kind: kind, data: payload) else {
-            throw DecodingError.dataCorrupted(DecodingError.Context(
-                codingPath: [],
-                debugDescription: "unreachable: invalid UP message"
-            ))
+        if handshakeReceived {
+            return try .blockAnnouncement(
+                JamDecoder.decode(BlockAnnouncement.self, from: data, withConfig: config)
+            )
+        } else {
+            handshakeReceived = true
+            return try .blockAnnouncementHandshake(
+                JamDecoder.decode(BlockAnnouncementHandshake.self, from: data, withConfig: config)
+            )
         }
-        return message
     }
 }
 

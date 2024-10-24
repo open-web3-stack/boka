@@ -1,6 +1,7 @@
 import Blockchain
 import Codec
 import Foundation
+import Networking
 import TracingUtils
 import Utils
 
@@ -12,15 +13,19 @@ enum SendTarget {
 }
 
 public final class NetworkManager: Sendable {
+    private let peerManager: PeerManager
     private let network: Network
     private let blockchain: Blockchain
     private let subscriptions: EventSubscriptions
+
     // This is for development only
     // Those peers will receive all the messages regardless the target
     private let devPeers: Set<NetAddr>
 
     public init(config: Network.Config, blockchain: Blockchain, eventBus: EventBus, devPeers: Set<NetAddr>) async throws {
-        let handler = HandlerImpl(blockchain: blockchain)
+        peerManager = PeerManager()
+
+        let handler = HandlerImpl(blockchain: blockchain, peerManager: peerManager)
         network = try await Network(
             config: config,
             protocolConfig: blockchain.config,
@@ -29,10 +34,11 @@ public final class NetworkManager: Sendable {
         )
         self.blockchain = blockchain
         subscriptions = EventSubscriptions(eventBus: eventBus)
+
         self.devPeers = devPeers
 
         for peer in devPeers {
-            _ = try network.connect(to: peer, mode: .validator)
+            _ = try network.connect(to: peer, role: .validator)
         }
 
         logger.info("P2P Listening on \(try! network.listenAddress())")
@@ -68,6 +74,7 @@ public final class NetworkManager: Sendable {
         let targets = getSendTarget(target: target)
         for target in targets {
             Task {
+                logger.trace("sending message", metadata: ["target": "\(target)", "message": "\(message)"])
                 let res = await Result {
                     try await network.send(to: target, message: message)
                 }
@@ -85,6 +92,7 @@ public final class NetworkManager: Sendable {
         let targets = getSendTarget(target: target)
         for target in targets {
             Task {
+                logger.trace("sending message", metadata: ["target": "\(target)", "message": "\(message)"])
                 // not expecting a response
                 // TODO: handle errors and ensure no data is returned
                 _ = try await network.send(to: target, message: message)
@@ -93,6 +101,7 @@ public final class NetworkManager: Sendable {
     }
 
     private func on(safroleTicketsGenerated event: RuntimeEvents.SafroleTicketsGenerated) async {
+        logger.trace("sending tickets", metadata: ["epochIndex": "\(event.epochIndex)"])
         for ticket in event.items {
             await send(
                 message: .safroleTicket1(.init(
@@ -112,6 +121,7 @@ public final class NetworkManager: Sendable {
 
 struct HandlerImpl: NetworkProtocolHandler {
     let blockchain: Blockchain
+    let peerManager: PeerManager
 
     func handle(ceRequest: CERequest) async throws -> (any Encodable)? {
         switch ceRequest {
@@ -139,11 +149,39 @@ struct HandlerImpl: NetworkProtocolHandler {
         }
     }
 
-    func handle(upMessage: UPMessage) async throws {
+    func handle(connection: some ConnectionInfoProtocol, upMessage: UPMessage) async throws {
         switch upMessage {
+        case let .blockAnnouncementHandshake(message):
+            logger.trace("received block announcement handshake: \(message)")
+            await peerManager.addPeer(address: connection.remoteAddress, handshake: message)
         case let .blockAnnouncement(message):
-            logger.debug("received block announcement: \(message)")
-            // TODO: handle it
+            logger.trace("received block announcement: \(message)")
+            await peerManager.updatePeer(address: connection.remoteAddress, message: message)
+        }
+    }
+
+    func handle(
+        connection _: some ConnectionInfoProtocol, stream: some StreamProtocol<UPMessage>, kind: UniquePresistentStreamKind
+    ) async throws {
+        switch kind {
+        case .blockAnnouncement:
+            // send handshake message
+            let finalized = await blockchain.dataProvider.finalizedHead
+            let heads = try await blockchain.dataProvider.getHeads()
+            var headsWithTimeslot: [HashAndSlot] = []
+            for head in heads {
+                try await headsWithTimeslot.append(HashAndSlot(
+                    hash: head,
+                    timeslot: blockchain.dataProvider.getHeader(hash: head).value.timeslot
+                ))
+            }
+
+            let handshake = BlockAnnouncementHandshake(
+                finalized: HashAndSlot(hash: finalized.hash, timeslot: finalized.timeslot),
+                heads: headsWithTimeslot
+            )
+
+            try stream.send(message: .blockAnnouncementHandshake(handshake))
         }
     }
 }
