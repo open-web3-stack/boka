@@ -19,9 +19,9 @@ public final class NetworkManager: Sendable {
     // Those peers will receive all the messages regardless the target
     private let devPeers: Set<NetAddr>
 
-    public init(config: Network.Config, blockchain: Blockchain, eventBus: EventBus, devPeers: Set<NetAddr>) throws {
+    public init(config: Network.Config, blockchain: Blockchain, eventBus: EventBus, devPeers: Set<NetAddr>) async throws {
         let handler = HandlerImpl(blockchain: blockchain)
-        network = try Network(
+        network = try await Network(
             config: config,
             protocolConfig: blockchain.config,
             genesisHeader: blockchain.dataProvider.genesisBlockHash,
