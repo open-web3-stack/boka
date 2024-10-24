@@ -29,6 +29,7 @@ public class Server {
 
         var handlers: [String: JSONRPCHandler] = SystemHandler.getHandlers()
         handlers.merge(ChainHandler.getHandlers(source: source)) { _, new in new }
+        handlers.merge(TelemetryHandler.getHandlers(source: source)) { _, new in new }
 
         // Register routes
         let rpcController = JSONRPCController(handlers: handlers)

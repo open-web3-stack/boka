@@ -20,8 +20,8 @@ public class ValidatorNode: Node {
             dataProvider: dataProvider
         )
 
-        let genesisState = try await blockchain.getState(hash: blockchain.dataProvider.genesisBlockHash)
+        let genesisState = try await dataProvider.getState(hash: blockchain.dataProvider.genesisBlockHash)
 
-        await validator.on(genesis: genesisState!)
+        await validator.on(genesis: genesisState)
     }
 }

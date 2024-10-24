@@ -55,8 +55,10 @@ public class Node {
             devPeers: Set(config.peers)
         )
 
+        let nodeDataSource = NodeDataSource(blockchain: blockchain, chainDataProvider: dataProvider, networkManager: network)
+
         rpcServer = try config.rpc.map {
-            try Server(config: $0, source: blockchain)
+            try Server(config: $0, source: nodeDataSource)
         }
     }
 
