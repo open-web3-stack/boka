@@ -57,14 +57,31 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
     }
 
     public func send(message: Handler.PresistentHandler.Message) throws {
-        try send(data: message.encode(), finish: true)
+        try send(message: message.encode(), finish: false)
     }
 
+    /// send raw data
     func send(data: Data, finish: Bool = false) throws {
         guard status == .open else {
             throw StreamError.notOpen
         }
+
         try stream.send(data: data, finish: finish)
+    }
+
+    // send message with length prefix
+    func send(message: Data, finish: Bool = false) throws {
+        guard status == .open else {
+            throw StreamError.notOpen
+        }
+
+        let length = UInt32(message.count)
+        var lengthData = Data(repeating: 0, count: 4)
+        lengthData.withUnsafeMutableBytes { ptr in
+            ptr.storeBytes(of: UInt32(littleEndian: length), as: UInt32.self)
+        }
+        try stream.send(data: lengthData, finish: false)
+        try stream.send(data: message, finish: finish)
     }
 
     func received(data: Data) {

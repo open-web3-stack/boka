@@ -42,7 +42,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         let data = try request.encode()
         let kind = request.kind
         let stream = try createStream(kind: kind)
-        try stream.send(data: data)
+        try stream.send(message: data)
         // TODO: pipe this to decoder directly to be able to reject early
         var response = Data()
         while let nextData = await stream.receive() {
@@ -144,7 +144,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                 }
                 let request = try decoder.decode(data: data)
                 let resp = try await impl.ephemeralStreamHandler.handle(connection: self, request: request)
-                try stream.send(data: resp, finish: true)
+                try stream.send(message: resp, finish: true)
             }
         }
     }
@@ -186,7 +186,7 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
                 guard let lengthData else {
                     break
                 }
-                let length = UInt32(littleEndian: lengthData.withUnsafeBytes { $0.load(as: UInt32.self) })
+                let length = UInt32(littleEndian: lengthData.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) })
                 // sanity check for length
                 // TODO: pick better value
                 guard length < 1024 * 1024 * 10 else {

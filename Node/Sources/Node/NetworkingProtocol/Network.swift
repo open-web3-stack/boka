@@ -7,9 +7,13 @@ import Utils
 
 public protocol NetworkProtocolHandler: Sendable {
     func handle(ceRequest: CERequest) async throws -> (any Encodable)?
-    func handle(upMessage: UPMessage) async throws
+    func handle(connection: some ConnectionInfoProtocol, upMessage: UPMessage) async throws
 
-    func handle(connection: some ConnectionInfoProtocol, stream: some StreamProtocol, kind: UniquePresistentStreamKind) async throws
+    func handle(
+        connection: some ConnectionInfoProtocol,
+        stream: some StreamProtocol<UPMessage>,
+        kind: UniquePresistentStreamKind
+    ) async throws
 }
 
 public final class Network: Sendable {
@@ -105,17 +109,20 @@ struct PresistentStreamHandlerImpl: PresistentStreamHandler {
     fileprivate let impl: NetworkImpl
 
     func createDecoder(kind: StreamKind) -> any MessageDecoder<Message> {
-        UPMessageDecoder(config: impl.config, kind: kind)
+        switch kind {
+        case .blockAnnouncement:
+            BlockAnnouncementDecoder(config: impl.config, kind: kind)
+        }
     }
 
-    func streamOpened(connection: any ConnectionInfoProtocol, stream: any StreamProtocol, kind: StreamKind) async throws {
+    func streamOpened(connection: any ConnectionInfoProtocol, stream: any StreamProtocol<Message>, kind: StreamKind) async throws {
         try await impl.handler.handle(connection: connection, stream: stream, kind: kind)
     }
 
     func handle(connection: any ConnectionInfoProtocol, message: Message) async throws {
         impl.logger.trace("handling message: \(message) from \(connection.id)")
 
-        try await impl.handler.handle(upMessage: message)
+        try await impl.handler.handle(connection: connection, upMessage: message)
     }
 }
 
