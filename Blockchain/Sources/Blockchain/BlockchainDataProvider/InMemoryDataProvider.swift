@@ -86,11 +86,13 @@ extension InMemoryDataProvider: BlockchainDataProviderProtocol {
     public func add(block: BlockRef) {
         blockByHash[block.hash] = block
         hashByTimeslot[block.header.timeslot, default: Set()].insert(block.hash)
-        if let number = numberByHash[block.header.parentHash] {
-            numberByHash[block.hash] = number + 1
+        let blockNumber = if let number = numberByHash[block.header.parentHash] {
+            number + 1
         } else {
-            numberByHash[block.hash] = 0
+            UInt32(0)
         }
+        numberByHash[block.hash] = blockNumber
+        hashByNumber[blockNumber, default: Set()].insert(block.hash)
     }
 
     public func setFinalizedHead(hash: Data32) {
@@ -110,6 +112,7 @@ extension InMemoryDataProvider: BlockchainDataProviderProtocol {
     public func remove(hash: Data32) {
         let timeslot = blockByHash[hash]?.header.timeslot ?? stateByBlockHash[hash]?.value.timeslot
         stateByBlockHash.removeValue(forKey: hash)
+        blockByHash.removeValue(forKey: hash)
 
         if let timeslot {
             hashByTimeslot[timeslot]?.remove(hash)
@@ -120,5 +123,7 @@ extension InMemoryDataProvider: BlockchainDataProviderProtocol {
         if let number {
             hashByNumber[number]?.remove(hash)
         }
+
+        heads.remove(hash)
     }
 }
