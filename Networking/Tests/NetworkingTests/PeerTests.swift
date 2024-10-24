@@ -107,9 +107,8 @@ struct PeerTests {
     struct MockPresentStreamHandler: PresistentStreamHandler {
         func streamOpened(
             connection _: any Networking.ConnectionInfoProtocol,
-            stream _: any Networking.StreamProtocol<
-                PeerTests.MockRequest<PeerTests.UniquePresistentStreamKind>
-            >, kind _: PeerTests.UniquePresistentStreamKind
+            stream _: any Networking.StreamProtocol<PeerTests.MockRequest<PeerTests.UniquePresistentStreamKind>>,
+            kind _: PeerTests.UniquePresistentStreamKind
         ) async throws {}
 
         func handle(
