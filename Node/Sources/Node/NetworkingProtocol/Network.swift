@@ -77,6 +77,10 @@ public final class Network: Sendable {
     public func listenAddress() throws -> NetAddr {
         try peer.listenAddress()
     }
+
+    public func getPeersCount() -> Int {
+        peer.getPeersCount()
+    }
 }
 
 struct HandlerDef: StreamHandler {
