@@ -76,7 +76,7 @@ public final class Runtime {
         // offendersMarkers is validated at apply time by Disputes
     }
 
-    public func validateHeaderSeal(block: BlockRef, state: inout State) throws(Error) {
+    public func validateHeaderSeal(block: BlockRef, state: inout State, prevState: StateRef) throws(Error) {
         let vrfOutput: Data32
         let blockAuthorKey = try Result {
             try Bandersnatch.PublicKey(data: state.currentValidators[Int(block.header.authorIndex)].bandersnatch)
@@ -87,7 +87,7 @@ public final class Runtime {
         switch state.safroleState.ticketsOrKeys {
         case let .left(tickets):
             let ticket = tickets[Int(index)]
-            let vrfInputData = SigningContext.safroleTicketInputData(entropy: state.entropyPool.t3, attempt: ticket.attempt)
+            let vrfInputData = SigningContext.safroleTicketInputData(entropy: prevState.value.entropyPool.t3, attempt: ticket.attempt)
             vrfOutput = try Result {
                 try blockAuthorKey.ietfVRFVerify(
                     vrfInputData: vrfInputData,
@@ -107,16 +107,17 @@ public final class Runtime {
                 logger.debug("expected key: \(key.toHexString()), got key: \(blockAuthorKey.data.toHexString())")
                 throw Error.invalidAuthorKey
             }
-            let vrfInputData = SigningContext.fallbackSealInputData(entropy: state.entropyPool.t3)
+            let vrfInputData = SigningContext.fallbackSealInputData(entropy: prevState.value.entropyPool.t3)
             vrfOutput = try Result {
-                try blockAuthorKey.ietfVRFVerify(
+                logger.trace("verifying ticket", metadata: ["key": "\(blockAuthorKey.data.toHexString())"])
+                return try blockAuthorKey.ietfVRFVerify(
                     vrfInputData: vrfInputData,
                     auxData: encodedHeader,
                     signature: block.header.seal
                 )
             }.mapError(Error.invalidBlockSeal).get()
 
-            entropyVRFInputData = SigningContext.fallbackSealInputData(entropy: state.entropyPool.t3)
+            entropyVRFInputData = SigningContext.fallbackSealInputData(entropy: prevState.value.entropyPool.t3)
         }
 
         _ = try Result {
@@ -156,7 +157,14 @@ public final class Runtime {
         do {
             try updateSafrole(block: block, state: &newState)
 
-            try validateHeaderSeal(block: block, state: &newState)
+            if newState.ticketsOrKeys != prevState.value.ticketsOrKeys {
+                logger.trace("state tickets changed", metadata: [
+                    "old": "\(prevState.value.ticketsOrKeys)",
+                    "new": "\(newState.ticketsOrKeys)",
+                ])
+            }
+
+            try validateHeaderSeal(block: block, state: &newState, prevState: prevState)
 
             try updateDisputes(block: block, state: &newState)
 

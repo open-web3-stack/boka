@@ -7,13 +7,14 @@ import Utils
 
 struct ValidatorServiceTests {
     func setup(
-        config _: ProtocolConfigRef = .dev,
+        config: ProtocolConfigRef = .dev,
         time: TimeInterval = 988,
         keysCount: Int = 12
     ) async throws -> (BlockchainServices, ValidatorService) {
         setupTestLogger()
 
         let services = await BlockchainServices(
+            config: config,
             timeProvider: MockTimeProvider(time: time),
             keysCount: keysCount
         )
