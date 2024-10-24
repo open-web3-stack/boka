@@ -44,12 +44,12 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
     public func createNewBlock(
         timeslot: TimeslotIndex,
         claim: Either<(TicketItemAndOutput, Bandersnatch.PublicKey), Bandersnatch.PublicKey>
-    ) async throws
-        -> BlockRef
-    {
+    ) async throws -> BlockRef {
         let parentHash = await dataProvider.bestHead.hash
 
         logger.trace("creating new block for timeslot: \(timeslot) with parent hash: \(parentHash)")
+
+        // TODO: verify we are indeed the block author
 
         let state = try await dataProvider.getState(hash: parentHash)
         let epoch = timeslot.timeslotToEpochIndex(config: config)
@@ -175,8 +175,15 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
             tickets.value = []
             let timeslot = epoch.epochToTimeslotIndex(config: config)
 
-            let bestHead = await dataProvider.bestHead.hash
-            let state = try await dataProvider.getState(hash: bestHead)
+            let bestHead = await dataProvider.bestHead
+
+            let bestHeadTimeslot = bestHead.timeslot
+            let bestHeadEpoch = bestHeadTimeslot.timeslotToEpochIndex(config: config)
+            if bestHeadEpoch + 1 != epoch {
+                logger.warning("best head epoch \(bestHeadEpoch) is too far from current epoch \(epoch)")
+            }
+
+            let state = try await dataProvider.getState(hash: bestHead.hash)
 
             // simulate next block to determine the block authors for next epoch
             let res = try state.value.updateSafrole(
@@ -186,6 +193,10 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
                 offenders: [],
                 extrinsics: .dummy(config: config)
             )
+
+            logger.trace("expected safrole tickets", metadata: [
+                "tickets": "\(res.state.ticketsOrKeys)", "epoch": "\(epoch)", "parentTimeslot": "\(bestHead.timeslot)",
+            ])
 
             await scheduleNewBlocks(ticketsOrKeys: res.state.ticketsOrKeys, timeslot: timeslot)
         }

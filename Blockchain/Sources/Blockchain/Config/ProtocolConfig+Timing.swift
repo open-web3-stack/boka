@@ -20,7 +20,10 @@ extension ProtocolConfigRef {
     }
 
     public var prepareEpochStartTimeDelta: TimeInterval {
-        -TimeInterval(value.slotPeriodSeconds) * 3
+        if value.epochLength < 15 {
+            return -TimeInterval(value.slotPeriodSeconds)
+        }
+        return -TimeInterval(value.slotPeriodSeconds) * 3
     }
 
     public func scheduleTimeForAuthoring(timeslot: TimeslotIndex) -> TimeInterval {
