@@ -12,6 +12,10 @@ public protocol ConnectionInfoProtocol {
     var remoteAddress: NetAddr { get }
 }
 
+enum ConnectionError: Error {
+    case receiveFailed
+}
+
 public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoProtocol {
     let connection: QuicConnection
     let impl: PeerImpl<Handler>
@@ -49,7 +53,15 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
             response.append(nextData)
             break
         }
-        return response
+        guard response.count >= 4 else {
+            stream.close(abort: true)
+            throw ConnectionError.receiveFailed
+        }
+        let lengthData = response.prefix(4)
+        let length = UInt32(
+            littleEndian: lengthData.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+        )
+        return response.dropFirst(4).prefix(Int(length))
     }
 
     @discardableResult
