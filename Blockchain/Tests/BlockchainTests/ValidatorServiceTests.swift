@@ -6,11 +6,16 @@ import Utils
 @testable import Blockchain
 
 struct ValidatorServiceTests {
-    func setup(time: TimeInterval = 988) async throws -> (BlockchainServices, ValidatorService) {
-        // setupTestLogger()
+    func setup(
+        config _: ProtocolConfigRef = .dev,
+        time: TimeInterval = 988,
+        keysCount: Int = 12
+    ) async throws -> (BlockchainServices, ValidatorService) {
+        setupTestLogger()
 
         let services = await BlockchainServices(
-            timeProvider: MockTimeProvider(time: time)
+            timeProvider: MockTimeProvider(time: time),
+            keysCount: keysCount
         )
         let validatorService = await ValidatorService(
             blockchain: services.blockchain,
@@ -111,5 +116,35 @@ struct ValidatorServiceTests {
         let blockAuthoredEvents = events.filter { $0 is RuntimeEvents.BlockAuthored }
 
         #expect(blockAuthoredEvents.count == 25)
+    }
+
+    @Test
+    func makeManyBlocksWithSingleKey() async throws {
+        let (services, validatorService) = try await setup(
+            config: .minimal,
+            keysCount: 0
+        )
+        let genesisState = services.genesisState
+        let storeMiddleware = services.storeMiddleware
+        let config = services.config
+        let scheduler = services.scheduler
+        let keystore = services.keystore
+
+        try await keystore.addDevKeys(seed: 0)
+
+        await validatorService.on(genesis: genesisState)
+
+        await storeMiddleware.wait()
+
+        for _ in 0 ..< 50 {
+            await scheduler.advance(by: TimeInterval(config.value.slotPeriodSeconds))
+            await storeMiddleware.wait() // let events to be processed
+        }
+
+        let events = await storeMiddleware.wait()
+
+        let blockAuthoredEvents = events.filter { $0 is RuntimeEvents.BlockAuthored }
+
+        #expect(blockAuthoredEvents.count > 0)
     }
 }

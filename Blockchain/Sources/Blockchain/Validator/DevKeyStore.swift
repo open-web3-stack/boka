@@ -28,6 +28,7 @@ public final class DevKeyStore: KeyStore {
         await keystore.get(type, publicKey: publicKey)
     }
 
+    @discardableResult
     public func addDevKeys(seed: UInt32) async throws -> KeySet {
         var seedData = Data(repeating: 0, count: 32)
         seedData[0 ..< 4] = seed.encode()

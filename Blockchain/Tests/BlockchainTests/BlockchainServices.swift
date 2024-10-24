@@ -7,7 +7,7 @@ class BlockchainServices {
     let dataProvider: BlockchainDataProvider
     let eventBus: EventBus
     let scheduler: MockScheduler
-    let keystore: KeyStore
+    let keystore: DevKeyStore
     let storeMiddleware: StoreMiddleware
     let genesisBlock: BlockRef
     let genesisState: StateRef
@@ -20,7 +20,8 @@ class BlockchainServices {
 
     init(
         config: ProtocolConfigRef = .dev,
-        timeProvider: MockTimeProvider = MockTimeProvider(time: 988)
+        timeProvider: MockTimeProvider = MockTimeProvider(time: 988),
+        keysCount: Int = 12
     ) async {
         self.config = config
         self.timeProvider = timeProvider
@@ -35,7 +36,7 @@ class BlockchainServices {
 
         scheduler = MockScheduler(timeProvider: timeProvider)
 
-        keystore = try! await DevKeyStore()
+        keystore = try! await DevKeyStore(devKeysCount: keysCount)
     }
 
     deinit {
