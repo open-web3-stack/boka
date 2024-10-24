@@ -38,7 +38,7 @@ struct ExtrinsicPoolServiceTests {
 
     @Test
     func testAddAndRetrieveTickets() async throws {
-        let state = try await dataProvider.getState(hash: dataProvider.bestHead)
+        let state = try await dataProvider.getBestState()
 
         var allTickets = SortedUniqueArray<TicketItemAndOutput>()
 
@@ -74,7 +74,7 @@ struct ExtrinsicPoolServiceTests {
 
     @Test
     func testAddAndInvalidTickets() async throws {
-        let state = try await dataProvider.getState(hash: dataProvider.bestHead)
+        let state = try await dataProvider.getBestState()
 
         var allTickets = SortedUniqueArray<TicketItemAndOutput>()
 
@@ -117,7 +117,7 @@ struct ExtrinsicPoolServiceTests {
     @Test
     func testRemoveTicketsOnBlockFinalization() async throws {
         // Add some tickets to the pool
-        let state = try await dataProvider.getState(hash: dataProvider.bestHead)
+        let state: StateRef = try await dataProvider.getBestState()
         let validatorKey = state.value.currentValidators[0]
         let secretKey = try await keystore.get(Bandersnatch.self, publicKey: Bandersnatch.PublicKey(data: validatorKey.bandersnatch))!
 
@@ -149,7 +149,10 @@ struct ExtrinsicPoolServiceTests {
             availability: ExtrinsicAvailability.dummy(config: config),
             reports: ExtrinsicGuarantees.dummy(config: config)
         )
-        let block = BlockRef(Block(header: Header.dummy(config: config), extrinsic: extrinsic))
+        let block = BlockRef(Block(header: Header.dummy(config: config), extrinsic: extrinsic)).mutate {
+            $0.header.unsigned.parentHash = state.value.lastBlockHash
+            $0.header.unsigned.timeslot = state.value.timeslot + 1
+        }
 
         try await dataProvider.add(block: block)
 
@@ -168,7 +171,7 @@ struct ExtrinsicPoolServiceTests {
     @Test
     func testUpdateStateOnEpochChange() async throws {
         // Insert some valid tickets
-        let state = try await dataProvider.getState(hash: dataProvider.bestHead)
+        let state = try await dataProvider.getBestState()
         let validatorKey = state.value.currentValidators[0]
         let secretKey = try await keystore.get(Bandersnatch.self, publicKey: Bandersnatch.PublicKey(data: validatorKey.bandersnatch))!
 
@@ -197,9 +200,10 @@ struct ExtrinsicPoolServiceTests {
         // Simulate an epoch change with new entropy
         let nextTimeslot = state.value.timeslot + TimeslotIndex(config.value.epochLength)
 
+        let bestHead = await dataProvider.bestHead.hash
         let newBlock = BlockRef.dummy(config: config).mutate {
             $0.header.unsigned.timeslot = nextTimeslot
-            $0.header.unsigned.parentHash = dataProvider.bestHead
+            $0.header.unsigned.parentHash = bestHead
         }
 
         let oldEntropyPool = state.value.entropyPool
