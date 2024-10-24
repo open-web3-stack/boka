@@ -86,10 +86,8 @@ struct PeerTests {
             MockEphemeralMessageDecoder(kind: kind)
         }
 
-        // deal with data
         func handle(connection _: any ConnectionInfoProtocol, request: Request) async throws -> Data {
             let data = request.data
-
             guard data.count >= 4 else {
                 throw NSError(
                     domain: "ExtractError", code: 1,
@@ -116,10 +114,8 @@ struct PeerTests {
 
         func handle(
             connection _: any Networking.ConnectionInfoProtocol,
-            message: PeerTests.MockRequest<PeerTests.UniquePresistentStreamKind>
-        ) async throws {
-            print("Present handle received: \(String(decoding: message.data, as: UTF8.self))")
-        }
+            message _: PeerTests.MockRequest<PeerTests.UniquePresistentStreamKind>
+        ) async throws {}
 
         typealias StreamKind = UniquePresistentStreamKind
         typealias Request = MockRequest<UniquePresistentStreamKind>
