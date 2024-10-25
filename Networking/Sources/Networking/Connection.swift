@@ -14,6 +14,7 @@ public protocol ConnectionInfoProtocol {
 
 enum ConnectionError: Error {
     case receiveFailed
+    case invalidLength
 }
 
 public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoProtocol {
@@ -42,26 +43,30 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         try? connection.shutdown(errorCode: abort ? 1 : 0) // TODO: define some error code
     }
 
-    public func request(_ request: Handler.EphemeralHandler.Request) async throws -> Data {
+    public func decodeLength(from data: Data) throws -> UInt32 {
+        guard data.count >= 4 else {
+            throw ConnectionError.invalidLength
+        }
+        return UInt32(littleEndian: data.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) })
+    }
+
+    public func request(_ request: Handler.EphemeralHandler.Request) async throws -> [Data] {
         let data = try request.encode()
         let kind = request.kind
         let stream = try createStream(kind: kind)
         try stream.send(message: data)
-        // TODO: pipe this to decoder directly to be able to reject early
-        var response = Data()
+
+        var reps = [Data()]
         while let nextData = await stream.receive() {
-            response.append(nextData)
-            break
+            if nextData.isEmpty { // fin flag
+                break
+            }
+            let length = try decodeLength(from: nextData.prefix(4))
+            let data = nextData.dropFirst(4).prefix(Int(length))
+            reps.append(data)
         }
-        guard response.count >= 4 else {
-            stream.close(abort: true)
-            throw ConnectionError.receiveFailed
-        }
-        let lengthData = response.prefix(4)
-        let length = UInt32(
-            littleEndian: lengthData.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
-        )
-        return response.dropFirst(4).prefix(Int(length))
+
+        return reps
     }
 
     @discardableResult
@@ -121,7 +126,6 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                 return
             }
             if let upKind = Handler.PresistentHandler.StreamKind(rawValue: byte) {
-                // TODO: handle duplicated UP streams
                 presistentStreams.write { presistentStreams in
                     presistentStreams[upKind] = stream
                 }
@@ -134,25 +138,20 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                 var decoder = impl.ephemeralStreamHandler.createDecoder(kind: ceKind)
 
                 let lengthData = await stream.receive(count: 4)
-                guard let lengthData else {
+                guard let lengthData, let length = try? decodeLength(from: lengthData) else {
                     stream.close(abort: true)
                     logger.debug("Invalid request length")
                     return
                 }
-                let length = UInt32(littleEndian: lengthData.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) })
-                // sanity check for length
-                // TODO: pick better value
                 guard length < 1024 * 1024 * 10 else {
                     stream.close(abort: true)
                     logger.debug("Invalid request length: \(length)")
-                    // TODO: report bad peer
                     return
                 }
                 let data = await stream.receive(count: Int(length))
                 guard let data else {
                     stream.close(abort: true)
                     logger.debug("Invalid request data")
-                    // TODO: report bad peer
                     return
                 }
                 let request = try decoder.decode(data: data)
@@ -196,16 +195,12 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
         do {
             while true {
                 let lengthData = await stream.receive(count: 4)
-                guard let lengthData else {
+                guard let lengthData, let length = try? connection.decodeLength(from: lengthData) else {
                     break
                 }
-                let length = UInt32(littleEndian: lengthData.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) })
-                // sanity check for length
-                // TODO: pick better value
                 guard length < 1024 * 1024 * 10 else {
                     stream.close(abort: true)
                     logger.debug("Invalid message length: \(length)")
-                    // TODO: report bad peer
                     return
                 }
                 let data = await stream.receive(count: Int(length))

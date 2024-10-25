@@ -207,19 +207,19 @@ struct PeerTests {
         )
         try? await Task.sleep(for: .milliseconds(100))
 
-        let data1 = try await connection1.request(
+        let dataList1 = try await connection1.request(
             MockRequest(kind: .typeA, data: Data("hello world".utf8))
         )
-        #expect(data1 == Data("hello world".utf8))
+        #expect(dataList1.first == Data("hello world".utf8))
 
         let connection2 = try peer2.connect(
             to: NetAddr(ipAddress: "127.0.0.1", port: 8083)!, role: .validator
         )
         try? await Task.sleep(for: .milliseconds(100))
 
-        let data2 = try await connection2.request(
+        let dataList2 = try await connection2.request(
             MockRequest(kind: .typeB, data: Data("I am jam".utf8))
         )
-        #expect(data2 == Data("I am jam".utf8))
+        #expect(dataList2.first == Data("I am jam".utf8))
     }
 }

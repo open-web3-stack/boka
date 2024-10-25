@@ -85,10 +85,6 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
     }
 
     func received(data: Data) {
-        if data.isEmpty {
-            return
-        }
-
         if !channel.syncSend(data) {
             logger.warning("stream \(id) is full")
             // TODO: backpressure handling
