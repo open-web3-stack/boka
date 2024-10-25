@@ -13,7 +13,7 @@ let BLOCK_REQUEST_BLOCK_COUNT: UInt32 = 50
 // - remove slow one
 // - sync peer rotation
 // - fast sync mode (no verification)
-public actor SyncManager {
+public actor SyncManager: Sendable {
     private let blockchain: Blockchain
     private let network: Network
     private let peerManager: PeerManager
@@ -21,7 +21,9 @@ public actor SyncManager {
     private let subscriptions: EventSubscriptions
 
     // starts with bulk syncing mode, until our best have catched up with the peer best
-    private var bulkSyncing = true
+    private var bulkSyncing = false
+    private var syncContinuation: [CheckedContinuation<Void, Never>] = []
+
     private var networkBest: HashAndSlot?
     private var networkFinalizedBest: HashAndSlot?
     private var currentRequest: (peer: NetAddr, request: BlockRequest)?
@@ -39,6 +41,15 @@ public actor SyncManager {
             await subscriptions.subscribe(NetworkEvents.PeerUpdated.self, id: "SyncManager.PeerUpdated") { [weak self] event in
                 await self?.on(peerUpdated: event.info, newBlockHeader: event.newBlockHeader)
             }
+        }
+    }
+
+    public func waitForSyncCompletion() async {
+        if !bulkSyncing {
+            return
+        }
+        await withCheckedContinuation { continuation in
+            syncContinuation.append(continuation)
         }
     }
 
@@ -97,7 +108,9 @@ public actor SyncManager {
                     if currentHead.timeslot >= networkBest!.timeslot {
                         if bulkSyncing {
                             bulkSyncing = false
-                            subscriptions.publish(NetworkEvents.BulkSyncCompleted())
+                            syncContinuation.forEach { $0.resume() }
+                            syncContinuation = []
+                            logger.info("bulk sync completed")
                             return
                         }
                     }

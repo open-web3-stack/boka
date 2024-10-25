@@ -15,17 +15,22 @@ enum BroadcastTarget {
 }
 
 public final class NetworkManager: Sendable {
-    private let peerManager: PeerManager
-    private let network: Network
-    private let syncManager: SyncManager
-    private let blockchain: Blockchain
+    let peerManager: PeerManager
+    let network: Network
+    let syncManager: SyncManager
+    let blockchain: Blockchain
     private let subscriptions: EventSubscriptions
 
     // This is for development only
     // Those peers will receive all the messages regardless the target
     private let devPeers: Set<NetAddr>
 
-    public init(config: Network.Config, blockchain: Blockchain, eventBus: EventBus, devPeers: Set<NetAddr>) async throws {
+    public init(
+        config: Network.Config,
+        blockchain: Blockchain,
+        eventBus: EventBus,
+        devPeers: Set<NetAddr>
+    ) async throws {
         peerManager = PeerManager(eventBus: eventBus)
 
         network = try await Network(
