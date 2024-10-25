@@ -29,6 +29,11 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
     public func importBlock(_ block: BlockRef) async throws {
         logger.debug("importing block: #\(block.header.timeslot) \(block.hash)")
 
+        if try await dataProvider.hasBlock(hash: block.hash) {
+            logger.debug("block already imported", metadata: ["hash": "\(block.hash)"])
+            return
+        }
+
         try await withSpan("importBlock") { span in
             span.attributes.blockHash = block.hash.description
 

@@ -12,16 +12,24 @@ public class ValidatorNode: Node {
         try await super.init(config: config, genesis: genesis, eventBus: eventBus, keystore: keystore)
 
         let scheduler = DispatchQueueScheduler(timeProvider: timeProvider)
-        validator = await ValidatorService(
+        let validator = await ValidatorService(
             blockchain: blockchain,
             keystore: keystore,
             eventBus: eventBus,
             scheduler: scheduler,
             dataProvider: dataProvider
         )
+        self.validator = validator
 
-        let genesisState = try await dataProvider.getState(hash: blockchain.dataProvider.genesisBlockHash)
-
-        await validator.on(genesis: genesisState)
+        let syncManager = network.syncManager
+        let dataProvider = blockchain.dataProvider
+        let local = config.local
+        Task {
+            let genesisState = try await dataProvider.getState(hash: dataProvider.genesisBlockHash)
+            if !local {
+                await syncManager.waitForSyncCompletion()
+            }
+            await validator.on(genesis: genesisState)
+        }
     }
 }

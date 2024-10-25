@@ -12,6 +12,6 @@ public struct BlockAnnouncementHandshake: Codable, Sendable {
 }
 
 public struct BlockAnnouncement: Codable, Sendable {
-    public var header: Header
+    public var header: HeaderRef
     public var finalized: HashAndSlot
 }
