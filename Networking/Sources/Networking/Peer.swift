@@ -374,7 +374,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             streams[quicStream.id]
         }
         if let stream {
-            stream.close(abort: false)
+            stream.closeChannel()
         } else {
             logger.warning("Stream sendShutdown but stream is gone?", metadata: ["streamId": "\(quicStream.id)"])
         }

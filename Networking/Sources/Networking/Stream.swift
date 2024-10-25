@@ -88,9 +88,6 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         if data.isEmpty {
             return
         }
-        if status == .closed {
-            print("status is closed, ignoring data")
-        }
         if !channel.syncSend(data) {
             logger.warning("stream \(id) is full")
             // TODO: backpressure handling
@@ -106,6 +103,10 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         status = abort ? .aborted : .closed
         channel.close()
         try? stream.shutdown(errorCode: abort ? 1 : 0) // TODO: define some error code
+    }
+
+    public func closeChannel() {
+        channel.close()
     }
 
     // remote initiated close
