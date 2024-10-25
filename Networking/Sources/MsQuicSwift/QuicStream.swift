@@ -201,9 +201,13 @@ private class StreamHandle {
 
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
             logger.trace("Peer send shutdown")
+            if let stream {
+                stream.handler.dataReceived(stream, data: nil)
+            }
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
             logger.trace("Peer send aborted")
+            // TODO: check if we need to close the stream completely
 
         case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
             logger.trace("Stream shutdown complete")

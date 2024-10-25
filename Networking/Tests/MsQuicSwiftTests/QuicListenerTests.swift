@@ -35,6 +35,8 @@ struct QuicListenerTests {
     let registration: QuicRegistration
 
     init() throws {
+        // setupTestLogger()
+
         registration = try QuicRegistration()
     }
 
