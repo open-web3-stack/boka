@@ -1,7 +1,7 @@
 import Foundation
 import Utils
 
-public class ValidatorService {
+public final class ValidatorService: Sendable {
     private let blockchain: Blockchain
     private let keystore: KeyStore
     private let safrole: SafroleService

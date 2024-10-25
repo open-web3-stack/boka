@@ -4,6 +4,7 @@ import Foundation
 import Networking
 
 public enum CERequest: Sendable {
+    case blockRequest(BlockRequest)
     case safroleTicket1(SafroleTicketMessage)
     case safroleTicket2(SafroleTicketMessage)
 }
@@ -13,6 +14,8 @@ extension CERequest: RequestProtocol {
 
     public func encode() throws -> Data {
         switch self {
+        case let .blockRequest(message):
+            try JamEncoder.encode(message)
         case let .safroleTicket1(message):
             try JamEncoder.encode(message)
         case let .safroleTicket2(message):
@@ -22,6 +25,8 @@ extension CERequest: RequestProtocol {
 
     public var kind: CommonEphemeralStreamKind {
         switch self {
+        case .blockRequest:
+            .blockRequest
         case .safroleTicket1:
             .safroleTicket1
         case .safroleTicket2:
@@ -31,6 +36,8 @@ extension CERequest: RequestProtocol {
 
     static func getType(kind: CommonEphemeralStreamKind) -> Decodable.Type {
         switch kind {
+        case .blockRequest:
+            BlockRequest.self
         case .safroleTicket1:
             SafroleTicketMessage.self
         case .safroleTicket2:
@@ -42,6 +49,11 @@ extension CERequest: RequestProtocol {
 
     static func from(kind: CommonEphemeralStreamKind, data: any Decodable) -> CERequest? {
         switch kind {
+        case .blockRequest:
+            guard let message = data as? BlockRequest else {
+                return nil
+            }
+            return .blockRequest(message)
         case .safroleTicket1:
             guard let message = data as? SafroleTicketMessage else {
                 return nil
@@ -54,34 +66,6 @@ extension CERequest: RequestProtocol {
             return .safroleTicket2(message)
         default:
             fatalError("unimplemented")
-        }
-    }
-}
-
-extension CERequest {
-    public func handle(blockchain: Blockchain) async throws -> (any Encodable)? {
-        switch self {
-        case let .safroleTicket1(message):
-            blockchain.publish(event: RuntimeEvents.SafroleTicketsReceived(
-                items: [
-                    ExtrinsicTickets.TicketItem(
-                        attempt: message.attempt,
-                        signature: message.proof
-                    ),
-                ]
-            ))
-            // TODO: rebroadcast to other peers after some time
-            return nil
-        case let .safroleTicket2(message):
-            blockchain.publish(event: RuntimeEvents.SafroleTicketsReceived(
-                items: [
-                    ExtrinsicTickets.TicketItem(
-                        attempt: message.attempt,
-                        signature: message.proof
-                    ),
-                ]
-            ))
-            return nil
         }
     }
 }

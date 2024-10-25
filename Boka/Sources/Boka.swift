@@ -58,7 +58,7 @@ struct Boka: AsyncParsableCommand {
     var basePath: String?
 
     @Option(name: .long, help: "A preset config or path to chain config file.")
-    var chain: Genesis = .preset(.dev)
+    var chain: Genesis = .preset(.minimal)
 
     @Option(name: .long, help: "Listen address for RPC server. Pass 'no' to disable RPC server. Default to 127.0.0.1:9955.")
     var rpc: MaybeEnabled<NetAddr> = .enabled(NetAddr(address: "127.0.0.1:9955")!)
@@ -81,6 +81,12 @@ struct Boka: AsyncParsableCommand {
     @Option(name: .long, help: "Node name. For telemetry only.")
     var name: String?
 
+    @Flag(name: .long, help: "Enable local mode, whereas peers are not expected.")
+    var local: Bool = false
+
+    @Flag(name: .long, help: "Enable dev mode. This is equivalent to --local --validator")
+    var dev: Bool = false
+
     mutating func run() async throws {
         let services = try await Tracing.bootstrap("Boka", loggerOnly: true)
         for service in services {
@@ -94,6 +100,16 @@ struct Boka: AsyncParsableCommand {
         logger.info("Starting Boka.")
 
         logger.info("Chain: \(chain)")
+
+        if dev {
+            local = true
+            validator = true
+            logger.info("Dev mode enabled. Enabling local and validator.")
+        }
+
+        if local {
+            logger.info("Local mode enabled.")
+        }
 
         if let name {
             logger.info("Node name: \(name)")
@@ -146,7 +162,12 @@ struct Boka: AsyncParsableCommand {
             handlerMiddleware: .tracing(prefix: "Handler")
         )
 
-        let config = Node.Config(rpc: rpcConfig, network: networkConfig, peers: peers)
+        let config = Node.Config(
+            rpc: rpcConfig,
+            network: networkConfig,
+            peers: peers,
+            local: local
+        )
 
         let node: Node = if validator {
             try await ValidatorNode(

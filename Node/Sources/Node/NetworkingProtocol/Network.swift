@@ -84,8 +84,8 @@ public final class Network: Sendable {
         try peer.listenAddress()
     }
 
-    public func getPeersCount() -> Int {
-        peer.getPeersCount()
+    public var peersCount: Int {
+        peer.peersCount
     }
 }
 

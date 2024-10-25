@@ -133,7 +133,35 @@ extension Header {
     }
 }
 
-public typealias HeaderRef = Ref<Header>
+public final class HeaderRef: Ref<Header>, @unchecked Sendable {
+    public required init(_ value: Header) {
+        lazyHash = Lazy {
+            Ref(value.hash())
+        }
+
+        super.init(value)
+    }
+
+    private let lazyHash: Lazy<Ref<Data32>>
+
+    public var hash: Data32 {
+        lazyHash.value.value
+    }
+
+    override public var description: String {
+        "Header(hash: \(hash), timeslot: \(value.timeslot))"
+    }
+}
+
+extension HeaderRef: Codable {
+    public convenience init(from decoder: Decoder) throws {
+        try self.init(.init(from: decoder))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        try value.encode(to: encoder)
+    }
+}
 
 extension Header.Unsigned: Dummy {
     public typealias Config = ProtocolConfigRef

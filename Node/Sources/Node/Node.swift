@@ -14,14 +14,17 @@ public class Node {
         public var rpc: RPCConfig?
         public var network: NetworkConfig
         public var peers: [NetAddr]
+        public var local: Bool
 
-        public init(rpc: RPCConfig?, network: NetworkConfig, peers: [NetAddr] = []) {
+        public init(rpc: RPCConfig?, network: NetworkConfig, peers: [NetAddr] = [], local: Bool = false) {
             self.rpc = rpc
             self.network = network
             self.peers = peers
+            self.local = local
         }
     }
 
+    public let config: Config
     public let blockchain: Blockchain
     public let rpcServer: Server?
     public let timeProvider: TimeProvider
@@ -35,6 +38,8 @@ public class Node {
         eventBus: EventBus,
         keystore: KeyStore
     ) async throws {
+        self.config = config
+
         let (genesisState, genesisBlock, protocolConfig) = try await genesis.load()
 
         logger.info("Genesis: \(genesisBlock.hash)")
