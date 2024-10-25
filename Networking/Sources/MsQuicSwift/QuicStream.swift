@@ -198,15 +198,12 @@ private class StreamHandle {
                     logger.warning("Stream received data but it is already gone?")
                 }
             }
-            if event.pointee.RECEIVE.Flags.rawValue & QUIC_RECEIVE_FLAG_FIN.rawValue != 0 {
-                // maybe close function need it
-                if let stream {
-                    stream.handler.dataReceived(stream, data: Data())
-                }
-            }
 
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
             logger.trace("Peer send shutdown")
+            if let stream {
+                stream.handler.sendShutdown(stream)
+            }
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
             logger.trace("Peer send aborted")

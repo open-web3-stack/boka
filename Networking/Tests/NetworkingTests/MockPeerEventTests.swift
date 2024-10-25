@@ -15,6 +15,7 @@ final class MockPeerEventTests {
             case streamStarted(connection: QuicConnection, stream: QuicStream)
             case dataReceived(stream: QuicStream, data: Data)
             case closed(stream: QuicStream, status: QuicStatus, code: QuicErrorCode)
+            case sendShutdown(_ quicStream: QuicStream)
         }
 
         let events: ThreadSafeContainer<[EventType]> = .init([])
@@ -75,6 +76,12 @@ final class MockPeerEventTests {
             print("closed stream \(stream.id) with status \(status) and code \(code)")
             events.write { events in
                 events.append(.closed(stream: stream, status: status, code: code))
+            }
+        }
+
+        func sendShutdown(_ quicStream: QuicStream) {
+            events.write { events in
+                events.append(.sendShutdown(quicStream))
             }
         }
     }

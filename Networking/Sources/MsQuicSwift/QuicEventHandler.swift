@@ -39,6 +39,7 @@ public protocol QuicEventHandler: Sendable {
     // stream events
     func dataReceived(_ stream: QuicStream, data: Data)
     func closed(_ stream: QuicStream, status: QuicStatus, code: QuicErrorCode)
+    func sendShutdown(_ quicStream: QuicStream)
 }
 
 // default implementations
@@ -75,6 +76,7 @@ public final class MockQuicEventHandler: QuicEventHandler {
         case streamStarted(connection: QuicConnection, stream: QuicStream)
         case dataReceived(stream: QuicStream, data: Data)
         case closed(stream: QuicStream, status: QuicStatus, code: QuicErrorCode)
+        case sendShutdown(_ quicStream: QuicStream)
     }
 
     public let events: ThreadSafeContainer<[EventType]> = .init([])
@@ -131,6 +133,12 @@ public final class MockQuicEventHandler: QuicEventHandler {
     public func closed(_ stream: QuicStream, status: QuicStatus, code: QuicErrorCode) {
         events.write { events in
             events.append(.closed(stream: stream, status: status, code: code))
+        }
+    }
+
+    public func sendShutdown(_ quicStream: QuicStream) {
+        events.write { events in
+            events.append(.sendShutdown(quicStream))
         }
     }
 }
