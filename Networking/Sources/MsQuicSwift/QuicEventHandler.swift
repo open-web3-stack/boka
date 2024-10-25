@@ -37,7 +37,8 @@ public protocol QuicEventHandler: Sendable {
     func streamStarted(_ connect: QuicConnection, stream: QuicStream)
 
     // stream events
-    func dataReceived(_ stream: QuicStream, data: Data)
+    // nil data indicate end of data stream
+    func dataReceived(_ stream: QuicStream, data: Data?)
     func closed(_ stream: QuicStream, status: QuicStatus, code: QuicErrorCode)
 }
 
@@ -60,7 +61,7 @@ extension QuicEventHandler {
 
     public func streamStarted(_: QuicConnection, stream _: QuicStream) {}
 
-    public func dataReceived(_: QuicStream, data _: Data) {}
+    public func dataReceived(_: QuicStream, data _: Data?) {}
 
     public func closed(_: QuicStream, status _: QuicStatus, code _: QuicErrorCode) {}
 }
@@ -73,7 +74,7 @@ public final class MockQuicEventHandler: QuicEventHandler {
         case shutdownInitiated(connection: QuicConnection, reason: ConnectionCloseReason)
         case shutdownComplete(connection: QuicConnection)
         case streamStarted(connection: QuicConnection, stream: QuicStream)
-        case dataReceived(stream: QuicStream, data: Data)
+        case dataReceived(stream: QuicStream, data: Data?)
         case closed(stream: QuicStream, status: QuicStatus, code: QuicErrorCode)
     }
 
@@ -122,7 +123,7 @@ public final class MockQuicEventHandler: QuicEventHandler {
         }
     }
 
-    public func dataReceived(_ stream: QuicStream, data: Data) {
+    public func dataReceived(_ stream: QuicStream, data: Data?) {
         events.write { events in
             events.append(.dataReceived(stream: stream, data: data))
         }

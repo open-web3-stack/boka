@@ -342,7 +342,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         }
     }
 
-    func dataReceived(_ stream: QuicStream, data: Data) {
+    func dataReceived(_ stream: QuicStream, data: Data?) {
         let stream = impl.streams.read { streams in
             streams[stream.id]
         }
