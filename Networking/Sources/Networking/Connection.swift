@@ -55,7 +55,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         let kind = request.kind
         let stream = try createStream(kind: kind)
         try stream.send(message: data)
-
+        // TODO: pipe this to decoder directly to be able to reject early
         var reps = Data()
         while let nextData = await stream.receive() {
             let length = try decodeLength(from: nextData.prefix(4))
