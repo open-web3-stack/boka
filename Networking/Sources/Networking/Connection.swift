@@ -58,9 +58,6 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
 
         var reps = Data()
         while let nextData = await stream.receive() {
-            if nextData.isEmpty { // fin flag
-                break
-            }
             let length = try decodeLength(from: nextData.prefix(4))
             let data = nextData.dropFirst(4).prefix(Int(length))
             reps.append(data)

@@ -207,9 +207,6 @@ private class StreamHandle {
 
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
             logger.trace("Peer send shutdown")
-            api.call { api in
-                _ = api.pointee.StreamShutdown(ptr, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0)
-            }
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
             logger.trace("Peer send aborted")
