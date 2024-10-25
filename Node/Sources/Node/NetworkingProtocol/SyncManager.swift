@@ -97,7 +97,7 @@ public actor SyncManager: Sendable {
 
                 Task {
                     let resp = try await network.send(to: addr, message: .blockRequest(request))
-                    let decoded = try JamDecoder.decode([BlockRef].self, from: resp, withConfig: blockchain.config)
+                    let decoded = try CERequest.decodeResponseForBlockRequest(data: resp, config: blockchain.config)
                     for block in decoded {
                         try await blockchain.importBlock(block)
                     }

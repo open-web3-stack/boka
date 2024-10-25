@@ -68,4 +68,13 @@ extension CERequest: RequestProtocol {
             fatalError("unimplemented")
         }
     }
+
+    static func decodeResponseForBlockRequest(data: Data, config: ProtocolConfigRef) throws -> [BlockRef] {
+        let decoder = JamDecoder(data: data, config: config)
+        var resp = [BlockRef]()
+        while !decoder.isAtEnd {
+            try resp.append(decoder.decode(BlockRef.self))
+        }
+        return resp
+    }
 }

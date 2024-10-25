@@ -132,7 +132,7 @@ struct HandlerImpl: NetworkProtocolHandler {
     let blockchain: Blockchain
     let peerManager: PeerManager
 
-    func handle(ceRequest: CERequest) async throws -> (any Encodable)? {
+    func handle(ceRequest: CERequest) async throws -> [any Encodable] {
         switch ceRequest {
         case let .blockRequest(message):
             let dataProvider = blockchain.dataProvider
@@ -178,7 +178,7 @@ struct HandlerImpl: NetworkProtocolHandler {
                 ]
             ))
             // TODO: rebroadcast to other peers after some time
-            return nil
+            return []
         case let .safroleTicket2(message):
             blockchain.publish(event: RuntimeEvents.SafroleTicketsReceived(
                 items: [
@@ -188,7 +188,7 @@ struct HandlerImpl: NetworkProtocolHandler {
                     ),
                 ]
             ))
-            return nil
+            return []
         }
     }
 
