@@ -109,6 +109,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                 return
             }
             if let upKind = Handler.PresistentHandler.StreamKind(rawValue: byte) {
+                // TODO: handle duplicated UP streams
                 presistentStreams.write { presistentStreams in
                     presistentStreams[upKind] = stream
                 }
