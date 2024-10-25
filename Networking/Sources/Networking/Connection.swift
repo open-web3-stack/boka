@@ -50,13 +50,13 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         return UInt32(littleEndian: data.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) })
     }
 
-    public func request(_ request: Handler.EphemeralHandler.Request) async throws -> [Data] {
+    public func request(_ request: Handler.EphemeralHandler.Request) async throws -> Data {
         let data = try request.encode()
         let kind = request.kind
         let stream = try createStream(kind: kind)
         try stream.send(message: data)
 
-        var reps = [Data()]
+        var reps = Data()
         while let nextData = await stream.receive() {
             if nextData.isEmpty { // fin flag
                 break

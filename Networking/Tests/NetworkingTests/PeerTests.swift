@@ -210,7 +210,7 @@ struct PeerTests {
         let dataList1 = try await connection1.request(
             MockRequest(kind: .typeA, data: Data("hello world".utf8))
         )
-        #expect(dataList1.first == Data("hello world".utf8))
+        #expect(dataList1 == Data("hello world".utf8))
 
         let connection2 = try peer2.connect(
             to: NetAddr(ipAddress: "127.0.0.1", port: 8083)!, role: .validator
@@ -220,6 +220,6 @@ struct PeerTests {
         let dataList2 = try await connection2.request(
             MockRequest(kind: .typeB, data: Data("I am jam".utf8))
         )
-        #expect(dataList2.first == Data("I am jam".utf8))
+        #expect(dataList2 == Data("I am jam".utf8))
     }
 }
