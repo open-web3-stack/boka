@@ -342,7 +342,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         }
     }
 
-    func dataReceived(_ stream: QuicStream, data: Data) {
+    func dataReceived(_ stream: QuicStream, data: Data?) {
         let stream = impl.streams.read { streams in
             streams[stream.id]
         }
@@ -366,17 +366,6 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             }
         } else {
             logger.warning("Stream closed but stream is gone?", metadata: ["streamId": "\(quicStream.id)"])
-        }
-    }
-
-    func sendShutdown(_ quicStream: QuicStream) {
-        let stream = impl.streams.read { streams in
-            streams[quicStream.id]
-        }
-        if let stream {
-            stream.closeChannel()
-        } else {
-            logger.warning("Stream sendShutdown but stream is gone?", metadata: ["streamId": "\(quicStream.id)"])
         }
     }
 }

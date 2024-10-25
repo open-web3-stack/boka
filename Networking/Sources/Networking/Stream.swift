@@ -6,7 +6,16 @@ import TracingUtils
 import Utils
 
 public enum StreamStatus: Sendable {
-    case open, closed, aborted
+    // bidirection open
+    case open
+    // remote to local channel closed
+    case sendOnly
+    // local to remote channel closed
+    case receiveOnly
+    // stream completely closed
+    case closed
+    // stream aborted
+    case aborted
 }
 
 enum StreamError: Error {
@@ -69,9 +78,21 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         try stream.send(data: data, finish: finish)
     }
 
+    var canSend: Bool {
+        status == .open || status == .sendOnly
+    }
+
+    var canReceive: Bool {
+        status == .open || status == .receiveOnly
+    }
+
+    var ended: Bool {
+        status == .closed || status == .aborted
+    }
+
     // send message with length prefix
     func send(message: Data, finish: Bool = false) throws {
-        guard status == .open else {
+        guard canSend else {
             throw StreamError.notOpen
         }
 
@@ -82,9 +103,20 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         }
         try stream.send(data: lengthData, finish: false)
         try stream.send(data: message, finish: finish)
+        if finish {
+            status = .receiveOnly
+        }
     }
 
-    func received(data: Data) {
+    func received(data: Data?) {
+        guard let data else {
+            if !canReceive {
+                logger.warning("unexpected status: \(status)")
+            }
+            status = .sendOnly
+            channel.close()
+            return
+        }
         if data.isEmpty {
             return
         }
@@ -96,7 +128,7 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
 
     // initiate stream close
     public func close(abort: Bool = false) {
-        if status != .open {
+        if ended {
             logger.warning("Trying to close stream \(id) in status \(status)")
             return
         }
@@ -105,13 +137,10 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         try? stream.shutdown(errorCode: abort ? 1 : 0) // TODO: define some error code
     }
 
-    public func closeChannel() {
-        channel.close()
-    }
-
     // remote initiated close
     func closed(abort: Bool = false) {
         status = abort ? .aborted : .closed
+        channel.close()
     }
 
     func receive() async -> Data? {
