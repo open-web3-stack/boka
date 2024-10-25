@@ -30,6 +30,6 @@ public final class NodeDataSource: DataSource {
     }
 
     public func getPeersCount() async throws -> Int {
-        networkManager.getPeersCount()
+        networkManager.peersCount
     }
 }

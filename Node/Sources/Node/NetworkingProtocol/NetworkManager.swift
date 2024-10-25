@@ -114,8 +114,8 @@ public final class NetworkManager: Sendable {
         }
     }
 
-    public func getPeersCount() -> Int {
-        network.getPeersCount()
+    public var peersCount: Int {
+        network.peersCount
     }
 }
 
