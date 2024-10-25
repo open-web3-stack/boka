@@ -34,6 +34,10 @@ public class JamDecoder {
             )
         }
     }
+
+    public var isAtEnd: Bool {
+        input.isEmpty
+    }
 }
 
 protocol ArrayWrapper: Collection where Element: Decodable {
