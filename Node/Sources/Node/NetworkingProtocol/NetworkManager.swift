@@ -7,7 +7,9 @@ import Utils
 
 private let logger = Logger(label: "NetworkManager")
 
-enum SendTarget {
+let MAX_BLOCKS_PER_REQUEST: UInt32 = 50
+
+enum BroadcastTarget {
     case safroleStep1Validator
     case currentValidators
 }
@@ -15,6 +17,7 @@ enum SendTarget {
 public final class NetworkManager: Sendable {
     private let peerManager: PeerManager
     private let network: Network
+    private let syncManager: SyncManager
     private let blockchain: Blockchain
     private let subscriptions: EventSubscriptions
 
@@ -23,16 +26,19 @@ public final class NetworkManager: Sendable {
     private let devPeers: Set<NetAddr>
 
     public init(config: Network.Config, blockchain: Blockchain, eventBus: EventBus, devPeers: Set<NetAddr>) async throws {
-        peerManager = PeerManager()
+        peerManager = PeerManager(eventBus: eventBus)
 
-        let handler = HandlerImpl(blockchain: blockchain, peerManager: peerManager)
         network = try await Network(
             config: config,
             protocolConfig: blockchain.config,
             genesisHeader: blockchain.dataProvider.genesisBlockHash,
-            handler: handler
+            handler: HandlerImpl(blockchain: blockchain, peerManager: peerManager)
+        )
+        syncManager = SyncManager(
+            blockchain: blockchain, network: network, peerManager: peerManager, eventBus: eventBus
         )
         self.blockchain = blockchain
+
         subscriptions = EventSubscriptions(eventBus: eventBus)
 
         self.devPeers = devPeers
@@ -53,7 +59,7 @@ public final class NetworkManager: Sendable {
         }
     }
 
-    private func getSendTarget(target: SendTarget) -> Set<NetAddr> {
+    private func getAddresses(target: BroadcastTarget) -> Set<NetAddr> {
         // TODO: get target from onchain state
         switch target {
         case .safroleStep1Validator:
@@ -65,31 +71,29 @@ public final class NetworkManager: Sendable {
         }
     }
 
-    private func send<R: Decodable>(
+    private func send(to: NetAddr, message: CERequest) async throws -> Data {
+        try await network.send(to: to, message: message)
+    }
+
+    private func broadcast(
+        to: BroadcastTarget,
         message: CERequest,
-        target: SendTarget,
-        responseType: R.Type,
-        responseHandler: @Sendable @escaping (Result<R, Error>) async -> Void
+        responseHandler: @Sendable @escaping (Result<Data, Error>) async -> Void
     ) async {
-        let targets = getSendTarget(target: target)
+        let targets = getAddresses(target: to)
         for target in targets {
             Task {
                 logger.trace("sending message", metadata: ["target": "\(target)", "message": "\(message)"])
                 let res = await Result {
                     try await network.send(to: target, message: message)
                 }
-                .flatMap { data in
-                    Result(catching: {
-                        try JamDecoder.decode(responseType, from: data, withConfig: blockchain.config)
-                    })
-                }
                 await responseHandler(res)
             }
         }
     }
 
-    private func send(message: CERequest, target: SendTarget) async {
-        let targets = getSendTarget(target: target)
+    private func broadcast(to: BroadcastTarget, message: CERequest) async {
+        let targets = getAddresses(target: to)
         for target in targets {
             Task {
                 logger.trace("sending message", metadata: ["target": "\(target)", "message": "\(message)"])
@@ -103,13 +107,13 @@ public final class NetworkManager: Sendable {
     private func on(safroleTicketsGenerated event: RuntimeEvents.SafroleTicketsGenerated) async {
         logger.trace("sending tickets", metadata: ["epochIndex": "\(event.epochIndex)"])
         for ticket in event.items {
-            await send(
+            await broadcast(
+                to: .safroleStep1Validator,
                 message: .safroleTicket1(.init(
                     epochIndex: event.epochIndex,
                     attempt: ticket.ticket.attempt,
                     proof: ticket.ticket.signature
-                )),
-                target: .safroleStep1Validator
+                ))
             )
         }
     }
@@ -125,6 +129,40 @@ struct HandlerImpl: NetworkProtocolHandler {
 
     func handle(ceRequest: CERequest) async throws -> (any Encodable)? {
         switch ceRequest {
+        case let .blockRequest(message):
+            let dataProvider = blockchain.dataProvider
+            let count = min(MAX_BLOCKS_PER_REQUEST, message.maxBlocks)
+            var resp = [BlockRef]()
+            resp.reserveCapacity(Int(count))
+            switch message.direction {
+            case .ascendingExcludsive:
+                let number = try await dataProvider.getBlockNumber(hash: message.hash)
+                var currentHash = message.hash
+                for i in 1 ... count {
+                    let hashes = try await dataProvider.getBlockHash(byNumber: number + i)
+                    var found = false
+                    for hash in hashes {
+                        let block = try await dataProvider.getBlock(hash: hash)
+                        if block.header.parentHash == currentHash {
+                            resp.append(block)
+                            found = true
+                            currentHash = hash
+                            break
+                        }
+                    }
+                    if !found {
+                        break
+                    }
+                }
+            case .descendingInclusive:
+                var hash = message.hash
+                for _ in 0 ..< count {
+                    let block = try await dataProvider.getBlock(hash: hash)
+                    resp.append(block)
+                    hash = block.header.parentHash
+                }
+            }
+            return resp
         case let .safroleTicket1(message):
             blockchain.publish(event: RuntimeEvents.SafroleTicketsReceived(
                 items: [
