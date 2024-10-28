@@ -147,7 +147,7 @@ extension BlockchainDataProvider {
         try await dataProvider.remove(hash: hash)
     }
 
-    public var genesisBlockHash: Data32 {
+    public nonisolated var genesisBlockHash: Data32 {
         dataProvider.genesisBlockHash
     }
 

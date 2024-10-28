@@ -27,16 +27,17 @@ public class Node {
     public let config: Config
     public let blockchain: Blockchain
     public let rpcServer: Server?
-    public let timeProvider: TimeProvider
+    public let scheduler: Scheduler
     public let dataProvider: BlockchainDataProvider
     public let keystore: KeyStore
     public let network: NetworkManager
 
-    public init(
+    public required init(
         config: Config,
         genesis: Genesis,
         eventBus: EventBus,
-        keystore: KeyStore
+        keystore: KeyStore,
+        scheduler: Scheduler = DispatchQueueScheduler(timeProvider: SystemTimeProvider())
     ) async throws {
         self.config = config
 
@@ -45,11 +46,11 @@ public class Node {
         logger.info("Genesis: \(genesisBlock.hash)")
 
         dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
-        timeProvider = SystemTimeProvider()
+        self.scheduler = scheduler
         let blockchain = try await Blockchain(
             config: protocolConfig,
             dataProvider: dataProvider,
-            timeProvider: timeProvider,
+            timeProvider: scheduler.timeProvider,
             eventBus: eventBus
         )
         self.blockchain = blockchain

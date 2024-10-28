@@ -28,7 +28,9 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         await subscribe(RuntimeEvents.SafroleTicketsGenerated.self, id: "BlockAuthor.SafroleTicketsGenerated") { [weak self] event in
             try await self?.on(safroleTicketsGenerated: event)
         }
+    }
 
+    public func onSyncCompleted() async {
         scheduleForNextEpoch("BlockAuthor.scheduleForNextEpoch") { [weak self] epoch in
             await self?.onBeforeEpoch(epoch: epoch)
         }
@@ -37,7 +39,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
     public func on(genesis _: StateRef) async {
         let nowTimeslot = timeProvider.getTime().timeToTimeslot(config: config)
         // schedule for current epoch
-        let epoch = (nowTimeslot + 1).timeslotToEpochIndex(config: config)
+        let epoch = nowTimeslot.timeslotToEpochIndex(config: config)
         await onBeforeEpoch(epoch: epoch)
     }
 
@@ -179,8 +181,10 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
 
             let bestHeadTimeslot = bestHead.timeslot
             let bestHeadEpoch = bestHeadTimeslot.timeslotToEpochIndex(config: config)
-            if bestHeadEpoch + 1 != epoch {
+            if bestHeadEpoch != 0, bestHeadEpoch + 1 < epoch {
                 logger.warning("best head epoch \(bestHeadEpoch) is too far from current epoch \(epoch)")
+            } else if bestHeadEpoch >= epoch {
+                logger.error("trying to do onBeforeEpoch for epoch \(epoch) but best head epoch is \(bestHeadEpoch)")
             }
 
             let state = try await dataProvider.getState(hash: bestHead.hash)
