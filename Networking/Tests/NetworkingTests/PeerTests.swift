@@ -370,8 +370,8 @@ struct PeerTests {
             let tasks = (1 ... 88).map { _ in
                 Task {
                     let net = try peer.listenAddress()
-                    let random = arc4random()
-                    let type = arc4random() % 2 == 0 ? EphemeralStreamKind.typeA : EphemeralStreamKind.typeB
+                    let random = Int(arc4random_uniform(100))
+                    let type = random % 2 == 0 ? EphemeralStreamKind.typeA : EphemeralStreamKind.typeB
                     let messageData = Data("Concurrent request \(net.description) + \(random)".utf8)
                     let response = try await peer.connect(
                         to: net,
