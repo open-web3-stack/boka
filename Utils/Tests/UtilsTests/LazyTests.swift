@@ -1,4 +1,3 @@
-import Atomics
 import Testing
 
 @testable import Utils
