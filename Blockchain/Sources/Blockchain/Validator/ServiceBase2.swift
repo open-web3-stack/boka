@@ -1,4 +1,3 @@
-import Atomics
 import Foundation
 import TracingUtils
 import Utils
