@@ -120,6 +120,10 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         if data.isEmpty {
             return
         }
+        guard canReceive else {
+            logger.warning("unexpected status: \(status)")
+            return
+        }
         if !channel.syncSend(data) {
             logger.warning("stream \(id) is full")
             // TODO: backpressure handling

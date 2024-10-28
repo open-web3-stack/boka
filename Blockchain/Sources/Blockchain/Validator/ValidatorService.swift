@@ -40,6 +40,10 @@ public final class ValidatorService: Sendable {
         )
     }
 
+    public func onSyncCompleted() async {
+        await blockAuthor.onSyncCompleted()
+    }
+
     public func on(genesis: StateRef) async {
         await safrole.on(genesis: genesis)
         await blockAuthor.on(genesis: genesis)

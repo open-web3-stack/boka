@@ -44,6 +44,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
     }
 
     public func request(_ request: Handler.EphemeralHandler.Request) async throws -> Data {
+        logger.trace("sending request", metadata: ["kind": "\(request.kind)"])
         let data = try request.encode()
         let kind = request.kind
         let stream = try createStream(kind: kind)
@@ -194,11 +195,7 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
         )
         var decoder = handler.createDecoder(kind: kind)
         do {
-            while true {
-                let data = try await receiveMaybeData(stream: stream)
-                guard let data else {
-                    break
-                }
+            while let data = try await receiveMaybeData(stream: stream) {
                 let msg = try decoder.decode(data: data)
                 try await handler.handle(connection: connection, message: msg)
             }

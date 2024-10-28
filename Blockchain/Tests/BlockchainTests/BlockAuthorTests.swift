@@ -12,6 +12,7 @@ struct BlockAuthorTests {
         let services = await BlockchainServices()
         let blockAuthor = await services.blockAuthor
         let runtime = Runtime(config: services.config)
+        await blockAuthor.onSyncCompleted()
         return (services, blockAuthor, runtime)
     }
 
@@ -108,7 +109,7 @@ struct BlockAuthorTests {
 
         await blockAuthor.on(genesis: genesisState)
 
-        #expect(scheduler.storage.value.tasks.count > 0)
+        #expect(scheduler.taskCount > 0)
 
         await scheduler.advance(by: TimeInterval(2))
 

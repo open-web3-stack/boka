@@ -107,13 +107,16 @@ public final class Peer<Handler: StreamHandler>: Sendable {
     // TODO: see if we can remove the role parameter
     public func connect(to address: NetAddr, role: PeerRole) throws -> Connection<Handler> {
         let conn = impl.connections.read { connections in
-            connections.byType[role]?[address]
+            connections.byAddr[address]?.0
         }
         return try conn ?? impl.connections.write { connections in
-            let curr = connections.byType[role, default: [:]][address]
+            let curr = connections.byAddr[address]?.0
             if let curr {
                 return curr
             }
+
+            logger.debug("connecting to peer", metadata: ["address": "\(address)", "role": "\(role)"])
+
             let quicConn = try QuicConnection(
                 handler: PeerEventHandler(self.impl),
                 registration: self.impl.clientConfiguration.registration,
@@ -127,7 +130,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
                 remoteAddress: address,
                 initiatedByLocal: true
             )
-            connections.byType[role, default: [:]][address] = conn
+            connections.byAddr[address] = (conn, role)
             connections.byId[conn.id] = conn
             return conn
         }
@@ -144,7 +147,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
         }
         for connection in connections {
             if let stream = try? connection.createPreistentStream(kind: kind) {
-                let res = Result(catching: { try stream.send(data: messageData) })
+                let res = Result(catching: { try stream.send(message: messageData) })
                 switch res {
                 case .success:
                     break
@@ -167,7 +170,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
 
 final class PeerImpl<Handler: StreamHandler>: Sendable {
     struct ConnectionStorage {
-        var byType: [PeerRole: [NetAddr: Connection<Handler>]] = [:]
+        var byAddr: [NetAddr: (Connection<Handler>, PeerRole)] = [:]
         var byId: [UniqueId: Connection<Handler>] = [:]
     }
 
@@ -212,14 +215,14 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
     func addConnection(_ connection: QuicConnection, addr: NetAddr, role: PeerRole) -> Bool {
         connections.write { connections in
             if role == .builder {
-                let currentCount = connections.byType[role]?.count ?? 0
+                let currentCount = connections.byAddr.values.filter { $0.1 == role }.count
                 if currentCount >= self.settings.maxBuilderConnections {
                     self.logger.warning("max builder connections reached")
                     // TODO: consider connection rotation strategy
                     return false
                 }
             }
-            if connections.byType[role, default: [:]][addr] != nil {
+            if connections.byAddr[addr] != nil {
                 self.logger.warning("connection already exists")
                 return false
             }
@@ -230,7 +233,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                 remoteAddress: addr,
                 initiatedByLocal: false
             )
-            connections.byType[role, default: [:]][addr] = conn
+            connections.byAddr[addr] = (conn, role)
             connections.byId[connection.id] = conn
             return true
         }
@@ -328,7 +331,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         impl.connections.write { connections in
             if let conn = connections.byId[connection.id] {
                 connections.byId.removeValue(forKey: connection.id)
-                connections.byType[conn.role]?.removeValue(forKey: conn.remoteAddress)
+                connections.byAddr[conn.remoteAddress] = nil
             }
         }
     }

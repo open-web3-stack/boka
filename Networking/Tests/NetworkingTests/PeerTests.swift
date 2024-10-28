@@ -17,10 +17,7 @@ struct PeerTests {
         var kind: Kind
         var data: Data
         func encode() throws -> Data {
-            let length = UInt32(data.count)
-            var lengthData = withUnsafeBytes(of: length.littleEndian) { Data($0) }
-            lengthData.append(data)
-            return lengthData
+            data
         }
 
         typealias StreamKind = Kind
@@ -101,19 +98,8 @@ struct PeerTests {
 
         func handle(connection _: any ConnectionInfoProtocol, request: Request) async throws -> Data {
             let data = request.data
-            guard data.count >= 4 else {
-                throw NSError(
-                    domain: "ExtractError", code: 1,
-                    userInfo: [NSLocalizedDescriptionKey: "Data too short to contain length"]
-                )
-            }
-            let lengthData = data.prefix(4)
-            let length = UInt32(
-                littleEndian: lengthData.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
-            )
-            let actualData = data.dropFirst(4).prefix(Int(length))
-            await dataStorage.updateData(actualData)
-            return actualData
+            await dataStorage.updateData(data)
+            return data
         }
     }
 
@@ -197,7 +183,7 @@ struct PeerTests {
             kind: .uniqueB, message: .init(kind: .uniqueB, data: Data("I am jam".utf8))
         )
         // Verify last received data
-        try? await Task.sleep(for: .milliseconds(1000))
+        try? await Task.sleep(for: .milliseconds(100))
         await #expect(handler2.lastReceivedData == Data("hello world".utf8))
         await #expect(handler1.lastReceivedData == Data("I am jam".utf8))
     }
@@ -422,14 +408,14 @@ struct PeerTests {
         }
 
         // Wait for all connections to establish
-        try? await Task.sleep(for: .seconds(10))
+        try? await Task.sleep(for: .seconds(1))
 
         let centralPeer = peers[0]
         let messagedata = Data("Sync message".utf8)
         centralPeer.broadcast(kind: .uniqueA, message: MockRequest(kind: .uniqueA, data: messagedata))
 
         // Wait for message to propagate
-        try? await Task.sleep(for: .seconds(60))
+        try? await Task.sleep(for: .seconds(2))
 
         // Check that each peer received the broadcast
         for i in 1 ..< handles.count {

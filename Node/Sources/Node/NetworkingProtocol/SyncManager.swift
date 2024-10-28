@@ -8,11 +8,18 @@ private let logger = Logger(label: "SyncManager")
 
 let BLOCK_REQUEST_BLOCK_COUNT: UInt32 = 50
 
+enum SyncStatus {
+    case discovering
+    case bulkSyncing
+    case syncing
+}
+
 // TODO:
 // - pick best peer
 // - remove slow one
 // - sync peer rotation
 // - fast sync mode (no verification)
+// - re-enter to bulk sync mode if new peer with better head is discovered
 public actor SyncManager: Sendable {
     private let blockchain: Blockchain
     private let network: Network
@@ -20,8 +27,7 @@ public actor SyncManager: Sendable {
 
     private let subscriptions: EventSubscriptions
 
-    // starts with bulk syncing mode, until our best have catched up with the peer best
-    private var bulkSyncing = false
+    private var status = SyncStatus.discovering
     private var syncContinuation: [CheckedContinuation<Void, Never>] = []
 
     private var networkBest: HashAndSlot?
@@ -45,7 +51,7 @@ public actor SyncManager: Sendable {
     }
 
     public func waitForSyncCompletion() async {
-        if !bulkSyncing {
+        if status == .syncing {
             return
         }
         await withCheckedContinuation { continuation in
@@ -72,11 +78,21 @@ public actor SyncManager: Sendable {
         }
 
         let currentHead = await blockchain.dataProvider.bestHead
+        if currentHead.timeslot >= networkBest!.timeslot {
+            syncCompleted()
+            return
+        }
 
-        if bulkSyncing {
+        switch status {
+        case .discovering:
+            status = .bulkSyncing
             await bulkSync(currentHead: currentHead)
-        } else if let newBlockHeader {
-            importBlock(currentTimeslot: currentHead.timeslot, newHeader: newBlockHeader, peer: info.address)
+        case .bulkSyncing:
+            await bulkSync(currentHead: currentHead)
+        case .syncing:
+            if let newBlockHeader {
+                importBlock(currentTimeslot: currentHead.timeslot, newHeader: newBlockHeader, peer: info.address)
+            }
         }
     }
 
@@ -106,13 +122,8 @@ public actor SyncManager: Sendable {
 
                     let currentHead = await blockchain.dataProvider.bestHead
                     if currentHead.timeslot >= networkBest!.timeslot {
-                        if bulkSyncing {
-                            bulkSyncing = false
-                            syncContinuation.forEach { $0.resume() }
-                            syncContinuation = []
-                            logger.info("bulk sync completed")
-                            return
-                        }
+                        syncCompleted()
+                        return
                     }
 
                     await bulkSync(currentHead: blockchain.dataProvider.bestHead)
@@ -123,7 +134,17 @@ public actor SyncManager: Sendable {
         }
     }
 
+    private func syncCompleted() {
+        if status != .syncing {
+            status = .syncing
+            syncContinuation.forEach { $0.resume() }
+            syncContinuation = []
+            logger.info("sync completed")
+        }
+    }
+
     private func importBlock(currentTimeslot: TimeslotIndex, newHeader: HeaderRef, peer: NetAddr) {
+        logger.debug("importing block", metadata: ["hash": "\(newHeader.hash)", "remote": "\(peer)"])
         let blockchain = blockchain
         let network = network
         Task.detached {
@@ -135,9 +156,13 @@ public actor SyncManager: Sendable {
                         direction: .descendingInclusive,
                         maxBlocks: max(1, newHeader.value.timeslot - currentTimeslot)
                     )))
-                    let decoded = try JamDecoder.decode([BlockRef].self, from: resp, withConfig: blockchain.config)
+                    let decoder = JamDecoder(data: resp, config: blockchain.config)
+                    var blocks = [BlockRef]()
+                    while !decoder.isAtEnd {
+                        try blocks.append(decoder.decode(BlockRef.self))
+                    }
                     // reverse to import old block first
-                    for block in decoded.reversed() {
+                    for block in blocks.reversed() {
                         try await blockchain.importBlock(block)
                     }
                 } catch {
