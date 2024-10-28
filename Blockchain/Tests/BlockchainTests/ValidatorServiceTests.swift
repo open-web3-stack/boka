@@ -11,7 +11,7 @@ struct ValidatorServiceTests {
         time: TimeInterval = 988,
         keysCount: Int = 12
     ) async throws -> (BlockchainServices, ValidatorService) {
-        setupTestLogger()
+        // setupTestLogger()
 
         let services = await BlockchainServices(
             config: config,
@@ -25,6 +25,7 @@ struct ValidatorServiceTests {
             scheduler: services.scheduler,
             dataProvider: services.dataProvider
         )
+        await validatorService.onSyncCompleted()
         return (services, validatorService)
     }
 
@@ -96,7 +97,7 @@ struct ValidatorServiceTests {
 
     // try different genesis time offset to ensure edge cases are covered
     @Test(arguments: [988, 1000, 1003, 1021])
-    func makeManyBlocks(time: Int) async throws {
+    func makeManyBlocksWithAllKeys(time: Int) async throws {
         let (services, validatorService) = try await setup(time: TimeInterval(time))
         let genesisState = services.genesisState
         let storeMiddleware = services.storeMiddleware

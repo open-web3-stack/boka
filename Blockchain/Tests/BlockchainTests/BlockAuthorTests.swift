@@ -12,6 +12,7 @@ struct BlockAuthorTests {
         let services = await BlockchainServices()
         let blockAuthor = await services.blockAuthor
         let runtime = Runtime(config: services.config)
+        await blockAuthor.onSyncCompleted()
         return (services, blockAuthor, runtime)
     }
 

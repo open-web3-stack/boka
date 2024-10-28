@@ -181,7 +181,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
 
             let bestHeadTimeslot = bestHead.timeslot
             let bestHeadEpoch = bestHeadTimeslot.timeslotToEpochIndex(config: config)
-            if bestHeadEpoch + 1 < epoch {
+            if bestHeadEpoch != 0, bestHeadEpoch + 1 < epoch {
                 logger.warning("best head epoch \(bestHeadEpoch) is too far from current epoch \(epoch)")
             } else if bestHeadEpoch >= epoch {
                 logger.error("trying to do onBeforeEpoch for epoch \(epoch) but best head epoch is \(bestHeadEpoch)")
