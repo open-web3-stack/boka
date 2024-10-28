@@ -1,14 +1,14 @@
-import Atomics
+import Synchronization
 import TracingUtils
 
 public struct UniqueId: Sendable {
-    private static let idGenerator: ManagedAtomic<Int> = ManagedAtomic(0)
+    private static let idGenerator: Atomic<Int> = .init(0)
 
     public let id: Int
     public let name: String
 
     public init(_ name: String = "") {
-        id = UniqueId.idGenerator.loadThenWrappingIncrement(ordering: .relaxed)
+        (_, id) = UniqueId.idGenerator.wrappingAdd(1, ordering: .relaxed)
         self.name = name
     }
 
