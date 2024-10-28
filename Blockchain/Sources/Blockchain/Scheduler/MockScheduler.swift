@@ -1,11 +1,10 @@
-import Blockchain
 import Foundation
 import TracingUtils
 import Utils
 
 private let logger = Logger(label: "MockScheduler")
 
-final class SchedulerTask: Sendable, Comparable {
+private final class SchedulerTask: Sendable, Comparable {
     let id: UniqueId
     let scheduleTime: TimeInterval
     let repeats: TimeInterval?
@@ -35,23 +34,23 @@ final class SchedulerTask: Sendable, Comparable {
     }
 }
 
-struct Storage: Sendable {
-    var tasks: SortedArray<SchedulerTask> = .init([])
+private struct Storage: Sendable {
+    fileprivate var tasks: SortedArray<SchedulerTask> = .init([])
 }
 
-final class MockScheduler: Scheduler, Sendable {
-    let mockTimeProvider: MockTimeProvider
-    var timeProvider: TimeProvider {
+public final class MockScheduler: Scheduler, Sendable {
+    public let mockTimeProvider: MockTimeProvider
+    public var timeProvider: TimeProvider {
         mockTimeProvider
     }
 
-    let storage: ThreadSafeContainer<Storage> = .init(.init())
+    private let storage: ThreadSafeContainer<Storage> = .init(.init())
 
-    init(timeProvider: MockTimeProvider) {
+    public init(timeProvider: MockTimeProvider) {
         mockTimeProvider = timeProvider
     }
 
-    func scheduleImpl(
+    public func scheduleImpl(
         delay: TimeInterval,
         repeats: Bool,
         task: @escaping @Sendable () async -> Void,
@@ -74,13 +73,13 @@ final class MockScheduler: Scheduler, Sendable {
         }
     }
 
-    func advance(by interval: TimeInterval) async {
+    public func advance(by interval: TimeInterval) async {
         let to = timeProvider.getTimeInterval() + interval
         while await advanceNext(to: to) {}
         mockTimeProvider.advance(to: to)
     }
 
-    func advanceNext(to time: TimeInterval) async -> Bool {
+    private func advanceNext(to time: TimeInterval) async -> Bool {
         let task: SchedulerTask? = storage.write { storage in
             if let task = storage.tasks.array.first, task.scheduleTime <= time {
                 storage.tasks.remove(at: 0)

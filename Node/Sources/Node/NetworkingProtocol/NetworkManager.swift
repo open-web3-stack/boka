@@ -15,10 +15,10 @@ enum BroadcastTarget {
 }
 
 public final class NetworkManager: Sendable {
-    let peerManager: PeerManager
-    let network: Network
-    let syncManager: SyncManager
-    let blockchain: Blockchain
+    public let peerManager: PeerManager
+    public let network: Network
+    public let syncManager: SyncManager
+    public let blockchain: Blockchain
     private let subscriptions: EventSubscriptions
 
     // This is for development only
@@ -33,7 +33,7 @@ public final class NetworkManager: Sendable {
     ) async throws {
         peerManager = PeerManager(eventBus: eventBus)
 
-        network = try await Network(
+        network = try Network(
             config: config,
             protocolConfig: blockchain.config,
             genesisHeader: blockchain.dataProvider.genesisBlockHash,
@@ -60,6 +60,13 @@ public final class NetworkManager: Sendable {
                 id: "NetworkManager.SafroleTicketsGenerated"
             ) { [weak self] event in
                 await self?.on(safroleTicketsGenerated: event)
+            }
+
+            await subscriptions.subscribe(
+                RuntimeEvents.BlockImported.self,
+                id: "NetworkManager.BlockImported"
+            ) { [weak self] event in
+                await self?.on(blockImported: event)
             }
         }
     }
@@ -123,6 +130,18 @@ public final class NetworkManager: Sendable {
         }
     }
 
+    private func on(blockImported event: RuntimeEvents.BlockImported) async {
+        logger.debug("sending blocks", metadata: ["hash": "\(event.block.hash)"])
+        let finalized = await blockchain.dataProvider.finalizedHead
+        network.broadcast(
+            kind: .blockAnnouncement,
+            message: .blockAnnouncement(BlockAnnouncement(
+                header: event.block.header.asRef(),
+                finalized: HashAndSlot(hash: finalized.hash, timeslot: finalized.timeslot)
+            ))
+        )
+    }
+
     public var peersCount: Int {
         network.peersCount
     }
@@ -133,6 +152,7 @@ struct HandlerImpl: NetworkProtocolHandler {
     let peerManager: PeerManager
 
     func handle(ceRequest: CERequest) async throws -> [any Encodable] {
+        logger.trace("handling request", metadata: ["request": "\(ceRequest)"])
         switch ceRequest {
         case let .blockRequest(message):
             let dataProvider = blockchain.dataProvider
@@ -164,6 +184,9 @@ struct HandlerImpl: NetworkProtocolHandler {
                 for _ in 0 ..< count {
                     let block = try await dataProvider.getBlock(hash: hash)
                     resp.append(block)
+                    if hash == dataProvider.genesisBlockHash {
+                        break
+                    }
                     hash = block.header.parentHash
                 }
             }

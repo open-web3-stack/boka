@@ -21,7 +21,8 @@ let package = Package(
         .package(path: "../RPC"),
         .package(path: "../TracingUtils"),
         .package(path: "../Utils"),
-        .package(url: "https://github.com/gh123man/Async-Channels.git", from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
+        .package(url: "https://github.com/gh123man/Async-Channels.git", from: "1.0.2"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -38,7 +39,10 @@ let package = Package(
         ),
         .testTarget(
             name: "NodeTests",
-            dependencies: ["Node"]
+            dependencies: [
+                "Node",
+                .product(name: "Testing", package: "swift-testing"),
+            ]
         ),
     ],
     swiftLanguageModes: [.version("6")]
