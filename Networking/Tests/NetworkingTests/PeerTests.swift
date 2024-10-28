@@ -349,7 +349,6 @@ struct PeerTests {
                         to: net,
                         role: .validator
                     ).request(MockRequest(kind: type, data: messageData))
-                    print("received: \(String(decoding: response, as: UTF8.self))")
                     #expect(response == messageData, "Peer should receive correct response")
                 }
             }
