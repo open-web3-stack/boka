@@ -45,7 +45,7 @@ struct ValidatorServiceTests {
         #expect(safroleEvents.count == config.value.totalNumberOfValidators)
 
         // Check if block author tasks were scheduled
-        #expect(scheduler.storage.value.tasks.count > 0)
+        #expect(scheduler.taskCount > 0)
     }
 
     @Test

@@ -108,7 +108,7 @@ struct BlockAuthorTests {
 
         await blockAuthor.on(genesis: genesisState)
 
-        #expect(scheduler.storage.value.tasks.count > 0)
+        #expect(scheduler.taskCount > 0)
 
         await scheduler.advance(by: TimeInterval(2))
 

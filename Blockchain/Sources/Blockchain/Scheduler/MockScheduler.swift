@@ -50,6 +50,10 @@ public final class MockScheduler: Scheduler, Sendable {
         mockTimeProvider = timeProvider
     }
 
+    public var taskCount: Int {
+        storage.read { $0.tasks.array.count }
+    }
+
     public func scheduleImpl(
         delay: TimeInterval,
         repeats: Bool,
