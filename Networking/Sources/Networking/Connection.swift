@@ -11,6 +11,8 @@ public protocol ConnectionInfoProtocol {
     var role: PeerRole { get }
     var remoteAddress: NetAddr { get }
     var publicKey: Data? { get }
+
+    func ready() async throws
 }
 
 enum ConnectionError: Error {
