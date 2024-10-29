@@ -204,7 +204,7 @@ private class ConnectionHandle {
     fileprivate func callbackHandler(event: UnsafePointer<QUIC_CONNECTION_EVENT>) -> QuicStatus {
         switch event.pointee.Type {
         case QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED:
-            logger.trace("Peer certificate received")
+            logger.debug("Peer certificate received")
             if let connection {
                 let evtData = event.pointee.PEER_CERTIFICATE_RECEIVED
                 let data: Data?

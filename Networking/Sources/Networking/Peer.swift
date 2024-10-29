@@ -115,41 +115,6 @@ public final class Peer<Handler: StreamHandler>: Sendable {
         try listener.listenAddress()
     }
 
-    public func reconnect(to address: NetAddr, role: PeerRole) throws -> Connection<Handler> {
-        let conn = impl.connections.read { connections in
-            connections.byAddr[address]
-        }
-        if let conn {
-            print("conn \(conn.id.name)")
-        } else {
-            print("reconnect")
-        }
-        return try impl.connections.write { connections in
-            if let curr = connections.byAddr[address] {
-                return curr
-            }
-
-            logger.info("connecting to peer", metadata: ["address": "\(address)", "role": "\(role)"])
-
-            let quicConn = try QuicConnection(
-                handler: PeerEventHandler(self.impl),
-                registration: self.impl.clientConfiguration.registration,
-                configuration: self.impl.clientConfiguration
-            )
-            try quicConn.connect(to: address)
-            let conn = Connection(
-                quicConn,
-                impl: self.impl,
-                role: role,
-                remoteAddress: address,
-                initiatedByLocal: true
-            )
-            connections.byAddr[address] = conn
-            connections.byId[conn.id] = conn
-            return conn
-        }
-    }
-
     // TODO: see if we can remove the role parameter
     public func connect(to address: NetAddr, role: PeerRole) throws -> Connection<Handler> {
         let conn = impl.connections.read { connections in
@@ -411,15 +376,16 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
     }
 
     func shutdownComplete(_ connection: QuicConnection) {
-        logger.info("connection shutdown complete", metadata: ["connectionId": "\(connection.id)"])
+        logger.debug("connection shutdown complete", metadata: ["connectionId": "\(connection.id)"])
         impl.connections.write { connections in
             if let conn = connections.byId[connection.id] {
-                conn.closed()
-                connections.byId.removeValue(forKey: connection.id)
-                connections.byAddr.removeValue(forKey: conn.remoteAddress)
+                // remove publickey first,func closed will change state to closed
                 if let publicKey = conn.publicKey {
                     connections.byPublicKey.removeValue(forKey: publicKey)
                 }
+                conn.closed()
+                connections.byId.removeValue(forKey: connection.id)
+                connections.byAddr.removeValue(forKey: conn.remoteAddress)
             }
         }
     }
