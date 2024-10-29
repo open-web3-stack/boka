@@ -1,6 +1,6 @@
 # Boka
 
-JAM built with Swift
+Boka / 波卡 / bō kǎ: A JAM implementation built with Swift, brought to you by Laminar Labs.
 
 ## Development Environment
 
