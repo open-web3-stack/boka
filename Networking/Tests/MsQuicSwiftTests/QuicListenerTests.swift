@@ -133,7 +133,7 @@ struct QuicListenerTests {
         }.first!
         try remoteStream2.send(data: Data("another replay to 2".utf8))
 
-        try? await Task.sleep(for: .milliseconds(100))
+        try? await Task.sleep(for: .milliseconds(200))
         let receivedData = serverHandler.events.value.compactMap {
             switch $0 {
             case let .dataReceived(_, data):

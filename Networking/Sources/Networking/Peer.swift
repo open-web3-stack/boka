@@ -60,6 +60,8 @@ public final class Peer<Handler: StreamHandler>: Sendable {
         impl.logger
     }
 
+    public let publicKey: Data
+
     public init(options: PeerOptions<Handler>) throws {
         let logger = Logger(label: "Peer".uniqueId)
 
@@ -81,11 +83,14 @@ public final class Peer<Handler: StreamHandler>: Sendable {
             registration: registration, pkcs12: pkcs12, alpns: [clientAlpn], client: true, settings: options.clientSettings
         )
 
+        publicKey = options.secretKey.publicKey.data.data
+
         impl = PeerImpl(
             logger: logger,
             role: options.role,
             settings: options.peerSettings,
             alpns: alpns,
+            publicKey: publicKey,
             clientConfiguration: clientConfiguration,
             presistentStreamHandler: options.presistentStreamHandler,
             ephemeralStreamHandler: options.ephemeralStreamHandler
@@ -98,6 +103,12 @@ public final class Peer<Handler: StreamHandler>: Sendable {
             listenAddress: options.listenAddress,
             alpns: allAlpns
         )
+
+        logger.debug("Peer initialized", metadata: [
+            "listenAddress": "\(options.listenAddress)",
+            "role": "\(options.role)",
+            "publicKey": "\(options.secretKey.publicKey.data.toHexString())",
+        ])
     }
 
     public func listenAddress() throws -> NetAddr {
@@ -185,6 +196,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
     fileprivate let settings: PeerSettings
     fileprivate let alpns: [PeerRole: Data]
     fileprivate let alpnLookup: [Data: PeerRole]
+    fileprivate let publicKey: Data
 
     fileprivate let clientConfiguration: QuicConfiguration
 
@@ -199,6 +211,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
         role: PeerRole,
         settings: PeerSettings,
         alpns: [PeerRole: Data],
+        publicKey: Data,
         clientConfiguration: QuicConfiguration,
         presistentStreamHandler: Handler.PresistentHandler,
         ephemeralStreamHandler: Handler.EphemeralHandler
@@ -207,6 +220,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
         self.role = role
         self.settings = settings
         self.alpns = alpns
+        self.publicKey = publicKey
         self.clientConfiguration = clientConfiguration
         self.presistentStreamHandler = presistentStreamHandler
         self.ephemeralStreamHandler = ephemeralStreamHandler
@@ -302,12 +316,19 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             if alternativeName != generateSubjectAlternativeName(pubkey: publicKey) {
                 return .code(.badCert)
             }
-            if impl.role == PeerRole.validator {
-                // TODO: verify if it is current or next validator
-            }
-            conn.publicKey = publicKey
 
-            return impl.connections.write { connections in
+            if publicKey == impl.publicKey {
+                // self connection
+                logger.trace("self connection rejected", metadata: [
+                    "connectionId": "\(connection.id)",
+                    "publicKey": "\(publicKey.toHexString())",
+                ])
+                return .code(.connectionRefused)
+            }
+
+            // TODO: verify if it is current or next validator
+
+            return try impl.connections.write { connections in
                 if connections.byPublicKey.keys.contains(publicKey) {
                     // duplicated connection
                     logger.debug("duplicated connection rejected", metadata: [
@@ -318,6 +339,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                     return .code(.connectionRefused)
                 }
                 connections.byPublicKey[publicKey] = conn
+                try conn.opened(publicKey: publicKey)
                 return .code(.success)
             }
         } catch {
@@ -357,6 +379,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         logger.trace("connection shutdown complete", metadata: ["connectionId": "\(connection.id)"])
         impl.connections.write { connections in
             if let conn = connections.byId[connection.id] {
+                conn.closed()
                 connections.byId.removeValue(forKey: connection.id)
                 connections.byAddr.removeValue(forKey: conn.remoteAddress)
                 if let publicKey = conn.publicKey {
