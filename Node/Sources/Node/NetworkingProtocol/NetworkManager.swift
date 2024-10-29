@@ -23,7 +23,7 @@ public final class NetworkManager: Sendable {
 
     // This is for development only
     // Those peers will receive all the messages regardless the target
-    private let devPeers: Set<NetAddr>
+    private let devPeers: Set<Either<PeerId, NetAddr>>
 
     public init(
         config: Network.Config,
@@ -46,13 +46,23 @@ public final class NetworkManager: Sendable {
 
         subscriptions = EventSubscriptions(eventBus: eventBus)
 
-        self.devPeers = devPeers
-
-        for peer in devPeers {
-            _ = try network.connect(to: peer, role: .validator)
-        }
+        var selfDevPeers = Set<Either<PeerId, NetAddr>>()
 
         logger.info("P2P Listening on \(try! network.listenAddress())")
+
+        for peer in devPeers {
+            let conn = try network.connect(to: peer, role: .validator)
+            try? await conn.ready()
+            let pubkey = conn.publicKey
+            if let pubkey {
+                selfDevPeers.insert(.left(PeerId(publicKey: pubkey, address: peer)))
+            } else {
+                // unable to connect, add as address
+                selfDevPeers.insert(.right(peer))
+            }
+        }
+
+        self.devPeers = selfDevPeers
 
         Task {
             await subscriptions.subscribe(
@@ -76,10 +86,10 @@ public final class NetworkManager: Sendable {
         switch target {
         case .safroleStep1Validator:
             // TODO: only send to the selected validator in the spec
-            Set(devPeers.map { .right($0) })
+            devPeers
         case .currentValidators:
             // TODO: read onchain state for validators
-            Set(devPeers.map { .right($0) })
+            devPeers
         }
     }
 
