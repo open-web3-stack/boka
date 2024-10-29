@@ -10,6 +10,7 @@ public protocol ConnectionInfoProtocol {
     var id: UniqueId { get }
     var role: PeerRole { get }
     var remoteAddress: NetAddr { get }
+    var publicKey: Data? { get }
 }
 
 enum ConnectionError: Error {
@@ -26,6 +27,16 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         [Handler.PresistentHandler.StreamKind: Stream<Handler>]
     > = .init([:])
     let initiatedByLocal: Bool
+    private let _publicKey: ThreadSafeContainer<Data?> = .init(nil)
+
+    public internal(set) var publicKey: Data? {
+        get {
+            _publicKey.value
+        }
+        set {
+            _publicKey.value = newValue
+        }
+    }
 
     public var id: UniqueId {
         connection.id
