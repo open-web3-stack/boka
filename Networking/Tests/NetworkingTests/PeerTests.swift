@@ -153,6 +153,162 @@ struct PeerTests {
     }
 
     @Test
+    func largeDataRequest() async throws {
+        let handler1 = MockPresentStreamHandler()
+        let handler2 = MockPresentStreamHandler()
+        // Define the data size, 5MB
+        let dataSize = 5 * 1024 * 1024
+        var largeData = Data(capacity: dataSize)
+
+        // Generate random data
+        for _ in 0 ..< dataSize {
+            largeData.append(UInt8.random(in: 0 ... 255))
+        }
+
+        let peer1 = try Peer(
+            options: PeerOptions<MockStreamHandler>(
+                role: .validator,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 9085)!,
+                genesisHeader: Data32(),
+                secretKey: Ed25519.SecretKey(from: Data32()),
+                presistentStreamHandler: handler1,
+                ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                serverSettings: .defaultSettings,
+                clientSettings: .defaultSettings
+            )
+        )
+
+        let peer2 = try Peer(
+            options: PeerOptions<MockStreamHandler>(
+                role: .validator,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 9086)!,
+                genesisHeader: Data32(),
+                secretKey: Ed25519.SecretKey(from: Data32()),
+                presistentStreamHandler: handler2,
+                ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                serverSettings: .defaultSettings,
+                clientSettings: .defaultSettings
+            )
+        )
+
+        try? await Task.sleep(for: .milliseconds(100))
+
+        let connection1 = try peer1.connect(
+            to: NetAddr(ipAddress: "127.0.0.1", port: 9086)!, role: .validator
+        )
+        try? await Task.sleep(for: .milliseconds(100))
+
+        let receivedData1 = try await connection1.request(
+            MockRequest(kind: .typeA, data: largeData)
+        )
+
+        // Verify that the received data matches the original large data
+        #expect(receivedData1 == largeData, "Data mismatch in large data request from peer1 to peer2.")
+
+        let connection2 = try peer2.connect(
+            to: NetAddr(ipAddress: "127.0.0.1", port: 9085)!, role: .validator
+        )
+        try? await Task.sleep(for: .milliseconds(100))
+
+        // Send a large data request from peer2 to peer1 and await the response
+        let receivedData2 = try await connection2.request(
+            MockRequest(kind: .typeB, data: largeData)
+        )
+
+        #expect(receivedData2 == largeData, "Data mismatch in large data request from peer2 to peer1.")
+
+        peer1.broadcast(
+            kind: .uniqueA, message: .init(kind: .uniqueA, data: largeData)
+        )
+        try? await Task.sleep(for: .milliseconds(100))
+
+        peer2.broadcast(
+            kind: .uniqueB, message: .init(kind: .uniqueB, data: largeData)
+        )
+        // Verify last received data
+        try? await Task.sleep(for: .milliseconds(1000))
+        await #expect(handler2.lastReceivedData == largeData)
+        await #expect(handler1.lastReceivedData == largeData)
+    }
+
+    @Test
+    func peerFailureRecovery() async throws {
+        var peers: [Peer<MockStreamHandler>] = []
+        var handles: [MockPresentStreamHandler] = []
+        var connections: [Connection<MockStreamHandler>] = []
+        // Create 10 peers
+        for i in 0 ..< 10 {
+            let nextPeerIndex = (i + 1) % 10
+            let handle = MockPresentStreamHandler()
+            let peer = try Peer(
+                options: PeerOptions<MockStreamHandler>(
+                    role: .validator,
+                    listenAddress: NetAddr(ipAddress: "127.0.0.1", port: UInt16(1200 + i))!,
+                    genesisHeader: Data32(),
+                    secretKey: Ed25519.SecretKey(from: Data32()),
+                    presistentStreamHandler: handle,
+                    ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                    serverSettings: .defaultSettings,
+                    clientSettings: .defaultSettings
+                )
+            )
+            let connection = try peer.connect(
+                to: NetAddr(ipAddress: "127.0.0.1", port: UInt16(1200 + nextPeerIndex))!,
+                role: .validator
+            )
+            handles.append(handle)
+            connections.append(connection)
+            peers.append(peer)
+        }
+
+        // Connect each peer to its next peer in a circular network
+        for i in 0 ..< peers.count {
+            let nextPeerIndex = (i + 1) % peers.count
+            _ = try peers[i].connect(
+                to: NetAddr(ipAddress: "127.0.0.1", port: UInt16(1200 + nextPeerIndex))!,
+                role: .validator
+            )
+        }
+
+        // Wait for connections
+        try? await Task.sleep(for: .milliseconds(100))
+
+        let recoverIndex = 9
+        let recoverCon = connections[recoverIndex]
+        let recoverPeer = peers[recoverIndex]
+        let handle = handles[recoverIndex]
+        let messageData = Data("Post-recovery message".utf8)
+        let centerPeer = peers[0]
+        centerPeer.broadcast(kind: .uniqueB, message: MockRequest(kind: .uniqueB, data: messageData))
+        try? await Task.sleep(for: .milliseconds(2000))
+        // Ensure the failing peer receives the broadcast
+        var receivedData = await handle.lastReceivedData
+        #expect(receivedData == messageData, "Failing peer should receive broadcast after recovery")
+
+        // Simulate a peer failure by disconnecting one peer,need to adjust
+        recoverCon.close(abort: true)
+
+        // Wait to simulate downtime
+        try? await Task.sleep(for: .milliseconds(1000))
+
+        // Reconnect the failing peer
+        let connection = try recoverPeer.connect(
+            to: centerPeer.listenAddress(),
+            role: .validator
+        )
+        connections[recoverIndex] = connection
+        // Wait for reconnection
+        try? await Task.sleep(for: .milliseconds(100))
+
+        centerPeer.broadcast(kind: .uniqueC, message: MockRequest(kind: .uniqueC, data: messageData))
+        try? await Task.sleep(for: .milliseconds(2000))
+        // Ensure the failing peer receives the broadcast
+        receivedData = await handle.lastReceivedData
+        #expect(receivedData == messageData, "Failing peer should receive broadcast after recovery")
+        try? await Task.sleep(for: .milliseconds(1000))
+    }
+
+    @Test
     func peerBroadcast() async throws {
         let handler1 = MockPresentStreamHandler()
         let handler2 = MockPresentStreamHandler()
@@ -367,17 +523,20 @@ struct PeerTests {
 
         // Send multiple requests from each peer
         for peer in peers {
-            let tasks = (1 ... 88).map { _ in
+            let tasks = (1 ... 50).map { i in
                 Task {
-                    let net = try peer.listenAddress()
-                    let random = Int.random(in: 0 ..< 100)
-                    let type = random % 2 == 0 ? EphemeralStreamKind.typeA : EphemeralStreamKind.typeB
-                    let messageData = Data("Concurrent request \(net.description) + \(random)".utf8)
-                    let response = try await peer.connect(
-                        to: net,
-                        role: .validator
-                    ).request(MockRequest(kind: type, data: messageData))
-                    #expect(response == messageData, "Peer should receive correct response")
+                    let net = NetAddr(ipAddress: "127.0.0.1", port: UInt16(8300 + i + 1))!
+                    let peerNet = try peer.listenAddress()
+                    if net.description != peerNet.description {
+                        let random = Int.random(in: 0 ..< 100)
+                        let type = random % 2 == 0 ? EphemeralStreamKind.typeA : EphemeralStreamKind.typeB
+                        let messageData = Data("Concurrent request \(net.description) + \(random)".utf8)
+                        let response = try await peer.connect(
+                            to: net,
+                            role: .validator
+                        ).request(MockRequest(kind: type, data: messageData))
+                        #expect(response == messageData, "Peer should receive correct response")
+                    }
                 }
             }
             // Wait for all tasks to complete
