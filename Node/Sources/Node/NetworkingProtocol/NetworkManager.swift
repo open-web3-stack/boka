@@ -71,19 +71,19 @@ public final class NetworkManager: Sendable {
         }
     }
 
-    private func getAddresses(target: BroadcastTarget) -> Set<NetAddr> {
+    private func getAddresses(target: BroadcastTarget) -> Set<Either<PeerId, NetAddr>> {
         // TODO: get target from onchain state
         switch target {
         case .safroleStep1Validator:
             // TODO: only send to the selected validator in the spec
-            devPeers
+            Set(devPeers.map { .right($0) })
         case .currentValidators:
             // TODO: read onchain state for validators
-            devPeers
+            Set(devPeers.map { .right($0) })
         }
     }
 
-    private func send(to: NetAddr, message: CERequest) async throws -> Data {
+    private func send(to: PeerId, message: CERequest) async throws -> Data {
         try await network.send(to: to, message: message)
     }
 
@@ -97,7 +97,12 @@ public final class NetworkManager: Sendable {
             Task {
                 logger.trace("sending message", metadata: ["target": "\(target)", "message": "\(message)"])
                 let res = await Result {
-                    try await network.send(to: target, message: message)
+                    switch target {
+                    case let .left(peerId):
+                        try await network.send(to: peerId, message: message)
+                    case let .right(address):
+                        try await network.send(to: address, message: message)
+                    }
                 }
                 await responseHandler(res)
             }
@@ -111,7 +116,12 @@ public final class NetworkManager: Sendable {
                 logger.trace("sending message", metadata: ["target": "\(target)", "message": "\(message)"])
                 // not expecting a response
                 // TODO: handle errors and ensure no data is returned
-                _ = try await network.send(to: target, message: message)
+                switch target {
+                case let .left(peerId):
+                    _ = try await network.send(to: peerId, message: message)
+                case let .right(address):
+                    _ = try await network.send(to: address, message: message)
+                }
             }
         }
     }
@@ -219,10 +229,16 @@ struct HandlerImpl: NetworkProtocolHandler {
         switch upMessage {
         case let .blockAnnouncementHandshake(message):
             logger.trace("received block announcement handshake: \(message)")
-            await peerManager.addPeer(address: connection.remoteAddress, handshake: message)
+            try await peerManager.addPeer(
+                id: PeerId(publicKey: connection.publicKey.unwrap(), address: connection.remoteAddress),
+                handshake: message
+            )
         case let .blockAnnouncement(message):
             logger.trace("received block announcement: \(message)")
-            await peerManager.updatePeer(address: connection.remoteAddress, message: message)
+            try await peerManager.updatePeer(
+                id: PeerId(publicKey: connection.publicKey.unwrap(), address: connection.remoteAddress),
+                message: message
+            )
         }
     }
 
