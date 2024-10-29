@@ -376,15 +376,16 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
     }
 
     func shutdownComplete(_ connection: QuicConnection) {
-        logger.trace("connection shutdown complete", metadata: ["connectionId": "\(connection.id)"])
+        logger.debug("connection shutdown complete", metadata: ["connectionId": "\(connection.id)"])
         impl.connections.write { connections in
             if let conn = connections.byId[connection.id] {
-                conn.closed()
-                connections.byId.removeValue(forKey: connection.id)
-                connections.byAddr.removeValue(forKey: conn.remoteAddress)
+                // remove publickey first,func closed will change state to closed
                 if let publicKey = conn.publicKey {
                     connections.byPublicKey.removeValue(forKey: publicKey)
                 }
+                conn.closed()
+                connections.byId.removeValue(forKey: connection.id)
+                connections.byAddr.removeValue(forKey: conn.remoteAddress)
             }
         }
     }
