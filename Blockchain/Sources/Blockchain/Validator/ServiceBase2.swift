@@ -1,4 +1,3 @@
-import Atomics
 import Foundation
 import TracingUtils
 import Utils
@@ -65,7 +64,7 @@ public class ServiceBase2: ServiceBase, @unchecked Sendable {
     public func scheduleForNextEpoch(_ id: UniqueId, fn: @escaping @Sendable (EpochIndex) async -> Void) -> Cancellable {
         let now = timeProvider.getTime()
         let nowTimeslot = now.timeToTimeslot(config: config)
-        let nextEpoch = (nowTimeslot + 1).timeslotToEpochIndex(config: config) + 1
+        let nextEpoch = nowTimeslot.timeslotToEpochIndex(config: config) + 1
         return scheduleFor(epoch: nextEpoch, id: id, fn: fn)
     }
 

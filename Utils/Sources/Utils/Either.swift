@@ -118,3 +118,5 @@ extension Either: EncodedSize where Left: EncodedSize, Right: EncodedSize {
         return nil
     }
 }
+
+extension Either: Hashable where Left: Hashable, Right: Hashable {}

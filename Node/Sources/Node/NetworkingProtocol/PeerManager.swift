@@ -7,7 +7,7 @@ import Utils
 private let logger = Logger(label: "PeerManager")
 
 public struct PeerInfo: Sendable {
-    public let address: NetAddr
+    public let id: PeerId
     public internal(set) var finalized: HashAndSlot
     public internal(set) var heads: Set<HashAndSlot> = []
 
@@ -23,29 +23,29 @@ public struct PeerInfo: Sendable {
 public actor PeerManager: Sendable {
     private let eventBus: EventBus
 
-    public private(set) var peers: [NetAddr: PeerInfo] = [:]
+    public private(set) var peers: [Data: PeerInfo] = [:]
 
     init(eventBus: EventBus) {
         self.eventBus = eventBus
     }
 
-    func addPeer(address: NetAddr, handshake: BlockAnnouncementHandshake) {
+    func addPeer(id: PeerId, handshake: BlockAnnouncementHandshake) {
         var peer = PeerInfo(
-            address: address,
+            id: id,
             finalized: handshake.finalized
         )
         for head in handshake.heads {
             peer.heads.insert(head)
         }
-        peers[address] = peer
+        peers[id.publicKey] = peer
 
-        logger.debug("added peer", metadata: ["address": "\(address)", "finalized": "\(peer.finalized)"])
+        logger.debug("added peer", metadata: ["address": "\(id.address)", "publicKey": "\(id.publicKey)", "finalized": "\(peer.finalized)"])
         eventBus.publish(NetworkEvents.PeerAdded(info: peer))
     }
 
-    func updatePeer(address: NetAddr, message: BlockAnnouncement) {
+    func updatePeer(id: PeerId, message: BlockAnnouncement) {
         let updatedPeer: PeerInfo
-        if var peer = peers[address] {
+        if var peer = peers[id.publicKey] {
             peer.finalized = message.finalized
             // purge heads that are older than the finalized head
             // or if it is the parent of the new block
@@ -59,16 +59,18 @@ public actor PeerManager: Sendable {
         } else {
             // this shouldn't happen but let's handle it
             updatedPeer = PeerInfo(
-                address: address,
+                id: id,
                 finalized: message.finalized,
                 heads: [
                     HashAndSlot(hash: message.header.hash, timeslot: message.header.value.timeslot),
                 ]
             )
         }
-        peers[address] = updatedPeer
+        peers[id.publicKey] = updatedPeer
 
-        logger.debug("updated peer", metadata: ["address": "\(address)", "finalized": "\(updatedPeer.finalized)"])
+        logger.debug("updated peer", metadata: [
+            "address": "\(id.address)", "publicKey": "\(id.publicKey)", "finalized": "\(updatedPeer.finalized)",
+        ])
         eventBus.publish(NetworkEvents.PeerUpdated(info: updatedPeer, newBlockHeader: message.header))
     }
 }

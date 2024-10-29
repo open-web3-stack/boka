@@ -60,6 +60,8 @@ public final class Peer<Handler: StreamHandler>: Sendable {
         impl.logger
     }
 
+    public let publicKey: Data
+
     public init(options: PeerOptions<Handler>) throws {
         let logger = Logger(label: "Peer".uniqueId)
 
@@ -81,11 +83,14 @@ public final class Peer<Handler: StreamHandler>: Sendable {
             registration: registration, pkcs12: pkcs12, alpns: [clientAlpn], client: true, settings: options.clientSettings
         )
 
+        publicKey = options.secretKey.publicKey.data.data
+
         impl = PeerImpl(
             logger: logger,
             role: options.role,
             settings: options.peerSettings,
             alpns: alpns,
+            publicKey: publicKey,
             clientConfiguration: clientConfiguration,
             presistentStreamHandler: options.presistentStreamHandler,
             ephemeralStreamHandler: options.ephemeralStreamHandler
@@ -98,6 +103,12 @@ public final class Peer<Handler: StreamHandler>: Sendable {
             listenAddress: options.listenAddress,
             alpns: allAlpns
         )
+
+        logger.debug("Peer initialized", metadata: [
+            "listenAddress": "\(options.listenAddress)",
+            "role": "\(options.role)",
+            "publicKey": "\(options.secretKey.publicKey.data.toHexString())",
+        ])
     }
 
     public func listenAddress() throws -> NetAddr {
@@ -107,13 +118,15 @@ public final class Peer<Handler: StreamHandler>: Sendable {
     // TODO: see if we can remove the role parameter
     public func connect(to address: NetAddr, role: PeerRole) throws -> Connection<Handler> {
         let conn = impl.connections.read { connections in
-            connections.byType[role]?[address]
+            connections.byAddr[address]
         }
         return try conn ?? impl.connections.write { connections in
-            let curr = connections.byType[role, default: [:]][address]
-            if let curr {
+            if let curr = connections.byAddr[address] {
                 return curr
             }
+
+            logger.debug("connecting to peer", metadata: ["address": "\(address)", "role": "\(role)"])
+
             let quicConn = try QuicConnection(
                 handler: PeerEventHandler(self.impl),
                 registration: self.impl.clientConfiguration.registration,
@@ -127,9 +140,15 @@ public final class Peer<Handler: StreamHandler>: Sendable {
                 remoteAddress: address,
                 initiatedByLocal: true
             )
-            connections.byType[role, default: [:]][address] = conn
+            connections.byAddr[address] = conn
             connections.byId[conn.id] = conn
             return conn
+        }
+    }
+
+    public func getConnection(publicKey: Data) -> Connection<Handler>? {
+        impl.connections.read { connections in
+            connections.byPublicKey[publicKey]
         }
     }
 
@@ -144,7 +163,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
         }
         for connection in connections {
             if let stream = try? connection.createPreistentStream(kind: kind) {
-                let res = Result(catching: { try stream.send(data: messageData) })
+                let res = Result(catching: { try stream.send(message: messageData) })
                 switch res {
                 case .success:
                     break
@@ -167,8 +186,9 @@ public final class Peer<Handler: StreamHandler>: Sendable {
 
 final class PeerImpl<Handler: StreamHandler>: Sendable {
     struct ConnectionStorage {
-        var byType: [PeerRole: [NetAddr: Connection<Handler>]] = [:]
+        var byAddr: [NetAddr: Connection<Handler>] = [:]
         var byId: [UniqueId: Connection<Handler>] = [:]
+        var byPublicKey: [Data: Connection<Handler>] = [:]
     }
 
     fileprivate let logger: Logger
@@ -176,6 +196,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
     fileprivate let settings: PeerSettings
     fileprivate let alpns: [PeerRole: Data]
     fileprivate let alpnLookup: [Data: PeerRole]
+    fileprivate let publicKey: Data
 
     fileprivate let clientConfiguration: QuicConfiguration
 
@@ -190,6 +211,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
         role: PeerRole,
         settings: PeerSettings,
         alpns: [PeerRole: Data],
+        publicKey: Data,
         clientConfiguration: QuicConfiguration,
         presistentStreamHandler: Handler.PresistentHandler,
         ephemeralStreamHandler: Handler.EphemeralHandler
@@ -198,6 +220,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
         self.role = role
         self.settings = settings
         self.alpns = alpns
+        self.publicKey = publicKey
         self.clientConfiguration = clientConfiguration
         self.presistentStreamHandler = presistentStreamHandler
         self.ephemeralStreamHandler = ephemeralStreamHandler
@@ -212,14 +235,14 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
     func addConnection(_ connection: QuicConnection, addr: NetAddr, role: PeerRole) -> Bool {
         connections.write { connections in
             if role == .builder {
-                let currentCount = connections.byType[role]?.count ?? 0
+                let currentCount = connections.byAddr.values.filter { $0.role == role }.count
                 if currentCount >= self.settings.maxBuilderConnections {
                     self.logger.warning("max builder connections reached")
                     // TODO: consider connection rotation strategy
                     return false
                 }
             }
-            if connections.byType[role, default: [:]][addr] != nil {
+            if connections.byAddr[addr] != nil {
                 self.logger.warning("connection already exists")
                 return false
             }
@@ -230,7 +253,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                 remoteAddress: addr,
                 initiatedByLocal: false
             )
-            connections.byType[role, default: [:]][addr] = conn
+            connections.byAddr[addr] = conn
             connections.byId[connection.id] = conn
             return true
         }
@@ -276,6 +299,13 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         guard let certificate else {
             return .code(.requiredCert)
         }
+        let conn = impl.connections.read { connections in
+            connections.byId[connection.id]
+        }
+        guard let conn else {
+            logger.warning("Trying to open connection but connection is gone?", metadata: ["connectionId": "\(connection.id)"])
+            return .code(.connectionRefused)
+        }
         do {
             let (publicKey, alternativeName) = try parseCertificate(data: certificate, type: .x509)
             logger.trace("Certificate parsed", metadata: [
@@ -286,8 +316,31 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             if alternativeName != generateSubjectAlternativeName(pubkey: publicKey) {
                 return .code(.badCert)
             }
-            if impl.role == PeerRole.validator {
-                // TODO: verify if it is current or next validator
+
+            if publicKey == impl.publicKey {
+                // self connection
+                logger.trace("self connection rejected", metadata: [
+                    "connectionId": "\(connection.id)",
+                    "publicKey": "\(publicKey.toHexString())",
+                ])
+                return .code(.connectionRefused)
+            }
+
+            // TODO: verify if it is current or next validator
+
+            return try impl.connections.write { connections in
+                if connections.byPublicKey.keys.contains(publicKey) {
+                    // duplicated connection
+                    logger.debug("duplicated connection rejected", metadata: [
+                        "connectionId": "\(connection.id)",
+                        "publicKey": "\(publicKey.toHexString())",
+                    ])
+                    // TODO: write a test for this
+                    return .code(.connectionRefused)
+                }
+                connections.byPublicKey[publicKey] = conn
+                try conn.opened(publicKey: publicKey)
+                return .code(.success)
             }
         } catch {
             logger.warning("Failed to parse certificate", metadata: [
@@ -295,7 +348,6 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 "error": "\(error)"])
             return .code(.badCert)
         }
-        return .code(.success)
     }
 
     func connected(_ connection: QuicConnection) {
@@ -327,8 +379,12 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         logger.trace("connection shutdown complete", metadata: ["connectionId": "\(connection.id)"])
         impl.connections.write { connections in
             if let conn = connections.byId[connection.id] {
+                conn.closed()
                 connections.byId.removeValue(forKey: connection.id)
-                connections.byType[conn.role]?.removeValue(forKey: conn.remoteAddress)
+                connections.byAddr.removeValue(forKey: conn.remoteAddress)
+                if let publicKey = conn.publicKey {
+                    connections.byPublicKey.removeValue(forKey: publicKey)
+                }
             }
         }
     }

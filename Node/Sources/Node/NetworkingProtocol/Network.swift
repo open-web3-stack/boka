@@ -71,6 +71,11 @@ public final class Network: Sendable {
         try peer.connect(to: to, role: role)
     }
 
+    public func send(to: PeerId, message: CERequest) async throws -> Data {
+        let conn = try peer.getConnection(publicKey: to.publicKey) ?? peer.connect(to: to.address, role: .builder)
+        return try await conn.request(message)
+    }
+
     public func send(to: NetAddr, message: CERequest) async throws -> Data {
         let conn = try peer.connect(to: to, role: .builder)
         return try await conn.request(message)

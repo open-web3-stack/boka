@@ -226,13 +226,14 @@ private class ConnectionHandle {
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
             let evtData = event.pointee.SHUTDOWN_INITIATED_BY_TRANSPORT
-            if evtData.Status == QuicStatusCode.connectionIdle.rawValue {
+            let status = QuicStatus(rawValue: evtData.Status)
+            if status == .code(.connectionIdle) {
                 logger.trace("Successfully shut down on idle.")
                 if let connection {
                     connection.handler.shutdownInitiated(connection, reason: .idle)
                 }
             } else {
-                logger.debug("Shut down by transport. Status: \(evtData.Status) Error: \(evtData.ErrorCode)")
+                logger.debug("Shut down by transport. Status: \(status) Error: \(evtData.ErrorCode)")
                 if let connection {
                     connection.handler.shutdownInitiated(
                         connection,
