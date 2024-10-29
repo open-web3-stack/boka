@@ -10,22 +10,47 @@ public protocol ConnectionInfoProtocol {
     var id: UniqueId { get }
     var role: PeerRole { get }
     var remoteAddress: NetAddr { get }
+    var publicKey: Data? { get }
 }
 
 enum ConnectionError: Error {
     case receiveFailed
     case invalidLength
+    case unexpectedState
+    case closed
+}
+
+enum ConnectionState {
+    case connecting(continuations: [CheckedContinuation<Void, Error>])
+    case connected(publicKey: Data)
+    case closed
 }
 
 public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoProtocol {
     let connection: QuicConnection
     let impl: PeerImpl<Handler>
+
     public let role: PeerRole
     public let remoteAddress: NetAddr
+
     let presistentStreams: ThreadSafeContainer<
         [Handler.PresistentHandler.StreamKind: Stream<Handler>]
     > = .init([:])
     let initiatedByLocal: Bool
+    private let state: ThreadSafeContainer<ConnectionState> = .init(.connecting(continuations: []))
+
+    public var publicKey: Data? {
+        state.read {
+            switch $0 {
+            case .connecting:
+                nil
+            case let .connected(publicKey):
+                publicKey
+            case .closed:
+                nil
+            }
+        }
+    }
 
     public var id: UniqueId {
         connection.id
@@ -39,11 +64,79 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         self.initiatedByLocal = initiatedByLocal
     }
 
+    func opened(publicKey: Data) throws {
+        try state.write { state in
+            if case let .connecting(continuations) = state {
+                for continuation in continuations {
+                    continuation.resume()
+                }
+                state = .connected(publicKey: publicKey)
+            } else {
+                throw ConnectionError.unexpectedState
+            }
+        }
+    }
+
+    func closed() {
+        state.write { state in
+            if case let .connecting(continuations) = state {
+                for continuation in continuations {
+                    continuation.resume(throwing: ConnectionError.closed)
+                }
+                state = .closed
+            }
+            state = .closed
+        }
+    }
+
+    public var isClosed: Bool {
+        state.read {
+            switch $0 {
+            case .connecting:
+                false
+            case .connected:
+                false
+            case .closed:
+                true
+            }
+        }
+    }
+
+    public func ready() async throws {
+        let isReady = state.read {
+            switch $0 {
+            case .connecting:
+                false
+            case .connected:
+                true
+            case .closed:
+                true
+            }
+        }
+
+        if isReady {
+            return
+        }
+        try await withCheckedThrowingContinuation { continuation in
+            state.write { state in
+                if case var .connecting(continuations) = state {
+                    continuations.append(continuation)
+                    state = .connecting(continuations: continuations)
+                } else {
+                    continuation.resume()
+                }
+            }
+        }
+    }
+
     public func close(abort: Bool = false) {
         try? connection.shutdown(errorCode: abort ? 1 : 0) // TODO: define some error code
     }
 
     public func request(_ request: Handler.EphemeralHandler.Request) async throws -> Data {
+        guard !isClosed else {
+            throw ConnectionError.closed
+        }
         logger.trace("sending request", metadata: ["kind": "\(request.kind)"])
         let data = try request.encode()
         let kind = request.kind

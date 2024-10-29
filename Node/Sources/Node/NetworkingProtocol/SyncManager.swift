@@ -32,7 +32,7 @@ public actor SyncManager: Sendable {
 
     private var networkBest: HashAndSlot?
     private var networkFinalizedBest: HashAndSlot?
-    private var currentRequest: (peer: NetAddr, request: BlockRequest)?
+    private var currentRequest: (peer: PeerId, request: BlockRequest)?
 
     public init(blockchain: Blockchain, network: Network, peerManager: PeerManager, eventBus: EventBus) {
         self.blockchain = blockchain
@@ -91,7 +91,7 @@ public actor SyncManager: Sendable {
             await bulkSync(currentHead: currentHead)
         case .syncing:
             if let newBlockHeader {
-                importBlock(currentTimeslot: currentHead.timeslot, newHeader: newBlockHeader, peer: info.address)
+                importBlock(currentTimeslot: currentHead.timeslot, newHeader: newBlockHeader, peer: info.id)
             }
         }
     }
@@ -101,18 +101,18 @@ public actor SyncManager: Sendable {
             return
         }
 
-        for (addr, info) in await peerManager.peers {
+        for info in await peerManager.peers.values {
             if let peerBest = info.best, peerBest.timeslot > currentHead.timeslot {
                 let request = BlockRequest(
                     hash: currentHead.hash,
                     direction: .ascendingExcludsive,
                     maxBlocks: min(BLOCK_REQUEST_BLOCK_COUNT, peerBest.timeslot - currentHead.timeslot)
                 )
-                currentRequest = (addr, request)
-                logger.debug("bulk syncing", metadata: ["peer": "\(addr)", "request": "\(request)"])
+                currentRequest = (info.id, request)
+                logger.debug("bulk syncing", metadata: ["peer": "\(info.id)", "request": "\(request)"])
 
                 Task {
-                    let resp = try await network.send(to: addr, message: .blockRequest(request))
+                    let resp = try await network.send(to: info.id, message: .blockRequest(request))
                     let decoded = try CERequest.decodeResponseForBlockRequest(data: resp, config: blockchain.config)
                     for block in decoded {
                         try await blockchain.importBlock(block)
@@ -143,7 +143,7 @@ public actor SyncManager: Sendable {
         }
     }
 
-    private func importBlock(currentTimeslot: TimeslotIndex, newHeader: HeaderRef, peer: NetAddr) {
+    private func importBlock(currentTimeslot: TimeslotIndex, newHeader: HeaderRef, peer: PeerId) {
         logger.debug("importing block", metadata: ["hash": "\(newHeader.hash)", "remote": "\(peer)"])
         let blockchain = blockchain
         let network = network
