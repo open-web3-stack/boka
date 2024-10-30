@@ -303,9 +303,10 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             connections.byId[connection.id]
         }
         guard let conn else {
-            logger.warning("Trying to open connection but connection is gone?", metadata: ["connectionId": "\(connection.id)"])
+            logger.warning("Attempt to open but connection is absent", metadata: ["connectionId": "\(connection.id)"])
             return .code(.connectionRefused)
         }
+
         do {
             let (publicKey, alternativeName) = try parseCertificate(data: certificate, type: .x509)
             logger.trace("Certificate parsed", metadata: [
@@ -313,39 +314,38 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 "publicKey": "\(publicKey.toHexString())",
                 "alternativeName": "\(alternativeName)",
             ])
+            if publicKey == impl.publicKey {
+                // Self connection detected
+                logger.trace("Rejecting self-connection", metadata: ["connectionId": "\(connection.id)"])
+                return .code(.connectionRefused)
+            }
             if alternativeName != generateSubjectAlternativeName(pubkey: publicKey) {
                 return .code(.badCert)
             }
-
-            if publicKey == impl.publicKey {
-                // self connection
-                logger.trace("self connection rejected", metadata: [
-                    "connectionId": "\(connection.id)",
-                    "publicKey": "\(publicKey.toHexString())",
-                ])
-                return .code(.connectionRefused)
-            }
-
             // TODO: verify if it is current or next validator
 
+            // Check for an existing connection by public key
             return try impl.connections.write { connections in
                 if connections.byPublicKey.keys.contains(publicKey) {
-                    // duplicated connection
-                    logger.debug("duplicated connection rejected", metadata: [
-                        "connectionId": "\(connection.id)",
-                        "publicKey": "\(publicKey.toHexString())",
-                    ])
-                    // TODO: write a test for this
-                    return .code(.connectionRefused)
+                    // Deterministically decide based on public key comparison
+                    if !publicKey.lexicographicallyPrecedes(impl.publicKey) {
+                        connections.byPublicKey[publicKey] = conn
+                        try conn.opened(publicKey: publicKey)
+                        return .code(.success)
+                    } else {
+                        logger.debug("Rejecting duplicate connection by rule", metadata: [
+                            "connectionId": "\(connection.id)", "publicKey": "\(publicKey.toHexString())",
+                        ])
+                        return .code(.connectionRefused)
+                    }
+                } else {
+                    connections.byPublicKey[publicKey] = conn
+                    try conn.opened(publicKey: publicKey)
+                    return .code(.success)
                 }
-                connections.byPublicKey[publicKey] = conn
-                try conn.opened(publicKey: publicKey)
-                return .code(.success)
             }
         } catch {
-            logger.warning("Failed to parse certificate", metadata: [
-                "connectionId": "\(connection.id)",
-                "error": "\(error)"])
+            logger.warning("Certificate parsing failed", metadata: ["connectionId": "\(connection.id)", "error": "\(error)"])
             return .code(.badCert)
         }
     }
