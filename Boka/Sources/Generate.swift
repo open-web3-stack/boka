@@ -30,36 +30,13 @@ struct Generate: AsyncParsableCommand {
     var id: String = "dev"
 
     func run() async throws {
-        let (state, block, config) = try await chain.load()
-
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes, .sortedKeys]
-        encoder.dataEncodingStrategy = .hex
-
-        let genesis: any Encodable = switch format {
+        let chainspec = try await chain.load()
+        let data = switch format {
         case .json:
-            GenesisData(
-                name: name,
-                id: id,
-                bootnodes: [],
-                preset: nil,
-                config: config.value,
-                block: block.value,
-                state: state.value
-            )
+            try chainspec.encode()
         case .binary:
-            try GenesisDataBinary(
-                name: name,
-                id: id,
-                bootnodes: [],
-                preset: nil,
-                config: config.value,
-                block: JamEncoder.encode(block),
-                state: JamEncoder.encode(state)
-            )
+            try chainspec.encodeBinary()
         }
-
-        let data = try encoder.encode(genesis)
         try data.write(to: URL(fileURLWithPath: output))
 
         print("Chainspec generated at \(output)")

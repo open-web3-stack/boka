@@ -41,7 +41,10 @@ public class Node {
     ) async throws {
         self.config = config
 
-        let (genesisState, genesisBlock, protocolConfig) = try await genesis.load()
+        let chainspec = try await genesis.load()
+        let genesisBlock = chainspec.block.asRef()
+        let genesisState = chainspec.state.asRef()
+        let protocolConfig = try chainspec.getConfig()
 
         logger.info("Genesis: \(genesisBlock.hash)")
 
