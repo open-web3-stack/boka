@@ -1,4 +1,5 @@
 import Blockchain
+import Codec
 import Foundation
 import Utils
 
@@ -57,7 +58,9 @@ extension Genesis {
                 config = genesis.config!
             }
             let configRef = Ref(config)
-            let (state, block) = try State.devGenesis(config: configRef)
+            let state = genesis.state.asRef()
+            let block = genesis.block.asRef()
+
             return (state, block, configRef)
         }
     }
@@ -65,32 +68,39 @@ extension Genesis {
     private func validate(_ genesis: GenesisData) throws {
         // Validate required fields
         if genesis.name.isEmpty {
-            throw GenesisError.invalidFormat("Invalid or missing 'name'")
+            throw GenesisError.invalidFormat("Missing 'name'")
         }
         if genesis.id.isEmpty {
-            throw GenesisError.invalidFormat("Invalid or missing 'id'")
+            throw GenesisError.invalidFormat("Missing 'id'")
         }
-        if genesis.bootnodes.isEmpty {
-            throw GenesisError.invalidFormat("Invalid or missing 'bootnodes'")
-        }
-        if genesis.state.isEmpty {
-            throw GenesisError.invalidFormat("Invalid or missing 'state'")
+        if genesis.preset == nil, genesis.config == nil {
+            throw GenesisError.invalidFormat("One of 'preset' or 'config' is required")
         }
     }
 
-    func readAndValidateGenesis(from filePath: String) throws -> GenesisData {
+    private func readFile(from filePath: String) throws -> Data {
         do {
             let fileContents = try String(contentsOfFile: filePath, encoding: .utf8)
-            let data = fileContents.data(using: .utf8)!
-            let decoder = JSONDecoder()
-            let genesis = try decoder.decode(GenesisData.self, from: data)
-            try validate(genesis)
-            return genesis
-        } catch let error as GenesisError {
-            throw error
+            return fileContents.data(using: .utf8)!
         } catch {
             throw GenesisError.fileReadError(error)
         }
+    }
+
+    private func parseGenesis(from data: Data) throws -> GenesisData {
+        let decoder = JSONDecoder()
+        if let genesisData = try? decoder.decode(GenesisData.self, from: data) {
+            return genesisData
+        }
+        let genesisData = try decoder.decode(GenesisDataBinary.self, from: data)
+        return try genesisData.toGenesisData()
+    }
+
+    func readAndValidateGenesis(from filePath: String) throws -> GenesisData {
+        let data = try readFile(from: filePath)
+        let genesis = try parseGenesis(from: data)
+        try validate(genesis)
+        return genesis
     }
 }
 
@@ -107,27 +117,86 @@ extension KeyedDecodingContainer {
     }
 }
 
-struct GenesisData: Codable {
-    var name: String
-    var id: String
-    var bootnodes: [String]
-    var preset: GenesisPreset?
-    var config: ProtocolConfig?
-    // TODO: check & deal with state
-    var state: String
-
-    // ensure one of preset or config is present
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        name = try container.decode(String.self, forKey: .name)
-        id = try container.decode(String.self, forKey: .id)
-        bootnodes = try container.decode([String].self, forKey: .bootnodes)
-        preset = try container.decodeIfPresent(GenesisPreset.self, forKey: .preset)
-        if preset == nil {
-            config = try container.decode(ProtocolConfig.self, forKey: .config, required: true)
-        } else {
-            config = try container.decodeIfPresent(ProtocolConfig.self, forKey: .config, required: false)
+private func getConfig(preset: GenesisPreset?, config: ProtocolConfig?) throws -> ProtocolConfig {
+    if let preset {
+        let ret = preset.config.value
+        if let genesisConfig = config {
+            return ret.merged(with: genesisConfig)
         }
-        state = try container.decode(String.self, forKey: .state)
+        return ret
+    }
+    if let config {
+        return config
+    }
+    throw GenesisError.invalidFormat("One of 'preset' or 'config' is required")
+}
+
+public struct GenesisData: Codable {
+    public var name: String
+    public var id: String
+    public var bootnodes: [String]
+    public var preset: GenesisPreset?
+    public var config: ProtocolConfig?
+    public var block: Block
+    public var state: State
+
+    public init(
+        name: String,
+        id: String,
+        bootnodes: [String],
+        preset: GenesisPreset?,
+        config: ProtocolConfig?,
+        block: Block,
+        state: State
+    ) {
+        self.name = name
+        self.id = id
+        self.bootnodes = bootnodes
+        self.preset = preset
+        self.config = config
+        self.block = block
+        self.state = state
+    }
+}
+
+public struct GenesisDataBinary: Codable {
+    public var name: String
+    public var id: String
+    public var bootnodes: [String]
+    public var preset: GenesisPreset?
+    public var config: ProtocolConfig?
+    public var block: Data
+    public var state: Data
+
+    public init(
+        name: String,
+        id: String,
+        bootnodes: [String],
+        preset: GenesisPreset?,
+        config: ProtocolConfig?,
+        block: Data,
+        state: Data
+    ) {
+        self.name = name
+        self.id = id
+        self.bootnodes = bootnodes
+        self.preset = preset
+        self.config = config
+        self.block = block
+        self.state = state
+    }
+
+    public func toGenesisData() throws -> GenesisData {
+        let block = try JamDecoder(data: block, config: config).decode(Block.self)
+        let state = try JamDecoder(data: state, config: config).decode(State.self)
+        return GenesisData(
+            name: name,
+            id: id,
+            bootnodes: bootnodes,
+            preset: preset,
+            config: config,
+            block: block,
+            state: state
+        )
     }
 }

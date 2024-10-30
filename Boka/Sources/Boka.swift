@@ -51,7 +51,8 @@ enum MaybeEnabled<T: ExpressibleByArgument>: ExpressibleByArgument {
 struct Boka: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "JAM built with Swift",
-        version: "0.0.1"
+        version: "0.0.1",
+        subcommands: [Generate.self]
     )
 
     @Option(name: .shortAndLong, help: "Base path to database files.")

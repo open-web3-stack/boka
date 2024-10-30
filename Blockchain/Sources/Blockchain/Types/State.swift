@@ -126,6 +126,10 @@ extension State {
     public var lastBlockHash: Data32 {
         recentHistory.items.last.map(\.headerHash)!
     }
+
+    public func asRef() -> StateRef {
+        StateRef(self)
+    }
 }
 
 extension State: Dummy {
