@@ -35,13 +35,13 @@ jobs:
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
-    - name: Cache SPM
-      uses: actions/cache@v4
-      with:
-        path: '**/.build'
-        key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
-        restore-keys: |
-          ${{ runner.os }}-spm-
+    # - name: Cache SPM
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: '**/.build'
+    #     key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+    #     restore-keys: |
+    #       ${{ runner.os }}-spm-
     - name: Cache Cargo
       uses: actions/cache@v4
       with:
