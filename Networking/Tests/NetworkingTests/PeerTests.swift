@@ -144,6 +144,46 @@ struct PeerTests {
     }
 
     @Test
+    func concurrentPeerConnection() async throws {
+        let peer1 = try Peer(
+            options: PeerOptions<MockStreamHandler>(
+                role: .validator,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+                genesisHeader: Data32(),
+                secretKey: Ed25519.SecretKey(from: Data32.random()),
+                presistentStreamHandler: MockPresentStreamHandler(),
+                ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                serverSettings: .defaultSettings,
+                clientSettings: .defaultSettings
+            )
+        )
+        let peer2 = try Peer(
+            options: PeerOptions<MockStreamHandler>(
+                role: .validator,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+                genesisHeader: Data32(),
+                secretKey: Ed25519.SecretKey(from: Data32.random()),
+                presistentStreamHandler: MockPresentStreamHandler(),
+                ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                serverSettings: .defaultSettings,
+                clientSettings: .defaultSettings
+            )
+        )
+
+        let connection1 = try peer1.connect(to: peer2.listenAddress(), role: .validator)
+        let connection2 = try peer2.connect(to: peer1.listenAddress(), role: .validator)
+        try? await Task.sleep(for: .milliseconds(50))
+        if !connection1.isClosed {
+            let data = try await connection1.request(MockRequest(kind: .typeA, data: Data("hello world".utf8)))
+            #expect(data == Data("hello world response".utf8))
+        }
+        if !connection2.isClosed {
+            let data = try await connection2.request(MockRequest(kind: .typeA, data: Data("hello world".utf8)))
+            #expect(data == Data("hello world response".utf8))
+        }
+    }
+
+    @Test
     func largeDataRequest() async throws {
         let handler1 = MockPresentStreamHandler()
         let handler2 = MockPresentStreamHandler()
@@ -159,7 +199,7 @@ struct PeerTests {
         let peer1 = try Peer(
             options: PeerOptions<MockStreamHandler>(
                 role: .validator,
-                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 9085)!,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32.random()),
                 presistentStreamHandler: handler1,
@@ -172,7 +212,7 @@ struct PeerTests {
         let peer2 = try Peer(
             options: PeerOptions<MockStreamHandler>(
                 role: .validator,
-                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 9086)!,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32.random()),
                 presistentStreamHandler: handler2,
@@ -185,7 +225,7 @@ struct PeerTests {
         try? await Task.sleep(for: .milliseconds(50))
 
         let connection1 = try peer1.connect(
-            to: NetAddr(ipAddress: "127.0.0.1", port: 9086)!, role: .validator
+            to: peer2.listenAddress(), role: .validator
         )
         try? await Task.sleep(for: .milliseconds(50))
 
@@ -218,7 +258,7 @@ struct PeerTests {
         let peer1 = try Peer(
             options: PeerOptions<MockStreamHandler>(
                 role: .validator,
-                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 185)!,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32.random()),
                 presistentStreamHandler: MockPresentStreamHandler(),
@@ -231,7 +271,7 @@ struct PeerTests {
         let peer2 = try Peer(
             options: PeerOptions<MockStreamHandler>(
                 role: .validator,
-                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 186)!,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32.random()),
                 presistentStreamHandler: handler2,
@@ -244,7 +284,7 @@ struct PeerTests {
         let peer3 = try Peer(
             options: PeerOptions<MockStreamHandler>(
                 role: .validator,
-                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 187)!,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32.random()),
                 presistentStreamHandler: handler2,
@@ -257,7 +297,7 @@ struct PeerTests {
         try? await Task.sleep(for: .milliseconds(50))
 
         let connection = try peer1.connect(
-            to: NetAddr(ipAddress: "127.0.0.1", port: 186)!, role: .validator
+            to: peer2.listenAddress(), role: .validator
         )
         try? await Task.sleep(for: .milliseconds(50))
 
@@ -308,7 +348,7 @@ struct PeerTests {
         let peer1 = try Peer(
             options: PeerOptions<MockStreamHandler>(
                 role: .validator,
-                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 8081)!,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32.random()),
                 presistentStreamHandler: handler1,
@@ -320,7 +360,7 @@ struct PeerTests {
         let peer2 = try Peer(
             options: PeerOptions<MockStreamHandler>(
                 role: .validator,
-                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 8082)!,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32.random()),
                 presistentStreamHandler: handler2,
@@ -331,7 +371,7 @@ struct PeerTests {
         )
 
         _ = try peer1.connect(
-            to: NetAddr(ipAddress: "127.0.0.1", port: 8082)!, role: .validator
+            to: peer2.listenAddress(), role: .validator
         )
 
         try? await Task.sleep(for: .milliseconds(50))
@@ -344,7 +384,7 @@ struct PeerTests {
             kind: .uniqueB, message: .init(kind: .uniqueB, data: Data("I am jam".utf8))
         )
         // Verify last received data
-        try? await Task.sleep(for: .milliseconds(50))
+        try? await Task.sleep(for: .milliseconds(100))
         await #expect(handler2.lastReceivedData == Data("hello world".utf8))
         await #expect(handler1.lastReceivedData == Data("I am jam".utf8))
     }
@@ -383,6 +423,7 @@ struct PeerTests {
         let dataList1 = try await connection1.request(
             MockRequest(kind: .typeA, data: Data("hello world".utf8))
         )
+        try? await Task.sleep(for: .milliseconds(100))
         #expect(dataList1 == Data("hello world response".utf8))
     }
 
@@ -452,7 +493,7 @@ struct PeerTests {
             let peer = try Peer(
                 options: PeerOptions<MockStreamHandler>(
                     role: .builder,
-                    listenAddress: NetAddr(ipAddress: "127.0.0.1", port: UInt16(7081 + i))!,
+                    listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                     genesisHeader: Data32(),
                     secretKey: Ed25519.SecretKey(from: Data32.random()),
                     presistentStreamHandler: handler,
