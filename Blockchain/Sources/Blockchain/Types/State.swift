@@ -20,7 +20,7 @@ public struct State: Sendable, Equatable, Codable {
     public var safroleState: SafroleState
 
     // δ: The (prior) state of the service accounts.
-    public var serviceAccounts: [ServiceIndex: ServiceAccount]
+    @CodingAs<SortedKeyValues<ServiceIndex, ServiceAccount>> public var serviceAccounts: [ServiceIndex: ServiceAccount]
 
     // η: The eηtropy accumulator and epochal raηdomness.
     public var entropyPool: EntropyPool
@@ -125,6 +125,10 @@ public struct State: Sendable, Equatable, Codable {
 extension State {
     public var lastBlockHash: Data32 {
         recentHistory.items.last.map(\.headerHash)!
+    }
+
+    public func asRef() -> StateRef {
+        StateRef(self)
     }
 }
 

@@ -11,7 +11,7 @@ struct BlockchainDataProviderTests {
     let provider: BlockchainDataProvider
 
     init() async throws {
-        setupTestLogger()
+        // setupTestLogger()
 
         (genesisState, genesisBlock) = try State.devGenesis(config: config)
         provider = try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))

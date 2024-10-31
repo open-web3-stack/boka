@@ -269,6 +269,23 @@ private struct JamKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPr
         try decoder.decode(type, key: key)
     }
 
+    func decodeIfPresent<T: Decodable>(_ type: T.Type, forKey key: K) throws -> T? {
+        let byte = try decoder.input.read()
+        switch byte {
+        case 0:
+            return nil
+        case 1:
+            return try decoder.decode(type, key: key)
+        default:
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Invalid boolean value: \(byte)"
+                )
+            )
+        }
+    }
+
     func nestedContainer<NestedKey>(keyedBy _: NestedKey.Type, forKey _: K) throws -> KeyedDecodingContainer<NestedKey>
         where NestedKey: CodingKey
     {

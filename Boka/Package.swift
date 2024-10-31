@@ -37,9 +37,6 @@ let package = Package(
             dependencies: [
                 "Boka",
                 .product(name: "Testing", package: "swift-testing"),
-            ],
-            resources: [
-                .copy("chainfiles"),
             ]
         ),
     ],
