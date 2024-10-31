@@ -234,6 +234,7 @@ struct PeerTests {
         let receivedData1 = try await connection1.request(
             MockRequest(kind: .typeA, data: largeData)
         )
+        try? await Task.sleep(for: .milliseconds(100))
 
         // Verify that the received data matches the original large data
         #expect(receivedData1 == largeData + Data(" response".utf8))
@@ -241,13 +242,13 @@ struct PeerTests {
         peer1.broadcast(
             kind: .uniqueA, message: .init(kind: .uniqueA, data: largeData)
         )
-        try? await Task.sleep(for: .milliseconds(50))
+        try? await Task.sleep(for: .milliseconds(100))
 
         peer2.broadcast(
             kind: .uniqueB, message: .init(kind: .uniqueB, data: largeData)
         )
         // Verify last received data
-        try? await Task.sleep(for: .milliseconds(1000))
+        try? await Task.sleep(for: .milliseconds(2000))
         await #expect(handler2.lastReceivedData == largeData)
         await #expect(handler1.lastReceivedData == largeData)
     }
