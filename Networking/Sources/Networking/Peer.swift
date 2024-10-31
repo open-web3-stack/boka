@@ -379,20 +379,20 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         logger.info("connection shutdown complete", metadata: ["connectionId": "\(connection.id)"])
         impl.connections.write { connections in
             if let conn = connections.byId[connection.id] {
-                //                if conn.isReconnect {
-                //                    do {
-                //                        try conn.reconnecting()
-                //                        logger.info("Reconnection complete", metadata: ["connectionId": "\(connection.id)"])
-                //                    } catch {
-                //                        logger.warning(
-                //                            "\(connection.id) Failed to reconnect",
-                //                            metadata: [ "error": "\(error)"]
-                //                        )
-                //                    }
-                //                    return
-                //                } else {
-                //                    logger.info("Connection closed", metadata: ["connectionId": "\(connection.id)"])
-                //                }
+                if conn.isReconnect {
+                    do {
+                        try conn.reconnecting()
+                        logger.info("Reconnection complete", metadata: ["connectionId": "\(connection.id)"])
+                    } catch {
+                        logger.warning(
+                            "\(connection.id) Failed to reconnect",
+                            metadata: ["error": "\(error)"]
+                        )
+                    }
+                    return
+                } else {
+                    logger.info("Connection closed", metadata: ["connectionId": "\(connection.id)"])
+                }
                 // remove publickey first,func closed will change state to closed
                 if let publicKey = conn.publicKey {
                     connections.byPublicKey.removeValue(forKey: publicKey)
@@ -408,11 +408,11 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         logger.info("Shutdown initiated", metadata: ["connectionId": "\(connection.id)", "reason": "\(reason)"])
         if shouldReconnect(basedOn: reason) {
             logger.info("shouldReconnect true", metadata: ["connectionId": "\(connection.id)"])
-            //            impl.connections.write { connections in
-            //                if let conn = connections.byId[connection.id] {
-            //                    conn.reconnect()
-            //                }
-            //            }
+            impl.connections.write { connections in
+                if let conn = connections.byId[connection.id] {
+                    conn.reconnect()
+                }
+            }
         } else {
             logger.info("Closing", metadata: ["connectionId": "\(connection.id)"])
         }
@@ -424,9 +424,14 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         case .idle:
             // Do not reconnect for idle closures.
             false
-        case let .transport(status, code):
-            // Determine if the transport error is recoverable.
-            !status.isSucceeded
+        case let .transport(status, _):
+            switch QuicStatusCode(rawValue: status.rawValue) { // TODO: Add all the cases about reconnects
+            case .badCert:
+                // Do not reconnect if the closure was initiated by the peer.
+                false
+            default:
+                !status.isSucceeded
+            }
         case let .byPeer(code):
             // Do not reconnect if the closure was initiated by the peer.
             code != .success
