@@ -406,7 +406,7 @@ struct PeerTests {
         let peer2 = try Peer(
             options: PeerOptions<MockStreamHandler>(
                 role: .validator,
-                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 1)!,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32.random()),
                 presistentStreamHandler: MockPresentStreamHandler(),
