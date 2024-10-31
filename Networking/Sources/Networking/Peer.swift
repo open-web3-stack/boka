@@ -376,9 +376,23 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
     }
 
     func shutdownComplete(_ connection: QuicConnection) {
-        logger.debug("connection shutdown complete", metadata: ["connectionId": "\(connection.id)"])
+        logger.info("connection shutdown complete", metadata: ["connectionId": "\(connection.id)"])
         impl.connections.write { connections in
             if let conn = connections.byId[connection.id] {
+                //                if conn.isReconnect {
+                //                    do {
+                //                        try conn.reconnecting()
+                //                        logger.info("Reconnection complete", metadata: ["connectionId": "\(connection.id)"])
+                //                    } catch {
+                //                        logger.warning(
+                //                            "\(connection.id) Failed to reconnect",
+                //                            metadata: [ "error": "\(error)"]
+                //                        )
+                //                    }
+                //                    return
+                //                } else {
+                //                    logger.info("Connection closed", metadata: ["connectionId": "\(connection.id)"])
+                //                }
                 // remove publickey first,func closed will change state to closed
                 if let publicKey = conn.publicKey {
                     connections.byPublicKey.removeValue(forKey: publicKey)
@@ -387,6 +401,38 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 connections.byId.removeValue(forKey: connection.id)
                 connections.byAddr.removeValue(forKey: conn.remoteAddress)
             }
+        }
+    }
+
+    func shutdownInitiated(_ connection: QuicConnection, reason: ConnectionCloseReason) {
+        logger.info("Shutdown initiated", metadata: ["connectionId": "\(connection.id)", "reason": "\(reason)"])
+        if shouldReconnect(basedOn: reason) {
+            logger.info("shouldReconnect true", metadata: ["connectionId": "\(connection.id)"])
+            //            impl.connections.write { connections in
+            //                if let conn = connections.byId[connection.id] {
+            //                    conn.reconnect()
+            //                }
+            //            }
+        } else {
+            logger.info("Closing", metadata: ["connectionId": "\(connection.id)"])
+        }
+    }
+
+    // TODO: Add all the cases about reconnects
+    private func shouldReconnect(basedOn reason: ConnectionCloseReason) -> Bool {
+        switch reason {
+        case .idle:
+            // Do not reconnect for idle closures.
+            false
+        case let .transport(status, code):
+            // Determine if the transport error is recoverable.
+            !status.isSucceeded
+        case let .byPeer(code):
+            // Do not reconnect if the closure was initiated by the peer.
+            code != .success
+        case let .byLocal(code):
+            // Do not reconnect if the local side initiated the closure.
+            code != .success
         }
     }
 

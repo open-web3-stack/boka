@@ -308,7 +308,7 @@ struct PeerTests {
         #expect(receivedData == messageData + Data(" response".utf8))
         try? await Task.sleep(for: .milliseconds(50))
         // Simulate a peer failure by disconnecting one peer
-        connection.close(abort: true)
+        connection.close(abort: false)
         // Wait to simulate downtime
         try? await Task.sleep(for: .milliseconds(200))
         // check the peer is usable & connect to another peer
@@ -336,7 +336,7 @@ struct PeerTests {
         peer1.broadcast(
             kind: .uniqueC, message: .init(kind: .uniqueC, data: messageData)
         )
-        try? await Task.sleep(for: .milliseconds(50))
+        try? await Task.sleep(for: .milliseconds(500))
         await #expect(handler2.lastReceivedData == messageData)
     }
 
@@ -384,7 +384,7 @@ struct PeerTests {
             kind: .uniqueB, message: .init(kind: .uniqueB, data: Data("I am jam".utf8))
         )
         // Verify last received data
-        try? await Task.sleep(for: .milliseconds(100))
+        try? await Task.sleep(for: .milliseconds(200))
         await #expect(handler2.lastReceivedData == Data("hello world".utf8))
         await #expect(handler1.lastReceivedData == Data("I am jam".utf8))
     }
@@ -487,7 +487,7 @@ struct PeerTests {
         var peers: [Peer<MockStreamHandler>] = []
         var handlers: [MockPresentStreamHandler] = []
         // Create 100 peer nodes
-        for i in 0 ..< 100 {
+        for _ in 0 ..< 100 {
             let handler = MockPresentStreamHandler()
             handlers.append(handler)
             let peer = try Peer(

@@ -20,12 +20,14 @@ enum ConnectionError: Error {
     case invalidLength
     case unexpectedState
     case closed
+    case reconnect
 }
 
 enum ConnectionState {
     case connecting(continuations: [CheckedContinuation<Void, Error>])
     case connected(publicKey: Data)
     case closed
+    case reconnect
 }
 
 public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoProtocol {
@@ -49,6 +51,8 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
             case let .connected(publicKey):
                 publicKey
             case .closed:
+                nil
+            case .reconnect:
                 nil
             }
         }
@@ -91,6 +95,25 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         }
     }
 
+    func reconnect() {
+        state.write { state in
+            if case let .connecting(continuations) = state {
+                for continuation in continuations {
+                    continuation.resume(throwing: ConnectionError.reconnect)
+                }
+                state = .reconnect
+            }
+            state = .reconnect
+        }
+    }
+
+    // TODO: Add reconnection attempts & Apply exponential backoff delay
+    func reconnecting() throws {
+        let addr = try connection.getRemoteAddress()
+        print("connection.getRemoteAddress() \(addr)")
+        try connection.connect(to: addr)
+    }
+
     public var isClosed: Bool {
         state.read {
             switch $0 {
@@ -100,6 +123,19 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                 false
             case .closed:
                 true
+            case .reconnect:
+                false
+            }
+        }
+    }
+
+    public var isReconnect: Bool {
+        state.read {
+            switch $0 {
+            case .reconnect:
+                true
+            default:
+                false
             }
         }
     }
@@ -112,6 +148,8 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
             case .connected:
                 true
             case .closed:
+                true
+            case .reconnect:
                 true
             }
         }
