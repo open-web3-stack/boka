@@ -102,8 +102,11 @@ extension Header: Codable {
                 priorStateRoot: container.decode(Data32.self, forKey: .priorStateRoot),
                 extrinsicsHash: container.decode(Data32.self, forKey: .extrinsicsHash),
                 timeslot: container.decode(UInt32.self, forKey: .timeslot),
-                epoch: container.decode(EpochMarker?.self, forKey: .epoch),
-                winningTickets: container.decode(ConfigFixedSizeArray<Ticket, ProtocolConfig.EpochLength>?.self, forKey: .winningTickets),
+                epoch: container.decodeIfPresent(EpochMarker.self, forKey: .epoch),
+                winningTickets: container.decodeIfPresent(
+                    ConfigFixedSizeArray<Ticket, ProtocolConfig.EpochLength>.self,
+                    forKey: .winningTickets
+                ),
                 offendersMarkers: container.decode([Ed25519PublicKey].self, forKey: .offendersMarkers),
                 authorIndex: container.decode(ValidatorIndex.self, forKey: .authorIndex),
                 vrfSignature: container.decode(BandersnatchSignature.self, forKey: .vrfSignature)

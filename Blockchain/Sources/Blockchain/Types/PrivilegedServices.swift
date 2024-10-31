@@ -1,3 +1,6 @@
+import Codec
+import Utils
+
 public struct PrivilegedServices: Sendable, Equatable, Codable {
     // m
     public var empower: ServiceIndex
@@ -6,7 +9,7 @@ public struct PrivilegedServices: Sendable, Equatable, Codable {
     // v
     public var designate: ServiceIndex
     // g
-    public var basicGas: [ServiceIndex: Gas]
+    @CodingAs<SortedKeyValues<ServiceIndex, Gas>> public var basicGas: [ServiceIndex: Gas]
 
     public init(empower: ServiceIndex, assign: ServiceIndex, designate: ServiceIndex, basicGas: [ServiceIndex: Gas]) {
         self.empower = empower

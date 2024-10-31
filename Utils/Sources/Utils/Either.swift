@@ -45,10 +45,10 @@ extension Either: Codable where Left: Codable, Right: Codable {
             var container = encoder.unkeyedContainer()
             switch self {
             case let .left(a):
-                try container.encode(0)
+                try container.encode(UInt8(0))
                 try container.encode(a)
             case let .right(b):
-                try container.encode(1)
+                try container.encode(UInt8(1))
                 try container.encode(b)
             }
         } else {

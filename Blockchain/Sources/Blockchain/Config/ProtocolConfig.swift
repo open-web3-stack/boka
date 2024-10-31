@@ -2,7 +2,7 @@ import PolkaVM
 import Utils
 
 // constants defined in the graypaper
-public struct ProtocolConfig: Sendable, Codable {
+public struct ProtocolConfig: Sendable, Codable, Equatable {
     // A = 8: The period, in seconds, between audit tranches.
     public var auditTranchePeriod: Int
 
