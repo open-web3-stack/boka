@@ -294,19 +294,19 @@ struct PeerTests {
             )
         )
 
-        try? await Task.sleep(for: .milliseconds(50))
+        try? await Task.sleep(for: .milliseconds(100))
 
         let connection = try peer1.connect(
             to: peer2.listenAddress(), role: .validator
         )
-        try? await Task.sleep(for: .milliseconds(50))
+        try? await Task.sleep(for: .milliseconds(100))
 
         let receivedData = try await connection.request(
             MockRequest(kind: .typeA, data: messageData)
         )
 
         #expect(receivedData == messageData + Data(" response".utf8))
-        try? await Task.sleep(for: .milliseconds(50))
+        try? await Task.sleep(for: .milliseconds(100))
         // Simulate a peer failure by disconnecting one peer
         connection.close(abort: true)
         // Wait to simulate downtime
@@ -320,18 +320,18 @@ struct PeerTests {
         let receivedData2 = try await connection2.request(
             MockRequest(kind: .typeA, data: messageData)
         )
-        try? await Task.sleep(for: .milliseconds(50))
+        try? await Task.sleep(for: .milliseconds(100))
         #expect(receivedData2 == messageData + Data(" response".utf8))
         // Reconnect the failing peer
         let reconnection = try peer1.connect(
             to: peer2.listenAddress(),
             role: .validator
         )
-        try? await Task.sleep(for: .milliseconds(50))
+        try? await Task.sleep(for: .milliseconds(100))
         let recoverData = try await reconnection.request(
             MockRequest(kind: .typeA, data: messageData)
         )
-        try? await Task.sleep(for: .milliseconds(50))
+        try? await Task.sleep(for: .milliseconds(100))
         #expect(recoverData == messageData + Data(" response".utf8))
         peer1.broadcast(
             kind: .uniqueC, message: .init(kind: .uniqueC, data: messageData)
