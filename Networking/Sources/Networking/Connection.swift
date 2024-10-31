@@ -52,8 +52,8 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                 publicKey
             case .closed:
                 nil
-            case .reconnect:
-                nil
+            case let .reconnect(publicKey):
+                publicKey
             }
         }
     }
@@ -101,9 +101,9 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                 for continuation in continuations {
                     continuation.resume(throwing: ConnectionError.reconnect)
                 }
-                state = .connected(publicKey: publicKey)
+                state = .reconnect(publicKey: publicKey)
             }
-            state = .connected(publicKey: publicKey)
+            state = .reconnect(publicKey: publicKey)
         }
     }
 
@@ -128,7 +128,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         }
     }
 
-    public var isReconnect: Bool {
+    public var needReconnect: Bool {
         state.read {
             switch $0 {
             case .reconnect:

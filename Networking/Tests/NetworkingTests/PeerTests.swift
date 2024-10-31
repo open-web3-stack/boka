@@ -254,6 +254,61 @@ struct PeerTests {
     }
 
     @Test
+    func peerReconnect() async throws {
+        let handler2 = MockPresentStreamHandler()
+        let messageData = Data("Post-recovery message".utf8)
+
+        let peer1 = try Peer(
+            options: PeerOptions<MockStreamHandler>(
+                role: .validator,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+                genesisHeader: Data32(),
+                secretKey: Ed25519.SecretKey(from: Data32.random()),
+                presistentStreamHandler: MockPresentStreamHandler(),
+                ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                serverSettings: .defaultSettings,
+                clientSettings: .defaultSettings
+            )
+        )
+
+        let peer2 = try Peer(
+            options: PeerOptions<MockStreamHandler>(
+                role: .validator,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+                genesisHeader: Data32(),
+                secretKey: Ed25519.SecretKey(from: Data32.random()),
+                presistentStreamHandler: handler2,
+                ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                serverSettings: .defaultSettings,
+                clientSettings: .defaultSettings
+            )
+        )
+
+        try? await Task.sleep(for: .milliseconds(100))
+
+        let connection = try peer1.connect(
+            to: peer2.listenAddress(), role: .validator
+        )
+        try? await Task.sleep(for: .milliseconds(100))
+
+        let receivedData = try await connection.request(
+            MockRequest(kind: .typeA, data: messageData)
+        )
+
+        #expect(receivedData == messageData + Data(" response".utf8))
+        try? await Task.sleep(for: .milliseconds(100))
+        // Simulate a peer failure by disconnecting one peer
+        connection.close(abort: true)
+        // Wait to simulate downtime
+        try? await Task.sleep(for: .milliseconds(200))
+        peer1.broadcast(
+            kind: .uniqueC, message: .init(kind: .uniqueC, data: messageData)
+        )
+        try? await Task.sleep(for: .milliseconds(1000))
+        await #expect(handler2.lastReceivedData == messageData)
+    }
+
+    @Test
     func peerFailureRecovery() async throws {
         let handler2 = MockPresentStreamHandler()
         let messageData = Data("Post-recovery message".utf8)
@@ -284,19 +339,6 @@ struct PeerTests {
             )
         )
 
-        let peer3 = try Peer(
-            options: PeerOptions<MockStreamHandler>(
-                role: .validator,
-                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
-                genesisHeader: Data32(),
-                secretKey: Ed25519.SecretKey(from: Data32.random()),
-                presistentStreamHandler: handler2,
-                ephemeralStreamHandler: MockEphemeralStreamHandler(),
-                serverSettings: .defaultSettings,
-                clientSettings: .defaultSettings
-            )
-        )
-
         try? await Task.sleep(for: .milliseconds(100))
 
         let connection = try peer1.connect(
@@ -314,17 +356,6 @@ struct PeerTests {
         connection.close(abort: true)
         // Wait to simulate downtime
         try? await Task.sleep(for: .milliseconds(200))
-        // check the peer is usable & connect to another peer
-        let connection2 = try peer1.connect(
-            to: peer3.listenAddress(),
-            role: .validator
-        )
-        try? await Task.sleep(for: .milliseconds(50))
-        let receivedData2 = try await connection2.request(
-            MockRequest(kind: .typeA, data: messageData)
-        )
-        try? await Task.sleep(for: .milliseconds(100))
-        #expect(receivedData2 == messageData + Data(" response".utf8))
         // Reconnect the failing peer
         let reconnection = try peer1.connect(
             to: peer2.listenAddress(),

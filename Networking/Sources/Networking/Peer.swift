@@ -379,6 +379,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         logger.info("connection shutdown complete", metadata: ["connectionId": "\(connection.id)"])
         impl.connections.write { connections in
             if let conn = connections.byId[connection.id] {
+                let needReconnect = conn.needReconnect
                 // remove publickey first,func closed will change state to closed
                 if let publicKey = conn.publicKey {
                     connections.byPublicKey.removeValue(forKey: publicKey)
@@ -386,7 +387,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 conn.closed()
                 connections.byId.removeValue(forKey: connection.id)
                 connections.byAddr.removeValue(forKey: conn.remoteAddress)
-                if conn.isReconnect {
+                if needReconnect {
                     do {
                         try conn.reconnecting()
                         logger.info("Reconnection complete", metadata: ["connectionId": "\(connection.id)"])
