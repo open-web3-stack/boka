@@ -107,12 +107,6 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         }
     }
 
-    // TODO: Add reconnection attempts & Apply exponential backoff delay
-    func reconnecting() throws {
-        let addr = try connection.getRemoteAddress()
-        print("connection.getRemoteAddress() \(addr)")
-    }
-
     public var isClosed: Bool {
         state.read {
             switch $0 {

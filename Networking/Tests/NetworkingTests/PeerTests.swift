@@ -254,7 +254,7 @@ struct PeerTests {
     }
 
     @Test
-    func peerReconnect() async throws {
+    func connReconnect() async throws {
         let handler2 = MockPresentStreamHandler()
         let messageData = Data("Post-recovery message".utf8)
 
