@@ -175,10 +175,12 @@ struct PeerTests {
         try? await Task.sleep(for: .milliseconds(50))
         if !connection1.isClosed {
             let data = try await connection1.request(MockRequest(kind: .typeA, data: Data("hello world".utf8)))
+            try? await Task.sleep(for: .milliseconds(50))
             #expect(data == Data("hello world response".utf8))
         }
         if !connection2.isClosed {
             let data = try await connection2.request(MockRequest(kind: .typeA, data: Data("hello world".utf8)))
+            try? await Task.sleep(for: .milliseconds(50))
             #expect(data == Data("hello world response".utf8))
         }
     }
