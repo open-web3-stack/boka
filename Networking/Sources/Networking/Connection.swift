@@ -27,7 +27,7 @@ enum ConnectionState {
     case connecting(continuations: [CheckedContinuation<Void, Error>])
     case connected(publicKey: Data)
     case closed
-    case reconnect
+    case reconnect(publicKey: Data)
 }
 
 public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoProtocol {
@@ -95,15 +95,15 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         }
     }
 
-    func reconnect() {
+    func reconnect(publicKey: Data) {
         state.write { state in
             if case let .connecting(continuations) = state {
                 for continuation in continuations {
                     continuation.resume(throwing: ConnectionError.reconnect)
                 }
-                state = .reconnect
+                state = .connected(publicKey: publicKey)
             }
-            state = .reconnect
+            state = .connected(publicKey: publicKey)
         }
     }
 
@@ -111,7 +111,6 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
     func reconnecting() throws {
         let addr = try connection.getRemoteAddress()
         print("connection.getRemoteAddress() \(addr)")
-        try connection.connect(to: addr)
     }
 
     public var isClosed: Bool {

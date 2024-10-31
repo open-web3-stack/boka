@@ -308,7 +308,7 @@ struct PeerTests {
         #expect(receivedData == messageData + Data(" response".utf8))
         try? await Task.sleep(for: .milliseconds(50))
         // Simulate a peer failure by disconnecting one peer
-        connection.close(abort: false)
+        connection.close(abort: true)
         // Wait to simulate downtime
         try? await Task.sleep(for: .milliseconds(200))
         // check the peer is usable & connect to another peer

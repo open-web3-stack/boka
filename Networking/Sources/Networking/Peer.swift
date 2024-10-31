@@ -379,6 +379,13 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         logger.info("connection shutdown complete", metadata: ["connectionId": "\(connection.id)"])
         impl.connections.write { connections in
             if let conn = connections.byId[connection.id] {
+                // remove publickey first,func closed will change state to closed
+                if let publicKey = conn.publicKey {
+                    connections.byPublicKey.removeValue(forKey: publicKey)
+                }
+                conn.closed()
+                connections.byId.removeValue(forKey: connection.id)
+                connections.byAddr.removeValue(forKey: conn.remoteAddress)
                 if conn.isReconnect {
                     do {
                         try conn.reconnecting()
@@ -389,17 +396,9 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                             metadata: ["error": "\(error)"]
                         )
                     }
-                    return
                 } else {
                     logger.info("Connection closed", metadata: ["connectionId": "\(connection.id)"])
                 }
-                // remove publickey first,func closed will change state to closed
-                if let publicKey = conn.publicKey {
-                    connections.byPublicKey.removeValue(forKey: publicKey)
-                }
-                conn.closed()
-                connections.byId.removeValue(forKey: connection.id)
-                connections.byAddr.removeValue(forKey: conn.remoteAddress)
             }
         }
     }
@@ -410,7 +409,9 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             logger.info("shouldReconnect true", metadata: ["connectionId": "\(connection.id)"])
             impl.connections.write { connections in
                 if let conn = connections.byId[connection.id] {
-                    conn.reconnect()
+                    if let publicKey = conn.publicKey {
+                        conn.reconnect(publicKey: publicKey)
+                    }
                 }
             }
         } else {
@@ -425,9 +426,8 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             // Do not reconnect for idle closures.
             false
         case let .transport(status, _):
-            switch QuicStatusCode(rawValue: status.rawValue) { // TODO: Add all the cases about reconnects
+            switch QuicStatusCode(rawValue: status.rawValue) {
             case .badCert:
-                // Do not reconnect if the closure was initiated by the peer.
                 false
             default:
                 !status.isSucceeded
