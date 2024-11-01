@@ -274,10 +274,14 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
 
     // TODO: Add reconnection attempts & Apply exponential backoff delay
     func reconnect(to address: NetAddr, role: PeerRole) throws {
-        logger.debug("reconnecting", metadata: ["address": "\(address)", "role": "\(role)"])
         Task {
-            try await Task.sleep(for: .microseconds(1000))
+            try await Task.sleep(for: .microseconds(2000))
+            logger.debug("reconnecting", metadata: ["to address": "\(address)", "role": "\(role)"])
             try connections.write { connections in
+                if connections.byAddr[address] != nil {
+                    logger.warning("reconnecting to \(address) already connected")
+                    return
+                }
                 let quicConn = try QuicConnection(
                     handler: PeerEventHandler(self),
                     registration: clientConfiguration.registration,
@@ -293,6 +297,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                 )
                 connections.byAddr[address] = conn
                 connections.byId[conn.id] = conn
+                logger.debug("reconnectted", metadata: ["address": "\(address)", "role": "\(role)"])
             }
         }
     }
@@ -436,25 +441,27 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
 
     func shutdownComplete(_ connection: QuicConnection) {
         logger.debug("connection shutdown complete", metadata: ["connectionId": "\(connection.id)"])
-        impl.connections.write { connections in
+        let conn = impl.connections.read { connections in
+            connections.byId[connection.id]
+        }
+        let needReconnect = impl.connections.write { connections in
             if let conn = connections.byId[connection.id] {
                 let needReconnect = conn.needReconnect
                 if let publicKey = conn.publicKey {
                     connections.byPublicKey.removeValue(forKey: publicKey)
                 }
-                conn.closed()
                 connections.byId.removeValue(forKey: connection.id)
                 connections.byAddr.removeValue(forKey: conn.remoteAddress)
-                if needReconnect {
-                    do {
-                        try impl.reconnect(to: conn.remoteAddress, role: conn.role)
-                    } catch {
-                        logger.error("reconnect failed", metadata: ["error": "\(error)"])
-                    }
-
-                } else {
-                    logger.debug("Connection closed", metadata: ["connectionId": "\(connection.id)"])
-                }
+                conn.closed()
+                return needReconnect
+            }
+            return false
+        }
+        if needReconnect, let address = conn?.remoteAddress, let role = conn?.role {
+            do {
+                try impl.reconnect(to: address, role: role)
+            } catch {
+                logger.error("reconnect failed", metadata: ["error": "\(error)"])
             }
         }
     }
@@ -469,6 +476,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             impl.connections.write { connections in
                 if let conn = connections.byId[connection.id] {
                     if let publicKey = conn.publicKey {
+                        connections.byPublicKey.removeValue(forKey: publicKey)
                         conn.reconnect(publicKey: publicKey)
                     }
                 }

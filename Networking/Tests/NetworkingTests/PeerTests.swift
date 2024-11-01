@@ -270,7 +270,7 @@ struct PeerTests {
                 clientSettings: .defaultSettings
             )
         )
-
+        try print("peer1: \(peer1.listenAddress())")
         let peer2 = try Peer(
             options: PeerOptions<MockStreamHandler>(
                 role: .validator,
@@ -283,12 +283,13 @@ struct PeerTests {
                 clientSettings: .defaultSettings
             )
         )
-
+        try print("peer2: \(peer2.listenAddress())")
         try? await Task.sleep(for: .milliseconds(100))
 
         let connection = try peer1.connect(
             to: peer2.listenAddress(), role: .validator
         )
+        print("connection addr: \(connection.remoteAddress)")
         try? await Task.sleep(for: .milliseconds(100))
 
         let receivedData = try await connection.request(
@@ -305,7 +306,9 @@ struct PeerTests {
             kind: .uniqueC, message: .init(kind: .uniqueC, data: messageData)
         )
         try? await Task.sleep(for: .milliseconds(1000))
-        await #expect(handler2.lastReceivedData == messageData)
+        let lastReceivedData = await handler2.lastReceivedData
+        print("lastReceivedData \(lastReceivedData?.toHexString() ?? "none")")
+        #expect(lastReceivedData == messageData)
     }
 
     @Test
@@ -401,7 +404,7 @@ struct PeerTests {
         #expect(receivedData == messageData + Data(" response".utf8))
         try? await Task.sleep(for: .milliseconds(100))
         // Simulate a peer failure by disconnecting one peer
-        connection.close(abort: true)
+        connection.close(abort: false)
         // Wait to simulate downtime
         try? await Task.sleep(for: .milliseconds(200))
         // Reconnect the failing peer
@@ -416,10 +419,10 @@ struct PeerTests {
         try? await Task.sleep(for: .milliseconds(100))
         #expect(recoverData == messageData + Data(" response".utf8))
         peer1.broadcast(
-            kind: .uniqueC, message: .init(kind: .uniqueC, data: messageData)
+            kind: .uniqueC, message: .init(kind: .uniqueC, data: recoverData)
         )
         try? await Task.sleep(for: .milliseconds(500))
-        await #expect(handler2.lastReceivedData == messageData)
+        await #expect(handler2.lastReceivedData == recoverData)
     }
 
     @Test
