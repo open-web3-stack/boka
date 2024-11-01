@@ -254,7 +254,7 @@ struct PeerTests {
     }
 
     @Test
-    func connReconnect() async throws {
+    func connectionNeedToReconnect() async throws {
         let handler2 = MockPresentStreamHandler()
         let messageData = Data("Post-recovery message".utf8)
 
@@ -297,7 +297,7 @@ struct PeerTests {
 
         #expect(receivedData == messageData + Data(" response".utf8))
         try? await Task.sleep(for: .milliseconds(100))
-        // Simulate a peer failure by disconnecting one peer
+        // Simulate abnormal shutdown of connections
         connection.close(abort: true)
         // Wait to simulate downtime
         try? await Task.sleep(for: .milliseconds(200))
@@ -309,7 +309,55 @@ struct PeerTests {
     }
 
     @Test
-    func peerFailureRecovery() async throws {
+    func ConnectionNoNeedToReconnect() async throws {
+        let handler2 = MockPresentStreamHandler()
+        let messageData = Data("Post-recovery message".utf8)
+
+        let peer1 = try Peer(
+            options: PeerOptions<MockStreamHandler>(
+                role: .validator,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+                genesisHeader: Data32(),
+                secretKey: Ed25519.SecretKey(from: Data32.random()),
+                presistentStreamHandler: MockPresentStreamHandler(),
+                ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                serverSettings: .defaultSettings,
+                clientSettings: .defaultSettings
+            )
+        )
+
+        let peer2 = try Peer(
+            options: PeerOptions<MockStreamHandler>(
+                role: .validator,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+                genesisHeader: Data32(),
+                secretKey: Ed25519.SecretKey(from: Data32.random()),
+                presistentStreamHandler: handler2,
+                ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                serverSettings: .defaultSettings,
+                clientSettings: .defaultSettings
+            )
+        )
+
+        try? await Task.sleep(for: .milliseconds(100))
+
+        let connection = try peer1.connect(
+            to: peer2.listenAddress(), role: .validator
+        )
+        try? await Task.sleep(for: .milliseconds(100))
+        // Simulate regular shutdown of connections
+        connection.close(abort: false)
+        // Wait to simulate downtime
+        try? await Task.sleep(for: .milliseconds(200))
+        peer1.broadcast(
+            kind: .uniqueC, message: .init(kind: .uniqueC, data: messageData)
+        )
+        try? await Task.sleep(for: .milliseconds(1000))
+        await #expect(handler2.lastReceivedData == nil)
+    }
+
+    @Test
+    func connectionManualReconnect() async throws {
         let handler2 = MockPresentStreamHandler()
         let messageData = Data("Post-recovery message".utf8)
 

@@ -435,15 +435,10 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
     }
 
     func shutdownComplete(_ connection: QuicConnection) {
-        logger.info("connection shutdown complete", metadata: ["connectionId": "\(connection.id)"])
-//        let conn = impl.connections.read { connections in
-//            connections.byId[connection.id]
-//        }
-//        let needReconnect = conn.needReconnect
+        logger.debug("connection shutdown complete", metadata: ["connectionId": "\(connection.id)"])
         impl.connections.write { connections in
             if let conn = connections.byId[connection.id] {
                 let needReconnect = conn.needReconnect
-                // remove publickey first,func closed will change state to closed
                 if let publicKey = conn.publicKey {
                     connections.byPublicKey.removeValue(forKey: publicKey)
                 }
@@ -458,19 +453,19 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                     }
 
                 } else {
-                    logger.info("Connection closed", metadata: ["connectionId": "\(connection.id)"])
+                    logger.debug("Connection closed", metadata: ["connectionId": "\(connection.id)"])
                 }
             }
         }
     }
 
     func shutdownInitiated(_ connection: QuicConnection, reason: ConnectionCloseReason) {
-        logger.info(
+        logger.debug(
             "Shutdown initiated",
             metadata: ["connectionId": "\(connection.id)", "reason": "\(reason)"]
         )
         if shouldReconnect(basedOn: reason) {
-            logger.info("shouldReconnect true", metadata: ["connectionId": "\(connection.id)"])
+            logger.debug("shouldReconnect ", metadata: ["connectionId": "\(connection.id)"])
             impl.connections.write { connections in
                 if let conn = connections.byId[connection.id] {
                     if let publicKey = conn.publicKey {
@@ -478,8 +473,6 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                     }
                 }
             }
-        } else {
-            logger.info("Closing", metadata: ["connectionId": "\(connection.id)"])
         }
     }
 
