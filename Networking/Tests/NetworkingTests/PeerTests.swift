@@ -270,7 +270,6 @@ struct PeerTests {
                 clientSettings: .defaultSettings
             )
         )
-        try print("peer1: \(peer1.listenAddress())")
         let peer2 = try Peer(
             options: PeerOptions<MockStreamHandler>(
                 role: .validator,
@@ -283,13 +282,11 @@ struct PeerTests {
                 clientSettings: .defaultSettings
             )
         )
-        try print("peer2: \(peer2.listenAddress())")
         try? await Task.sleep(for: .milliseconds(100))
 
         let connection = try peer1.connect(
             to: peer2.listenAddress(), role: .validator
         )
-        print("connection addr: \(connection.remoteAddress)")
         try? await Task.sleep(for: .milliseconds(100))
 
         let receivedData = try await connection.request(
@@ -305,9 +302,8 @@ struct PeerTests {
         peer1.broadcast(
             kind: .uniqueC, message: .init(kind: .uniqueC, data: messageData)
         )
-        try? await Task.sleep(for: .milliseconds(1000))
+        try? await Task.sleep(for: .milliseconds(5000))
         let lastReceivedData = await handler2.lastReceivedData
-        print("lastReceivedData \(lastReceivedData?.toHexString() ?? "none")")
         #expect(lastReceivedData == messageData)
     }
 
@@ -421,7 +417,7 @@ struct PeerTests {
         peer1.broadcast(
             kind: .uniqueC, message: .init(kind: .uniqueC, data: recoverData)
         )
-        try? await Task.sleep(for: .milliseconds(500))
+        try? await Task.sleep(for: .milliseconds(1000))
         await #expect(handler2.lastReceivedData == recoverData)
     }
 

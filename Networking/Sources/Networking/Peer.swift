@@ -297,7 +297,6 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                 )
                 connections.byAddr[address] = conn
                 connections.byId[conn.id] = conn
-                logger.debug("reconnectted", metadata: ["address": "\(address)", "role": "\(role)"])
             }
         }
     }
@@ -472,7 +471,6 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             metadata: ["connectionId": "\(connection.id)", "reason": "\(reason)"]
         )
         if shouldReconnect(basedOn: reason) {
-            logger.debug("shouldReconnect ", metadata: ["connectionId": "\(connection.id)"])
             impl.connections.write { connections in
                 if let conn = connections.byId[connection.id] {
                     if let publicKey = conn.publicKey {
