@@ -55,10 +55,10 @@ public struct Registers: Equatable {
 
     /// standard program init registers
     public init(config: DefaultPvmConfig, argumentData: Data?) {
-        reg1 = UInt32(config.pvmProgramInitRegister1Value)
-        reg2 = UInt32(config.pvmProgramInitStackBaseAddress)
-        reg10 = UInt32(config.pvmProgramInitInputStartAddress)
-        reg11 = UInt32(argumentData?.count ?? 0)
+        self[Index(raw: 0)] = UInt32(config.pvmProgramInitRegister1Value)
+        self[Index(raw: 1)] = UInt32(config.pvmProgramInitStackBaseAddress)
+        self[Index(raw: 7)] = UInt32(config.pvmProgramInitInputStartAddress)
+        self[Index(raw: 8)] = UInt32(argumentData?.count ?? 0)
     }
 
     public subscript(index: Index) -> UInt32 {

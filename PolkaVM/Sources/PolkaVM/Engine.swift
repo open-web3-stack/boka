@@ -25,6 +25,12 @@ public class Engine {
                     if case let .exit(hostExitReason) = hostCall(state: state, callIndex: callIndex) {
                         return hostExitReason
                     }
+                case .halt:
+                    state.updatePC(0)
+                    return reason
+                case .panic:
+                    state.updatePC(0)
+                    return reason
                 default:
                     return reason
                 }

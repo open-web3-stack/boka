@@ -107,20 +107,17 @@ extension Accumulation {
                 assertionFailure("unreachable: service not found")
                 throw AccumulationError.invalidServiceIndex
             }
-            let acc = try serviceAccounts[service].unwrap(orError: AccumulationError.invalidServiceIndex)
-            guard let code = acc.preimages[acc.codeHash] else {
-                continue
-            }
-            let (ctx, commitment) = try accumlateFunction.invoke(
+            let (newState, transfers, commitment, _) = try accumlateFunction.invoke(
                 config: config,
+                state: AccumulateState(
+                    serviceAccounts: serviceAccounts,
+                    validatorQueue: validatorQueue,
+                    authorizationQueue: authorizationQueue,
+                    privilegedServices: privilegedServices
+                ),
                 serviceIndex: service,
-                code: code,
-                serviceAccounts: serviceAccounts,
                 gas: gas,
                 arguments: arguments,
-                validatorQueue: validatorQueue,
-                authorizationQueue: authorizationQueue,
-                privilegedServices: privilegedServices,
                 initialIndex: Blake2b256.hash(service.encode(), entropyPool.t0.data, block.header.timeslot.encode())
                     .data.decode(UInt32.self),
                 timeslot: block.header.timeslot
@@ -129,27 +126,25 @@ extension Accumulation {
                 commitments.append((service, commitment))
             }
 
-            for (service, account) in ctx.newAccounts {
+            for (service, account) in newState.serviceAccounts {
                 guard newServiceAccounts[service] == nil else {
                     throw AccumulationError.duplicatedServiceIndex
                 }
                 newServiceAccounts[service] = account
             }
 
-            newServiceAccounts[service] = ctx.account
-
             switch service {
             case privilegedServices.empower:
-                newPrivilegedServices = ctx.privilegedServices
+                newPrivilegedServices = newState.privilegedServices
             case privilegedServices.assign:
-                newAuthorizationQueue = ctx.authorizationQueue
+                newAuthorizationQueue = newState.authorizationQueue
             case privilegedServices.designate:
-                newValidatorQueue = ctx.validatorQueue
+                newValidatorQueue = newState.validatorQueue
             default:
                 break
             }
 
-            for transfer in ctx.transfers {
+            for transfer in transfers {
                 transferReceivers[transfer.sender, default: []].append(transfer)
             }
         }
