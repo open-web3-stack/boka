@@ -19,7 +19,7 @@ public class IsAuthorizedContext: InvocationContext {
             return GasFn().call(config: config, state: state)
         } else {
             state.consumeGas(Gas(10))
-            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHAT.rawValue)
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHAT.rawValue)
             return .continued
         }
     }

@@ -49,7 +49,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     // L = 14, 400: The maximum age in timeslots of the lookup anchor.
     public var maxLookupAnchorAge: Int
 
-    // M = 128: The size of a transfer memo in octets.
+    // WT = 128: The size of a transfer memo in octets.
     public var transferMemoSize: Int
 
     // N = 2: The number of ticket entries per validator.

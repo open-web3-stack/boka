@@ -15,7 +15,7 @@ extension IsAuthorizedFunction {
         let args = try JamEncoder.encode(package) + JamEncoder.encode(coreIndex)
         let ctx = IsAuthorizedContext(config: config)
 
-        let (exitReason, _, _, output) = invokePVM(
+        let (exitReason, _, output) = invokePVM(
             config: config,
             blob: package.authorizationCodeHash.data,
             pc: 0,
