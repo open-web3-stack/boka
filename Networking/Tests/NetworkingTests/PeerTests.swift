@@ -87,7 +87,7 @@ struct PeerTests {
     struct MockEphemeralStreamHandler: EphemeralStreamHandler {
         typealias StreamKind = EphemeralStreamKind
         typealias Request = MockRequest<EphemeralStreamKind>
-        private let dataStorage = DataStorage()
+        private let dataStorage: PeerTests.DataStorage = DataStorage()
 
         var lastReceivedData: Data? {
             get async { await dataStorage.data.last }
@@ -302,13 +302,13 @@ struct PeerTests {
         peer1.broadcast(
             kind: .uniqueC, message: .init(kind: .uniqueC, data: messageData)
         )
-        try? await Task.sleep(for: .milliseconds(5000))
+        try? await Task.sleep(for: .milliseconds(1000))
         let lastReceivedData = await handler2.lastReceivedData
         #expect(lastReceivedData == messageData)
     }
 
     @Test
-    func ConnectionNoNeedToReconnect() async throws {
+    func connectionNoNeedToReconnect() async throws {
         let handler2 = MockPresentStreamHandler()
         let messageData = Data("Post-recovery message".utf8)
 

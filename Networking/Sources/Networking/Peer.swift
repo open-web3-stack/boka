@@ -166,7 +166,6 @@ public final class Peer<Handler: StreamHandler>: Sendable {
         let connections = impl.connections.read { connections in
             connections.byId.values
         }
-
         guard let messageData = try? message.encode() else {
             impl.logger.warning("Failed to encode message: \(message)")
             return
@@ -274,30 +273,27 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
 
     // TODO: Add reconnection attempts & Apply exponential backoff delay
     func reconnect(to address: NetAddr, role: PeerRole) throws {
-        Task {
-            try await Task.sleep(for: .microseconds(2000))
-            logger.debug("reconnecting", metadata: ["to address": "\(address)", "role": "\(role)"])
-            try connections.write { connections in
-                if connections.byAddr[address] != nil {
-                    logger.warning("reconnecting to \(address) already connected")
-                    return
-                }
-                let quicConn = try QuicConnection(
-                    handler: PeerEventHandler(self),
-                    registration: clientConfiguration.registration,
-                    configuration: clientConfiguration
-                )
-                try quicConn.connect(to: address)
-                let conn = Connection(
-                    quicConn,
-                    impl: self,
-                    role: role,
-                    remoteAddress: address,
-                    initiatedByLocal: true
-                )
-                connections.byAddr[address] = conn
-                connections.byId[conn.id] = conn
+        logger.debug("reconnecting", metadata: ["to address": "\(address)", "role": "\(role)"])
+        try connections.write { connections in
+            if connections.byAddr[address] != nil {
+                logger.warning("reconnecting to \(address) already connected")
+                return
             }
+            let quicConn = try QuicConnection(
+                handler: PeerEventHandler(self),
+                registration: clientConfiguration.registration,
+                configuration: clientConfiguration
+            )
+            try quicConn.connect(to: address)
+            let conn = Connection(
+                quicConn,
+                impl: self,
+                role: role,
+                remoteAddress: address,
+                initiatedByLocal: true
+            )
+            connections.byAddr[address] = conn
+            connections.byId[conn.id] = conn
         }
     }
 

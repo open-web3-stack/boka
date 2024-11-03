@@ -124,12 +124,10 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
 
     public var needReconnect: Bool {
         state.read {
-            switch $0 {
-            case .reconnect:
-                true
-            default:
-                false
+            if case .reconnect = $0 {
+                return true
             }
+            return false
         }
     }
 
