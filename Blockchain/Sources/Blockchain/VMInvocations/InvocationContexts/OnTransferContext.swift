@@ -34,16 +34,11 @@ public class OnTransferContext: InvocationContext {
         case GasFn.identifier:
             return GasFn().call(config: config, state: state)
         case Info.identifier:
-            return Info(
-                account: context.account,
-                serviceIndex: context.index,
-                accounts: context.accounts,
-                newAccounts: [:]
-            )
-            .call(config: config, state: state)
+            return Info(serviceIndex: context.index, accounts: context.accounts)
+                .call(config: config, state: state)
         default:
             state.consumeGas(Gas(10))
-            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHAT.rawValue)
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHAT.rawValue)
             return .continued
         }
     }

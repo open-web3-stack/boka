@@ -12,7 +12,7 @@ public func invokePVM(
     gas: Gas,
     argumentData: Data?,
     ctx: any InvocationContext
-) -> (ExitReason, VMState?, Gas?, Data?) {
+) -> (ExitReason, Gas, Data?) {
     do {
         let state = try VMState(standardProgramBlob: blob, pc: pc, gas: gas, argumentData: argumentData)
         let engine = Engine(config: config, invocationContext: ctx)
@@ -20,19 +20,19 @@ public func invokePVM(
 
         switch exitReason {
         case .outOfGas:
-            return (.outOfGas, state, nil, nil)
+            return (.outOfGas, Gas(0), nil)
         case .halt:
             let (addr, len) = state.readRegister(Registers.Index(raw: 10), Registers.Index(raw: 11))
             let output = try? state.readMemory(address: addr, length: Int(len))
-            return (.halt, state, Gas(state.getGas()), output ?? Data())
+            return (.halt, Gas(state.getGas()), output ?? Data())
         default:
-            return (.panic(.trap), state, nil, nil)
+            return (.panic(.trap), Gas(0), nil)
         }
     } catch let e as StandardProgram.Error {
         logger.error("standard program initialization failed: \(e)")
-        return (.panic(.trap), nil, nil, nil)
+        return (.panic(.trap), Gas(0), nil)
     } catch let e {
         logger.error("unknown error: \(e)")
-        return (.panic(.trap), nil, nil, nil)
+        return (.panic(.trap), Gas(0), nil)
     }
 }
