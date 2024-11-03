@@ -7,9 +7,7 @@ private let logger = Logger(label: "AccumulateContext")
 public class AccumulateContext: InvocationContext {
     public typealias ContextType = (
         x: AccumlateResultContext,
-        y: AccumlateResultContext, // only set in checkpoint function
-        serviceIndex: ServiceIndex,
-        accounts: [ServiceIndex: ServiceAccount],
+        y: AccumlateResultContext, // only set in checkpoint host-call
         timeslot: TimeslotIndex
     )
 
@@ -23,29 +21,31 @@ public class AccumulateContext: InvocationContext {
 
     public func dispatch(index: UInt32, state: VMState) -> ExecOutcome {
         logger.debug("dispatching host-call: \(index)")
-        guard context.x.account != nil else {
-            fatalError("context x.account is nil")
-        }
+
+        // the accumulating service account
+        var account = context.x.accumulateState.serviceAccounts[context.x.serviceIndex]!
+
+        var allAccounts = context.x.serviceAccounts
+        allAccounts.merge(context.x.accumulateState.serviceAccounts) { _, new in new }
+
         switch UInt8(index) {
         case Read.identifier:
-            return Read(account: context.x.account!, serviceIndex: context.serviceIndex, accounts: context.accounts)
+            return Read(account: account, serviceIndex: context.x.serviceIndex, accounts: allAccounts)
                 .call(config: config, state: state)
         case Write.identifier:
-            return Write(account: &context.x.account!, serviceIndex: context.serviceIndex)
+            let execOutcome = Write(account: &account, serviceIndex: context.x.serviceIndex)
                 .call(config: config, state: state)
+            // G function in Gray Paper
+            context.x.accumulateState.serviceAccounts[context.x.serviceIndex] = account
+            return execOutcome
         case Lookup.identifier:
-            return Lookup(account: context.x.account!, serviceIndex: context.serviceIndex, accounts: context.accounts)
+            return Lookup(account: account, serviceIndex: context.x.serviceIndex, accounts: allAccounts)
                 .call(config: config, state: state)
         case GasFn.identifier:
             return GasFn().call(config: config, state: state)
         case Info.identifier:
-            return Info(
-                account: context.x.account!,
-                serviceIndex: context.serviceIndex,
-                accounts: context.accounts,
-                newAccounts: context.x.newAccounts
-            )
-            .call(config: config, state: state)
+            return Info(serviceIndex: context.x.serviceIndex, accounts: allAccounts)
+                .call(config: config, state: state)
         case Empower.identifier:
             return Empower(x: &context.x).call(config: config, state: state)
         case Assign.identifier:
@@ -55,15 +55,15 @@ public class AccumulateContext: InvocationContext {
         case Checkpoint.identifier:
             return Checkpoint(x: context.x, y: &context.y).call(config: config, state: state)
         case New.identifier:
-            return New(x: &context.x, accounts: context.accounts).call(config: config, state: state)
+            return New(x: &context.x, account: account, accounts: allAccounts).call(config: config, state: state)
         case Upgrade.identifier:
-            return Upgrade(x: &context.x, serviceIndex: context.serviceIndex)
+            return Upgrade(x: &context.x)
                 .call(config: config, state: state)
         case Transfer.identifier:
-            return Transfer(x: &context.x, serviceIndex: context.serviceIndex, accounts: context.accounts)
+            return Transfer(x: &context.x, account: account, accounts: allAccounts)
                 .call(config: config, state: state)
         case Quit.identifier:
-            return Quit(x: &context.x, serviceIndex: context.serviceIndex, accounts: context.accounts)
+            return Quit(x: &context.x, account: account, accounts: allAccounts)
                 .call(config: config, state: state)
         case Solicit.identifier:
             return Solicit(x: &context.x, timeslot: context.timeslot).call(config: config, state: state)
