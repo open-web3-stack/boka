@@ -254,7 +254,10 @@ final class MockPeerEventTests {
             configuration: clientConfiguration
         )
         try clientConnection.connect(to: listenAddress)
+        let stream1 = try clientConnection.createStream()
+        try stream1.send(data: Data("test data 1".utf8))
         try? await Task.sleep(for: .milliseconds(1000))
+
         #expect(throws: Error.self) {
             let stream1 = try clientConnection.createStream()
             try stream1.send(data: Data("test data 1".utf8))
