@@ -80,6 +80,8 @@ public enum StateKeys {
             >
         >
 
+        public init() {}
+
         public func encode() -> Data32 {
             constructKey(1)
         }
@@ -96,6 +98,8 @@ public enum StateKeys {
             >
         >
 
+        public init() {}
+
         public func encode() -> Data32 {
             constructKey(2)
         }
@@ -103,6 +107,8 @@ public enum StateKeys {
 
     public struct RecentHistoryKey: StateKey {
         public typealias Value = StateValue<RecentHistory>
+
+        public init() {}
 
         public func encode() -> Data32 {
             constructKey(3)
@@ -112,6 +118,8 @@ public enum StateKeys {
     public struct SafroleStateKey: StateKey {
         public typealias Value = StateValue<SafroleState>
 
+        public init() {}
+
         public func encode() -> Data32 {
             constructKey(4)
         }
@@ -120,6 +128,8 @@ public enum StateKeys {
     public struct JudgementsKey: StateKey {
         public typealias Value = StateValue<JudgementsState>
 
+        public init() {}
+
         public func encode() -> Data32 {
             constructKey(5)
         }
@@ -127,6 +137,8 @@ public enum StateKeys {
 
     public struct EntropyPoolKey: StateKey {
         public typealias Value = StateValue<EntropyPool>
+
+        public init() {}
 
         public func encode() -> Data32 {
             constructKey(6)
@@ -141,6 +153,8 @@ public enum StateKeys {
             >
         >
 
+        public init() {}
+
         public func encode() -> Data32 {
             constructKey(7)
         }
@@ -153,6 +167,8 @@ public enum StateKeys {
                 ProtocolConfig.TotalNumberOfValidators
             >
         >
+
+        public init() {}
 
         public func encode() -> Data32 {
             constructKey(8)
@@ -167,6 +183,8 @@ public enum StateKeys {
             >
         >
 
+        public init() {}
+
         public func encode() -> Data32 {
             constructKey(9)
         }
@@ -180,6 +198,8 @@ public enum StateKeys {
             >
         >
 
+        public init() {}
+
         public func encode() -> Data32 {
             constructKey(10)
         }
@@ -187,6 +207,8 @@ public enum StateKeys {
 
     public struct TimeslotKey: StateKey {
         public typealias Value = StateValue<TimeslotIndex>
+
+        public init() {}
 
         public func encode() -> Data32 {
             constructKey(11)
@@ -196,6 +218,8 @@ public enum StateKeys {
     public struct PrivilegedServicesKey: StateKey {
         public typealias Value = StateValue<PrivilegedServices>
 
+        public init() {}
+
         public func encode() -> Data32 {
             constructKey(12)
         }
@@ -203,6 +227,8 @@ public enum StateKeys {
 
     public struct ActivityStatisticsKey: StateKey {
         public typealias Value = StateValue<ValidatorActivityStatistics>
+
+        public init() {}
 
         public func encode() -> Data32 {
             constructKey(13)

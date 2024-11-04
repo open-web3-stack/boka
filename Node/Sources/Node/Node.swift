@@ -42,11 +42,11 @@ public class Node {
         self.config = config
 
         let chainspec = try await genesis.load()
-        let genesisBlock = chainspec.block.asRef()
-        let genesisStateData = chainspec.state
+        let genesisBlock = try chainspec.getBlock()
+        let genesisStateData = try chainspec.getState()
         let backend = try InMemoryBackend(config: chainspec.getConfig(), store: genesisStateData)
         let genesisState = try await State(backend: backend)
-        let genesisStateRef = Ref(genesisState)
+        let genesisStateRef = StateRef(genesisState)
         let protocolConfig = try chainspec.getConfig()
 
         logger.info("Genesis: \(genesisBlock.hash)")

@@ -44,17 +44,17 @@ extension Genesis {
         case let .preset(preset):
             let config = preset.config
             let (state, block) = try State.devGenesis(config: config)
-            var kv = [Data32: Data]()
+            var kv = [String: Data]()
             for (key, value) in try await state.value.toKV() {
-                kv[key] = value
+                kv[key.toHexString()] = value
             }
-            return ChainSpec(
+            return try ChainSpec(
                 name: preset.rawValue,
                 id: preset.rawValue,
                 bootnodes: [],
                 preset: preset,
                 config: config.value,
-                block: block.value,
+                block: JamEncoder.encode(block.value),
                 state: kv
             )
         case let .file(path):

@@ -258,6 +258,10 @@ extension State {
     public func toKV() async throws -> some Sequence<(key: Data32, value: Data)> {
         try await KVSequence(state: self)
     }
+
+    public func asRef() -> StateRef {
+        StateRef(self)
+    }
 }
 
 extension State: Dummy {
