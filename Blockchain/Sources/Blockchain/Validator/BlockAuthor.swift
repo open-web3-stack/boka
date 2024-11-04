@@ -120,7 +120,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
 
         let unsignedHeader = Header.Unsigned(
             parentHash: parentHash,
-            priorStateRoot: state.value.stateRoot(),
+            priorStateRoot: state.stateRoot,
             extrinsicsHash: extrinsic.hash(),
             timeslot: timeslot,
             epoch: safroleResult.epochMark,

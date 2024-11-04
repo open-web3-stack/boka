@@ -54,7 +54,7 @@ public final class Runtime {
             throw Error.invalidParentHash
         }
 
-        guard block.header.priorStateRoot == state.value.stateRoot() else {
+        guard block.header.priorStateRoot == state.stateRoot else {
             throw Error.invalidHeaderStateRoot
         }
 

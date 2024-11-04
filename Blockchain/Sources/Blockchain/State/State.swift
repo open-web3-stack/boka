@@ -474,4 +474,12 @@ extension State: Accumulation {
     }
 }
 
-public typealias StateRef = Ref<State>
+public class StateRef: Ref<State>, @unchecked Sendable {
+    public static func dummy(config: ProtocolConfigRef, block: BlockRef?) -> StateRef {
+        StateRef(State.dummy(config: config, block: block))
+    }
+
+    public var stateRoot: Data32 {
+        value.stateRoot()
+    }
+}
