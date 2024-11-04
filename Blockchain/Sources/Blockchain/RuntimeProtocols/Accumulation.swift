@@ -21,7 +21,7 @@ public struct AccumulationOutput {
     public var serviceAccounts: [ServiceIndex: ServiceAccount]
 }
 
-public protocol Accumulation {
+public protocol Accumulation: ServiceAccounts {
     var privilegedServices: PrivilegedServices { get }
     var validatorQueue: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
@@ -34,13 +34,12 @@ public protocol Accumulation {
         ProtocolConfig.TotalNumberOfCores
     > { get }
     var entropyPool: EntropyPool { get }
-    var serviceAccounts: [ServiceIndex: ServiceAccount] { get }
     var accumlateFunction: AccumulateFunction { get }
     var onTransferFunction: OnTransferFunction { get }
 }
 
 extension Accumulation {
-    public func update(config: ProtocolConfigRef, block: BlockRef, workReports: [WorkReport]) throws -> AccumulationOutput {
+    public func update(config: ProtocolConfigRef, block: BlockRef, workReports: [WorkReport]) async throws -> AccumulationOutput {
         var servicesGasRatio: [ServiceIndex: Gas] = [:]
         var servicesGas: [ServiceIndex: Gas] = [:]
 
@@ -50,15 +49,13 @@ extension Accumulation {
         }
 
         let totalGasRatio = workReports.flatMap(\.results).reduce(Gas(0)) { $0 + $1.gasRatio }
-        let totalMinimalGas = try workReports.flatMap(\.results)
-            .reduce(Gas(0)) {
-                try $0 + serviceAccounts[$1.serviceIndex].unwrap(orError: AccumulationError.invalidServiceIndex).minAccumlateGas
-            }
+        var totalMinimalGas = Gas(0)
         for report in workReports {
             for result in report.results {
                 servicesGasRatio[result.serviceIndex, default: Gas(0)] += result.gasRatio
-                servicesGas[result.serviceIndex, default: Gas(0)] += try serviceAccounts[result.serviceIndex]
-                    .unwrap(orError: AccumulationError.invalidServiceIndex).minAccumlateGas
+                let acc = try await get(serviceAccount: result.serviceIndex).unwrap(orError: AccumulationError.invalidServiceIndex)
+                totalMinimalGas += acc.minAccumlateGas
+                servicesGas[result.serviceIndex, default: Gas(0)] += acc.minAccumlateGas
             }
         }
         let remainingGas = config.value.coreAccumulationGas - totalMinimalGas
@@ -98,7 +95,7 @@ extension Accumulation {
             ProtocolConfig.TotalNumberOfCores
         >?
 
-        var newServiceAccounts = serviceAccounts
+        var newServiceAccounts = [ServiceIndex: ServiceAccount]()
 
         var transferReceivers = [ServiceIndex: [DeferredTransfers]]()
 
@@ -107,10 +104,11 @@ extension Accumulation {
                 assertionFailure("unreachable: service not found")
                 throw AccumulationError.invalidServiceIndex
             }
-            let (newState, transfers, commitment, _) = try accumlateFunction.invoke(
+            let (newState, transfers, commitment, _) = try await accumlateFunction.invoke(
                 config: config,
+                accounts: self,
                 state: AccumulateState(
-                    serviceAccounts: serviceAccounts,
+                    serviceAccounts: newServiceAccounts,
                     validatorQueue: validatorQueue,
                     authorizationQueue: authorizationQueue,
                     privilegedServices: privilegedServices
@@ -150,8 +148,9 @@ extension Accumulation {
         }
 
         for (service, transfers) in transferReceivers {
-            let acc = try serviceAccounts[service].unwrap(orError: AccumulationError.invalidServiceIndex)
-            guard let code = acc.preimages[acc.codeHash] else {
+            let acc = try await get(serviceAccount: service).unwrap(orError: AccumulationError.invalidServiceIndex)
+            let code = try await get(serviceAccount: service, preimageHash: acc.codeHash)
+            guard let code else {
                 continue
             }
             newServiceAccounts[service] = try onTransferFunction.invoke(
