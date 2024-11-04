@@ -147,10 +147,10 @@ final class MockPeerEventTests {
             configuration: clientConfiguration
         )
 
-        try? await Task.sleep(for: .milliseconds(100))
-        await #expect(throws: Error.self) {
-            try clientConnection.connect(to: listenAddress)
-            try? await Task.sleep(for: .milliseconds(200))
+        try? await Task.sleep(for: .milliseconds(50))
+        try clientConnection.connect(to: listenAddress)
+        try? await Task.sleep(for: .milliseconds(1000))
+        #expect(throws: Error.self) {
             let stream1 = try clientConnection.createStream()
             try stream1.send(data: Data("test data 1".utf8))
         }
@@ -253,10 +253,9 @@ final class MockPeerEventTests {
             registration: registration,
             configuration: clientConfiguration
         )
-        try? await Task.sleep(for: .milliseconds(100))
-        await #expect(throws: Error.self) {
-            try clientConnection.connect(to: listenAddress)
-            try? await Task.sleep(for: .milliseconds(200))
+        try clientConnection.connect(to: listenAddress)
+        try? await Task.sleep(for: .milliseconds(1000))
+        #expect(throws: Error.self) {
             let stream1 = try clientConnection.createStream()
             try stream1.send(data: Data("test data 1".utf8))
         }
