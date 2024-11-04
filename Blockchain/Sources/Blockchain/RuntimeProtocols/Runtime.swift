@@ -140,15 +140,15 @@ public final class Runtime {
         // TODO: validate other things
     }
 
-    public func apply(block: BlockRef, state prevState: StateRef, context: ApplyContext) throws(Error) -> StateRef {
-        let validatedBlock = try Result { try block.toValidated(config: config) }
+    public func apply(block: BlockRef, state prevState: StateRef, context: ApplyContext) async throws(Error) -> StateRef {
+        let validatedBlock = try Result(catching: { try block.toValidated(config: config) })
             .mapError(Error.validateError)
             .get()
 
-        return try apply(block: validatedBlock, state: prevState, context: context)
+        return try await apply(block: validatedBlock, state: prevState, context: context)
     }
 
-    public func apply(block: Validated<BlockRef>, state prevState: StateRef, context: ApplyContext) throws(Error) -> StateRef {
+    public func apply(block: Validated<BlockRef>, state prevState: StateRef, context: ApplyContext) async throws(Error) -> StateRef {
         try validate(block: block, state: prevState, context: context)
         let block = block.value
 
@@ -170,9 +170,22 @@ public final class Runtime {
 
             // depends on Safrole and Disputes
             let availableReports = try updateReports(block: block, state: &newState)
-            let res = try newState.update(config: config, block: block, workReports: availableReports)
+            let res = try await newState.update(config: config, block: block, workReports: availableReports)
             newState.privilegedServices = res.privilegedServices
-            newState.serviceAccounts = res.serviceAccounts
+
+            for (service, account) in res.serviceAccounts {
+                newState[serviceAccount: service] = account.toDetails()
+                for (hash, value) in account.storage {
+                    newState[serviceAccount: service, storageKey: hash] = value
+                }
+                for (hash, value) in account.preimages {
+                    newState[serviceAccount: service, preimageHash: hash] = value
+                }
+                for (hashLength, value) in account.preimageInfos {
+                    newState[serviceAccount: service, preimageHash: hashLength.hash, length: hashLength.length] = value
+                }
+            }
+
             newState.authorizationQueue = res.authorizationQueue
             newState.validatorQueue = res.validatorQueue
 
@@ -311,7 +324,7 @@ public final class Runtime {
         return availableReports
     }
 
-    public func updatePreimages(block: BlockRef, state newState: inout State) throws {
+    public func updatePreimages(block: BlockRef, state newState: inout State) async throws {
         let preimages = block.extrinsic.preimages.preimages
 
         guard preimages.isSortedAndUnique() else {
@@ -319,20 +332,19 @@ public final class Runtime {
         }
 
         for preimage in preimages {
-            guard var acc = newState.serviceAccounts[preimage.serviceIndex] else {
-                throw Error.invalidPreimageServiceIndex
-            }
-
             let hash = preimage.data.blake2b256hash()
-            let hashAndLength = HashAndLength(hash: hash, length: UInt32(preimage.data.count))
-            guard acc.preimages[hash] == nil, acc.preimageInfos[hashAndLength] == nil else {
+            let preimageData: Data? = try await newState.get(serviceAccount: preimage.serviceIndex, preimageHash: hash)
+            let info = try await newState.get(
+                serviceAccount: preimage.serviceIndex, preimageHash: hash, length: UInt32(preimage.data.count)
+            )
+            guard preimageData == nil, info == nil else {
                 throw Error.duplicatedPreimage
             }
 
-            acc.preimages[hash] = preimage.data
-            acc.preimageInfos[hashAndLength] = .init([newState.timeslot])
-
-            newState.serviceAccounts[preimage.serviceIndex] = acc
+            newState[serviceAccount: preimage.serviceIndex, preimageHash: hash] = preimage.data
+            newState[
+                serviceAccount: preimage.serviceIndex, preimageHash: hash, length: UInt32(preimage.data.count)
+            ] = .init([newState.timeslot])
         }
     }
 

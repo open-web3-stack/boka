@@ -17,11 +17,12 @@ struct ChainSpecTests {
         for preset in GenesisPreset.allCases {
             let genesis = Genesis.preset(preset)
             let chainspec = try await genesis.load()
-            let state = chainspec.state.asRef()
-            let block = chainspec.block.asRef()
+            let backend = try InMemoryBackend(config: chainspec.getConfig(), store: chainspec.getState())
+            let block = try chainspec.getBlock()
             let config = try chainspec.getConfig()
 
-            #expect(state.value.lastBlockHash == block.hash)
+            let recentHistory = try await backend.read(StateKeys.RecentHistoryKey())
+            #expect(recentHistory.items.last?.headerHash == block.hash)
 
             // Verify config matches preset
             #expect(config == preset.config)
@@ -33,15 +34,6 @@ struct ChainSpecTests {
         let chainspec = try await genesis.load()
 
         let data = try chainspec.encode()
-        let decoded = try ChainSpec.decode(from: data)
-        #expect(decoded == chainspec)
-    }
-
-    @Test func encodeDecodeChainSpecBinary() async throws {
-        let genesis = Genesis.preset(.minimal)
-        let chainspec = try await genesis.load()
-
-        let data = try chainspec.encodeBinary()
         let decoded = try ChainSpec.decode(from: data)
         #expect(decoded == chainspec)
     }

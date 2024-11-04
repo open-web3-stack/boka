@@ -1,6 +1,26 @@
 import Foundation
 import Utils
 
+public struct ServiceAccountDetails: Sendable, Equatable, Codable {
+    // c
+    public var codeHash: Data32
+
+    // b
+    public var balance: Balance
+
+    // g
+    public var minAccumlateGas: Gas
+
+    // m
+    public var minOnTransferGas: Gas
+
+    // l: the total number of octets used in storage
+    public var totalByteLength: UInt64
+
+    // i: number of items in storage
+    public var itemsCount: UInt32
+}
+
 public struct ServiceAccount: Sendable, Equatable, Codable {
     // s
     public var storage: [Data32: Data]
@@ -41,6 +61,17 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
         self.balance = balance
         self.minAccumlateGas = minAccumlateGas
         self.minOnTransferGas = minOnTransferGas
+    }
+
+    public func toDetails() -> ServiceAccountDetails {
+        ServiceAccountDetails(
+            codeHash: codeHash,
+            balance: balance,
+            minAccumlateGas: minAccumlateGas,
+            minOnTransferGas: minOnTransferGas,
+            totalByteLength: totalByteLength,
+            itemsCount: itemsCount
+        )
     }
 }
 
