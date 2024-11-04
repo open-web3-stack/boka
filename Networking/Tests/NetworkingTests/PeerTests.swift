@@ -693,12 +693,9 @@ struct PeerTests {
         }
 
         var connections = [Connection<MockStreamHandler>]()
-        for i in 0 ..< peers.count {
+        for i in 0 ..< peersCount {
             let peer = peers[i]
-            for j in 0 ..< peers.count {
-                if i >= j {
-                    continue
-                }
+            for j in i + 1 ..< peersCount {
                 let otherPeer = peers[j]
                 let conn = try peer.connect(
                     to: otherPeer.listenAddress(),
