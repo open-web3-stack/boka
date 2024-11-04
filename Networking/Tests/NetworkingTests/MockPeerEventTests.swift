@@ -149,24 +149,10 @@ final class MockPeerEventTests {
 
         // Attempt to connect
         try clientConnection.connect(to: listenAddress)
-        let stream1 = try clientConnection.createStream()
-        try stream1.send(data: Data("test data 1".utf8))
-
         try? await Task.sleep(for: .milliseconds(100))
-        let (_, reason) = clientHandler.events.value.compactMap {
-            switch $0 {
-            case let .shutdownInitiated(connection, reason):
-                (connection, reason) as (QuicConnection, ConnectionCloseReason)?
-            default:
-                nil
-            }
-        }.first!
-        #expect(
-            reason
-                == ConnectionCloseReason.transport(
-                    status: QuicStatus.code(QuicStatusCode.badCert), code: QuicErrorCode(298)
-                )
-        )
+        #expect(throws: Error.self) {
+            try clientConnection.createStream()
+        }
     }
 
     @Test
@@ -269,24 +255,10 @@ final class MockPeerEventTests {
 
         // Attempt to connect
         try clientConnection.connect(to: listenAddress)
-        let stream1 = try clientConnection.createStream()
-        try stream1.send(data: Data("test data 1".utf8))
-
         try? await Task.sleep(for: .milliseconds(100))
-        let (_, reason) = serverHandler.events.value.compactMap {
-            switch $0 {
-            case let .shutdownInitiated(connection, reason):
-                (connection, reason) as (QuicConnection, ConnectionCloseReason)?
-            default:
-                nil
-            }
-        }.first!
-        #expect(
-            reason
-                == ConnectionCloseReason.transport(
-                    status: QuicStatus.code(QuicStatusCode.badCert), code: QuicErrorCode(298)
-                )
-        )
+        #expect(throws: Error.self) {
+            try clientConnection.createStream()
+        }
     }
 
     @Test
