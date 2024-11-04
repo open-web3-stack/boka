@@ -36,9 +36,10 @@ public protocol Guaranteeing {
         >,
         ProtocolConfig.TotalNumberOfCores
     > { get }
-    var serviceAccounts: [ServiceIndex: ServiceAccount] { get }
     var recentHistory: RecentHistory { get }
     var offenders: Set<Ed25519PublicKey> { get }
+
+    func serviceAccount(index: ServiceIndex) -> ServiceAccountDetails?
 }
 
 extension Guaranteeing {
@@ -66,6 +67,12 @@ extension Guaranteeing {
         let n = timeslot % UInt32(config.value.epochLength) / UInt32(config.value.coreAssignmentRotationPeriod)
 
         return toCoreAssignment(source, n: n, max: UInt32(config.value.totalNumberOfCores))
+    }
+
+    public func requiredStorageKeys(extrinsic: ExtrinsicGuarantees) -> [any StateKey] {
+        extrinsic.guarantees
+            .flatMap(\.workReport.results)
+            .map { StateKeys.ServiceAccountKey(index: $0.serviceIndex) }
     }
 
     public func update(
@@ -131,7 +138,7 @@ extension Guaranteeing {
             }
 
             for result in report.results {
-                guard let acc = serviceAccounts[result.serviceIndex] else {
+                guard let acc = serviceAccount(index: result.serviceIndex) else {
                     throw .invalidServiceIndex
                 }
 
