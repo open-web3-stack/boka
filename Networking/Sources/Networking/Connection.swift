@@ -20,12 +20,14 @@ enum ConnectionError: Error {
     case invalidLength
     case unexpectedState
     case closed
+    case reconnect
 }
 
 enum ConnectionState {
     case connecting(continuations: [CheckedContinuation<Void, Error>])
     case connected(publicKey: Data)
     case closed
+    case reconnect(publicKey: Data)
 }
 
 public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoProtocol {
@@ -50,6 +52,8 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                 publicKey
             case .closed:
                 nil
+            case let .reconnect(publicKey):
+                publicKey
             }
         }
     }
@@ -91,6 +95,18 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         }
     }
 
+    func reconnect(publicKey: Data) {
+        state.write { state in
+            if case let .connecting(continuations) = state {
+                for continuation in continuations {
+                    continuation.resume(throwing: ConnectionError.reconnect)
+                }
+                state = .reconnect(publicKey: publicKey)
+            }
+            state = .reconnect(publicKey: publicKey)
+        }
+    }
+
     public var isClosed: Bool {
         state.read {
             switch $0 {
@@ -100,7 +116,18 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                 false
             case .closed:
                 true
+            case .reconnect:
+                false
             }
+        }
+    }
+
+    public var needReconnect: Bool {
+        state.read {
+            if case .reconnect = $0 {
+                return true
+            }
+            return false
         }
     }
 
@@ -112,6 +139,8 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
             case .connected:
                 true
             case .closed:
+                true
+            case .reconnect:
                 true
             }
         }

@@ -75,12 +75,14 @@ public final class Peer<Handler: StreamHandler>: Sendable {
 
         let registration = try QuicRegistration()
         let serverConfiguration = try QuicConfiguration(
-            registration: registration, pkcs12: pkcs12, alpns: allAlpns, client: false, settings: options.serverSettings
+            registration: registration, pkcs12: pkcs12, alpns: allAlpns, client: false,
+            settings: options.serverSettings
         )
 
         let clientAlpn = alpns[options.role]!
         let clientConfiguration = try QuicConfiguration(
-            registration: registration, pkcs12: pkcs12, alpns: [clientAlpn], client: true, settings: options.clientSettings
+            registration: registration, pkcs12: pkcs12, alpns: [clientAlpn], client: true,
+            settings: options.clientSettings
         )
 
         publicKey = options.secretKey.publicKey.data.data
@@ -104,11 +106,14 @@ public final class Peer<Handler: StreamHandler>: Sendable {
             alpns: allAlpns
         )
 
-        logger.debug("Peer initialized", metadata: [
-            "listenAddress": "\(options.listenAddress)",
-            "role": "\(options.role)",
-            "publicKey": "\(options.secretKey.publicKey.data.toHexString())",
-        ])
+        logger.debug(
+            "Peer initialized",
+            metadata: [
+                "listenAddress": "\(options.listenAddress)",
+                "role": "\(options.role)",
+                "publicKey": "\(options.secretKey.publicKey.data.toHexString())",
+            ]
+        )
     }
 
     public func listenAddress() throws -> NetAddr {
@@ -120,30 +125,33 @@ public final class Peer<Handler: StreamHandler>: Sendable {
         let conn = impl.connections.read { connections in
             connections.byAddr[address]
         }
-        return try conn ?? impl.connections.write { connections in
-            if let curr = connections.byAddr[address] {
-                return curr
+        return try conn
+            ?? impl.connections.write { connections in
+                if let curr = connections.byAddr[address] {
+                    return curr
+                }
+
+                logger.debug(
+                    "connecting to peer", metadata: ["address": "\(address)", "role": "\(role)"]
+                )
+
+                let quicConn = try QuicConnection(
+                    handler: PeerEventHandler(self.impl),
+                    registration: self.impl.clientConfiguration.registration,
+                    configuration: self.impl.clientConfiguration
+                )
+                try quicConn.connect(to: address)
+                let conn = Connection(
+                    quicConn,
+                    impl: self.impl,
+                    role: role,
+                    remoteAddress: address,
+                    initiatedByLocal: true
+                )
+                connections.byAddr[address] = conn
+                connections.byId[conn.id] = conn
+                return conn
             }
-
-            logger.debug("connecting to peer", metadata: ["address": "\(address)", "role": "\(role)"])
-
-            let quicConn = try QuicConnection(
-                handler: PeerEventHandler(self.impl),
-                registration: self.impl.clientConfiguration.registration,
-                configuration: self.impl.clientConfiguration
-            )
-            try quicConn.connect(to: address)
-            let conn = Connection(
-                quicConn,
-                impl: self.impl,
-                role: role,
-                remoteAddress: address,
-                initiatedByLocal: true
-            )
-            connections.byAddr[address] = conn
-            connections.byId[conn.id] = conn
-            return conn
-        }
     }
 
     public func getConnection(publicKey: Data) -> Connection<Handler>? {
@@ -152,11 +160,12 @@ public final class Peer<Handler: StreamHandler>: Sendable {
         }
     }
 
-    public func broadcast(kind: Handler.PresistentHandler.StreamKind, message: Handler.PresistentHandler.Message) {
+    public func broadcast(
+        kind: Handler.PresistentHandler.StreamKind, message: Handler.PresistentHandler.Message
+    ) {
         let connections = impl.connections.read { connections in
             connections.byId.values
         }
-
         guard let messageData = try? message.encode() else {
             impl.logger.warning("Failed to encode message: \(message)")
             return
@@ -168,11 +177,14 @@ public final class Peer<Handler: StreamHandler>: Sendable {
                 case .success:
                     break
                 case let .failure(error):
-                    impl.logger.warning("Failed to send message", metadata: [
-                        "connectionId": "\(connection.id)",
-                        "kind": "\(kind)",
-                        "error": "\(error)",
-                    ])
+                    impl.logger.warning(
+                        "Failed to send message",
+                        metadata: [
+                            "connectionId": "\(connection.id)",
+                            "kind": "\(kind)",
+                            "error": "\(error)",
+                        ]
+                    )
                 }
             }
         }
@@ -259,6 +271,32 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
         }
     }
 
+    // TODO: Add reconnection attempts & Apply exponential backoff delay
+    func reconnect(to address: NetAddr, role: PeerRole) throws {
+        logger.debug("reconnecting", metadata: ["to address": "\(address)", "role": "\(role)"])
+        try connections.write { connections in
+            if connections.byAddr[address] != nil {
+                logger.warning("reconnecting to \(address) already connected")
+                return
+            }
+            let quicConn = try QuicConnection(
+                handler: PeerEventHandler(self),
+                registration: clientConfiguration.registration,
+                configuration: clientConfiguration
+            )
+            try quicConn.connect(to: address)
+            let conn = Connection(
+                quicConn,
+                impl: self,
+                role: role,
+                remoteAddress: address,
+                initiatedByLocal: true
+            )
+            connections.byAddr[address] = conn
+            connections.byId[conn.id] = conn
+        }
+    }
+
     func addStream(_ stream: Stream<Handler>) {
         streams.write { streams in
             if streams[stream.id] != nil {
@@ -280,11 +318,15 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         self.impl = impl
     }
 
-    func newConnection(_: QuicListener, connection: QuicConnection, info: ConnectionInfo) -> QuicStatus {
+    func newConnection(_: QuicListener, connection: QuicConnection, info: ConnectionInfo)
+        -> QuicStatus
+    {
         let addr = info.remoteAddress
         let role = impl.alpnLookup[info.negotiatedAlpn]
         guard let role else {
-            logger.warning("unknown alpn: \(String(data: info.negotiatedAlpn, encoding: .utf8) ?? info.negotiatedAlpn.toDebugHexString())")
+            logger.warning(
+                "unknown alpn: \(String(data: info.negotiatedAlpn, encoding: .utf8) ?? info.negotiatedAlpn.toDebugHexString())"
+            )
             return .code(.alpnNegFailure)
         }
         logger.debug("new connection: \(addr) role: \(role)")
@@ -303,20 +345,28 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             connections.byId[connection.id]
         }
         guard let conn else {
-            logger.warning("Attempt to open but connection is absent", metadata: ["connectionId": "\(connection.id)"])
+            logger.warning(
+                "Attempt to open but connection is absent",
+                metadata: ["connectionId": "\(connection.id)"]
+            )
             return .code(.connectionRefused)
         }
 
         do {
             let (publicKey, alternativeName) = try parseCertificate(data: certificate, type: .x509)
-            logger.trace("Certificate parsed", metadata: [
-                "connectionId": "\(connection.id)",
-                "publicKey": "\(publicKey.toHexString())",
-                "alternativeName": "\(alternativeName)",
-            ])
+            logger.trace(
+                "Certificate parsed",
+                metadata: [
+                    "connectionId": "\(connection.id)",
+                    "publicKey": "\(publicKey.toHexString())",
+                    "alternativeName": "\(alternativeName)",
+                ]
+            )
             if publicKey == impl.publicKey {
                 // Self connection detected
-                logger.trace("Rejecting self-connection", metadata: ["connectionId": "\(connection.id)"])
+                logger.trace(
+                    "Rejecting self-connection", metadata: ["connectionId": "\(connection.id)"]
+                )
                 return .code(.connectionRefused)
             }
             if alternativeName != generateSubjectAlternativeName(pubkey: publicKey) {
@@ -333,9 +383,13 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                         try conn.opened(publicKey: publicKey)
                         return .code(.success)
                     } else {
-                        logger.debug("Rejecting duplicate connection by rule", metadata: [
-                            "connectionId": "\(connection.id)", "publicKey": "\(publicKey.toHexString())",
-                        ])
+                        logger.debug(
+                            "Rejecting duplicate connection by rule",
+                            metadata: [
+                                "connectionId": "\(connection.id)",
+                                "publicKey": "\(publicKey.toHexString())",
+                            ]
+                        )
                         return .code(.connectionRefused)
                     }
                 } else {
@@ -345,7 +399,10 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 }
             }
         } catch {
-            logger.warning("Certificate parsing failed", metadata: ["connectionId": "\(connection.id)", "error": "\(error)"])
+            logger.warning(
+                "Certificate parsing failed",
+                metadata: ["connectionId": "\(connection.id)", "error": "\(error)"]
+            )
             return .code(.badCert)
         }
     }
@@ -355,7 +412,9 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             connections.byId[connection.id]
         }
         guard let conn else {
-            logger.warning("Connected but connection is gone?", metadata: ["connectionId": "\(connection.id)"])
+            logger.warning(
+                "Connected but connection is gone?", metadata: ["connectionId": "\(connection.id)"]
+            )
             return
         }
 
@@ -377,16 +436,67 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
 
     func shutdownComplete(_ connection: QuicConnection) {
         logger.debug("connection shutdown complete", metadata: ["connectionId": "\(connection.id)"])
-        impl.connections.write { connections in
+        let conn = impl.connections.read { connections in
+            connections.byId[connection.id]
+        }
+        let needReconnect = impl.connections.write { connections in
             if let conn = connections.byId[connection.id] {
-                // remove publickey first,func closed will change state to closed
+                let needReconnect = conn.needReconnect
                 if let publicKey = conn.publicKey {
                     connections.byPublicKey.removeValue(forKey: publicKey)
                 }
-                conn.closed()
                 connections.byId.removeValue(forKey: connection.id)
                 connections.byAddr.removeValue(forKey: conn.remoteAddress)
+                conn.closed()
+                return needReconnect
             }
+            return false
+        }
+        if needReconnect, let address = conn?.remoteAddress, let role = conn?.role {
+            do {
+                try impl.reconnect(to: address, role: role)
+            } catch {
+                logger.error("reconnect failed", metadata: ["error": "\(error)"])
+            }
+        }
+    }
+
+    func shutdownInitiated(_ connection: QuicConnection, reason: ConnectionCloseReason) {
+        logger.debug(
+            "Shutdown initiated",
+            metadata: ["connectionId": "\(connection.id)", "reason": "\(reason)"]
+        )
+        if shouldReconnect(basedOn: reason) {
+            impl.connections.write { connections in
+                if let conn = connections.byId[connection.id] {
+                    if let publicKey = conn.publicKey {
+                        connections.byPublicKey.removeValue(forKey: publicKey)
+                        conn.reconnect(publicKey: publicKey)
+                    }
+                }
+            }
+        }
+    }
+
+    // TODO: Add all the cases about reconnects
+    private func shouldReconnect(basedOn reason: ConnectionCloseReason) -> Bool {
+        switch reason {
+        case .idle:
+            // Do not reconnect for idle closures.
+            false
+        case let .transport(status, _):
+            switch QuicStatusCode(rawValue: status.rawValue) {
+            case .badCert:
+                false
+            default:
+                !status.isSucceeded
+            }
+        case let .byPeer(code):
+            // Do not reconnect if the closure was initiated by the peer.
+            code != .success
+        case let .byLocal(code):
+            // Do not reconnect if the local side initiated the closure.
+            code != .success
         }
     }
 
@@ -419,10 +529,14 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             if let connection {
                 connection.streamClosed(stream: stream, abort: !status.isSucceeded)
             } else {
-                logger.warning("Stream closed but connection is gone?", metadata: ["streamId": "\(stream.id)"])
+                logger.warning(
+                    "Stream closed but connection is gone?", metadata: ["streamId": "\(stream.id)"]
+                )
             }
         } else {
-            logger.warning("Stream closed but stream is gone?", metadata: ["streamId": "\(quicStream.id)"])
+            logger.warning(
+                "Stream closed but stream is gone?", metadata: ["streamId": "\(quicStream.id)"]
+            )
         }
     }
 }
