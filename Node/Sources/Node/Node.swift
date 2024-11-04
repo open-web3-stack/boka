@@ -43,12 +43,15 @@ public class Node {
 
         let chainspec = try await genesis.load()
         let genesisBlock = chainspec.block.asRef()
-        let genesisState = chainspec.state.asRef()
+        let genesisStateData = chainspec.state
+        let backend = try InMemoryBackend(config: chainspec.getConfig(), store: genesisStateData)
+        let genesisState = try await State(backend: backend)
+        let genesisStateRef = Ref(genesisState)
         let protocolConfig = try chainspec.getConfig()
 
         logger.info("Genesis: \(genesisBlock.hash)")
 
-        dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
+        dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisStateRef, genesisBlock: genesisBlock))
         self.scheduler = scheduler
         let blockchain = try await Blockchain(
             config: protocolConfig,

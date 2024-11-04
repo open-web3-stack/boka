@@ -31,13 +31,16 @@ struct ChainHandler {
     func getState(request: JSONRequest) async throws -> any Encodable {
         let hash = request.params?["hash"] as? String
         if let hash {
-            guard let data = Data(fromHexString: hash), let data32 = Data32(data) else {
+            guard
+                let data = Data(fromHexString: hash),
+                let data32 = Data32(data)
+            else {
                 throw JSONError(code: -32602, message: "Invalid block hash")
             }
             let state = try await source.getState(hash: data32)
             // return state root for now
             return [
-                "stateRoot": state?.stateRoot.description,
+                "stateRoot": state?.value.stateRoot().description,
                 "blockHash": hash.description,
             ]
         } else {
@@ -45,7 +48,7 @@ struct ChainHandler {
             let block = try await source.getBestBlock()
             let state = try await source.getState(hash: block.hash)
             return [
-                "stateRoot": state?.stateRoot.description,
+                "stateRoot": state?.value.stateRoot().description,
                 "blockHash": block.hash.description,
             ]
         }

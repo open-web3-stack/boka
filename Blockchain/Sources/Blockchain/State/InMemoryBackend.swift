@@ -30,6 +30,10 @@ public actor InMemoryBackend: StateBackend {
         }
     }
 
+    public func readAll() async throws -> [Data32: Data] {
+        store
+    }
+
     public func stateRoot() async throws -> Data32 {
         // TODO: store intermediate state so we can calculate the root efficiently
         try stateMerklize(kv: store)

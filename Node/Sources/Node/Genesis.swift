@@ -44,6 +44,10 @@ extension Genesis {
         case let .preset(preset):
             let config = preset.config
             let (state, block) = try State.devGenesis(config: config)
+            var kv = [Data32: Data]()
+            for (key, value) in try await state.value.toKV() {
+                kv[key] = value
+            }
             return ChainSpec(
                 name: preset.rawValue,
                 id: preset.rawValue,
@@ -51,7 +55,7 @@ extension Genesis {
                 preset: preset,
                 config: config.value,
                 block: block.value,
-                state: state.value
+                state: kv
             )
         case let .file(path):
             let data = try readFile(from: path)

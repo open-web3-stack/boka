@@ -207,6 +207,57 @@ extension State {
     public var lastBlockHash: Data32 {
         recentHistory.items.last.map(\.headerHash)!
     }
+
+    private class KVSequence: Sequence {
+        typealias Element = (key: Data32, value: Data)
+
+        let seq: any Sequence<(key: Data32, value: Data)>
+        let layer: [Data32: Data]
+
+        init(state: State) async throws {
+            seq = try await state.backend.readAll()
+            var layer = [Data32: Data]()
+            for (key, value) in state.layer.toKV() {
+                layer[key.encode()] = try JamEncoder.encode(value)
+            }
+            self.layer = layer
+        }
+
+        func makeIterator() -> KVSequence.Iterator {
+            KVSequence.Iterator(iter: seq.makeIterator(), layer: layer)
+        }
+
+        struct Iterator: IteratorProtocol {
+            typealias Element = (key: Data32, value: Data)
+
+            var iter: any IteratorProtocol<KVSequence.Element>
+            var layerIterator: (any IteratorProtocol<KVSequence.Element>)?
+            let layer: [Data32: Data]
+
+            init(iter: any IteratorProtocol<KVSequence.Element>, layer: [Data32: Data]) {
+                self.iter = iter
+                self.layer = layer
+            }
+
+            mutating func next() -> KVSequence.Iterator.Element? {
+                if layerIterator != nil {
+                    return layerIterator?.next()
+                }
+                if let (key, value) = iter.next() {
+                    if layer[key] != nil {
+                        return next() // skip this one
+                    }
+                    return (key, value)
+                }
+                layerIterator = layer.makeIterator()
+                return layerIterator?.next()
+            }
+        }
+    }
+
+    public func toKV() async throws -> some Sequence<(key: Data32, value: Data)> {
+        try await KVSequence(state: self)
+    }
 }
 
 extension State: Dummy {

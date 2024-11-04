@@ -213,7 +213,7 @@ public struct StateLayer: @unchecked Sendable {
 }
 
 extension StateLayer {
-    public func toKV() -> some Sequence<(key: any StateKey, value: Any)> {
+    public func toKV() -> some Sequence<(key: any StateKey, value: Codable & Sendable)> {
         changes.map { (key: $0.key.base as! any StateKey, value: $0.value) }
     }
 }

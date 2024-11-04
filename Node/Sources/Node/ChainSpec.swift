@@ -37,7 +37,7 @@ public struct ChainSpec: Codable, Equatable {
     public var preset: GenesisPreset?
     public var config: ProtocolConfig?
     public var block: Block
-    public var state: State
+    public var state: [Data32: Data]
 
     public init(
         name: String,
@@ -46,7 +46,7 @@ public struct ChainSpec: Codable, Equatable {
         preset: GenesisPreset?,
         config: ProtocolConfig?,
         block: Block,
-        state: State
+        state: [Data32: Data]
     ) {
         self.name = name
         self.id = id
@@ -72,7 +72,7 @@ public struct ChainSpec: Codable, Equatable {
         try decoder.setConfig(mergeConfig(preset: preset, config: config))
 
         block = try container.decode(Block.self, forKey: .block)
-        state = try container.decode(State.self, forKey: .state)
+        state = try container.decode([Data32: Data].self, forKey: .state)
     }
 
     public func getConfig() throws -> ProtocolConfigRef {
@@ -163,7 +163,7 @@ public struct ChainSpecBinary: Codable {
     public func toChainSpec() throws -> ChainSpec {
         let finalConfig = try mergeConfig(preset: preset, config: config)
         let block = try JamDecoder(data: block, config: finalConfig).decode(Block.self)
-        let state = try JamDecoder(data: state, config: finalConfig).decode(State.self)
+        let state = try JamDecoder(data: state, config: finalConfig).decode([Data32: Data].self)
         return ChainSpec(
             name: name,
             id: id,

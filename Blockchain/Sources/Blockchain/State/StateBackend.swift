@@ -1,3 +1,4 @@
+import Foundation
 import Utils
 
 public enum StateBackendError: Error {
@@ -9,6 +10,8 @@ public protocol StateBackend: Sendable {
 
     func batchRead(_ keys: [any StateKey]) async throws -> [(key: any StateKey, value: Codable & Sendable)]
     mutating func batchWrite(_ changes: [(key: any StateKey, value: Codable & Sendable)]) async throws
+
+    func readAll() async throws -> [Data32: Data]
 
     func stateRoot() async throws -> Data32
 
