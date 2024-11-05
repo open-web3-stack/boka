@@ -440,7 +440,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         }
         // Check if the connection is already reconnected
         impl.reconnectStates.write { reconnectStates in
-            if let _ = reconnectStates[conn.remoteAddress] {
+            if reconnectStates[conn.remoteAddress] != nil {
                 reconnectStates[conn.remoteAddress] = nil
             }
         }
