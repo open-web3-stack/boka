@@ -147,15 +147,7 @@ final class MockPeerEventTests {
             configuration: clientConfiguration
         )
 
-        do {
-            try clientConnection.connect(to: listenAddress)
-            let stream1 = try clientConnection.createStream()
-            try stream1.send(data: Data("test data 1".utf8))
-        } catch {
-            #expect(error != nil)
-            return
-        }
-
+        try clientConnection.connect(to: listenAddress)
         try await Task.sleep(for: .milliseconds(100))
         let (_, reason) = clientHandler.events.value.compactMap {
             switch $0 {
@@ -270,14 +262,7 @@ final class MockPeerEventTests {
             registration: registration,
             configuration: clientConfiguration
         )
-        do {
-            try clientConnection.connect(to: listenAddress)
-            let stream1 = try clientConnection.createStream()
-            try stream1.send(data: Data("test data 1".utf8))
-        } catch {
-            #expect(error != nil)
-            return
-        }
+        try clientConnection.connect(to: listenAddress)
         try await Task.sleep(for: .milliseconds(100))
         let (_, reason) = clientHandler.events.value.compactMap {
             switch $0 {
