@@ -19,6 +19,22 @@ public enum PeerRole: Sendable, Hashable {
 struct ReconnectState {
     var attempt: Int
     var delay: TimeInterval
+
+    init() {
+        attempt = 0
+        delay = 1
+    }
+
+    // Initializer with custom values
+    init(attempt: Int = 0, delay: TimeInterval = 1) {
+        self.attempt = attempt
+        self.delay = delay
+    }
+
+    mutating func applyBackoff() {
+        attempt += 1
+        delay *= 2
+    }
 }
 
 public struct PeerOptions<Handler: StreamHandler>: Sendable {
@@ -284,8 +300,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
         if state.attempt < reconnectMaxRetryAttempts {
             reconnectStates.write { reconnectStates in
                 if var state = reconnectStates[address] {
-                    state.attempt += 1
-                    state.delay *= 2
+                    state.applyBackoff()
                     reconnectStates[address] = state
                 }
             }
