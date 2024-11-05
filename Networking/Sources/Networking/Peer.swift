@@ -16,6 +16,27 @@ public enum PeerRole: Sendable, Hashable {
     // case proxy // not yet specified
 }
 
+struct ReconnectState {
+    var attempt: Int
+    var delay: TimeInterval
+
+    init() {
+        attempt = 0
+        delay = 1
+    }
+
+    // Initializer with custom values
+    init(attempt: Int = 0, delay: TimeInterval = 1) {
+        self.attempt = attempt
+        self.delay = delay
+    }
+
+    mutating func applyBackoff() {
+        attempt += 1
+        delay *= 2
+    }
+}
+
 public struct PeerOptions<Handler: StreamHandler>: Sendable {
     public var role: PeerRole
     public var listenAddress: NetAddr
@@ -50,7 +71,7 @@ public struct PeerOptions<Handler: StreamHandler>: Sendable {
     }
 }
 
-// TODO: reconnects, reopen UP stream, peer reputation system to ban peers not following the protocol
+// TODO: reopen UP stream, peer reputation system to ban peers not following the protocol
 public final class Peer<Handler: StreamHandler>: Sendable {
     private let impl: PeerImpl<Handler>
 
@@ -61,7 +82,6 @@ public final class Peer<Handler: StreamHandler>: Sendable {
     }
 
     public let publicKey: Data
-
     public init(options: PeerOptions<Handler>) throws {
         let logger = Logger(label: "Peer".uniqueId)
 
@@ -214,7 +234,9 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
 
     fileprivate let connections: ThreadSafeContainer<ConnectionStorage> = .init(.init())
     fileprivate let streams: ThreadSafeContainer<[UniqueId: Stream<Handler>]> = .init([:])
+    fileprivate let reconnectStates: ThreadSafeContainer<[NetAddr: ReconnectState]> = .init([:])
 
+    let reconnectMaxRetryAttempts = 5
     let presistentStreamHandler: Handler.PresistentHandler
     let ephemeralStreamHandler: Handler.EphemeralHandler
 
@@ -271,29 +293,43 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
         }
     }
 
-    // TODO: Add reconnection attempts & Apply exponential backoff delay
     func reconnect(to address: NetAddr, role: PeerRole) throws {
-        logger.debug("reconnecting", metadata: ["to address": "\(address)", "role": "\(role)"])
-        try connections.write { connections in
-            if connections.byAddr[address] != nil {
-                logger.warning("reconnecting to \(address) already connected")
-                return
+        let state = reconnectStates.read { reconnectStates in
+            reconnectStates[address] ?? .init()
+        }
+        if state.attempt < reconnectMaxRetryAttempts {
+            reconnectStates.write { reconnectStates in
+                if var state = reconnectStates[address] {
+                    state.applyBackoff()
+                    reconnectStates[address] = state
+                }
             }
-            let quicConn = try QuicConnection(
-                handler: PeerEventHandler(self),
-                registration: clientConfiguration.registration,
-                configuration: clientConfiguration
-            )
-            try quicConn.connect(to: address)
-            let conn = Connection(
-                quicConn,
-                impl: self,
-                role: role,
-                remoteAddress: address,
-                initiatedByLocal: true
-            )
-            connections.byAddr[address] = conn
-            connections.byId[conn.id] = conn
+            Task {
+                try await Task.sleep(for: .seconds(state.delay))
+                try connections.write { connections in
+                    if connections.byAddr[address] != nil {
+                        logger.warning("reconnecting to \(address) already connected")
+                        return
+                    }
+                    let quicConn = try QuicConnection(
+                        handler: PeerEventHandler(self),
+                        registration: clientConfiguration.registration,
+                        configuration: clientConfiguration
+                    )
+                    try quicConn.connect(to: address)
+                    let conn = Connection(
+                        quicConn,
+                        impl: self,
+                        role: role,
+                        remoteAddress: address,
+                        initiatedByLocal: true
+                    )
+                    connections.byAddr[address] = conn
+                    connections.byId[conn.id] = conn
+                }
+            }
+        } else {
+            logger.warning("reconnect attempt exceeded max attempts")
         }
     }
 
@@ -416,6 +452,10 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 "Connected but connection is gone?", metadata: ["connectionId": "\(connection.id)"]
             )
             return
+        }
+        // Check if the connection is already reconnected
+        impl.reconnectStates.write { reconnectStates in
+            reconnectStates[conn.remoteAddress] = nil
         }
 
         if conn.initiatedByLocal {

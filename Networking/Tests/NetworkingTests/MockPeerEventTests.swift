@@ -147,12 +147,8 @@ final class MockPeerEventTests {
             configuration: clientConfiguration
         )
 
-        // Attempt to connect
         try clientConnection.connect(to: listenAddress)
-        let stream1 = try clientConnection.createStream()
-        try stream1.send(data: Data("test data 1".utf8))
-
-        try? await Task.sleep(for: .milliseconds(100))
+        try await Task.sleep(for: .milliseconds(100))
         let (_, reason) = clientHandler.events.value.compactMap {
             switch $0 {
             case let .shutdownInitiated(connection, reason):
@@ -212,7 +208,7 @@ final class MockPeerEventTests {
         let stream1 = try clientConnection.createStream()
         try stream1.send(data: Data("test data 1".utf8))
 
-        try? await Task.sleep(for: .milliseconds(100))
+        try await Task.sleep(for: .milliseconds(100))
         let (_, info) = serverHandler.events.value.compactMap {
             switch $0 {
             case let .newConnection(_, connection, info):
@@ -266,14 +262,9 @@ final class MockPeerEventTests {
             registration: registration,
             configuration: clientConfiguration
         )
-
-        // Attempt to connect
         try clientConnection.connect(to: listenAddress)
-        let stream1 = try clientConnection.createStream()
-        try stream1.send(data: Data("test data 1".utf8))
-
-        try? await Task.sleep(for: .milliseconds(100))
-        let (_, reason) = serverHandler.events.value.compactMap {
+        try await Task.sleep(for: .milliseconds(100))
+        let (_, reason) = clientHandler.events.value.compactMap {
             switch $0 {
             case let .shutdownInitiated(connection, reason):
                 (connection, reason) as (QuicConnection, ConnectionCloseReason)?
