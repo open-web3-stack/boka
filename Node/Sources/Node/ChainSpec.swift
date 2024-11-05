@@ -36,8 +36,8 @@ public struct ChainSpec: Codable, Equatable {
     public var bootnodes: [String]
     public var preset: GenesisPreset?
     public var config: ProtocolConfig?
-    public var block: Block
-    public var state: State
+    public var block: Data
+    public var state: [String: Data]
 
     public init(
         name: String,
@@ -45,8 +45,8 @@ public struct ChainSpec: Codable, Equatable {
         bootnodes: [String],
         preset: GenesisPreset?,
         config: ProtocolConfig?,
-        block: Block,
-        state: State
+        block: Data,
+        state: [String: Data]
     ) {
         self.name = name
         self.id = id
@@ -71,12 +71,24 @@ public struct ChainSpec: Codable, Equatable {
 
         try decoder.setConfig(mergeConfig(preset: preset, config: config))
 
-        block = try container.decode(Block.self, forKey: .block)
-        state = try container.decode(State.self, forKey: .state)
+        block = try container.decode(Data.self, forKey: .block)
+        state = try container.decode([String: Data].self, forKey: .state)
     }
 
     public func getConfig() throws -> ProtocolConfigRef {
         try mergeConfig(preset: preset, config: config)
+    }
+
+    public func getBlock() throws -> BlockRef {
+        try JamDecoder.decode(BlockRef.self, from: block, withConfig: getConfig())
+    }
+
+    public func getState() throws -> [Data32: Data] {
+        var output = [Data32: Data]()
+        for (key, value) in state {
+            try output[Data32(fromHexString: key).unwrap()] = value
+        }
+        return output
     }
 
     public func encode() throws -> Data {
@@ -87,34 +99,12 @@ public struct ChainSpec: Codable, Equatable {
         return try encoder.encode(self)
     }
 
-    public func encodeBinary() throws -> Data {
-        let encoder = JSONEncoder()
-        encoder.dataEncodingStrategy = .hex
-        encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes, .sortedKeys]
-        encoder.userInfo[.config] = try getConfig()
-        let binary = try ChainSpecBinary(
-            name: name,
-            id: id,
-            bootnodes: bootnodes,
-            preset: preset,
-            config: config,
-            block: JamEncoder.encode(block),
-            state: JamEncoder.encode(state)
-        )
-        return try encoder.encode(binary)
-    }
-
     public static func decode(from data: Data) throws -> ChainSpec {
         let decoder = JSONDecoder()
         decoder.dataDecodingStrategy = .hex
         let ref: ConfigRef<ProtocolConfigRef> = .init()
         decoder.userInfo[.config] = ref
-        if let chainspec = try? decoder.decode(ChainSpec.self, from: data) {
-            try chainspec.validate()
-            return chainspec
-        }
-        let binary = try decoder.decode(ChainSpecBinary.self, from: data)
-        let chainspec = try binary.toChainSpec()
+        let chainspec = try decoder.decode(ChainSpec.self, from: data)
         try chainspec.validate()
         return chainspec
     }
@@ -130,64 +120,5 @@ public struct ChainSpec: Codable, Equatable {
         if preset == nil, config == nil {
             throw GenesisError.invalidFormat("One of 'preset' or 'config' is required")
         }
-    }
-}
-
-public struct ChainSpecBinary: Codable {
-    public var name: String
-    public var id: String
-    public var bootnodes: [String]
-    public var preset: GenesisPreset?
-    public var config: ProtocolConfig?
-    public var block: Data
-    public var state: Data
-
-    public init(
-        name: String,
-        id: String,
-        bootnodes: [String],
-        preset: GenesisPreset?,
-        config: ProtocolConfig?,
-        block: Data,
-        state: Data
-    ) {
-        self.name = name
-        self.id = id
-        self.bootnodes = bootnodes
-        self.preset = preset
-        self.config = config
-        self.block = block
-        self.state = state
-    }
-
-    public func toChainSpec() throws -> ChainSpec {
-        let finalConfig = try mergeConfig(preset: preset, config: config)
-        let block = try JamDecoder(data: block, config: finalConfig).decode(Block.self)
-        let state = try JamDecoder(data: state, config: finalConfig).decode(State.self)
-        return ChainSpec(
-            name: name,
-            id: id,
-            bootnodes: bootnodes,
-            preset: preset,
-            config: config,
-            block: block,
-            state: state
-        )
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        name = try container.decode(String.self, forKey: .name)
-        id = try container.decode(String.self, forKey: .id)
-        bootnodes = try container.decode([String].self, forKey: .bootnodes)
-        preset = try container.decodeIfPresent(GenesisPreset.self, forKey: .preset)
-        if preset == nil {
-            config = try container.decode(ProtocolConfig.self, forKey: .config, required: true)
-        } else {
-            config = try container.decodeIfPresent(ProtocolConfig.self, forKey: .config, required: false)
-        }
-
-        block = try container.decode(Data.self, forKey: .block)
-        state = try container.decode(Data.self, forKey: .state)
     }
 }
