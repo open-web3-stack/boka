@@ -297,12 +297,12 @@ struct PeerTests {
         try? await Task.sleep(for: .milliseconds(100))
         // Simulate abnormal shutdown of connections
         connection.close(abort: true)
-        // Wait to simulate downtime
-        try? await Task.sleep(for: .milliseconds(200))
+        // Wait to simulate downtime & reconnected 3~5s
+        try? await Task.sleep(for: .milliseconds(3000))
         peer1.broadcast(
             kind: .uniqueC, message: .init(kind: .uniqueC, data: messageData)
         )
-        try? await Task.sleep(for: .milliseconds(1000))
+        try await Task.sleep(for: .milliseconds(1000))
         let lastReceivedData = await handler2.lastReceivedData
         #expect(lastReceivedData == messageData)
     }
@@ -693,12 +693,9 @@ struct PeerTests {
         }
 
         var connections = [Connection<MockStreamHandler>]()
-        for i in 0 ..< peers.count {
+        for i in 0 ..< peersCount {
             let peer = peers[i]
-            for j in 0 ..< peers.count {
-                if i >= j {
-                    continue
-                }
+            for j in i + 1 ..< peersCount {
                 let otherPeer = peers[j]
                 let conn = try peer.connect(
                     to: otherPeer.listenAddress(),
