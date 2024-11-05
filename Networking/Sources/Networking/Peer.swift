@@ -279,7 +279,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
 
     func reconnect(to address: NetAddr, role: PeerRole) throws {
         let state = reconnectStates.read { reconnectStates in
-            reconnectStates[address] ?? ReconnectState(attempt: 0, delay: 1)
+            reconnectStates[address] ?? .init()
         }
         if state.attempt < reconnectMaxRetryAttempts {
             reconnectStates.write { reconnectStates in
