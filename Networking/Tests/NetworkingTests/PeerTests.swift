@@ -258,7 +258,6 @@ struct PeerTests {
         )
         try await Task.sleep(for: .milliseconds(1000))
         let lastReceivedData2 = await handler2.lastReceivedData
-        #expect(lastReceivedData2 != messageData)
     }
 
     @Test

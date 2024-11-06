@@ -571,10 +571,15 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             if let connection {
                 connection.streamClosed(stream: stream, abort: !status.isSucceeded)
                 if shouldReopenStream(connection: connection, stream: stream, status: status) {
-                    // Attempt to recreate the persistent stream
-                    logger.info("Attempting to recreate stream \(stream.id) \(status) \(code)")
-                } else {
-                    logger.info("should not reopenStream \(stream.id)")
+                    do {
+                        if let kind = stream.kind {
+                            do {
+                                try connection.createPreistentStream(kind: kind)
+                            } catch {
+                                logger.error("Attempt to recreate the persistent stream failed: \(error)")
+                            }
+                        }
+                    }
                 }
             } else {
                 logger.warning(
