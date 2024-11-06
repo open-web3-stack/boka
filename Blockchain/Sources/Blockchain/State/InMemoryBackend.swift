@@ -2,41 +2,73 @@ import Codec
 import Foundation
 import Utils
 
-public actor InMemoryBackend: StateBackend {
-    private let config: ProtocolConfigRef
-    private var store: [Data32: Data]
+private struct KVPair: Comparable, Sendable {
+    var key: Data
+    var value: Data
 
-    public init(config: ProtocolConfigRef, store: [Data32: Data] = [:]) {
-        self.config = config
-        self.store = store
+    public static func < (lhs: KVPair, rhs: KVPair) -> Bool {
+        lhs.key.lexicographicallyPrecedes(rhs.key)
     }
+}
 
-    public func readImpl(_ key: any StateKey) async throws -> (Codable & Sendable)? {
-        guard let value = store[key.encode()] else {
-            return nil
-        }
-        return try JamDecoder.decode(key.decodeType(), from: value, withConfig: config)
-    }
+public actor InMemoryBackend: StateBackendProtocol {
+    private var store: SortedArray<KVPair>
+    private var refCounts: [Data: Int]
 
-    public func batchRead(_ keys: [any StateKey]) async throws -> [(key: any StateKey, value: Codable & Sendable)] {
-        try keys.map {
-            let data = try store[$0.encode()].unwrap()
-            return try ($0, JamDecoder.decode($0.decodeType(), from: data, withConfig: config))
-        }
-    }
+    public init(store: [Data32: Data] = [:]) {
+        self.store = .init(store.map { KVPair(key: $0.key.data, value: $0.value) })
+        refCounts = [:]
 
-    public func batchWrite(_ changes: [(key: any StateKey, value: Codable & Sendable)]) async throws {
-        for (key, value) in changes {
-            store[key.encode()] = try JamEncoder.encode(value)
+        for key in store.keys {
+            refCounts[key.data] = 1
         }
     }
 
-    public func readAll() async throws -> [Data32: Data] {
-        store
+    public func read(key: Data) async throws -> Data? {
+        let idx = store.insertIndex(KVPair(key: key, value: Data()))
+        let item = store.array[safe: idx]
+        if item?.key == key {
+            return item?.value
+        }
+        return nil
     }
 
-    public func stateRoot() async throws -> Data32 {
-        // TODO: store intermediate state so we can calculate the root efficiently
-        try stateMerklize(kv: store)
+    public func readAll(prefix: Data, startKey: Data?, limit: UInt32?) async throws -> [(key: Data, value: Data)] {
+        var resp = [(key: Data, value: Data)]()
+        let startKey = startKey ?? prefix
+        let startIndex = store.insertIndex(KVPair(key: startKey, value: Data()))
+        for i in startIndex ..< store.array.count {
+            let item = store.array[i]
+            if item.key.starts(with: prefix) {
+                resp.append((item.key, item.value))
+            } else {
+                break
+            }
+            if let limit, resp.count == limit {
+                break
+            }
+        }
+        return resp
+    }
+
+    public func batchRead(keys: [Data]) async throws -> [(key: Data, value: Data?)] {
+        var resp = [(key: Data, value: Data?)]()
+        for key in keys {
+            let value = try await read(key: key)
+            resp.append((key, value))
+        }
+        return resp
+    }
+
+    public func batchUpdate(_: [StateBackendOperation]) async throws {}
+
+    public func gc() async throws {
+        // check ref counts and remove keys with 0 ref count
+        for (key, count) in refCounts where count == 0 {
+            let idx = store.insertIndex(KVPair(key: key, value: Data()))
+            if store.array[safe: idx]?.key == key {
+                store.remove(at: idx)
+            }
+        }
     }
 }

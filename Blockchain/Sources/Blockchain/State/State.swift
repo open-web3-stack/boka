@@ -197,9 +197,8 @@ public struct State: Sendable {
         }
     }
 
-    public func stateRoot() -> Data32 {
-        // TODO: incorporate layer changes and calculate state root
-        Data32()
+    public var stateRoot: Data32 {
+        backend.rootHash
     }
 }
 
@@ -324,11 +323,9 @@ extension State: Dummy {
         for (key, value) in kv {
             store[key.encode()] = try! JamEncoder.encode(value)
         }
+        let rootHash = try! stateMerklize(kv: store)
 
-        let backend = InMemoryBackend(
-            config: config,
-            store: store
-        )
+        let backend = StateBackend(InMemoryBackend(store: store), config: config, rootHash: rootHash)
 
         let layer = StateLayer(changes: kv)
 
@@ -484,6 +481,6 @@ public class StateRef: Ref<State>, @unchecked Sendable {
     }
 
     public var stateRoot: Data32 {
-        value.stateRoot()
+        value.stateRoot
     }
 }

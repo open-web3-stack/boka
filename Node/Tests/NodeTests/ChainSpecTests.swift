@@ -1,6 +1,7 @@
 import Blockchain
 import Foundation
 import Testing
+import Utils
 
 @testable import Node
 
@@ -17,7 +18,7 @@ struct ChainSpecTests {
         for preset in GenesisPreset.allCases {
             let genesis = Genesis.preset(preset)
             let chainspec = try await genesis.load()
-            let backend = try InMemoryBackend(config: chainspec.getConfig(), store: chainspec.getState())
+            let backend = try StateBackend(InMemoryBackend(store: chainspec.getState()), config: chainspec.getConfig(), rootHash: Data32())
             let block = try chainspec.getBlock()
             let config = try chainspec.getConfig()
 

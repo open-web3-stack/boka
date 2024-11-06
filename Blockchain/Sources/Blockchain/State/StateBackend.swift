@@ -1,28 +1,42 @@
+import Codec
 import Foundation
 import Utils
 
 public enum StateBackendError: Error {
     case missingState
+    case invalidData
 }
 
-public protocol StateBackend: Sendable {
-    func readImpl(_ key: any StateKey) async throws -> (Codable & Sendable)?
+public final class StateBackend: Sendable {
+    private let impl: StateBackendProtocol
+    private let config: ProtocolConfigRef
+    public let rootHash: Data32
 
-    func batchRead(_ keys: [any StateKey]) async throws -> [(key: any StateKey, value: Codable & Sendable)]
-    mutating func batchWrite(_ changes: [(key: any StateKey, value: Codable & Sendable)]) async throws
+    public init(_ impl: StateBackendProtocol, config: ProtocolConfigRef, rootHash: Data32) {
+        self.impl = impl
+        self.config = config
+        self.rootHash = rootHash
+    }
 
-    func readAll() async throws -> [Data32: Data]
-
-    func stateRoot() async throws -> Data32
-
-    // TODO: aux store for full key and intermidate merkle root
-}
-
-extension StateBackend {
     public func read<Key: StateKey>(_ key: Key) async throws -> Key.Value.ValueType {
-        guard let ret = try await readImpl(key) as? Key.Value.ValueType else {
-            throw StateBackendError.missingState
+        let encodedKey = key.encode().data
+        if let ret = try await impl.read(key: encodedKey) {
+            guard let ret = try JamDecoder.decode(key.decodeType(), from: ret, withConfig: config) as? Key.Value.ValueType else {
+                throw StateBackendError.invalidData
+            }
+            return ret
         }
-        return ret
+        if Key.Value.optional {
+            return Key.Value.DecodeType?.none as! Key.Value.ValueType
+        }
+        throw StateBackendError.missingState
+    }
+
+    func batchRead(_: [any StateKey]) async throws -> [(key: any StateKey, value: Codable & Sendable)] {
+        []
+    }
+
+    func readAll() async throws -> [Data32: Data] {
+        [:]
     }
 }
