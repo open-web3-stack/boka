@@ -558,16 +558,24 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         }
     }
 
-    func closed(_ quicStream: QuicStream, status: QuicStatus, code _: QuicErrorCode) {
+    func closed(_ quicStream: QuicStream, status: QuicStatus, code: QuicErrorCode) {
         let stream = impl.streams.read { streams in
             streams[quicStream.id]
         }
+        logger.info("closed stream \(String(describing: stream?.id)) \(status) \(code)")
+
         if let stream {
             let connection = impl.connections.read { connections in
                 connections.byId[stream.connectionId]
             }
             if let connection {
                 connection.streamClosed(stream: stream, abort: !status.isSucceeded)
+                if shouldReopenStream(connection: connection, stream: stream, status: status) {
+                    // Attempt to recreate the persistent stream
+                    logger.info("Attempting to recreate stream \(stream.id) \(status) \(code)")
+                } else {
+                    logger.info("should not reopenStream \(stream.id)")
+                }
             } else {
                 logger.warning(
                     "Stream closed but connection is gone?", metadata: ["streamId": "\(stream.id)"]
@@ -578,5 +586,15 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 "Stream closed but stream is gone?", metadata: ["streamId": "\(quicStream.id)"]
             )
         }
+    }
+
+    private func shouldReopenStream(connection: Connection<Handler>, stream: Stream<Handler>, status: QuicStatus) -> Bool {
+        logger.info("reopen stream about connection needReconnect:\(connection.needReconnect) isClosed:\(connection.isClosed)")
+        // Need to reopen connection or close it
+        if connection.needReconnect || connection.isClosed {
+            return false
+        }
+        // Only reopen if the stream is a persistent UP stream and the closure was unexpected
+        return stream.kind != nil && status.rawValue != QuicStatusCode.connectionIdle.rawValue
     }
 }
