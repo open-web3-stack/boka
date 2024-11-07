@@ -5,7 +5,7 @@ public protocol OnTransferFunction {
         config: ProtocolConfigRef,
         service: ServiceIndex,
         code: Data,
-        serviceAccounts: [ServiceIndex: ServiceAccount],
+        serviceAccounts: inout some ServiceAccounts,
         transfers: [DeferredTransfers]
-    ) throws -> ServiceAccount
+    ) async throws
 }

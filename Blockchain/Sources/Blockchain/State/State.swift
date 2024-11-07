@@ -387,6 +387,23 @@ extension State: ServiceAccounts {
     ) {
         layer[serviceAccount: index, preimageHash: hash, length: length] = value
     }
+
+    public mutating func remove(serviceAccount index: ServiceIndex) {
+        layer.removeValue(forKey: StateKeys.ServiceAccountKey(index: index))
+        // TODO: remove all storage, preimage, preimage info as well
+    }
+
+    public mutating func remove(serviceAccount index: ServiceIndex, storageKey key: Data32) {
+        layer.removeValue(forKey: StateKeys.ServiceAccountStorageKey(index: index, key: key))
+    }
+
+    public mutating func remove(serviceAccount index: ServiceIndex, preimageHash hash: Data32) {
+        layer.removeValue(forKey: StateKeys.ServiceAccountPreimagesKey(index: index, hash: hash))
+    }
+
+    public mutating func remove(serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32) {
+        layer.removeValue(forKey: StateKeys.ServiceAccountPreimageInfoKey(index: index, hash: hash, length: length))
+    }
 }
 
 extension State: Safrole {
@@ -446,14 +463,14 @@ extension State: Guaranteeing {
 struct DummyFunction: AccumulateFunction, OnTransferFunction {
     func invoke(
         config _: ProtocolConfigRef,
-        accounts _: ServiceAccounts,
+        accounts _: inout some ServiceAccounts,
         state _: AccumulateState,
         serviceIndex _: ServiceIndex,
         gas _: Gas,
         arguments _: [AccumulateArguments],
         initialIndex _: ServiceIndex,
         timeslot _: TimeslotIndex
-    ) throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
+    ) async throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
         fatalError("not implemented")
     }
 
@@ -461,9 +478,9 @@ struct DummyFunction: AccumulateFunction, OnTransferFunction {
         config _: ProtocolConfigRef,
         service _: ServiceIndex,
         code _: Data,
-        serviceAccounts _: [ServiceIndex: ServiceAccount],
+        serviceAccounts _: inout some ServiceAccounts,
         transfers _: [DeferredTransfers]
-    ) throws -> ServiceAccount {
+    ) async throws {
         fatalError("not implemented")
     }
 }

@@ -19,6 +19,14 @@ public struct ServiceAccountDetails: Sendable, Equatable, Codable {
 
     // i: number of items in storage
     public var itemsCount: UInt32
+
+    // t: the minimum, or threshold, balance needed for any given service account in terms of its storage footprint
+    public func thresholdBalance(config: ProtocolConfigRef) -> Balance {
+        let base = Balance(config.value.serviceMinBalance)
+        let items = Balance(config.value.additionalMinBalancePerStateItem) * Balance(itemsCount)
+        let bytes = Balance(config.value.additionalMinBalancePerStateByte) * Balance(totalByteLength)
+        return base + items + bytes
+    }
 }
 
 public struct ServiceAccount: Sendable, Equatable, Codable {

@@ -173,7 +173,7 @@ public final class Runtime {
             let res = try await newState.update(config: config, block: block, workReports: availableReports)
             newState.privilegedServices = res.privilegedServices
 
-            for (service, account) in res.serviceAccounts {
+            for (service, account) in res.newServiceAccounts {
                 newState[serviceAccount: service] = account.toDetails()
                 for (hash, value) in account.storage {
                     newState[serviceAccount: service, storageKey: hash] = value

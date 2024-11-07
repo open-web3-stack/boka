@@ -14,9 +14,9 @@ public class IsAuthorizedContext: InvocationContext {
         self.config = config
     }
 
-    public func dispatch(index: UInt32, state: VMState) -> ExecOutcome {
+    public func dispatch(index: UInt32, state: VMState) async -> ExecOutcome {
         if index == GasFn.identifier {
-            return GasFn().call(config: config, state: state)
+            return await GasFn().call(config: config, state: state)
         } else {
             state.consumeGas(Gas(10))
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHAT.rawValue)

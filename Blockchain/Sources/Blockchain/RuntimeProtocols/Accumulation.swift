@@ -18,7 +18,7 @@ public struct AccumulationOutput {
         >,
         ProtocolConfig.TotalNumberOfCores
     >
-    public var serviceAccounts: [ServiceIndex: ServiceAccount]
+    public var newServiceAccounts: [ServiceIndex: ServiceAccount]
 }
 
 public protocol Accumulation: ServiceAccounts {
@@ -39,7 +39,7 @@ public protocol Accumulation: ServiceAccounts {
 }
 
 extension Accumulation {
-    public func update(config: ProtocolConfigRef, block: BlockRef, workReports: [WorkReport]) async throws -> AccumulationOutput {
+    public mutating func update(config: ProtocolConfigRef, block: BlockRef, workReports: [WorkReport]) async throws -> AccumulationOutput {
         var servicesGasRatio: [ServiceIndex: Gas] = [:]
         var servicesGas: [ServiceIndex: Gas] = [:]
 
@@ -96,7 +96,6 @@ extension Accumulation {
         >?
 
         var newServiceAccounts = [ServiceIndex: ServiceAccount]()
-
         var transferReceivers = [ServiceIndex: [DeferredTransfers]]()
 
         for (service, arguments) in serviceArguments {
@@ -106,9 +105,9 @@ extension Accumulation {
             }
             let (newState, transfers, commitment, _) = try await accumlateFunction.invoke(
                 config: config,
-                accounts: self,
+                accounts: &self,
                 state: AccumulateState(
-                    serviceAccounts: newServiceAccounts,
+                    serviceAccounts: [:],
                     validatorQueue: validatorQueue,
                     authorizationQueue: authorizationQueue,
                     privilegedServices: privilegedServices
@@ -153,11 +152,11 @@ extension Accumulation {
             guard let code else {
                 continue
             }
-            newServiceAccounts[service] = try onTransferFunction.invoke(
+            try await onTransferFunction.invoke(
                 config: config,
                 service: service,
                 code: code,
-                serviceAccounts: newServiceAccounts,
+                serviceAccounts: &self,
                 transfers: transfers
             )
         }
@@ -167,7 +166,7 @@ extension Accumulation {
             privilegedServices: newPrivilegedServices ?? privilegedServices,
             validatorQueue: newValidatorQueue ?? validatorQueue,
             authorizationQueue: newAuthorizationQueue ?? authorizationQueue,
-            serviceAccounts: newServiceAccounts
+            newServiceAccounts: newServiceAccounts
         )
     }
 }

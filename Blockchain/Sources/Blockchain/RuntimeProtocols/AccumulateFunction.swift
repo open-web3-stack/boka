@@ -60,7 +60,7 @@ public struct AccumulateState {
 /// X
 public struct AccumlateResultContext {
     /// d
-    public var serviceAccounts: [ServiceIndex: ServiceAccount]
+    public var serviceAccounts: ServiceAccounts
     /// s: the accumulating service account index
     public var serviceIndex: ServiceIndex
     /// u
@@ -75,7 +75,7 @@ public protocol AccumulateFunction {
     func invoke(
         config: ProtocolConfigRef,
         // prior accounts
-        accounts: ServiceAccounts,
+        accounts: inout some ServiceAccounts,
         // u
         state: AccumulateState,
         // s

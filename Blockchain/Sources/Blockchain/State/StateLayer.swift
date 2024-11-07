@@ -235,4 +235,8 @@ extension StateLayer {
             changes[AnyHashable(key)] = newValue
         }
     }
+
+    public mutating func removeValue(forKey key: some StateKey) {
+        changes.removeValue(forKey: key)
+    }
 }
