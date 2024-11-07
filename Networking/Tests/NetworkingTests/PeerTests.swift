@@ -729,6 +729,7 @@ struct PeerTests {
                 data: Data("Message from peer \(i)".utf8)
             )
             peer.broadcast(kind: message.kind, message: message)
+            try? await Task.sleep(for: .milliseconds(50))
         }
 
         // Wait for message propagation
