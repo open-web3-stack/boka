@@ -118,7 +118,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
             extrinsics: extrinsic.tickets
         )
 
-        let unsignedHeader = try await Header.Unsigned(
+        let unsignedHeader = Header.Unsigned(
             parentHash: parentHash,
             priorStateRoot: state.stateRoot,
             extrinsicsHash: extrinsic.hash(),

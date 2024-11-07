@@ -197,75 +197,14 @@ public struct State: Sendable {
         }
     }
 
-    public func save() async throws -> State {
-        let changes = layer.toKV()
-        let trie = StateTrie(rootHash: backend.rootHash, backend: backend)
-        try await trie.update(updates: changes)
-        let newRoot = trie.rootHash
-        return State(backend: backend.newBackend(rootHash: newRoot), layer: layer)
+    public func save() async throws {
+        try await backend.write(layer.toKV())
     }
 }
 
 extension State {
     public var lastBlockHash: Data32 {
         recentHistory.items.last.map(\.headerHash)!
-    }
-
-    private class KVSequence: Sequence {
-        typealias Element = (key: Data32, value: Data)
-
-        let seq: any Sequence<(key: Data32, value: Data)>
-        let layer: [Data32: Data?]
-
-        init(state: State) async throws {
-            seq = try await state.backend.readAll()
-            var layer = [Data32: Data?]()
-            for (key, value) in state.layer.toKV() {
-                layer[key.encode()] = try value.map { try JamEncoder.encode($0) }
-            }
-            self.layer = layer
-        }
-
-        func makeIterator() -> KVSequence.Iterator {
-            KVSequence.Iterator(iter: seq.makeIterator(), layer: layer)
-        }
-
-        struct Iterator: IteratorProtocol {
-            typealias Element = (key: Data32, value: Data)
-
-            var iter: any IteratorProtocol<KVSequence.Element>
-            var layerIterator: [Data32: Data?].Iterator?
-            let layer: [Data32: Data?]
-
-            init(iter: any IteratorProtocol<KVSequence.Element>, layer: [Data32: Data?]) {
-                self.iter = iter
-                self.layer = layer
-            }
-
-            mutating func next() -> KVSequence.Iterator.Element? {
-                if layerIterator != nil {
-                    if let (key, value) = layerIterator?.next() {
-                        if let value {
-                            return (key, value)
-                        }
-                        return next() // skip this one
-                    }
-                    return nil
-                }
-                if let (key, value) = iter.next() {
-                    if layer.keys.contains(key) {
-                        return next() // skip this one
-                    }
-                    return (key, value)
-                }
-                layerIterator = layer.makeIterator()
-                return next()
-            }
-        }
-    }
-
-    public func toKV() async throws -> some Sequence<(key: Data32, value: Data)> {
-        try await KVSequence(state: self)
     }
 
     public func asRef() -> StateRef {
@@ -335,7 +274,7 @@ extension State: Dummy {
         }
         let rootHash = try! stateMerklize(kv: store)
 
-        let backend = StateBackend(InMemoryBackend(store: store), config: config, rootHash: rootHash)
+        let backend = StateBackend(InMemoryBackend(), config: config, rootHash: rootHash)
 
         let layer = StateLayer(changes: kv)
 
@@ -488,5 +427,9 @@ extension State: Accumulation {
 public class StateRef: Ref<State>, @unchecked Sendable {
     public static func dummy(config: ProtocolConfigRef, block: BlockRef?) -> StateRef {
         StateRef(State.dummy(config: config, block: block))
+    }
+
+    public var stateRoot: Data32 {
+        fatalError("not implemented")
     }
 }

@@ -12,17 +12,14 @@ private struct KVPair: Comparable, Sendable {
 }
 
 public actor InMemoryBackend: StateBackendProtocol {
-    private var store: SortedArray<KVPair>
-    private var refCounts: [Data: Int]
+    // we really should be using Heap or some other Tree based structure here
+    // but let's keep it simple for now
+    private var store: SortedArray<KVPair> = .init([])
+    private var rawValues: [Data32: Data] = [:]
+    private var refCounts: [Data: Int] = [:]
+    private var rawValueRefCounts: [Data32: Int] = [:]
 
-    public init(store: [Data32: Data] = [:]) {
-        self.store = .init(store.map { KVPair(key: $0.key.data, value: $0.value) })
-        refCounts = [:]
-
-        for key in store.keys {
-            refCounts[key.data] = 1
-        }
-    }
+    public init() {}
 
     public func read(key: Data) async throws -> Data? {
         let idx = store.insertIndex(KVPair(key: key, value: Data()))
@@ -51,23 +48,47 @@ public actor InMemoryBackend: StateBackendProtocol {
         return resp
     }
 
-    public func batchRead(keys: [Data]) async throws -> [(key: Data, value: Data?)] {
-        var resp = [(key: Data, value: Data?)]()
-        for key in keys {
-            let value = try await read(key: key)
-            resp.append((key, value))
+    public func batchUpdate(_ updates: [StateBackendOperation]) async throws {
+        for update in updates {
+            switch update {
+            case let .write(key, value):
+                let idx = store.insertIndex(KVPair(key: key, value: value))
+                let item = store.array[safe: idx]
+                if let item, item.key == key { // found
+                    // value is not used for ordering so this is safe
+                    store.unsafeArrayAccess[idx].value = value
+                } else { // not found
+                    store.insert(KVPair(key: key, value: value))
+                }
+            case let .writeRawValue(key, value):
+                rawValues[key] = value
+                rawValueRefCounts[key, default: 0] += 1
+            case .refIncrement:
+                break
+            case .refDecrement:
+                break
+            }
         }
-        return resp
     }
 
-    public func batchUpdate(_: [StateBackendOperation]) async throws {}
+    public func readValue(hash: Data32) async throws -> Data? {
+        rawValues[hash]
+    }
 
-    public func gc() async throws {
+    public func gc(callback: @Sendable (Data) -> Data32?) async throws {
         // check ref counts and remove keys with 0 ref count
         for (key, count) in refCounts where count == 0 {
             let idx = store.insertIndex(KVPair(key: key, value: Data()))
-            if store.array[safe: idx]?.key == key {
+            let item = store.array[safe: idx]
+            if let item, item.key == key {
                 store.remove(at: idx)
+                if let rawValueKey = callback(item.value) {
+                    rawValueRefCounts[rawValueKey, default: 0] -= 1
+                    if rawValueRefCounts[rawValueKey] == 0 {
+                        rawValues.removeValue(forKey: rawValueKey)
+                        rawValueRefCounts.removeValue(forKey: rawValueKey)
+                    }
+                }
             }
         }
     }
