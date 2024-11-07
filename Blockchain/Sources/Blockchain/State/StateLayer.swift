@@ -1,238 +1,242 @@
 import Foundation
 import Utils
 
+private enum StateLayerValue: Sendable {
+    case value(Codable & Sendable)
+    case deleted
+
+    init(_ value: (Codable & Sendable)?) {
+        if let value {
+            self = .value(value)
+        } else {
+            self = .deleted
+        }
+    }
+
+    func value<T>() -> T? {
+        if case let .value(value) = self {
+            return value as? T
+        }
+        return nil
+    }
+}
+
 // @unchecked because AnyHashable is not Sendable
 public struct StateLayer: @unchecked Sendable {
-    private var changes: [AnyHashable: Codable & Sendable] = [:]
+    private var changes: [AnyHashable: StateLayerValue] = [:]
 
     public init(backend: StateBackend) async throws {
-        let keys: [any StateKey] = [
-            StateKeys.CoreAuthorizationPoolKey(),
-            StateKeys.AuthorizationQueueKey(),
-            StateKeys.RecentHistoryKey(),
-            StateKeys.SafroleStateKey(),
-            StateKeys.JudgementsKey(),
-            StateKeys.EntropyPoolKey(),
-            StateKeys.ValidatorQueueKey(),
-            StateKeys.CurrentValidatorsKey(),
-            StateKeys.PreviousValidatorsKey(),
-            StateKeys.ReportsKey(),
-            StateKeys.TimeslotKey(),
-            StateKeys.PrivilegedServicesKey(),
-            StateKeys.ActivityStatisticsKey(),
-        ]
-
-        let results = try await backend.batchRead(keys)
+        let results = try await backend.batchRead(StateKeys.prefetchKeys)
 
         for (key, value) in results {
-            changes[AnyHashable(key)] = value
+            changes[AnyHashable(key)] = try .init(value.unwrap())
         }
     }
 
     public init(changes: [(key: any StateKey, value: Codable & Sendable)]) {
         for (key, value) in changes {
-            self.changes[AnyHashable(key)] = value
+            self.changes[AnyHashable(key)] = .value(value)
         }
     }
 
     // α: The core αuthorizations pool.
-    public var coreAuthorizationPool: StateKeys.CoreAuthorizationPoolKey.Value.ValueType {
+    public var coreAuthorizationPool: StateKeys.CoreAuthorizationPoolKey.Value {
         get {
-            changes[StateKeys.CoreAuthorizationPoolKey()] as! StateKeys.CoreAuthorizationPoolKey.Value.ValueType
+            changes[StateKeys.CoreAuthorizationPoolKey()]!.value()!
         }
         set {
-            changes[StateKeys.CoreAuthorizationPoolKey()] = newValue
+            changes[StateKeys.CoreAuthorizationPoolKey()] = .init(newValue)
         }
     }
 
     // φ: The authorization queue.
-    public var authorizationQueue: StateKeys.AuthorizationQueueKey.Value.ValueType {
+    public var authorizationQueue: StateKeys.AuthorizationQueueKey.Value {
         get {
-            changes[StateKeys.AuthorizationQueueKey()] as! StateKeys.AuthorizationQueueKey.Value.ValueType
+            changes[StateKeys.AuthorizationQueueKey()]!.value()!
         }
         set {
-            changes[StateKeys.AuthorizationQueueKey()] = newValue
+            changes[StateKeys.AuthorizationQueueKey()] = .init(newValue)
         }
     }
 
     // β: Information on the most recent βlocks.
-    public var recentHistory: StateKeys.RecentHistoryKey.Value.ValueType {
+    public var recentHistory: StateKeys.RecentHistoryKey.Value {
         get {
-            changes[StateKeys.RecentHistoryKey()] as! StateKeys.RecentHistoryKey.Value.ValueType
+            changes[StateKeys.RecentHistoryKey()]!.value()!
         }
         set {
-            changes[StateKeys.RecentHistoryKey()] = newValue
+            changes[StateKeys.RecentHistoryKey()] = .init(newValue)
         }
     }
 
     // γ: State concerning Safrole.
-    public var safroleState: StateKeys.SafroleStateKey.Value.ValueType {
+    public var safroleState: StateKeys.SafroleStateKey.Value {
         get {
-            changes[StateKeys.SafroleStateKey()] as! StateKeys.SafroleStateKey.Value.ValueType
+            changes[StateKeys.SafroleStateKey()]!.value()!
         }
         set {
-            changes[StateKeys.SafroleStateKey()] = newValue
+            changes[StateKeys.SafroleStateKey()] = .init(newValue)
         }
     }
 
     // ψ: past judgements
-    public var judgements: StateKeys.JudgementsKey.Value.ValueType {
+    public var judgements: StateKeys.JudgementsKey.Value {
         get {
-            changes[StateKeys.JudgementsKey()] as! StateKeys.JudgementsKey.Value.ValueType
+            changes[StateKeys.JudgementsKey()]!.value()!
         }
         set {
-            changes[StateKeys.JudgementsKey()] = newValue
+            changes[StateKeys.JudgementsKey()] = .init(newValue)
         }
     }
 
     // η: The eηtropy accumulator and epochal raηdomness.
-    public var entropyPool: StateKeys.EntropyPoolKey.Value.ValueType {
+    public var entropyPool: StateKeys.EntropyPoolKey.Value {
         get {
-            changes[StateKeys.EntropyPoolKey()] as! StateKeys.EntropyPoolKey.Value.ValueType
+            changes[StateKeys.EntropyPoolKey()]!.value()!
         }
         set {
-            changes[StateKeys.EntropyPoolKey()] = newValue
+            changes[StateKeys.EntropyPoolKey()] = .init(newValue)
         }
     }
 
     // ι: The validator keys and metadata to be drawn from next.
-    public var validatorQueue: StateKeys.ValidatorQueueKey.Value.ValueType {
+    public var validatorQueue: StateKeys.ValidatorQueueKey.Value {
         get {
-            changes[StateKeys.ValidatorQueueKey()] as! StateKeys.ValidatorQueueKey.Value.ValueType
+            changes[StateKeys.ValidatorQueueKey()]!.value()!
         }
         set {
-            changes[StateKeys.ValidatorQueueKey()] = newValue
+            changes[StateKeys.ValidatorQueueKey()] = .init(newValue)
         }
     }
 
     // κ: The validator κeys and metadata currently active.
-    public var currentValidators: StateKeys.CurrentValidatorsKey.Value.ValueType {
+    public var currentValidators: StateKeys.CurrentValidatorsKey.Value {
         get {
-            changes[StateKeys.CurrentValidatorsKey()] as! StateKeys.CurrentValidatorsKey.Value.ValueType
+            changes[StateKeys.CurrentValidatorsKey()]!.value()!
         }
         set {
-            changes[StateKeys.CurrentValidatorsKey()] = newValue
+            changes[StateKeys.CurrentValidatorsKey()] = .init(newValue)
         }
     }
 
     // λ: The validator keys and metadata which were active in the prior epoch.
-    public var previousValidators: StateKeys.PreviousValidatorsKey.Value.ValueType {
+    public var previousValidators: StateKeys.PreviousValidatorsKey.Value {
         get {
-            changes[StateKeys.PreviousValidatorsKey()] as! StateKeys.PreviousValidatorsKey.Value.ValueType
+            changes[StateKeys.PreviousValidatorsKey()]!.value()!
         }
         set {
-            changes[StateKeys.PreviousValidatorsKey()] = newValue
+            changes[StateKeys.PreviousValidatorsKey()] = .init(newValue)
         }
     }
 
     // ρ: The ρending reports, per core, which are being made available prior to accumulation.
-    public var reports: StateKeys.ReportsKey.Value.ValueType {
+    public var reports: StateKeys.ReportsKey.Value {
         get {
-            changes[StateKeys.ReportsKey()] as! StateKeys.ReportsKey.Value.ValueType
+            changes[StateKeys.ReportsKey()]!.value()!
         }
         set {
-            changes[StateKeys.ReportsKey()] = newValue
+            changes[StateKeys.ReportsKey()] = .init(newValue)
         }
     }
 
     // τ: The most recent block’s τimeslot.
-    public var timeslot: StateKeys.TimeslotKey.Value.ValueType {
+    public var timeslot: StateKeys.TimeslotKey.Value {
         get {
-            changes[StateKeys.TimeslotKey()] as! StateKeys.TimeslotKey.Value.ValueType
+            changes[StateKeys.TimeslotKey()]!.value()!
         }
         set {
-            changes[StateKeys.TimeslotKey()] = newValue
+            changes[StateKeys.TimeslotKey()] = .init(newValue)
         }
     }
 
     // χ: The privileged service indices.
-    public var privilegedServices: StateKeys.PrivilegedServicesKey.Value.ValueType {
+    public var privilegedServices: StateKeys.PrivilegedServicesKey.Value {
         get {
-            changes[StateKeys.PrivilegedServicesKey()] as! StateKeys.PrivilegedServicesKey.Value.ValueType
+            changes[StateKeys.PrivilegedServicesKey()]!.value()!
         }
         set {
-            changes[StateKeys.PrivilegedServicesKey()] = newValue
+            changes[StateKeys.PrivilegedServicesKey()] = .init(newValue)
         }
     }
 
     // π: The activity statistics for the validators.
-    public var activityStatistics: StateKeys.ActivityStatisticsKey.Value.ValueType {
+    public var activityStatistics: StateKeys.ActivityStatisticsKey.Value {
         get {
-            changes[StateKeys.ActivityStatisticsKey()] as! StateKeys.ActivityStatisticsKey.Value.ValueType
+            changes[StateKeys.ActivityStatisticsKey()]!.value()!
         }
         set {
-            changes[StateKeys.ActivityStatisticsKey()] = newValue
+            changes[StateKeys.ActivityStatisticsKey()] = .init(newValue)
         }
     }
 
     // δ: The (prior) state of the service accounts.
-    public subscript(serviceAccount index: ServiceIndex) -> StateKeys.ServiceAccountKey.Value.ValueType? {
+    public subscript(serviceAccount index: ServiceIndex) -> StateKeys.ServiceAccountKey.Value? {
         get {
-            changes[StateKeys.ServiceAccountKey(index: index)] as? StateKeys.ServiceAccountKey.Value.ValueType
+            changes[StateKeys.ServiceAccountKey(index: index)]!.value()!
         }
         set {
-            changes[StateKeys.ServiceAccountKey(index: index)] = newValue
+            changes[StateKeys.ServiceAccountKey(index: index)] = .init(newValue)
         }
     }
 
     // s
-    public subscript(serviceAccount index: ServiceIndex, storageKey key: Data32) -> StateKeys.ServiceAccountStorageKey.Value.ValueType? {
+    public subscript(serviceAccount index: ServiceIndex, storageKey key: Data32) -> StateKeys.ServiceAccountStorageKey.Value? {
         get {
-            changes[StateKeys.ServiceAccountStorageKey(index: index, key: key)] as? StateKeys.ServiceAccountStorageKey.Value.ValueType
+            changes[StateKeys.ServiceAccountStorageKey(index: index, key: key)]!.value()!
         }
         set {
-            changes[StateKeys.ServiceAccountStorageKey(index: index, key: key)] = newValue
+            changes[StateKeys.ServiceAccountStorageKey(index: index, key: key)] = .init(newValue)
         }
     }
 
     // p
     public subscript(
         serviceAccount index: ServiceIndex, preimageHash hash: Data32
-    ) -> StateKeys.ServiceAccountPreimagesKey.Value.ValueType? {
+    ) -> StateKeys.ServiceAccountPreimagesKey.Value? {
         get {
-            changes[StateKeys.ServiceAccountPreimagesKey(index: index, hash: hash)] as? StateKeys.ServiceAccountPreimagesKey.Value.ValueType
+            changes[StateKeys.ServiceAccountPreimagesKey(index: index, hash: hash)]!.value()!
         }
         set {
-            changes[StateKeys.ServiceAccountPreimagesKey(index: index, hash: hash)] = newValue
+            changes[StateKeys.ServiceAccountPreimagesKey(index: index, hash: hash)] = .init(newValue)
         }
     }
 
     // l
     public subscript(
         serviceAccount index: ServiceIndex, preimageHash hash: Data32, length length: UInt32
-    ) -> StateKeys.ServiceAccountPreimageInfoKey.Value.ValueType? {
+    ) -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
         get {
             changes[
                 StateKeys.ServiceAccountPreimageInfoKey(index: index, hash: hash, length: length)
-            ] as? StateKeys.ServiceAccountPreimageInfoKey.Value.ValueType
+            ]!.value()!
         }
         set {
-            changes[StateKeys.ServiceAccountPreimageInfoKey(index: index, hash: hash, length: length)] = newValue
+            changes[StateKeys.ServiceAccountPreimageInfoKey(index: index, hash: hash, length: length)] = .init(newValue)
         }
     }
 }
 
 extension StateLayer {
-    public func toKV() -> some Sequence<(key: any StateKey, value: Codable & Sendable)> {
-        changes.map { (key: $0.key.base as! any StateKey, value: $0.value) }
+    public func toKV() -> some Sequence<(key: any StateKey, value: (Codable & Sendable)?)> {
+        changes.map { (key: $0.key.base as! any StateKey, value: $0.value.value()) }
     }
 }
 
 extension StateLayer {
-    public func read<Key: StateKey>(_ key: Key) -> Key.Value.ValueType? {
-        changes[key] as? Key.Value.ValueType
+    public func read<Key: StateKey>(_ key: Key) -> Key.Value? {
+        changes[key] as? Key.Value
     }
 
-    public mutating func write<Key: StateKey>(_ key: Key, value: Key.Value.ValueType) {
-        changes[key] = value
+    public mutating func write<Key: StateKey>(_ key: Key, value: Key.Value?) {
+        changes[key] = .init(value)
     }
 
     public subscript(key: any StateKey) -> (Codable & Sendable)? {
         get {
-            changes[AnyHashable(key)]
+            changes[AnyHashable(key)]?.value()
         }
         set {
-            changes[AnyHashable(key)] = newValue
+            changes[AnyHashable(key)] = .init(newValue)
         }
     }
 }

@@ -2,32 +2,17 @@ import Foundation
 import Utils
 
 public protocol StateKey: Hashable, Sendable {
-    associatedtype Value: StateValueProtocol
+    associatedtype Value: Codable & Sendable
     func encode() -> Data32
+    static var optional: Bool { get }
 }
 
 extension StateKey {
     public func decodeType() -> (Sendable & Codable).Type {
-        Value.DecodeType.self
+        Value.self
     }
-}
 
-public protocol StateValueProtocol {
-    associatedtype ValueType: Codable & Sendable
-    associatedtype DecodeType: Codable & Sendable
-    static var optional: Bool { get }
-}
-
-public struct StateValue<T: Codable & Sendable>: StateValueProtocol {
-    public typealias ValueType = T
-    public typealias DecodeType = T
     public static var optional: Bool { false }
-}
-
-public struct StateOptionalValue<T: Codable & Sendable>: StateValueProtocol {
-    public typealias ValueType = T?
-    public typealias DecodeType = T
-    public static var optional: Bool { true }
 }
 
 private func constructKey(_ idx: UInt8) -> Data32 {
@@ -68,16 +53,30 @@ private func constructKey(_ service: ServiceIndex, _ val: UInt32, _: Data) -> Da
 }
 
 public enum StateKeys {
+    public static let prefetchKeys: [any StateKey] = [
+        CoreAuthorizationPoolKey(),
+        AuthorizationQueueKey(),
+        RecentHistoryKey(),
+        SafroleStateKey(),
+        JudgementsKey(),
+        EntropyPoolKey(),
+        ValidatorQueueKey(),
+        CurrentValidatorsKey(),
+        PreviousValidatorsKey(),
+        ReportsKey(),
+        TimeslotKey(),
+        PrivilegedServicesKey(),
+        ActivityStatisticsKey(),
+    ]
+
     public struct CoreAuthorizationPoolKey: StateKey {
-        public typealias Value = StateValue<
-            ConfigFixedSizeArray<
-                ConfigLimitedSizeArray<
-                    Data32,
-                    ProtocolConfig.Int0,
-                    ProtocolConfig.MaxAuthorizationsPoolItems
-                >,
-                ProtocolConfig.TotalNumberOfCores
-            >
+        public typealias Value = ConfigFixedSizeArray<
+            ConfigLimitedSizeArray<
+                Data32,
+                ProtocolConfig.Int0,
+                ProtocolConfig.MaxAuthorizationsPoolItems
+            >,
+            ProtocolConfig.TotalNumberOfCores
         >
 
         public init() {}
@@ -88,14 +87,12 @@ public enum StateKeys {
     }
 
     public struct AuthorizationQueueKey: StateKey {
-        public typealias Value = StateValue<
+        public typealias Value = ConfigFixedSizeArray<
             ConfigFixedSizeArray<
-                ConfigFixedSizeArray<
-                    Data32,
-                    ProtocolConfig.MaxAuthorizationsQueueItems
-                >,
-                ProtocolConfig.TotalNumberOfCores
-            >
+                Data32,
+                ProtocolConfig.MaxAuthorizationsQueueItems
+            >,
+            ProtocolConfig.TotalNumberOfCores
         >
 
         public init() {}
@@ -106,7 +103,7 @@ public enum StateKeys {
     }
 
     public struct RecentHistoryKey: StateKey {
-        public typealias Value = StateValue<RecentHistory>
+        public typealias Value = RecentHistory
 
         public init() {}
 
@@ -116,7 +113,7 @@ public enum StateKeys {
     }
 
     public struct SafroleStateKey: StateKey {
-        public typealias Value = StateValue<SafroleState>
+        public typealias Value = SafroleState
 
         public init() {}
 
@@ -126,7 +123,7 @@ public enum StateKeys {
     }
 
     public struct JudgementsKey: StateKey {
-        public typealias Value = StateValue<JudgementsState>
+        public typealias Value = JudgementsState
 
         public init() {}
 
@@ -136,7 +133,7 @@ public enum StateKeys {
     }
 
     public struct EntropyPoolKey: StateKey {
-        public typealias Value = StateValue<EntropyPool>
+        public typealias Value = EntropyPool
 
         public init() {}
 
@@ -146,11 +143,9 @@ public enum StateKeys {
     }
 
     public struct ValidatorQueueKey: StateKey {
-        public typealias Value = StateValue<
-            ConfigFixedSizeArray<
-                ValidatorKey,
-                ProtocolConfig.TotalNumberOfValidators
-            >
+        public typealias Value = ConfigFixedSizeArray<
+            ValidatorKey,
+            ProtocolConfig.TotalNumberOfValidators
         >
 
         public init() {}
@@ -161,11 +156,9 @@ public enum StateKeys {
     }
 
     public struct CurrentValidatorsKey: StateKey {
-        public typealias Value = StateValue<
-            ConfigFixedSizeArray<
-                ValidatorKey,
-                ProtocolConfig.TotalNumberOfValidators
-            >
+        public typealias Value = ConfigFixedSizeArray<
+            ValidatorKey,
+            ProtocolConfig.TotalNumberOfValidators
         >
 
         public init() {}
@@ -176,11 +169,9 @@ public enum StateKeys {
     }
 
     public struct PreviousValidatorsKey: StateKey {
-        public typealias Value = StateValue<
-            ConfigFixedSizeArray<
-                ValidatorKey,
-                ProtocolConfig.TotalNumberOfValidators
-            >
+        public typealias Value = ConfigFixedSizeArray<
+            ValidatorKey,
+            ProtocolConfig.TotalNumberOfValidators
         >
 
         public init() {}
@@ -191,11 +182,9 @@ public enum StateKeys {
     }
 
     public struct ReportsKey: StateKey {
-        public typealias Value = StateValue<
-            ConfigFixedSizeArray<
-                ReportItem?,
-                ProtocolConfig.TotalNumberOfCores
-            >
+        public typealias Value = ConfigFixedSizeArray<
+            ReportItem?,
+            ProtocolConfig.TotalNumberOfCores
         >
 
         public init() {}
@@ -206,7 +195,7 @@ public enum StateKeys {
     }
 
     public struct TimeslotKey: StateKey {
-        public typealias Value = StateValue<TimeslotIndex>
+        public typealias Value = TimeslotIndex
 
         public init() {}
 
@@ -216,7 +205,7 @@ public enum StateKeys {
     }
 
     public struct PrivilegedServicesKey: StateKey {
-        public typealias Value = StateValue<PrivilegedServices>
+        public typealias Value = PrivilegedServices
 
         public init() {}
 
@@ -226,7 +215,7 @@ public enum StateKeys {
     }
 
     public struct ActivityStatisticsKey: StateKey {
-        public typealias Value = StateValue<ValidatorActivityStatistics>
+        public typealias Value = ValidatorActivityStatistics
 
         public init() {}
 
@@ -236,7 +225,8 @@ public enum StateKeys {
     }
 
     public struct ServiceAccountKey: StateKey {
-        public typealias Value = StateOptionalValue<ServiceAccountDetails>
+        public typealias Value = ServiceAccountDetails
+        public static var optional: Bool { true }
 
         public var index: ServiceIndex
 
@@ -250,7 +240,8 @@ public enum StateKeys {
     }
 
     public struct ServiceAccountStorageKey: StateKey {
-        public typealias Value = StateOptionalValue<Data>
+        public typealias Value = Data
+        public static var optional: Bool { true }
 
         public var index: ServiceIndex
         public var key: Data32
@@ -266,7 +257,8 @@ public enum StateKeys {
     }
 
     public struct ServiceAccountPreimagesKey: StateKey {
-        public typealias Value = StateOptionalValue<Data>
+        public typealias Value = Data
+        public static var optional: Bool { true }
 
         public var index: ServiceIndex
         public var hash: Data32
@@ -282,7 +274,8 @@ public enum StateKeys {
     }
 
     public struct ServiceAccountPreimageInfoKey: StateKey {
-        public typealias Value = StateOptionalValue<LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>>
+        public typealias Value = LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>
+        public static var optional: Bool { true }
 
         public var index: ServiceIndex
         public var hash: Data32

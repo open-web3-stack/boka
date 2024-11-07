@@ -69,12 +69,12 @@ public enum StateTrieError: Error {
 }
 
 public class StateTrie {
-    private let backend: StateBackendProtocol
+    private let backend: StateBackend
     public private(set) var rootHash: Data32
     private var nodes: [Data32: TrieNode] = [:]
     private var deleted: Set<Data32> = []
 
-    public init(rootHash: Data32, backend: StateBackendProtocol) {
+    public init(rootHash: Data32, backend: StateBackend) {
         self.rootHash = rootHash
         self.backend = backend
     }
@@ -86,7 +86,7 @@ public class StateTrie {
         if let node = nodes[hash] {
             return node
         }
-        guard let data = try await backend.read(key: hash.data) else {
+        guard let data = try await backend.readTrieNode(key: hash.data) else {
             return nil
         }
 
@@ -148,7 +148,7 @@ public class StateTrie {
             }
         }
 
-        try await backend.batchUpdate(ops)
+        try await backend.batchUpdateTrieNodes(ops)
     }
 
     private func insert(
