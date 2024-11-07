@@ -8,7 +8,7 @@ public enum StateBackendOperation: Sendable {
     case refDecrement(key: Data)
 }
 
-/// key: trie node hash (32 bytes)
+/// key: trie node hash (31 bytes)
 /// value: trie node data (64 bytes)
 /// ref counting requirements:
 ///   - write do not increment ref count, only explicit ref increment do

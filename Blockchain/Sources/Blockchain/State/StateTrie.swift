@@ -7,13 +7,20 @@ private enum TrieNodeType {
     case regularLeaf
 }
 
+private func toId(hash: Data32) -> Data {
+    var id = hash.data
+    id[0] = id[0] & 0b0111_1111 // clear the highest bit
+    return id
+}
+
 private struct TrieNode {
-    var hash: Data32
-    var left: Data32
-    var right: Data32
-    var type: TrieNodeType
-    var isNew: Bool
-    var rawValue: Data?
+    let hash: Data32
+    let left: Data32
+    let right: Data32
+    let type: TrieNodeType
+    let isNew: Bool
+    let rawValue: Data?
+    let id: Data
 
     init(hash: Data32, data: Data64, isNew: Bool = false) {
         self.hash = hash
@@ -29,6 +36,7 @@ private struct TrieNode {
         default:
             type = .branch
         }
+        id = toId(hash: hash)
     }
 
     private init(left: Data32, right: Data32, type: TrieNodeType, isNew: Bool, rawValue: Data?) {
@@ -38,6 +46,7 @@ private struct TrieNode {
         self.type = type
         self.isNew = isNew
         self.rawValue = rawValue
+        id = toId(hash: hash)
     }
 
     var encodedData: Data64 {
@@ -81,7 +90,9 @@ private struct TrieNode {
     }
 
     static func branch(left: Data32, right: Data32) -> TrieNode {
-        .init(left: left, right: right, type: .branch, isNew: true, rawValue: nil)
+        var left = left.data
+        left[0] = left[0] & 0b0111_1111 // clear the highest bit
+        return .init(left: Data32(left)!, right: right, type: .branch, isNew: true, rawValue: nil)
     }
 }
 
@@ -93,8 +104,8 @@ public enum StateTrieError: Error {
 public actor StateTrie: Sendable {
     private let backend: StateBackendProtocol
     public private(set) var rootHash: Data32
-    private var nodes: [Data32: TrieNode] = [:]
-    private var deleted: Set<Data32> = []
+    private var nodes: [Data: TrieNode] = [:]
+    private var deleted: Set<Data> = []
 
     public init(rootHash: Data32, backend: StateBackendProtocol) {
         self.rootHash = rootHash
@@ -133,13 +144,14 @@ public actor StateTrie: Sendable {
         if hash == Data32() {
             return nil
         }
-        if deleted.contains(hash) {
+        let id = toId(hash: hash)
+        if deleted.contains(id) {
             return nil
         }
-        if let node = nodes[hash] {
+        if let node = nodes[id] {
             return node
         }
-        guard let data = try await backend.read(key: hash.data) else {
+        guard let data = try await backend.read(key: id) else {
             return nil
         }
 
@@ -168,20 +180,23 @@ public actor StateTrie: Sendable {
         var refChanges = [Data: Int]()
 
         // process deleted nodes
-        for hash in deleted {
-            let node = try await get(hash: hash).unwrap()
+        let deletedCopy = deleted
+        deleted.removeAll()
+        for id in deletedCopy {
+            guard let node = nodes[id] else {
+                continue
+            }
             if node.isBranch {
                 // assign -1 to not worry about duplicates
                 refChanges[node.hash.data] = -1
                 refChanges[node.left.data] = -1
                 refChanges[node.right.data] = -1
             }
-            nodes.removeValue(forKey: hash)
+            nodes.removeValue(forKey: id)
         }
-        deleted.removeAll()
 
         for node in nodes.values where node.isNew {
-            ops.append(.write(key: node.hash.data, value: node.encodedData.data))
+            ops.append(.write(key: node.id, value: node.encodedData.data))
             if node.type == .regularLeaf {
                 try ops.append(.writeRawValue(key: node.right, value: node.rawValue.unwrap()))
             }
@@ -196,7 +211,11 @@ public actor StateTrie: Sendable {
 
         nodes.removeAll()
 
+        let zeros = Data(repeating: 0, count: 32)
         for (key, value) in refChanges {
+            if key == zeros {
+                continue
+            }
             if value > 0 {
                 ops.append(.refIncrement(key: key))
             } else if value < 0 {
@@ -210,7 +229,11 @@ public actor StateTrie: Sendable {
     private func insert(
         hash: Data32, key: Data32, value: Data, depth: UInt8
     ) async throws -> Data32 {
-        let parent = try await get(hash: hash).unwrap(orError: StateTrieError.invalidParent)
+        guard let parent = try await get(hash: hash) else {
+            let node = TrieNode.leaf(key: key, value: value)
+            saveNode(node: node)
+            return node.hash
+        }
         removeNode(hash: hash)
 
         if parent.isBranch {
@@ -235,7 +258,7 @@ public actor StateTrie: Sendable {
         if existing.isLeaf(key: newKey) {
             // update existing leaf
             let newLeaf = TrieNode.leaf(key: newKey, value: newValue)
-            nodes[newLeaf.hash] = newLeaf
+            saveNode(node: newLeaf)
             return newLeaf.hash
         }
 
@@ -297,13 +320,14 @@ public actor StateTrie: Sendable {
     }
 
     private func removeNode(hash: Data32) {
-        deleted.insert(hash)
-        nodes.removeValue(forKey: hash)
+        let id = toId(hash: hash)
+        deleted.insert(id)
+        nodes.removeValue(forKey: id)
     }
 
     private func saveNode(node: TrieNode) {
-        nodes[node.hash] = node
-        deleted.remove(node.hash) // TODO: maybe this is not needed
+        nodes[node.id] = node
+        deleted.remove(node.id) // TODO: maybe this is not needed
     }
 }
 

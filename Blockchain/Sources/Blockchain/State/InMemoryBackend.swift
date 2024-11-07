@@ -63,10 +63,10 @@ public actor InMemoryBackend: StateBackendProtocol {
             case let .writeRawValue(key, value):
                 rawValues[key] = value
                 rawValueRefCounts[key, default: 0] += 1
-            case .refIncrement:
-                break
-            case .refDecrement:
-                break
+            case let .refIncrement(key):
+                refCounts[key, default: 0] += 1
+            case let .refDecrement(key):
+                refCounts[key, default: 0] -= 1
             }
         }
     }
