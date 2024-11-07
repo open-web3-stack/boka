@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   coverage:
-    name: Build and Test
+    name: Code Coverage
     runs-on: [self-hosted, linux]
     timeout-minutes: 30
     steps:
@@ -66,6 +66,8 @@ jobs:
       uses: SwiftyLab/setup-swift@latest
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@nightly
+    - name: Build deps
+      run: make deps
     - name: Test Coverage
       run: make test-coverage
     - uses: codecov/codecov-action@v4
