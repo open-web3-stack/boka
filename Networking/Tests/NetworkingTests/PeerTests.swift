@@ -258,6 +258,7 @@ struct PeerTests {
         )
         try await Task.sleep(for: .milliseconds(1000))
         let lastReceivedData2 = await handler2.lastReceivedData
+        #expect(lastReceivedData2 != messageData)
     }
 
     @Test
@@ -731,7 +732,7 @@ struct PeerTests {
         }
 
         // Wait for message propagation
-        try? await Task.sleep(for: .milliseconds(100))
+        try? await Task.sleep(for: .milliseconds(1000))
 
         // everyone should receive two messages
         for (idx, handler) in handlers.enumerated() {

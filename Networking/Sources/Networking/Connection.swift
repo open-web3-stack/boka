@@ -242,14 +242,14 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                     if existingStream.stream.id < stream.stream.id {
                         // The new stream has a higher ID, so reset the existing one
                         existingStream.close(abort: false)
-                        logger.info(
+                        logger.debug(
                             "Reset older UP stream with lower ID",
                             metadata: ["existingStreamId": "\(existingStream.stream.id)", "newStreamId": "\(stream.stream.id)"]
                         )
                     } else {
                         // The existing stream has a higher ID or is equal, so reset the new one
                         stream.close(abort: false)
-                        logger.info(
+                        logger.debug(
                             "Duplicate UP stream detected, closing new stream with lower or equal ID",
                             metadata: ["existingStreamId": "\(existingStream.stream.id)", "newStreamId": "\(stream.stream.id)"]
                         )

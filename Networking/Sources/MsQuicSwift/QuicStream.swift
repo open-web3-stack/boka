@@ -71,7 +71,7 @@ public final class QuicStream: Sendable {
     }
 
     public func shutdown(errorCode: QuicErrorCode = .success) throws {
-        logger.info("closing stream \(errorCode)")
+        logger.debug("closing stream \(errorCode)")
 
         try storage.write { storage in
             guard let storage2 = storage else {
@@ -206,10 +206,10 @@ private class StreamHandle {
             }
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
-            logger.info("Peer send aborted")
+            logger.trace("Peer send aborted")
 
         case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
-            logger.info("Stream shutdown complete")
+            logger.trace("Stream shutdown complete")
 
             let evtData = event.pointee.SHUTDOWN_COMPLETE
             if let stream {
