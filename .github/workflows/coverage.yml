@@ -11,18 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
-    name: Swift Lint
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-    - name: Check swift codestyle
-      uses: cirruslabs/swiftlint-action@v1
-      with:
-        args: --config .swiftlint.yml --strict
-
-  test:
+  coverage:
     name: Build and Test
     runs-on: [self-hosted, linux]
     timeout-minutes: 30
