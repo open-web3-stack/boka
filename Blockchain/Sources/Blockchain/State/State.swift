@@ -197,8 +197,18 @@ public struct State: Sendable {
         }
     }
 
-    public func save() async throws {
+    // TODO: we don't really want to write to the underlying backend here
+    // instead, it should be writting to a in memory layer
+    // and when actually saving the state, save the in memory layer to the presistent store
+    public func save() async throws -> Data32 {
         try await backend.write(layer.toKV())
+        return await backend.rootHash
+    }
+
+    public var stateRoot: Data32 {
+        get async {
+            await backend.rootHash
+        }
     }
 }
 
@@ -427,9 +437,5 @@ extension State: Accumulation {
 public class StateRef: Ref<State>, @unchecked Sendable {
     public static func dummy(config: ProtocolConfigRef, block: BlockRef?) -> StateRef {
         StateRef(State.dummy(config: config, block: block))
-    }
-
-    public var stateRoot: Data32 {
-        fatalError("not implemented")
     }
 }

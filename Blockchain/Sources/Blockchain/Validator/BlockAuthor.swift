@@ -118,9 +118,11 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
             extrinsics: extrinsic.tickets
         )
 
+        let stateRoot = try await state.value.save()
+
         let unsignedHeader = Header.Unsigned(
             parentHash: parentHash,
-            priorStateRoot: state.stateRoot,
+            priorStateRoot: stateRoot,
             extrinsicsHash: extrinsic.hash(),
             timeslot: timeslot,
             epoch: safroleResult.epochMark,

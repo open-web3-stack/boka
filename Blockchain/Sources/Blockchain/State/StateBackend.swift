@@ -52,6 +52,11 @@ public final class StateBackend: Sendable {
         try await trie.save()
     }
 
+    public func writeRaw(_ values: [(key: Data32, value: Data?)]) async throws {
+        try await trie.update(values)
+        try await trie.save()
+    }
+
     public func gc() async throws {
         try await impl.gc { data in
             guard data.count == 64 else {

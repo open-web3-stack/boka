@@ -42,7 +42,10 @@ struct BlockAuthorTests {
         let block = try await blockAuthor.createNewBlock(timeslot: timeslot, claim: .right(pubkey))
 
         // Verify block
-        try _ = await runtime.apply(block: block, state: genesisState, context: .init(timeslot: timeslot + 1))
+        try _ = await runtime.apply(block: block, state: genesisState, context: .init(
+            timeslot: timeslot + 1,
+            stateRoot: genesisState.value.stateRoot
+        ))
     }
 
     @Test
@@ -95,7 +98,10 @@ struct BlockAuthorTests {
         let block = try await blockAuthor.createNewBlock(timeslot: timeslot, claim: .left((ticket, devKey.bandersnatch)))
 
         // Verify block
-        try _ = await runtime.apply(block: block, state: newStateRef, context: .init(timeslot: timeslot + 1))
+        try _ = await runtime.apply(block: block, state: newStateRef, context: .init(
+            timeslot: timeslot + 1,
+            stateRoot: newStateRef.value.stateRoot
+        ))
     }
 
     @Test
@@ -122,7 +128,10 @@ struct BlockAuthorTests {
         let timeslot = timeProvider.getTime().timeToTimeslot(config: config)
 
         // Verify block
-        try _ = await runtime.apply(block: block.block, state: genesisState, context: .init(timeslot: timeslot + 1))
+        try _ = await runtime.apply(block: block.block, state: genesisState, context: .init(
+            timeslot: timeslot + 1,
+            stateRoot: genesisState.value.stateRoot
+        ))
     }
 
     // TODO: test including extrinsic tickets from extrinsic pool

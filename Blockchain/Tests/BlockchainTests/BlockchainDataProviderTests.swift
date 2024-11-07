@@ -78,11 +78,11 @@ struct BlockchainDataProviderTests {
 
         // Verify state exists
         #expect(try await provider.hasState(hash: block.hash))
-        #expect(try await provider.getState(hash: block.hash).stateRoot == state.stateRoot)
+        #expect(try await provider.getState(hash: block.hash).value.stateRoot == state.value.stateRoot)
 
         // Test getting best state
         let bestState = try await provider.getBestState()
-        #expect(bestState.stateRoot == state.stateRoot)
+        #expect(await bestState.value.stateRoot == state.value.stateRoot)
     }
 
     @Test func testStateOperationsErrors() async throws {
