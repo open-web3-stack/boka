@@ -36,6 +36,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
 
     public let role: PeerRole
     public let remoteAddress: NetAddr
+    private let lastActive: ThreadSafeContainer<TimeInterval> = .init(0)
 
     let presistentStreams: ThreadSafeContainer<
         [Handler.PresistentHandler.StreamKind: Stream<Handler>]
@@ -58,6 +59,10 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         }
     }
 
+    public var lastActiveTimeStamp: TimeInterval {
+        lastActive.read { $0 }
+    }
+
     public var id: UniqueId {
         connection.id
     }
@@ -68,6 +73,11 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         self.role = role
         self.remoteAddress = remoteAddress
         self.initiatedByLocal = initiatedByLocal
+        lastActive.write { $0 = Date().timeIntervalSince1970 }
+    }
+
+    func updateLastActive() {
+        lastActive.write { $0 = Date().timeIntervalSince1970 }
     }
 
     func opened(publicKey: Data) throws {
