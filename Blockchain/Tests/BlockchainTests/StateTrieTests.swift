@@ -1,7 +1,19 @@
-@testable import Blockchain
 import Foundation
 import Testing
+import TracingUtils
 import Utils
+
+@testable import Blockchain
+
+private let logger = Logger(label: "StateTrieTests")
+
+private func merklize(_ data: some Sequence<(key: Data32, value: Data)>) -> Data32 {
+    var dict = [Data32: Data]()
+    for (key, value) in data {
+        dict[key] = value
+    }
+    return try! stateMerklize(kv: dict)
+}
 
 struct StateTrieTests {
     let backend = InMemoryBackend()
@@ -30,14 +42,58 @@ struct StateTrieTests {
     }
 
     @Test
+    func testInsertAndRetrieveSimple() async throws {
+        let trie = StateTrie(rootHash: Data32(), backend: backend)
+        let remainKey = Data(repeating: 0, count: 31)
+        let pairs = [
+            (key: Data32(Data([0b0000_0000]) + remainKey)!, value: Data([0])),
+            (key: Data32(Data([0b1000_0000]) + remainKey)!, value: Data([1])),
+            (key: Data32(Data([0b0100_0000]) + remainKey)!, value: Data([2])),
+            (key: Data32(Data([0b1100_0000]) + remainKey)!, value: Data([3])),
+        ]
+
+        for (i, pair) in pairs.enumerated() {
+            try await trie.update([(key: pair.key, value: pair.value)])
+
+            let expectedRoot = merklize(pairs[0 ... i])
+            let trieRoot = await trie.rootHash
+            #expect(expectedRoot == trieRoot)
+        }
+
+        for (i, (key, value)) in pairs.enumerated() {
+            let retrieved = try await trie.read(key: key)
+            #expect(retrieved == value, "Failed at index \(i)")
+        }
+
+        try await trie.save()
+
+        for (i, (key, value)) in pairs.enumerated() {
+            let retrieved = try await trie.read(key: key)
+            #expect(retrieved == value, "Failed at index \(i)")
+        }
+    }
+
+    @Test
     func testInsertAndRetrieveMultipleValues() async throws {
         let trie = StateTrie(rootHash: Data32(), backend: backend)
-        let pairs = (0 ..< 5).map { i in
-            let data = Data(String(i).utf8)
+        let pairs = (0 ..< 50).map { i in
+            let data = Data([UInt8(i)])
             return (key: data.blake2b256hash(), value: data)
         }
 
-        try await trie.update(pairs)
+        for (i, pair) in pairs.enumerated() {
+            try await trie.update([(key: pair.key, value: pair.value)])
+
+            let expectedRoot = merklize(pairs[0 ... i])
+            let trieRoot = await trie.rootHash
+            #expect(expectedRoot == trieRoot)
+        }
+
+        for (i, (key, value)) in pairs.enumerated() {
+            let retrieved = try await trie.read(key: key)
+            #expect(retrieved == value, "Failed at index \(i)")
+        }
+
         try await trie.save()
 
         for (i, (key, value)) in pairs.enumerated() {

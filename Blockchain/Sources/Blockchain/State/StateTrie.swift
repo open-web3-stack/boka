@@ -1,16 +1,13 @@
 import Foundation
+import TracingUtils
 import Utils
+
+private let logger = Logger(label: "StateTrie")
 
 private enum TrieNodeType {
     case branch
     case embeddedLeaf
     case regularLeaf
-}
-
-private func toId(hash: Data32) -> Data {
-    var id = hash.data
-    id[0] = id[0] & 0b0111_1111 // clear the highest bit
-    return id
 }
 
 private struct TrieNode {
@@ -20,7 +17,6 @@ private struct TrieNode {
     let type: TrieNodeType
     let isNew: Bool
     let rawValue: Data?
-    let id: Data
 
     init(hash: Data32, data: Data64, isNew: Bool = false) {
         self.hash = hash
@@ -36,7 +32,6 @@ private struct TrieNode {
         default:
             type = .branch
         }
-        id = toId(hash: hash)
     }
 
     private init(left: Data32, right: Data32, type: TrieNodeType, isNew: Bool, rawValue: Data?) {
@@ -46,7 +41,6 @@ private struct TrieNode {
         self.type = type
         self.isNew = isNew
         self.rawValue = rawValue
-        id = toId(hash: hash)
     }
 
     var encodedData: Data64 {
@@ -144,7 +138,7 @@ public actor StateTrie: Sendable {
         if hash == Data32() {
             return nil
         }
-        let id = toId(hash: hash)
+        let id = hash.data.suffix(31)
         if deleted.contains(id) {
             return nil
         }
@@ -180,34 +174,33 @@ public actor StateTrie: Sendable {
         var refChanges = [Data: Int]()
 
         // process deleted nodes
-        let deletedCopy = deleted
-        deleted.removeAll()
-        for id in deletedCopy {
+        for id in deleted {
             guard let node = nodes[id] else {
                 continue
             }
             if node.isBranch {
                 // assign -1 to not worry about duplicates
-                refChanges[node.hash.data] = -1
-                refChanges[node.left.data] = -1
-                refChanges[node.right.data] = -1
+                refChanges[node.hash.data.suffix(31)] = -1
+                refChanges[node.left.data.suffix(31)] = -1
+                refChanges[node.right.data.suffix(31)] = -1
             }
             nodes.removeValue(forKey: id)
         }
+        deleted.removeAll()
 
         for node in nodes.values where node.isNew {
-            ops.append(.write(key: node.id, value: node.encodedData.data))
+            ops.append(.write(key: node.hash.data.suffix(31), value: node.encodedData.data))
             if node.type == .regularLeaf {
                 try ops.append(.writeRawValue(key: node.right, value: node.rawValue.unwrap()))
             }
             if node.isBranch {
-                refChanges[node.left.data] = (refChanges[node.left.data] ?? 0) + 1
-                refChanges[node.right.data] = (refChanges[node.right.data] ?? 0) + 1
+                refChanges[node.left.data.suffix(31), default: 0] += 1
+                refChanges[node.right.data.suffix(31), default: 0] += 1
             }
         }
 
         // pin root node
-        refChanges[rootHash.data] = (refChanges[rootHash.data] ?? 0) + 1
+        refChanges[rootHash.data.suffix(31), default: 0] += 1
 
         nodes.removeAll()
 
@@ -217,9 +210,9 @@ public actor StateTrie: Sendable {
                 continue
             }
             if value > 0 {
-                ops.append(.refIncrement(key: key))
+                ops.append(.refIncrement(key: key.suffix(31)))
             } else if value < 0 {
-                ops.append(.refDecrement(key: key))
+                ops.append(.refDecrement(key: key.suffix(31)))
             }
         }
 
@@ -234,9 +227,10 @@ public actor StateTrie: Sendable {
             saveNode(node: node)
             return node.hash
         }
-        removeNode(hash: hash)
 
         if parent.isBranch {
+            removeNode(hash: hash)
+
             let bitValue = bitAt(key.data, position: depth)
             var left = parent.left
             var right = parent.right
@@ -262,7 +256,7 @@ public actor StateTrie: Sendable {
             return newLeaf.hash
         }
 
-        let existingKeyBit = bitAt(existing.left.data, position: depth)
+        let existingKeyBit = bitAt(existing.left.data[1...], position: depth)
         let newKeyBit = bitAt(newKey.data, position: depth)
 
         if existingKeyBit == newKeyBit {
@@ -292,9 +286,10 @@ public actor StateTrie: Sendable {
 
     private func delete(hash: Data32, key: Data32, depth: UInt8) async throws -> Data32 {
         let node = try await get(hash: hash).unwrap(orError: StateTrieError.invalidParent)
-        removeNode(hash: hash)
 
         if node.isBranch {
+            removeNode(hash: hash)
+
             let bitValue = bitAt(key.data, position: depth)
             var left = node.left
             var right = node.right
@@ -320,14 +315,44 @@ public actor StateTrie: Sendable {
     }
 
     private func removeNode(hash: Data32) {
-        let id = toId(hash: hash)
+        let id = hash.data.suffix(31)
         deleted.insert(id)
         nodes.removeValue(forKey: id)
     }
 
     private func saveNode(node: TrieNode) {
-        nodes[node.id] = node
-        deleted.remove(node.id) // TODO: maybe this is not needed
+        let id = node.hash.data.suffix(31)
+        nodes[id] = node
+        deleted.remove(id) // TODO: maybe this is not needed
+    }
+
+    public func debugPrint() async throws {
+        func printNode(_ hash: Data32, depth: UInt8) async throws {
+            let prefix = String(repeating: " ", count: Int(depth))
+            if hash == Data32() {
+                logger.info("\(prefix) nil")
+                return
+            }
+            let node = try await get(hash: hash)
+            guard let node else {
+                return logger.info("\(prefix) ????")
+            }
+            logger.info("\(prefix)\(node.hash.toHexString()) \(node.type)")
+            if node.isBranch {
+                logger.info("\(prefix) left:")
+                try await printNode(node.left, depth: depth + 1)
+
+                logger.info("\(prefix) right:")
+                try await printNode(node.right, depth: depth + 1)
+            } else {
+                logger.info("\(prefix) key: \(node.left.toHexString())")
+                if let value = node.value {
+                    logger.info("\(prefix) value: \(value.toHexString())")
+                }
+            }
+        }
+
+        try await printNode(rootHash, depth: 0)
     }
 }
 

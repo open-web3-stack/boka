@@ -1,22 +1,25 @@
 import Codec
 import Foundation
+import TracingUtils
 import Utils
 
-private struct KVPair: Comparable, Sendable {
-    var key: Data
-    var value: Data
-
-    public static func < (lhs: KVPair, rhs: KVPair) -> Bool {
-        lhs.key.lexicographicallyPrecedes(rhs.key)
-    }
-}
+private let logger = Logger(label: "InMemoryBackend")
 
 public actor InMemoryBackend: StateBackendProtocol {
+    public struct KVPair: Comparable, Sendable {
+        var key: Data
+        var value: Data
+
+        public static func < (lhs: KVPair, rhs: KVPair) -> Bool {
+            lhs.key.lexicographicallyPrecedes(rhs.key)
+        }
+    }
+
     // we really should be using Heap or some other Tree based structure here
     // but let's keep it simple for now
-    private var store: SortedArray<KVPair> = .init([])
+    public private(set) var store: SortedArray<KVPair> = .init([])
     private var rawValues: [Data32: Data] = [:]
-    private var refCounts: [Data: Int] = [:]
+    public private(set) var refCounts: [Data: Int] = [:]
     private var rawValueRefCounts: [Data32: Int] = [:]
 
     public init() {}
@@ -90,6 +93,15 @@ public actor InMemoryBackend: StateBackendProtocol {
                     }
                 }
             }
+        }
+    }
+
+    public func debugPrint() {
+        for item in store.array {
+            let refCount = refCounts[item.key, default: 0]
+            logger.info("key: \(item.key.toHexString())")
+            logger.info("value: \(item.value.toHexString())")
+            logger.info("ref count: \(refCount)")
         }
     }
 }
