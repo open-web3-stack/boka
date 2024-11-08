@@ -22,6 +22,7 @@ struct BlockAuthorTests {
         let config = services.config
         let timeProvider = services.timeProvider
         let genesisState = services.genesisState
+        let stateRoot = await genesisState.value.stateRoot
 
         let timeslot = timeProvider.getTime().timeToTimeslot(config: config)
 
@@ -44,7 +45,7 @@ struct BlockAuthorTests {
         // Verify block
         try _ = await runtime.apply(block: block, state: genesisState, context: .init(
             timeslot: timeslot + 1,
-            stateRoot: genesisState.value.stateRoot
+            stateRoot: stateRoot
         ))
     }
 

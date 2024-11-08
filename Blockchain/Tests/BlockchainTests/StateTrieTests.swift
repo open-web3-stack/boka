@@ -1,11 +1,8 @@
 import Foundation
 import Testing
-import TracingUtils
 import Utils
 
 @testable import Blockchain
-
-private let logger = Logger(label: "StateTrieTests")
 
 private func merklize(_ data: some Sequence<(key: Data32, value: Data)>) -> Data32 {
     var dict = [Data32: Data]()

@@ -37,9 +37,9 @@ public final class Runtime {
         public let timeslot: TimeslotIndex
         public let stateRoot: Data32
 
-        public init(timeslot: TimeslotIndex, stateRoot _: Data32) {
+        public init(timeslot: TimeslotIndex, stateRoot: Data32) {
             self.timeslot = timeslot
-            stateRoot = Data32()
+            self.stateRoot = stateRoot
         }
     }
 

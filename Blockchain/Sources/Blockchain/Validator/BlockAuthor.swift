@@ -54,6 +54,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         // TODO: verify we are indeed the block author
 
         let state = try await dataProvider.getState(hash: parentHash)
+        let stateRoot = await state.value.stateRoot
         let epoch = timeslot.timeslotToEpochIndex(config: config)
 
         let pendingTickets = await extrinsicPool.getPendingTickets(epoch: epoch)
@@ -117,8 +118,6 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
             offenders: state.value.judgements.punishSet,
             extrinsics: extrinsic.tickets
         )
-
-        let stateRoot = try await state.value.save()
 
         let unsignedHeader = Header.Unsigned(
             parentHash: parentHash,
