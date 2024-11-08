@@ -18,12 +18,14 @@ struct ChainSpecTests {
         for preset in GenesisPreset.allCases {
             let genesis = Genesis.preset(preset)
             let chainspec = try await genesis.load()
-            let backend = try StateBackend(InMemoryBackend(store: chainspec.getState()), config: chainspec.getConfig(), rootHash: Data32())
+            let backend = try StateBackend(InMemoryBackend(), config: chainspec.getConfig(), rootHash: Data32())
+            let state = try chainspec.getState()
+            try await backend.writeRaw(state.map { (key: $0.key, value: $0.value) })
             let block = try chainspec.getBlock()
             let config = try chainspec.getConfig()
 
             let recentHistory = try await backend.read(StateKeys.RecentHistoryKey())
-            #expect(recentHistory.items.last?.headerHash == block.hash)
+            #expect(recentHistory?.items.last?.headerHash == block.hash)
 
             // Verify config matches preset
             #expect(config == preset.config)
