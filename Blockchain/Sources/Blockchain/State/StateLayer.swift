@@ -208,7 +208,7 @@ public struct StateLayer: @unchecked Sendable {
         get {
             changes[
                 StateKeys.ServiceAccountPreimageInfoKey(index: index, hash: hash, length: length)
-            ]!.value()!
+            ]?.value()
         }
         set {
             changes[StateKeys.ServiceAccountPreimageInfoKey(index: index, hash: hash, length: length)] = .init(newValue)
