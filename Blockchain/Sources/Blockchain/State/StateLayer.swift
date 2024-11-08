@@ -172,7 +172,7 @@ public struct StateLayer: @unchecked Sendable {
     // δ: The (prior) state of the service accounts.
     public subscript(serviceAccount index: ServiceIndex) -> StateKeys.ServiceAccountKey.Value? {
         get {
-            changes[StateKeys.ServiceAccountKey(index: index)]!.value()!
+            changes[StateKeys.ServiceAccountKey(index: index)]?.value()
         }
         set {
             changes[StateKeys.ServiceAccountKey(index: index)] = .init(newValue)
@@ -182,7 +182,7 @@ public struct StateLayer: @unchecked Sendable {
     // s
     public subscript(serviceAccount index: ServiceIndex, storageKey key: Data32) -> StateKeys.ServiceAccountStorageKey.Value? {
         get {
-            changes[StateKeys.ServiceAccountStorageKey(index: index, key: key)]!.value()!
+            changes[StateKeys.ServiceAccountStorageKey(index: index, key: key)]?.value()
         }
         set {
             changes[StateKeys.ServiceAccountStorageKey(index: index, key: key)] = .init(newValue)
@@ -194,7 +194,7 @@ public struct StateLayer: @unchecked Sendable {
         serviceAccount index: ServiceIndex, preimageHash hash: Data32
     ) -> StateKeys.ServiceAccountPreimagesKey.Value? {
         get {
-            changes[StateKeys.ServiceAccountPreimagesKey(index: index, hash: hash)]!.value()!
+            changes[StateKeys.ServiceAccountPreimagesKey(index: index, hash: hash)]?.value()
         }
         set {
             changes[StateKeys.ServiceAccountPreimagesKey(index: index, hash: hash)] = .init(newValue)
