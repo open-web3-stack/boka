@@ -477,7 +477,6 @@ struct DummyFunction: AccumulateFunction, OnTransferFunction {
     func invoke(
         config _: ProtocolConfigRef,
         service _: ServiceIndex,
-        code _: Data,
         serviceAccounts _: inout some ServiceAccounts,
         transfers _: [DeferredTransfers]
     ) async throws {

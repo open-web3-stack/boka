@@ -5,20 +5,44 @@ public enum AccumulationError: Error {
     case duplicatedServiceIndex
 }
 
+// accumulation output pairing
+public struct Commitment: Hashable {
+    public var serviceIndex: ServiceIndex
+    public var hash: Data32
+
+    public init(service: ServiceIndex, hash: Data32) {
+        serviceIndex = service
+        self.hash = hash
+    }
+}
+
+/// outer accumulation function ∆+ output
 public struct AccumulationOutput {
-    public var commitments: [(ServiceIndex, Data32)]
-    public var privilegedServices: PrivilegedServices
-    public var validatorQueue: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
-    >
-    public var authorizationQueue: ConfigFixedSizeArray<
-        ConfigFixedSizeArray<
-            Data32,
-            ProtocolConfig.MaxAuthorizationsQueueItems
-        >,
-        ProtocolConfig.TotalNumberOfCores
-    >
-    public var newServiceAccounts: [ServiceIndex: ServiceAccount]
+    // number of work results accumulated
+    public var numAccumulated: Int
+    public var state: AccumulateState
+    public var transfers: [DeferredTransfers]
+    public var commitments: Set<Commitment>
+}
+
+/// parallelized accumulation function ∆* output
+public struct ParallelAccumulationOutput {
+    public var gasUsed: Gas
+    public var state: AccumulateState
+    public var transfers: [DeferredTransfers]
+    public var commitments: Set<Commitment>
+}
+
+/// single-service accumulation function ∆1 output
+public struct SingleAccumulationOutput {
+    // o
+    public var state: AccumulateState
+    // t
+    public var transfers: [DeferredTransfers]
+    // b
+    public var commitment: Data32?
+    // u
+    public var gasUsed: Gas
 }
 
 public protocol Accumulation: ServiceAccounts {
@@ -39,50 +63,69 @@ public protocol Accumulation: ServiceAccounts {
 }
 
 extension Accumulation {
-    public mutating func update(config: ProtocolConfigRef, block: BlockRef, workReports: [WorkReport]) async throws -> AccumulationOutput {
-        var servicesGasRatio: [ServiceIndex: Gas] = [:]
-        var servicesGas: [ServiceIndex: Gas] = [:]
+    /// single-service accumulate function ∆1
+    private mutating func singleAccumulate(
+        config: ProtocolConfigRef,
+        state: AccumulateState,
+        workReports: [WorkReport],
+        service: ServiceIndex,
+        block: BlockRef,
+        privilegedGas: [ServiceIndex: Gas]
+    ) async throws -> SingleAccumulationOutput {
+        var gas = Gas(0)
+        var arguments: [AccumulateArguments] = []
 
-        // privileged gas
-        for (service, gas) in privilegedServices.basicGas {
-            servicesGas[service] = gas
-        }
-
-        let totalGasRatio = workReports.flatMap(\.results).reduce(Gas(0)) { $0 + $1.gasRatio }
-        var totalMinimalGas = Gas(0)
-        for report in workReports {
-            for result in report.results {
-                servicesGasRatio[result.serviceIndex, default: Gas(0)] += result.gasRatio
-                let acc = try await get(serviceAccount: result.serviceIndex).unwrap(orError: AccumulationError.invalidServiceIndex)
-                totalMinimalGas += acc.minAccumlateGas
-                servicesGas[result.serviceIndex, default: Gas(0)] += acc.minAccumlateGas
-            }
-        }
-        let remainingGas = config.value.coreAccumulationGas - totalMinimalGas
-
-        for (service, gas) in servicesGas {
-            servicesGas[service] = gas + servicesGasRatio[service, default: Gas(0)] * remainingGas / totalGasRatio
-        }
-
-        var serviceArguments: [ServiceIndex: [AccumulateArguments]] = [:]
-
-        // ensure privileged services will be called
-        for service in privilegedServices.basicGas.keys {
-            serviceArguments[service] = []
+        for basicGas in privilegedGas.values {
+            gas += basicGas
         }
 
         for report in workReports {
             for result in report.results {
-                serviceArguments[result.serviceIndex, default: []].append(AccumulateArguments(
-                    result: result,
-                    paylaodHash: result.payloadHash,
-                    packageHash: report.packageSpecification.workPackageHash,
-                    authorizationOutput: report.authorizationOutput
-                ))
+                if result.serviceIndex == service {
+                    gas += result.gasRatio
+                    arguments.append(AccumulateArguments(
+                        result: result,
+                        paylaodHash: result.payloadHash,
+                        packageHash: report.packageSpecification.workPackageHash,
+                        authorizationOutput: report.authorizationOutput
+                    ))
+                }
             }
         }
 
-        var commitments = [(ServiceIndex, Data32)]()
+        let (newState, transfers, commitment, gasUsed) = try await accumlateFunction.invoke(
+            config: config,
+            accounts: &self,
+            state: state,
+            serviceIndex: service,
+            gas: gas,
+            arguments: arguments,
+            initialIndex: Blake2b256.hash(service.encode(), entropyPool.t0.data, block.header.timeslot.encode())
+                .data.decode(UInt32.self),
+            timeslot: block.header.timeslot
+        )
+
+        return SingleAccumulationOutput(
+            state: newState,
+            transfers: transfers,
+            commitment: commitment,
+            gasUsed: gasUsed
+        )
+    }
+
+    /// parallelized accumulate function ∆*
+    private mutating func parallelizedAccumulate(
+        config: ProtocolConfigRef,
+        block: BlockRef,
+        state: AccumulateState,
+        workReports: [WorkReport],
+        privilegedGas: [ServiceIndex: Gas]
+    ) async throws -> ParallelAccumulationOutput {
+        var services = Set<ServiceIndex>()
+        var gasUsed = Gas(0)
+        var transfers: [DeferredTransfers] = []
+        var commitments = Set<Commitment>()
+        var newServiceAccounts = [ServiceIndex: ServiceAccount]()
         var newPrivilegedServices: PrivilegedServices?
         var newValidatorQueue: ConfigFixedSizeArray<
             ValidatorKey, ProtocolConfig.TotalNumberOfValidators
@@ -95,36 +138,38 @@ extension Accumulation {
             ProtocolConfig.TotalNumberOfCores
         >?
 
-        var newServiceAccounts = [ServiceIndex: ServiceAccount]()
-        var transferReceivers = [ServiceIndex: [DeferredTransfers]]()
-
-        for (service, arguments) in serviceArguments {
-            guard let gas = servicesGas[service] else {
-                assertionFailure("unreachable: service not found")
-                throw AccumulationError.invalidServiceIndex
+        for report in workReports {
+            for result in report.results {
+                services.insert(result.serviceIndex)
             }
-            let (newState, transfers, commitment, _) = try await accumlateFunction.invoke(
+        }
+
+        for service in privilegedGas.keys {
+            services.insert(service)
+        }
+
+        for service in services {
+            let singleOutput = try await singleAccumulate(
                 config: config,
-                accounts: &self,
-                state: AccumulateState(
-                    serviceAccounts: [:],
-                    validatorQueue: validatorQueue,
-                    authorizationQueue: authorizationQueue,
-                    privilegedServices: privilegedServices
-                ),
-                serviceIndex: service,
-                gas: gas,
-                arguments: arguments,
-                initialIndex: Blake2b256.hash(service.encode(), entropyPool.t0.data, block.header.timeslot.encode())
-                    .data.decode(UInt32.self),
-                timeslot: block.header.timeslot
+                state: state,
+                workReports: workReports,
+                service: service,
+                block: block,
+                privilegedGas: privilegedGas
             )
-            if let commitment {
-                commitments.append((service, commitment))
+            gasUsed += singleOutput.gasUsed
+
+            if let commitment = singleOutput.commitment {
+                commitments.insert(Commitment(service: service, hash: commitment))
             }
 
-            for (service, account) in newState.serviceAccounts {
-                guard newServiceAccounts[service] == nil else {
+            for transfer in singleOutput.transfers {
+                transfers.append(transfer)
+            }
+
+            // new service accounts
+            for (service, account) in singleOutput.state.serviceAccounts {
+                guard newServiceAccounts[service] == nil, try await get(serviceAccount: service) == nil else {
                     throw AccumulationError.duplicatedServiceIndex
                 }
                 newServiceAccounts[service] = account
@@ -132,41 +177,120 @@ extension Accumulation {
 
             switch service {
             case privilegedServices.empower:
-                newPrivilegedServices = newState.privilegedServices
+                newPrivilegedServices = singleOutput.state.privilegedServices
             case privilegedServices.assign:
-                newAuthorizationQueue = newState.authorizationQueue
+                newAuthorizationQueue = singleOutput.state.authorizationQueue
             case privilegedServices.designate:
-                newValidatorQueue = newState.validatorQueue
+                newValidatorQueue = singleOutput.state.validatorQueue
             default:
                 break
             }
+        }
 
-            for transfer in transfers {
-                transferReceivers[transfer.sender, default: []].append(transfer)
+        return ParallelAccumulationOutput(
+            gasUsed: gasUsed,
+            state: AccumulateState(
+                serviceAccounts: newServiceAccounts,
+                validatorQueue: newValidatorQueue ?? validatorQueue,
+                authorizationQueue: newAuthorizationQueue ?? authorizationQueue,
+                privilegedServices: newPrivilegedServices ?? privilegedServices
+            ),
+            transfers: transfers,
+            commitments: commitments
+        )
+    }
+
+    /// outer accumulate function ∆+
+    private mutating func outerAccumulate(
+        config: ProtocolConfigRef,
+        block: BlockRef,
+        state: AccumulateState,
+        workReports: [WorkReport],
+        privilegedGas: [ServiceIndex: Gas],
+        gasLimit: Gas
+    ) async throws -> AccumulationOutput {
+        var i = 0
+        var sumGasRequired = Gas(0)
+        for report in workReports {
+            for result in report.results {
+                if result.gasRatio + sumGasRequired > gasLimit {
+                    break
+                }
+                sumGasRequired += result.gasRatio
+                i += 1
             }
         }
 
-        for (service, transfers) in transferReceivers {
-            let acc = try await get(serviceAccount: service).unwrap(orError: AccumulationError.invalidServiceIndex)
-            let code = try await get(serviceAccount: service, preimageHash: acc.codeHash)
-            guard let code else {
-                continue
-            }
+        if i == 0 {
+            return AccumulationOutput(
+                numAccumulated: 0,
+                state: state,
+                transfers: [],
+                commitments: Set()
+            )
+        } else {
+            let parallelOutput = try await parallelizedAccumulate(
+                config: config,
+                block: block,
+                state: state,
+                workReports: Array(workReports[0 ..< i]),
+                privilegedGas: privilegedGas
+            )
+            let outerOutput = try await outerAccumulate(
+                config: config,
+                block: block,
+                state: parallelOutput.state,
+                workReports: Array(workReports[i ..< workReports.count]),
+                privilegedGas: [:],
+                gasLimit: gasLimit - parallelOutput.gasUsed
+            )
+            return AccumulationOutput(
+                numAccumulated: i + outerOutput.numAccumulated,
+                state: outerOutput.state,
+                transfers: parallelOutput.transfers + outerOutput.transfers,
+                commitments: parallelOutput.commitments.union(outerOutput.commitments)
+            )
+        }
+    }
+
+    public mutating func accumulate(
+        config: ProtocolConfigRef,
+        block: BlockRef,
+        workReports: [WorkReport]
+    ) async throws -> (state: AccumulateState, commitments: Set<Commitment>) {
+        let sumPrevilegedGas = privilegedServices.basicGas.values.reduce(Gas(0)) { $0 + $1.value }
+        let minTotalGas = config.value.coreAccumulationGas * Gas(config.value.totalNumberOfCores) + sumPrevilegedGas
+        let gasLimit = max(config.value.totalAccumulationGas, minTotalGas)
+
+        let res = try await outerAccumulate(
+            config: config,
+            block: block,
+            state: AccumulateState(
+                serviceAccounts: [:],
+                validatorQueue: validatorQueue,
+                authorizationQueue: authorizationQueue,
+                privilegedServices: privilegedServices
+            ),
+            workReports: workReports,
+            privilegedGas: privilegedServices.basicGas,
+            gasLimit: gasLimit
+        )
+
+        var transferGroups = [ServiceIndex: [DeferredTransfers]]()
+
+        for transfer in res.transfers {
+            transferGroups[transfer.destination, default: []].append(transfer)
+        }
+
+        for (service, transfers) in transferGroups {
             try await onTransferFunction.invoke(
                 config: config,
                 service: service,
-                code: code,
                 serviceAccounts: &self,
                 transfers: transfers
             )
         }
 
-        return .init(
-            commitments: commitments,
-            privilegedServices: newPrivilegedServices ?? privilegedServices,
-            validatorQueue: newValidatorQueue ?? validatorQueue,
-            authorizationQueue: newAuthorizationQueue ?? authorizationQueue,
-            newServiceAccounts: newServiceAccounts
-        )
+        return (res.state, res.commitments)
     }
 }

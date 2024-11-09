@@ -37,6 +37,9 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     // GR: The total gas allocated for a work-package’s Refine logic.
     public var workPackageRefineGas: Gas
 
+    // GT: The total gas allocated across all cores for Accumulation.
+    public var totalAccumulationGas: Gas
+
     // H = 8: The size of recent history, in blocks.
     public var recentHistorySize: Int
 
@@ -119,6 +122,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         coreAccumulationGas: Gas,
         workPackageAuthorizerGas: Gas,
         workPackageRefineGas: Gas,
+        totalAccumulationGas: Gas,
         recentHistorySize: Int,
         maxWorkItems: Int,
         maxTicketsPerExtrinsic: Int,
@@ -154,6 +158,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         self.coreAccumulationGas = coreAccumulationGas
         self.workPackageAuthorizerGas = workPackageAuthorizerGas
         self.workPackageRefineGas = workPackageRefineGas
+        self.totalAccumulationGas = totalAccumulationGas
         self.recentHistorySize = recentHistorySize
         self.maxWorkItems = maxWorkItems
         self.maxTicketsPerExtrinsic = maxTicketsPerExtrinsic
@@ -215,6 +220,8 @@ extension ProtocolConfig {
                 ? other.workPackageAuthorizerGas : workPackageAuthorizerGas,
             workPackageRefineGas: other.workPackageRefineGas.value != 0
                 ? other.workPackageRefineGas : workPackageRefineGas,
+            totalAccumulationGas: other.totalAccumulationGas.value != 0
+                ? other.totalAccumulationGas : totalAccumulationGas,
             recentHistorySize: other.recentHistorySize != 0
                 ? other.recentHistorySize : recentHistorySize,
             maxWorkItems: other.maxWorkItems != 0 ? other.maxWorkItems : maxWorkItems,
@@ -294,6 +301,9 @@ extension ProtocolConfig {
         )
         workPackageRefineGas = try decode(
             .workPackageRefineGas, defaultValue: Gas(0), required: required
+        )
+        totalAccumulationGas = try decode(
+            .totalAccumulationGas, defaultValue: Gas(0), required: required
         )
         recentHistorySize = try decode(.recentHistorySize, defaultValue: 0, required: required)
         maxWorkItems = try decode(.maxWorkItems, defaultValue: 0, required: required)
@@ -431,6 +441,14 @@ extension ProtocolConfig {
         public typealias TOutput = Gas
         public static func read(config: ProtocolConfigRef) -> Gas {
             config.value.workPackageRefineGas
+        }
+    }
+
+    public enum TotalAccumulationGas: ReadGas {
+        public typealias TConfig = ProtocolConfigRef
+        public typealias TOutput = Gas
+        public static func read(config: ProtocolConfigRef) -> Gas {
+            config.value.totalAccumulationGas
         }
     }
 

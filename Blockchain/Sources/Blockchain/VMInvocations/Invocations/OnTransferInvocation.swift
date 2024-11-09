@@ -7,7 +7,6 @@ extension OnTransferFunction {
     public func invoke(
         config: ProtocolConfigRef,
         service: ServiceIndex,
-        code _: Data,
         serviceAccounts: inout some ServiceAccounts,
         transfers: [DeferredTransfers]
     ) async throws {

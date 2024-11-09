@@ -170,10 +170,13 @@ public final class Runtime {
 
             // depends on Safrole and Disputes
             let availableReports = try updateReports(block: block, state: &newState)
-            let res = try await newState.update(config: config, block: block, workReports: availableReports)
-            newState.privilegedServices = res.privilegedServices
 
-            for (service, account) in res.newServiceAccounts {
+            // accumulate and implied transfers
+            let (accumulateState, _) = try await newState.accumulate(config: config, block: block, workReports: availableReports)
+            newState.authorizationQueue = accumulateState.authorizationQueue
+            newState.validatorQueue = accumulateState.validatorQueue
+            newState.privilegedServices = accumulateState.privilegedServices
+            for (service, account) in accumulateState.serviceAccounts {
                 newState[serviceAccount: service] = account.toDetails()
                 for (hash, value) in account.storage {
                     newState[serviceAccount: service, storageKey: hash] = value
@@ -185,9 +188,6 @@ public final class Runtime {
                     newState[serviceAccount: service, preimageHash: hashLength.hash, length: hashLength.length] = value
                 }
             }
-
-            newState.authorizationQueue = res.authorizationQueue
-            newState.validatorQueue = res.validatorQueue
 
             newState.coreAuthorizationPool = try updateAuthorizationPool(
                 block: block, state: prevState

@@ -2,9 +2,13 @@ import Foundation
 import Utils
 
 public struct AccumulateArguments: Codable {
+    /// o
     public var result: WorkResult
+    /// l
     public var paylaodHash: Data32
+    /// k
     public var packageHash: Data32
+    /// a
     public var authorizationOutput: Data
 
     public init(result: WorkResult, paylaodHash: Data32, packageHash: Data32, authorizationOutput: Data) {
