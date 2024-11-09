@@ -33,6 +33,10 @@ test-cargo:
 .PHONY: test-all
 test-all: test test-cargo
 
+.PHONY: test-coverage
+test-coverage:
+	./scripts/runTests.sh test --enable-code-coverage
+
 .PHONY: build
 build: githooks deps
 	./scripts/run.sh build

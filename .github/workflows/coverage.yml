@@ -1,0 +1,77 @@
+name: Coverage
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    name: Code Coverage
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 30
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - run: sudo apt-get update
+    - uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
+    # - name: Cache SPM
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: '**/.build'
+    #     key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+    #     restore-keys: |
+    #       ${{ runner.os }}-spm-
+    - name: Cache Cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - name: Cache bandersnatch_vrfs static lib
+      uses: actions/cache@v4
+      with:
+        path: .lib/libbandersnatch_vrfs.a
+        key: ${{ runner.os }}-libs-libbandersnatch-${{ hashFiles('Utils/Sources/bandersnatch/**') }}
+        restore-keys: |
+            ${{ runner.os }}-libs-libbandersnatch
+    - name: Cache bls static lib
+      uses: actions/cache@v4
+      with:
+        path: .lib/libbls.a
+        key: ${{ runner.os }}-libs-libbls-${{ hashFiles('Utils/Sources/bls/**') }}
+        restore-keys: |
+            ${{ runner.os }}-libs-libbls
+    - name: Cache erasure-coding static lib
+      uses: actions/cache@v4
+      with:
+        path: .lib/libec.a
+        key: ${{ runner.os }}-libs-libec-${{ hashFiles('Utils/Sources/erasure-coding/**') }}
+        restore-keys: |
+            ${{ runner.os }}-libs-libec
+    - name: Setup Swift
+      uses: SwiftyLab/setup-swift@latest
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@nightly
+    - name: Build deps
+      run: make deps
+    - name: Test Coverage
+      run: make test-coverage
+    - uses: codecov/codecov-action@v4
+      with:
+        fail_ci_if_error: true # optional (default = false)
+        token: ${{ secrets.CODECOV_TOKEN }} # required
+        verbose: true # optional (default = false)
