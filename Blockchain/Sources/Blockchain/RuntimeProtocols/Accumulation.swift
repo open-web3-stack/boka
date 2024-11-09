@@ -5,6 +5,16 @@ public enum AccumulationError: Error {
     case duplicatedServiceIndex
 }
 
+public struct AccumulationQueueItem: Sendable, Equatable, Codable {
+    public var workReport: WorkReport
+    public var dependencies: Set<Data32>
+
+    public init(workReport: WorkReport, dependencies: Set<Data32>) {
+        self.workReport = workReport
+        self.dependencies = dependencies
+    }
+}
+
 // accumulation output pairing
 public struct Commitment: Hashable {
     public var serviceIndex: ServiceIndex

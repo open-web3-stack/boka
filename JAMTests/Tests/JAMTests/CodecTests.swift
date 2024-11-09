@@ -103,9 +103,9 @@ struct CodecTests {
             return [
                 "anchor": json["anchor"]!["headerHash"]!,
                 "beefy_root": json["anchor"]!["beefyRoot"]!,
-                "lookup_anchor": json["lokupAnchor"]!["headerHash"]!,
-                "lookup_anchor_slot": json["lokupAnchor"]!["timeslot"]!,
-                "prerequisite": json["prerequistieWorkPackage"] ?? .null,
+                "lookup_anchor": json["lookupAnchor"]!["headerHash"]!,
+                "lookup_anchor_slot": json["lookupAnchor"]!["timeslot"]!,
+                "prerequisite": json["prerequisiteWorkPackages"] ?? .null,
                 "state_root": json["anchor"]!["stateRoot"]!,
             ].json
         }

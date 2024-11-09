@@ -12,19 +12,19 @@ public struct RecentHistory: Sendable, Equatable, Codable {
         // s
         public var stateRoot: Data32
 
-        // p
-        public var workReportHashes: ConfigLimitedSizeArray<Data32, ProtocolConfig.Int0, ProtocolConfig.TotalNumberOfCores>
+        // p: work report: segment root lookup
+        public var lookup: [Data32: Data32]
 
         public init(
             headerHash: Data32,
             mmr: MMR,
             stateRoot: Data32,
-            workReportHashes: ConfigLimitedSizeArray<Data32, ProtocolConfig.Int0, ProtocolConfig.TotalNumberOfCores>
+            lookup: [Data32: Data32]
         ) {
             self.headerHash = headerHash
             self.mmr = mmr
             self.stateRoot = stateRoot
-            self.workReportHashes = workReportHashes
+            self.lookup = lookup
         }
     }
 
@@ -40,7 +40,7 @@ extension RecentHistory: Dummy {
                 headerHash: Data32(),
                 mmr: MMR([]),
                 stateRoot: Data32(),
-                workReportHashes: ConfigLimitedSizeArray(config: config)
+                lookup: [Data32: Data32]()
             )]
         ))
     }
@@ -51,7 +51,7 @@ extension RecentHistory {
         headerHash: Data32,
         parentStateRoot: Data32,
         accumulateRoot: Data32,
-        workReportHashes: ConfigLimitedSizeArray<Data32, ProtocolConfig.Int0, ProtocolConfig.TotalNumberOfCores>
+        lookup: [Data32: Data32]
     ) {
         if items.count > 0 { // if this is not block #0
             // write the state root of last block
@@ -65,7 +65,7 @@ extension RecentHistory {
             headerHash: headerHash,
             mmr: mmr,
             stateRoot: Data32(), // empty and will be updated upon next block
-            workReportHashes: workReportHashes
+            lookup: lookup
         )
 
         items.safeAppend(newItem)

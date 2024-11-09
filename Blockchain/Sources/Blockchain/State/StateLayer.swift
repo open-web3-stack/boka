@@ -20,6 +20,8 @@ public struct StateLayer: @unchecked Sendable {
             StateKeys.TimeslotKey(),
             StateKeys.PrivilegedServicesKey(),
             StateKeys.ActivityStatisticsKey(),
+            StateKeys.AccumulationQueueKey(),
+            StateKeys.AccumulationHistoryKey(),
         ]
 
         let results = try await backend.batchRead(keys)
@@ -162,6 +164,26 @@ public struct StateLayer: @unchecked Sendable {
         }
         set {
             changes[StateKeys.ActivityStatisticsKey()] = newValue
+        }
+    }
+
+    // ϑ: The accumulation queue.
+    public var accumulationQueue: StateKeys.AccumulationQueueKey.Value.ValueType {
+        get {
+            changes[StateKeys.AccumulationQueueKey()] as! StateKeys.AccumulationQueueKey.Value.ValueType
+        }
+        set {
+            changes[StateKeys.AccumulationQueueKey()] = newValue
+        }
+    }
+
+    // ξ: The accumulation history.
+    public var accumulationHistory: StateKeys.AccumulationHistoryKey.Value.ValueType {
+        get {
+            changes[StateKeys.AccumulationHistoryKey()] as! StateKeys.AccumulationHistoryKey.Value.ValueType
+        }
+        set {
+            changes[StateKeys.AccumulationHistoryKey()] = newValue
         }
     }
 

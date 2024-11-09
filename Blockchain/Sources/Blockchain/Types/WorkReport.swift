@@ -18,6 +18,9 @@ public struct WorkReport: Sendable, Equatable, Codable {
     // o: authorization output
     public var authorizationOutput: Data
 
+    // l: segment-root lookup dictionary
+    public var lookup: [Data32: Data32]
+
     // r: the results of the evaluation of each of the items in the package
     public var results: ConfigLimitedSizeArray<
         WorkResult,
@@ -31,6 +34,7 @@ public struct WorkReport: Sendable, Equatable, Codable {
         authorizationOutput: Data,
         refinementContext: RefinementContext,
         packageSpecification: AvailabilitySpecifications,
+        lookup: [Data32: Data32],
         results: ConfigLimitedSizeArray<WorkResult, ProtocolConfig.Int1, ProtocolConfig.MaxWorkItems>
     ) {
         self.authorizerHash = authorizerHash
@@ -38,6 +42,7 @@ public struct WorkReport: Sendable, Equatable, Codable {
         self.authorizationOutput = authorizationOutput
         self.refinementContext = refinementContext
         self.packageSpecification = packageSpecification
+        self.lookup = lookup
         self.results = results
     }
 }
@@ -51,6 +56,7 @@ extension WorkReport: Dummy {
             authorizationOutput: Data(),
             refinementContext: RefinementContext.dummy(config: config),
             packageSpecification: AvailabilitySpecifications.dummy(config: config),
+            lookup: [:],
             results: try! ConfigLimitedSizeArray(config: config, defaultValue: WorkResult.dummy(config: config))
         )
     }
@@ -64,9 +70,8 @@ extension WorkReport {
 
 extension WorkReport: EncodedSize {
     public var encodedSize: Int {
-        authorizerHash.encodedSize + coreIndex.encodedSize + authorizationOutput.encodedSize + refinementContext
-            .encodedSize + packageSpecification
-            .encodedSize + results.encodedSize
+        authorizerHash.encodedSize + coreIndex.encodedSize + authorizationOutput.encodedSize +
+            refinementContext.encodedSize + packageSpecification.encodedSize + lookup.encodedSize + results.encodedSize
     }
 
     public static var encodeedSizeHint: Int? {
@@ -78,9 +83,13 @@ extension WorkReport: Validate {
     public enum WorkReportError: Swift.Error {
         case tooBig
         case invalidCoreIndex
+        case tooManyDependencies
     }
 
     public func validate(config: Config) throws(WorkReportError) {
+        guard refinementContext.prerequisiteWorkPackages.count + lookup.count <= config.value.maxDepsInWorkReport else {
+            throw .tooManyDependencies
+        }
         guard encodedSize <= config.value.maxEncodedWorkReportSize else {
             throw .tooBig
         }

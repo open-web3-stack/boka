@@ -235,6 +235,36 @@ public enum StateKeys {
         }
     }
 
+    public struct AccumulationQueueKey: StateKey {
+        public typealias Value = StateValue<
+            ConfigFixedSizeArray<
+                [AccumulationQueueItem],
+                ProtocolConfig.EpochLength
+            >
+        >
+
+        public init() {}
+
+        public func encode() -> Data32 {
+            constructKey(14)
+        }
+    }
+
+    public struct AccumulationHistoryKey: StateKey {
+        public typealias Value = StateValue<
+            ConfigFixedSizeArray<
+                Set<Data32>,
+                ProtocolConfig.EpochLength
+            >
+        >
+
+        public init() {}
+
+        public func encode() -> Data32 {
+            constructKey(15)
+        }
+    }
+
     public struct ServiceAccountKey: StateKey {
         public typealias Value = StateOptionalValue<ServiceAccountDetails>
 

@@ -146,6 +146,26 @@ public struct State: Sendable {
         }
     }
 
+    // ϑ: The accumulation queue.
+    public var accumulationQueue: StateKeys.AccumulationQueueKey.Value.ValueType {
+        get {
+            layer.accumulationQueue
+        }
+        set {
+            layer.accumulationQueue = newValue
+        }
+    }
+
+    // ξ: The accumulation history.
+    public var accumulationHistory: StateKeys.AccumulationHistoryKey.Value.ValueType {
+        get {
+            layer.accumulationHistory
+        }
+        set {
+            layer.accumulationHistory = newValue
+        }
+    }
+
     // δ: The (prior) state of the service accounts.
     public subscript(serviceAccount index: ServiceIndex) -> StateKeys.ServiceAccountKey.Value.ValueType? {
         get {
@@ -280,7 +300,7 @@ extension State: Dummy {
                 headerHash: block.hash,
                 mmr: MMR([]),
                 stateRoot: Data32(),
-                workReportHashes: try! ConfigLimitedSizeArray(config: config)
+                lookup: [Data32: Data32]()
             ))
         }
         let safroleState: StateKeys.SafroleStateKey.Value.ValueType = SafroleState.dummy(config: config)
@@ -303,6 +323,14 @@ extension State: Dummy {
         )
         let judgements: StateKeys.JudgementsKey.Value.ValueType = JudgementsState.dummy(config: config)
         let activityStatistics: StateKeys.ActivityStatisticsKey.Value.ValueType = ValidatorActivityStatistics.dummy(config: config)
+        let accumulationQueue: StateKeys.AccumulationQueueKey.Value.ValueType = try! ConfigLimitedSizeArray(
+            config: config,
+            defaultValue: [AccumulationQueueItem]()
+        )
+        let accumulationHistory: StateKeys.AccumulationHistoryKey.Value.ValueType = try! ConfigLimitedSizeArray(
+            config: config,
+            defaultValue: Set<Data32>()
+        )
 
         let kv: [(any StateKey, Codable & Sendable)] = [
             (StateKeys.CoreAuthorizationPoolKey(), coreAuthorizationPool),
@@ -318,6 +346,8 @@ extension State: Dummy {
             (StateKeys.TimeslotKey(), timeslot),
             (StateKeys.PrivilegedServicesKey(), privilegedServices),
             (StateKeys.ActivityStatisticsKey(), activityStatistics),
+            (StateKeys.AccumulationQueueKey(), accumulationQueue),
+            (StateKeys.AccumulationHistoryKey(), accumulationHistory),
         ]
 
         var store: [Data32: Data] = [:]
