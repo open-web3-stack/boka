@@ -45,8 +45,10 @@ extension Genesis {
             let config = preset.config
             let (state, block) = try State.devGenesis(config: config)
             var kv = [String: Data]()
-            for (key, value) in try await state.value.toKV() {
-                kv[key.toHexString()] = value
+            for (key, value) in state.value.layer.toKV() {
+                if let value {
+                    kv[key.encode().toHexString()] = try JamEncoder.encode(value)
+                }
             }
             return try ChainSpec(
                 name: preset.rawValue,
