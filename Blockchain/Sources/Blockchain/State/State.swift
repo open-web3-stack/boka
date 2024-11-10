@@ -323,11 +323,11 @@ extension State: Dummy {
         )
         let judgements: StateKeys.JudgementsKey.Value.ValueType = JudgementsState.dummy(config: config)
         let activityStatistics: StateKeys.ActivityStatisticsKey.Value.ValueType = ValidatorActivityStatistics.dummy(config: config)
-        let accumulationQueue: StateKeys.AccumulationQueueKey.Value.ValueType = try! ConfigLimitedSizeArray(
+        let accumulationQueue: StateKeys.AccumulationQueueKey.Value.ValueType = try! ConfigFixedSizeArray(
             config: config,
             defaultValue: [AccumulationQueueItem]()
         )
-        let accumulationHistory: StateKeys.AccumulationHistoryKey.Value.ValueType = try! ConfigLimitedSizeArray(
+        let accumulationHistory: StateKeys.AccumulationHistoryKey.Value.ValueType = try! ConfigFixedSizeArray(
             config: config,
             defaultValue: Set<Data32>()
         )
