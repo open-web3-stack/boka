@@ -39,9 +39,11 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
 
             let runtime = Runtime(config: config)
             let parent = try await dataProvider.getState(hash: block.header.parentHash)
+            let stateRoot = await parent.value.stateRoot
             let timeslot = timeProvider.getTime().timeToTimeslot(config: config)
             // TODO: figure out what is the best way to deal with block received a bit too early
-            let state = try await runtime.apply(block: block, state: parent, context: .init(timeslot: timeslot + 1))
+            let context = Runtime.ApplyContext(timeslot: timeslot + 1, stateRoot: stateRoot)
+            let state = try await runtime.apply(block: block, state: parent, context: context)
 
             try await dataProvider.blockImported(block: block, state: state)
 

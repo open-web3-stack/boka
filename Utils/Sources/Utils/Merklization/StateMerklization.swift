@@ -10,7 +10,7 @@ public enum MerklizeError: Error {
 public func stateMerklize(kv: [Data32: Data], i: Int = 0) throws(MerklizeError) -> Data32 {
     func branch(l: Data32, r: Data32) -> Data64 {
         var data = l.data + r.data
-        data[0] = l.data[0] & 0x7F
+        data[0] = l.data[0] & 0x7F // clear the highest bit
         return Data64(data)!
     }
 

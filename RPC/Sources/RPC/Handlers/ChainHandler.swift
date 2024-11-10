@@ -38,18 +38,21 @@ struct ChainHandler {
                 throw JSONError(code: -32602, message: "Invalid block hash")
             }
             let state = try await source.getState(hash: data32)
+            guard let state else {
+                return JSON.null
+            }
             // return state root for now
-            return [
-                "stateRoot": state?.stateRoot.description,
-                "blockHash": hash.description,
+            return await [
+                "stateRoot": state.value.stateRoot.toHexString(),
+                "blockHash": hash,
             ]
         } else {
             // return best block state by default
             let block = try await source.getBestBlock()
             let state = try await source.getState(hash: block.hash)
-            return [
-                "stateRoot": state?.stateRoot.description,
-                "blockHash": block.hash.description,
+            return await [
+                "stateRoot": state?.value.stateRoot.toHexString(),
+                "blockHash": block.hash.toHexString(),
             ]
         }
     }

@@ -35,9 +35,11 @@ public final class Runtime {
 
     public struct ApplyContext {
         public let timeslot: TimeslotIndex
+        public let stateRoot: Data32
 
-        public init(timeslot: TimeslotIndex) {
+        public init(timeslot: TimeslotIndex, stateRoot: Data32) {
             self.timeslot = timeslot
+            self.stateRoot = stateRoot
         }
     }
 
@@ -54,7 +56,7 @@ public final class Runtime {
             throw Error.invalidParentHash
         }
 
-        guard block.header.priorStateRoot == state.stateRoot else {
+        guard block.header.priorStateRoot == context.stateRoot else {
             throw Error.invalidHeaderStateRoot
         }
 
