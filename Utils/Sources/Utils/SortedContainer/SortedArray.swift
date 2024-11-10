@@ -44,6 +44,13 @@ public struct SortedArray<T: Comparable>: SortedContainer {
     public mutating func remove(where predicate: (T) throws -> Bool) rethrows {
         try array.removeAll(where: predicate)
     }
+
+    // mutate access to underlying array directly
+    // this is unsafe and should be used with care
+    public var unsafeArrayAccess: [T] {
+        _read { yield array }
+        _modify { yield &array }
+    }
 }
 
 extension SortedArray: Encodable where T: Encodable {
