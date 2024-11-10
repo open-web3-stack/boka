@@ -69,13 +69,19 @@ jobs:
             - name: Build deps
               run: make deps
             - name: Test Coverage
-              run: make test-coverage
+              run: |
+                  SWIFTFLAGS="-Xfrontend -enable-experimental-feature -Xfrontend ExtendedLifeTimeCoverageInstrumentation" \
+                  swift test --enable-code-coverage
+                  llvm-profdata merge -sparse .build/debug/codecov/*.profraw -o coverage.profdata
+                  llvm-cov export -format=lcov .build/debug/<your_test_executable> -instr-profile=coverage.profdata > coverage.lcov
             - name: List Coverage Files
               run: |
                   echo "Checking coverage files..."
-                  find . -name "*.lcov" -o -name "*.json" -o -name "*.xml"
+                  find . -name "*.lcov" -o -name "*.xml"
+
             - uses: codecov/codecov-action@v4
               with:
-                  fail_ci_if_error: true # optional (default = false)
-                  token: ${{ secrets.CODECOV_TOKEN }} # required
-                  verbose: true # optional (default = false)
+                  fail_ci_if_error: true
+                  token: ${{ secrets.CODECOV_TOKEN }}
+                  verbose: true
+                  path: "./coverage.lcov"
