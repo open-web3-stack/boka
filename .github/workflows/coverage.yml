@@ -23,7 +23,7 @@ jobs:
             - run: sudo apt-get update
             - uses: awalsh128/cache-apt-pkgs-action@latest
               with:
-                  packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
+                  packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev lcov
             # - name: Cache SPM
             #   uses: actions/cache@v4
             #   with:
@@ -69,19 +69,14 @@ jobs:
             - name: Build deps
               run: make deps
             - name: Test Coverage
-              run: |
-                  SWIFTFLAGS="-Xfrontend -enable-experimental-feature -Xfrontend ExtendedLifeTimeCoverageInstrumentation" \
-                  swift test --enable-code-coverage
-                  llvm-profdata merge -sparse .build/debug/codecov/*.profraw -o coverage.profdata
-                  llvm-cov export -format=lcov .build/debug/<your_test_executable> -instr-profile=coverage.profdata > coverage.lcov
-            - name: List Coverage Files
+              run: make test-coverage
+            - name: Change And List Coverage Files
               run: |
                   echo "Checking coverage files..."
+                  find . -name "*.json" -exec lcov --add-tracefile {} --output-file coverage.lcov
                   find . -name "*.lcov" -o -name "*.xml"
-
             - uses: codecov/codecov-action@v4
               with:
-                  fail_ci_if_error: true
-                  token: ${{ secrets.CODECOV_TOKEN }}
-                  verbose: true
-                  path: "./coverage.lcov"
+                  fail_ci_if_error: true # optional (default = false)
+                  token: ${{ secrets.CODECOV_TOKEN }} # required
+                  verbose: true # optional (default = false)
