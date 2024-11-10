@@ -18,9 +18,4 @@ public protocol ServiceAccounts {
         length: UInt32,
         value: StateKeys.ServiceAccountPreimageInfoKey.Value?
     )
-
-    mutating func remove(serviceAccount index: ServiceIndex)
-    mutating func remove(serviceAccount index: ServiceIndex, storageKey key: Data32)
-    mutating func remove(serviceAccount index: ServiceIndex, preimageHash hash: Data32)
-    mutating func remove(serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32)
 }

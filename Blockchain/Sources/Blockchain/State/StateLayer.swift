@@ -170,22 +170,22 @@ public struct StateLayer: @unchecked Sendable {
     }
 
     // ϑ: The accumulation queue.
-    public var accumulationQueue: StateKeys.AccumulationQueueKey.Value.ValueType {
+    public var accumulationQueue: StateKeys.AccumulationQueueKey.Value {
         get {
-            changes[StateKeys.AccumulationQueueKey()] as! StateKeys.AccumulationQueueKey.Value.ValueType
+            changes[StateKeys.AccumulationQueueKey()]!.value()!
         }
         set {
-            changes[StateKeys.AccumulationQueueKey()] = newValue
+            changes[StateKeys.AccumulationQueueKey()] = .init(newValue)
         }
     }
 
     // ξ: The accumulation history.
-    public var accumulationHistory: StateKeys.AccumulationHistoryKey.Value.ValueType {
+    public var accumulationHistory: StateKeys.AccumulationHistoryKey.Value {
         get {
-            changes[StateKeys.AccumulationHistoryKey()] as! StateKeys.AccumulationHistoryKey.Value.ValueType
+            changes[StateKeys.AccumulationHistoryKey()]!.value()!
         }
         set {
-            changes[StateKeys.AccumulationHistoryKey()] = newValue
+            changes[StateKeys.AccumulationHistoryKey()] = .init(newValue)
         }
     }
 
@@ -258,9 +258,5 @@ extension StateLayer {
         set {
             changes[AnyHashable(key)] = .init(newValue)
         }
-    }
-
-    public mutating func removeValue(forKey key: some StateKey) {
-        changes.removeValue(forKey: key)
     }
 }

@@ -146,7 +146,7 @@ public class Write: HostCall {
         if key != nil, let service, let acc, acc.thresholdBalance(config: config) <= acc.balance {
             state.writeRegister(Registers.Index(raw: 7), len)
             if regs[3] == 0 {
-                serviceAccounts.remove(serviceAccount: service, storageKey: key!)
+                serviceAccounts.set(serviceAccount: service, storageKey: key!, value: nil)
             } else {
                 try serviceAccounts.set(
                     serviceAccount: service,
@@ -505,7 +505,7 @@ public class Quit: HostCall {
 
         if isValidDest {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
-            x.serviceAccounts.remove(serviceAccount: x.serviceIndex)
+            x.serviceAccounts.set(serviceAccount: x.serviceIndex, account: nil)
             throw VMInvocationsError.forceHalt
         } else if memo == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
@@ -515,7 +515,8 @@ public class Quit: HostCall {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.LOW.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
-            x.serviceAccounts.remove(serviceAccount: x.serviceIndex)
+            // TODO: need to remove all storage and preimages?
+            x.serviceAccounts.set(serviceAccount: x.serviceIndex, account: nil)
             x.transfers.append(DeferredTransfers(
                 sender: x.serviceIndex,
                 destination: dest,
@@ -599,8 +600,8 @@ public class Forget: HostCall {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.HUH.rawValue)
         } else {
             if canExpunge {
-                x.serviceAccounts.remove(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length)
-                x.serviceAccounts.remove(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!)
+                x.serviceAccounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: nil)
+                x.serviceAccounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, value: nil)
             } else if isAvailable1, var preimageInfo {
                 preimageInfo.append(timeslot)
                 x.serviceAccounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: preimageInfo)

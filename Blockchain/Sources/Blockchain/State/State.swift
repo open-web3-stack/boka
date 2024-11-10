@@ -147,7 +147,7 @@ public struct State: Sendable {
     }
 
     // ϑ: The accumulation queue.
-    public var accumulationQueue: StateKeys.AccumulationQueueKey.Value.ValueType {
+    public var accumulationQueue: StateKeys.AccumulationQueueKey.Value {
         get {
             layer.accumulationQueue
         }
@@ -157,7 +157,7 @@ public struct State: Sendable {
     }
 
     // ξ: The accumulation history.
-    public var accumulationHistory: StateKeys.AccumulationHistoryKey.Value.ValueType {
+    public var accumulationHistory: StateKeys.AccumulationHistoryKey.Value {
         get {
             layer.accumulationHistory
         }
@@ -372,23 +372,6 @@ extension State: ServiceAccounts {
         value: StateKeys.ServiceAccountPreimageInfoKey.Value?
     ) {
         layer[serviceAccount: index, preimageHash: hash, length: length] = value
-    }
-
-    public mutating func remove(serviceAccount index: ServiceIndex) {
-        layer.removeValue(forKey: StateKeys.ServiceAccountKey(index: index))
-        // TODO: remove all storage, preimage, preimage info as well
-    }
-
-    public mutating func remove(serviceAccount index: ServiceIndex, storageKey key: Data32) {
-        layer.removeValue(forKey: StateKeys.ServiceAccountStorageKey(index: index, key: key))
-    }
-
-    public mutating func remove(serviceAccount index: ServiceIndex, preimageHash hash: Data32) {
-        layer.removeValue(forKey: StateKeys.ServiceAccountPreimagesKey(index: index, hash: hash))
-    }
-
-    public mutating func remove(serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32) {
-        layer.removeValue(forKey: StateKeys.ServiceAccountPreimageInfoKey(index: index, hash: hash, length: length))
     }
 }
 

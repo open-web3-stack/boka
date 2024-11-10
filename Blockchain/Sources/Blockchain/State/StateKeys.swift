@@ -227,11 +227,9 @@ public enum StateKeys {
     }
 
     public struct AccumulationQueueKey: StateKey {
-        public typealias Value = StateValue<
-            ConfigFixedSizeArray<
-                [AccumulationQueueItem],
-                ProtocolConfig.EpochLength
-            >
+        public typealias Value = ConfigFixedSizeArray<
+            [AccumulationQueueItem],
+            ProtocolConfig.EpochLength
         >
 
         public init() {}
@@ -242,11 +240,9 @@ public enum StateKeys {
     }
 
     public struct AccumulationHistoryKey: StateKey {
-        public typealias Value = StateValue<
-            ConfigFixedSizeArray<
-                Set<Data32>,
-                ProtocolConfig.EpochLength
-            >
+        public typealias Value = ConfigFixedSizeArray<
+            Set<Data32>,
+            ProtocolConfig.EpochLength
         >
 
         public init() {}
