@@ -70,10 +70,12 @@ jobs:
               run: make deps
             - name: Test Coverage
               run: make test-coverage
-            - name: Change And List Coverage Files
+            - name: Convert coverage report to LCOV
+              run: |
+                  find . -name "*.json" -exec lcov --add-tracefile {} --output-file coverage.lcov \;
+            - name: List Coverage Files
               run: |
                   echo "Checking coverage files..."
-                  find . -name "*.json" -exec lcov --add-tracefile {} --output-file coverage.lcov
                   find . -name "*.lcov" -o -name "*.xml"
             - uses: codecov/codecov-action@v4
               with:
