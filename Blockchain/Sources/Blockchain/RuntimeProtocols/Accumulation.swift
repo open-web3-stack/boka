@@ -90,16 +90,14 @@ extension Accumulation {
         }
 
         for report in workReports {
-            for result in report.results {
-                if result.serviceIndex == service {
-                    gas += result.gasRatio
-                    arguments.append(AccumulateArguments(
-                        result: result,
-                        paylaodHash: result.payloadHash,
-                        packageHash: report.packageSpecification.workPackageHash,
-                        authorizationOutput: report.authorizationOutput
-                    ))
-                }
+            for result in report.results where result.serviceIndex == service {
+                gas += result.gasRatio
+                arguments.append(AccumulateArguments(
+                    result: result,
+                    paylaodHash: result.payloadHash,
+                    packageHash: report.packageSpecification.workPackageHash,
+                    authorizationOutput: report.authorizationOutput
+                ))
             }
         }
 

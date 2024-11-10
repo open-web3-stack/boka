@@ -469,7 +469,7 @@ public class Transfer: HostCall {
                 memo: Data128(memo!)!,
                 gasLimit: gasLimit
             ))
-            acc.balance = acc.balance - amount
+            acc.balance -= amount
             x.serviceAccounts.set(serviceAccount: x.serviceIndex, account: acc)
         }
     }
