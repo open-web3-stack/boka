@@ -72,13 +72,14 @@ jobs:
               run: make test-coverage
             - name: Convert coverage report to LCOV
               run: |
-                  find . -name "*.json" -exec lcov --add-tracefile {} --output-file coverage.lcov \;
+                  find . -name "*test.json" -exec lcov --ignore-errors count --ignore-errors format --ignore-errors corrupt --add-tracefile {} --output-file coverage.lcov \;
             - name: List Coverage Files
               run: |
                   echo "Checking coverage files..."
                   find . -name "*.lcov" -o -name "*.xml"
             - uses: codecov/codecov-action@v4
               with:
+                  files: coverage.lcov
                   fail_ci_if_error: true # optional (default = false)
                   token: ${{ secrets.CODECOV_TOKEN }} # required
                   verbose: true # optional (default = false)
