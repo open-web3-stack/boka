@@ -19,7 +19,7 @@ public struct WorkReport: Sendable, Equatable, Codable {
     public var authorizationOutput: Data
 
     // l: segment-root lookup dictionary
-    public var lookup: [Data32: Data32]
+    @CodingAs<SortedKeyValues<Data32, Data32>> public var lookup: [Data32: Data32]
 
     // r: the results of the evaluation of each of the items in the package
     public var results: ConfigLimitedSizeArray<

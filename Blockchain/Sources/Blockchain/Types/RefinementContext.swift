@@ -3,8 +3,8 @@ import Utils
 
 // A refinement context, denoted by the set X, describes the context of the chain
 // at the point that the report’s corresponding work-package was evaluated.
-public struct RefinementContext: Sendable, Equatable, Codable, Hashable {
-    public struct Anchor: Sendable, Equatable, Codable, Hashable {
+public struct RefinementContext: Sendable, Equatable, Codable {
+    public struct Anchor: Sendable, Equatable, Codable {
         // a
         public var headerHash: Data32
         // s
@@ -43,7 +43,7 @@ public struct RefinementContext: Sendable, Equatable, Codable, Hashable {
     public var lookupAnchor: LookupAnchor
 
     // p
-    public var prerequisiteWorkPackages: Set<Data32>
+    @CodingAs<SortedSet<Data32>> public var prerequisiteWorkPackages: Set<Data32>
 
     public init(anchor: Anchor, lookupAnchor: LookupAnchor, prerequisiteWorkPackages: Set<Data32>) {
         self.anchor = anchor

@@ -1,3 +1,4 @@
+import Codec
 import Utils
 
 // β
@@ -12,8 +13,8 @@ public struct RecentHistory: Sendable, Equatable, Codable {
         // s
         public var stateRoot: Data32
 
-        // p: work report: segment root lookup
-        public var lookup: [Data32: Data32]
+        // p: work report hahs -> segment root lookup
+        @CodingAs<SortedKeyValues<Data32, Data32>> public var lookup: [Data32: Data32]
 
         public init(
             headerHash: Data32,
