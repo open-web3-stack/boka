@@ -74,17 +74,12 @@ jobs:
               run: |
                   mkdir -p coverage
                   find . -name "*.profraw" -exec llvm-profdata merge -sparse {} -o coverage/coverage.profdata \;
-                  # find executable files
-                  executables=$(find .build/debug -type f -executable)
-                  # generate lcov coverage report
-                  for executable in $executables; do
+                  find .build/debug -type f -name "*.xctest" -exec file {} \; | grep -i 'executable' | cut -d: -f1 | while read executable; do
                     if [ -f "$executable" ]; then
+                      echo "Generating coverage for $executable"
                       llvm-cov export -format=lcov -instr-profile=coverage/coverage.profdata "$executable" >> coverage/coverage.lcov
-                    else
-                      echo "Warning: $executable not found."
                     fi
                   done
-
             - name: List Coverage Files
               run: |
                   echo "Checking coverage files..."
