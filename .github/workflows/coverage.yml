@@ -70,12 +70,23 @@ jobs:
               run: make deps
             - name: Test Coverage
               run: make test-coverage
+            - name: Merge and generate coverage report
+              run: |
+                  mkdir -p coverage
+                  llvm-profdata merge -sparse coverage/*.profraw -o coverage/coverage.profdata
+                  for executable in $(find .build/debug -type f -name "*Tests.xctest"); do
+                    echo "Processing coverage for $executable"
+                    llvm-cov export -format=lcov "$executable" -instr-profile=coverage/coverage.profdata >> coverage/coverage.lcov
+                  done
+                  echo "Generated lcov coverage file:"
+                  cat coverage/coverage.lcov
             - name: List Coverage Files
               run: |
                   echo "Checking coverage files..."
-                  find . -name "*.lcov" -o -name "*.json" -o -name "*.xml"
+                  find . -name "*.lcov" -o -name "*.xml"
             - uses: codecov/codecov-action@v4
               with:
+                  file: coverage/coverage.lcov
                   fail_ci_if_error: true # optional (default = false)
                   token: ${{ secrets.CODECOV_TOKEN }} # required
                   verbose: true # optional (default = false)
