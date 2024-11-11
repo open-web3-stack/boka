@@ -23,7 +23,7 @@ jobs:
             - run: sudo apt-get update
             - uses: awalsh128/cache-apt-pkgs-action@latest
               with:
-                  packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev lcov
+                  packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev lcov llvm
             # - name: Cache SPM
             #   uses: actions/cache@v4
             #   with:
@@ -69,17 +69,29 @@ jobs:
             - name: Build deps
               run: make deps
             - name: Test Coverage
-              run: make test-coverage
-            - name: Convert coverage report to LCOV
               run: |
-                  find . -name "*test.json" -exec lcov --ignore-errors count --ignore-errors format --ignore-errors corrupt --add-tracefile {} --output-file coverage.lcov \;
+                  for package in $(find . -name Package.swift -exec dirname {} \;); do
+                    cd $package
+                    swift test --enable-code-coverage
+                    cd -
+                  done
+
+            - name: Merge Coverage Reports
+              run: |
+                  mkdir -p coverage
+                  find . -name "*.profdata" -exec cp {} coverage/ \;
+                  llvm-profdata merge -sparse coverage/*.profdata -o coverage/merged.profdata
+                  llvm-cov export -format=lcov .build/debug/CodeCoverage/Coverage.profdata \
+                  -instr-profile=coverage/merged.profdata \
+                  -ignore-filename-regex=".build|Tests" > coverage/coverage.lcov
+
             - name: List Coverage Files
               run: |
                   echo "Checking coverage files..."
                   find . -name "*.lcov" -o -name "*.xml"
             - uses: codecov/codecov-action@v4
               with:
-                  files: coverage.lcov
+                  files: coverage/coverage.lcov
                   fail_ci_if_error: true # optional (default = false)
                   token: ${{ secrets.CODECOV_TOKEN }} # required
                   verbose: true # optional (default = false)
