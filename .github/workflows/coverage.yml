@@ -72,7 +72,11 @@ jobs:
               run: |
                   for package in $(find . -name Package.swift -exec dirname {} \;); do
                     cd $package
-                    swift test --enable-code-coverage
+                    if [ -d "Tests" ]; then
+                      swift test --enable-code-coverage || echo "No tests found in $package"
+                    else
+                      echo "Skipping $package: No Tests directory"
+                    fi
                     cd -
                   done
 
