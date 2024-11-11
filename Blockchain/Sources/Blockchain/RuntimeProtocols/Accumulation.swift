@@ -70,6 +70,8 @@ public protocol Accumulation: ServiceAccounts {
     var entropyPool: EntropyPool { get }
     var accumlateFunction: AccumulateFunction { get }
     var onTransferFunction: OnTransferFunction { get }
+    var accumulationQueue: StateKeys.AccumulationQueueKey.Value { get }
+    var accumulationHistory: StateKeys.AccumulationHistoryKey.Value { get }
 }
 
 extension Accumulation {
@@ -261,11 +263,73 @@ extension Accumulation {
         }
     }
 
-    public mutating func accumulate(
+    // E: edit the accumulation queue, remove the dependencies of the items that are already accumulated
+    public func editAccumulatedItems(items: inout [AccumulationQueueItem], accumulatedPackages: Set<Data32>) {
+        for index in items.indices {
+            if !accumulatedPackages.contains(items[index].workReport.packageSpecification.workPackageHash) {
+                items[index].dependencies.subtract(accumulatedPackages)
+            }
+        }
+    }
+
+    // Q: find the reports that have no dependencies
+    private func findNoDepsReports(items: inout [AccumulationQueueItem]) -> [WorkReport] {
+        let noDepsReports = items.filter(\.dependencies.isEmpty).map(\.workReport)
+        if noDepsReports.isEmpty {
+            return []
+        } else {
+            editAccumulatedItems(items: &items, accumulatedPackages: Set(noDepsReports.map(\.packageSpecification.workPackageHash)))
+            return noDepsReports + findNoDepsReports(items: &items)
+        }
+    }
+
+    // newly available work-reports, W, are partitioned into two sequences based on the condition of having zero prerequisite work-reports
+    public func partitionWorkReports(
+        availableReports: [WorkReport],
+        history: StateKeys.AccumulationHistoryKey.Value
+    ) -> (zeroPrereqReports: [WorkReport], newQueueItems: [AccumulationQueueItem]) {
+        let zeroPrereqReports = availableReports.filter { report in
+            report.refinementContext.prerequisiteWorkPackages.isEmpty && report.lookup.isEmpty
+        }
+
+        let queuedReports = availableReports.filter { !zeroPrereqReports.contains($0) }
+
+        var newQueueItems: [AccumulationQueueItem] = []
+        for report in queuedReports {
+            newQueueItems.append(.init(
+                workReport: report,
+                dependencies: report.refinementContext.prerequisiteWorkPackages.union(report.lookup.keys)
+            ))
+        }
+
+        editAccumulatedItems(
+            items: &newQueueItems,
+            accumulatedPackages: Set(history.array.reduce(into: Set<Data32>()) { $0.formUnion($1) })
+        )
+
+        return (zeroPrereqReports, newQueueItems)
+    }
+
+    public func getAccumulatableReports(
+        index: Int, availableReports: [WorkReport],
+        history: StateKeys.AccumulationHistoryKey.Value
+    ) -> (accumulatableReports: [WorkReport], newQueueItems: [AccumulationQueueItem]) {
+        let (zeroPrereqReports, newQueueItems) = partitionWorkReports(availableReports: availableReports, history: history)
+
+        let rightQueueItems = accumulationQueue.array[index...]
+        let leftQueueItems = accumulationQueue.array[0 ..< index]
+        var allQueueItems = rightQueueItems.flatMap { $0 } + leftQueueItems.flatMap { $0 } + newQueueItems
+
+        editAccumulatedItems(items: &allQueueItems, accumulatedPackages: Set(zeroPrereqReports.map(\.packageSpecification.workPackageHash)))
+
+        return (zeroPrereqReports + findNoDepsReports(items: &allQueueItems), newQueueItems)
+    }
+
+    public mutating func update(
         config: ProtocolConfigRef,
         block: BlockRef,
         workReports: [WorkReport]
-    ) async throws -> (state: AccumulateState, commitments: Set<Commitment>) {
+    ) async throws -> (numAccumulated: Int, state: AccumulateState, commitments: Set<Commitment>) {
         let sumPrevilegedGas = privilegedServices.basicGas.values.reduce(Gas(0)) { $0 + $1.value }
         let minTotalGas = config.value.coreAccumulationGas * Gas(config.value.totalNumberOfCores) + sumPrevilegedGas
         let gasLimit = max(config.value.totalAccumulationGas, minTotalGas)
@@ -299,6 +363,6 @@ extension Accumulation {
             )
         }
 
-        return (res.state, res.commitments)
+        return (res.numAccumulated, res.state, res.commitments)
     }
 }

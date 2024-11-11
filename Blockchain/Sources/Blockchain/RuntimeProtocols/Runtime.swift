@@ -173,23 +173,14 @@ public final class Runtime {
             // depends on Safrole and Disputes
             let availableReports = try updateReports(block: block, state: &newState)
 
-            // accumulate and implied transfers
-            let (accumulateState, _) = try await newState.accumulate(config: config, block: block, workReports: availableReports)
-            newState.authorizationQueue = accumulateState.authorizationQueue
-            newState.validatorQueue = accumulateState.validatorQueue
-            newState.privilegedServices = accumulateState.privilegedServices
-            for (service, account) in accumulateState.serviceAccounts {
-                newState[serviceAccount: service] = account.toDetails()
-                for (hash, value) in account.storage {
-                    newState[serviceAccount: service, storageKey: hash] = value
-                }
-                for (hash, value) in account.preimages {
-                    newState[serviceAccount: service, preimageHash: hash] = value
-                }
-                for (hashLength, value) in account.preimageInfos {
-                    newState[serviceAccount: service, preimageHash: hashLength.hash, length: hashLength.length] = value
-                }
-            }
+            // accumulation
+            try await accumulate(
+                config: config,
+                block: block,
+                availableReports: availableReports,
+                state: &newState,
+                prevTimeslot: prevState.value.timeslot
+            )
 
             newState.coreAuthorizationPool = try updateAuthorizationPool(
                 block: block, state: prevState
@@ -212,6 +203,60 @@ public final class Runtime {
         }
 
         return StateRef(newState)
+    }
+
+    // accumulation related state updates
+    public func accumulate(
+        config: ProtocolConfigRef,
+        block: BlockRef,
+        availableReports: [WorkReport],
+        state: inout State,
+        prevTimeslot: TimeslotIndex
+    ) async throws {
+        let curIndex = Int(block.header.timeslot) % config.value.epochLength
+        var (accumulatableReports, newQueueItems) = state.getAccumulatableReports(
+            index: curIndex,
+            availableReports: availableReports,
+            history: state.accumulationHistory
+        )
+
+        // accumulate and transfers
+        let (numAccumulated, accumulateState, _) = try await state.update(config: config, block: block, workReports: accumulatableReports)
+
+        state.authorizationQueue = accumulateState.authorizationQueue
+        state.validatorQueue = accumulateState.validatorQueue
+        state.privilegedServices = accumulateState.privilegedServices
+        for (service, account) in accumulateState.serviceAccounts {
+            state[serviceAccount: service] = account.toDetails()
+            for (hash, value) in account.storage {
+                state[serviceAccount: service, storageKey: hash] = value
+            }
+            for (hash, value) in account.preimages {
+                state[serviceAccount: service, preimageHash: hash] = value
+            }
+            for (hashLength, value) in account.preimageInfos {
+                state[serviceAccount: service, preimageHash: hashLength.hash, length: hashLength.length] = value
+            }
+        }
+
+        // update accumulation history
+        _ = try state.accumulationHistory.remove(at: 0)
+        let accumulated = accumulatableReports[0 ..< numAccumulated]
+        let newHistory = Set(accumulated.map(\.packageSpecification.workPackageHash))
+        state.accumulationHistory[state.accumulationHistory.array.count - 1] = newHistory
+
+        // update accumulation queue
+        for i in 0 ..< config.value.epochLength {
+            let queueIdx = (curIndex - i) % config.value.epochLength
+            if i == 0 {
+                state.editAccumulatedItems(items: &newQueueItems, accumulatedPackages: newHistory)
+                state.accumulationQueue[queueIdx] = newQueueItems
+            } else if i >= 1, i < state.timeslot - prevTimeslot {
+                state.accumulationQueue[queueIdx] = []
+            } else {
+                state.editAccumulatedItems(items: &state.accumulationQueue[queueIdx], accumulatedPackages: newHistory)
+            }
+        }
     }
 
     public func updateRecentHistory(block: BlockRef, state newState: inout State) throws {
