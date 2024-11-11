@@ -28,7 +28,8 @@ public final class RocksDB {
 
         // Optimize rocksdb
         rocksdb_options_increase_parallelism(dbOptions, Int32(cpus))
-        rocksdb_options_optimize_level_style_compaction(dbOptions, 0) // TODO: check this
+        let memtable_memory_budget: UInt64 = 512 * 1024 * 1024 // 512 MB
+        rocksdb_options_optimize_level_style_compaction(dbOptions, memtable_memory_budget)
 
         // create the DB if it's not already present
         rocksdb_options_set_create_if_missing(dbOptions, 1)
