@@ -23,7 +23,7 @@ jobs:
             - run: sudo apt-get update
             - uses: awalsh128/cache-apt-pkgs-action@latest
               with:
-                  packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
+                  packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev llvm
             # - name: Cache SPM
             #   uses: actions/cache@v4
             #   with:
@@ -73,13 +73,18 @@ jobs:
             - name: Merge and generate coverage report
               run: |
                   mkdir -p coverage
-                  llvm-profdata merge -sparse coverage/*.profraw -o coverage/coverage.profdata
-                  for executable in $(find .build/debug -type f -name "*Tests.xctest"); do
-                    echo "Processing coverage for $executable"
-                    llvm-cov export -format=lcov "$executable" -instr-profile=coverage/coverage.profdata >> coverage/coverage.lcov
+                  find . -name "*.profraw" -exec llvm-profdata merge -sparse {} -o coverage/coverage.profdata \;
+                  # find executable files
+                  executables=$(find .build/debug -type f -executable)
+                  # generate lcov coverage report
+                  for executable in $executables; do
+                    if [ -f "$executable" ]; then
+                      llvm-cov export -format=lcov -instr-profile=coverage/coverage.profdata "$executable" >> coverage/coverage.lcov
+                    else
+                      echo "Warning: $executable not found."
+                    fi
                   done
-                  echo "Generated lcov coverage file:"
-                  cat coverage/coverage.lcov
+
             - name: List Coverage Files
               run: |
                   echo "Checking coverage files..."
