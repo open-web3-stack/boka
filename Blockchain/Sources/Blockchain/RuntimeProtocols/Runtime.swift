@@ -240,21 +240,26 @@ public final class Runtime {
         }
 
         // update accumulation history
-        _ = try state.accumulationHistory.remove(at: 0)
         let accumulated = accumulatableReports[0 ..< numAccumulated]
-        let newHistory = Set(accumulated.map(\.packageSpecification.workPackageHash))
-        state.accumulationHistory[state.accumulationHistory.array.count - 1] = newHistory
+        let newHistoryItem = Set(accumulated.map(\.packageSpecification.workPackageHash))
+        for i in 0 ..< config.value.epochLength {
+            if i == config.value.epochLength - 1 {
+                state.accumulationHistory[i] = newHistoryItem
+            } else {
+                state.accumulationHistory[i] = state.accumulationHistory[i + 1]
+            }
+        }
 
         // update accumulation queue
         for i in 0 ..< config.value.epochLength {
-            let queueIdx = (curIndex - i) % config.value.epochLength
+            let queueIdx = (curIndex - i) %% config.value.epochLength
             if i == 0 {
-                state.editAccumulatedItems(items: &newQueueItems, accumulatedPackages: newHistory)
+                state.editAccumulatedItems(items: &newQueueItems, accumulatedPackages: newHistoryItem)
                 state.accumulationQueue[queueIdx] = newQueueItems
             } else if i >= 1, i < state.timeslot - prevTimeslot {
                 state.accumulationQueue[queueIdx] = []
             } else {
-                state.editAccumulatedItems(items: &state.accumulationQueue[queueIdx], accumulatedPackages: newHistory)
+                state.editAccumulatedItems(items: &state.accumulationQueue[queueIdx], accumulatedPackages: newHistoryItem)
             }
         }
     }
