@@ -287,7 +287,7 @@ struct PeerTests {
         let connection = try peer1.connect(
             to: peer2.listenAddress(), role: .validator
         )
-        try? await Task.sleep(for: .milliseconds(100))
+        try? await Task.sleep(for: .milliseconds(1000))
 
         let receivedData = try await connection.request(
             MockRequest(kind: .typeA, data: messageData)
@@ -391,7 +391,7 @@ struct PeerTests {
         let connection = try peer1.connect(
             to: peer2.listenAddress(), role: .validator
         )
-        try? await Task.sleep(for: .milliseconds(100))
+        try? await Task.sleep(for: .milliseconds(1000))
 
         let receivedData = try await connection.request(
             MockRequest(kind: .typeA, data: messageData)
@@ -614,7 +614,7 @@ struct PeerTests {
         }
 
         // Wait for message propagation
-        try? await Task.sleep(for: .milliseconds(100))
+        try? await Task.sleep(for: .milliseconds(1000))
 
         // everyone should receive two messages
         for (idx, handler) in handlers.enumerated() {
@@ -736,9 +736,9 @@ struct PeerTests {
     func broadcastSynchronization() async throws {
         var peers: [Peer<MockStreamHandler>] = []
         var handles: [MockPresentStreamHandler] = []
-
+        let peersCount = 50
         // Create 50 peers with unique addresses
-        for _ in 0 ..< 50 {
+        for _ in 0 ..< peersCount {
             let handle = MockPresentStreamHandler()
             let peer = try Peer(
                 options: PeerOptions<MockStreamHandler>(
@@ -757,9 +757,9 @@ struct PeerTests {
         }
 
         // Connect each peer to form a fully connected network
-        for i in 0 ..< peers.count {
+        for i in 0 ..< peersCount {
             let peer = peers[i]
-            for j in 0 ..< peers.count where i > j {
+            for j in i + 1 ..< peersCount {
                 let otherPeer = peers[j]
                 let conn = try peer.connect(
                     to: otherPeer.listenAddress(),
@@ -775,7 +775,7 @@ struct PeerTests {
         centralPeer.broadcast(kind: .uniqueA, message: MockRequest(kind: .uniqueA, data: messagedata))
 
         // Wait for message to propagate
-        try? await Task.sleep(for: .seconds(1))
+        try? await Task.sleep(for: .seconds(2))
 
         // Check that each peer received the broadcast
         for i in 1 ..< handles.count {

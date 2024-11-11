@@ -70,16 +70,11 @@ jobs:
               run: make deps
             - name: Test Coverage
               run: |
-                  for package in $(find . -name Package.swift -exec dirname {} \;); do
-                   cd $package
-                   if [ -d "Tests" ] && [ "$(find Tests -name '*.swift' | xargs grep -l '#expect' | wc -l)" -gt 0 ]; then
-                     echo "Running tests in $package"
-                     swift test --enable-code-coverage --parallel || echo "Tests timed out or failed in $package"
-                   else
-                     echo "Skipping $package: No valid test cases found"
-                   fi
-                   cd -
-                   done
+                  for file in **/Package.swift; do
+                    cd $(dirname "$file")
+                    swift test --enable-test-discovery
+                    cd -
+                  done
 
             - name: Merge Coverage Reports
               run: |
