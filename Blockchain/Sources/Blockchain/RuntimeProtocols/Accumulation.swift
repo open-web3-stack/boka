@@ -265,10 +265,10 @@ extension Accumulation {
 
     // E: edit the accumulation queue, remove the dependencies of the items that are already accumulated
     public func editAccumulatedItems(items: inout [AccumulationQueueItem], accumulatedPackages: Set<Data32>) {
-        for index in items.indices {
-            if !accumulatedPackages.contains(items[index].workReport.packageSpecification.workPackageHash) {
-                items[index].dependencies.subtract(accumulatedPackages)
-            }
+        for index in items.indices
+            where !accumulatedPackages.contains(items[index].workReport.packageSpecification.workPackageHash)
+        {
+            items[index].dependencies.subtract(accumulatedPackages)
         }
     }
 
