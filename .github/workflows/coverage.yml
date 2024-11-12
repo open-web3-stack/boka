@@ -73,7 +73,7 @@ jobs:
             - name: Merge and generate coverage report
               run: |
                   echo "Finding profraw files..."
-                  find . find . -name "*.profraw"
+                  find . -name "*.profraw"
                   echo "Finding Tests files..."
                   find . -type f -path "*.build/*/debug/*Tests*.o"
                   mkdir -p coverage
