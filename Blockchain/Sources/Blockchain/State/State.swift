@@ -146,6 +146,26 @@ public struct State: Sendable {
         }
     }
 
+    // ϑ: The accumulation queue.
+    public var accumulationQueue: StateKeys.AccumulationQueueKey.Value {
+        get {
+            layer.accumulationQueue
+        }
+        set {
+            layer.accumulationQueue = newValue
+        }
+    }
+
+    // ξ: The accumulation history.
+    public var accumulationHistory: StateKeys.AccumulationHistoryKey.Value {
+        get {
+            layer.accumulationHistory
+        }
+        set {
+            layer.accumulationHistory = newValue
+        }
+    }
+
     // δ: The (prior) state of the service accounts.
     public subscript(serviceAccount index: ServiceIndex) -> StateKeys.ServiceAccountKey.Value? {
         get {
@@ -238,7 +258,7 @@ extension State: Dummy {
                 headerHash: block.hash,
                 mmr: MMR([]),
                 stateRoot: Data32(),
-                workReportHashes: try! ConfigLimitedSizeArray(config: config)
+                lookup: [Data32: Data32]()
             ))
         }
         let safroleState: StateKeys.SafroleStateKey.Value = SafroleState.dummy(config: config)
@@ -261,6 +281,14 @@ extension State: Dummy {
         )
         let judgements: StateKeys.JudgementsKey.Value = JudgementsState.dummy(config: config)
         let activityStatistics: StateKeys.ActivityStatisticsKey.Value = ValidatorActivityStatistics.dummy(config: config)
+        let accumulationQueue: StateKeys.AccumulationQueueKey.Value = try! ConfigFixedSizeArray(
+            config: config,
+            defaultValue: [AccumulationQueueItem]()
+        )
+        let accumulationHistory: StateKeys.AccumulationHistoryKey.Value = try! ConfigFixedSizeArray(
+            config: config,
+            defaultValue: Set<Data32>()
+        )
 
         let kv: [(any StateKey, Codable & Sendable)] = [
             (StateKeys.CoreAuthorizationPoolKey(), coreAuthorizationPool),
@@ -276,6 +304,8 @@ extension State: Dummy {
             (StateKeys.TimeslotKey(), timeslot),
             (StateKeys.PrivilegedServicesKey(), privilegedServices),
             (StateKeys.ActivityStatisticsKey(), activityStatistics),
+            (StateKeys.AccumulationQueueKey(), accumulationQueue),
+            (StateKeys.AccumulationHistoryKey(), accumulationHistory),
         ]
 
         var store: [Data32: Data] = [:]
@@ -402,24 +432,23 @@ extension State: Guaranteeing {
 struct DummyFunction: AccumulateFunction, OnTransferFunction {
     func invoke(
         config _: ProtocolConfigRef,
-        accounts _: ServiceAccounts,
+        accounts _: inout some ServiceAccounts,
         state _: AccumulateState,
         serviceIndex _: ServiceIndex,
         gas _: Gas,
         arguments _: [AccumulateArguments],
         initialIndex _: ServiceIndex,
         timeslot _: TimeslotIndex
-    ) throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
+    ) async throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
         fatalError("not implemented")
     }
 
     func invoke(
         config _: ProtocolConfigRef,
         service _: ServiceIndex,
-        code _: Data,
-        serviceAccounts _: [ServiceIndex: ServiceAccount],
+        serviceAccounts _: inout some ServiceAccounts,
         transfers _: [DeferredTransfers]
-    ) throws -> ServiceAccount {
+    ) async throws {
         fatalError("not implemented")
     }
 }

@@ -25,7 +25,7 @@ public struct WorkItem: Sendable, Equatable, Codable {
     // g
     public var gasLimit: Gas
 
-    // i: a sequence of imported data segments i identified by the root of the segments tree and an index into it
+    // i: a sequence of imported data segments which identify a prior exported segment through an index
     public var inputs: [ImportedDataSegment]
 
     // x: a sequence of hashed of blob hashes and lengths to be introduced in this block

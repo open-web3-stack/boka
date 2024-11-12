@@ -215,7 +215,7 @@ struct ExtrinsicPoolServiceTests {
                 headerHash: newBlock.hash,
                 mmr: MMR([]),
                 stateRoot: Data32(),
-                workReportHashes: ConfigLimitedSizeArray(config: config)
+                lookup: [Data32: Data32]()
             ))
         }
 

@@ -5,5 +5,5 @@ public protocol InvocationContext<ContextType> {
     var context: ContextType { get set }
 
     /// host-call dispatch function
-    func dispatch(index: UInt32, state: VMState) -> ExecOutcome
+    func dispatch(index: UInt32, state: VMState) async -> ExecOutcome
 }
