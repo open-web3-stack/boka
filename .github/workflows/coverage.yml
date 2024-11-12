@@ -72,15 +72,14 @@ jobs:
               run: make test-coverage
             - name: Merge and generate coverage report
               run: |
-                  echo "Finding coverage files..."
-                  find . -name "*.lcov" -o -name "*.xml" -o -name "*.json"
+                  echo "Finding profraw files..."
+                  find . find . -name "*.profraw"
                   echo "Finding Tests files..."
                   find . -type f -path "*.build/*/debug/*Tests*.o"
                   mkdir -p coverage
-                  profdata_file="coverage/coverage.profdata"
                   echo "Merging .profraw files..."
-                  llvm-profdata merge -sparse $(find . -name "*.profraw") -o "$profdata_file"
-                  find . -type f -path "*.build/*/debug/*Tests*.o" | while read object_file; do
+                  llvm-profdata merge -sparse -f $(find . -name "*.profraw") -o coverage/coverage.profdata
+                  find . -type f -path "*.build/*/debug/*Tests*.o" -print | while read object_file; do
                       echo "Processing $object_file"
                       llvm-cov export -format=lcov -instr-profile=coverage/coverage.profdata "$object_file" >> coverage/coverage.lcov
                   done
