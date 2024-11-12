@@ -91,16 +91,17 @@ jobs:
                   if [ -z "$profraw_files" ]; then
                       echo "No .profraw files found. Exiting."
                       exit 1
-                  fifirst_valid_file=true
+                  fi
+                  first_valid_file=true
                   output_profdata="coverage/coverage.profdata"
                   temp_profdata="coverage/temp_coverage.profdata"
                   # Merge valid .profraw files
                   for file in $profraw_files; do
                       echo "Checking $file"
-                      # Validate the file with a temporary merge
+                      echo "Validate the file with a temporary merge"
                       llvm-profdata merge -sparse -o "$temp_profdata" "$file" 2>&1
                       if [ $? -eq 0 ] && [ -s "$temp_profdata" ]; then
-                        # Initialize or merge into output_profdata
+                        echo "Initialize or merge into output_profdata"
                         if [ "$first_valid_file" = true ]; then
                             mv "$temp_profdata" "$output_profdata"
                             first_valid_file=false
