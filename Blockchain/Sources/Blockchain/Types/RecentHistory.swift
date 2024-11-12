@@ -13,7 +13,7 @@ public struct RecentHistory: Sendable, Equatable, Codable {
         // s
         public var stateRoot: Data32
 
-        // p: work report hahs -> segment root lookup
+        // p: work package hash -> segment root lookup
         @CodingAs<SortedKeyValues<Data32, Data32>> public var lookup: [Data32: Data32]
 
         public init(
