@@ -85,32 +85,40 @@ jobs:
                   echo "Checking if coverage directory was created..."
                   ls -ld coverage
                   echo "Merging .profraw files..."
-                  # Initialize an empty coverage.profdata file
-                  llvm-profdata merge -o coverage/coverage.profdata --sparse /dev/null
                   # Find all .profraw files
                   profraw_files=$(find . -name "*.profraw")
                   # Check if any .profraw files were found
                   if [ -z "$profraw_files" ]; then
                       echo "No .profraw files found. Exiting."
                       exit 1
-                  fi
+                  fifirst_valid_file=true
+                  output_profdata="coverage/coverage.profdata"
+                  temp_profdata="coverage/temp_coverage.profdata"
                   # Merge valid .profraw files
                   for file in $profraw_files; do
                       echo "Checking $file"
-                      llvm-profdata merge -o /dev/null --sparse "$file" 2>/dev/null
-                      if [ $? -eq 0 ]; then
-                          echo "Merging $file"
-                          llvm-profdata merge -sparse -o coverage/coverage.profdata coverage/coverage.profdata "$file" 2>/dev/null
+                      # Validate the file with a temporary merge
+                      llvm-profdata merge -sparse -o "$temp_profdata" "$file" 2>&1
+                      if [ $? -eq 0 ] && [ -s "$temp_profdata" ]; then
+                        # Initialize or merge into output_profdata
+                        if [ "$first_valid_file" = true ]; then
+                            mv "$temp_profdata" "$output_profdata"
+                            first_valid_file=false
+                        else
+                            llvm-profdata merge -sparse -o "$output_profdata" "$output_profdata" "$file" 2>&1
+                        fi
                       else
-                          echo "Warning: $file is invalid or incompatible and will be skipped"
+                          echo "Warning: $file is invalid or incompatible and will be skipped" >&2
                       fi
+                      # Clean up the temporary file to avoid clutter
+                      rm -f "$temp_profdata"
                   done
 
                   # Check if the coverage.profdata file is non-empty
-                  if [ -s coverage/coverage.profdata ]; then
-                      echo "Merging complete; coverage.profdata file is generated and non-empty"
+                  if [ -s "$output_profdata" ]; then
+                      echo "Successfully created $output_profdata"
                   else
-                      echo "Error: Failed to generate a valid coverage.profdata file"
+                      echo "Error: No valid profiles merged; $output_profdata not created." >&2
                       exit 1
                   fi
                   echo "Generating coverage report..."
