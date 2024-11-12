@@ -80,9 +80,12 @@ jobs:
                   find . -name "*.profraw"
                   echo "Finding Tests files..."
                   find . -type f -path "*.build/*/debug/*Tests*.o"
+                  echo "Creating coverage directory..."
                   mkdir -p coverage
+                  echo "Checking if coverage directory was created..."
+                  ls -ld coverage
                   echo "Merging .profraw files..."
-                  find . -name "*.profraw" -print0 | xargs -0 llvm-profdata merge -sparse -f -o coverage/coverage.profdata
+                  llvm-profdata merge -o coverage/coverage.profdata $(find . -name "*.profraw" -print)
                   if [ -f coverage/coverage.profdata ]; then
                       if [ -s coverage/coverage.profdata ]; then
                           echo "coverage.profdata file exists and is not empty"
