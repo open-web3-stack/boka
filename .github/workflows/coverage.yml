@@ -79,9 +79,17 @@ jobs:
                   mkdir -p coverage
                   echo "Merging .profraw files..."
                   find . -name "*.profraw" -print0 | xargs -0 llvm-profdata merge -sparse -f -o coverage/coverage.profdata
-                  llvm-cov show ./your_binary -instr-profile=coverage/coverage.profdata
+                  if [ -f coverage/coverage.profdata ]; then
+                      if [ -s coverage/coverage.profdata ]; then
+                          echo "coverage.profdata file exists and is not empty"
+                      else
+                          echo "coverage.profdata file exists but is empty"
+                      fi
+                  else
+                      echo "coverage.profdata file does not exist"
+                  fi
                   echo "Generating coverage report..."
-                  find . -type f -path "*.build/*/debug/*Tests*.o" -print | while read object_file; do
+                  find . -type f -path "*.build/*/debug/*Tests*.o" -print0 | while read -d $'\0' object_file; do
                       echo "Processing $object_file"
                       llvm-cov export -format=lcov -instr-profile=coverage/coverage.profdata "$object_file" >> coverage/coverage.lcov
                   done
