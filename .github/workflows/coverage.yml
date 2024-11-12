@@ -70,6 +70,10 @@ jobs:
               run: make deps
             - name: Test Coverage
               run: make test-coverage
+            - name: List Coverage Files
+              run: |
+                  echo "Checking coverage files..."
+                  find . -name "*.lcov" -o -name "*.xml" -o -name "*.json"
             - name: Merge and generate coverage report
               run: |
                   echo "Finding profraw files..."
@@ -94,11 +98,6 @@ jobs:
                       llvm-cov export -format=lcov -instr-profile=coverage/coverage.profdata "$object_file" >> coverage/coverage.lcov
                   done
                   echo "Coverage report generated at coverage/coverage.lcov"
-
-            - name: List Coverage Files
-              run: |
-                  echo "Checking coverage files..."
-                  find . -name "*.lcov" -o -name "*.xml" -o -name "*.json"
             - uses: codecov/codecov-action@v4
               with:
                   file: coverage/coverage.lcov
