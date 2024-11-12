@@ -78,7 +78,9 @@ jobs:
                   find . -type f -path "*.build/*/debug/*Tests*.o"
                   mkdir -p coverage
                   echo "Merging .profraw files..."
-                  llvm-profdata merge -sparse -f $(find . -name "*.profraw") -o coverage/coverage.profdata
+                  find . -name "*.profraw" -print0 | xargs -0 llvm-profdata merge -sparse -f -o coverage/coverage.profdata
+                  llvm-cov show ./your_binary -instr-profile=coverage/coverage.profdata
+                  echo "Generating coverage report..."
                   find . -type f -path "*.build/*/debug/*Tests*.o" -print | while read object_file; do
                       echo "Processing $object_file"
                       llvm-cov export -format=lcov -instr-profile=coverage/coverage.profdata "$object_file" >> coverage/coverage.lcov
