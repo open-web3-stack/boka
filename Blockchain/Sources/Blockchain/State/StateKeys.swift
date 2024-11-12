@@ -67,6 +67,8 @@ public enum StateKeys {
         TimeslotKey(),
         PrivilegedServicesKey(),
         ActivityStatisticsKey(),
+        AccumulationQueueKey(),
+        AccumulationHistoryKey(),
     ]
 
     public struct CoreAuthorizationPoolKey: StateKey {
@@ -221,6 +223,32 @@ public enum StateKeys {
 
         public func encode() -> Data32 {
             constructKey(13)
+        }
+    }
+
+    public struct AccumulationQueueKey: StateKey {
+        public typealias Value = ConfigFixedSizeArray<
+            [AccumulationQueueItem],
+            ProtocolConfig.EpochLength
+        >
+
+        public init() {}
+
+        public func encode() -> Data32 {
+            constructKey(14)
+        }
+    }
+
+    public struct AccumulationHistoryKey: StateKey {
+        public typealias Value = ConfigFixedSizeArray<
+            Set<Data32>,
+            ProtocolConfig.EpochLength
+        >
+
+        public init() {}
+
+        public func encode() -> Data32 {
+            constructKey(15)
         }
     }
 

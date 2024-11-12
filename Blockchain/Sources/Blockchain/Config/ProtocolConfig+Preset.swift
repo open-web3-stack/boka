@@ -11,11 +11,13 @@ extension Ref where T == ProtocolConfig {
         preimagePurgePeriod: 28800,
         epochLength: 6,
         auditBiasFactor: 2,
-        coreAccumulationGas: Gas(10_000_000), // TODO: check this
-        workPackageAuthorizerGas: Gas(10_000_000), // TODO: check this
-        workPackageRefineGas: Gas(10_000_000), // TODO: check this
+        coreAccumulationGas: Gas(100_000),
+        workPackageAuthorizerGas: Gas(1_000_000),
+        workPackageRefineGas: Gas(500_000_000),
+        totalAccumulationGas: Gas(341_000_000),
         recentHistorySize: 8,
         maxWorkItems: 4,
+        maxDepsInWorkReport: 8,
         maxTicketsPerExtrinsic: 4,
         maxLookupAnchorAge: 14400,
         transferMemoSize: 128,
@@ -49,11 +51,13 @@ extension Ref where T == ProtocolConfig {
         preimagePurgePeriod: 28800,
         epochLength: 12,
         auditBiasFactor: 2,
-        coreAccumulationGas: Gas(10_000_000), // TODO: check this
-        workPackageAuthorizerGas: Gas(10_000_000), // TODO: check this
-        workPackageRefineGas: Gas(10_000_000), // TODO: check this
+        coreAccumulationGas: Gas(100_000),
+        workPackageAuthorizerGas: Gas(1_000_000),
+        workPackageRefineGas: Gas(500_000_000),
+        totalAccumulationGas: Gas(341_000_000),
         recentHistorySize: 8,
         maxWorkItems: 4,
+        maxDepsInWorkReport: 8,
         maxTicketsPerExtrinsic: 16,
         maxLookupAnchorAge: 14400,
         transferMemoSize: 128,
@@ -86,11 +90,13 @@ extension Ref where T == ProtocolConfig {
         preimagePurgePeriod: 28800,
         epochLength: 600,
         auditBiasFactor: 2,
-        coreAccumulationGas: Gas(10_000_000), // TODO: check this
-        workPackageAuthorizerGas: Gas(10_000_000), // TODO: check this
-        workPackageRefineGas: Gas(10_000_000), // TODO: check this
+        coreAccumulationGas: Gas(100_000),
+        workPackageAuthorizerGas: Gas(1_000_000),
+        workPackageRefineGas: Gas(500_000_000),
+        totalAccumulationGas: Gas(341_000_000),
         recentHistorySize: 8,
         maxWorkItems: 4,
+        maxDepsInWorkReport: 8,
         maxTicketsPerExtrinsic: 16,
         maxLookupAnchorAge: 14400,
         transferMemoSize: 128,

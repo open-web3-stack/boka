@@ -6,61 +6,40 @@ import Utils
 extension AccumulateFunction {
     public func invoke(
         config: ProtocolConfigRef,
+        accounts: inout some ServiceAccounts,
         state: AccumulateState,
         serviceIndex: ServiceIndex,
         gas: Gas,
         arguments: [AccumulateArguments],
         initialIndex: ServiceIndex,
         timeslot: TimeslotIndex
-    ) throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
-        var serviceAccounts = state.serviceAccounts
-
-        let defaultState = AccumulateState(
-            serviceAccounts: [:],
-            validatorQueue: state.validatorQueue,
-            authorizationQueue: state.authorizationQueue,
-            privilegedServices: state.privilegedServices
-        )
-
-        if serviceAccounts[serviceIndex]?.codeHash.data == nil {
-            return (defaultState, [], nil, Gas(0))
+    ) async throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
+        guard let accumulatingAccountDetails = try await accounts.get(serviceAccount: serviceIndex) else {
+            return (state, [], nil, Gas(0))
         }
 
-        guard let accumulatingAccount = serviceAccounts[serviceIndex] else {
-            throw AccumulationError.invalidServiceIndex
-        }
-
-        serviceAccounts.removeValue(forKey: serviceIndex)
-
-        let defaultCtx = try AccumlateResultContext(
-            serviceAccounts: serviceAccounts,
+        let resultCtx = AccumlateResultContext(
+            serviceAccounts: accounts,
             serviceIndex: serviceIndex,
-            accumulateState: AccumulateState(
-                serviceAccounts: [serviceIndex: accumulatingAccount],
-                validatorQueue: state.validatorQueue,
-                authorizationQueue: state.authorizationQueue,
-                privilegedServices: state.privilegedServices
-            ),
+            accumulateState: state,
             nextAccountIndex: AccumulateContext.check(
                 i: initialIndex & (serviceIndexModValue - 1) + 256,
-                serviceAccounts: [serviceIndex: accumulatingAccount]
+                serviceAccounts: [:]
             ),
             transfers: []
         )
 
-        let ctx = AccumulateContext(
-            context: (
-                x: defaultCtx,
-                y: defaultCtx,
-                timeslot: timeslot
-            ),
-            config: config
+        var contextContent = AccumulateContext.ContextType(
+            x: resultCtx,
+            y: resultCtx,
+            timeslot: timeslot
         )
+        let ctx = AccumulateContext(context: &contextContent, config: config)
         let argument = try JamEncoder.encode(arguments)
 
-        let (exitReason, gas, output) = invokePVM(
+        let (exitReason, gas, output) = await invokePVM(
             config: config,
-            blob: serviceAccounts[serviceIndex]!.codeHash.data,
+            blob: accumulatingAccountDetails.codeHash.data,
             pc: 10,
             gas: gas,
             argumentData: argument,

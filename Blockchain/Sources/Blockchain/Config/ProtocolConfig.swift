@@ -37,20 +37,23 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     // GR: The total gas allocated for a work-package’s Refine logic.
     public var workPackageRefineGas: Gas
 
+    // GT: The total gas allocated across all cores for Accumulation.
+    public var totalAccumulationGas: Gas
+
     // H = 8: The size of recent history, in blocks.
     public var recentHistorySize: Int
 
     // I = 4: The maximum amount of work items in a package.
     public var maxWorkItems: Int
 
+    // J = 8: The maximum sum of dependency items in a work-report.
+    public var maxDepsInWorkReport: Int
+
     // K = 16: The maximum number of tickets which may be submitted in a single extrinsic.
     public var maxTicketsPerExtrinsic: Int
 
     // L = 14, 400: The maximum age in timeslots of the lookup anchor.
     public var maxLookupAnchorAge: Int
-
-    // WT = 128: The size of a transfer memo in octets.
-    public var transferMemoSize: Int
 
     // N = 2: The number of ticket entries per validator.
     public var ticketEntriesPerValidator: Int
@@ -67,16 +70,16 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     // R = 10: The rotation period of validator-core assignments, in timeslots.
     public var coreAssignmentRotationPeriod: Int
 
-    // S = 4,000,000: The maximum size of service code in octets.
-    public var maxServiceCodeSize: Int
-
     // U = 5: The period in timeslots after which reported but unavailable work may be replaced.
     public var preimageReplacementPeriod: Int
 
     // V = 1023: The total number of validators.
     public var totalNumberOfValidators: Int
 
-    // WC = 684: The basic size of our erasure-coded pieces.
+    // WC = 4,000,000: The maximum size of service code in octets.
+    public var maxServiceCodeSize: Int
+
+    // WE = 684: The basic size of our erasure-coded pieces.
     public var erasureCodedPieceSize: Int
 
     // WM = 2^11: The maximum number of entries in a work-package manifest.
@@ -91,6 +94,9 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
 
     // WS = 6: The size of an exported segment in erasure-coded pieces.
     public var erasureCodedSegmentSize: Int
+
+    // WT = 128: The size of a transfer memo in octets.
+    public var transferMemoSize: Int
 
     // Y = 500: The number of slots into an epoch at which ticket-submission ends.
     public var ticketSubmissionEndSlot: Int
@@ -119,8 +125,10 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         coreAccumulationGas: Gas,
         workPackageAuthorizerGas: Gas,
         workPackageRefineGas: Gas,
+        totalAccumulationGas: Gas,
         recentHistorySize: Int,
         maxWorkItems: Int,
+        maxDepsInWorkReport: Int,
         maxTicketsPerExtrinsic: Int,
         maxLookupAnchorAge: Int,
         transferMemoSize: Int,
@@ -154,8 +162,10 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         self.coreAccumulationGas = coreAccumulationGas
         self.workPackageAuthorizerGas = workPackageAuthorizerGas
         self.workPackageRefineGas = workPackageRefineGas
+        self.totalAccumulationGas = totalAccumulationGas
         self.recentHistorySize = recentHistorySize
         self.maxWorkItems = maxWorkItems
+        self.maxDepsInWorkReport = maxDepsInWorkReport
         self.maxTicketsPerExtrinsic = maxTicketsPerExtrinsic
         self.maxLookupAnchorAge = maxLookupAnchorAge
         self.transferMemoSize = transferMemoSize
@@ -215,9 +225,13 @@ extension ProtocolConfig {
                 ? other.workPackageAuthorizerGas : workPackageAuthorizerGas,
             workPackageRefineGas: other.workPackageRefineGas.value != 0
                 ? other.workPackageRefineGas : workPackageRefineGas,
+            totalAccumulationGas: other.totalAccumulationGas.value != 0
+                ? other.totalAccumulationGas : totalAccumulationGas,
             recentHistorySize: other.recentHistorySize != 0
                 ? other.recentHistorySize : recentHistorySize,
             maxWorkItems: other.maxWorkItems != 0 ? other.maxWorkItems : maxWorkItems,
+            maxDepsInWorkReport: other.maxDepsInWorkReport != 0
+                ? other.maxDepsInWorkReport : maxDepsInWorkReport,
             maxTicketsPerExtrinsic: other.maxTicketsPerExtrinsic != 0
                 ? other.maxTicketsPerExtrinsic : maxTicketsPerExtrinsic,
             maxLookupAnchorAge: other.maxLookupAnchorAge != 0
@@ -295,8 +309,12 @@ extension ProtocolConfig {
         workPackageRefineGas = try decode(
             .workPackageRefineGas, defaultValue: Gas(0), required: required
         )
+        totalAccumulationGas = try decode(
+            .totalAccumulationGas, defaultValue: Gas(0), required: required
+        )
         recentHistorySize = try decode(.recentHistorySize, defaultValue: 0, required: required)
         maxWorkItems = try decode(.maxWorkItems, defaultValue: 0, required: required)
+        maxDepsInWorkReport = try decode(.maxDepsInWorkReport, defaultValue: 0, required: required)
         maxTicketsPerExtrinsic = try decode(
             .maxTicketsPerExtrinsic, defaultValue: 0, required: required
         )
@@ -434,6 +452,14 @@ extension ProtocolConfig {
         }
     }
 
+    public enum TotalAccumulationGas: ReadGas {
+        public typealias TConfig = ProtocolConfigRef
+        public typealias TOutput = Gas
+        public static func read(config: ProtocolConfigRef) -> Gas {
+            config.value.totalAccumulationGas
+        }
+    }
+
     public enum RecentHistorySize: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
@@ -445,6 +471,13 @@ extension ProtocolConfig {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
             config.value.maxWorkItems
+        }
+    }
+
+    public enum MaxDepsInWorkReport: ReadInt {
+        public typealias TConfig = ProtocolConfigRef
+        public static func read(config: ProtocolConfigRef) -> Int {
+            config.value.maxDepsInWorkReport
         }
     }
 
