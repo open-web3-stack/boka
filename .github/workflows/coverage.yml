@@ -85,28 +85,33 @@ jobs:
                   echo "Checking if coverage directory was created..."
                   ls -ld coverage
                   echo "Merging .profraw files..."
+                  # Initialize an empty coverage.profdata file
                   llvm-profdata merge -o coverage/coverage.profdata --sparse /dev/null
-                  # Iterate over each .profraw file and try merging only valid files
-                  for file in $(find . -name "*.profraw"); do
+                  # Find all .profraw files
+                  profraw_files=$(find . -name "*.profraw")
+                  # Check if any .profraw files were found
+                  if [ -z "$profraw_files" ]; then
+                      echo "No .profraw files found. Exiting."
+                      exit 1
+                  fi
+                  # Merge valid .profraw files
+                  for file in $profraw_files; do
                       echo "Checking $file"
-                      # Test if the file can be merged without errors
                       llvm-profdata merge -o /dev/null --sparse "$file" 2>/dev/null
                       if [ $? -eq 0 ]; then
                           echo "Merging $file"
-                          # Merge into the main coverage.profdata file if it’s valid
                           llvm-profdata merge -sparse -o coverage/coverage.profdata coverage/coverage.profdata "$file" 2>/dev/null
                       else
                           echo "Warning: $file is invalid or incompatible and will be skipped"
                       fi
                   done
-                  if [ -f coverage/coverage.profdata ]; then
-                      if [ -s coverage/coverage.profdata ]; then
-                          echo "coverage.profdata file exists and is not empty"
-                      else
-                          echo "coverage.profdata file exists but is empty"
-                      fi
+
+                  # Check if the coverage.profdata file is non-empty
+                  if [ -s coverage/coverage.profdata ]; then
+                      echo "Merging complete; coverage.profdata file is generated and non-empty"
                   else
-                      echo "coverage.profdata file does not exist"
+                      echo "Error: Failed to generate a valid coverage.profdata file"
+                      exit 1
                   fi
                   echo "Generating coverage report..."
                   find . -type f -path "*.build/*/debug/*Tests*.o" -print0 | while read -d $'\0' object_file; do
