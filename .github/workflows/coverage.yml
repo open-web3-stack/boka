@@ -72,26 +72,24 @@ jobs:
               run: make test-coverage
             - name: Merge and generate coverage report
               run: |
-                  echo "Finding object files..."
-                  find . -type f -path "*.build/*/debug/*Tests*.o"
+                  echo "Finding coverage files..."
+                  find . -name "*.lcov" -o -name "*.xml" -o -name "*.json"
                   echo "Finding Tests files..."
-                  find . -type f -path "*.build/*/*Tests.build" -name "*.o"
+                  find . -type f -path "*.build/*/debug/*Tests*.o"
                   mkdir -p coverage
                   profdata_file="coverage/coverage.profdata"
                   echo "Merging .profraw files..."
                   llvm-profdata merge -sparse $(find . -name "*.profraw") -o "$profdata_file"
                   find . -type f -path "*.build/*/debug/*Tests*.o" | while read object_file; do
-                      if file "$object_file" | grep -iq 'ELF'; then
-                          echo "Processing $object_file"
-                          llvm-cov export -format=lcov -instr-profile=coverage/coverage.profdata "$object_file" >> coverage/coverage.lcov
-                      fi
+                      echo "Processing $object_file"
+                      llvm-cov export -format=lcov -instr-profile=coverage/coverage.profdata "$object_file" >> coverage/coverage.lcov
                   done
                   echo "Coverage report generated at coverage/coverage.lcov"
 
             - name: List Coverage Files
               run: |
                   echo "Checking coverage files..."
-                  find . -name "*.lcov" -o -name "*.xml"
+                  find . -name "*.lcov" -o -name "*.xml" -o -name "*.json"
             - uses: codecov/codecov-action@v4
               with:
                   file: coverage/coverage.lcov
