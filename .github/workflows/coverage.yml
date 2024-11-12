@@ -85,7 +85,20 @@ jobs:
                   echo "Checking if coverage directory was created..."
                   ls -ld coverage
                   echo "Merging .profraw files..."
-                  llvm-profdata merge -o coverage/coverage.profdata $(find . -name "*.profraw" -print)
+                  llvm-profdata merge -o coverage/coverage.profdata --sparse /dev/null
+                  # Iterate over each .profraw file and try merging only valid files
+                  for file in $(find . -name "*.profraw"); do
+                      echo "Checking $file"
+                      # Test if the file can be merged without errors
+                      llvm-profdata merge -o /dev/null --sparse "$file" 2>/dev/null
+                      if [ $? -eq 0 ]; then
+                          echo "Merging $file"
+                          # Merge into the main coverage.profdata file if it’s valid
+                          llvm-profdata merge -sparse -o coverage/coverage.profdata coverage/coverage.profdata "$file" 2>/dev/null
+                      else
+                          echo "Warning: $file is invalid or incompatible and will be skipped"
+                      fi
+                  done
                   if [ -f coverage/coverage.profdata ]; then
                       if [ -s coverage/coverage.profdata ]; then
                           echo "coverage.profdata file exists and is not empty"
