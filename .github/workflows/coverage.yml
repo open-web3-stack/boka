@@ -74,32 +74,18 @@ jobs:
               run: |
                   llvm-profdata merge -sparse $(find . -type f -path '*/.build/*/debug/codecov/*.profdata') -o default.profdata
                   for file in **/Tests; do
-                  # Get the BIN_PATH for the current subproject
-                  BIN_PATH="$(swift build --show-bin-path --package-path "$(dirname "$file")")"
-                  # Find all .xctest files in the current subproject
-                  XCTEST_PATHS=$(find "${BIN_PATH}" -name '*.xctest')
-                  # Iterate over each .xctest file found
-                  for XCTEST_PATH in $XCTEST_PATHS; do
-                      echo "Processing $XCTEST_PATH"
-                      # Set the LLVM_COV tool and binary path
-                      LLVM_COV='llvm-cov'
-                      COV_BIN=$XCTEST_PATH
-                      echo "Using COV_BIN: $COV_BIN"
-                      # If on macOS, use xcrun to access llvm tools
-                      # The file path is also different on macOS
-                      if [[ "$OSTYPE" == "darwin"* ]]; then
-                      f="$(basename $XCTEST_PATH .xctest)"
-                      COV_BIN="${COV_BIN}/Contents/MacOS/$f"
-                      LLVM_COV='xcrun llvm-cov'
-                      fi
-                      echo "Final COV_BIN: $COV_BIN"
-
-                      # Export the code coverage for the current subproject and append to app.coverage.lcov
-                      xcrun llvm-cov export "${COV_BIN}" \
-                      -instr-profile=default.profdata \
-                      -format lcov >> coverage.lcov \
-                      -ignore-filename-regex=".build/repositories/*"
-                  done
+                    BIN_PATH="$(swift build --show-bin-path --package-path "$(dirname "$file")")"
+                    XCTEST_PATHS=$(find "${BIN_PATH}" -name '*.xctest')
+                    for XCTEST_PATH in $XCTEST_PATHS; do
+                        echo "Processing $XCTEST_PATH"
+                        COV_BIN=$XCTEST_PATH
+                        echo "Using COV_BIN: $COV_BIN"
+                        # Export the code coverage for the current subproject and append to coverage.lcov
+                        llvm-cov export "${COV_BIN}" \
+                        -instr-profile=default.profdata \
+                        -format lcov >> coverage.lcov \
+                        -ignore-filename-regex=".build/repositories/*"
+                    done
                   done
             - uses: codecov/codecov-action@v4
               with:
