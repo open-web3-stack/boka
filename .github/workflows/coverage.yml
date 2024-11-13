@@ -1,77 +1,136 @@
 name: Coverage
 
 on:
-  push:
-    branches: ["master"]
-  pull_request:
-    branches: ["master"]
+    push:
+        branches: ["master"]
+    pull_request:
+        branches: ["master"]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 
 jobs:
-  coverage:
-    name: Code Coverage
-    runs-on: [self-hosted, linux]
-    timeout-minutes: 30
-    steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-    - run: sudo apt-get update
-    - uses: awalsh128/cache-apt-pkgs-action@latest
-      with:
-        packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
-    # - name: Cache SPM
-    #   uses: actions/cache@v4
-    #   with:
-    #     path: '**/.build'
-    #     key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
-    #     restore-keys: |
-    #       ${{ runner.os }}-spm-
-    - name: Cache Cargo
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-    - name: Cache bandersnatch_vrfs static lib
-      uses: actions/cache@v4
-      with:
-        path: .lib/libbandersnatch_vrfs.a
-        key: ${{ runner.os }}-libs-libbandersnatch-${{ hashFiles('Utils/Sources/bandersnatch/**') }}
-        restore-keys: |
-            ${{ runner.os }}-libs-libbandersnatch
-    - name: Cache bls static lib
-      uses: actions/cache@v4
-      with:
-        path: .lib/libbls.a
-        key: ${{ runner.os }}-libs-libbls-${{ hashFiles('Utils/Sources/bls/**') }}
-        restore-keys: |
-            ${{ runner.os }}-libs-libbls
-    - name: Cache erasure-coding static lib
-      uses: actions/cache@v4
-      with:
-        path: .lib/libec.a
-        key: ${{ runner.os }}-libs-libec-${{ hashFiles('Utils/Sources/erasure-coding/**') }}
-        restore-keys: |
-            ${{ runner.os }}-libs-libec
-    - name: Setup Swift
-      uses: SwiftyLab/setup-swift@latest
-    - name: Setup Rust
-      uses: dtolnay/rust-toolchain@nightly
-    - name: Build deps
-      run: make deps
-    - name: Test Coverage
-      run: make test-coverage
-    - uses: codecov/codecov-action@v4
-      with:
-        fail_ci_if_error: true # optional (default = false)
-        token: ${{ secrets.CODECOV_TOKEN }} # required
-        verbose: true # optional (default = false)
+    coverage:
+        name: Code Coverage
+        runs-on: [self-hosted, linux]
+        timeout-minutes: 30
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v4
+              with:
+                  submodules: recursive
+            - run: sudo apt-get update
+            - uses: awalsh128/cache-apt-pkgs-action@latest
+              with:
+                  packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev llvm
+            # - name: Cache SPM
+            #   uses: actions/cache@v4
+            #   with:
+            #     path: '**/.build'
+            #     key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+            #     restore-keys: |
+            #       ${{ runner.os }}-spm-
+            - name: Cache Cargo
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.cargo/bin/
+                      ~/.cargo/registry/index/
+                      ~/.cargo/registry/cache/
+                      ~/.cargo/git/db/
+                      target/
+                  key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            - name: Cache bandersnatch_vrfs static lib
+              uses: actions/cache@v4
+              with:
+                  path: .lib/libbandersnatch_vrfs.a
+                  key: ${{ runner.os }}-libs-libbandersnatch-${{ hashFiles('Utils/Sources/bandersnatch/**') }}
+                  restore-keys: |
+                      ${{ runner.os }}-libs-libbandersnatch
+            - name: Cache bls static lib
+              uses: actions/cache@v4
+              with:
+                  path: .lib/libbls.a
+                  key: ${{ runner.os }}-libs-libbls-${{ hashFiles('Utils/Sources/bls/**') }}
+                  restore-keys: |
+                      ${{ runner.os }}-libs-libbls
+            - name: Cache erasure-coding static lib
+              uses: actions/cache@v4
+              with:
+                  path: .lib/libec.a
+                  key: ${{ runner.os }}-libs-libec-${{ hashFiles('Utils/Sources/erasure-coding/**') }}
+                  restore-keys: |
+                      ${{ runner.os }}-libs-libec
+            - name: Setup Swift
+              uses: SwiftyLab/setup-swift@latest
+            - name: Setup Rust
+              uses: dtolnay/rust-toolchain@nightly
+            - name: Build deps
+              run: make deps
+            - name: Test Coverage
+              run: make test-coverage
+            - name: List Coverage Files
+              run: |
+                  echo "Checking coverage files..."
+                  find . -name "*.lcov" -o -name "*.xml" -o -name "*.json"
+            - name: Merge and generate coverage report
+              run: |
+                  echo "Finding profraw files..."
+                  find . -name "*.profraw"
+                  echo "Finding Tests files..."
+                  find . -type f -path "*.build/*/debug/*Tests*.o"
+                  echo "Creating coverage directory..."
+                  mkdir -p coverage
+                  echo "Checking if coverage directory was created..."
+                  ls -ld coverage
+                  echo "Merging .profraw files..."
+                  # Find all .profraw files
+                  profraw_files=$(find . -name "*.profraw")
+                  # Check if any .profraw files were found
+                  if [ -z "$profraw_files" ]; then
+                      echo "No .profraw files found. Exiting."
+                      exit 1
+                  fi
+                  first_valid_file=true
+                  output_profdata="coverage/coverage.profdata"
+                  temp_profdata="coverage/temp_coverage.profdata"
+                  # Merge valid .profraw files
+                  for file in $profraw_files; do
+                      echo "Checking $file"
+                      echo "Validate the file with a temporary merge"
+                      llvm-profdata merge -sparse -o "$temp_profdata" "$file" 2>&1
+                      if [ $? -eq 0 ] && [ -s "$temp_profdata" ]; then
+                        echo "Initialize or merge into output_profdata"
+                        if [ "$first_valid_file" = true ]; then
+                            mv "$temp_profdata" "$output_profdata"
+                            first_valid_file=false
+                        else
+                            llvm-profdata merge -sparse -o "$output_profdata" "$output_profdata" "$file" 2>&1
+                        fi
+                      else
+                          echo "Warning: $file is invalid or incompatible and will be skipped" >&2
+                      fi
+                      # Clean up the temporary file to avoid clutter
+                      rm -f "$temp_profdata"
+                  done
+
+                  # Check if the coverage.profdata file is non-empty
+                  if [ -s "$output_profdata" ]; then
+                      echo "Successfully created $output_profdata"
+                  else
+                      echo "Error: No valid profiles merged; $output_profdata not created." >&2
+                      exit 1
+                  fi
+                  echo "Generating coverage report..."
+                  find . -type f -path "*.build/*/debug/*Tests*.o" -print0 | while read -d $'\0' object_file; do
+                      echo "Processing $object_file"
+                      llvm-cov export -format=lcov -instr-profile=coverage/coverage.profdata "$object_file" >> coverage/coverage.lcov
+                  done
+                  echo "Coverage report generated at coverage/coverage.lcov"
+            - uses: codecov/codecov-action@v4
+              with:
+                  file: coverage/coverage.lcov
+                  fail_ci_if_error: true # optional (default = false)
+                  token: ${{ secrets.CODECOV_TOKEN }} # required
+                  verbose: true # optional (default = false)
