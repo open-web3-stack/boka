@@ -13,7 +13,7 @@ concurrency:
 jobs:
     coverage:
         name: Code Coverage
-        runs-on: [ubuntu-latest, linux]
+        runs-on: [self-hosted, linux]
         timeout-minutes: 30
         steps:
             - name: Checkout Code
@@ -70,67 +70,40 @@ jobs:
               run: make deps
             - name: Test Coverage
               run: make test-coverage
-            - name: List Coverage Files
-              run: |
-                  echo "Checking coverage files..."
-                  find . -name "*.lcov" -o -name "*.xml" -o -name "*.json"
             - name: Merge and generate coverage report
               run: |
-                  echo "Finding profraw files..."
-                  find . -name "*.profraw"
-                  echo "Finding Tests files..."
-                  find . -type f -path "*.build/*/debug/*Tests*.o"
-                  echo "Creating coverage directory..."
-                  mkdir -p coverage
-                  echo "Checking if coverage directory was created..."
-                  ls -ld coverage
-                  echo "Merging .profraw files..."
-                  # Find all .profraw files
-                  profraw_files=$(find . -name "*.profraw")
-                  # Check if any .profraw files were found
-                  if [ -z "$profraw_files" ]; then
-                      echo "No .profraw files found. Exiting."
-                      exit 1
-                  fi
-                  first_valid_file=true
-                  output_profdata="coverage/coverage.profdata"
-                  temp_profdata="coverage/temp_coverage.profdata"
-                  # Merge valid .profraw files
-                  for file in $profraw_files; do
-                      echo "Checking $file"
-                      echo "Validate the file with a temporary merge"
-                      llvm-profdata merge -sparse -o "$temp_profdata" "$file" 2>&1
-                      if [ $? -eq 0 ] && [ -s "$temp_profdata" ]; then
-                        echo "Initialize or merge into output_profdata"
-                        if [ "$first_valid_file" = true ]; then
-                            mv "$temp_profdata" "$output_profdata"
-                            first_valid_file=false
-                        else
-                            llvm-profdata merge -sparse -o "$output_profdata" "$output_profdata" "$file" 2>&1
-                        fi
-                      else
-                          echo "Warning: $file is invalid or incompatible and will be skipped" >&2
+                  llvm-profdata merge -sparse $(find . -type f -path '*/.build/*/debug/codecov/*.profdata') -o default.profdata
+                  for file in **/Tests; do
+                  # Get the BIN_PATH for the current subproject
+                  BIN_PATH="$(swift build --show-bin-path --package-path "$(dirname "$file")")"
+                  # Find all .xctest files in the current subproject
+                  XCTEST_PATHS=$(find "${BIN_PATH}" -name '*.xctest')
+                  # Iterate over each .xctest file found
+                  for XCTEST_PATH in $XCTEST_PATHS; do
+                      echo "Processing $XCTEST_PATH"
+                      # Set the LLVM_COV tool and binary path
+                      LLVM_COV='llvm-cov'
+                      COV_BIN=$XCTEST_PATH
+                      echo "Using COV_BIN: $COV_BIN"
+                      # If on macOS, use xcrun to access llvm tools
+                      # The file path is also different on macOS
+                      if [[ "$OSTYPE" == "darwin"* ]]; then
+                      f="$(basename $XCTEST_PATH .xctest)"
+                      COV_BIN="${COV_BIN}/Contents/MacOS/$f"
+                      LLVM_COV='xcrun llvm-cov'
                       fi
-                      # Clean up the temporary file to avoid clutter
-                      rm -f "$temp_profdata"
-                  done
+                      echo "Final COV_BIN: $COV_BIN"
 
-                  # Check if the coverage.profdata file is non-empty
-                  if [ -s "$output_profdata" ]; then
-                      echo "Successfully created $output_profdata"
-                  else
-                      echo "Error: No valid profiles merged; $output_profdata not created." >&2
-                      exit 1
-                  fi
-                  echo "Generating coverage report..."
-                  find . -type f -path "*.build/*/debug/*Tests*.o" -print0 | while read -d $'\0' object_file; do
-                      echo "Processing $object_file"
-                      llvm-cov export -format=lcov -instr-profile=coverage/coverage.profdata "$object_file" >> coverage/coverage.lcov
+                      # Export the code coverage for the current subproject and append to app.coverage.lcov
+                      xcrun llvm-cov export "${COV_BIN}" \
+                      -instr-profile=default.profdata \
+                      -format lcov >> coverage.lcov \
+                      -ignore-filename-regex=".build/repositories/*"
                   done
-                  echo "Coverage report generated at coverage/coverage.lcov"
+                  done
             - uses: codecov/codecov-action@v4
               with:
-                  file: coverage/coverage.lcov
+                  file: coverage.lcov
                   fail_ci_if_error: true # optional (default = false)
                   token: ${{ secrets.CODECOV_TOKEN }} # required
                   verbose: true # optional (default = false)
