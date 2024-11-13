@@ -21,6 +21,10 @@ extension UniqueId: Equatable {
     public static func == (lhs: UniqueId, rhs: UniqueId) -> Bool {
         lhs.id == rhs.id
     }
+
+    public static func < (lhs: UniqueId, rhs: UniqueId) -> Bool {
+        lhs.id < rhs.id
+    }
 }
 
 extension UniqueId: Hashable {

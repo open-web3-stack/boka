@@ -16,7 +16,7 @@ public enum PeerRole: Sendable, Hashable {
     // case proxy // not yet specified
 }
 
-struct ReconnectState {
+struct BackoffState {
     var attempt: Int
     var delay: TimeInterval
 
@@ -25,7 +25,6 @@ struct ReconnectState {
         delay = 1
     }
 
-    // Initializer with custom values
     init(attempt: Int = 0, delay: TimeInterval = 1) {
         self.attempt = attempt
         self.delay = delay
@@ -234,9 +233,10 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
 
     fileprivate let connections: ThreadSafeContainer<ConnectionStorage> = .init(.init())
     fileprivate let streams: ThreadSafeContainer<[UniqueId: Stream<Handler>]> = .init([:])
-    fileprivate let reconnectStates: ThreadSafeContainer<[NetAddr: ReconnectState]> = .init([:])
+    fileprivate let reconnectStates: ThreadSafeContainer<[NetAddr: BackoffState]> = .init([:])
+    fileprivate let reopenStates: ThreadSafeContainer<[UniqueId: BackoffState]> = .init([:])
 
-    let reconnectMaxRetryAttempts = 5
+    let maxRetryAttempts = 5
     let presistentStreamHandler: Handler.PresistentHandler
     let ephemeralStreamHandler: Handler.EphemeralHandler
 
@@ -297,39 +297,70 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
         let state = reconnectStates.read { reconnectStates in
             reconnectStates[address] ?? .init()
         }
-        if state.attempt < reconnectMaxRetryAttempts {
-            reconnectStates.write { reconnectStates in
-                if var state = reconnectStates[address] {
-                    state.applyBackoff()
-                    reconnectStates[address] = state
-                }
+
+        guard state.attempt < maxRetryAttempts else {
+            logger.warning("reconnecting to \(address) exceeded max attempts")
+            return
+        }
+
+        reconnectStates.write { reconnectStates in
+            if var state = reconnectStates[address] {
+                state.applyBackoff()
+                reconnectStates[address] = state
             }
-            Task {
-                try await Task.sleep(for: .seconds(state.delay))
-                try connections.write { connections in
-                    if connections.byAddr[address] != nil {
-                        logger.warning("reconnecting to \(address) already connected")
-                        return
-                    }
-                    let quicConn = try QuicConnection(
-                        handler: PeerEventHandler(self),
-                        registration: clientConfiguration.registration,
-                        configuration: clientConfiguration
-                    )
-                    try quicConn.connect(to: address)
-                    let conn = Connection(
-                        quicConn,
-                        impl: self,
-                        role: role,
-                        remoteAddress: address,
-                        initiatedByLocal: true
-                    )
-                    connections.byAddr[address] = conn
-                    connections.byId[conn.id] = conn
+        }
+        Task {
+            try await Task.sleep(for: .seconds(state.delay))
+            try connections.write { connections in
+                if connections.byAddr[address] != nil {
+                    logger.warning("reconnecting to \(address) already connected")
+                    return
                 }
+                let quicConn = try QuicConnection(
+                    handler: PeerEventHandler(self),
+                    registration: clientConfiguration.registration,
+                    configuration: clientConfiguration
+                )
+                try quicConn.connect(to: address)
+                let conn = Connection(
+                    quicConn,
+                    impl: self,
+                    role: role,
+                    remoteAddress: address,
+                    initiatedByLocal: true
+                )
+                connections.byAddr[address] = conn
+                connections.byId[conn.id] = conn
             }
-        } else {
-            logger.warning("reconnect attempt exceeded max attempts")
+        }
+    }
+
+    func reopenUpStream(connection: Connection<Handler>, kind: Handler.PresistentHandler.StreamKind) {
+        let state = reopenStates.read { states in
+            states[connection.id] ?? .init()
+        }
+
+        guard state.attempt < maxRetryAttempts else {
+            logger.warning("Reopen attempt for stream \(kind) on connection \(connection.id) exceeded max attempts")
+            return
+        }
+
+        reopenStates.write { states in
+            if var state = states[connection.id] {
+                state.applyBackoff()
+                states[connection.id] = state
+            }
+        }
+
+        Task {
+            try await Task.sleep(for: .seconds(state.delay))
+            do {
+                logger.debug("Attempting to reopen UP stream of kind \(kind) for connection \(connection.id)")
+                try connection.createPreistentStream(kind: kind)
+            } catch {
+                logger.error("Failed to reopen UP stream for connection \(connection.id): \(error)")
+                reopenUpStream(connection: connection, kind: kind)
+            }
         }
     }
 
@@ -546,6 +577,10 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         }
         if let conn {
             conn.streamStarted(stream: stream)
+            // Check
+            impl.reopenStates.write { states in
+                states[conn.id] = nil
+            }
         }
     }
 
@@ -562,12 +597,25 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         let stream = impl.streams.read { streams in
             streams[quicStream.id]
         }
+
         if let stream {
             let connection = impl.connections.read { connections in
                 connections.byId[stream.connectionId]
             }
             if let connection {
                 connection.streamClosed(stream: stream, abort: !status.isSucceeded)
+                if shouldReopenStream(connection: connection, stream: stream, status: status) {
+                    do {
+                        if let kind = stream.kind {
+                            //                            impl.reopenUpStream(connection: connection, kind: kind);
+                            do {
+                                try connection.createPreistentStream(kind: kind)
+                            } catch {
+                                logger.error("Attempt to recreate the persistent stream failed: \(error)")
+                            }
+                        }
+                    }
+                }
             } else {
                 logger.warning(
                     "Stream closed but connection is gone?", metadata: ["streamId": "\(stream.id)"]
@@ -577,6 +625,20 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             logger.warning(
                 "Stream closed but stream is gone?", metadata: ["streamId": "\(quicStream.id)"]
             )
+        }
+    }
+
+    // TODO: Add all the cases about reopen up stream
+    private func shouldReopenStream(connection: Connection<Handler>, stream: Stream<Handler>, status: QuicStatus) -> Bool {
+        // Only reopen if the stream is a persistent UP stream and the closure was unexpected
+        if connection.isClosed || connection.needReconnect || stream.kind == nil {
+            return false
+        }
+        switch QuicStatusCode(rawValue: status.rawValue) {
+        case .connectionIdle, .badCert:
+            return false
+        default:
+            return !status.isSucceeded
         }
     }
 }
