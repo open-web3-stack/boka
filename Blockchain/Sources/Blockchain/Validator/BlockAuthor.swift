@@ -54,6 +54,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         // TODO: verify we are indeed the block author
 
         let state = try await dataProvider.getState(hash: parentHash)
+        let stateRoot = await state.value.stateRoot
         let epoch = timeslot.timeslotToEpochIndex(config: config)
 
         let pendingTickets = await extrinsicPool.getPendingTickets(epoch: epoch)
@@ -120,7 +121,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
 
         let unsignedHeader = Header.Unsigned(
             parentHash: parentHash,
-            priorStateRoot: state.stateRoot,
+            priorStateRoot: stateRoot,
             extrinsicsHash: extrinsic.hash(),
             timeslot: timeslot,
             epoch: safroleResult.epochMark,

@@ -7,15 +7,15 @@ public protocol ServiceAccounts {
     func get(serviceAccount index: ServiceIndex, preimageHash hash: Data32) async throws -> Data?
     func get(
         serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32
-    ) async throws -> StateKeys.ServiceAccountPreimageInfoKey.Value.ValueType
+    ) async throws -> StateKeys.ServiceAccountPreimageInfoKey.Value?
 
-    mutating func set(serviceAccount index: ServiceIndex, account: ServiceAccountDetails)
-    mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data32, value: Data)
-    mutating func set(serviceAccount index: ServiceIndex, preimageHash hash: Data32, value: Data)
+    mutating func set(serviceAccount index: ServiceIndex, account: ServiceAccountDetails?)
+    mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data32, value: Data?)
+    mutating func set(serviceAccount index: ServiceIndex, preimageHash hash: Data32, value: Data?)
     mutating func set(
         serviceAccount index: ServiceIndex,
         preimageHash hash: Data32,
         length: UInt32,
-        value: StateKeys.ServiceAccountPreimageInfoKey.Value.ValueType
+        value: StateKeys.ServiceAccountPreimageInfoKey.Value?
     )
 }

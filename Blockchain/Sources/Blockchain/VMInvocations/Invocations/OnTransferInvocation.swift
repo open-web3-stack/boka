@@ -7,25 +7,25 @@ extension OnTransferFunction {
     public func invoke(
         config: ProtocolConfigRef,
         service: ServiceIndex,
-        code _: Data,
-        serviceAccounts: [ServiceIndex: ServiceAccount],
+        serviceAccounts: inout some ServiceAccounts,
         transfers: [DeferredTransfers]
-    ) throws -> ServiceAccount {
-        guard var account = serviceAccounts[service] else {
+    ) async throws {
+        guard var account = try await serviceAccounts.get(serviceAccount: service) else {
             throw VMInvocationsError.serviceAccountNotFound
         }
 
         account.balance += transfers.reduce(Balance(0)) { $0 + $1.amount }
 
         if account.codeHash.data.isEmpty || transfers.isEmpty {
-            return account
+            return
         }
 
-        let ctx = OnTransferContext(context: (account, service, serviceAccounts), config: config)
+        var contextContent = OnTransferContext.ContextType(service, serviceAccounts)
+        let ctx = OnTransferContext(context: &contextContent, config: config)
         let gasLimitSum = transfers.reduce(Balance(0)) { $0 + $1.gasLimit }
         let argument = try JamEncoder.encode(transfers)
 
-        _ = invokePVM(
+        _ = await invokePVM(
             config: config,
             blob: account.codeHash.data,
             pc: 15,
@@ -33,7 +33,5 @@ extension OnTransferFunction {
             argumentData: argument,
             ctx: ctx
         )
-
-        return ctx.context.0
     }
 }

@@ -17,7 +17,7 @@ public struct State: Sendable {
     }
 
     // α: The core αuthorizations pool.
-    public var coreAuthorizationPool: StateKeys.CoreAuthorizationPoolKey.Value.ValueType {
+    public var coreAuthorizationPool: StateKeys.CoreAuthorizationPoolKey.Value {
         get {
             layer.coreAuthorizationPool
         }
@@ -27,7 +27,7 @@ public struct State: Sendable {
     }
 
     // φ: The authorization queue.
-    public var authorizationQueue: StateKeys.AuthorizationQueueKey.Value.ValueType {
+    public var authorizationQueue: StateKeys.AuthorizationQueueKey.Value {
         get {
             layer.authorizationQueue
         }
@@ -37,7 +37,7 @@ public struct State: Sendable {
     }
 
     // β: Information on the most recent βlocks.
-    public var recentHistory: StateKeys.RecentHistoryKey.Value.ValueType {
+    public var recentHistory: StateKeys.RecentHistoryKey.Value {
         get {
             layer.recentHistory
         }
@@ -47,7 +47,7 @@ public struct State: Sendable {
     }
 
     // γ: State concerning Safrole.
-    public var safroleState: StateKeys.SafroleStateKey.Value.ValueType {
+    public var safroleState: StateKeys.SafroleStateKey.Value {
         get {
             layer.safroleState
         }
@@ -57,7 +57,7 @@ public struct State: Sendable {
     }
 
     // ψ: past judgements
-    public var judgements: StateKeys.JudgementsKey.Value.ValueType {
+    public var judgements: StateKeys.JudgementsKey.Value {
         get {
             layer.judgements
         }
@@ -67,7 +67,7 @@ public struct State: Sendable {
     }
 
     // η: The eηtropy accumulator and epochal raηdomness.
-    public var entropyPool: StateKeys.EntropyPoolKey.Value.ValueType {
+    public var entropyPool: StateKeys.EntropyPoolKey.Value {
         get {
             layer.entropyPool
         }
@@ -77,7 +77,7 @@ public struct State: Sendable {
     }
 
     // ι: The validator keys and metadata to be drawn from next.
-    public var validatorQueue: StateKeys.ValidatorQueueKey.Value.ValueType {
+    public var validatorQueue: StateKeys.ValidatorQueueKey.Value {
         get {
             layer.validatorQueue
         }
@@ -87,7 +87,7 @@ public struct State: Sendable {
     }
 
     // κ: The validator κeys and metadata currently active.
-    public var currentValidators: StateKeys.CurrentValidatorsKey.Value.ValueType {
+    public var currentValidators: StateKeys.CurrentValidatorsKey.Value {
         get {
             layer.currentValidators
         }
@@ -97,7 +97,7 @@ public struct State: Sendable {
     }
 
     // λ: The validator keys and metadata which were active in the prior epoch.
-    public var previousValidators: StateKeys.PreviousValidatorsKey.Value.ValueType {
+    public var previousValidators: StateKeys.PreviousValidatorsKey.Value {
         get {
             layer.previousValidators
         }
@@ -107,7 +107,7 @@ public struct State: Sendable {
     }
 
     // ρ: The ρending reports, per core, which are being made available prior to accumulation.
-    public var reports: StateKeys.ReportsKey.Value.ValueType {
+    public var reports: StateKeys.ReportsKey.Value {
         get {
             layer.reports
         }
@@ -117,7 +117,7 @@ public struct State: Sendable {
     }
 
     // τ: The most recent block’s τimeslot.
-    public var timeslot: StateKeys.TimeslotKey.Value.ValueType {
+    public var timeslot: StateKeys.TimeslotKey.Value {
         get {
             layer.timeslot
         }
@@ -127,7 +127,7 @@ public struct State: Sendable {
     }
 
     // χ: The privileged service indices.
-    public var privilegedServices: StateKeys.PrivilegedServicesKey.Value.ValueType {
+    public var privilegedServices: StateKeys.PrivilegedServicesKey.Value {
         get {
             layer.privilegedServices
         }
@@ -137,7 +137,7 @@ public struct State: Sendable {
     }
 
     // π: The activity statistics for the validators.
-    public var activityStatistics: StateKeys.ActivityStatisticsKey.Value.ValueType {
+    public var activityStatistics: StateKeys.ActivityStatisticsKey.Value {
         get {
             layer.activityStatistics
         }
@@ -146,8 +146,28 @@ public struct State: Sendable {
         }
     }
 
+    // ϑ: The accumulation queue.
+    public var accumulationQueue: StateKeys.AccumulationQueueKey.Value {
+        get {
+            layer.accumulationQueue
+        }
+        set {
+            layer.accumulationQueue = newValue
+        }
+    }
+
+    // ξ: The accumulation history.
+    public var accumulationHistory: StateKeys.AccumulationHistoryKey.Value {
+        get {
+            layer.accumulationHistory
+        }
+        set {
+            layer.accumulationHistory = newValue
+        }
+    }
+
     // δ: The (prior) state of the service accounts.
-    public subscript(serviceAccount index: ServiceIndex) -> StateKeys.ServiceAccountKey.Value.ValueType? {
+    public subscript(serviceAccount index: ServiceIndex) -> StateKeys.ServiceAccountKey.Value? {
         get {
             layer[serviceAccount: index]
         }
@@ -157,7 +177,7 @@ public struct State: Sendable {
     }
 
     // s
-    public subscript(serviceAccount index: ServiceIndex, storageKey key: Data32) -> StateKeys.ServiceAccountStorageKey.Value.ValueType? {
+    public subscript(serviceAccount index: ServiceIndex, storageKey key: Data32) -> StateKeys.ServiceAccountStorageKey.Value? {
         get {
             layer[serviceAccount: index, storageKey: key]
         }
@@ -169,7 +189,7 @@ public struct State: Sendable {
     // p
     public subscript(
         serviceAccount index: ServiceIndex, preimageHash hash: Data32
-    ) -> StateKeys.ServiceAccountPreimagesKey.Value.ValueType? {
+    ) -> StateKeys.ServiceAccountPreimagesKey.Value? {
         get {
             layer[serviceAccount: index, preimageHash: hash]
         }
@@ -181,7 +201,7 @@ public struct State: Sendable {
     // l
     public subscript(
         serviceAccount index: ServiceIndex, preimageHash hash: Data32, length length: UInt32
-    ) -> StateKeys.ServiceAccountPreimageInfoKey.Value.ValueType? {
+    ) -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
         get {
             layer[serviceAccount: index, preimageHash: hash, length: length]
         }
@@ -197,66 +217,24 @@ public struct State: Sendable {
         }
     }
 
-    public func stateRoot() -> Data32 {
-        // TODO: incorporate layer changes and calculate state root
-        Data32()
+    // TODO: we don't really want to write to the underlying backend here
+    // instead, it should be writting to a in memory layer
+    // and when actually saving the state, save the in memory layer to the presistent store
+    public func save() async throws -> Data32 {
+        try await backend.write(layer.toKV())
+        return await backend.rootHash
+    }
+
+    public var stateRoot: Data32 {
+        get async {
+            await backend.rootHash
+        }
     }
 }
 
 extension State {
     public var lastBlockHash: Data32 {
         recentHistory.items.last.map(\.headerHash)!
-    }
-
-    private class KVSequence: Sequence {
-        typealias Element = (key: Data32, value: Data)
-
-        let seq: any Sequence<(key: Data32, value: Data)>
-        let layer: [Data32: Data]
-
-        init(state: State) async throws {
-            seq = try await state.backend.readAll()
-            var layer = [Data32: Data]()
-            for (key, value) in state.layer.toKV() {
-                layer[key.encode()] = try JamEncoder.encode(value)
-            }
-            self.layer = layer
-        }
-
-        func makeIterator() -> KVSequence.Iterator {
-            KVSequence.Iterator(iter: seq.makeIterator(), layer: layer)
-        }
-
-        struct Iterator: IteratorProtocol {
-            typealias Element = (key: Data32, value: Data)
-
-            var iter: any IteratorProtocol<KVSequence.Element>
-            var layerIterator: (any IteratorProtocol<KVSequence.Element>)?
-            let layer: [Data32: Data]
-
-            init(iter: any IteratorProtocol<KVSequence.Element>, layer: [Data32: Data]) {
-                self.iter = iter
-                self.layer = layer
-            }
-
-            mutating func next() -> KVSequence.Iterator.Element? {
-                if layerIterator != nil {
-                    return layerIterator?.next()
-                }
-                if let (key, value) = iter.next() {
-                    if layer[key] != nil {
-                        return next() // skip this one
-                    }
-                    return (key, value)
-                }
-                layerIterator = layer.makeIterator()
-                return layerIterator?.next()
-            }
-        }
-    }
-
-    public func toKV() async throws -> some Sequence<(key: Data32, value: Data)> {
-        try await KVSequence(state: self)
     }
 
     public func asRef() -> StateRef {
@@ -272,37 +250,45 @@ extension State: Dummy {
     }
 
     public static func dummy(config: Config, block: BlockRef?) -> State {
-        let coreAuthorizationPool: StateKeys.CoreAuthorizationPoolKey.Value.ValueType =
+        let coreAuthorizationPool: StateKeys.CoreAuthorizationPoolKey.Value =
             try! ConfigFixedSizeArray(config: config, defaultValue: ConfigLimitedSizeArray(config: config))
-        var recentHistory: StateKeys.RecentHistoryKey.Value.ValueType = RecentHistory.dummy(config: config)
+        var recentHistory: StateKeys.RecentHistoryKey.Value = RecentHistory.dummy(config: config)
         if let block {
             recentHistory.items.safeAppend(RecentHistory.HistoryItem(
                 headerHash: block.hash,
                 mmr: MMR([]),
                 stateRoot: Data32(),
-                workReportHashes: try! ConfigLimitedSizeArray(config: config)
+                lookup: [Data32: Data32]()
             ))
         }
-        let safroleState: StateKeys.SafroleStateKey.Value.ValueType = SafroleState.dummy(config: config)
-        let entropyPool: StateKeys.EntropyPoolKey.Value.ValueType = EntropyPool((Data32(), Data32(), Data32(), Data32()))
-        let validatorQueue: StateKeys.ValidatorQueueKey.Value.ValueType =
+        let safroleState: StateKeys.SafroleStateKey.Value = SafroleState.dummy(config: config)
+        let entropyPool: StateKeys.EntropyPoolKey.Value = EntropyPool((Data32(), Data32(), Data32(), Data32()))
+        let validatorQueue: StateKeys.ValidatorQueueKey.Value =
             try! ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config))
-        let currentValidators: StateKeys.CurrentValidatorsKey.Value.ValueType =
+        let currentValidators: StateKeys.CurrentValidatorsKey.Value =
             try! ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config))
-        let previousValidators: StateKeys.PreviousValidatorsKey.Value.ValueType =
+        let previousValidators: StateKeys.PreviousValidatorsKey.Value =
             try! ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config))
-        let reports: StateKeys.ReportsKey.Value.ValueType = try! ConfigFixedSizeArray(config: config, defaultValue: nil)
-        let timeslot: StateKeys.TimeslotKey.Value.ValueType = block?.header.timeslot ?? 0
-        let authorizationQueue: StateKeys.AuthorizationQueueKey.Value.ValueType =
+        let reports: StateKeys.ReportsKey.Value = try! ConfigFixedSizeArray(config: config, defaultValue: nil)
+        let timeslot: StateKeys.TimeslotKey.Value = block?.header.timeslot ?? 0
+        let authorizationQueue: StateKeys.AuthorizationQueueKey.Value =
             try! ConfigFixedSizeArray(config: config, defaultValue: ConfigFixedSizeArray(config: config, defaultValue: Data32()))
-        let privilegedServices: StateKeys.PrivilegedServicesKey.Value.ValueType = PrivilegedServices(
+        let privilegedServices: StateKeys.PrivilegedServicesKey.Value = PrivilegedServices(
             empower: ServiceIndex(),
             assign: ServiceIndex(),
             designate: ServiceIndex(),
             basicGas: [:]
         )
-        let judgements: StateKeys.JudgementsKey.Value.ValueType = JudgementsState.dummy(config: config)
-        let activityStatistics: StateKeys.ActivityStatisticsKey.Value.ValueType = ValidatorActivityStatistics.dummy(config: config)
+        let judgements: StateKeys.JudgementsKey.Value = JudgementsState.dummy(config: config)
+        let activityStatistics: StateKeys.ActivityStatisticsKey.Value = ValidatorActivityStatistics.dummy(config: config)
+        let accumulationQueue: StateKeys.AccumulationQueueKey.Value = try! ConfigFixedSizeArray(
+            config: config,
+            defaultValue: [AccumulationQueueItem]()
+        )
+        let accumulationHistory: StateKeys.AccumulationHistoryKey.Value = try! ConfigFixedSizeArray(
+            config: config,
+            defaultValue: Set<Data32>()
+        )
 
         let kv: [(any StateKey, Codable & Sendable)] = [
             (StateKeys.CoreAuthorizationPoolKey(), coreAuthorizationPool),
@@ -318,17 +304,17 @@ extension State: Dummy {
             (StateKeys.TimeslotKey(), timeslot),
             (StateKeys.PrivilegedServicesKey(), privilegedServices),
             (StateKeys.ActivityStatisticsKey(), activityStatistics),
+            (StateKeys.AccumulationQueueKey(), accumulationQueue),
+            (StateKeys.AccumulationHistoryKey(), accumulationHistory),
         ]
 
         var store: [Data32: Data] = [:]
         for (key, value) in kv {
             store[key.encode()] = try! JamEncoder.encode(value)
         }
+        let rootHash = try! stateMerklize(kv: store)
 
-        let backend = InMemoryBackend(
-            config: config,
-            store: store
-        )
+        let backend = StateBackend(InMemoryBackend(), config: config, rootHash: rootHash)
 
         let layer = StateLayer(changes: kv)
 
@@ -360,22 +346,22 @@ extension State: ServiceAccounts {
 
     public func get(
         serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32
-    ) async throws -> StateKeys.ServiceAccountPreimageInfoKey.Value.ValueType {
+    ) async throws -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
         if let res = layer[serviceAccount: index, preimageHash: hash, length: length] {
             return res
         }
         return try await backend.read(StateKeys.ServiceAccountPreimageInfoKey(index: index, hash: hash, length: length))
     }
 
-    public mutating func set(serviceAccount index: ServiceIndex, account: ServiceAccountDetails) {
+    public mutating func set(serviceAccount index: ServiceIndex, account: ServiceAccountDetails?) {
         layer[serviceAccount: index] = account
     }
 
-    public mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data32, value: Data) {
+    public mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data32, value: Data?) {
         layer[serviceAccount: index, storageKey: key] = value
     }
 
-    public mutating func set(serviceAccount index: ServiceIndex, preimageHash hash: Data32, value: Data) {
+    public mutating func set(serviceAccount index: ServiceIndex, preimageHash hash: Data32, value: Data?) {
         layer[serviceAccount: index, preimageHash: hash] = value
     }
 
@@ -383,7 +369,7 @@ extension State: ServiceAccounts {
         serviceAccount index: ServiceIndex,
         preimageHash hash: Data32,
         length: UInt32,
-        value: StateKeys.ServiceAccountPreimageInfoKey.Value.ValueType
+        value: StateKeys.ServiceAccountPreimageInfoKey.Value?
     ) {
         layer[serviceAccount: index, preimageHash: hash, length: length] = value
     }
@@ -446,24 +432,23 @@ extension State: Guaranteeing {
 struct DummyFunction: AccumulateFunction, OnTransferFunction {
     func invoke(
         config _: ProtocolConfigRef,
-        accounts _: ServiceAccounts,
+        accounts _: inout some ServiceAccounts,
         state _: AccumulateState,
         serviceIndex _: ServiceIndex,
         gas _: Gas,
         arguments _: [AccumulateArguments],
         initialIndex _: ServiceIndex,
         timeslot _: TimeslotIndex
-    ) throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
+    ) async throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
         fatalError("not implemented")
     }
 
     func invoke(
         config _: ProtocolConfigRef,
         service _: ServiceIndex,
-        code _: Data,
-        serviceAccounts _: [ServiceIndex: ServiceAccount],
+        serviceAccounts _: inout some ServiceAccounts,
         transfers _: [DeferredTransfers]
-    ) throws -> ServiceAccount {
+    ) async throws {
         fatalError("not implemented")
     }
 }
@@ -481,9 +466,5 @@ extension State: Accumulation {
 public class StateRef: Ref<State>, @unchecked Sendable {
     public static func dummy(config: ProtocolConfigRef, block: BlockRef?) -> StateRef {
         StateRef(State.dummy(config: config, block: block))
-    }
-
-    public var stateRoot: Data32 {
-        value.stateRoot()
     }
 }
