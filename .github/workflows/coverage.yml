@@ -78,10 +78,8 @@ jobs:
                     XCTEST_PATHS=$(find "${BIN_PATH}" -name '*.xctest')
                     for XCTEST_PATH in $XCTEST_PATHS; do
                         echo "Processing $XCTEST_PATH"
-                        COV_BIN=$XCTEST_PATH
-                        echo "Using COV_BIN: $COV_BIN"
                         # Export the code coverage for the current subproject and append to coverage.lcov
-                        llvm-cov export "${COV_BIN}" \
+                        llvm-cov export "${XCTEST_PATH}" \
                         -instr-profile=default.profdata \
                         -format lcov >> coverage.lcov \
                         -ignore-filename-regex=".build/repositories/*"
