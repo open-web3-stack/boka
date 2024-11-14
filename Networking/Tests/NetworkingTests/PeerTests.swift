@@ -184,13 +184,13 @@ struct PeerTests {
             let con = try peer.connect(to: centerPeer.listenAddress(), role: .builder)
             try await con.ready()
         }
+        try? await Task.sleep(for: .milliseconds(2000))
         centerPeer.broadcast(kind: .uniqueA, message: .init(kind: .uniqueA, data: Data("connection rotation strategy".utf8)))
-        try? await Task.sleep(for: .milliseconds(500))
+        try? await Task.sleep(for: .milliseconds(200))
         var receivedCount = 0
         for handler in handlers {
             receivedCount += await handler.receivedData.count
         }
-        print("recievedCount: \(receivedCount)")
         #expect(receivedCount == PeerSettings.defaultSettings.maxBuilderConnections)
     }
 
