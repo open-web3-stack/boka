@@ -271,9 +271,15 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
             if role == .builder {
                 let currentCount = connections.byAddr.values.filter { $0.role == role }.count
                 if currentCount >= self.settings.maxBuilderConnections {
-                    self.logger.warning("max builder connections reached")
-                    // TODO: consider connection rotation strategy
-                    return false
+                    if let conn = connections.byAddr.values.filter({ $0.role == .builder })
+                        .sorted(by: { $0.lastActiveTimeStamp < $1.lastActiveTimeStamp }).first
+                    {
+                        self.logger.warning("Replacing least active builder connection at \(conn.remoteAddress)")
+                        conn.close(abort: false)
+                    } else {
+                        self.logger.warning("Max builder connections reached, no eligible replacement found")
+                        return false
+                    }
                 }
             }
             if connections.byAddr[addr] != nil {
@@ -590,6 +596,10 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         }
         if let stream {
             stream.received(data: data)
+            let connection = impl.connections.read { connections in
+                connections.byId[stream.connectionId]
+            }
+            connection?.updateLastActive()
         }
     }
 
