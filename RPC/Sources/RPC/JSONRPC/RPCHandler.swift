@@ -2,9 +2,10 @@ import Foundation
 import Vapor
 
 protocol RPCHandler {
-    static var method: String { get }
     associatedtype Request: Content
     associatedtype Response: Content
+
+    var method: String { get }
 
     func handle(request: JSONRequest<Request>) async throws -> Response
 }

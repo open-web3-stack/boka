@@ -8,12 +8,23 @@ let logger = Logger(label: "RPC.RPCController")
 typealias JSONRPCHandler = @Sendable (JSONRequest) async throws -> any Encodable
 
 final class JSONRPCController: RouteCollection, Sendable {
-    let handlers: [String: JSONRPCHandler]
-    let encoder = JSONEncoder()
-    let decoder = JSONDecoder()
+    let handlers: [String: RPCHandler]
+    let encoder: JSONEncoder
+    let decoder: JSONDecoder
 
-    init(handlers: [String: JSONRPCHandler]) {
+    init(handlers _: [RPCHandler]) {
+        var handlers = [String: RPCHandler]()
+        for handler in handlers {
+            handlers[handler.method] = handler
+        }
         self.handlers = handlers
+
+        encoder = JSONEncoder()
+        encoder.dataEncodingStrategy = .hex
+        encoder.outputFormatting = [.withoutEscapingSlashes, .sortedKeys]
+
+        decoder = JSONDecoder()
+        decoder.dataDecodingStrategy = .hex
     }
 
     func boot(routes: RoutesBuilder) throws {
@@ -72,7 +83,7 @@ final class JSONRPCController: RouteCollection, Sendable {
                 return JSONResponse(jsonrpc: "2.0", result: nil, error: JSONError.methodNotFound(method), id: request.id)
             }
 
-            let res = try await handler(request)
+            let res = try await handler.handle(request: request)
             return JSONResponse(jsonrpc: "2.0", result: AnyCodable(res), error: nil, id: request.id)
         } catch {
             logger.error("Failed to handle JSON request: \(error)")

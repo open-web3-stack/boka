@@ -1,32 +1,36 @@
 import Utils
 
-struct SystemHandler {
-    static func getHandlers() -> [String: JSONRPCHandler] {
-        let handler = SystemHandler()
-
-        return [
-            "system_health": handler.health,
-            "system_name": handler.name,
+enum SystemHandlers {
+    static func getHandlers(source: SystemDataSource) -> [RPCHandler] {
+        [
+            Health(),
+            Name(source: source),
         ]
     }
 
-    func health(request _: JSONRequest) async throws -> any Encodable {
-        true
-    }
-
-    func name(request _: JSONRequest) async throws -> any Encodable {
-        "Boka"
-    }
-}
-
-enum SystemHandlers {
     struct Health: RPCHandler {
         static var method: String { "system_health" }
-        typealias Request = JSON
+        typealias Request = VoidRequest
         typealias Response = Bool
 
         func handle(request _: Request) async throws -> Response {
             true
+        }
+    }
+
+    struct Name: RPCHandler {
+        static var method: String { "system_name" }
+        typealias Request = VoidRequest
+        typealias Response = String
+
+        private let source: SystemDataSource
+
+        init(source: SystemDataSource) {
+            self.source = source
+        }
+
+        func handle(request _: Request) async throws -> Response {
+            try await source.name()
         }
     }
 }
