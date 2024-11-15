@@ -8,3 +8,7 @@ public protocol DataSource: Sendable {
     func getState(hash: Data32) async throws -> StateRef?
     func getPeersCount() async throws -> Int
 }
+
+public protocol SystemDataSource: Sendable {
+    func name() async throws -> String
+}

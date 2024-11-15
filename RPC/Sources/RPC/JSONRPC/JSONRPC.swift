@@ -1,10 +1,10 @@
 import Utils
 import Vapor
 
-struct JSONRequest: Content {
+struct JSONRequest<Params: Content>: Content {
     let jsonrpc: String
     let method: String
-    let params: JSON?
+    let params: Params?
     let id: Int
 }
 

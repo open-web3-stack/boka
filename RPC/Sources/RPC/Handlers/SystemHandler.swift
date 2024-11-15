@@ -1,3 +1,5 @@
+import Utils
+
 struct SystemHandler {
     static func getHandlers() -> [String: JSONRPCHandler] {
         let handler = SystemHandler()
@@ -14,5 +16,17 @@ struct SystemHandler {
 
     func name(request _: JSONRequest) async throws -> any Encodable {
         "Boka"
+    }
+}
+
+enum SystemHandlers {
+    struct Health: RPCHandler {
+        static var method: String { "system_health" }
+        typealias Request = JSON
+        typealias Response = Bool
+
+        func handle(request _: Request) async throws -> Response {
+            true
+        }
     }
 }
