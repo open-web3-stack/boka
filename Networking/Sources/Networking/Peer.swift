@@ -70,7 +70,7 @@ public struct PeerOptions<Handler: StreamHandler>: Sendable {
     }
 }
 
-// TODO: reopen UP stream, peer reputation system to ban peers not following the protocol
+// TODO: peer reputation system to ban peers not following the protocol
 public final class Peer<Handler: StreamHandler>: Sendable {
     private let impl: PeerImpl<Handler>
 
@@ -272,7 +272,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                 let currentCount = connections.byAddr.values.filter { $0.role == role }.count
                 if currentCount >= self.settings.maxBuilderConnections {
                     if let conn = connections.byAddr.values.filter({ $0.role == .builder })
-                        .sorted(by: { $0.lastActiveTimeStamp < $1.lastActiveTimeStamp }).first
+                        .sorted(by: { $0.getLastActive() < $1.getLastActive() }).first
                     {
                         self.logger.warning("Replacing least active builder connection at \(conn.remoteAddress)")
                         conn.close(abort: false)
