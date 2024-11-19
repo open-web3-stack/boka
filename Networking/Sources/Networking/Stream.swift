@@ -43,10 +43,12 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
     private let _status: ThreadSafeContainer<StreamStatus> = .init(.open)
     let connectionId: UniqueId
     let kind: Handler.PresistentHandler.StreamKind?
-
     public var id: UniqueId {
         stream.id
     }
+
+    let reSendStates: ThreadSafeContainer<[UniqueId: BackoffState]> = .init([:])
+    let maxRetryAttempts = 5
 
     public private(set) var status: StreamStatus {
         get {
@@ -127,6 +129,36 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         if !channel.syncSend(data) {
             logger.warning("stream \(id) is full")
             // TODO: backpressure handling
+            backpressure(data)
+        }
+    }
+
+    private func backpressure(_ data: Data) {
+        let state = reSendStates.read { reconnectStates in
+            reconnectStates[id] ?? .init()
+        }
+
+        guard state.attempt < maxRetryAttempts else {
+            logger.warning("reChannelSend: \(id) reached max retry attempts")
+            return
+        }
+
+        reSendStates.write { reSendStates in
+            if var state = reSendStates[id] {
+                state.applyBackoff()
+                reSendStates[id] = state
+            }
+        }
+        Task {
+            try await Task.sleep(for: .seconds(state.delay))
+            if !channel.syncSend(data) {
+                logger.warning("stream \(id) is full")
+                backpressure(data)
+            } else {
+                reSendStates.write { states in
+                    states[id] = nil
+                }
+            }
         }
     }
 
