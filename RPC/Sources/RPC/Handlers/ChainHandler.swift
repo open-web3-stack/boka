@@ -2,58 +2,30 @@ import Blockchain
 import Foundation
 import Utils
 
-struct ChainHandler {
-    let source: DataSource
-
-    static func getHandlers(source: DataSource) -> [String: JSONRPCHandler] {
-        let handler = ChainHandler(source: source)
-
-        return [
-            "chain_getBlock": handler.getBlock,
-            "chain_getState": handler.getState,
+enum ChainHandlers {
+    static func getHandlers(source: ChainDataSource) -> [any RPCHandler] {
+        [
+            GetBlock(source: source),
         ]
     }
 
-    func getBlock(request: JSONRequest) async throws -> any Encodable {
-        let hash = request.params?["hash"] as? String
-        if let hash {
-            guard let data = Data(fromHexString: hash), let data32 = Data32(data) else {
-                throw JSONError(code: -32602, message: "Invalid block hash")
-            }
-            let block = try await source.getBlock(hash: data32)
-            return block
-        } else {
-            let block = try await source.getBestBlock()
-            return block
-        }
-    }
+    struct GetBlock: RPCHandler {
+        var method: String { "chain_getBlock" }
+        typealias Request = Data32?
+        typealias Response = BlockRef?
 
-    func getState(request: JSONRequest) async throws -> any Encodable {
-        let hash = request.params?["hash"] as? String
-        if let hash {
-            guard
-                let data = Data(fromHexString: hash),
-                let data32 = Data32(data)
-            else {
-                throw JSONError(code: -32602, message: "Invalid block hash")
+        private let source: ChainDataSource
+
+        init(source: ChainDataSource) {
+            self.source = source
+        }
+
+        func handle(request: Request) async throws -> Response? {
+            if let hash = request {
+                try await source.getBlock(hash: hash)
+            } else {
+                try await source.getBestBlock()
             }
-            let state = try await source.getState(hash: data32)
-            guard let state else {
-                return JSON.null
-            }
-            // return state root for now
-            return await [
-                "stateRoot": state.value.stateRoot.toHexString(),
-                "blockHash": hash,
-            ]
-        } else {
-            // return best block state by default
-            let block = try await source.getBestBlock()
-            let state = try await source.getState(hash: block.hash)
-            return await [
-                "stateRoot": state?.value.stateRoot.toHexString(),
-                "blockHash": block.hash.toHexString(),
-            ]
         }
     }
 }

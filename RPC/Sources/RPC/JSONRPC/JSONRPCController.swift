@@ -5,19 +5,20 @@ import Vapor
 
 let logger = Logger(label: "RPC.RPCController")
 
-typealias JSONRPCHandler = @Sendable (JSONRequest) async throws -> any Encodable
-
 final class JSONRPCController: RouteCollection, Sendable {
-    let handlers: [String: RPCHandler]
+    let handlers: [String: any RPCHandler]
     let encoder: JSONEncoder
     let decoder: JSONDecoder
 
-    init(handlers _: [RPCHandler]) {
-        var handlers = [String: RPCHandler]()
+    init(handlers: [any RPCHandler]) {
+        var dict = [String: any RPCHandler]()
         for handler in handlers {
-            handlers[handler.method] = handler
+            if dict.keys.contains(handler.method) {
+                logger.warning("Duplicated handler: \(handler.method)")
+            }
+            dict[handler.method] = handler
         }
-        self.handlers = handlers
+        self.handlers = dict
 
         encoder = JSONEncoder()
         encoder.dataEncodingStrategy = .hex
@@ -64,7 +65,7 @@ final class JSONRPCController: RouteCollection, Sendable {
             logger.debug("Failed to decode JSON request: \(error)")
 
             let rpcError = JSONError(code: -32600, message: "Invalid Request")
-            let rpcResponse = JSONResponse(jsonrpc: "2.0", result: nil, error: rpcError, id: nil)
+            let rpcResponse = JSONResponse(id: nil, error: rpcError)
 
             do {
                 let responseData = try encoder.encode(rpcResponse)
@@ -80,16 +81,15 @@ final class JSONRPCController: RouteCollection, Sendable {
         do {
             let method = request.method
             guard let handler = handlers[method] else {
-                return JSONResponse(jsonrpc: "2.0", result: nil, error: JSONError.methodNotFound(method), id: request.id)
+                return JSONResponse(id: request.id, error: JSONError.methodNotFound(method))
             }
 
-            let res = try await handler.handle(request: request)
-            return JSONResponse(jsonrpc: "2.0", result: AnyCodable(res), error: nil, id: request.id)
+            return try await handler.handle(jsonRequest: request)
         } catch {
             logger.error("Failed to handle JSON request: \(error)")
 
             let rpcError = JSONError(code: -32600, message: "Invalid Request")
-            return JSONResponse(jsonrpc: "2.0", result: nil, error: rpcError, id: request.id)
+            return JSONResponse(id: request.id, error: rpcError)
         }
     }
 }

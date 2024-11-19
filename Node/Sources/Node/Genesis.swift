@@ -47,7 +47,7 @@ extension Genesis {
             var kv = [String: Data]()
             for (key, value) in state.value.layer.toKV() {
                 if let value {
-                    kv[key.encode().toHexString()] = try JamEncoder.encode(value)
+                    kv[key.toHexString()] = try JamEncoder.encode(value)
                 }
             }
             return try ChainSpec(

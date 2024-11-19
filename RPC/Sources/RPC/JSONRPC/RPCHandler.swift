@@ -1,24 +1,24 @@
 import Foundation
+import Utils
 import Vapor
 
-protocol RPCHandler {
-    associatedtype Request: Content
-    associatedtype Response: Content
+protocol RPCHandler: Sendable {
+    associatedtype Request: FromJSON
+    associatedtype Response: Encodable
 
     var method: String { get }
 
-    func handle(request: JSONRequest<Request>) async throws -> Response
+    func handle(request: Request) async throws -> Response?
+    func handle(jsonRequest: JSONRequest) async throws -> JSONResponse
 }
 
-enum VoidRequest: Content, Codable {
-    case void
-
-    init(from _: Decoder) throws {
-        // read nothing
-        self = .void
-    }
-
-    func encode(to _: Encoder) throws {
-        // write nothing
+extension RPCHandler {
+    public func handle(jsonRequest: JSONRequest) async throws -> JSONResponse {
+        let req = try Request(from: jsonRequest.params)
+        let res = try await handle(request: req)
+        return JSONResponse(
+            id: jsonRequest.id,
+            result: res
+        )
     }
 }
