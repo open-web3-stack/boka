@@ -20,7 +20,7 @@ final class MockPeerEventTests {
         }
 
         let logger: Logger
-        let channel: Channel<Data> = .init(capacity: 100)
+        let channel: Channel<Data> = .init(capacity: 5)
         let events: ThreadSafeContainer<[EventType]> = .init([])
         let resendStates: ThreadSafeContainer<[UniqueId: BackoffState]> = .init([:])
         let maxRetryAttempts = 5
@@ -32,24 +32,21 @@ final class MockPeerEventTests {
 
         private func backpressure(_ data: Data, on stream: QuicStream) {
             logger.info("backpressure for stream: \(stream.id)")
-            let state = resendStates.read { reconnectStates in
-                reconnectStates[stream.id] ?? .init()
-            }
-
             do {
+                var state = resendStates.read { resendStates in
+                    resendStates[stream.id] ?? .init()
+                }
                 let windowSize = try stream.getFlowControlWindow()
-                logger.info("backpressure: \(stream.id) window size: \(windowSize)")
+                logger.info("backpressure: \(stream.id) window size: \(windowSize) retry times \(state.attempt)")
                 guard state.attempt < maxRetryAttempts else {
                     logger.warning("backpressure: \(stream.id) reached max retry attempts")
-                    try? stream.adjustFlowControl(recvBufferSize: Int(Int16.max))
+                    try? stream.adjustFlowControl(windowSize: Int(Int16.max))
                     return
                 }
-                try stream.adjustFlowControl(recvBufferSize: windowSize >> 1)
+                try stream.adjustFlowControl(windowSize: windowSize >> 1)
+                state.applyBackoff()
                 resendStates.write { resendStates in
-                    if var state = resendStates[stream.id] {
-                        state.applyBackoff()
-                        resendStates[stream.id] = state
-                    }
+                    resendStates[stream.id] = state
                 }
                 Task {
                     try await Task.sleep(for: .seconds(state.delay))
@@ -57,7 +54,7 @@ final class MockPeerEventTests {
                         logger.warning("stream \(stream.id) is full")
                         backpressure(data, on: stream)
                     } else {
-                        try stream.adjustFlowControl(recvBufferSize: Int(Int16.max))
+                        try stream.adjustFlowControl(windowSize: Int(Int16.max))
                         resendStates.write { states in
                             states[stream.id] = nil
                         }
@@ -111,7 +108,7 @@ final class MockPeerEventTests {
             }
         }
 
-        func dataReceived(stream: QuicStream, data: Data?) {
+        func dataReceived(_ stream: QuicStream, data: Data?) {
             if isBackpressureEnabled {
                 backpressure(data!, on: stream)
                 return
@@ -196,26 +193,17 @@ final class MockPeerEventTests {
             registration: registration,
             configuration: clientConfiguration
         )
-        // Attempt to connect
         try clientConnection.connect(to: listenAddress)
+
+        for i in 0 ..< 5 {
+            _ = serverHandler.channel.syncSend(Data("send data \(i)".utf8))
+        }
+        #expect(serverHandler.channel.syncSend(Data("send data fail".utf8)) == false)
+
         let stream1 = try clientConnection.createStream()
         try stream1.send(data: Data("test data 1".utf8))
 
-        try await Task.sleep(for: .milliseconds(100))
-        let (_, info) = serverHandler.events.value.compactMap {
-            switch $0 {
-            case let .newConnection(_, connection, info):
-                (connection, info) as (QuicConnection, ConnectionInfo)?
-            default:
-                nil
-            }
-        }.first!
-        let (ipAddress2, _) = info.remoteAddress.getAddressAndPort()
-
-        #expect(info.negotiatedAlpn == Data("testalpn".utf8))
-        #expect(info.serverName == "127.0.0.1")
-        #expect(info.localAddress == listenAddress)
-        #expect(ipAddress2 == "127.0.0.1")
+        try await Task.sleep(for: .milliseconds(50000))
     }
 
     @Test

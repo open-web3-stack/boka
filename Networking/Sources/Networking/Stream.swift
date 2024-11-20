@@ -145,12 +145,12 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
 
             guard state.attempt < maxRetryAttempts else {
                 logger.warning("resend: \(id) reached max retry attempts")
-                try? stream.adjustFlowControl(recvBufferSize: Int(Int16.max))
+                try? stream.adjustFlowControl(windowSize: Int(Int16.max))
                 return
             }
 
             // Adjust flow control to half of the window size
-            try stream.adjustFlowControl(recvBufferSize: windowsSize >> 1)
+            try stream.adjustFlowControl(windowSize: windowsSize >> 1)
 
             resendStates.write { resendStates in
                 if var state = resendStates[id] {
@@ -165,7 +165,7 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
                     logger.warning("stream \(id) is full")
                     backpressure(data) // Retry if sending fails
                 } else {
-                    try stream.adjustFlowControl(recvBufferSize: Int(Int16.max))
+                    try stream.adjustFlowControl(windowSize: Int(Int16.max))
                     resendStates.write { states in
                         states[id] = nil
                     }

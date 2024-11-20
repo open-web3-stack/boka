@@ -108,10 +108,12 @@ public final class QuicStream: Sendable {
         }
     }
 
-    public func adjustFlowControl(recvBufferSize: Int) throws {
+    public func adjustFlowControl(windowSize: Int) throws {
         try storage.write { storage in
             var settings = QUIC_SETTINGS()
-            settings.StreamRecvWindowDefault = UInt32(recvBufferSize)
+            settings.IsSet.StreamRecvWindowDefault = 1
+            settings.StreamRecvWindowDefault = UInt32(windowSize)
+            print("windowSize \(windowSize)")
             let settingsSize = UInt32(MemoryLayout.size(ofValue: settings))
             guard let storage, let api = storage.connection.api else {
                 throw QuicError.alreadyClosed
