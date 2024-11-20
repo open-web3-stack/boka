@@ -107,7 +107,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     // ZI = 2^24: The standard pvm program initialization input data size.
     public var pvmProgramInitInputDataSize: Int
 
-    // ZP = 2^14: The standard pvm program initialization page size.
+    // ZG = 2^14: The standard pvm program initialization page size.
     public var pvmProgramInitPageSize: Int
 
     // ZQ = 2^16: The standard pvm program initialization segment size.

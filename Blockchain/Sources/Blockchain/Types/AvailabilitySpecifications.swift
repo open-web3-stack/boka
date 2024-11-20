@@ -14,16 +14,21 @@ public struct AvailabilitySpecifications: Sendable, Equatable, Codable {
     // e
     public var segmentRoot: Data32
 
+    // n
+    public var segmentCount: Int
+
     public init(
         workPackageHash: Data32,
         length: DataLength,
         erasureRoot: Data32,
-        segmentRoot: Data32
+        segmentRoot: Data32,
+        segmentCount: Int
     ) {
         self.workPackageHash = workPackageHash
         self.length = length
         self.erasureRoot = erasureRoot
         self.segmentRoot = segmentRoot
+        self.segmentCount = segmentCount
     }
 }
 
@@ -34,14 +39,15 @@ extension AvailabilitySpecifications: Dummy {
             workPackageHash: Data32(),
             length: 0,
             erasureRoot: Data32(),
-            segmentRoot: Data32()
+            segmentRoot: Data32(),
+            segmentCount: 0
         )
     }
 }
 
 extension AvailabilitySpecifications: EncodedSize {
     public var encodedSize: Int {
-        workPackageHash.encodedSize + length.encodedSize + erasureRoot.encodedSize + segmentRoot.encodedSize
+        workPackageHash.encodedSize + length.encodedSize + erasureRoot.encodedSize + segmentRoot.encodedSize + segmentCount.encodedSize
     }
 
     public static var encodeedSizeHint: Int? {

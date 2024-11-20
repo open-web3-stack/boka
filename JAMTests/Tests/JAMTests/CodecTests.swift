@@ -197,7 +197,7 @@ struct CodecTests {
         if let value = value as? Extrinsic {
             return [
                 "tickets": transform(json["tickets"]!, value: value.tickets),
-                "disputes": transform(json["judgements"]!, value: value.judgements),
+                "disputes": transform(json["disputes"]!, value: value.disputes),
                 "preimages": transform(json["preimages"]!, value: value.preimages),
                 "assurances": transform(json["availability"]!, value: value.availability),
                 "guarantees": transform(json["reports"]!, value: value.reports),

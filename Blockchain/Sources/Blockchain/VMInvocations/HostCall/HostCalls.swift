@@ -242,7 +242,7 @@ public class Empower: HostCall {
 
         if basicGas.count != 0 {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
-            x.accumulateState.privilegedServices.empower = regs[0]
+            x.accumulateState.privilegedServices.blessed = regs[0]
             x.accumulateState.privilegedServices.assign = regs[1]
             x.accumulateState.privilegedServices.designate = regs[2]
             x.accumulateState.privilegedServices.basicGas = basicGas
