@@ -113,7 +113,6 @@ public final class QuicStream: Sendable {
             var settings = QUIC_SETTINGS()
             settings.IsSet.StreamRecvWindowDefault = 1
             settings.StreamRecvWindowDefault = UInt32(windowSize)
-            print("windowSize \(windowSize)")
             let settingsSize = UInt32(MemoryLayout.size(ofValue: settings))
             guard let storage, let api = storage.connection.api else {
                 throw QuicError.alreadyClosed

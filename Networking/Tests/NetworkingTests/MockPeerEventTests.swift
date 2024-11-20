@@ -194,16 +194,23 @@ final class MockPeerEventTests {
             configuration: clientConfiguration
         )
         try clientConnection.connect(to: listenAddress)
-
+        var sendData = [Data]()
         for i in 0 ..< 5 {
-            _ = serverHandler.channel.syncSend(Data("send data \(i)".utf8))
+            let data = Data("send data \(i)".utf8)
+            sendData.append(data)
+            _ = serverHandler.channel.syncSend(data)
         }
         #expect(serverHandler.channel.syncSend(Data("send data fail".utf8)) == false)
-
+        let data = Data("test data 1".utf8)
+        sendData.append(data)
         let stream1 = try clientConnection.createStream()
-        try stream1.send(data: Data("test data 1".utf8))
-
-        try await Task.sleep(for: .milliseconds(50000))
+        try stream1.send(data: data)
+        try await Task.sleep(for: .milliseconds(2000))
+        await #expect(serverHandler.channel.receive() == sendData.first)
+        try await Task.sleep(for: .milliseconds(2000))
+        for data in sendData[1...] {
+            await #expect(serverHandler.channel.receive() == data)
+        }
     }
 
     @Test
