@@ -1,4 +1,6 @@
+import AsyncChannels
 import Foundation
+import Logging
 import MsQuicSwift
 import Testing
 import Utils
@@ -17,9 +19,53 @@ final class MockPeerEventTests {
             case closed(stream: QuicStream, status: QuicStatus, code: QuicErrorCode)
         }
 
+        let logger: Logger
+        let channel: Channel<Data> = .init(capacity: 100)
         let events: ThreadSafeContainer<[EventType]> = .init([])
+        let resendStates: ThreadSafeContainer<[UniqueId: BackoffState]> = .init([:])
+        let maxRetryAttempts = 5
+        let isBackpressureEnabled: Bool
+        init(_ isBackpressureEnabled: Bool = false) {
+            self.isBackpressureEnabled = isBackpressureEnabled
+            logger = Logger(label: "MockPeerEventHandler")
+        }
 
-        init() {}
+        private func backpressure(_ data: Data, on stream: QuicStream) {
+            let state = resendStates.read { reconnectStates in
+                reconnectStates[stream.id] ?? .init()
+            }
+
+            do {
+                let windowSize = try stream.getFlowControlWindow()
+
+                guard state.attempt < maxRetryAttempts else {
+                    logger.warning("resend: \(stream.id) reached max retry attempts")
+                    try? stream.adjustFlowControl(recvBufferSize: Int(Int16.max))
+                    return
+                }
+                try stream.adjustFlowControl(recvBufferSize: windowSize >> 1)
+                resendStates.write { resendStates in
+                    if var state = resendStates[stream.id] {
+                        state.applyBackoff()
+                        resendStates[stream.id] = state
+                    }
+                }
+                Task {
+                    try await Task.sleep(for: .seconds(state.delay))
+                    if !channel.syncSend(data) {
+                        logger.warning("stream \(stream.id) is full")
+                        backpressure(data, on: stream)
+                    } else {
+                        try stream.adjustFlowControl(recvBufferSize: Int(Int16.max))
+                        resendStates.write { states in
+                            states[stream.id] = nil
+                        }
+                    }
+                }
+            } catch {
+                logger.error("backpressure: \(error)")
+            }
+        }
 
         func newConnection(
             _ listener: QuicListener, connection: QuicConnection, info: ConnectionInfo
@@ -64,7 +110,11 @@ final class MockPeerEventTests {
             }
         }
 
-        func dataReceived(_ stream: QuicStream, data: Data?) {
+        func dataReceived(stream: QuicStream, data: Data?) {
+            if isBackpressureEnabled {
+                backpressure(data!, on: stream)
+                return
+            }
             events.write { events in
                 events.append(.dataReceived(stream: stream, data: data))
             }
@@ -83,7 +133,7 @@ final class MockPeerEventTests {
 
     init() throws {
         registration = try QuicRegistration()
-        let privateKey = try Ed25519.SecretKey(from: Data32())
+        let privateKey = try Ed25519.SecretKey(from: Data32.random())
         certData = try generateSelfSignedCertificate(privateKey: privateKey)
         // Msquic certificate verification passed, custom verification failed
         badCertData = Data(
