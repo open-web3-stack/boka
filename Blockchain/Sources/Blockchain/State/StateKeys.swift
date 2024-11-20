@@ -33,22 +33,22 @@ private func constructKey(_ idx: UInt8, _ service: ServiceIndex) -> Data32 {
     return Data32(data)!
 }
 
-private func constructKey(_ service: ServiceIndex, _ val: UInt32, _: Data) -> Data32 {
-    var data = Data(capacity: 32)
+private func constructKey(_ service: ServiceIndex, _ val: UInt32, _ data: Data) -> Data32 {
+    var stateKey = Data(capacity: 32)
 
     withUnsafeBytes(of: service) { servicePtr in
         withUnsafeBytes(of: val) { valPtr in
-            data.append(servicePtr.load(as: UInt8.self))
-            data.append(valPtr.load(as: UInt8.self))
-            data.append(servicePtr.load(fromByteOffset: 1, as: UInt8.self))
-            data.append(valPtr.load(fromByteOffset: 1, as: UInt8.self))
-            data.append(servicePtr.load(fromByteOffset: 2, as: UInt8.self))
-            data.append(valPtr.load(fromByteOffset: 2, as: UInt8.self))
-            data.append(servicePtr.load(fromByteOffset: 3, as: UInt8.self))
-            data.append(valPtr.load(fromByteOffset: 3, as: UInt8.self))
+            stateKey.append(servicePtr.load(as: UInt8.self))
+            stateKey.append(valPtr.load(as: UInt8.self))
+            stateKey.append(servicePtr.load(fromByteOffset: 1, as: UInt8.self))
+            stateKey.append(valPtr.load(fromByteOffset: 1, as: UInt8.self))
+            stateKey.append(servicePtr.load(fromByteOffset: 2, as: UInt8.self))
+            stateKey.append(valPtr.load(fromByteOffset: 2, as: UInt8.self))
+            stateKey.append(servicePtr.load(fromByteOffset: 3, as: UInt8.self))
+            stateKey.append(valPtr.load(fromByteOffset: 3, as: UInt8.self))
         }
     }
-    data.append(contentsOf: data[relative: 0 ..< 24])
+    stateKey.append(contentsOf: data[relative: 0 ..< 24])
     return Data32(data)!
 }
 
@@ -316,7 +316,7 @@ public enum StateKeys {
         }
 
         public func encode() -> Data32 {
-            constructKey(index, length, hash.blake2b256hash().data)
+            constructKey(index, length, hash.blake2b256hash().data[2...])
         }
     }
 }

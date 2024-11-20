@@ -64,7 +64,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     // P = 6: The slot period, in seconds.
     public var slotPeriodSeconds: Int
 
-    // Q = 80: The maximum number of items in the authorizations queue.
+    // Q = 80: The number of items in the authorizations queue.
     public var maxAuthorizationsQueueItems: Int
 
     // R = 10: The rotation period of validator-core assignments, in timeslots.

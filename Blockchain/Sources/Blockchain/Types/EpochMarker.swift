@@ -1,20 +1,23 @@
 import Utils
 
 public struct EpochMarker: Sendable, Equatable, Codable {
-    public var entropy: Data32
+    public var entropyOne: Data32
+    public var entropyTwo: Data32
     public var validators: ConfigFixedSizeArray<
         BandersnatchPublicKey,
         ProtocolConfig.TotalNumberOfValidators
     >
 
     public init(
-        entropy: Data32,
+        entropyOne: Data32,
+        entropyTwo: Data32,
         validators: ConfigFixedSizeArray<
             BandersnatchPublicKey,
             ProtocolConfig.TotalNumberOfValidators
         >
     ) {
-        self.entropy = entropy
+        self.entropyOne = entropyOne
+        self.entropyTwo = entropyTwo
         self.validators = validators
     }
 }
