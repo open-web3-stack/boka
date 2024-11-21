@@ -74,7 +74,7 @@ struct PVMTests {
     }
 
     @Test(arguments: try loadTests())
-    func testPVM(testCase: Testcase) throws {
+    func testPVM(testCase: Testcase) async throws {
         let decoder = JSONDecoder()
         let testCase = try decoder.decode(PolkaVMTestcase.self, from: testCase.data)
         let program = try ProgramCode(Data(testCase.program))
@@ -90,7 +90,7 @@ struct PVMTests {
             memory: memory
         )
         let engine = Engine(config: DefaultPvmConfig())
-        let exitReason = engine.execute(program: program, state: vmState)
+        let exitReason = await engine.execute(program: program, state: vmState)
         logger.debug("exit reason: \(exitReason)")
         let exitReason2: Status = switch exitReason {
         case .halt:

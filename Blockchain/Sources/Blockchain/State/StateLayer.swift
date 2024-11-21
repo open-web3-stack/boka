@@ -169,6 +169,26 @@ public struct StateLayer: Sendable {
         }
     }
 
+    // ϑ: The accumulation queue.
+    public var accumulationQueue: StateKeys.AccumulationQueueKey.Value {
+        get {
+            changes[StateKeys.AccumulationQueueKey()]!.value()!
+        }
+        set {
+            changes[StateKeys.AccumulationQueueKey()] = .init(newValue)
+        }
+    }
+
+    // ξ: The accumulation history.
+    public var accumulationHistory: StateKeys.AccumulationHistoryKey.Value {
+        get {
+            changes[StateKeys.AccumulationHistoryKey()]!.value()!
+        }
+        set {
+            changes[StateKeys.AccumulationHistoryKey()] = .init(newValue)
+        }
+    }
+
     // δ: The (prior) state of the service accounts.
     public subscript(serviceAccount index: ServiceIndex) -> StateKeys.ServiceAccountKey.Value? {
         get {

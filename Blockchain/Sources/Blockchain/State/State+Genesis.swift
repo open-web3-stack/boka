@@ -37,7 +37,7 @@ extension State {
             headerHash: block.hash,
             mmr: MMR([]),
             stateRoot: Data32(),
-            workReportHashes: ConfigLimitedSizeArray(config: config)
+            lookup: [Data32: Data32]()
         ))
 
         return (StateRef(state), block)

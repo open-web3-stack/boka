@@ -234,13 +234,37 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                 return
             }
             if let upKind = Handler.PresistentHandler.StreamKind(rawValue: byte) {
-                // TODO: handle duplicated UP streams
+                // Check for duplicate UP streams
+                let existingStream = presistentStreams.read { presistentStreams in
+                    presistentStreams[upKind]
+                }
+                if let existingStream {
+                    if existingStream.stream.id < stream.stream.id {
+                        // The new stream has a higher ID, so reset the existing one
+                        existingStream.close(abort: false)
+                        logger.debug(
+                            "Reset older UP stream with lower ID",
+                            metadata: ["existingStreamId": "\(existingStream.stream.id)", "newStreamId": "\(stream.stream.id)"]
+                        )
+                    } else {
+                        // The existing stream has a higher ID or is equal, so reset the new one
+                        stream.close(abort: false)
+                        logger.debug(
+                            "Duplicate UP stream detected, closing new stream with lower or equal ID",
+                            metadata: ["existingStreamId": "\(existingStream.stream.id)", "newStreamId": "\(stream.stream.id)"]
+                        )
+                        return // Exit without replacing the existing stream
+                    }
+                }
+
+                // Write the new stream as the active one for this UP kind
                 presistentStreams.write { presistentStreams in
                     presistentStreams[upKind] = stream
                 }
                 runPresistentStreamLoop(stream: stream, kind: upKind)
                 return
             }
+
             if let ceKind = Handler.EphemeralHandler.StreamKind(rawValue: byte) {
                 logger.debug("stream opened. kind: \(ceKind)")
 

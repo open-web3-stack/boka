@@ -10,9 +10,11 @@ public enum GuaranteeingError: Error {
     case outOfGas
     case invalidContext
     case duplicatedWorkPackage
-    case prerequistieNotFound
+    case prerequisiteNotFound
     case invalidResultCodeHash
+    case invalidServiceGas
     case invalidPublicKey
+    case invalidSegmentLookup
 }
 
 public protocol Guaranteeing {
@@ -38,6 +40,14 @@ public protocol Guaranteeing {
     > { get }
     var recentHistory: RecentHistory { get }
     var offenders: Set<Ed25519PublicKey> { get }
+    var accumulationQueue: ConfigFixedSizeArray<
+        [AccumulationQueueItem],
+        ProtocolConfig.EpochLength
+    > { get }
+    var accumulationHistory: ConfigFixedSizeArray<
+        Set<Data32>,
+        ProtocolConfig.EpochLength
+    > { get }
 
     func serviceAccount(index: ServiceIndex) -> ServiceAccountDetails?
 }
@@ -102,8 +112,12 @@ extension Guaranteeing {
 
         var totalMinGasRequirement = Gas(0)
 
+        var oldLookups = [Data32: Data32]()
+
         for guarantee in extrinsic.guarantees {
             let report = guarantee.workReport
+
+            oldLookups[report.packageSpecification.workPackageHash] = report.packageSpecification.segmentRoot
 
             for credential in guarantee.credential {
                 let isCurrent = (guarantee.timeslot / coreAssignmentRotationPeriod) == (timeslot / coreAssignmentRotationPeriod)
@@ -146,6 +160,10 @@ extension Guaranteeing {
                     throw .invalidResultCodeHash
                 }
 
+                guard result.gasRatio >= acc.minAccumlateGas else {
+                    throw .invalidServiceGas
+                }
+
                 totalMinGasRequirement += acc.minAccumlateGas
             }
         }
@@ -154,14 +172,24 @@ extension Guaranteeing {
             throw .outOfGas
         }
 
-        let allRecentWorkReportHashes = Set(recentHistory.items.flatMap(\.workReportHashes.array))
-        guard allRecentWorkReportHashes.isDisjoint(with: workReportHashes) else {
+        let recentWorkReportHashes: Set<Data32> = Set(recentHistory.items.flatMap(\.lookup.keys))
+        let accumulateHistoryReports = Set(accumulationHistory.array.flatMap { $0 })
+        let accumulateQueueReports = Set(accumulationQueue.array.flatMap { $0 }
+            .flatMap(\.workReport.refinementContext.prerequisiteWorkPackages))
+        let pendingWorkReportHashes = Set(reports.array.flatMap { $0?.workReport.refinementContext.prerequisiteWorkPackages ?? [] })
+        let pipelinedWorkReportHashes = recentWorkReportHashes.union(accumulateHistoryReports).union(accumulateQueueReports)
+            .union(pendingWorkReportHashes)
+        guard pipelinedWorkReportHashes.isDisjoint(with: workReportHashes) else {
             throw .duplicatedWorkPackage
         }
 
-        let contexts = Set(extrinsic.guarantees.map(\.workReport.refinementContext))
+        for item in recentHistory.items {
+            oldLookups.merge(item.lookup, uniquingKeysWith: { _, new in new })
+        }
 
-        for context in contexts {
+        for guarantee in extrinsic.guarantees {
+            let report = guarantee.workReport
+            let context = report.refinementContext
             let history = recentHistory.items.first { $0.headerHash == context.anchor.headerHash }
             guard let history else {
                 throw .invalidContext
@@ -172,15 +200,21 @@ extension Guaranteeing {
             guard context.anchor.beefyRoot == history.mmr.hash() else {
                 throw .invalidContext
             }
-            guard context.lokupAnchor.timeslot >= timeslot - UInt32(config.value.maxLookupAnchorAge) else {
+            guard context.lookupAnchor.timeslot >= timeslot - UInt32(config.value.maxLookupAnchorAge) else {
                 throw .invalidContext
             }
 
-            if let prerequistieWorkPackage = context.prerequistieWorkPackage {
-                guard allRecentWorkReportHashes.contains(prerequistieWorkPackage) ||
-                    workReportHashes.contains(prerequistieWorkPackage)
+            for prerequisiteWorkPackage in context.prerequisiteWorkPackages.union(report.lookup.keys) {
+                guard recentWorkReportHashes.contains(prerequisiteWorkPackage) ||
+                    workReportHashes.contains(prerequisiteWorkPackage)
                 else {
-                    throw .prerequistieNotFound
+                    throw .prerequisiteNotFound
+                }
+            }
+
+            for (hash, root) in report.lookup {
+                guard oldLookups[hash] == root else {
+                    throw .invalidSegmentLookup
                 }
             }
         }

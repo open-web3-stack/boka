@@ -144,6 +144,124 @@ struct PeerTests {
     }
 
     @Test
+    func reopenUpStream() async throws {
+        let handler2 = MockPresentStreamHandler()
+        var messageData = Data("reopen up stream".utf8)
+        let peer1 = try Peer(
+            options: PeerOptions<MockStreamHandler>(
+                role: .validator,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+                genesisHeader: Data32(),
+                secretKey: Ed25519.SecretKey(from: Data32.random()),
+                presistentStreamHandler: MockPresentStreamHandler(),
+                ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                serverSettings: .defaultSettings,
+                clientSettings: .defaultSettings
+            )
+        )
+        let peer2 = try Peer(
+            options: PeerOptions<MockStreamHandler>(
+                role: .validator,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+                genesisHeader: Data32(),
+                secretKey: Ed25519.SecretKey(from: Data32.random()),
+                presistentStreamHandler: handler2,
+                ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                serverSettings: .defaultSettings,
+                clientSettings: .defaultSettings
+            )
+        )
+        try? await Task.sleep(for: .milliseconds(100))
+
+        let connection = try peer1.connect(
+            to: peer2.listenAddress(), role: .validator
+        )
+        try? await Task.sleep(for: .milliseconds(100))
+
+        peer1.broadcast(
+            kind: .uniqueA, message: .init(kind: .uniqueA, data: messageData)
+        )
+        try? await Task.sleep(for: .milliseconds(100))
+        let lastReceivedData = await handler2.lastReceivedData
+        #expect(lastReceivedData == messageData)
+
+        try? await Task.sleep(for: .milliseconds(100))
+        // Simulate abnormal close stream
+        let stream = connection.presistentStreams.read { presistentStreams in
+            presistentStreams[.uniqueA]
+        }
+        stream!.close(abort: true)
+        // Wait to simulate downtime & reopen up stream 3~5s
+        try? await Task.sleep(for: .milliseconds(3000))
+        messageData = Data("reopen up stream data".utf8)
+        peer1.broadcast(
+            kind: .uniqueA, message: .init(kind: .uniqueA, data: messageData)
+        )
+        try await Task.sleep(for: .milliseconds(1000))
+        let lastReceivedData2 = await handler2.lastReceivedData
+        #expect(lastReceivedData2 == messageData)
+    }
+
+    @Test
+    func regularClosedStream() async throws {
+        let handler2 = MockPresentStreamHandler()
+        var messageData = Data("reopen up stream".utf8)
+        let peer1 = try Peer(
+            options: PeerOptions<MockStreamHandler>(
+                role: .validator,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+                genesisHeader: Data32(),
+                secretKey: Ed25519.SecretKey(from: Data32.random()),
+                presistentStreamHandler: MockPresentStreamHandler(),
+                ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                serverSettings: .defaultSettings,
+                clientSettings: .defaultSettings
+            )
+        )
+        let peer2 = try Peer(
+            options: PeerOptions<MockStreamHandler>(
+                role: .validator,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+                genesisHeader: Data32(),
+                secretKey: Ed25519.SecretKey(from: Data32.random()),
+                presistentStreamHandler: handler2,
+                ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                serverSettings: .defaultSettings,
+                clientSettings: .defaultSettings
+            )
+        )
+        try? await Task.sleep(for: .milliseconds(100))
+
+        let connection = try peer1.connect(
+            to: peer2.listenAddress(), role: .validator
+        )
+        try? await Task.sleep(for: .milliseconds(100))
+
+        peer1.broadcast(
+            kind: .uniqueA, message: .init(kind: .uniqueA, data: messageData)
+        )
+        try? await Task.sleep(for: .milliseconds(100))
+        let lastReceivedData = await handler2.lastReceivedData
+        #expect(lastReceivedData == messageData)
+
+        try? await Task.sleep(for: .milliseconds(100))
+        // Simulate regular close stream
+        let stream = connection.presistentStreams.read { presistentStreams in
+            presistentStreams[.uniqueA]
+        }
+        stream!.close(abort: false)
+        // Wait to simulate downtime
+        try? await Task.sleep(for: .milliseconds(3000))
+        messageData = Data("close up stream".utf8)
+        peer1.broadcast(
+            kind: .uniqueA, message: .init(kind: .uniqueA, data: messageData)
+        )
+        try await Task.sleep(for: .milliseconds(1000))
+        let lastReceivedData2 = await handler2.lastReceivedData
+        #expect(lastReceivedData2 != messageData)
+    }
+
+    @Test
     func concurrentPeerConnection() async throws {
         let peer1 = try Peer(
             options: PeerOptions<MockStreamHandler>(
@@ -611,10 +729,11 @@ struct PeerTests {
                 data: Data("Message from peer \(i)".utf8)
             )
             peer.broadcast(kind: message.kind, message: message)
+            try? await Task.sleep(for: .milliseconds(50))
         }
 
         // Wait for message propagation
-        try? await Task.sleep(for: .milliseconds(100))
+        try? await Task.sleep(for: .milliseconds(1000))
 
         // everyone should receive two messages
         for (idx, handler) in handlers.enumerated() {
