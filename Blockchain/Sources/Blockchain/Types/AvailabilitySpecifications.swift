@@ -15,7 +15,7 @@ public struct AvailabilitySpecifications: Sendable, Equatable, Codable {
     public var segmentRoot: Data32
 
     // n
-    public var segmentCount: Int
+    public var segmentCount: UInt16
 
     public init(
         workPackageHash: Data32,

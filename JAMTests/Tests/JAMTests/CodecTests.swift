@@ -178,6 +178,7 @@ struct CodecTests {
                 "len": json["length"]!,
                 "erasure_root": json["erasureRoot"]!,
                 "exports_root": json["segmentRoot"]!,
+                "exports_count": json["segmentCount"]!,
             ].json
         }
         if let value = value as? ExtrinsicGuarantees {
