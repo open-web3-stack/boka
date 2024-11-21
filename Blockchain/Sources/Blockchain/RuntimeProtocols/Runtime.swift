@@ -60,18 +60,7 @@ public final class Runtime {
             throw Error.invalidHeaderStateRoot
         }
 
-        let expectedExtrinsicHash = try Result { try JamEncoder.encode([
-            JamEncoder.encode(block.extrinsic.tickets).blake2b256hash(),
-            JamEncoder.encode(block.extrinsic.preimages).blake2b256hash(),
-            JamEncoder.encode(block.extrinsic.reports.guarantees.array.map { item in
-                try JamEncoder.encode(item.workReport.hash()) + JamEncoder.encode(item.timeslot) + JamEncoder.encode(item.credential)
-            }).blake2b256hash(),
-            JamEncoder.encode(block.extrinsic.availability).blake2b256hash(),
-            JamEncoder.encode(block.extrinsic.disputes).blake2b256hash(),
-        ]).blake2b256hash() }
-            .mapError(Error.encodeError).get()
-
-        guard block.header.extrinsicsHash == expectedExtrinsicHash else {
+        guard block.header.extrinsicsHash == block.extrinsic.hash() else {
             throw Error.invalidExtrinsicHash
         }
 

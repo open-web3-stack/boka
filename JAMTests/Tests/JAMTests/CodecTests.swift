@@ -102,11 +102,11 @@ struct CodecTests {
         if value is RefinementContext {
             return [
                 "anchor": json["anchor"]!["headerHash"]!,
+                "state_root": json["anchor"]!["stateRoot"]!,
                 "beefy_root": json["anchor"]!["beefyRoot"]!,
                 "lookup_anchor": json["lookupAnchor"]!["headerHash"]!,
                 "lookup_anchor_slot": json["lookupAnchor"]!["timeslot"]!,
-                "prerequisite": json["prerequisiteWorkPackages"] ?? .null,
-                "state_root": json["anchor"]!["stateRoot"]!,
+                "prerequisites": json["prerequisiteWorkPackages"] ?? .null,
             ].json
         }
         if value is ExtrinsicTickets {
@@ -122,7 +122,7 @@ struct CodecTests {
                 "code_hash": json["codeHash"]!,
                 "gas": json["gasRatio"]!,
                 "payload_hash": json["payloadHash"]!,
-                "service": json["serviceIndex"]!,
+                "service_id": json["serviceIndex"]!,
                 "result": json["output"]!["success"] == nil ? json["output"]! : [
                     "ok": json["output"]!["success"]!,
                 ].json,
@@ -175,7 +175,7 @@ struct CodecTests {
         if value is AvailabilitySpecifications {
             return [
                 "hash": json["workPackageHash"]!,
-                "len": json["length"]!,
+                "length": json["length"]!,
                 "erasure_root": json["erasureRoot"]!,
                 "exports_root": json["segmentRoot"]!,
                 "exports_count": json["segmentCount"]!,
@@ -198,10 +198,10 @@ struct CodecTests {
         if let value = value as? Extrinsic {
             return [
                 "tickets": transform(json["tickets"]!, value: value.tickets),
-                "disputes": transform(json["disputes"]!, value: value.disputes),
                 "preimages": transform(json["preimages"]!, value: value.preimages),
-                "assurances": transform(json["availability"]!, value: value.availability),
                 "guarantees": transform(json["reports"]!, value: value.reports),
+                "assurances": transform(json["availability"]!, value: value.availability),
+                "disputes": transform(json["disputes"]!, value: value.disputes),
             ].json
         }
         if let value = value as? Header {
@@ -243,10 +243,8 @@ struct CodecTests {
 
     @Test
     func block() throws {
-        withKnownIssue("waiting for refine_context.prerequisite updates", isIntermittent: true) {
-            let (actual, expected) = try Self.test(Block.self, path: "block")
-            #expect(actual == expected)
-        }
+        let (actual, expected) = try Self.test(Block.self, path: "block")
+        #expect(actual == expected)
     }
 
     @Test
@@ -257,18 +255,14 @@ struct CodecTests {
 
     @Test
     func extrinsic() throws {
-        withKnownIssue("waiting for refine_context.prerequisite updates", isIntermittent: true) {
-            let (actual, expected) = try Self.test(Extrinsic.self, path: "extrinsic")
-            #expect(actual == expected)
-        }
+        let (actual, expected) = try Self.test(Extrinsic.self, path: "extrinsic")
+        #expect(actual == expected)
     }
 
     @Test
     func guarantees_extrinsic() throws {
-        withKnownIssue("waiting for refine_context.prerequisite updates", isIntermittent: true) {
-            let (actual, expected) = try Self.test(ExtrinsicGuarantees.self, path: "guarantees_extrinsic")
-            #expect(actual == expected)
-        }
+        let (actual, expected) = try Self.test(ExtrinsicGuarantees.self, path: "guarantees_extrinsic")
+        #expect(actual == expected)
     }
 
     @Test
@@ -291,10 +285,8 @@ struct CodecTests {
 
     @Test
     func refine_context() throws {
-        withKnownIssue("waiting for refine_context.prerequisite updates", isIntermittent: true) {
-            let (actual, expected) = try Self.test(RefinementContext.self, path: "refine_context")
-            #expect(actual == expected)
-        }
+        let (actual, expected) = try Self.test(RefinementContext.self, path: "refine_context")
+        #expect(actual == expected)
     }
 
     @Test
@@ -311,18 +303,14 @@ struct CodecTests {
 
     @Test
     func work_package() throws {
-        withKnownIssue("waiting for refine_context.prerequisite updates", isIntermittent: true) {
-            let (actual, expected) = try Self.test(WorkPackage.self, path: "work_package")
-            #expect(actual == expected)
-        }
+        let (actual, expected) = try Self.test(WorkPackage.self, path: "work_package")
+        #expect(actual == expected)
     }
 
     @Test
     func work_report() throws {
-        withKnownIssue("waiting for refine_context.prerequisite updates", isIntermittent: true) {
-            let (actual, expected) = try Self.test(WorkReport.self, path: "work_report")
-            #expect(actual == expected)
-        }
+        let (actual, expected) = try Self.test(WorkReport.self, path: "work_report")
+        #expect(actual == expected)
     }
 
     @Test

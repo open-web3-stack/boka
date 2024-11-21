@@ -22,7 +22,7 @@ public struct AvailabilitySpecifications: Sendable, Equatable, Codable {
         length: DataLength,
         erasureRoot: Data32,
         segmentRoot: Data32,
-        segmentCount: Int
+        segmentCount: UInt16
     ) {
         self.workPackageHash = workPackageHash
         self.length = length
