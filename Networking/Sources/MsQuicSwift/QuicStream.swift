@@ -71,7 +71,7 @@ public final class QuicStream: Sendable {
     }
 
     public func shutdown(errorCode: QuicErrorCode = .success) throws {
-        logger.debug("closing stream \(errorCode)")
+        logger.info("closing stream \(errorCode)")
 
         try storage.write { storage in
             guard let storage2 = storage else {

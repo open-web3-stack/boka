@@ -7,6 +7,11 @@ import Utils
 
 final class MockPeerEventTests {
     final class MockPeerEventHandler: QuicEventHandler {
+        enum MockPeerAction {
+            case none
+            case mockHandshakeFailure
+        }
+
         enum EventType {
             case newConnection(listener: QuicListener, connection: QuicConnection, info: ConnectionInfo)
             case shouldOpen(connection: QuicConnection, certificate: Data?)
@@ -18,12 +23,18 @@ final class MockPeerEventTests {
         }
 
         let events: ThreadSafeContainer<[EventType]> = .init([])
+        let mockAction: MockPeerAction
 
-        init() {}
+        init(_ action: MockPeerAction = .none) {
+            mockAction = action
+        }
 
         func newConnection(
             _ listener: QuicListener, connection: QuicConnection, info: ConnectionInfo
         ) -> QuicStatus {
+            if mockAction == .mockHandshakeFailure {
+                return .code(.handshakeFailure)
+            }
             events.write { events in
                 events.append(.newConnection(listener: listener, connection: connection, info: info))
             }
@@ -169,7 +180,7 @@ final class MockPeerEventTests {
     func connected() async throws {
         let serverHandler = MockPeerEventHandler()
         let clientHandler = MockPeerEventHandler()
-        let privateKey1 = try Ed25519.SecretKey(from: Data32())
+        let privateKey1 = try Ed25519.SecretKey(from: Data32.random())
         let cert = try generateSelfSignedCertificate(privateKey: privateKey1)
         let serverConfiguration = try QuicConfiguration(
             registration: registration,
