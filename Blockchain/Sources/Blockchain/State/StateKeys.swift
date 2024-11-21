@@ -49,7 +49,7 @@ private func constructKey(_ service: ServiceIndex, _ val: UInt32, _ data: Data) 
         }
     }
     stateKey.append(contentsOf: data[relative: 0 ..< 24])
-    return Data32(data)!
+    return Data32(stateKey)!
 }
 
 public enum StateKeys {
