@@ -172,20 +172,20 @@ public struct StateLayer: Sendable {
     // ϑ: The accumulation queue.
     public var accumulationQueue: StateKeys.AccumulationQueueKey.Value {
         get {
-            changes[StateKeys.AccumulationQueueKey()]!.value()!
+            changes[StateKeys.AccumulationQueueKey().encode()]!.value()!
         }
         set {
-            changes[StateKeys.AccumulationQueueKey()] = .init(newValue)
+            changes[StateKeys.AccumulationQueueKey().encode()] = .init(newValue)
         }
     }
 
     // ξ: The accumulation history.
     public var accumulationHistory: StateKeys.AccumulationHistoryKey.Value {
         get {
-            changes[StateKeys.AccumulationHistoryKey()]!.value()!
+            changes[StateKeys.AccumulationHistoryKey().encode()]!.value()!
         }
         set {
-            changes[StateKeys.AccumulationHistoryKey()] = .init(newValue)
+            changes[StateKeys.AccumulationHistoryKey().encode()] = .init(newValue)
         }
     }
 
