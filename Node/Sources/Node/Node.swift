@@ -15,12 +15,20 @@ public class Node {
         public var network: NetworkConfig
         public var peers: [NetAddr]
         public var local: Bool
+        public var name: String?
 
-        public init(rpc: RPCConfig?, network: NetworkConfig, peers: [NetAddr] = [], local: Bool = false) {
+        public init(
+            rpc: RPCConfig?,
+            network: NetworkConfig,
+            peers: [NetAddr] = [],
+            local: Bool = false,
+            name: String? = nil
+        ) {
             self.rpc = rpc
             self.network = network
             self.peers = peers
             self.local = local
+            self.name = name
         }
     }
 
@@ -71,7 +79,12 @@ public class Node {
             devPeers: Set(config.peers)
         )
 
-        let nodeDataSource = NodeDataSource(blockchain: blockchain, chainDataProvider: dataProvider, networkManager: network)
+        let nodeDataSource = NodeDataSource(
+            blockchain: blockchain,
+            chainDataProvider: dataProvider,
+            networkManager: network,
+            name: config.name
+        )
 
         rpcServer = try config.rpc.map {
             try Server(config: $0, source: nodeDataSource)

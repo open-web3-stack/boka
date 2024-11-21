@@ -230,6 +230,14 @@ public struct State: Sendable {
             await backend.rootHash
         }
     }
+
+    public func read(key: Data32) async throws -> Data? {
+        let res = try layer[key].map { try JamEncoder.encode($0) }
+        if let res {
+            return res
+        }
+        return try await backend.readRaw(key)
+    }
 }
 
 extension State {
