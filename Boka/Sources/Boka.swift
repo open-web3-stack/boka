@@ -167,7 +167,8 @@ struct Boka: AsyncParsableCommand {
             rpc: rpcConfig,
             network: networkConfig,
             peers: peers,
-            local: local
+            local: local,
+            name: name
         )
 
         let node: Node = if validator {

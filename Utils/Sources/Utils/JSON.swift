@@ -74,6 +74,14 @@ extension JSON: CustomDebugStringConvertible {
     }
 }
 
+extension JSON: ExpressibleByIntegerLiteral {
+    public typealias IntegerLiteralType = Int32
+
+    public init(integerLiteral value: Int32) {
+        self = .number(Double(value))
+    }
+}
+
 extension JSON {
     public subscript(key: Any) -> JSON? {
         if let array, let index = key as? Int, index < array.count {

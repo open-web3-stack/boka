@@ -47,9 +47,13 @@ public final class StateBackend: Sendable {
         return ret
     }
 
-    public func write(_ values: any Sequence<(key: any StateKey, value: (Codable & Sendable)?)>) async throws {
-        try await trie.update(values.map { try (key: $0.key.encode(), value: $0.value.map { try JamEncoder.encode($0) }) })
+    public func write(_ values: any Sequence<(key: Data32, value: (Codable & Sendable)?)>) async throws {
+        try await trie.update(values.map { try (key: $0.key, value: $0.value.map { try JamEncoder.encode($0) }) })
         try await trie.save()
+    }
+
+    public func readRaw(_ key: Data32) async throws -> Data? {
+        try await trie.read(key: key)
     }
 
     public func writeRaw(_ values: [(key: Data32, value: Data?)]) async throws {
