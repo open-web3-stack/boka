@@ -102,7 +102,7 @@ public final class QuicConnection: Sendable {
     }
 
     public func connect(to address: NetAddr) throws {
-        logger.info("connecting to \(address)")
+        logger.debug("connecting to \(address)")
         try storage.write { storage in
             guard var storage2 = storage else {
                 throw QuicError.alreadyClosed
@@ -124,8 +124,14 @@ public final class QuicConnection: Sendable {
         }
     }
 
+    fileprivate func close() {
+        storage.write { storage in
+            storage = nil
+        }
+    }
+
     public func shutdown(errorCode: QuicErrorCode = .success) throws {
-        logger.info("closing connection")
+        logger.debug("closing connection")
         try storage.write { storage in
             guard let storage2 = storage else {
                 throw QuicError.alreadyClosed
@@ -146,7 +152,7 @@ public final class QuicConnection: Sendable {
     }
 
     public func createStream() throws -> QuicStream {
-        logger.info("creating stream")
+        logger.debug("creating stream")
 
         return try storage.read { storage in
             guard let storage, storage.state == .started else {
@@ -204,7 +210,7 @@ private class ConnectionHandle {
     fileprivate func callbackHandler(event: UnsafePointer<QUIC_CONNECTION_EVENT>) -> QuicStatus {
         switch event.pointee.Type {
         case QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED:
-            logger.info("Peer certificate received")
+            logger.debug("Peer certificate received")
             if let connection {
                 let evtData = event.pointee.PEER_CERTIFICATE_RECEIVED
                 let data: Data?
@@ -233,7 +239,7 @@ private class ConnectionHandle {
                     connection.handler.shutdownInitiated(connection, reason: .idle)
                 }
             } else {
-                logger.info("Shut down by transport. Status: \(status) Error: \(evtData.ErrorCode)")
+                logger.debug("Shut down by transport. Status: \(status) Error: \(evtData.ErrorCode)")
                 if let connection {
                     connection.handler.shutdownInitiated(
                         connection,
@@ -243,19 +249,20 @@ private class ConnectionHandle {
             }
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
-            logger.info("Shut down by peer. Error: \(event.pointee.SHUTDOWN_INITIATED_BY_PEER.ErrorCode)")
+            logger.debug("Shut down by peer. Error: \(event.pointee.SHUTDOWN_INITIATED_BY_PEER.ErrorCode)")
             if let connection {
                 let errorCode = QuicErrorCode(event.pointee.SHUTDOWN_INITIATED_BY_PEER.ErrorCode)
                 connection.handler.shutdownInitiated(connection, reason: .byPeer(code: errorCode))
             }
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
-            logger.info("Shutdown complete")
+            logger.debug("Shutdown complete")
             if let connection {
                 connection.handler.shutdownComplete(connection)
             }
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 // avoid closing twice
+                connection?.close()
                 api.call { api in
                     api.pointee.ConnectionClose(ptr)
                 }
@@ -263,7 +270,7 @@ private class ConnectionHandle {
             Unmanaged.passUnretained(self).release() // !! release -1
 
         case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
-            logger.info("Peer stream started")
+            logger.debug("Peer stream started")
             let streamPtr = event.pointee.PEER_STREAM_STARTED.Stream
             if let connection {
                 let stream = QuicStream(connection: connection, stream: streamPtr!, handler: connection.handler)

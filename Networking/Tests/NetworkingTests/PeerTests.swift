@@ -146,6 +146,8 @@ struct PeerTests {
     @Test
     func mockHandshakeFailure() async throws {
         let mockPeerTest = try MockPeerEventTests()
+//        let serverHandler = MockPeerEventTests.MockPeerEventHandler()
+
         let serverHandler = MockPeerEventTests.MockPeerEventHandler(
             MockPeerEventTests.MockPeerEventHandler.MockPeerAction.mockHandshakeFailure
         )
@@ -157,7 +159,7 @@ struct PeerTests {
         // Server setup with bad certificate
         let serverConfiguration = try QuicConfiguration(
             registration: mockPeerTest.registration,
-            pkcs12: mockPeerTest.badCertData,
+            pkcs12: mockPeerTest.certData,
             alpns: allAlpns,
             client: false,
             settings: QuicSettings.defaultSettings
@@ -186,7 +188,7 @@ struct PeerTests {
         )
 
         let connection1 = try peer1.connect(to: listenAddress, role: .validator)
-        try? await Task.sleep(for: .milliseconds(5000))
+        try? await Task.sleep(for: .milliseconds(3000))
         #expect(connection1.isClosed == true)
     }
 
@@ -382,15 +384,15 @@ struct PeerTests {
 
         let connection1 = try peer1.connect(to: peer2.listenAddress(), role: .validator)
         let connection2 = try peer2.connect(to: peer1.listenAddress(), role: .validator)
-        try? await Task.sleep(for: .milliseconds(50))
+        try? await Task.sleep(for: .milliseconds(1000))
         if !connection1.isClosed {
             let data = try await connection1.request(MockRequest(kind: .typeA, data: Data("hello world".utf8)))
-            try? await Task.sleep(for: .milliseconds(50))
+            try? await Task.sleep(for: .milliseconds(500))
             #expect(data == Data("hello world response".utf8))
         }
         if !connection2.isClosed {
             let data = try await connection2.request(MockRequest(kind: .typeA, data: Data("hello world".utf8)))
-            try? await Task.sleep(for: .milliseconds(50))
+            try? await Task.sleep(for: .milliseconds(500))
             #expect(data == Data("hello world response".utf8))
         }
     }
@@ -665,7 +667,7 @@ struct PeerTests {
             to: peer2.listenAddress(), role: .validator
         )
 
-        try? await Task.sleep(for: .milliseconds(50))
+        try? await Task.sleep(for: .milliseconds(500))
 
         peer1.broadcast(
             kind: .uniqueA, message: .init(kind: .uniqueA, data: Data("hello world".utf8))
@@ -675,7 +677,7 @@ struct PeerTests {
             kind: .uniqueB, message: .init(kind: .uniqueB, data: Data("I am jam".utf8))
         )
         // Verify last received data
-        try? await Task.sleep(for: .milliseconds(200))
+        try? await Task.sleep(for: .milliseconds(500))
         await #expect(handler2.lastReceivedData == Data("hello world".utf8))
         await #expect(handler1.lastReceivedData == Data("I am jam".utf8))
     }

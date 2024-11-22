@@ -32,9 +32,6 @@ final class MockPeerEventTests {
         func newConnection(
             _ listener: QuicListener, connection: QuicConnection, info: ConnectionInfo
         ) -> QuicStatus {
-            if mockAction == .mockHandshakeFailure {
-                return .code(.handshakeFailure)
-            }
             events.write { events in
                 events.append(.newConnection(listener: listener, connection: connection, info: info))
             }
@@ -43,6 +40,9 @@ final class MockPeerEventTests {
         }
 
         func shouldOpen(_: QuicConnection, certificate: Data?) -> QuicStatus {
+            if mockAction == .mockHandshakeFailure {
+                return .code(.handshakeFailure)
+            }
             guard let certificate else {
                 return .code(.requiredCert)
             }
