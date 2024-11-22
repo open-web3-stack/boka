@@ -186,7 +186,7 @@ extension Accumulation {
             }
 
             switch service {
-            case privilegedServices.empower:
+            case privilegedServices.blessed:
                 newPrivilegedServices = singleOutput.state.privilegedServices
             case privilegedServices.assign:
                 newAuthorizationQueue = singleOutput.state.authorizationQueue

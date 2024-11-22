@@ -282,7 +282,7 @@ extension State: Dummy {
         let authorizationQueue: StateKeys.AuthorizationQueueKey.Value =
             try! ConfigFixedSizeArray(config: config, defaultValue: ConfigFixedSizeArray(config: config, defaultValue: Data32()))
         let privilegedServices: StateKeys.PrivilegedServicesKey.Value = PrivilegedServices(
-            empower: ServiceIndex(),
+            blessed: ServiceIndex(),
             assign: ServiceIndex(),
             designate: ServiceIndex(),
             basicGas: [:]
