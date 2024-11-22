@@ -146,8 +146,6 @@ struct PeerTests {
     @Test
     func mockHandshakeFailure() async throws {
         let mockPeerTest = try MockPeerEventTests()
-//        let serverHandler = MockPeerEventTests.MockPeerEventHandler()
-
         let serverHandler = MockPeerEventTests.MockPeerEventHandler(
             MockPeerEventTests.MockPeerEventHandler.MockPeerAction.mockHandshakeFailure
         )
