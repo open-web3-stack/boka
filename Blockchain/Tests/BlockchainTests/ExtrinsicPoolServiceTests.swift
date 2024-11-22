@@ -144,7 +144,7 @@ struct ExtrinsicPoolServiceTests {
         let blockTickets = Array(tickets[0 ..< 2])
         let extrinsic = try Extrinsic(
             tickets: ExtrinsicTickets(tickets: ConfigLimitedSizeArray(config: config, array: blockTickets.map(\.ticket))),
-            judgements: ExtrinsicDisputes.dummy(config: config),
+            disputes: ExtrinsicDisputes.dummy(config: config),
             preimages: ExtrinsicPreimages.dummy(config: config),
             availability: ExtrinsicAvailability.dummy(config: config),
             reports: ExtrinsicGuarantees.dummy(config: config)

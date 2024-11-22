@@ -3,7 +3,7 @@ import Utils
 
 public struct PrivilegedServices: Sendable, Equatable, Codable {
     // m
-    public var empower: ServiceIndex
+    public var blessed: ServiceIndex
     // a
     public var assign: ServiceIndex
     // v
@@ -11,8 +11,8 @@ public struct PrivilegedServices: Sendable, Equatable, Codable {
     // g
     @CodingAs<SortedKeyValues<ServiceIndex, Gas>> public var basicGas: [ServiceIndex: Gas]
 
-    public init(empower: ServiceIndex, assign: ServiceIndex, designate: ServiceIndex, basicGas: [ServiceIndex: Gas]) {
-        self.empower = empower
+    public init(blessed: ServiceIndex, assign: ServiceIndex, designate: ServiceIndex, basicGas: [ServiceIndex: Gas]) {
+        self.blessed = blessed
         self.assign = assign
         self.designate = designate
         self.basicGas = basicGas

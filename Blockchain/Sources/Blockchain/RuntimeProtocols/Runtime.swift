@@ -60,10 +60,7 @@ public final class Runtime {
             throw Error.invalidHeaderStateRoot
         }
 
-        let expectedExtrinsicHash = try Result { try JamEncoder.encode(block.extrinsic).blake2b256hash() }
-            .mapError(Error.encodeError).get()
-
-        guard block.header.extrinsicsHash == expectedExtrinsicHash else {
+        guard block.header.extrinsicsHash == block.extrinsic.hash() else {
             throw Error.invalidExtrinsicHash
         }
 
@@ -297,7 +294,7 @@ public final class Runtime {
     }
 
     public func updateDisputes(block: BlockRef, state newState: inout State) throws {
-        let (posState, offenders) = try newState.update(config: config, disputes: block.extrinsic.judgements)
+        let (posState, offenders) = try newState.update(config: config, disputes: block.extrinsic.disputes)
         newState.mergeWith(postState: posState)
 
         guard offenders == block.header.offendersMarkers else {
@@ -379,7 +376,7 @@ public final class Runtime {
         return availableReports
     }
 
-    public func updatePreimages(block: BlockRef, state newState: inout State) async throws {
+    public func updatePreimages(block: BlockRef, state newState: inout State, prevState: StateRef) async throws {
         let preimages = block.extrinsic.preimages.preimages
 
         guard preimages.isSortedAndUnique() else {
@@ -388,14 +385,26 @@ public final class Runtime {
 
         for preimage in preimages {
             let hash = preimage.data.blake2b256hash()
+
+            // check prior state
+            let prevPreimageData: Data? = try await prevState.value.get(serviceAccount: preimage.serviceIndex, preimageHash: hash)
+            let prevInfo = try await prevState.value.get(
+                serviceAccount: preimage.serviceIndex, preimageHash: hash, length: UInt32(preimage.data.count)
+            )
+            guard prevPreimageData == nil, prevInfo == nil else {
+                throw Error.duplicatedPreimage
+            }
+
+            // disregard no longer useful ones in new state
             let preimageData: Data? = try await newState.get(serviceAccount: preimage.serviceIndex, preimageHash: hash)
             let info = try await newState.get(
                 serviceAccount: preimage.serviceIndex, preimageHash: hash, length: UInt32(preimage.data.count)
             )
-            guard preimageData == nil, info == nil else {
-                throw Error.duplicatedPreimage
+            if preimageData != nil || info != nil {
+                continue
             }
 
+            // update state
             newState[serviceAccount: preimage.serviceIndex, preimageHash: hash] = preimage.data
             newState[
                 serviceAccount: preimage.serviceIndex, preimageHash: hash, length: UInt32(preimage.data.count)
