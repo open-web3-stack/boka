@@ -28,7 +28,7 @@ extension OnTransferFunction {
         _ = await invokePVM(
             config: config,
             blob: account.codeHash.data,
-            pc: 15,
+            pc: 10,
             gas: gasLimitSum,
             argumentData: argument,
             ctx: ctx

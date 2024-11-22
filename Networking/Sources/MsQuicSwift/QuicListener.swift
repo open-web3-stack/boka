@@ -132,7 +132,7 @@ private final class ListenerHandle: Sendable {
                 localAddress: NetAddr(quicAddr: evtInfo.pointee.LocalAddress.pointee),
                 remoteAddress: NetAddr(quicAddr: evtInfo.pointee.RemoteAddress.pointee),
                 negotiatedAlpn: Data(bytes: evtInfo.pointee.NegotiatedAlpn, count: Int(evtInfo.pointee.NegotiatedAlpnLength)),
-                serverName: String(
+                serverName: evtInfo.pointee.ServerNameLength == 0 ? "" : String(
                     bytes: Data(bytes: evtInfo.pointee.ServerName, count: Int(evtInfo.pointee.ServerNameLength)),
                     encoding: .utf8
                 ) ?? ""

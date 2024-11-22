@@ -5,13 +5,15 @@ import TracingUtils
 import Vapor
 import XCTVapor
 
+struct DummySource: SystemDataSource {}
+
 final class JSONRPCControllerTests {
     var app: Application
 
     init() throws {
         app = Application(.testing)
 
-        let rpcController = JSONRPCController(handlers: SystemHandler.getHandlers())
+        let rpcController = JSONRPCController(handlers: SystemHandlers.getHandlers(source: DummySource()))
         try app.register(collection: rpcController)
     }
 

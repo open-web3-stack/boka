@@ -75,7 +75,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
 
         let extrinsic = try Extrinsic(
             tickets: ExtrinsicTickets(tickets: ConfigLimitedSizeArray(config: config, array: Array(tickets))),
-            judgements: ExtrinsicDisputes.dummy(config: config), // TODO:
+            disputes: ExtrinsicDisputes.dummy(config: config), // TODO:
             preimages: ExtrinsicPreimages.dummy(config: config), // TODO:
             availability: ExtrinsicAvailability.dummy(config: config), // TODO:
             reports: ExtrinsicGuarantees.dummy(config: config) // TODO:
