@@ -124,6 +124,12 @@ public final class QuicConnection: Sendable {
         }
     }
 
+    fileprivate func close() {
+        storage.write { storage in
+            storage = nil
+        }
+    }
+
     public func shutdown(errorCode: QuicErrorCode = .success) throws {
         logger.debug("closing connection")
         try storage.write { storage in
@@ -250,12 +256,13 @@ private class ConnectionHandle {
             }
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
-            logger.trace("Shutdown complete")
+            logger.debug("Shutdown complete")
             if let connection {
                 connection.handler.shutdownComplete(connection)
             }
             if event.pointee.SHUTDOWN_COMPLETE.AppCloseInProgress == 0 {
                 // avoid closing twice
+                connection?.close()
                 api.call { api in
                     api.pointee.ConnectionClose(ptr)
                 }
