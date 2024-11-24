@@ -115,7 +115,7 @@ public final class QuicStream: Sendable {
 
             let sendBuffer = sendBufferRaw.assumingMemoryBound(to: QUIC_BUFFER.self)
             let bufferPointer = sendBufferRaw.advanced(by: MemoryLayout<QUIC_BUFFER>.size).assumingMemoryBound(to: UInt8.self)
-            data.withUnsafeBytes { bufferPointer.update(from: $0.baseAddress!.assumingMemoryBound(to: UInt8.self), count: messageLength) }
+            data.copyBytes(to: bufferPointer, count: messageLength) // TODO: figure out a better way to avoid memory copy here
             sendBuffer.pointee.Buffer = bufferPointer
             sendBuffer.pointee.Length = UInt32(messageLength)
 
