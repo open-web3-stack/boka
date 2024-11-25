@@ -167,7 +167,7 @@ final class MockPeerEventTests {
     }
 
     @Test
-    func backpressureRetriesWithinLimit() async throws {
+    func backpressureRetries() async throws {
         let serverHandler = MockPeerEventHandler(.backpressure)
         let clientHandler = MockPeerEventHandler(.backpressure)
         let privateKey1 = try Ed25519.SecretKey(from: Data32.random())
