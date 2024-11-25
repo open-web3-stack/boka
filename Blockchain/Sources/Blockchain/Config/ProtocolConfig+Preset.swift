@@ -38,6 +38,7 @@ extension Ref where T == ProtocolConfig {
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
         pvmProgramInitPageSize: 1 << 14,
+        pvmMemoryPageSize: 1 << 12,
         pvmProgramInitSegmentSize: 1 << 16
     ))
 
@@ -78,6 +79,7 @@ extension Ref where T == ProtocolConfig {
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
         pvmProgramInitPageSize: 1 << 14,
+        pvmMemoryPageSize: 1 << 12,
         pvmProgramInitSegmentSize: 1 << 16
     ))
 
@@ -117,6 +119,7 @@ extension Ref where T == ProtocolConfig {
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
         pvmProgramInitPageSize: 1 << 14,
+        pvmMemoryPageSize: 1 << 12,
         pvmProgramInitSegmentSize: 1 << 16
     ))
 }

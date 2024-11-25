@@ -42,11 +42,11 @@ public class StandardProgram {
         let config = DefaultPvmConfig()
 
         let Q = StandardProgram.alignToSegmentSize
-        let ZP = config.pvmProgramInitPageSize
+        let ZG = config.pvmProgramInitPageSize
         let ZQ = config.pvmProgramInitSegmentSize
         let ZI = config.pvmProgramInitInputDataSize
         let readOnlyAlignedSize = Int(Q(readOnlyLen, config))
-        let heapEmptyPagesSize = Int(heapPages) * ZP
+        let heapEmptyPagesSize = Int(heapPages) * ZG
         let readWriteAlignedSize = Int(Q(readWriteLen + UInt32(heapEmptyPagesSize), config))
         let stackAlignedSize = Int(Q(stackSize, config))
 

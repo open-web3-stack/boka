@@ -175,7 +175,8 @@ public class Memory {
         return max(0, low - 1)
     }
 
-    private func getSection(forAddress address: UInt32) throws(Error) -> MemorySection {
+    private func getSection(forAddress: UInt32) throws(Error) -> MemorySection {
+        let address = forAddress & UInt32.max
         if memorySections.count != 0 {
             return memorySections[Memory.binarySearch(array: memorySections.map(\.startAddressBound), value: address)]
         } else if let readOnly {

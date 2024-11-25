@@ -110,6 +110,9 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     // ZG = 2^14: The standard pvm program initialization page size.
     public var pvmProgramInitPageSize: Int
 
+    // ZP = 2^12: The pvm memory page size.
+    public var pvmMemoryPageSize: Int
+
     // ZQ = 2^16: The standard pvm program initialization segment size.
     public var pvmProgramInitSegmentSize: Int
 
@@ -149,6 +152,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         pvmDynamicAddressAlignmentFactor: Int,
         pvmProgramInitInputDataSize: Int,
         pvmProgramInitPageSize: Int,
+        pvmMemoryPageSize: Int,
         pvmProgramInitSegmentSize: Int
     ) {
         self.auditTranchePeriod = auditTranchePeriod
@@ -186,6 +190,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         self.pvmDynamicAddressAlignmentFactor = pvmDynamicAddressAlignmentFactor
         self.pvmProgramInitInputDataSize = pvmProgramInitInputDataSize
         self.pvmProgramInitPageSize = pvmProgramInitPageSize
+        self.pvmMemoryPageSize = pvmMemoryPageSize
         self.pvmProgramInitSegmentSize = pvmProgramInitSegmentSize
     }
 }
@@ -198,6 +203,7 @@ extension Ref: @retroactive PvmConfig where T == ProtocolConfig {
     public var pvmDynamicAddressAlignmentFactor: Int { value.pvmDynamicAddressAlignmentFactor }
     public var pvmProgramInitInputDataSize: Int { value.pvmProgramInitInputDataSize }
     public var pvmProgramInitPageSize: Int { value.pvmProgramInitPageSize }
+    public var pvmMemoryPageSize: Int { value.pvmMemoryPageSize }
     public var pvmProgramInitSegmentSize: Int { value.pvmProgramInitSegmentSize }
 }
 
@@ -272,6 +278,8 @@ extension ProtocolConfig {
                 ? other.pvmProgramInitInputDataSize : pvmProgramInitInputDataSize,
             pvmProgramInitPageSize: other.pvmProgramInitPageSize != 0
                 ? other.pvmProgramInitPageSize : pvmProgramInitPageSize,
+            pvmMemoryPageSize: other.pvmMemoryPageSize != 0
+                ? other.pvmMemoryPageSize : pvmMemoryPageSize,
             pvmProgramInitSegmentSize: other.pvmProgramInitSegmentSize != 0
                 ? other.pvmProgramInitSegmentSize : pvmProgramInitSegmentSize
         )
@@ -364,6 +372,9 @@ extension ProtocolConfig {
         )
         pvmProgramInitPageSize = try decode(
             .pvmProgramInitPageSize, defaultValue: 0, required: required
+        )
+        pvmMemoryPageSize = try decode(
+            .pvmMemoryPageSize, defaultValue: 0, required: required
         )
         pvmProgramInitSegmentSize = try decode(
             .pvmProgramInitSegmentSize, defaultValue: 0, required: required

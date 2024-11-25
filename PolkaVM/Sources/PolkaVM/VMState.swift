@@ -82,19 +82,20 @@ public class VMState {
         pc = newPC
     }
 
-    public func readRegister(_ index: Registers.Index) -> UInt32 {
-        registers[index]
+    public func readRegister<T: FixedWidthInteger>(_ index: Registers.Index) -> T {
+        T(truncatingIfNeeded: registers[index])
     }
 
-    public func readRegister(_ index: Registers.Index, _ index2: Registers.Index) -> (UInt32, UInt32) {
-        (registers[index], registers[index2])
+    public func readRegister<T: FixedWidthInteger>(_ index: Registers.Index, _ index2: Registers.Index) -> (T, T) {
+        (T(truncatingIfNeeded: registers[index]), T(truncatingIfNeeded: registers[index2]))
     }
 
-    public func readRegisters(in range: Range<UInt8>) -> [UInt32] {
-        range.map { registers[Registers.Index(raw: $0)] }
+    public func readRegisters<T: FixedWidthInteger>(in range: Range<UInt8>) -> [T] {
+        range.map { T(truncatingIfNeeded: registers[Registers.Index(raw: $0)]) }
     }
 
-    public func writeRegister(_ index: Registers.Index, _ value: UInt32) {
-        registers[index] = value
+    public func writeRegister(_ index: Registers.Index, _ value: some FixedWidthInteger) {
+        let signExtendedValue = UInt64(bitPattern: Int64(truncatingIfNeeded: value))
+        registers[index] = signExtendedValue
     }
 }
