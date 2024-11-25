@@ -6,25 +6,20 @@ extension Instructions {
     }
 
     static func decodeImmediate<T: FixedWidthInteger>(_ data: Data) -> T {
-        let maxLen = T.bitWidth / 8
-        let len: Int = min(data.count, maxLen)
+        // The immediate value (as encoded in the code blob) can be at most 4 bytes
+        let len = min(data.count, 4)
         if len == 0 {
             return 0
         }
-        var value: UInt64 = 0
+        var value: UInt32 = 0
         for i in 0 ..< len {
-            value |= UInt64(data[relative: i]) << (8 * i)
+            value = value | (UInt32(data[relative: i]) << (8 * i))
         }
-
-        if len < maxLen {
-            let signBit = 1 << (8 * len - 1) // Find the MSB for the current length
-            if value & UInt64(signBit) != 0 { // Check if the sign bit is set
-                value |= ~((1 << (8 * len)) - 1) // Fill upper bits with 1
-            }
-        }
-
-        // convert to target type
-        return T(truncatingIfNeeded: value)
+        let shift = (4 - len) * 8
+        // shift left so that the MSB is the sign bit
+        // and then do signed shift right to fill the empty bits using the sign bit
+        let signExtendedValue = Int32(bitPattern: value << shift) >> shift
+        return T(truncatingIfNeeded: UInt64(bitPattern: Int64(signExtendedValue)))
     }
 
     static func decodeImmediate2<T: FixedWidthInteger, U: FixedWidthInteger>(
@@ -33,12 +28,12 @@ extension Instructions {
         minus: Int = 1
     ) throws -> (T, U) {
         let lX1 = try Int((data.at(relative: 0) / divideBy) & 0b111)
-        let lX = min(T.bitWidth / 8, lX1)
-        let lY = min(U.bitWidth / 8, max(0, data.count - Int(lX) - minus))
+        let lX = min(4, lX1)
+        let lY = min(4, max(0, data.count - Int(lX) - minus))
 
-        let vX: T = try decodeImmediate(data.at(relative: 1 ..< 1 + lX))
-        let vY: U = try decodeImmediate(data.at(relative: (1 + lX) ..< (1 + lX + lY)))
-        return (vX, vY)
+        let vX: UInt64 = try decodeImmediate(data.at(relative: 1 ..< (1 + lX)))
+        let vY: UInt64 = try decodeImmediate(data.at(relative: (1 + lX) ..< (1 + lX + lY)))
+        return (T(truncatingIfNeeded: vX), U(truncatingIfNeeded: vY))
     }
 
     static func isBranchValid(context: ExecutionContext, offset: UInt32) -> Bool {
