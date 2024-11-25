@@ -144,6 +144,58 @@ struct PeerTests {
     }
 
     @Test
+    func connectionRotationStrategy() async throws {
+        var peers: [Peer<MockStreamHandler>] = []
+        var handlers: [MockPresentStreamHandler] = []
+        let centerPeer = try Peer(
+            options: PeerOptions<MockStreamHandler>(
+                role: .validator,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+                genesisHeader: Data32(),
+                secretKey: Ed25519.SecretKey(from: Data32.random()),
+                presistentStreamHandler: MockPresentStreamHandler(),
+                ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                serverSettings: .defaultSettings,
+                clientSettings: .defaultSettings
+            )
+        )
+        // Create 30 peer nodes
+        for _ in 0 ..< 30 {
+            let handler = MockPresentStreamHandler()
+            handlers.append(handler)
+            let peer = try Peer(
+                options: PeerOptions<MockStreamHandler>(
+                    role: .builder,
+                    listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+                    genesisHeader: Data32(),
+                    secretKey: Ed25519.SecretKey(from: Data32.random()),
+                    presistentStreamHandler: handler,
+                    ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                    serverSettings: .defaultSettings,
+                    clientSettings: .defaultSettings
+                )
+            )
+            peers.append(peer)
+        }
+
+        // Make some connections
+        for i in 0 ..< 30 {
+            let peer = peers[i]
+            let con = try peer.connect(to: centerPeer.listenAddress(), role: .builder)
+            try await con.ready()
+        }
+        // Simulate close connections 3~5s
+        try? await Task.sleep(for: .milliseconds(5000))
+        centerPeer.broadcast(kind: .uniqueA, message: .init(kind: .uniqueA, data: Data("connection rotation strategy".utf8)))
+        try? await Task.sleep(for: .milliseconds(1000))
+        var receivedCount = 0
+        for handler in handlers {
+            receivedCount += await handler.receivedData.count
+        }
+        #expect(receivedCount == PeerSettings.defaultSettings.maxBuilderConnections)
+    }
+
+    @Test
     func mockHandshakeFailure() async throws {
         let mockPeerTest = try MockPeerEventTests()
         let serverHandler = MockPeerEventTests.MockPeerEventHandler(
