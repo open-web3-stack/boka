@@ -89,6 +89,45 @@ public final class QuicStream: Sendable {
         }
     }
 
+    public func getFlowControlWindow() throws -> Int {
+        try storage.write { storage in
+            var settings = QUIC_SETTINGS()
+            var settingsSize = UInt32(MemoryLayout.size(ofValue: settings))
+            guard let storage, let api = storage.connection.api else {
+                throw QuicError.alreadyClosed
+            }
+            try api.call("GetParam") { api in
+                api.pointee.GetParam(
+                    storage.handle.ptr,
+                    UInt32(QUIC_PARAM_CONN_SETTINGS),
+                    &settingsSize,
+                    &settings
+                )
+            }
+            return Int(settings.StreamRecvWindowDefault)
+        }
+    }
+
+    public func adjustFlowControl(windowSize: Int) throws {
+        try storage.write { storage in
+            var settings = QUIC_SETTINGS()
+            settings.IsSet.StreamRecvWindowDefault = 1
+            settings.StreamRecvWindowDefault = UInt32(windowSize)
+            let settingsSize = UInt32(MemoryLayout.size(ofValue: settings))
+            guard let storage, let api = storage.connection.api else {
+                throw QuicError.alreadyClosed
+            }
+            try api.call("SetParam") { api in
+                api.pointee.SetParam(
+                    storage.handle.ptr,
+                    UInt32(QUIC_PARAM_CONN_SETTINGS),
+                    settingsSize,
+                    &settings
+                )
+            }
+        }
+    }
+
     public func send(data: Data, start: Bool = false, finish: Bool = false) throws {
         logger.trace("Sending \(data.count) bytes")
 

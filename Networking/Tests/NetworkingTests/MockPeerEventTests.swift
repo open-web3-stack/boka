@@ -1,4 +1,6 @@
+import AsyncChannels
 import Foundation
+import Logging
 import MsQuicSwift
 import Testing
 import Utils
@@ -10,6 +12,7 @@ final class MockPeerEventTests {
         enum MockPeerAction {
             case none
             case mockHandshakeFailure
+            case backpressure
         }
 
         enum EventType {
@@ -22,11 +25,51 @@ final class MockPeerEventTests {
             case closed(stream: QuicStream, status: QuicStatus, code: QuicErrorCode)
         }
 
+        let logger: Logger
+        let channel: Channel<Data> = .init(capacity: 5)
         let events: ThreadSafeContainer<[EventType]> = .init([])
         let mockAction: MockPeerAction
 
+        let resendStates: ThreadSafeContainer<[UniqueId: BackoffState]> = .init([:])
+        let maxRetryAttempts = 5
         init(_ action: MockPeerAction = .none) {
             mockAction = action
+            logger = Logger(label: "MockPeerEventHandler")
+        }
+
+        private func backpressure(_ data: Data, on stream: QuicStream) {
+            logger.info("backpressure for stream: \(stream.id)")
+            do {
+                var state = resendStates.read { resendStates in
+                    resendStates[stream.id] ?? .init()
+                }
+                let windowSize = try stream.getFlowControlWindow()
+                logger.info("backpressure: \(stream.id) window size: \(windowSize) retry times \(state.attempt)")
+                guard state.attempt < maxRetryAttempts else {
+                    logger.warning("backpressure: \(stream.id) reached max retry attempts")
+                    try? stream.adjustFlowControl(windowSize: Int(Int16.max))
+                    return
+                }
+                try stream.adjustFlowControl(windowSize: windowSize >> 1)
+                state.applyBackoff()
+                resendStates.write { resendStates in
+                    resendStates[stream.id] = state
+                }
+                Task {
+                    try await Task.sleep(for: .seconds(state.delay))
+                    if !channel.syncSend(data) {
+                        logger.warning("stream \(stream.id) is full")
+                        backpressure(data, on: stream)
+                    } else {
+                        try stream.adjustFlowControl(windowSize: Int(Int16.max))
+                        resendStates.write { states in
+                            states[stream.id] = nil
+                        }
+                    }
+                }
+            } catch {
+                logger.error("backpressure: \(error)")
+            }
         }
 
         func newConnection(
@@ -76,6 +119,10 @@ final class MockPeerEventTests {
         }
 
         func dataReceived(_ stream: QuicStream, data: Data?) {
+            if mockAction == .backpressure {
+                backpressure(data!, on: stream)
+                return
+            }
             events.write { events in
                 events.append(.dataReceived(stream: stream, data: data))
             }
@@ -94,7 +141,7 @@ final class MockPeerEventTests {
 
     init() throws {
         registration = try QuicRegistration()
-        let privateKey = try Ed25519.SecretKey(from: Data32())
+        let privateKey = try Ed25519.SecretKey(from: Data32.random())
         certData = try generateSelfSignedCertificate(privateKey: privateKey)
         // Msquic certificate verification passed, custom verification failed
         badCertData = Data(
@@ -117,6 +164,63 @@ final class MockPeerEventTests {
             a46040805f3adf78a4477ff02020800
             """
         )!
+    }
+
+    @Test
+    func backpressureRetriesWithinLimit() async throws {
+        let serverHandler = MockPeerEventHandler(.backpressure)
+        let clientHandler = MockPeerEventHandler(.backpressure)
+        let privateKey1 = try Ed25519.SecretKey(from: Data32.random())
+        let cert = try generateSelfSignedCertificate(privateKey: privateKey1)
+        let serverConfiguration = try QuicConfiguration(
+            registration: registration,
+            pkcs12: certData,
+            alpns: [Data("testalpn".utf8)],
+            client: false,
+            settings: QuicSettings.defaultSettings
+        )
+
+        let listener = try QuicListener(
+            handler: serverHandler,
+            registration: registration,
+            configuration: serverConfiguration,
+            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+            alpns: [Data("testalpn".utf8)]
+        )
+
+        let listenAddress = try listener.listenAddress()
+        // Client setup with certificate
+        let clientConfiguration = try QuicConfiguration(
+            registration: registration,
+            pkcs12: cert,
+            alpns: [Data("testalpn".utf8)],
+            client: true,
+            settings: QuicSettings.defaultSettings
+        )
+
+        let clientConnection = try QuicConnection(
+            handler: clientHandler,
+            registration: registration,
+            configuration: clientConfiguration
+        )
+        try clientConnection.connect(to: listenAddress)
+        var sendData = [Data]()
+        for i in 0 ..< 5 {
+            let data = Data("send data \(i)".utf8)
+            sendData.append(data)
+            _ = serverHandler.channel.syncSend(data)
+        }
+        #expect(serverHandler.channel.syncSend(Data("send data fail".utf8)) == false)
+        let data = Data("test data 1".utf8)
+        sendData.append(data)
+        let stream1 = try clientConnection.createStream()
+        try stream1.send(data: data)
+        try await Task.sleep(for: .milliseconds(2000))
+        await #expect(serverHandler.channel.receive() == sendData.first)
+        try await Task.sleep(for: .milliseconds(2000))
+        for data in sendData[1...] {
+            await #expect(serverHandler.channel.receive() == data)
+        }
     }
 
     @Test

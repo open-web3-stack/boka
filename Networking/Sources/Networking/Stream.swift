@@ -43,10 +43,12 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
     private let _status: ThreadSafeContainer<StreamStatus> = .init(.open)
     let connectionId: UniqueId
     let kind: Handler.PresistentHandler.StreamKind?
-
     public var id: UniqueId {
         stream.id
     }
+
+    let resendStates: ThreadSafeContainer<[UniqueId: BackoffState]> = .init([:])
+    let maxRetryAttempts = 5
 
     public private(set) var status: StreamStatus {
         get {
@@ -127,6 +129,50 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         if !channel.syncSend(data) {
             logger.warning("stream \(id) is full")
             // TODO: backpressure handling
+            backpressure(data)
+        }
+    }
+
+    /// Handles backpressure when sending data, adjusting flow control and retrying if necessary.
+    private func backpressure(_ data: Data) {
+        let state = resendStates.read { reconnectStates in
+            reconnectStates[id] ?? .init()
+        }
+
+        do {
+            // Get the current flow control window size
+            let windowsSize = try stream.getFlowControlWindow()
+
+            guard state.attempt < maxRetryAttempts else {
+                logger.warning("resend: \(id) reached max retry attempts")
+                try? stream.adjustFlowControl(windowSize: Int(Int16.max))
+                return
+            }
+
+            // Adjust flow control to half of the window size
+            try stream.adjustFlowControl(windowSize: windowsSize >> 1)
+
+            resendStates.write { resendStates in
+                if var state = resendStates[id] {
+                    state.applyBackoff()
+                    resendStates[id] = state
+                }
+            }
+
+            Task {
+                try await Task.sleep(for: .seconds(state.delay))
+                if !channel.syncSend(data) {
+                    logger.warning("stream \(id) is full")
+                    backpressure(data) // Retry if sending fails
+                } else {
+                    try stream.adjustFlowControl(windowSize: Int(Int16.max))
+                    resendStates.write { states in
+                        states[id] = nil
+                    }
+                }
+            }
+        } catch {
+            logger.error("backpressure: \(error)")
         }
     }
 
