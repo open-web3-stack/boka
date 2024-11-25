@@ -13,13 +13,18 @@ extension Instructions {
         }
         var value: UInt64 = 0
         for i in 0 ..< len {
-            value = value | (UInt64(data[relative: i]) << (8 * i))
+            value |= UInt64(data[relative: i]) << (8 * i)
         }
-        let shift = (maxLen - len) * 8
-        // shift left so that the MSB is the sign bit
-        // and then do signed shift right to fill the empty bits using the sign bit
-        // and then convert back to UInt64
-        return .init(truncatingIfNeeded: UInt64(bitPattern: Int64(bitPattern: value << shift) >> shift))
+
+        if len < maxLen {
+            let signBit = 1 << (8 * len - 1) // Find the MSB for the current length
+            if value & UInt64(signBit) != 0 { // Check if the sign bit is set
+                value |= ~((1 << (8 * len)) - 1) // Fill upper bits with 1
+            }
+        }
+
+        // convert to target type
+        return T(truncatingIfNeeded: value)
     }
 
     static func decodeImmediate2<T: FixedWidthInteger, U: FixedWidthInteger>(
