@@ -142,7 +142,7 @@ struct PeerTests {
 
         typealias EphemeralHandler = MockEphemeralStreamHandler
     }
-  
+
     @Test
     func connectionRotationStrategy() async throws {
         var peers: [Peer<MockStreamHandler>] = []
@@ -193,9 +193,9 @@ struct PeerTests {
             receivedCount += await handler.receivedData.count
         }
         #expect(receivedCount == PeerSettings.defaultSettings.maxBuilderConnections)
-}
- 
-@Test
+    }
+
+    @Test
     func mockHandshakeFailure() async throws {
         let mockPeerTest = try MockPeerEventTests()
         let serverHandler = MockPeerEventTests.MockPeerEventHandler(
@@ -286,7 +286,6 @@ struct PeerTests {
         try? await Task.sleep(for: .milliseconds(1000))
         #expect(connection1.isClosed == true)
     }
-
 
     @Test
     func reopenUpStream() async throws {
