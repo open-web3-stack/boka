@@ -300,7 +300,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
     }
 
     func reconnect(to address: NetAddr, role: PeerRole) throws {
-        let state = reconnectStates.read { reconnectStates in
+        var state = reconnectStates.read { reconnectStates in
             reconnectStates[address] ?? .init()
         }
 
@@ -308,12 +308,9 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
             logger.warning("reconnecting to \(address) exceeded max attempts")
             return
         }
-
+        state.applyBackoff()
         reconnectStates.write { reconnectStates in
-            if var state = reconnectStates[address] {
-                state.applyBackoff()
-                reconnectStates[address] = state
-            }
+            reconnectStates[address] = state
         }
         Task {
             try await Task.sleep(for: .seconds(state.delay))
@@ -342,7 +339,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
     }
 
     func reopenUpStream(connection: Connection<Handler>, kind: Handler.PresistentHandler.StreamKind) {
-        let state = reopenStates.read { states in
+        var state = reopenStates.read { states in
             states[connection.id] ?? .init()
         }
 
@@ -350,12 +347,9 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
             logger.warning("Reopen attempt for stream \(kind) on connection \(connection.id) exceeded max attempts")
             return
         }
-
+        state.applyBackoff()
         reopenStates.write { states in
-            if var state = states[connection.id] {
-                state.applyBackoff()
-                states[connection.id] = state
-            }
+            states[connection.id] = state
         }
 
         Task {
@@ -563,10 +557,10 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             false
         case let .transport(status, _):
             switch QuicStatusCode(rawValue: status.rawValue) {
-            case .badCert:
-                false
+            case .aborted, .outOfMemory, .connectionTimeout, .unreachable, .bufferTooSmall, .connectionRefused:
+                true
             default:
-                !status.isSucceeded
+                status.isSucceeded
             }
         case let .byPeer(code):
             // Do not reconnect if the closure was initiated by the peer.

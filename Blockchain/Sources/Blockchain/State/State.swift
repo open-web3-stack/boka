@@ -230,6 +230,14 @@ public struct State: Sendable {
             await backend.rootHash
         }
     }
+
+    public func read(key: Data32) async throws -> Data? {
+        let res = try layer[key].map { try JamEncoder.encode($0) }
+        if let res {
+            return res
+        }
+        return try await backend.readRaw(key)
+    }
 }
 
 extension State {
@@ -274,7 +282,7 @@ extension State: Dummy {
         let authorizationQueue: StateKeys.AuthorizationQueueKey.Value =
             try! ConfigFixedSizeArray(config: config, defaultValue: ConfigFixedSizeArray(config: config, defaultValue: Data32()))
         let privilegedServices: StateKeys.PrivilegedServicesKey.Value = PrivilegedServices(
-            empower: ServiceIndex(),
+            blessed: ServiceIndex(),
             assign: ServiceIndex(),
             designate: ServiceIndex(),
             basicGas: [:]

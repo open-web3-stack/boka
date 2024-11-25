@@ -40,7 +40,7 @@ extension AccumulateFunction {
         let (exitReason, gas, output) = await invokePVM(
             config: config,
             blob: accumulatingAccountDetails.codeHash.data,
-            pc: 10,
+            pc: 5,
             gas: gas,
             argumentData: argument,
             ctx: ctx
