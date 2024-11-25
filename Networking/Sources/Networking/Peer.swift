@@ -70,7 +70,7 @@ public struct PeerOptions<Handler: StreamHandler>: Sendable {
     }
 }
 
-// TODO: reopen UP stream, peer reputation system to ban peers not following the protocol
+// TODO: peer reputation system to ban peers not following the protocol
 public final class Peer<Handler: StreamHandler>: Sendable {
     private let impl: PeerImpl<Handler>
 
@@ -271,9 +271,15 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
             if role == .builder {
                 let currentCount = connections.byAddr.values.filter { $0.role == role }.count
                 if currentCount >= self.settings.maxBuilderConnections {
-                    self.logger.warning("max builder connections reached")
-                    // TODO: consider connection rotation strategy
-                    return false
+                    if let conn = connections.byAddr.values.filter({ $0.role == .builder })
+                        .sorted(by: { $0.getLastActive() < $1.getLastActive() }).first
+                    {
+                        self.logger.warning("Replacing least active builder connection at \(conn.remoteAddress)")
+                        conn.close(abort: false)
+                    } else {
+                        self.logger.warning("Max builder connections reached, no eligible replacement found")
+                        return false
+                    }
                 }
             }
             if connections.byAddr[addr] != nil {
@@ -584,6 +590,10 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         }
         if let stream {
             stream.received(data: data)
+            let connection = impl.connections.read { connections in
+                connections.byId[stream.connectionId]
+            }
+            connection?.updateLastActive()
         }
     }
 
