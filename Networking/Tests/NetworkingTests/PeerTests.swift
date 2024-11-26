@@ -220,6 +220,12 @@ struct PeerTests {
 
         let connection1 = try peer1.connect(to: listenAddress, role: .validator)
         try? await Task.sleep(for: .milliseconds(3000))
+        #expect(throws: Error.self) {
+            _ = try connection1.createStream(kind: .typeA)
+        }
+        #expect(throws: Error.self) {
+            _ = try connection1.createStream(kind: .uniqueA)
+        }
         #expect(connection1.isClosed == true)
     }
 
@@ -429,7 +435,7 @@ struct PeerTests {
         let handler1 = MockPresentStreamHandler()
         let handler2 = MockPresentStreamHandler()
         // Define the data size, 5MB
-        let dataSize = 5 * 1024 * 1024
+        let dataSize = 10 * 1024 * 1024
         var largeData = Data(capacity: dataSize)
 
         // Generate random data
@@ -471,25 +477,29 @@ struct PeerTests {
         try? await Task.sleep(for: .milliseconds(50))
 
         let receivedData1 = try await connection1.request(
-            MockRequest(kind: .typeA, data: largeData)
+            MockRequest(kind: .typeA, data: largeData.prefix(dataSize / 2))
         )
         try? await Task.sleep(for: .milliseconds(100))
 
         // Verify that the received data matches the original large data
-        #expect(receivedData1 == largeData + Data(" response".utf8))
-
+        #expect(receivedData1 == largeData.prefix(dataSize / 2) + Data(" response".utf8))
         peer1.broadcast(
-            kind: .uniqueA, message: .init(kind: .uniqueA, data: largeData)
+            kind: .uniqueA, message: .init(kind: .uniqueA, data: largeData.prefix(dataSize / 2))
         )
         try? await Task.sleep(for: .milliseconds(100))
 
         peer2.broadcast(
-            kind: .uniqueB, message: .init(kind: .uniqueB, data: largeData)
+            kind: .uniqueB, message: .init(kind: .uniqueB, data: largeData.prefix(dataSize / 2))
         )
         // Verify last received data
         try? await Task.sleep(for: .milliseconds(2000))
-        await #expect(handler2.lastReceivedData == largeData)
-        await #expect(handler1.lastReceivedData == largeData)
+        await #expect(handler2.lastReceivedData == largeData.prefix(dataSize / 2))
+        await #expect(handler1.lastReceivedData == largeData.prefix(dataSize / 2))
+        await #expect(throws: Error.self) {
+            _ = try await connection1.request(
+                MockRequest(kind: .typeC, data: largeData)
+            )
+        }
     }
 
     @Test

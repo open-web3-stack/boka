@@ -479,7 +479,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             )
             return
         }
-        // Check if the connection is already reconnected
+
         impl.reconnectStates.write { reconnectStates in
             reconnectStates[conn.remoteAddress] = nil
         }
@@ -528,10 +528,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
     }
 
     func shutdownInitiated(_ connection: QuicConnection, reason: ConnectionCloseReason) {
-        logger.debug(
-            "Shutdown initiated",
-            metadata: ["connectionId": "\(connection.id)", "reason": "\(reason)"]
-        )
+        logger.debug("Shutdown initiated", metadata: ["connectionId": "\(connection.id)", "reason": "\(reason)"])
         if shouldReconnect(basedOn: reason) {
             impl.connections.write { connections in
                 if let conn = connections.byId[connection.id] {
