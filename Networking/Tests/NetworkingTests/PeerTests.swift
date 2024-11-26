@@ -365,12 +365,10 @@ struct PeerTests {
         let connection2 = try peer2.connect(to: peer1.listenAddress(), role: .validator)
         try? await Task.sleep(for: .milliseconds(1000))
         let connections = [connection1, connection2]
-        for connection in connections {
-            if !connection.isClosed {
-                let data = try await connection.request(MockRequest(kind: .typeA, data: Data("hello world".utf8)))
-                try? await Task.sleep(for: .milliseconds(500))
-                #expect(data == Data("hello world response".utf8))
-            }
+        for connection in connections where !connection.isClosed {
+            let data = try await connection.request(MockRequest(kind: .typeA, data: Data("hello world".utf8)))
+            try? await Task.sleep(for: .milliseconds(500))
+            #expect(data == Data("hello world response".utf8))
         }
     }
 
