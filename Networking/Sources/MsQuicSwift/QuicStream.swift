@@ -8,6 +8,10 @@ private struct Storage {
     let connection: QuicConnection
 }
 
+public enum SendError: Error {
+    case emptyData
+}
+
 public final class QuicStream: Sendable {
     public let id: UniqueId
     private let logger: Logger
@@ -97,8 +101,12 @@ public final class QuicStream: Sendable {
                 throw QuicError.alreadyClosed
             }
 
-            // TODO: improve the case when data is empty
             let messageLength = data.count
+
+            if messageLength == 0 {
+                logger.trace("No data to send.")
+                throw SendError.emptyData // Throw a specific error or return
+            }
 
             let sendBufferRaw = UnsafeMutableRawPointer.allocate( // !! allocate
                 byteCount: MemoryLayout<QUIC_BUFFER>.size + messageLength,
@@ -108,7 +116,6 @@ public final class QuicStream: Sendable {
             let sendBuffer = sendBufferRaw.assumingMemoryBound(to: QUIC_BUFFER.self)
             let bufferPointer = sendBufferRaw.advanced(by: MemoryLayout<QUIC_BUFFER>.size).assumingMemoryBound(to: UInt8.self)
             data.copyBytes(to: bufferPointer, count: messageLength) // TODO: figure out a better way to avoid memory copy here
-
             sendBuffer.pointee.Buffer = bufferPointer
             sendBuffer.pointee.Length = UInt32(messageLength)
 
