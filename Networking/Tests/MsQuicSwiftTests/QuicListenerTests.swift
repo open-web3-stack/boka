@@ -40,6 +40,57 @@ struct QuicListenerTests {
         registration = try QuicRegistration()
     }
 
+    final class MockQuicEventHandler: QuicEventHandler {
+        enum EventType {
+            case newConnection(listener: QuicListener, connection: QuicConnection, info: ConnectionInfo)
+            case shouldOpen(connection: QuicConnection, certificate: Data?)
+            case connected(connection: QuicConnection)
+            case shutdownInitiated(connection: QuicConnection, reason: ConnectionCloseReason)
+            case shutdownComplete(connection: QuicConnection)
+            case streamStarted(connection: QuicConnection, stream: QuicStream)
+            case dataReceived(stream: QuicStream, data: Data?)
+            case closed(stream: QuicStream, status: QuicStatus, code: QuicErrorCode)
+        }
+
+        let events: ThreadSafeContainer<[EventType]> = .init([])
+
+        init() {}
+
+        func newConnection(
+            _ listener: QuicListener, connection: QuicConnection, info: ConnectionInfo
+        ) -> QuicStatus {
+            events.write { events in
+                events.append(.newConnection(listener: listener, connection: connection, info: info))
+            }
+            return .code(.success)
+        }
+
+        func shouldOpen(_ connection: QuicConnection, certificate: Data?) -> QuicStatus {
+            events.write { events in
+                events.append(.shouldOpen(connection: connection, certificate: certificate))
+            }
+            return .code(.success)
+        }
+
+        func connected(_ connection: QuicConnection) {
+            events.write { events in
+                events.append(.connected(connection: connection))
+            }
+        }
+
+        func streamStarted(_ connect: QuicConnection, stream: QuicStream) {
+            events.write { events in
+                events.append(.streamStarted(connection: connect, stream: stream))
+            }
+        }
+
+        func dataReceived(_ stream: QuicStream, data: Data?) {
+            events.write { events in
+                events.append(.dataReceived(stream: stream, data: data))
+            }
+        }
+    }
+
     @Test
     func connectAndSendReceive() async throws {
         let serverHandler = MockQuicEventHandler()

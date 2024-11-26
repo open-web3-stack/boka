@@ -154,12 +154,10 @@ final class MockPeerEventTests {
         try clientConnection.connect(to: listenAddress)
         try await Task.sleep(for: .milliseconds(100))
         let (_, reason) = clientHandler.events.value.compactMap {
-            switch $0 {
-            case let .shutdownInitiated(connection, reason):
-                (connection, reason) as (QuicConnection, ConnectionCloseReason)?
-            default:
-                nil
+            if case let .shutdownInitiated(connection, reason) = $0 {
+                return (connection, reason)
             }
+            return nil
         }.first!
         #expect(
             reason
