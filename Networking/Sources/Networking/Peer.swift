@@ -20,12 +20,7 @@ struct BackoffState {
     var attempt: Int
     var delay: TimeInterval
 
-    init() {
-        attempt = 0
-        delay = 1
-    }
-
-    init(attempt: Int = 0, delay: TimeInterval = 1) {
+    init(_ attempt: Int = 0, _ delay: TimeInterval = 1) {
         self.attempt = attempt
         self.delay = delay
     }
