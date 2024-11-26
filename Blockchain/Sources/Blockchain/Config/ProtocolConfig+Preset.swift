@@ -37,9 +37,8 @@ extension Ref where T == ProtocolConfig {
         ticketSubmissionEndSlot: 2,
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
-        pvmProgramInitPageSize: 1 << 14,
-        pvmMemoryPageSize: 1 << 12,
-        pvmProgramInitSegmentSize: 1 << 16
+        pvmProgramInitZoneSize: 1 << 16,
+        pvmMemoryPageSize: 1 << 12
     ))
 
     // TODO: pick some good numbers for dev env
@@ -78,9 +77,8 @@ extension Ref where T == ProtocolConfig {
         ticketSubmissionEndSlot: 10,
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
-        pvmProgramInitPageSize: 1 << 14,
-        pvmMemoryPageSize: 1 << 12,
-        pvmProgramInitSegmentSize: 1 << 16
+        pvmProgramInitZoneSize: 1 << 16,
+        pvmMemoryPageSize: 1 << 12
     ))
 
     public static let mainnet = Ref(ProtocolConfig(
@@ -118,8 +116,7 @@ extension Ref where T == ProtocolConfig {
         ticketSubmissionEndSlot: 500,
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
-        pvmProgramInitPageSize: 1 << 14,
-        pvmMemoryPageSize: 1 << 12,
-        pvmProgramInitSegmentSize: 1 << 16
+        pvmProgramInitZoneSize: 1 << 16,
+        pvmMemoryPageSize: 1 << 12
     ))
 }

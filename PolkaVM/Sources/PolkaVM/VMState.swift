@@ -40,28 +40,28 @@ public class VMState {
         Memory.Readonly(memory)
     }
 
-    public func readMemory(address: UInt32) throws -> UInt8 {
-        try memory.read(address: address)
+    public func readMemory(address: some FixedWidthInteger) throws -> UInt8 {
+        try memory.read(address: UInt32(truncatingIfNeeded: address))
     }
 
-    public func readMemory(address: UInt32, length: Int) throws -> Data {
-        try memory.read(address: address, length: length)
+    public func readMemory(address: some FixedWidthInteger, length: Int) throws -> Data {
+        try memory.read(address: UInt32(truncatingIfNeeded: address), length: length)
     }
 
-    public func isMemoryReadable(address: UInt32, length: Int) -> Bool {
-        memory.isReadable(address: address, length: length)
+    public func isMemoryReadable(address: some FixedWidthInteger, length: Int) -> Bool {
+        memory.isReadable(address: UInt32(truncatingIfNeeded: address), length: length)
     }
 
-    public func isMemoryWritable(address: UInt32, length: Int) -> Bool {
-        memory.isWritable(address: address, length: length)
+    public func isMemoryWritable(address: some FixedWidthInteger, length: Int) -> Bool {
+        memory.isWritable(address: UInt32(truncatingIfNeeded: address), length: length)
     }
 
-    public func writeMemory(address: UInt32, value: UInt8) throws {
-        try memory.write(address: address, value: value)
+    public func writeMemory(address: some FixedWidthInteger, value: UInt8) throws {
+        try memory.write(address: UInt32(truncatingIfNeeded: address), value: value)
     }
 
-    public func writeMemory(address: UInt32, values: some Sequence<UInt8>) throws {
-        try memory.write(address: address, values: values)
+    public func writeMemory(address: some FixedWidthInteger, values: some Sequence<UInt8>) throws {
+        try memory.write(address: UInt32(truncatingIfNeeded: address), values: values)
     }
 
     public func sbrk(_ increment: UInt32) throws -> UInt32 {
@@ -95,7 +95,6 @@ public class VMState {
     }
 
     public func writeRegister(_ index: Registers.Index, _ value: some FixedWidthInteger) {
-        let signExtendedValue = UInt64(bitPattern: Int64(truncatingIfNeeded: value))
-        registers[index] = signExtendedValue
+        registers[index] = UInt64(truncatingIfNeeded: value)
     }
 }

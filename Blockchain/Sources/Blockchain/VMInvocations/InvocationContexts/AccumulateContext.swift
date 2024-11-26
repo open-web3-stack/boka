@@ -37,8 +37,8 @@ public class AccumulateContext: InvocationContext {
         case Info.identifier:
             return await Info(serviceIndex: context.x.serviceIndex, accounts: context.x.serviceAccounts)
                 .call(config: config, state: state)
-        case Empower.identifier:
-            return await Empower(x: &context.x).call(config: config, state: state)
+        case Bless.identifier:
+            return await Bless(x: &context.x).call(config: config, state: state)
         case Assign.identifier:
             return await Assign(x: &context.x).call(config: config, state: state)
         case Designate.identifier:

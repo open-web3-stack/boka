@@ -772,7 +772,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
             let value = try context.state.readMemory(address: context.state.readRegister(src) + offset)
-            context.state.writeRegister(dest, value)
+            context.state.writeRegister(dest, UInt64(bitPattern: Int64(Int8(bitPattern: value))))
             return .continued
         }
     }
@@ -812,7 +812,7 @@ public enum Instructions {
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
             let data = try context.state.readMemory(address: context.state.readRegister(src) &+ offset, length: 2)
             let value = data.decode(UInt16.self)
-            context.state.writeRegister(dest, value)
+            context.state.writeRegister(dest, UInt64(bitPattern: Int64(Int16(bitPattern: value))))
             return .continued
         }
     }
@@ -852,7 +852,7 @@ public enum Instructions {
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
             let data = try context.state.readMemory(address: context.state.readRegister(src) &+ offset, length: 4)
             let value = data.decode(UInt32.self)
-            context.state.writeRegister(dest, value)
+            context.state.writeRegister(dest, UInt64(bitPattern: Int64(Int32(bitPattern: value))))
             return .continued
         }
     }
@@ -891,7 +891,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt32 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, regVal &+ value)
+            context.state.writeRegister(ra, Int32(bitPattern: regVal &+ value))
             return .continued
         }
     }
@@ -967,7 +967,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt32 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, regVal &* value)
+            context.state.writeRegister(ra, Int32(bitPattern: regVal &* value))
             return .continued
         }
     }
@@ -1025,7 +1025,7 @@ public enum Instructions {
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt32 = context.state.readRegister(rb)
             let shift = value & 0x1F
-            context.state.writeRegister(ra, UInt32(truncatingIfNeeded: regVal << shift))
+            context.state.writeRegister(ra, Int32(bitPattern: regVal << shift))
             return .continued
         }
     }
@@ -1045,7 +1045,7 @@ public enum Instructions {
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt32 = context.state.readRegister(rb)
             let shift = value & 0x1F
-            context.state.writeRegister(ra, regVal >> shift)
+            context.state.writeRegister(ra, Int32(bitPattern: regVal >> shift))
             return .continued
         }
     }
@@ -1065,7 +1065,7 @@ public enum Instructions {
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt32 = context.state.readRegister(rb)
             let shift = value & 0x1F
-            context.state.writeRegister(ra, Int32(bitPattern: regVal) >> shift)
+            context.state.writeRegister(ra, UInt64(bitPattern: Int64(Int32(bitPattern: regVal) >> shift)))
             return .continued
         }
     }
@@ -1084,7 +1084,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt32 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, value &- regVal)
+            context.state.writeRegister(ra, Int32(bitPattern: value &- regVal))
             return .continued
         }
     }
@@ -1142,7 +1142,7 @@ public enum Instructions {
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt32 = context.state.readRegister(rb)
             let shift = regVal & 0x1F
-            context.state.writeRegister(ra, UInt32(truncatingIfNeeded: value << shift))
+            context.state.writeRegister(ra, Int32(bitPattern: value << shift))
             return .continued
         }
     }
@@ -1162,7 +1162,7 @@ public enum Instructions {
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt32 = context.state.readRegister(rb)
             let shift = regVal & 0x1F
-            context.state.writeRegister(ra, value >> shift)
+            context.state.writeRegister(ra, Int32(bitPattern: value >> shift))
             return .continued
         }
     }
@@ -1182,7 +1182,7 @@ public enum Instructions {
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt32 = context.state.readRegister(rb)
             let shift = regVal & 0x1F
-            context.state.writeRegister(ra, Int32(bitPattern: value) >> shift)
+            context.state.writeRegister(ra, UInt64(bitPattern: Int64(Int32(bitPattern: value) >> shift)))
             return .continued
         }
     }
@@ -1280,7 +1280,7 @@ public enum Instructions {
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt64 = context.state.readRegister(rb)
             let shift = value & 0x1F
-            context.state.writeRegister(ra, UInt64(truncatingIfNeeded: regVal << shift))
+            context.state.writeRegister(ra, Int64(bitPattern: regVal << shift))
             return .continued
         }
     }
@@ -1300,7 +1300,7 @@ public enum Instructions {
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt64 = context.state.readRegister(rb)
             let shift = value & 0x1F
-            context.state.writeRegister(ra, regVal >> shift)
+            context.state.writeRegister(ra, Int64(bitPattern: regVal >> shift))
             return .continued
         }
     }
@@ -1320,7 +1320,7 @@ public enum Instructions {
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt64 = context.state.readRegister(rb)
             let shift = value & 0x1F
-            context.state.writeRegister(ra, Int64(bitPattern: regVal) >> shift)
+            context.state.writeRegister(ra, UInt64(bitPattern: Int64(bitPattern: regVal) >> shift))
             return .continued
         }
     }
@@ -1507,7 +1507,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, raVal &+ rbVal)
+            context.state.writeRegister(rd, Int32(bitPattern: raVal &+ rbVal))
             return .continued
         }
     }
@@ -1525,7 +1525,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, raVal &- rbVal)
+            context.state.writeRegister(rd, Int32(bitPattern: raVal &- rbVal))
             return .continued
         }
     }
@@ -1543,7 +1543,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, raVal &* rbVal)
+            context.state.writeRegister(rd, Int32(bitPattern: raVal &* rbVal))
             return .continued
         }
     }
@@ -1590,7 +1590,7 @@ public enum Instructions {
             } else if a == Int32.min, b == -1 {
                 context.state.writeRegister(rd, a)
             } else {
-                context.state.writeRegister(rd, a / b)
+                context.state.writeRegister(rd, UInt64(bitPattern: Int64(a / b)))
             }
             return .continued
         }
@@ -1638,7 +1638,7 @@ public enum Instructions {
             } else if a == Int32.min, b == -1 {
                 context.state.writeRegister(rd, 0)
             } else {
-                context.state.writeRegister(rd, a % b)
+                context.state.writeRegister(rd, UInt64(bitPattern: Int64(a % b)))
             }
             return .continued
         }
@@ -1658,7 +1658,7 @@ public enum Instructions {
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
             let shift = rbVal & 0x1F
-            context.state.writeRegister(rd, UInt32(truncatingIfNeeded: raVal << shift))
+            context.state.writeRegister(rd, Int32(bitPattern: raVal << shift))
             return .continued
         }
     }
@@ -1677,7 +1677,7 @@ public enum Instructions {
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
             let shift = rbVal & 0x1F
-            context.state.writeRegister(rd, raVal >> shift)
+            context.state.writeRegister(rd, Int32(bitPattern: raVal >> shift))
             return .continued
         }
     }
@@ -1696,7 +1696,7 @@ public enum Instructions {
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
             let shift = rbVal & 0x1F
-            context.state.writeRegister(rd, Int32(bitPattern: raVal) >> shift)
+            context.state.writeRegister(rd, UInt64(bitPattern: Int64(Int32(bitPattern: raVal) >> shift)))
             return .continued
         }
     }
@@ -1797,7 +1797,7 @@ public enum Instructions {
             } else if a == Int64.min, b == -1 {
                 context.state.writeRegister(rd, a)
             } else {
-                context.state.writeRegister(rd, a / b)
+                context.state.writeRegister(rd, UInt64(bitPattern: Int64(a / b)))
             }
             return .continued
         }
@@ -1845,7 +1845,7 @@ public enum Instructions {
             } else if a == Int32.min, b == -1 {
                 context.state.writeRegister(rd, 0)
             } else {
-                context.state.writeRegister(rd, a % b)
+                context.state.writeRegister(rd, UInt64(bitPattern: a % b))
             }
             return .continued
         }
@@ -1977,7 +1977,7 @@ public enum Instructions {
             let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
             context.state.writeRegister(
                 rd,
-                Int128(Int64(bitPattern: raVal) * Int64(bitPattern: rbVal)) >> 64
+                UInt64(bitPattern: Int64(truncatingIfNeeded: Int128(Int64(bitPattern: raVal) * Int64(bitPattern: rbVal)) >> 64))
             )
             return .continued
         }
@@ -2016,7 +2016,7 @@ public enum Instructions {
             let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
             context.state.writeRegister(
                 rd,
-                Int128(Int64(bitPattern: raVal) * Int64(bitPattern: rbVal)) >> 64
+                UInt64(bitPattern: Int64(truncatingIfNeeded: Int128(Int64(bitPattern: raVal) * Int64(bitPattern: rbVal)) >> 64))
             )
             return .continued
         }
