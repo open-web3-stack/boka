@@ -93,6 +93,9 @@ public final class QuicStream: Sendable {
         }
     }
 
+    // https://github.com/microsoft/msquic/blob/main/docs/Settings.md
+    // StreamRecvWindowDefault Initial stream receive window size for all stream types.
+    // Retrieves the current flow control window (StreamRecvWindowDefault) for QUIC streams.
     public func getFlowControlWindow() throws -> Int {
         try storage.write { storage in
             var settings = QUIC_SETTINGS()
@@ -112,6 +115,8 @@ public final class QuicStream: Sendable {
         }
     }
 
+    // Adjusts the flow control window (StreamRecvWindowDefault) for QUIC streams.
+    // Optimize Network Throughput & Manage Resource Usage
     public func adjustFlowControl(windowSize: Int) throws {
         try storage.write { storage in
             var settings = QUIC_SETTINGS()
