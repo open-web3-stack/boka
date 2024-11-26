@@ -7,13 +7,6 @@ import Utils
 @testable import Networking
 
 struct PeerTests {
-    struct MockMessage: MessageProtocol {
-        let data: Data
-        func encode() throws -> Data {
-            data
-        }
-    }
-
     struct MockRequest<Kind: StreamKindProtocol>: RequestProtocol {
         var kind: Kind
         var data: Data
@@ -50,10 +43,6 @@ struct PeerTests {
             self.data = data
             return MockRequest(kind: kind, data: data)
         }
-
-        func finish() -> Data? {
-            data
-        }
     }
 
     struct MockUniqueMessageDecoder: MessageDecoder {
@@ -70,10 +59,6 @@ struct PeerTests {
             self.data = data
             return MockRequest(kind: kind, data: data)
         }
-
-        func finish() -> Data? {
-            data
-        }
     }
 
     actor DataStorage {
@@ -88,10 +73,6 @@ struct PeerTests {
         typealias StreamKind = EphemeralStreamKind
         typealias Request = MockRequest<EphemeralStreamKind>
         private let dataStorage: PeerTests.DataStorage = DataStorage()
-
-        var lastReceivedData: Data? {
-            get async { await dataStorage.data.last }
-        }
 
         func createDecoder(kind: StreamKind) -> any MessageDecoder<Request> {
             MockEphemeralMessageDecoder(kind: kind)
@@ -383,15 +364,13 @@ struct PeerTests {
         let connection1 = try peer1.connect(to: peer2.listenAddress(), role: .validator)
         let connection2 = try peer2.connect(to: peer1.listenAddress(), role: .validator)
         try? await Task.sleep(for: .milliseconds(1000))
-        if !connection1.isClosed {
-            let data = try await connection1.request(MockRequest(kind: .typeA, data: Data("hello world".utf8)))
-            try? await Task.sleep(for: .milliseconds(500))
-            #expect(data == Data("hello world response".utf8))
-        }
-        if !connection2.isClosed {
-            let data = try await connection2.request(MockRequest(kind: .typeA, data: Data("hello world".utf8)))
-            try? await Task.sleep(for: .milliseconds(500))
-            #expect(data == Data("hello world response".utf8))
+        let connections = [connection1, connection2]
+        for connection in connections {
+            if !connection.isClosed {
+                let data = try await connection.request(MockRequest(kind: .typeA, data: Data("hello world".utf8)))
+                try? await Task.sleep(for: .milliseconds(500))
+                #expect(data == Data("hello world response".utf8))
+            }
         }
     }
 

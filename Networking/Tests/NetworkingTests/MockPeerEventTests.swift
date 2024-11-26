@@ -19,7 +19,6 @@ final class MockPeerEventTests {
             case shutdownInitiated(connection: QuicConnection, reason: ConnectionCloseReason)
             case streamStarted(connection: QuicConnection, stream: QuicStream)
             case dataReceived(stream: QuicStream, data: Data?)
-            case closed(stream: QuicStream, status: QuicStatus, code: QuicErrorCode)
         }
 
         let events: ThreadSafeContainer<[EventType]> = .init([])
@@ -78,12 +77,6 @@ final class MockPeerEventTests {
         func dataReceived(_ stream: QuicStream, data: Data?) {
             events.write { events in
                 events.append(.dataReceived(stream: stream, data: data))
-            }
-        }
-
-        func closed(_ stream: QuicStream, status: QuicStatus, code: QuicErrorCode) {
-            events.write { events in
-                events.append(.closed(stream: stream, status: status, code: code))
             }
         }
     }
