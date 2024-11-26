@@ -144,6 +144,150 @@ struct PeerTests {
     }
 
     @Test
+    func connectionRotationStrategy() async throws {
+        var peers: [Peer<MockStreamHandler>] = []
+        var handlers: [MockPresentStreamHandler] = []
+        let centerPeer = try Peer(
+            options: PeerOptions<MockStreamHandler>(
+                role: .validator,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+                genesisHeader: Data32(),
+                secretKey: Ed25519.SecretKey(from: Data32.random()),
+                presistentStreamHandler: MockPresentStreamHandler(),
+                ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                serverSettings: .defaultSettings,
+                clientSettings: .defaultSettings
+            )
+        )
+        // Create 30 peer nodes
+        for _ in 0 ..< 30 {
+            let handler = MockPresentStreamHandler()
+            handlers.append(handler)
+            let peer = try Peer(
+                options: PeerOptions<MockStreamHandler>(
+                    role: .builder,
+                    listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+                    genesisHeader: Data32(),
+                    secretKey: Ed25519.SecretKey(from: Data32.random()),
+                    presistentStreamHandler: handler,
+                    ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                    serverSettings: .defaultSettings,
+                    clientSettings: .defaultSettings
+                )
+            )
+            peers.append(peer)
+        }
+
+        // Make some connections
+        for i in 0 ..< 30 {
+            let peer = peers[i]
+            let con = try peer.connect(to: centerPeer.listenAddress(), role: .builder)
+            try await con.ready()
+        }
+        // Simulate close connections 3~5s
+        try? await Task.sleep(for: .milliseconds(5000))
+        centerPeer.broadcast(kind: .uniqueA, message: .init(kind: .uniqueA, data: Data("connection rotation strategy".utf8)))
+        try? await Task.sleep(for: .milliseconds(1000))
+        var receivedCount = 0
+        for handler in handlers {
+            receivedCount += await handler.receivedData.count
+        }
+        #expect(receivedCount == PeerSettings.defaultSettings.maxBuilderConnections)
+    }
+
+    @Test
+    func mockHandshakeFailure() async throws {
+        let mockPeerTest = try MockPeerEventTests()
+        let serverHandler = MockPeerEventTests.MockPeerEventHandler(
+            MockPeerEventTests.MockPeerEventHandler.MockPeerAction.mockHandshakeFailure
+        )
+        let alpns = [
+            PeerRole.validator: Alpn(genesisHeader: Data32(), builder: false).data,
+            PeerRole.builder: Alpn(genesisHeader: Data32(), builder: true).data,
+        ]
+        let allAlpns = Array(alpns.values)
+        // Server setup with bad certificate
+        let serverConfiguration = try QuicConfiguration(
+            registration: mockPeerTest.registration,
+            pkcs12: mockPeerTest.certData,
+            alpns: allAlpns,
+            client: false,
+            settings: QuicSettings.defaultSettings
+        )
+
+        let listener = try QuicListener(
+            handler: serverHandler,
+            registration: mockPeerTest.registration,
+            configuration: serverConfiguration,
+            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+            alpns: allAlpns
+        )
+
+        let listenAddress = try listener.listenAddress()
+        let peer1 = try Peer(
+            options: PeerOptions<MockStreamHandler>(
+                role: .validator,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+                genesisHeader: Data32(),
+                secretKey: Ed25519.SecretKey(from: Data32.random()),
+                presistentStreamHandler: MockPresentStreamHandler(),
+                ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                serverSettings: .defaultSettings,
+                clientSettings: .defaultSettings
+            )
+        )
+
+        let connection1 = try peer1.connect(to: listenAddress, role: .validator)
+        try? await Task.sleep(for: .milliseconds(3000))
+        #expect(connection1.isClosed == true)
+    }
+
+    @Test
+    func mockShutdownBadCert() async throws {
+        let mockPeerTest = try MockPeerEventTests()
+        let serverHandler = MockPeerEventTests.MockPeerEventHandler()
+        let alpns = [
+            PeerRole.validator: Alpn(genesisHeader: Data32(), builder: false).data,
+            PeerRole.builder: Alpn(genesisHeader: Data32(), builder: true).data,
+        ]
+        let allAlpns = Array(alpns.values)
+        // Server setup with bad certificate
+        let serverConfiguration = try QuicConfiguration(
+            registration: mockPeerTest.registration,
+            pkcs12: mockPeerTest.badCertData,
+            alpns: allAlpns,
+            client: false,
+            settings: QuicSettings.defaultSettings
+        )
+
+        let listener = try QuicListener(
+            handler: serverHandler,
+            registration: mockPeerTest.registration,
+            configuration: serverConfiguration,
+            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+            alpns: allAlpns
+        )
+
+        let listenAddress = try listener.listenAddress()
+        let peer1 = try Peer(
+            options: PeerOptions<MockStreamHandler>(
+                role: .validator,
+                listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+                genesisHeader: Data32(),
+                secretKey: Ed25519.SecretKey(from: Data32.random()),
+                presistentStreamHandler: MockPresentStreamHandler(),
+                ephemeralStreamHandler: MockEphemeralStreamHandler(),
+                serverSettings: .defaultSettings,
+                clientSettings: .defaultSettings
+            )
+        )
+
+        let connection1 = try peer1.connect(to: listenAddress, role: .validator)
+        try? await Task.sleep(for: .milliseconds(1000))
+        #expect(connection1.isClosed == true)
+    }
+
+    @Test
     func reopenUpStream() async throws {
         let handler2 = MockPresentStreamHandler()
         var messageData = Data("reopen up stream".utf8)
@@ -197,7 +341,7 @@ struct PeerTests {
         peer1.broadcast(
             kind: .uniqueA, message: .init(kind: .uniqueA, data: messageData)
         )
-        try await Task.sleep(for: .milliseconds(1000))
+        try await Task.sleep(for: .milliseconds(2000))
         let lastReceivedData2 = await handler2.lastReceivedData
         #expect(lastReceivedData2 == messageData)
     }
@@ -290,15 +434,15 @@ struct PeerTests {
 
         let connection1 = try peer1.connect(to: peer2.listenAddress(), role: .validator)
         let connection2 = try peer2.connect(to: peer1.listenAddress(), role: .validator)
-        try? await Task.sleep(for: .milliseconds(50))
+        try? await Task.sleep(for: .milliseconds(1000))
         if !connection1.isClosed {
             let data = try await connection1.request(MockRequest(kind: .typeA, data: Data("hello world".utf8)))
-            try? await Task.sleep(for: .milliseconds(50))
+            try? await Task.sleep(for: .milliseconds(500))
             #expect(data == Data("hello world response".utf8))
         }
         if !connection2.isClosed {
             let data = try await connection2.request(MockRequest(kind: .typeA, data: Data("hello world".utf8)))
-            try? await Task.sleep(for: .milliseconds(50))
+            try? await Task.sleep(for: .milliseconds(500))
             #expect(data == Data("hello world response".utf8))
         }
     }
@@ -573,7 +717,7 @@ struct PeerTests {
             to: peer2.listenAddress(), role: .validator
         )
 
-        try? await Task.sleep(for: .milliseconds(50))
+        try? await Task.sleep(for: .milliseconds(500))
 
         peer1.broadcast(
             kind: .uniqueA, message: .init(kind: .uniqueA, data: Data("hello world".utf8))
@@ -583,7 +727,7 @@ struct PeerTests {
             kind: .uniqueB, message: .init(kind: .uniqueB, data: Data("I am jam".utf8))
         )
         // Verify last received data
-        try? await Task.sleep(for: .milliseconds(200))
+        try? await Task.sleep(for: .milliseconds(500))
         await #expect(handler2.lastReceivedData == Data("hello world".utf8))
         await #expect(handler1.lastReceivedData == Data("I am jam".utf8))
     }

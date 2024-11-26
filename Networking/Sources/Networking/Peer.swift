@@ -70,7 +70,7 @@ public struct PeerOptions<Handler: StreamHandler>: Sendable {
     }
 }
 
-// TODO: reopen UP stream, peer reputation system to ban peers not following the protocol
+// TODO: peer reputation system to ban peers not following the protocol
 public final class Peer<Handler: StreamHandler>: Sendable {
     private let impl: PeerImpl<Handler>
 
@@ -271,9 +271,15 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
             if role == .builder {
                 let currentCount = connections.byAddr.values.filter { $0.role == role }.count
                 if currentCount >= self.settings.maxBuilderConnections {
-                    self.logger.warning("max builder connections reached")
-                    // TODO: consider connection rotation strategy
-                    return false
+                    if let conn = connections.byAddr.values.filter({ $0.role == .builder })
+                        .sorted(by: { $0.getLastActive() < $1.getLastActive() }).first
+                    {
+                        self.logger.warning("Replacing least active builder connection at \(conn.remoteAddress)")
+                        conn.close(abort: false)
+                    } else {
+                        self.logger.warning("Max builder connections reached, no eligible replacement found")
+                        return false
+                    }
                 }
             }
             if connections.byAddr[addr] != nil {
@@ -294,7 +300,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
     }
 
     func reconnect(to address: NetAddr, role: PeerRole) throws {
-        let state = reconnectStates.read { reconnectStates in
+        var state = reconnectStates.read { reconnectStates in
             reconnectStates[address] ?? .init()
         }
 
@@ -302,12 +308,9 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
             logger.warning("reconnecting to \(address) exceeded max attempts")
             return
         }
-
+        state.applyBackoff()
         reconnectStates.write { reconnectStates in
-            if var state = reconnectStates[address] {
-                state.applyBackoff()
-                reconnectStates[address] = state
-            }
+            reconnectStates[address] = state
         }
         Task {
             try await Task.sleep(for: .seconds(state.delay))
@@ -336,7 +339,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
     }
 
     func reopenUpStream(connection: Connection<Handler>, kind: Handler.PresistentHandler.StreamKind) {
-        let state = reopenStates.read { states in
+        var state = reopenStates.read { states in
             states[connection.id] ?? .init()
         }
 
@@ -344,12 +347,9 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
             logger.warning("Reopen attempt for stream \(kind) on connection \(connection.id) exceeded max attempts")
             return
         }
-
+        state.applyBackoff()
         reopenStates.write { states in
-            if var state = states[connection.id] {
-                state.applyBackoff()
-                states[connection.id] = state
-            }
+            states[connection.id] = state
         }
 
         Task {
@@ -557,10 +557,10 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             false
         case let .transport(status, _):
             switch QuicStatusCode(rawValue: status.rawValue) {
-            case .badCert:
-                false
+            case .aborted, .outOfMemory, .connectionTimeout, .unreachable, .bufferTooSmall, .connectionRefused:
+                true
             default:
-                !status.isSucceeded
+                status.isSucceeded
             }
         case let .byPeer(code):
             // Do not reconnect if the closure was initiated by the peer.
@@ -590,6 +590,10 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         }
         if let stream {
             stream.received(data: data)
+            let connection = impl.connections.read { connections in
+                connections.byId[stream.connectionId]
+            }
+            connection?.updateLastActive()
         }
     }
 

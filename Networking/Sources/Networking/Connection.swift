@@ -1,6 +1,7 @@
 import AsyncChannels
 import Foundation
 import MsQuicSwift
+import Synchronization
 import TracingUtils
 import Utils
 
@@ -36,7 +37,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
 
     public let role: PeerRole
     public let remoteAddress: NetAddr
-
+    private let lastActive: Atomic<TimeInterval> = Atomic(0)
     let presistentStreams: ThreadSafeContainer<
         [Handler.PresistentHandler.StreamKind: Stream<Handler>]
     > = .init([:])
@@ -58,6 +59,10 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         }
     }
 
+    func getLastActive() -> TimeInterval {
+        lastActive.load(ordering: .sequentiallyConsistent)
+    }
+
     public var id: UniqueId {
         connection.id
     }
@@ -68,6 +73,11 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         self.role = role
         self.remoteAddress = remoteAddress
         self.initiatedByLocal = initiatedByLocal
+        updateLastActive()
+    }
+
+    func updateLastActive() {
+        lastActive.store(Date().timeIntervalSince1970, ordering: .releasing)
     }
 
     func opened(publicKey: Data) throws {
