@@ -5,18 +5,18 @@ public protocol PvmConfig {
     // ZI = 2^24: The standard pvm program initialization input data size.
     var pvmProgramInitInputDataSize: Int { get }
 
-    // ZP = 2^14: The standard pvm program initialization page size.
-    var pvmProgramInitPageSize: Int { get }
+    // ZZ = 2^16: The standard pvm program initialization zone size.
+    var pvmProgramInitZoneSize: Int { get }
 
-    // ZQ = 2^16: The standard pvm program initialization segment size.
-    var pvmProgramInitSegmentSize: Int { get }
+    // ZP = 2^12: The pvm memory page size.
+    var pvmMemoryPageSize: Int { get }
 }
 
 public struct DefaultPvmConfig: PvmConfig {
     public let pvmDynamicAddressAlignmentFactor: Int
     public let pvmProgramInitInputDataSize: Int
-    public let pvmProgramInitPageSize: Int
-    public let pvmProgramInitSegmentSize: Int
+    public let pvmProgramInitZoneSize: Int
+    public let pvmMemoryPageSize: Int
 
     public let pvmProgramInitRegister1Value: Int
     public let pvmProgramInitStackBaseAddress: Int
@@ -25,11 +25,11 @@ public struct DefaultPvmConfig: PvmConfig {
     public init() {
         pvmDynamicAddressAlignmentFactor = 2
         pvmProgramInitInputDataSize = 1 << 24
-        pvmProgramInitPageSize = 1 << 14
-        pvmProgramInitSegmentSize = 1 << 16
+        pvmProgramInitZoneSize = 1 << 16
+        pvmMemoryPageSize = 1 << 12
 
         pvmProgramInitRegister1Value = (1 << 32) - (1 << 16)
-        pvmProgramInitStackBaseAddress = (1 << 32) - (2 * pvmProgramInitSegmentSize) - pvmProgramInitInputDataSize
-        pvmProgramInitInputStartAddress = pvmProgramInitStackBaseAddress + pvmProgramInitSegmentSize
+        pvmProgramInitStackBaseAddress = (1 << 32) - (2 * pvmProgramInitZoneSize) - pvmProgramInitInputDataSize
+        pvmProgramInitInputStartAddress = pvmProgramInitStackBaseAddress + pvmProgramInitZoneSize
     }
 }

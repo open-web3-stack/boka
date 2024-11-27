@@ -107,11 +107,11 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     // ZI = 2^24: The standard pvm program initialization input data size.
     public var pvmProgramInitInputDataSize: Int
 
-    // ZG = 2^14: The standard pvm program initialization page size.
-    public var pvmProgramInitPageSize: Int
+    // ZZ = 2^16: The standard pvm program initialization zone size.
+    public var pvmProgramInitZoneSize: Int
 
-    // ZQ = 2^16: The standard pvm program initialization segment size.
-    public var pvmProgramInitSegmentSize: Int
+    // ZP = 2^12: The pvm memory page size.
+    public var pvmMemoryPageSize: Int
 
     public init(
         auditTranchePeriod: Int,
@@ -148,8 +148,8 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         ticketSubmissionEndSlot: Int,
         pvmDynamicAddressAlignmentFactor: Int,
         pvmProgramInitInputDataSize: Int,
-        pvmProgramInitPageSize: Int,
-        pvmProgramInitSegmentSize: Int
+        pvmProgramInitZoneSize: Int,
+        pvmMemoryPageSize: Int
     ) {
         self.auditTranchePeriod = auditTranchePeriod
         self.additionalMinBalancePerStateItem = additionalMinBalancePerStateItem
@@ -185,8 +185,8 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         self.ticketSubmissionEndSlot = ticketSubmissionEndSlot
         self.pvmDynamicAddressAlignmentFactor = pvmDynamicAddressAlignmentFactor
         self.pvmProgramInitInputDataSize = pvmProgramInitInputDataSize
-        self.pvmProgramInitPageSize = pvmProgramInitPageSize
-        self.pvmProgramInitSegmentSize = pvmProgramInitSegmentSize
+        self.pvmProgramInitZoneSize = pvmProgramInitZoneSize
+        self.pvmMemoryPageSize = pvmMemoryPageSize
     }
 }
 
@@ -197,8 +197,8 @@ extension ProtocolConfig: PvmConfig {}
 extension Ref: @retroactive PvmConfig where T == ProtocolConfig {
     public var pvmDynamicAddressAlignmentFactor: Int { value.pvmDynamicAddressAlignmentFactor }
     public var pvmProgramInitInputDataSize: Int { value.pvmProgramInitInputDataSize }
-    public var pvmProgramInitPageSize: Int { value.pvmProgramInitPageSize }
-    public var pvmProgramInitSegmentSize: Int { value.pvmProgramInitSegmentSize }
+    public var pvmProgramInitZoneSize: Int { value.pvmProgramInitZoneSize }
+    public var pvmMemoryPageSize: Int { value.pvmMemoryPageSize }
 }
 
 extension ProtocolConfig {
@@ -270,10 +270,10 @@ extension ProtocolConfig {
                 ? other.pvmDynamicAddressAlignmentFactor : pvmDynamicAddressAlignmentFactor,
             pvmProgramInitInputDataSize: other.pvmProgramInitInputDataSize != 0
                 ? other.pvmProgramInitInputDataSize : pvmProgramInitInputDataSize,
-            pvmProgramInitPageSize: other.pvmProgramInitPageSize != 0
-                ? other.pvmProgramInitPageSize : pvmProgramInitPageSize,
-            pvmProgramInitSegmentSize: other.pvmProgramInitSegmentSize != 0
-                ? other.pvmProgramInitSegmentSize : pvmProgramInitSegmentSize
+            pvmProgramInitZoneSize: other.pvmProgramInitZoneSize != 0
+                ? other.pvmProgramInitZoneSize : pvmProgramInitZoneSize,
+            pvmMemoryPageSize: other.pvmMemoryPageSize != 0
+                ? other.pvmMemoryPageSize : pvmMemoryPageSize
         )
     }
 
@@ -362,11 +362,11 @@ extension ProtocolConfig {
         pvmProgramInitInputDataSize = try decode(
             .pvmProgramInitInputDataSize, defaultValue: 0, required: required
         )
-        pvmProgramInitPageSize = try decode(
-            .pvmProgramInitPageSize, defaultValue: 0, required: required
+        pvmProgramInitZoneSize = try decode(
+            .pvmProgramInitZoneSize, defaultValue: 0, required: required
         )
-        pvmProgramInitSegmentSize = try decode(
-            .pvmProgramInitSegmentSize, defaultValue: 0, required: required
+        pvmMemoryPageSize = try decode(
+            .pvmMemoryPageSize, defaultValue: 0, required: required
         )
     }
 }
