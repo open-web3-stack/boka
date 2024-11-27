@@ -603,7 +603,15 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                         impl.reopenUpStream(connection: connection, kind: kind)
                     }
                 }
+            } else {
+                logger.warning(
+                    "Stream closed but connection is gone?", metadata: ["streamId": "\(stream.id)"]
+                )
             }
+        } else {
+            logger.warning(
+                "Stream closed but stream is gone?", metadata: ["streamId": "\(quicStream.id)"]
+            )
         }
     }
 
@@ -617,7 +625,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         case .connectionIdle, .badCert:
             return false
         default:
-            return !status.isSucceeded
+            return status.isSucceeded
         }
     }
 }

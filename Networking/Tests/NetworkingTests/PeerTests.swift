@@ -165,8 +165,8 @@ struct PeerTests {
             let con = try peer.connect(to: centerPeer.listenAddress(), role: .builder)
             try await con.ready()
         }
-        // Simulate close connections 3~5s
-        try? await Task.sleep(for: .milliseconds(5000))
+        // Simulate close connections 5~8s
+        try? await Task.sleep(for: .milliseconds(8000))
         centerPeer.broadcast(kind: .uniqueA, message: .init(kind: .uniqueA, data: Data("connection rotation strategy".utf8)))
         try? await Task.sleep(for: .milliseconds(1000))
         var receivedCount = 0
@@ -323,7 +323,7 @@ struct PeerTests {
         }
         stream!.close(abort: true)
         // Wait to simulate downtime & reopen up stream 3~5s
-        try? await Task.sleep(for: .milliseconds(3000))
+        try? await Task.sleep(for: .milliseconds(5000))
         messageData = Data("reopen up stream data".utf8)
         peer1.broadcast(
             kind: .uniqueA, message: .init(kind: .uniqueA, data: messageData)
