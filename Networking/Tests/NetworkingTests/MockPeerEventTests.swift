@@ -207,6 +207,8 @@ final class MockPeerEventTests {
 
         // Attempt to connect
         try clientConnection.connect(to: listenAddress)
+        let removeAddress = try clientConnection.getRemoteAddress()
+        #expect(removeAddress != nil)
         let stream1 = try clientConnection.createStream()
         try stream1.send(data: Data("test data 1".utf8))
 
