@@ -145,7 +145,7 @@ struct QuicListenerTests {
         try stream1.send(data: Data("test data 1".utf8))
 
         try? await Task.sleep(for: .milliseconds(100))
-        let (_, info) = serverHandler.events.value.compactMap {
+        let (serverConnection, info) = serverHandler.events.value.compactMap {
             switch $0 {
             case let .newConnection(_, connection, info):
                 (connection, info) as (QuicConnection, ConnectionInfo)?
@@ -160,6 +160,21 @@ struct QuicListenerTests {
         #expect(info.serverName == "127.0.0.1")
         #expect(info.localAddress == listenAddress)
         #expect(ipAddress2 == "127.0.0.1")
+
+        let stream2 = try serverConnection.createStream()
+        try stream2.send(data: Data("other test data 2".utf8))
+
+        try? await Task.sleep(for: .milliseconds(100))
+        let receivedData = serverHandler.events.value.compactMap {
+            switch $0 {
+            case let .dataReceived(_, data):
+                data
+            default:
+                nil
+            }
+        }
+        #expect(receivedData.count == 1)
+        #expect(receivedData[0] == Data("test data 1".utf8))
     }
 
     @Test
