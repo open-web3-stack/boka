@@ -474,9 +474,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             connections.byId[connection.id]
         }
         guard let conn else {
-            logger.warning(
-                "Connected but connection is gone?", metadata: ["connectionId": "\(connection.id)"]
-            )
+            logger.warning("Connected but connection is gone?", metadata: ["connectionId": "\(connection.id)"])
             return
         }
 
@@ -506,17 +504,17 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             connections.byId[connection.id]
         }
         let needReconnect = impl.connections.write { connections in
+            var needReconnect = false
             if let conn = connections.byId[connection.id] {
-                let needReconnect = conn.needReconnect
+                needReconnect = conn.needReconnect
                 if let publicKey = conn.publicKey {
                     connections.byPublicKey.removeValue(forKey: publicKey)
                 }
                 connections.byId.removeValue(forKey: connection.id)
                 connections.byAddr.removeValue(forKey: conn.remoteAddress)
                 conn.closed()
-                return needReconnect
             }
-            return false
+            return needReconnect
         }
         if needReconnect, let address = conn?.remoteAddress, let role = conn?.role {
             do {
@@ -601,21 +599,11 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             if let connection {
                 connection.streamClosed(stream: stream, abort: !status.isSucceeded)
                 if shouldReopenStream(connection: connection, stream: stream, status: status) {
-                    do {
-                        if let kind = stream.kind {
-                            impl.reopenUpStream(connection: connection, kind: kind)
-                        }
+                    if let kind = stream.kind {
+                        impl.reopenUpStream(connection: connection, kind: kind)
                     }
                 }
-            } else {
-                logger.warning(
-                    "Stream closed but connection is gone?", metadata: ["streamId": "\(stream.id)"]
-                )
             }
-        } else {
-            logger.warning(
-                "Stream closed but stream is gone?", metadata: ["streamId": "\(quicStream.id)"]
-            )
         }
     }
 
