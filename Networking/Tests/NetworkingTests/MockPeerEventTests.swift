@@ -167,6 +167,8 @@ final class MockPeerEventTests {
         )
     }
 
+    final class MockQuicEventHandler: QuicEventHandler {}
+
     @Test
     func connected() async throws {
         let serverHandler = MockPeerEventHandler()
@@ -227,6 +229,82 @@ final class MockPeerEventTests {
         #expect(info.serverName == "127.0.0.1")
         #expect(info.localAddress == listenAddress)
         #expect(ipAddress2 == "127.0.0.1")
+    }
+
+    @Test
+    func mockTestCert() async throws {
+        let serverHandler = MockPeerEventHandler()
+        let clientHandler = MockQuicEventHandler()
+
+        let serverConfiguration = try QuicConfiguration(
+            registration: registration,
+            pkcs12: badCertData,
+            alpns: [Data("testalpn".utf8)],
+            client: false,
+            settings: QuicSettings.defaultSettings
+        )
+
+        let listener = try QuicListener(
+            handler: serverHandler,
+            registration: registration,
+            configuration: serverConfiguration,
+            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+            alpns: [Data("testalpn".utf8)]
+        )
+
+        let listenAddress = try listener.listenAddress()
+
+        // Client setup with bad certificate
+        let clientConfiguration = try QuicConfiguration(
+            registration: registration,
+            pkcs12: certData,
+            alpns: [Data("testalpn".utf8)],
+            client: true,
+            settings: QuicSettings.defaultSettings
+        )
+
+        let clientConnection = try QuicConnection(
+            handler: clientHandler,
+            registration: registration,
+            configuration: clientConfiguration
+        )
+        try clientConnection.connect(to: listenAddress)
+        try await Task.sleep(for: .milliseconds(100))
+        let stream1 = try clientConnection.createStream()
+
+        try stream1.send(data: Data("test data 1".utf8))
+
+        try? await Task.sleep(for: .milliseconds(100))
+        let (serverConnection, info) = serverHandler.events.value.compactMap {
+            switch $0 {
+            case let .newConnection(_, connection, info):
+                (connection, info) as (QuicConnection, ConnectionInfo)?
+            default:
+                nil
+            }
+        }.first!
+        let (ipAddress2, _) = info.remoteAddress.getAddressAndPort()
+
+        #expect(info.negotiatedAlpn == Data("testalpn".utf8))
+        #expect(info.serverName == "127.0.0.1")
+        #expect(info.localAddress == listenAddress)
+        #expect(ipAddress2 == "127.0.0.1")
+
+        let stream2 = try serverConnection.createStream()
+        try stream2.send(data: Data("other test data 2".utf8))
+
+        try? await Task.sleep(for: .milliseconds(100))
+        let receivedData = serverHandler.events.value.compactMap {
+            switch $0 {
+            case let .dataReceived(_, data):
+                data
+            default:
+                nil
+            }
+        }
+
+        #expect(receivedData.count == 1)
+        #expect(receivedData[0] == Data("test data 1".utf8))
     }
 
     @Test

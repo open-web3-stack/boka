@@ -173,11 +173,16 @@ struct QuicListenerTests {
                 nil
             }
         }
-        try clientConnection.shutdown()
+
         #expect(receivedData.count == 1)
         #expect(receivedData[0] == Data("test data 1".utf8))
+        try clientConnection.shutdown()
+        try? await Task.sleep(for: .milliseconds(1000))
         #expect(throws: Error.self) {
             try serverConnection.connect(to: info.remoteAddress)
+        }
+        #expect(throws: Error.self) {
+            _ = try clientConnection.getRemoteAddress()
         }
     }
 
