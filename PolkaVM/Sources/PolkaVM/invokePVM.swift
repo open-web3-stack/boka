@@ -22,7 +22,7 @@ public func invokePVM(
         case .outOfGas:
             return (.outOfGas, Gas(0), nil)
         case .halt:
-            let (addr, len) = state.readRegister(Registers.Index(raw: 10), Registers.Index(raw: 11))
+            let (addr, len): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 10), Registers.Index(raw: 11))
             let output = try? state.readMemory(address: addr, length: Int(len))
             return (.halt, Gas(state.getGas()), output ?? Data())
         default:
