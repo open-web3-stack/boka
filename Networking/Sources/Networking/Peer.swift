@@ -350,7 +350,10 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
         Task {
             try await Task.sleep(for: .seconds(state.delay))
             do {
-                logger.debug("Attempting to reopen UP stream of kind \(kind) for connection \(connection.id)")
+                logger
+                    .debug(
+                        "Attempting to reopen UP stream of kind \(kind) for connection \(connection.id) attempt \(state.attempt) in \(state.delay) seconds"
+                    )
                 try connection.createPreistentStream(kind: kind)
             } catch {
                 logger.error("Failed to reopen UP stream for connection \(connection.id): \(error)")

@@ -322,8 +322,8 @@ struct PeerTests {
             presistentStreams[.uniqueA]
         }
         stream!.close(abort: true)
-        // Wait to simulate downtime & reopen up stream 3~5s
-        try? await Task.sleep(for: .milliseconds(5000))
+        // Wait to simulate downtime & reopen up stream 8s
+        try? await Task.sleep(for: .milliseconds(8000))
         messageData = Data("reopen up stream data".utf8)
         peer1.broadcast(
             kind: .uniqueA, message: .init(kind: .uniqueA, data: messageData)
