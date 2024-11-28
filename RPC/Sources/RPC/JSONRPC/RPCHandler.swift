@@ -6,7 +6,7 @@ protocol RPCHandler: Sendable {
     associatedtype Request: FromJSON
     associatedtype Response: Encodable
 
-    var method: String { get }
+    static var method: String { get }
 
     func handle(request: Request) async throws -> Response?
     func handle(jsonRequest: JSONRequest) async throws -> JSONResponse

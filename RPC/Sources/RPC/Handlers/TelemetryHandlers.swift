@@ -3,6 +3,11 @@ import Foundation
 import Utils
 
 enum TelemetryHandlers {
+    static let handlers: [any RPCHandler.Type] = [
+        GetUpdate.self,
+        Name.self,
+    ]
+
     static func getHandlers(source: TelemetryDataSource & ChainDataSource) -> [any RPCHandler] {
         [
             GetUpdate(source: source),
@@ -11,9 +16,10 @@ enum TelemetryHandlers {
     }
 
     struct GetUpdate: RPCHandler {
-        var method: String { "telemetry_getUpdate" }
         typealias Request = VoidRequest
         typealias Response = [String: String]
+
+        static var method: String { "telemetry_getUpdate" }
 
         private let source: TelemetryDataSource & ChainDataSource
 
@@ -34,9 +40,10 @@ enum TelemetryHandlers {
     }
 
     struct Name: RPCHandler {
-        var method: String { "telemetry_name" }
         typealias Request = VoidRequest
         typealias Response = String
+
+        static var method: String { "telemetry_name" }
 
         private let source: TelemetryDataSource
 

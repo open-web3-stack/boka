@@ -27,10 +27,7 @@ public class Server {
         let env = try Environment.detect(arguments: ["--env"])
         app = Application(env)
 
-        var handlers: [any RPCHandler] = SystemHandlers.getHandlers(source: source)
-        handlers.append(contentsOf: ChainHandlers.getHandlers(source: source))
-        handlers.append(contentsOf: TelemetryHandlers.getHandlers(source: source))
-        handlers.append(contentsOf: RPCHandlers.getHandlers(source: handlers))
+        let handlers = AllHandlers.getHandlers(source: source)
 
         // Register routes
         let rpcController = JSONRPCController(handlers: handlers)

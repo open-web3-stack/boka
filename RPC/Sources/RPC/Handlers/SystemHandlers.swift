@@ -1,6 +1,11 @@
 import Utils
 
 enum SystemHandlers {
+    static let handlers: [any RPCHandler.Type] = [
+        Health.self,
+        Version.self,
+    ]
+
     static func getHandlers(source _: SystemDataSource) -> [any RPCHandler] {
         [
             Health(),
@@ -9,9 +14,10 @@ enum SystemHandlers {
     }
 
     struct Health: RPCHandler {
-        var method: String { "system_health" }
         typealias Request = VoidRequest
         typealias Response = Bool
+
+        static var method: String { "system_health" }
 
         func handle(request _: Request) async throws -> Response? {
             true
@@ -19,9 +25,10 @@ enum SystemHandlers {
     }
 
     struct Version: RPCHandler {
-        var method: String { "system_version" }
         typealias Request = VoidRequest
         typealias Response = String
+
+        static var method: String { "system_version" }
 
         func handle(request _: Request) async throws -> Response? {
             "0.0.1"

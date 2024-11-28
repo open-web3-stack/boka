@@ -3,6 +3,10 @@ import Foundation
 import Utils
 
 enum ChainHandlers {
+    static let handlers: [any RPCHandler.Type] = [
+        GetBlock.self,
+    ]
+
     static func getHandlers(source: ChainDataSource) -> [any RPCHandler] {
         [
             GetBlock(source: source),
@@ -10,9 +14,11 @@ enum ChainHandlers {
     }
 
     struct GetBlock: RPCHandler {
-        var method: String { "chain_getBlock" }
         typealias Request = Data32?
         typealias Response = BlockRef?
+        typealias DataSource = ChainDataSource
+
+        static var method: String { "chain_getBlock" }
 
         private let source: ChainDataSource
 

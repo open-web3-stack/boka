@@ -13,10 +13,11 @@ final class JSONRPCController: RouteCollection, Sendable {
     init(handlers: [any RPCHandler]) {
         var dict = [String: any RPCHandler]()
         for handler in handlers {
-            if dict.keys.contains(handler.method) {
-                logger.warning("Duplicated handler: \(handler.method)")
+            let method = type(of: handler).method
+            if dict.keys.contains(method) {
+                logger.warning("Duplicated handler: \(method)")
             }
-            dict[handler.method] = handler
+            dict[method] = handler
         }
         self.handlers = dict
 
