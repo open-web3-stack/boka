@@ -119,16 +119,10 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
 
     public var isClosed: Bool {
         state.read {
-            switch $0 {
-            case .connecting:
-                false
-            case .connected:
-                false
-            case .closed:
-                true
-            case .reconnect:
-                false
+            if case .closed = $0 {
+                return true
             }
+            return false
         }
     }
 

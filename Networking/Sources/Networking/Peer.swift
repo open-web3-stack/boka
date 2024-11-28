@@ -20,12 +20,7 @@ struct BackoffState {
     var attempt: Int
     var delay: TimeInterval
 
-    init() {
-        attempt = 0
-        delay = 1
-    }
-
-    init(attempt: Int = 0, delay: TimeInterval = 1) {
+    init(_ attempt: Int = 0, _ delay: TimeInterval = 1) {
         self.attempt = attempt
         self.delay = delay
     }
@@ -479,12 +474,10 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             connections.byId[connection.id]
         }
         guard let conn else {
-            logger.warning(
-                "Connected but connection is gone?", metadata: ["connectionId": "\(connection.id)"]
-            )
+            logger.warning("Connected but connection is gone?", metadata: ["connectionId": "\(connection.id)"])
             return
         }
-        // Check if the connection is already reconnected
+
         impl.reconnectStates.write { reconnectStates in
             reconnectStates[conn.remoteAddress] = nil
         }
@@ -511,17 +504,17 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             connections.byId[connection.id]
         }
         let needReconnect = impl.connections.write { connections in
+            var needReconnect = false
             if let conn = connections.byId[connection.id] {
-                let needReconnect = conn.needReconnect
+                needReconnect = conn.needReconnect
                 if let publicKey = conn.publicKey {
                     connections.byPublicKey.removeValue(forKey: publicKey)
                 }
                 connections.byId.removeValue(forKey: connection.id)
                 connections.byAddr.removeValue(forKey: conn.remoteAddress)
                 conn.closed()
-                return needReconnect
             }
-            return false
+            return needReconnect
         }
         if needReconnect, let address = conn?.remoteAddress, let role = conn?.role {
             do {
@@ -533,10 +526,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
     }
 
     func shutdownInitiated(_ connection: QuicConnection, reason: ConnectionCloseReason) {
-        logger.debug(
-            "Shutdown initiated",
-            metadata: ["connectionId": "\(connection.id)", "reason": "\(reason)"]
-        )
+        logger.debug("Shutdown initiated", metadata: ["connectionId": "\(connection.id)", "reason": "\(reason)"])
         if shouldReconnect(basedOn: reason) {
             impl.connections.write { connections in
                 if let conn = connections.byId[connection.id] {
@@ -609,15 +599,8 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             if let connection {
                 connection.streamClosed(stream: stream, abort: !status.isSucceeded)
                 if shouldReopenStream(connection: connection, stream: stream, status: status) {
-                    do {
-                        if let kind = stream.kind {
-                            //                            impl.reopenUpStream(connection: connection, kind: kind);
-                            do {
-                                try connection.createPreistentStream(kind: kind)
-                            } catch {
-                                logger.error("Attempt to recreate the persistent stream failed: \(error)")
-                            }
-                        }
+                    if let kind = stream.kind {
+                        impl.reopenUpStream(connection: connection, kind: kind)
                     }
                 }
             } else {
@@ -642,7 +625,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         case .connectionIdle, .badCert:
             return false
         default:
-            return !status.isSucceeded
+            return status.isSucceeded
         }
     }
 }

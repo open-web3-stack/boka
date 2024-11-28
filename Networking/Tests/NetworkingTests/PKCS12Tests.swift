@@ -27,8 +27,8 @@ struct PKCS12Tests {
 
         let registration = try QuicRegistration()
 
-        let serverHandler = MockQuicEventHandler()
-        let clientHandler = MockQuicEventHandler()
+        let serverHandler = MockPeerEventTests.MockPeerEventHandler()
+        let clientHandler = MockPeerEventTests.MockPeerEventHandler()
 
         // create listener
 
@@ -71,26 +71,20 @@ struct PKCS12Tests {
 
         try? await Task.sleep(for: .milliseconds(50))
 
-        let clientData = clientHandler.events.value.compactMap {
-            switch $0 {
-            case let .shouldOpen(_, certificate):
-                certificate as Data?
-            default:
-                nil
+        let clientConn = clientHandler.events.value.compactMap {
+            if case let .connected(connection: connection) = $0 {
+                return connection
             }
-        }
+            return nil
+        }.first!
+        #expect(clientConn != nil)
 
-        #expect(clientData.first!.count > 0)
-
-        let serverData = serverHandler.events.value.compactMap {
-            switch $0 {
-            case let .shouldOpen(_, certificate):
-                certificate as Data?
-            default:
-                nil
+        let serverConn = serverHandler.events.value.compactMap {
+            if case let .connected(connection: connection) = $0 {
+                return connection
             }
-        }
-
-        #expect(serverData.first!.count > 0)
+            return nil
+        }.first!
+        #expect(serverConn != nil)
     }
 }
