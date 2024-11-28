@@ -79,11 +79,16 @@ struct LimitedSizeArrayTests {
         )
 
         #expect(array.encodedSize == 20) // 5 elements * 4 bytes each
+        let array1: LimitedSizeArray<FixedEncodedSizeType, ConstInt5, ConstInt10> = .init(
+            Array(repeating: FixedEncodedSizeType(), count: 10)
+        )
+        #expect(array1.encodedSize == 41)
         #expect(LimitedSizeArray<FixedEncodedSizeType, ConstInt5, ConstInt5>.encodeedSizeHint == 20)
+        #expect(LimitedSizeArray<FixedEncodedSizeType, ConstInt5, ConstInt10>.encodeedSizeHint == nil)
     }
 
     @Test func randomAccessCollection() throws {
-        let array: LimitedSizeArray<Int, ConstInt5, ConstInt10> = [1, 2, 3, 4, 5]
+        var array: LimitedSizeArray<Int, ConstInt5, ConstInt10> = [1, 2, 3, 4, 5]
 
         #expect(array.startIndex == 0)
         #expect(array.endIndex == 5)
@@ -95,6 +100,10 @@ struct LimitedSizeArrayTests {
         #expect(iteratorIndex == 1)
         array.formIndex(before: &iteratorIndex)
         #expect(iteratorIndex == 0)
+        #expect(array.index(after: iteratorIndex) == array.index(before: iteratorIndex) + 2)
+        array[iteratorIndex] = 9
+        #expect(array[iteratorIndex] == 9)
+        #expect(array.index(from: iteratorIndex) == 0)
     }
 
     @Test func randomAccessCollectionIndexOutOfBounds() throws {

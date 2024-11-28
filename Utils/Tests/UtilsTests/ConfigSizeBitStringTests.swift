@@ -113,4 +113,44 @@ struct ConfigSizeBitStringTests {
         value[19] = true
         #expect(value == value3)
     }
+
+    @Test func encodedSizeTests() throws {
+        let data = Data([0b1011_0101, 0b1100_0101, 0b0000_0110])
+        let length = 20
+        let value = try ConfigSizeBitString<ReadIntValue>(config: length, data: data)
+
+        #expect(value.encodedSize == data.count)
+        #expect(ConfigSizeBitString<ReadIntValue>.encodeedSizeHint == nil)
+    }
+
+    @Test func randomAccessCollection() throws {
+        var value = ConfigSizeBitString<ReadIntValue>(config: 8)
+        let result = value.withPtr { ptr in
+            ptr.reduce(0, +)
+        }
+        #expect(result == 0)
+
+        #expect(value.startIndex == 0)
+        #expect(value.endIndex == 8)
+
+        value[7] = true
+        let collected = Array(value)
+        #expect(collected == [false, false, false, false, false, false, false, true])
+
+        var idx = value.startIndex
+        value.formIndex(after: &idx)
+        #expect(idx == 1)
+
+        value.formIndex(before: &idx)
+        #expect(idx == 0)
+
+        let dist = value.distance(from: 0, to: 7)
+        #expect(dist == 7)
+
+        let indexForward = value.index(0, offsetBy: 3)
+        #expect(indexForward == 3)
+
+        let indexWithinLimit = value.index(0, offsetBy: 3, limitedBy: 5)
+        #expect(indexWithinLimit == 3)
+    }
 }
