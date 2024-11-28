@@ -4,19 +4,19 @@ import Testing
 
 @testable import Utils
 
-struct ConstInt5: ConstInt {
-    static let value = 5
-}
-
-struct ConstInt10: ConstInt {
-    static let value = 10
-}
-
-struct ConstInt0: ConstInt {
-    static let value = 0
-}
-
 struct LimitedSizeArrayTests {
+    struct ConstInt5: ConstInt {
+        static let value = 5
+    }
+
+    struct ConstInt10: ConstInt {
+        static let value = 10
+    }
+
+    struct ConstInt0: ConstInt {
+        static let value = 0
+    }
+
     @Test func initWithDefaultValue() throws {
         let defaultValue = 1
         let array = LimitedSizeArray<Int, ConstInt5, ConstInt10>(defaultValue: defaultValue)
