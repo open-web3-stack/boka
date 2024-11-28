@@ -12,7 +12,7 @@
 
 import Foundation
 
-public indirect enum JSON: Codable, Equatable {
+public indirect enum JSON: Codable, Equatable, Sendable {
     case dictionary([String: JSON])
     case array([JSON])
     case string(String)
