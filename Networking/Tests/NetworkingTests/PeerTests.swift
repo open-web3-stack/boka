@@ -165,8 +165,8 @@ struct PeerTests {
             let con = try peer.connect(to: centerPeer.listenAddress(), role: .builder)
             try await con.ready()
         }
-        // Simulate close connections 5~8s
-        try? await Task.sleep(for: .milliseconds(8000))
+        // Simulate close connections 5~10s
+        try? await Task.sleep(for: .milliseconds(10000))
         centerPeer.broadcast(kind: .uniqueA, message: .init(kind: .uniqueA, data: Data("connection rotation strategy".utf8)))
         try? await Task.sleep(for: .milliseconds(1000))
         var receivedCount = 0
