@@ -67,4 +67,43 @@ struct LimitedSizeArrayTests {
 
         #expect(decoded == array)
     }
+
+    @Test func encodedSize() throws {
+        struct FixedEncodedSizeType: EncodedSize {
+            var encodedSize: Int { 4 }
+            static var encodeedSizeHint: Int? { 4 }
+        }
+
+        let array: LimitedSizeArray<FixedEncodedSizeType, ConstInt5, ConstInt5> = .init(
+            Array(repeating: FixedEncodedSizeType(), count: 5)
+        )
+
+        #expect(array.encodedSize == 20) // 5 elements * 4 bytes each
+        #expect(LimitedSizeArray<FixedEncodedSizeType, ConstInt5, ConstInt5>.encodeedSizeHint == 20)
+    }
+
+    @Test func randomAccessCollection() throws {
+        let array: LimitedSizeArray<Int, ConstInt5, ConstInt10> = [1, 2, 3, 4, 5]
+
+        #expect(array.startIndex == 0)
+        #expect(array.endIndex == 5)
+        #expect(array[array.startIndex] == 1)
+        #expect(array[array.index(array.startIndex, offsetBy: 2)] == 3)
+
+        var iteratorIndex = array.startIndex
+        array.formIndex(after: &iteratorIndex)
+        #expect(iteratorIndex == 1)
+        array.formIndex(before: &iteratorIndex)
+        #expect(iteratorIndex == 0)
+    }
+
+    @Test func randomAccessCollectionIndexOutOfBounds() throws {
+        let array: LimitedSizeArray<Int, ConstInt5, ConstInt10> = [1, 2, 3, 4, 5]
+
+        // Ensure accessing out of bounds throws as expected
+        let index = array.startIndex
+        let outOfBounds = array.index(array.endIndex, offsetBy: 1, limitedBy: array.endIndex)
+        #expect(outOfBounds == nil)
+        #expect(index.distance(to: array.endIndex) == array.count)
+    }
 }

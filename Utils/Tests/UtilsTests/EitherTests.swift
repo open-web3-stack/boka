@@ -69,4 +69,42 @@ struct EitherTests {
         print("encodedSize: \(encodedSize)")
         #expect(encodedSize > 0)
     }
+
+    @Test(arguments: [
+        Either<Int, String>.left(42),
+        Either<Int, String>.right("hello"),
+    ])
+    func maybeEitherInit(either: Either<Int, String>) {
+        let maybe = MaybeEither(either)
+        #expect(maybe.value == either)
+    }
+
+    @Test(arguments: [
+        42,
+        -1,
+        1000,
+    ])
+    func maybeEitherInitLeft(left: Int) {
+        let maybe = MaybeEither<Int, String>(left: left)
+        #expect(maybe.value == .left(left))
+    }
+
+    @Test(arguments: [
+        "hello",
+        "world",
+        "",
+    ])
+    func maybeEitherInitRight(right: String) {
+        let maybe = MaybeEither<Int, String>(right: right)
+        #expect(maybe.value == .right(right))
+    }
+
+    @Test(arguments: [
+        Either<Int, Int>.left(42),
+        Either<Int, Int>.right(99),
+    ])
+    func testMaybeEitherUnwrapped(either: Either<Int, Int>) {
+        let maybe = MaybeEither(either)
+        #expect(maybe.unwrapped == (either == .left(42) ? 42 : 99))
+    }
 }

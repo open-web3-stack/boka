@@ -155,11 +155,6 @@ extension JSON {
             stringValue = value.description
         }
 
-        init(_ value: String) {
-            intValue = nil
-            stringValue = value
-        }
-
         init?(intValue: Int) {
             self.init(intValue)
         }

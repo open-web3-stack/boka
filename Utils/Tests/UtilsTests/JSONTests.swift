@@ -98,4 +98,58 @@ struct JSONTests {
             #expect(json.bool == nil)
         }
     }
+
+    @Test(arguments: [
+        (123, "123"), // Valid integer
+        (-456, "-456"), // Negative integer
+        (0, "0"), // Zero
+    ])
+    func integerKeyFromInt(value: Int, expectedString: String) throws {
+        let key = JSON.IntegerKey(value)
+        #expect(key.intValue == value)
+        #expect(key.stringValue == expectedString)
+    }
+
+    @Test(arguments: [
+        ("123", 123), // Valid string
+        ("-456", -456), // Negative integer string
+        ("invalid", nil), // Non-numeric string
+    ])
+    func integerKeyFromString(value: String, expectedInt: Int?) throws {
+        let key = JSON.IntegerKey(stringValue: value)
+        if let expected = expectedInt {
+            #expect(key!.intValue == expected)
+            #expect(key!.stringValue == value)
+        } else {
+            #expect(key == nil) // Ensure `nil` for invalid strings
+        }
+    }
+
+    @Test(arguments: [
+        (123, JSON.number(123.0)), // Integer to JSON
+        (-42, JSON.number(-42.0)), // Negative integer to JSON
+        (0, JSON.number(0.0)), // Zero to JSON
+    ])
+    func binaryIntegerToJSON(value: Int, expectedJSON: JSON) throws {
+        let json = value.json
+        #expect(json == expectedJSON)
+    }
+
+    @Test(arguments: [
+        ("Hello, world!", JSON.string("Hello, world!")), // Simple string
+        ("", JSON.string("")), // Empty string
+    ])
+    func stringToJSON(value: String, expectedJSON: JSON) throws {
+        let json = value.json
+        #expect(json == expectedJSON)
+    }
+
+    @Test(arguments: [
+        (true, JSON.boolean(true)), // Boolean true to JSON
+        (false, JSON.boolean(false)), // Boolean false to JSON
+    ])
+    func boolToJSON(value: Bool, expectedJSON: JSON) throws {
+        let json = value.json
+        #expect(json == expectedJSON)
+    }
 }
