@@ -40,6 +40,152 @@ struct QuicListenerTests {
         registration = try QuicRegistration()
     }
 
+    final class MockQuicEventHandler: QuicEventHandler {
+        enum EventType {
+            case newConnection(listener: QuicListener, connection: QuicConnection, info: ConnectionInfo)
+            case shouldOpen(connection: QuicConnection, certificate: Data?)
+            case connected(connection: QuicConnection)
+            case shutdownInitiated(connection: QuicConnection, reason: ConnectionCloseReason)
+            case shutdownComplete(connection: QuicConnection)
+            case streamStarted(connection: QuicConnection, stream: QuicStream)
+            case dataReceived(stream: QuicStream, data: Data?)
+            case closed(stream: QuicStream, status: QuicStatus, code: QuicErrorCode)
+        }
+
+        let events: ThreadSafeContainer<[EventType]> = .init([])
+
+        init() {}
+
+        func newConnection(
+            _ listener: QuicListener, connection: QuicConnection, info: ConnectionInfo
+        ) -> QuicStatus {
+            events.write { events in
+                events.append(.newConnection(listener: listener, connection: connection, info: info))
+            }
+            return .code(.success)
+        }
+
+        func shouldOpen(_ connection: QuicConnection, certificate: Data?) -> QuicStatus {
+            events.write { events in
+                events.append(.shouldOpen(connection: connection, certificate: certificate))
+            }
+            return .code(.success)
+        }
+
+        func connected(_ connection: QuicConnection) {
+            events.write { events in
+                events.append(.connected(connection: connection))
+            }
+        }
+
+        func streamStarted(_ connect: QuicConnection, stream: QuicStream) {
+            events.write { events in
+                events.append(.streamStarted(connection: connect, stream: stream))
+            }
+        }
+
+        func dataReceived(_ stream: QuicStream, data: Data?) {
+            events.write { events in
+                events.append(.dataReceived(stream: stream, data: data))
+            }
+        }
+    }
+
+    final class EmptyQuicEventHandler: QuicEventHandler {}
+
+    @Test
+    func emptyQuicEventHandler() async throws {
+        let serverHandler = MockQuicEventHandler()
+        let clientHandler = EmptyQuicEventHandler()
+
+        // create listener
+
+        let quicSettings = QuicSettings.defaultSettings
+        let serverConfiguration = try QuicConfiguration(
+            registration: registration,
+            pkcs12: pkcs12Data,
+            alpns: [Data("testalpn".utf8)],
+            client: false,
+            settings: quicSettings
+        )
+
+        let listener = try QuicListener(
+            handler: serverHandler,
+            registration: registration,
+            configuration: serverConfiguration,
+            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
+            alpns: [Data("testalpn".utf8)]
+        )
+
+        let listenAddress = try listener.listenAddress()
+        let (ipAddress, port) = listenAddress.getAddressAndPort()
+        #expect(ipAddress == "127.0.0.1")
+        #expect(port != 0)
+
+        // create connection to listener
+
+        let clientConfiguration = try QuicConfiguration(
+            registration: registration,
+            pkcs12: pkcs12Data,
+            alpns: [Data("testalpn".utf8)],
+            client: true,
+            settings: quicSettings
+        )
+
+        let clientConnection = try QuicConnection(
+            handler: clientHandler,
+            registration: registration,
+            configuration: clientConfiguration
+        )
+
+        try clientConnection.connect(to: listenAddress)
+
+        let stream1 = try clientConnection.createStream()
+
+        try stream1.send(data: Data("test data 1".utf8))
+
+        try? await Task.sleep(for: .milliseconds(100))
+        let (serverConnection, info) = serverHandler.events.value.compactMap {
+            switch $0 {
+            case let .newConnection(_, connection, info):
+                (connection, info) as (QuicConnection, ConnectionInfo)?
+            default:
+                nil
+            }
+        }.first!
+
+        let (ipAddress2, _) = info.remoteAddress.getAddressAndPort()
+
+        #expect(info.negotiatedAlpn == Data("testalpn".utf8))
+        #expect(info.serverName == "127.0.0.1")
+        #expect(info.localAddress == listenAddress)
+        #expect(ipAddress2 == "127.0.0.1")
+
+        let stream2 = try serverConnection.createStream()
+        try stream2.send(data: Data("other test data 2".utf8))
+
+        try? await Task.sleep(for: .milliseconds(100))
+        let receivedData = serverHandler.events.value.compactMap {
+            switch $0 {
+            case let .dataReceived(_, data):
+                data
+            default:
+                nil
+            }
+        }
+
+        #expect(receivedData.count == 1)
+        #expect(receivedData[0] == Data("test data 1".utf8))
+        try clientConnection.shutdown()
+        try? await Task.sleep(for: .milliseconds(1000))
+        #expect(throws: Error.self) {
+            try serverConnection.connect(to: info.remoteAddress)
+        }
+        #expect(throws: Error.self) {
+            _ = try clientConnection.getRemoteAddress()
+        }
+    }
+
     @Test
     func connectAndSendReceive() async throws {
         let serverHandler = MockQuicEventHandler()

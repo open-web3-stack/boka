@@ -7,13 +7,6 @@ import Utils
 @testable import Networking
 
 struct PeerTests {
-    struct MockMessage: MessageProtocol {
-        let data: Data
-        func encode() throws -> Data {
-            data
-        }
-    }
-
     struct MockRequest<Kind: StreamKindProtocol>: RequestProtocol {
         var kind: Kind
         var data: Data
@@ -50,10 +43,6 @@ struct PeerTests {
             self.data = data
             return MockRequest(kind: kind, data: data)
         }
-
-        func finish() -> Data? {
-            data
-        }
     }
 
     struct MockUniqueMessageDecoder: MessageDecoder {
@@ -70,10 +59,6 @@ struct PeerTests {
             self.data = data
             return MockRequest(kind: kind, data: data)
         }
-
-        func finish() -> Data? {
-            data
-        }
     }
 
     actor DataStorage {
@@ -88,10 +73,6 @@ struct PeerTests {
         typealias StreamKind = EphemeralStreamKind
         typealias Request = MockRequest<EphemeralStreamKind>
         private let dataStorage: PeerTests.DataStorage = DataStorage()
-
-        var lastReceivedData: Data? {
-            get async { await dataStorage.data.last }
-        }
 
         func createDecoder(kind: StreamKind) -> any MessageDecoder<Request> {
             MockEphemeralMessageDecoder(kind: kind)
@@ -184,8 +165,8 @@ struct PeerTests {
             let con = try peer.connect(to: centerPeer.listenAddress(), role: .builder)
             try await con.ready()
         }
-        // Simulate close connections 3~5s
-        try? await Task.sleep(for: .milliseconds(5000))
+        // Simulate close connections 5~8s
+        try? await Task.sleep(for: .milliseconds(8000))
         centerPeer.broadcast(kind: .uniqueA, message: .init(kind: .uniqueA, data: Data("connection rotation strategy".utf8)))
         try? await Task.sleep(for: .milliseconds(1000))
         var receivedCount = 0
@@ -239,6 +220,12 @@ struct PeerTests {
 
         let connection1 = try peer1.connect(to: listenAddress, role: .validator)
         try? await Task.sleep(for: .milliseconds(3000))
+        #expect(throws: Error.self) {
+            _ = try connection1.createStream(kind: .typeA)
+        }
+        #expect(throws: Error.self) {
+            _ = try connection1.createStream(kind: .uniqueA)
+        }
         #expect(connection1.isClosed == true)
     }
 
@@ -335,8 +322,8 @@ struct PeerTests {
             presistentStreams[.uniqueA]
         }
         stream!.close(abort: true)
-        // Wait to simulate downtime & reopen up stream 3~5s
-        try? await Task.sleep(for: .milliseconds(3000))
+        // Wait to simulate downtime & reopen up stream 8s
+        try? await Task.sleep(for: .milliseconds(8000))
         messageData = Data("reopen up stream data".utf8)
         peer1.broadcast(
             kind: .uniqueA, message: .init(kind: .uniqueA, data: messageData)
@@ -435,13 +422,9 @@ struct PeerTests {
         let connection1 = try peer1.connect(to: peer2.listenAddress(), role: .validator)
         let connection2 = try peer2.connect(to: peer1.listenAddress(), role: .validator)
         try? await Task.sleep(for: .milliseconds(1000))
-        if !connection1.isClosed {
-            let data = try await connection1.request(MockRequest(kind: .typeA, data: Data("hello world".utf8)))
-            try? await Task.sleep(for: .milliseconds(500))
-            #expect(data == Data("hello world response".utf8))
-        }
-        if !connection2.isClosed {
-            let data = try await connection2.request(MockRequest(kind: .typeA, data: Data("hello world".utf8)))
+        let connections = [connection1, connection2]
+        for connection in connections where !connection.isClosed {
+            let data = try await connection.request(MockRequest(kind: .typeA, data: Data("hello world".utf8)))
             try? await Task.sleep(for: .milliseconds(500))
             #expect(data == Data("hello world response".utf8))
         }
@@ -452,7 +435,7 @@ struct PeerTests {
         let handler1 = MockPresentStreamHandler()
         let handler2 = MockPresentStreamHandler()
         // Define the data size, 5MB
-        let dataSize = 5 * 1024 * 1024
+        let dataSize = 10 * 1024 * 1024
         var largeData = Data(capacity: dataSize)
 
         // Generate random data
@@ -494,25 +477,29 @@ struct PeerTests {
         try? await Task.sleep(for: .milliseconds(50))
 
         let receivedData1 = try await connection1.request(
-            MockRequest(kind: .typeA, data: largeData)
+            MockRequest(kind: .typeA, data: largeData.prefix(dataSize / 2))
         )
         try? await Task.sleep(for: .milliseconds(100))
 
         // Verify that the received data matches the original large data
-        #expect(receivedData1 == largeData + Data(" response".utf8))
-
+        #expect(receivedData1 == largeData.prefix(dataSize / 2) + Data(" response".utf8))
         peer1.broadcast(
-            kind: .uniqueA, message: .init(kind: .uniqueA, data: largeData)
+            kind: .uniqueA, message: .init(kind: .uniqueA, data: largeData.prefix(dataSize / 2))
         )
         try? await Task.sleep(for: .milliseconds(100))
 
         peer2.broadcast(
-            kind: .uniqueB, message: .init(kind: .uniqueB, data: largeData)
+            kind: .uniqueB, message: .init(kind: .uniqueB, data: largeData.prefix(dataSize / 2))
         )
         // Verify last received data
         try? await Task.sleep(for: .milliseconds(2000))
-        await #expect(handler2.lastReceivedData == largeData)
-        await #expect(handler1.lastReceivedData == largeData)
+        await #expect(handler2.lastReceivedData == largeData.prefix(dataSize / 2))
+        await #expect(handler1.lastReceivedData == largeData.prefix(dataSize / 2))
+        await #expect(throws: Error.self) {
+            _ = try await connection1.request(
+                MockRequest(kind: .typeC, data: largeData)
+            )
+        }
     }
 
     @Test
