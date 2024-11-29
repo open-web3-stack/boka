@@ -1,20 +1,21 @@
 import Utils
 
-enum RPCHandlers {
-    static let handlers: [any RPCHandler.Type] = [
+public enum RPCHandlers {
+    public static let handlers: [any RPCHandler.Type] = [
         Methods.self,
     ]
 
-    static func getHandlers(source: [any RPCHandler.Type]) -> [any RPCHandler] {
+    public static func getHandlers(source: [any RPCHandler.Type]) -> [any RPCHandler] {
         [Methods(source: source)]
     }
 
-    struct Methods: RPCHandler {
-        typealias Request = VoidRequest
-        typealias Response = [String]
-        typealias DataSource = [any RPCHandler.Type]
+    public struct Methods: RPCHandler {
+        public typealias Request = VoidRequest
+        public typealias Response = [String]
+        public typealias DataSource = [any RPCHandler.Type]
 
-        static var method: String { "rpc_methods" }
+        public static var method: String { "rpc_methods" }
+        public static var summary: String? { "Returns a list of available RPC methods." }
 
         private let methods: [String]
 
@@ -22,7 +23,7 @@ enum RPCHandlers {
             methods = source.map { h in h.method }
         }
 
-        func handle(request _: Request) async throws -> Response? {
+        public func handle(request _: Request) async throws -> Response? {
             methods
         }
     }

@@ -13,6 +13,8 @@ let package = Package(
         .package(path: "../TracingUtils"),
         .package(path: "../Utils"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
+        .package(url: "https://github.com/ajevans99/swift-json-schema.git", from: "0.2.1"),
+        .package(url: "https://github.com/wickwirew/Runtime.git", from: "2.2.7"),
     ],
     targets: [
         .executableTarget(
@@ -22,6 +24,9 @@ let package = Package(
                 "Utils",
                 "TracingUtils",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "JSONSchema", package: "swift-json-schema"),
+                .product(name: "JSONSchemaBuilder", package: "swift-json-schema"),
+                .product(name: "Runtime", package: "Runtime"),
             ]
         ),
     ],

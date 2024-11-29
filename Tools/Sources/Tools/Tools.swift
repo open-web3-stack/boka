@@ -7,7 +7,10 @@ import Utils
 struct Boka: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Boka Tools",
-        version: "0.0.1"
+        version: "0.0.1",
+        subcommands: [
+            OpenRPC.self,
+        ]
     )
 
     mutating func run() async throws {}

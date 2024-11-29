@@ -2,23 +2,24 @@ import Blockchain
 import Foundation
 import Utils
 
-enum ChainHandlers {
-    static let handlers: [any RPCHandler.Type] = [
+public enum ChainHandlers {
+    public static let handlers: [any RPCHandler.Type] = [
         GetBlock.self,
     ]
 
-    static func getHandlers(source: ChainDataSource) -> [any RPCHandler] {
+    public static func getHandlers(source: ChainDataSource) -> [any RPCHandler] {
         [
             GetBlock(source: source),
         ]
     }
 
-    struct GetBlock: RPCHandler {
-        typealias Request = Data32?
-        typealias Response = BlockRef?
-        typealias DataSource = ChainDataSource
+    public struct GetBlock: RPCHandler {
+        public typealias Request = Request1<Data32?>
+        public typealias Response = BlockRef?
+        public typealias DataSource = ChainDataSource
 
-        static var method: String { "chain_getBlock" }
+        public static var method: String { "chain_getBlock" }
+        public static var summary: String? { "Get block by hash. If hash is not provided, returns the best block." }
 
         private let source: ChainDataSource
 
@@ -26,8 +27,8 @@ enum ChainHandlers {
             self.source = source
         }
 
-        func handle(request: Request) async throws -> Response? {
-            if let hash = request {
+        public func handle(request: Request) async throws -> Response? {
+            if let hash = request.value {
                 try await source.getBlock(hash: hash)
             } else {
                 try await source.getBestBlock()

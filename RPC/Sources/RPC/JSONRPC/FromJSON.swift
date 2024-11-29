@@ -6,21 +6,21 @@ enum FromJSONError: Error {
     case unexpectedJSON
 }
 
-protocol FromJSON {
+public protocol FromJSON {
     init(from: JSON?) throws
 }
 
-enum VoidRequest: FromJSON {
+public enum VoidRequest: FromJSON {
     case void
 
-    init(from _: JSON?) throws {
+    public init(from _: JSON?) throws {
         // ignore
         self = .void
     }
 }
 
 extension Optional: FromJSON where Wrapped: FromJSON {
-    init(from json: JSON?) throws {
+    public init(from json: JSON?) throws {
         guard let json else {
             self = .none
             return
@@ -35,7 +35,7 @@ extension Optional: FromJSON where Wrapped: FromJSON {
 }
 
 extension BinaryInteger where Self: FromJSON {
-    init(from json: JSON?) throws {
+    public init(from json: JSON?) throws {
         guard let json else {
             throw FromJSONError.null
         }
@@ -60,7 +60,7 @@ extension UInt64: FromJSON {}
 extension UInt: FromJSON {}
 
 extension Data: FromJSON {
-    init(from json: JSON?) throws {
+    public init(from json: JSON?) throws {
         guard let json else {
             throw FromJSONError.null
         }
@@ -73,14 +73,14 @@ extension Data: FromJSON {
     }
 }
 
-extension Data32: FromJSON {
-    init(from json: JSON?) throws {
+extension FixedSizeData: FromJSON {
+    public init(from json: JSON?) throws {
         guard let json else {
             throw FromJSONError.null
         }
         switch json {
         case let .string(str):
-            self = try Data32(fromHexString: str).unwrap()
+            self = try FixedSizeData(fromHexString: str).unwrap()
         default:
             throw FromJSONError.unexpectedJSON
         }
