@@ -29,10 +29,10 @@ public struct Request1<T: FromJSON>: RequestParameter {
         guard case let .array(arr) = json else {
             throw RequestError.notArray
         }
-        guard arr.count == 1 else {
+        guard arr.count <= 1 else {
             throw RequestError.unexpectedLength
         }
-        value = try T(from: arr[0])
+        value = try T(from: arr[safe: 0])
     }
 }
 
@@ -48,10 +48,10 @@ public struct Request2<T1: FromJSON, T2: FromJSON>: RequestParameter {
         guard case let .array(arr) = json else {
             throw RequestError.notArray
         }
-        guard arr.count == 2 else {
+        guard arr.count <= 2 else {
             throw RequestError.unexpectedLength
         }
-        valuu = try (T1(from: arr[0]), T2(from: arr[1]))
+        valuu = try (T1(from: arr[safe: 0]), T2(from: arr[safe: 1]))
     }
 }
 
@@ -67,10 +67,10 @@ public struct Request3<T1: FromJSON, T2: FromJSON, T3: FromJSON>: RequestParamet
         guard case let .array(arr) = json else {
             throw RequestError.notArray
         }
-        guard arr.count == 3 else {
+        guard arr.count <= 3 else {
             throw RequestError.unexpectedLength
         }
-        value = try (T1(from: arr[0]), T2(from: arr[1]), T3(from: arr[2]))
+        value = try (T1(from: arr[safe: 0]), T2(from: arr[safe: 1]), T3(from: arr[safe: 2]))
     }
 }
 
@@ -86,9 +86,9 @@ public struct Request4<T1: FromJSON, T2: FromJSON, T3: FromJSON, T4: FromJSON>: 
         guard case let .array(arr) = json else {
             throw RequestError.notArray
         }
-        guard arr.count == 4 else {
+        guard arr.count <= 4 else {
             throw RequestError.unexpectedLength
         }
-        value = try (T1(from: arr[0]), T2(from: arr[1]), T3(from: arr[2]), T4(from: arr[3]))
+        value = try (T1(from: arr[safe: 0]), T2(from: arr[safe: 1]), T3(from: arr[safe: 2]), T4(from: arr[safe: 3]))
     }
 }
