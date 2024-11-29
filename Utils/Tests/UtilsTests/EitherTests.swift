@@ -5,6 +5,61 @@ import Testing
 @testable import Utils
 
 struct EitherTests {
+    struct EncodedString: EncodedSize {
+        let value: String
+
+        var encodedSize: Int {
+            value.utf8.count
+        }
+
+        static var encodeedSizeHint: Int? {
+            nil
+        }
+    }
+
+    struct EncodedInt: EncodedSize {
+        let value: Int
+
+        var encodedSize: Int {
+            MemoryLayout<Int>.size
+        }
+
+        static var encodeedSizeHint: Int? {
+            MemoryLayout<Int>.size
+        }
+    }
+
+    typealias MyEither = Either<EncodedString, EncodedInt>
+    typealias MyIntEither = Either<EncodedInt, EncodedInt>
+
+    @Test(arguments: [
+        Data([0x02]),
+    ])
+    func throwsOnUnknownVariant(data: Data) {
+        #expect(throws: Error.self) {
+            _ = try JamDecoder.decode(Either<String, Int>.self, from: data)
+        }
+    }
+
+    func encodedSizeForLeft() {
+        let either = MyEither.left(EncodedString(value: "Hi"))
+        #expect(either.encodedSize == 3)
+    }
+
+    @Test
+    func encodedSizeForRight() {
+        let either = MyEither.right(EncodedInt(value: 42))
+        #expect(either.encodedSize == 9)
+    }
+
+    @Test
+    func encodeedSizeHint() {
+        let hint = MyEither.encodeedSizeHint
+        #expect(hint == nil)
+        let IntHint = MyIntEither.encodeedSizeHint
+        #expect(IntHint == MemoryLayout<Int>.size * 2 + 1)
+    }
+
     @Test(arguments: [
         Either<String, Int>.left("Hello"),
         Either<String, Int>.right(42),
@@ -58,16 +113,6 @@ struct EitherTests {
     ])
     func description(either: Either<String, Int>, expected: String) {
         #expect(either.description == expected)
-    }
-
-    @Test(arguments: [
-        Either<String, Int>.left("Size Test"),
-        Either<String, Int>.right(999)
-    ])
-    func testEncodedSize(either: Either<String, Int>) {
-        let encodedSize = either.left.encodedSize
-        print("encodedSize: \(encodedSize)")
-        #expect(encodedSize > 0)
     }
 
     @Test(arguments: [

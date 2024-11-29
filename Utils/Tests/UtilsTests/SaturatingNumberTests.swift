@@ -4,6 +4,26 @@ import Testing
 @testable import Utils
 
 struct SaturatingNumberTests {
+    @Test func testMoreAssignment() {
+        var gas = Gas(100)
+        gas += Gas(2)
+        #expect(gas == Gas(102))
+        gas = Gas(100)
+        gas -= Gas(50)
+        #expect(gas == Gas(50))
+        gas = Gas(100)
+        gas *= Gas(2)
+        #expect(gas == Gas(200))
+        gas = Gas(200)
+        gas /= Gas(2)
+        #expect(gas == Gas(100))
+        gas = Gas(200)
+        gas %= Gas(2)
+        #expect(gas == Gas(0))
+        gas = Gas(200)
+        #expect(gas / 2 == Gas(100))
+    }
+
     @Test func testAdditionWithNoOverflow() {
         let gas1 = Gas(100)
         let gas2 = Gas(200)
@@ -105,5 +125,19 @@ struct SaturatingNumberTests {
 
         #expect(gas2 % gas1 == Gas(0))
         #expect(gas1 % gas2 == Gas(100))
+    }
+
+    @Test func testEncodedSize() {
+        let gas = Gas(100)
+        #expect(gas.encodedSize == MemoryLayout<Int>.size)
+    }
+
+    @Test func testEncodeedSizeHint() {
+        #expect(Gas.encodeedSizeHint == MemoryLayout<Int>.size)
+    }
+
+    @Test func testDescription() {
+        let gas = Gas(100)
+        #expect(gas.description == "100")
     }
 }
