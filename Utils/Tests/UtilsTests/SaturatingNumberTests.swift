@@ -22,6 +22,22 @@ struct SaturatingNumberTests {
         #expect(gas == Gas(0))
         gas = Gas(200)
         #expect(gas / 2 == Gas(100))
+        gas = Gas(100)
+        gas -= 50
+        #expect(gas == Gas(50))
+        gas = Gas(100)
+        gas *= 2
+        #expect(gas == Gas(200))
+        gas = Gas(200)
+        gas /= 2
+        #expect(gas == Gas(100))
+        gas = Gas(200)
+        gas %= 2
+        #expect(gas == Gas(0))
+        gas = Gas(100)
+        gas += 2
+        #expect(gas == Gas(102))
+        #expect(gas % 2 == Gas(0))
     }
 
     @Test func testAdditionWithNoOverflow() {
