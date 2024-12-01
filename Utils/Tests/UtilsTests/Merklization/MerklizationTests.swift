@@ -16,6 +16,13 @@ extension Blake2b256 {
 
 struct MerklizationTests {
     @Test
+    func testHash() throws {
+        var mmr = MMR([])
+        let emptyHash = try JamEncoder.encode(mmr).keccakHash()
+        #expect(mmr.hash() == emptyHash)
+    }
+
+    @Test
     func binaryMerklize() {
         let input: [Data] = [
             Data("node1".utf8),

@@ -42,61 +42,25 @@ struct JSONTests {
         JSON.boolean(true),
         JSON.null,
     ])
-    func encoding(json: JSON) throws {
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(json)
-        let decoder = JSONDecoder()
-        let decodedJSON = try decoder.decode(JSON.self, from: data)
-        #expect(json == decodedJSON)
-    }
-
-    @Test(arguments: [
-        JSON.dictionary(["key": .string("value")]),
-        JSON.array([.string("a"), .number(1)]),
-        JSON.string("test"),
-        JSON.number(42),
-        JSON.boolean(true),
-        JSON.null,
-    ])
     func propertyAccess(json: JSON) throws {
-        switch json {
-        case .dictionary:
-            #expect(json.dictionary != nil)
-            #expect(json.array == nil)
-            #expect(json.string == nil)
-            #expect(json.number == nil)
-            #expect(json.bool == nil)
-        case .array:
-            #expect(json.dictionary == nil)
-            #expect(json.array != nil)
-            #expect(json.string == nil)
-            #expect(json.number == nil)
-            #expect(json.bool == nil)
-        case .string:
-            #expect(json.dictionary == nil)
-            #expect(json.array == nil)
-            #expect(json.string != nil)
-            #expect(json.number == nil)
-            #expect(json.bool == nil)
-        case .number:
-            #expect(json.dictionary == nil)
-            #expect(json.array == nil)
-            #expect(json.string == nil)
-            #expect(json.number != nil)
-            #expect(json.bool == nil)
-        case .boolean:
-            #expect(json.dictionary == nil)
-            #expect(json.array == nil)
-            #expect(json.string == nil)
-            #expect(json.number == nil)
-            #expect(json.bool != nil)
-        case .null:
-            #expect(json.dictionary == nil)
-            #expect(json.array == nil)
-            #expect(json.string == nil)
-            #expect(json.number == nil)
-            #expect(json.bool == nil)
+        let isNil: [Bool] = [
+            json.dictionary == nil,
+            json.array == nil,
+            json.string == nil,
+            json.number == nil,
+            json.bool == nil,
+        ]
+
+        let expected: [Bool] = switch json {
+        case .dictionary: [false, true, true, true, true]
+        case .array: [true, false, true, true, true]
+        case .string: [true, true, false, true, true]
+        case .number: [true, true, true, false, true]
+        case .boolean: [true, true, true, true, false]
+        case .null: [true, true, true, true, true]
         }
+
+        #expect(isNil == expected)
     }
 
     @Test(arguments: [

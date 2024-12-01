@@ -41,6 +41,7 @@ struct EitherTests {
         }
     }
 
+    @Test
     func encodedSizeForLeft() {
         let either = MyEither.left(EncodedString(value: "Hi"))
         #expect(either.encodedSize == 3)
