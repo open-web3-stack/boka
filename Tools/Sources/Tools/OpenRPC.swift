@@ -97,7 +97,6 @@ func getSchema(type: Any.Type) -> any JSONSchemaComponent {
         return type.schema
     }
 
-    print(type)
     let info = try! typeInfo(of: type)
     switch info.kind {
     case .struct, .class:
