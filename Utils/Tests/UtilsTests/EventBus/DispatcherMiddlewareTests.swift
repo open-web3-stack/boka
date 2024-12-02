@@ -13,7 +13,7 @@ final class MiddlewareTests {
         }
     }
 
-    func testParallelDispatcher() async throws {
+    @Test func testParallelDispatcher() async throws {
         let orderManager = OrderManager()
 
         let firstMiddleware = Middleware.noop
@@ -27,14 +27,13 @@ final class MiddlewareTests {
 
         try await parallelMiddleware.handle((), next: {
             await orderManager.appendOrder(1)
-            try await handler(())
         })
 
         let order = await orderManager.order
         #expect(order.count == 2)
     }
 
-    func testSerialDispatcher() async throws {
+    @Test func testSerialDispatcher() async throws {
         let orderManager = OrderManager()
 
         let firstMiddleware = Middleware.noop
@@ -55,7 +54,7 @@ final class MiddlewareTests {
         #expect(order == [1, 2])
     }
 
-    func testMiddlewareChain() async throws {
+    @Test func testMiddlewareChain() async throws {
         let orderManager = OrderManager()
 
         let middleware1 = Middleware.noop
