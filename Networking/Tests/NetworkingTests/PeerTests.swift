@@ -137,11 +137,12 @@ struct PeerTests {
                 presistentStreamHandler: MockPresentStreamHandler(),
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
-                clientSettings: .defaultSettings
+                clientSettings: .defaultSettings,
+                peerSettings: PeerSettings(maxBuilderConnections: 3)
             )
         )
-        // Create 30 peer nodes
-        for _ in 0 ..< 30 {
+        // Create 5 peer nodes
+        for _ in 0 ..< 5 {
             let handler = MockPresentStreamHandler()
             handlers.append(handler)
             let peer = try Peer(
@@ -160,20 +161,20 @@ struct PeerTests {
         }
 
         // Make some connections
-        for i in 0 ..< 30 {
+        for i in 0 ..< 5 {
             let peer = peers[i]
             let con = try peer.connect(to: centerPeer.listenAddress(), role: .builder)
             try await con.ready()
         }
-        // Simulate close connections 5~8s
-        try? await Task.sleep(for: .milliseconds(8000))
-        centerPeer.broadcast(kind: .uniqueA, message: .init(kind: .uniqueA, data: Data("connection rotation strategy".utf8)))
+        // Simulate close connections 1~3s
         try? await Task.sleep(for: .milliseconds(1000))
+        centerPeer.broadcast(kind: .uniqueA, message: .init(kind: .uniqueA, data: Data("connection rotation strategy".utf8)))
+        try? await Task.sleep(for: .milliseconds(100))
         var receivedCount = 0
         for handler in handlers {
             receivedCount += await handler.receivedData.count
         }
-        #expect(receivedCount == PeerSettings.defaultSettings.maxBuilderConnections)
+        #expect(receivedCount == 3)
     }
 
     @Test

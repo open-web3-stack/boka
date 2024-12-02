@@ -12,7 +12,7 @@
 
 import Foundation
 
-public indirect enum JSON: Codable, Equatable {
+public indirect enum JSON: Codable, Equatable, Sendable {
     case dictionary([String: JSON])
     case array([JSON])
     case string(String)
@@ -153,11 +153,6 @@ extension JSON {
         init(_ value: Int) {
             intValue = value
             stringValue = value.description
-        }
-
-        init(_ value: String) {
-            intValue = nil
-            stringValue = value
         }
 
         init?(intValue: Int) {
