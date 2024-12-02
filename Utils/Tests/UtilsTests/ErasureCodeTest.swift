@@ -44,6 +44,22 @@ struct ErasureCodeTests {
         }
     }
 
+    @Test
+    func constructWithSegments() throws {
+        let segments: [Segment] = []
+        let encoder = SubShardEncoder()
+        let result = encoder.construct(segments: segments)
+        if case let .failure(constructFailed) = result {
+            #expect(constructFailed == ErasureCodeError.constructFailed)
+        }
+    }
+
+    @Test
+    func constructWithIncorrectSegmentSize() throws {
+        let incorrectData = Data(repeating: 0xFF, count: Int(SEGMENT_SIZE) - 1)
+        #expect(Segment(data: incorrectData, index: 0) == nil)
+    }
+
     @Test(arguments: try loadTests())
     func testReconstruct(testCase: ECTestCase) throws {
         // Convert segment_ec data back to bytes and prepare subshards

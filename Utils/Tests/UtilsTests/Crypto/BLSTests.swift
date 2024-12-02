@@ -65,4 +65,93 @@ import Testing
             )
         )
     }
+
+    @Test func BLSKeyInitialization() throws {
+        let seed = Data32.random()
+        let bls = try BLS.SecretKey(from: seed)
+        #expect(bls.publicKey.data.data.count == Int(BLS_PUBLICKEY_SERIALIZED_SIZE))
+    }
+
+    @Test func BLSSignatureSizeValidation() throws {
+        let bls = try BLS.SecretKey(from: Data32.random())
+        let message = Data("test".utf8)
+        let signature = try bls.sign(message: message)
+        #expect(signature.count == Int(BLS_SIGNATURE_SERIALIZED_SIZE))
+    }
+
+    @Test func BLSPublicKeySerialization() throws {
+        let bls = try BLS.SecretKey(from: Data32.random())
+        let publicKey = bls.publicKey
+
+        // Encode and decode the public key
+        let encoder = JSONEncoder()
+        let encodedData = try encoder.encode(publicKey)
+        let decoder = JSONDecoder()
+        let decodedPublicKey = try decoder.decode(BLS.PublicKey.self, from: encodedData)
+
+        #expect(decodedPublicKey == publicKey)
+    }
+
+    @Test func BLSPublicKeyEquality() throws {
+        let key1 = try BLS.SecretKey(from: Data32.random()).publicKey
+        let key2 = try BLS.SecretKey(from: Data32.random()).publicKey
+        #expect(key1 != key2)
+    }
+
+    @Test func PublicKeySerialization() throws {
+        let key1 = try BLS.SecretKey(from: Data32.random()).publicKey.data
+        let publicKey = try BLS.PublicKey(data: key1)
+
+        // Test encoding and decoding
+        let encoder = JSONEncoder()
+        let encoded = try encoder.encode(publicKey)
+
+        let decoder = JSONDecoder()
+        let decodedPublicKey = try decoder.decode(BLS.PublicKey.self, from: encoded)
+
+        #expect(publicKey == decodedPublicKey)
+        #expect(publicKey.description == decodedPublicKey.description)
+    }
+
+    @Test func PublicKey() throws {
+        let keyData1 = Data144.random()
+        #expect(throws: Error.self) {
+            _ = try BLS.PublicKey(data: keyData1)
+        }
+    }
+
+    @Test func PublicKeyVerifyValidSignature() throws {
+        let bls = try BLS.SecretKey(from: Data32.random())
+        let publicKey = bls.publicKey
+        let message = Data("testMessage".utf8)
+        let signature = try bls.sign(message: message)
+
+        // Test valid signature verification
+        #expect(try publicKey.verify(signature: signature, message: message))
+    }
+
+    @Test func PublicKeyVerifyInvalidSignature() throws {
+        let bls = try BLS.SecretKey(from: Data32.random())
+        let publicKey = bls.publicKey
+        let message = Data("testMessage".utf8)
+        let signature = try bls.sign(message: message)
+
+        // Corrupt the signature
+        var invalidSignature = signature
+        invalidSignature[0] ^= 0xFF // Flip a bit in the first byte
+
+        // Test invalid signature verification
+        #expect(try !publicKey.verify(signature: invalidSignature, message: message))
+    }
+
+    @Test func PublicKeyVerifyInvalidMessage() throws {
+        let bls = try BLS.SecretKey(from: Data32.random())
+        let publicKey = bls.publicKey
+        let message = Data("testMessage".utf8)
+        let invalidMessage = Data("invalidMessage".utf8)
+        let signature = try bls.sign(message: message)
+
+        // Test verification with an invalid message
+        #expect(try !publicKey.verify(signature: signature, message: invalidMessage))
+    }
 }
