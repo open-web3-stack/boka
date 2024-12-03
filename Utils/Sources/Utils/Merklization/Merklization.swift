@@ -1,6 +1,5 @@
 import Foundation
 
-// TODO: add tests
 public enum Merklization {
     // roundup of half
     private static func half(_ i: Int) -> Int {

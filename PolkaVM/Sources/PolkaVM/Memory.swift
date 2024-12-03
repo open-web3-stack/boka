@@ -122,18 +122,18 @@ public class Memory {
     public init(readOnlyData: Data, readWriteData: Data, argumentData: Data, heapEmptyPagesSize: UInt32, stackSize: UInt32) {
         let config = DefaultPvmConfig()
         let P = StandardProgram.alignToPageSize
-        let Q = StandardProgram.alignToSegmentSize
-        let ZQ = UInt32(config.pvmProgramInitSegmentSize)
+        let Q = StandardProgram.alignToZoneSize
+        let ZZ = UInt32(config.pvmProgramInitZoneSize)
         let readOnlyLen = UInt32(readOnlyData.count)
         let readWriteLen = UInt32(readWriteData.count)
         let argumentDataLen = UInt32(argumentData.count)
 
-        let heapStart = 2 * ZQ + Q(readOnlyLen, config)
+        let heapStart = 2 * ZZ + Q(readOnlyLen, config)
         let stackPageAlignedSize = P(stackSize, config)
 
         readOnly = MemorySection(
-            startAddressBound: ZQ,
-            endAddressBound: ZQ + P(readOnlyLen, config),
+            startAddressBound: ZZ,
+            endAddressBound: ZZ + P(readOnlyLen, config),
             data: readWriteData,
             isWritable: false
         )
@@ -175,7 +175,8 @@ public class Memory {
         return max(0, low - 1)
     }
 
-    private func getSection(forAddress address: UInt32) throws(Error) -> MemorySection {
+    private func getSection(forAddress: UInt32) throws(Error) -> MemorySection {
+        let address = forAddress & UInt32.max
         if memorySections.count != 0 {
             return memorySections[Memory.binarySearch(array: memorySections.map(\.startAddressBound), value: address)]
         } else if let readOnly {

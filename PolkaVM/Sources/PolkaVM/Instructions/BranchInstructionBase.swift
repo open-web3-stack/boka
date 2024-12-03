@@ -24,30 +24,30 @@ extension Branch {
     }
 }
 
-// for branch in A.5.7
+// for branch in A.5.8
 protocol BranchInstructionBase<Compare>: Branch {
     associatedtype Compare: BranchCompare
 
     var register: Registers.Index { get set }
-    var value: UInt32 { get set }
+    var value: UInt64 { get set }
     var offset: UInt32 { get set }
 }
 
 extension BranchInstructionBase {
-    public static func parse(data: Data) throws -> (Registers.Index, UInt32, UInt32) {
+    public static func parse(data: Data) throws -> (Registers.Index, UInt64, UInt32) {
         let register = try Registers.Index(ra: data.at(relative: 0))
-        let (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
+        let (value, offset): (UInt64, UInt32) = try Instructions.decodeImmediate2(data, divideBy: 16)
         return (register, value, offset)
     }
 
     public func condition(state: VMState) -> Bool {
-        let regVal = state.readRegister(register)
+        let regVal: UInt64 = state.readRegister(register)
         logger.trace("\(Compare.self) a(\(regVal)) b(\(value)) => \(Compare.compare(a: regVal, b: value))")
         return Compare.compare(a: regVal, b: value)
     }
 }
 
-// for branch in A.5.10
+// for branch in A.5.11
 protocol BranchInstructionBase2<Compare>: Branch {
     associatedtype Compare: BranchCompare
 
@@ -58,14 +58,14 @@ protocol BranchInstructionBase2<Compare>: Branch {
 
 extension BranchInstructionBase2 {
     public static func parse(data: Data) throws -> (Registers.Index, Registers.Index, UInt32) {
-        let offset = try Instructions.decodeImmediate(data.at(relative: 1...))
+        let offset: UInt32 = try Instructions.decodeImmediate(data.at(relative: 1...))
         let r1 = try Registers.Index(ra: data.at(relative: 0))
         let r2 = try Registers.Index(rb: data.at(relative: 0))
         return (r1, r2, offset)
     }
 
     public func condition(state: VMState) -> Bool {
-        let (r1Val, r2Val) = state.readRegister(r1, r2)
+        let (r1Val, r2Val): (UInt64, UInt64) = (state.readRegister(r1), state.readRegister(r2))
         logger.trace("\(Compare.self) a(\(r1Val)) b(\(r2Val)) => \(Compare.compare(a: r1Val, b: r2Val))")
         return Compare.compare(a: r1Val, b: r2Val)
     }

@@ -40,6 +40,7 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
     let impl: PeerImpl<Handler>
     private let channel: Channel<Data> = .init(capacity: 100)
     private let nextData: Mutex<Data?> = .init(nil)
+    private let receiveData: ThreadSafeContainer<[Data]> = .init([])
     private let _status: ThreadSafeContainer<StreamStatus> = .init(.open)
     let connectionId: UniqueId
     let kind: Handler.PresistentHandler.StreamKind?
@@ -128,51 +129,63 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         }
         if !channel.syncSend(data) {
             logger.warning("stream \(id) is full")
-            // TODO: backpressure handling
-            backpressure(data)
+            receiveData.write { receiveData in
+                receiveData.append(data)
+            }
+            backpressure()
         }
     }
 
     /// Handles backpressure when sending data, adjusting flow control and retrying if necessary.
-    private func backpressure(_ data: Data) {
-        let state = resendStates.read { reconnectStates in
-            reconnectStates[id] ?? .init()
+    private func backpressure() {
+        var state = resendStates.read { resendStates in
+            resendStates[id] ?? .init()
         }
 
+        let sendData = receiveData.read { receiveData in
+            receiveData.first
+        }
+        guard let sendData else {
+            return
+        }
         do {
             // Get the current flow control window size
             let windowsSize = try stream.getFlowControlWindow()
 
             guard state.attempt < maxRetryAttempts else {
                 logger.warning("resend: \(id) reached max retry attempts")
-                try? stream.adjustFlowControl(windowSize: Int(Int16.max))
+                // close current stream
+                close(abort: true)
                 return
             }
 
             // Adjust flow control to half of the window size
             try stream.adjustFlowControl(windowSize: windowsSize >> 1)
-
+            state.applyBackoff()
             resendStates.write { resendStates in
-                if var state = resendStates[id] {
-                    state.applyBackoff()
-                    resendStates[id] = state
-                }
+                resendStates[id] = state
             }
 
             Task {
                 try await Task.sleep(for: .seconds(state.delay))
-                if !channel.syncSend(data) {
+                if !channel.syncSend(sendData) {
                     logger.warning("stream \(id) is full")
-                    backpressure(data) // Retry if sending fails
+                    backpressure() // Retry if sending fails
                 } else {
                     try stream.adjustFlowControl(windowSize: Int(Int16.max))
+                    _ = receiveData.write { receiveData in
+                        receiveData.removeFirst()
+                    }
                     resendStates.write { states in
                         states[id] = nil
                     }
+                    backpressure()
                 }
             }
         } catch {
             logger.error("backpressure: \(error)")
+            // close current stream
+            close(abort: true)
         }
     }
 
