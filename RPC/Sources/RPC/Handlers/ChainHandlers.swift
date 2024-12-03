@@ -23,9 +23,9 @@ public enum ChainHandlers {
     public struct GetBlock: RPCHandler {
         public typealias Request = Request1<Data32?>
         public typealias Response = Data?
-        public typealias DataSource = ChainDataSource
 
         public static var method: String { "chain_getBlock" }
+        public static var requestNames: [String] { ["hash"] }
         public static var summary: String? { "Get block by hash. If hash is not provided, returns the best block." }
 
         private let source: ChainDataSource
@@ -47,9 +47,9 @@ public enum ChainHandlers {
     public struct GetBlockHash: RPCHandler {
         public typealias Request = Request1<TimeslotIndex?>
         public typealias Response = Data?
-        public typealias DataSource = ChainDataSource
 
         public static var method: String { "chain_getBlockHash" }
+        public static var requestNames: [String] { ["timeslot"] }
         public static var summary: String? { "Get the block hash by timeslot. If timeslot is not provided, returns the best block hash." }
 
         private let source: ChainDataSource
@@ -67,7 +67,6 @@ public enum ChainHandlers {
     public struct GetFinalziedHead: RPCHandler {
         public typealias Request = VoidRequest
         public typealias Response = Data32?
-        public typealias DataSource = ChainDataSource
 
         public static var method: String { "chain_getFinalziedHead" }
         public static var summary: String? { "Get hash of the last finalized block in the canon chain." }
@@ -87,9 +86,9 @@ public enum ChainHandlers {
     public struct GetHeader: RPCHandler {
         public typealias Request = Request1<Data32?>
         public typealias Response = Data?
-        public typealias DataSource = ChainDataSource
 
         public static var method: String { "chain_getHeader" }
+        public static var requestNames: [String] { ["hash"] }
         public static var summary: String? { "Get block header by hash. If hash is not provided, returns the best block header." }
 
         private let source: ChainDataSource

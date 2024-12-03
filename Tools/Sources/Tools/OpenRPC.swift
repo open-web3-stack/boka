@@ -31,8 +31,8 @@ struct OpenRPC: AsyncParsableCommand {
                         name: h.method,
                         summary: h.summary,
                         description: nil,
-                        params: h.requestType.types.map { createSpecContent(type: $0) },
-                        result: createSpecContent(type: h.responseType),
+                        params: h.requestType.types.enumerated().map { createSpecContent(type: $1, name: h.requestNames[safe: $0]) },
+                        result: createSpecContent(type: h.responseType, name: nil),
                         examples: nil
                     )
                 }
@@ -60,7 +60,7 @@ func build(@JSONSchemaBuilder _ content: () -> any JSONSchemaComponent) -> any J
     content()
 }
 
-func createSpecContent(type: Any.Type) -> SpecContent {
+func createSpecContent(type: Any.Type, name: String?) -> SpecContent {
     // if it is optional
     if let type = type as? OptionalProtocol.Type {
         return createSpecContentInner(type: type.wrappedType, required: false)
@@ -70,7 +70,7 @@ func createSpecContent(type: Any.Type) -> SpecContent {
 
     func createSpecContentInner(type: Any.Type, required: Bool) -> SpecContent {
         .init(
-            name: getName(type: type),
+            name: name ?? getName(type: type),
             summary: nil,
             description: nil,
             required: required,

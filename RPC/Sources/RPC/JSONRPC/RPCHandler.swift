@@ -15,6 +15,7 @@ public protocol RPCHandler: Sendable {
     static var summary: String? { get }
 
     static var requestType: any RequestParameter.Type { get }
+    static var requestNames: [String] { get }
     static var responseType: any Encodable.Type { get }
 }
 
@@ -34,5 +35,9 @@ extension RPCHandler {
 
     public static var responseType: any Encodable.Type {
         Response.self
+    }
+
+    public static var requestNames: [String] {
+        []
     }
 }
