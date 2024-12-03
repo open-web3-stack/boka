@@ -43,7 +43,7 @@ extension RefineInvocation {
             preimageHash: codeHash
         )
 
-        guard let codeBlob, let _ = try await serviceAccounts.get(serviceAccount: service) else {
+        guard let codeBlob, try await serviceAccounts.get(serviceAccount: service) != nil else {
             return (.failure(.invalidCode), [])
         }
 
