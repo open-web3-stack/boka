@@ -56,6 +56,7 @@ public struct SingleAccumulationOutput {
 }
 
 public protocol Accumulation: ServiceAccounts {
+    var timeslot: TimeslotIndex { get }
     var privilegedServices: PrivilegedServices { get }
     var validatorQueue: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
@@ -359,6 +360,7 @@ extension Accumulation {
                 config: config,
                 service: service,
                 serviceAccounts: &self,
+                timeslot: timeslot,
                 transfers: transfers
             )
         }

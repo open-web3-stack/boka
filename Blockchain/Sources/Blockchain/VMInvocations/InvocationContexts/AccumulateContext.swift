@@ -7,16 +7,17 @@ private let logger = Logger(label: "AccumulateContext")
 public class AccumulateContext: InvocationContext {
     public typealias ContextType = (
         x: AccumlateResultContext,
-        y: AccumlateResultContext, // only set in checkpoint host-call
-        timeslot: TimeslotIndex
+        y: AccumlateResultContext // only set in checkpoint host-call
     )
 
-    public var config: ProtocolConfigRef
+    public let config: ProtocolConfigRef
     public var context: ContextType
+    public let timeslot: TimeslotIndex
 
-    public init(context: inout ContextType, config: ProtocolConfigRef) {
+    public init(context: inout ContextType, config: ProtocolConfigRef, timeslot: TimeslotIndex) {
         self.config = config
         self.context = context
+        self.timeslot = timeslot
     }
 
     public func dispatch(index: UInt32, state: VMState) async -> ExecOutcome {
@@ -57,9 +58,9 @@ public class AccumulateContext: InvocationContext {
             return await Quit(x: &context.x)
                 .call(config: config, state: state)
         case Solicit.identifier:
-            return await Solicit(x: &context.x, timeslot: context.timeslot).call(config: config, state: state)
+            return await Solicit(x: &context.x, timeslot: timeslot).call(config: config, state: state)
         case Forget.identifier:
-            return await Forget(x: &context.x, timeslot: context.timeslot).call(config: config, state: state)
+            return await Forget(x: &context.x, timeslot: timeslot).call(config: config, state: state)
         default:
             state.consumeGas(Gas(10))
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHAT.rawValue)
