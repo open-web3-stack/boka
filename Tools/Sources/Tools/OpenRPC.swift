@@ -107,7 +107,7 @@ func getSchema(type: Any.Type) -> any JSONSchemaComponent {
                         getSchema(type: field.type)
                     }
                 }
-            }.title(String(describing: type))
+            }.title(getName(type: type))
         }
     default:
         return build {
