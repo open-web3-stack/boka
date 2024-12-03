@@ -3,17 +3,25 @@ import Utils
 public enum SystemHandlers {
     public static let handlers: [any RPCHandler.Type] = [
         Health.self,
+        Implementation.self,
         Version.self,
+        Properties.self,
+        NodeRoles.self,
+        Chain.self,
     ]
 
-    public static func getHandlers(source _: SystemDataSource) -> [any RPCHandler] {
+    public static func getHandlers(source: SystemDataSource) -> [any RPCHandler] {
         [
             Health(),
-            Version(),
+            Implementation(),
+            Version(source: source),
+            Properties(source: source),
+            NodeRoles(source: source),
+            Chain(source: source),
         ]
     }
 
-    public struct Health: RPCHandler {
+    struct Health: RPCHandler {
         public typealias Request = VoidRequest
         public typealias Response = Bool
 
@@ -25,7 +33,7 @@ public enum SystemHandlers {
         }
     }
 
-    public struct Implementation: RPCHandler {
+    struct Implementation: RPCHandler {
         public typealias Request = VoidRequest
         public typealias Response = String
 
@@ -37,15 +45,79 @@ public enum SystemHandlers {
         }
     }
 
-    public struct Version: RPCHandler {
+    struct Version: RPCHandler {
         public typealias Request = VoidRequest
         public typealias Response = String
 
         public static var method: String { "system_version" }
         public static var summary: String? { "Returns the version of the node." }
 
+        private let source: SystemDataSource
+
+        init(source: SystemDataSource) {
+            self.source = source
+        }
+
         public func handle(request _: Request) async throws -> Response? {
+            // TODO: read it from somewhere
             "0.0.1"
+        }
+    }
+
+    struct Properties: RPCHandler {
+        public typealias Request = VoidRequest
+        public typealias Response = JSON
+
+        public static var method: String { "system_properties" }
+        public static var summary: String? { "Get a custom set of properties as a JSON object, defined in the chain spec." }
+
+        private let source: SystemDataSource
+
+        init(source: SystemDataSource) {
+            self.source = source
+        }
+
+        public func handle(request _: Request) async throws -> Response? {
+            // TODO: implement
+            JSON.array([])
+        }
+    }
+
+    struct NodeRoles: RPCHandler {
+        public typealias Request = VoidRequest
+        public typealias Response = [String]
+
+        public static var method: String { "system_nodeRoles" }
+        public static var summary: String? { "Returns the roles the node is running as." }
+
+        private let source: SystemDataSource
+
+        init(source: SystemDataSource) {
+            self.source = source
+        }
+
+        public func handle(request _: Request) async throws -> Response? {
+            // TODO: implement
+            []
+        }
+    }
+
+    struct Chain: RPCHandler {
+        public typealias Request = VoidRequest
+        public typealias Response = String
+
+        public static var method: String { "system_chain" }
+        public static var summary: String? { "Returns the chain name, defined in the chain spec." }
+
+        private let source: SystemDataSource
+
+        init(source: SystemDataSource) {
+            self.source = source
+        }
+
+        public func handle(request _: Request) async throws -> Response? {
+            // TODO: implement
+            "dev"
         }
     }
 }

@@ -4,39 +4,17 @@ import Utils
 
 public enum TelemetryHandlers {
     public static let handlers: [any RPCHandler.Type] = [
-        GetUpdate.self,
         Name.self,
+        PeersCount.self,
+        NetworkKey.self,
     ]
 
-    public static func getHandlers(source: TelemetryDataSource & ChainDataSource) -> [any RPCHandler] {
+    public static func getHandlers(source: TelemetryDataSource) -> [any RPCHandler] {
         [
-            GetUpdate(source: source),
             Name(source: source),
+            PeersCount(source: source),
+            NetworkKey(source: source),
         ]
-    }
-
-    public struct GetUpdate: RPCHandler {
-        public typealias Request = VoidRequest
-        public typealias Response = [String: String]
-
-        public static var method: String { "telemetry_getUpdate" }
-        public static var summary: String? { "Returns the latest telemetry update." }
-
-        private let source: TelemetryDataSource & ChainDataSource
-
-        init(source: TelemetryDataSource & ChainDataSource) {
-            self.source = source
-        }
-
-        public func handle(request _: Request) async throws -> Response? {
-            let block = try await source.getBestBlock()
-            let peerCount = try await source.getPeersCount()
-            return [
-                "chainHead": block.header.timeslot.description,
-                "blockHash": block.hash.description,
-                "peerCount": peerCount.description,
-            ]
-        }
     }
 
     public struct Name: RPCHandler {
@@ -54,6 +32,43 @@ public enum TelemetryHandlers {
 
         public func handle(request _: Request) async throws -> Response? {
             try await source.name()
+        }
+    }
+
+    public struct PeersCount: RPCHandler {
+        public typealias Request = VoidRequest
+        public typealias Response = Int
+
+        public static var method: String { "telemetry_peersCount" }
+        public static var summary: String? { "Returns the number of connected peers." }
+
+        private let source: TelemetryDataSource
+
+        init(source: TelemetryDataSource) {
+            self.source = source
+        }
+
+        public func handle(request _: Request) async throws -> Response? {
+            try await source.getPeersCount()
+        }
+    }
+
+    public struct NetworkKey: RPCHandler {
+        public typealias Request = VoidRequest
+        public typealias Response = String
+
+        public static var method: String { "telemetry_networkKey" }
+        public static var summary: String? { "Returns the Ed25519 key for p2p networks." }
+
+        private let source: TelemetryDataSource
+
+        init(source: TelemetryDataSource) {
+            self.source = source
+        }
+
+        public func handle(request _: Request) async throws -> Response? {
+            // TODO: implement
+            nil
         }
     }
 }
