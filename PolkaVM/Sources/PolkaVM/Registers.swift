@@ -128,3 +128,23 @@ public struct Registers: Equatable {
         }
     }
 }
+
+extension Registers: Codable {
+    public init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+
+        var registers = [UInt64](repeating: 0, count: 13)
+        for i in 0 ..< 13 {
+            registers[i] = try container.decode(UInt64.self)
+        }
+        self.init(registers)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.unkeyedContainer()
+
+        for i in 0 ..< 13 {
+            try container.encode(self[Registers.Index(raw: UInt8(i))])
+        }
+    }
+}
