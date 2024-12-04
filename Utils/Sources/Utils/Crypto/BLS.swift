@@ -30,7 +30,7 @@ public enum BLS: KeyType {
             }
 
             // use SafePointer to ensure keypair is freed even `try PublicKey` throws
-            keyPairPtr = SafePointer(ptr: ptr.asSendable, free: keypair_free)
+            keyPairPtr = SafePointer(ptr: ptr, free: keypair_free)
             publicKey = try PublicKey(keyPair: keyPairPtr.ptr.value)
         }
 
