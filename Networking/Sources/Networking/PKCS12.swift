@@ -89,13 +89,12 @@ public func generateSelfSignedCertificate(privateKey: Ed25519.SecretKey) throws 
 }
 
 func generateSubjectAlternativeName(publicKey: Ed25519.PublicKey) -> String {
-    let base32Encoded = base32Encode(publicKey.data.data)
-    return "DNS:e\(base32Encoded)"
+    generateSubjectAlternativeName(pubkey: publicKey.data.data)
 }
 
 func generateSubjectAlternativeName(pubkey: Data) -> String {
     let base32Encoded = base32Encode(pubkey)
-    return "DNS:e\(base32Encoded)"
+    return "e\(base32Encoded)"
 }
 
 func base32Encode(_ data: Data) -> String {
