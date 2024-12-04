@@ -7,7 +7,7 @@ public struct Options: ~Copyable, Sendable {
     var value: OpaquePointer { ptr.value }
 
     public init() {
-        ptr = .init(rocksdb_options_create(), free: rocksdb_options_destroy)
+        ptr = .init(ptr: rocksdb_options_create(), free: rocksdb_options_destroy)
     }
 
     public func increaseParallelism(cpus: Int) {
@@ -33,7 +33,7 @@ public struct WriteOptions: ~Copyable, Sendable {
     var value: OpaquePointer { ptr.value }
 
     public init() {
-        ptr = .init(rocksdb_writeoptions_create(), free: rocksdb_writeoptions_destroy)
+        ptr = .init(ptr: rocksdb_writeoptions_create(), free: rocksdb_writeoptions_destroy)
     }
 }
 
@@ -43,6 +43,6 @@ public struct ReadOptions: ~Copyable, Sendable {
     var value: OpaquePointer { ptr.value }
 
     public init() {
-        ptr = .init(rocksdb_readoptions_create(), free: rocksdb_readoptions_destroy)
+        ptr = .init(ptr: rocksdb_readoptions_create(), free: rocksdb_readoptions_destroy)
     }
 }

@@ -23,7 +23,7 @@ public final class RocksDB: Sendable {
     private let db: SendableOpaquePointer
 
     public init(path: URL) throws(Error) {
-        dbOptions = Options()
+        let dbOptions = Options()
 
         // TODO: starting from options here
         // https://github.com/paritytech/parity-common/blob/e3787dc768b08e10809834c65419ad3c255b5cac/kvdb-rocksdb/src/lib.rs#L339
@@ -33,15 +33,17 @@ public final class RocksDB: Sendable {
         dbOptions.optimizeLevelStyleCompaction(memtableMemoryBudget: 512 * 1024 * 1024) // 512 MB
         dbOptions.setCreateIfMissing(true)
 
-        writeOptions = WriteOptions()
-        readOptions = ReadOptions()
-
         // open DB
         db = try Self.call { err, _ in
             rocksdb_open(dbOptions.value, path.path, &err).asSendable
         } onErr: { message throws(Error) in
             throw Error.openFailed(message: message)
         }
+
+        self.dbOptions = dbOptions
+
+        writeOptions = WriteOptions()
+        readOptions = ReadOptions()
     }
 
     deinit {
