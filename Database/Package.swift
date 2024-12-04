@@ -16,6 +16,8 @@ let package = Package(
         ),
     ],
     dependencies: [
+        .package(path: "../Blockchain"),
+        .package(path: "../Utils"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
     ],
     targets: [
@@ -25,6 +27,8 @@ let package = Package(
             name: "Database",
             dependencies: [
                 "rocksdb",
+                "Blockchain",
+                "Utils",
             ],
             linkerSettings: [
                 .unsafeFlags(["-L../.lib", "-L/opt/homebrew/lib"]),

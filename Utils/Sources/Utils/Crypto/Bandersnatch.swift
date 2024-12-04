@@ -29,7 +29,7 @@ public enum Bandersnatch: KeyType {
                 throw .createSecretFailed(err)
             }
 
-            self.ptr = SafePointer(ptr: ptr.asSendable, free: secret_free)
+            self.ptr = SafePointer(ptr: ptr, free: secret_free)
             publicKey = try PublicKey(secretKey: self.ptr.ptr.value)
         }
 
