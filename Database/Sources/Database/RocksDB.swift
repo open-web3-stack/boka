@@ -1,7 +1,8 @@
 import Foundation
 import rocksdb
+import Utils
 
-public final class RocksDB {
+public final class RocksDB: Sendable {
     public enum BatchOperation {
         case delete(key: Data)
         case put(key: Data, value: Data)
@@ -16,42 +17,35 @@ public final class RocksDB {
         case noData
     }
 
-    private let dbOptions: OpaquePointer
-    private let writeOptions: OpaquePointer
-    private let readOptions: OpaquePointer
-    private let db: OpaquePointer
+    private let dbOptions: Options
+    private let writeOptions: WriteOptions
+    private let readOptions: ReadOptions
+    private let db: SendableOpaquePointer
 
     public init(path: URL) throws(Error) {
-        let dbOptions = rocksdb_options_create()
-        self.dbOptions = dbOptions!
+        dbOptions = Options()
+
+        // TODO: starting from options here
+        // https://github.com/paritytech/parity-common/blob/e3787dc768b08e10809834c65419ad3c255b5cac/kvdb-rocksdb/src/lib.rs#L339
+
         let cpus = sysconf(Int32(_SC_NPROCESSORS_ONLN))
+        dbOptions.increaseParallelism(cpus: cpus)
+        dbOptions.optimizeLevelStyleCompaction(memtableMemoryBudget: 512 * 1024 * 1024) // 512 MB
+        dbOptions.setCreateIfMissing(true)
 
-        // Optimize rocksdb
-        rocksdb_options_increase_parallelism(dbOptions, Int32(cpus))
-        let memtable_memory_budget: UInt64 = 512 * 1024 * 1024 // 512 MB
-        rocksdb_options_optimize_level_style_compaction(dbOptions, memtable_memory_budget)
-
-        // create the DB if it's not already present
-        rocksdb_options_set_create_if_missing(dbOptions, 1)
-
-        // create writeoptions
-        writeOptions = rocksdb_writeoptions_create()
-        // create readoptions
-        readOptions = rocksdb_readoptions_create()
+        writeOptions = WriteOptions()
+        readOptions = ReadOptions()
 
         // open DB
         db = try Self.call { err, _ in
-            rocksdb_open(dbOptions, path.path, &err)
+            rocksdb_open(dbOptions.value, path.path, &err).asSendable
         } onErr: { message throws(Error) in
             throw Error.openFailed(message: message)
         }
     }
 
     deinit {
-        rocksdb_writeoptions_destroy(writeOptions)
-        rocksdb_readoptions_destroy(readOptions)
-        rocksdb_options_destroy(dbOptions)
-        rocksdb_close(db)
+        rocksdb_close(db.value)
     }
 }
 
@@ -61,8 +55,6 @@ extension RocksDB {
     private static func call<R>(
         _ data: [Data],
         fn: (inout UnsafeMutablePointer<Int8>?, [(ptr: UnsafeRawPointer, count: Int)]) -> R,
-        // need new swiftlint version https://github.com/realm/SwiftLint/issues/5631
-        // swiftlint:disable:next identifier_name
         onErr: (String) throws(Error) -> Void
     ) throws(Error) -> R {
         var err: UnsafeMutablePointer<Int8>?
@@ -127,7 +119,7 @@ extension RocksDB {
         try Self.call(key, value) { err, ptrs in
             let key = ptrs[0]
             let value = ptrs[1]
-            rocksdb_put(db, writeOptions, key.ptr, key.count, value.ptr, value.count, &err)
+            rocksdb_put(db.value, writeOptions.value, key.ptr, key.count, value.ptr, value.count, &err)
         } onErr: { message throws(Error) in
             throw Error.putFailed(message: message)
         }
@@ -138,22 +130,18 @@ extension RocksDB {
 
         let ret = try Self.call(key) { err, ptrs in
             let key = ptrs[0]
-            return rocksdb_get(db, readOptions, key.ptr, key.count, &len, &err)
+            return rocksdb_get(db.value, readOptions.value, key.ptr, key.count, &len, &err)
         } onErr: { message throws(Error) in
             throw Error.getFailed(message: message)
         }
 
-        defer {
-            free(ret)
-        }
-
-        return ret.map { Data(bytes: $0, count: len) }
+        return ret.map { Data(bytesNoCopy: $0, count: len, deallocator: .free) }
     }
 
     public func delete(key: Data) throws {
         try Self.call(key) { err, ptrs in
             let key = ptrs[0]
-            rocksdb_delete(db, writeOptions, key.ptr, key.count, &err)
+            rocksdb_delete(db.value, writeOptions.value, key.ptr, key.count, &err)
         } onErr: { message throws(Error) in
             throw Error.deleteFailed(message: message)
         }
@@ -182,7 +170,7 @@ extension RocksDB {
         }
 
         try Self.call { err, _ in
-            rocksdb_write(db, writeOptions, writeBatch, &err)
+            rocksdb_write(db.value, writeOptions.value, writeBatch, &err)
         } onErr: { message throws(Error) in
             throw Error.batchFailed(message: message)
         }
