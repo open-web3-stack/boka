@@ -2,10 +2,12 @@ import Foundation
 import rocksdb
 import Utils
 
-public final class RocksDB: Sendable {
+public protocol ColumnFamilyKey: Sendable, CaseIterable, Hashable, RawRepresentable<UInt8> {}
+
+public final class RocksDB<CFKey: ColumnFamilyKey>: Sendable {
     public enum BatchOperation {
-        case delete(key: Data)
-        case put(key: Data, value: Data)
+        case delete(column: CFKey, key: Data)
+        case put(column: CFKey, key: Data, value: Data)
     }
 
     public enum Error: Swift.Error {
@@ -17,12 +19,12 @@ public final class RocksDB: Sendable {
         case noData
     }
 
-    private let dbOptions: Options
     private let writeOptions: WriteOptions
     private let readOptions: ReadOptions
-    private let db: SendableOpaquePointer
+    private let db: SafePointer
+    private let cfHandles: [SendableOpaquePointer]
 
-    public init(path: URL) throws(Error) {
+    public init(path: URL) throws {
         let dbOptions = Options()
 
         // TODO: starting from options here
@@ -32,22 +34,50 @@ public final class RocksDB: Sendable {
         dbOptions.increaseParallelism(cpus: cpus)
         dbOptions.optimizeLevelStyleCompaction(memtableMemoryBudget: 512 * 1024 * 1024) // 512 MB
         dbOptions.setCreateIfMissing(true)
+        dbOptions.setCreateIfMissingColumnFamilies(true)
+
+        let cfOptions = Options()
+        cfOptions.setLevelCompactionDynamicLevelBytes(true)
+
+        var names = CFKey.allCases.map { "\($0)" }
+        // ensure always have a default column family
+        if !names.contains("default") {
+            names.insert("default", at: 0)
+        }
+        var cfOptionsList = names.map { _ in cfOptions.value as OpaquePointer? }
+
+        var outHandles = [OpaquePointer?](repeating: nil, count: names.count)
 
         // open DB
-        db = try Self.call { err, _ in
-            rocksdb_open(dbOptions.value, path.path, &err).asSendable
-        } onErr: { message throws(Error) in
-            throw Error.openFailed(message: message)
+        let dbPtr = try FFIUtils.withCString(names) { cnames in
+            var cnames = cnames
+            return try Self.call { err, _ in
+                rocksdb_open_column_families(
+                    dbOptions.value,
+                    path.path,
+                    Int32(names.count),
+                    &cnames,
+                    &cfOptionsList,
+                    &outHandles,
+                    &err
+                )
+            } onErr: { message throws in
+                throw Error.openFailed(message: message)
+            }
         }
 
-        self.dbOptions = dbOptions
+        db = SafePointer(ptr: dbPtr!, free: rocksdb_close)
+
+        cfHandles = outHandles.map { $0!.asSendable }
 
         writeOptions = WriteOptions()
         readOptions = ReadOptions()
     }
 
     deinit {
-        rocksdb_close(db.value)
+        for handle in cfHandles {
+            rocksdb_column_family_handle_destroy(handle.value)
+        }
     }
 }
 
@@ -57,8 +87,8 @@ extension RocksDB {
     private static func call<R>(
         _ data: [Data],
         fn: (inout UnsafeMutablePointer<Int8>?, [(ptr: UnsafeRawPointer, count: Int)]) -> R,
-        onErr: (String) throws(Error) -> Void
-    ) throws(Error) -> R {
+        onErr: (String) throws -> Void
+    ) throws -> R {
         var err: UnsafeMutablePointer<Int8>?
         defer {
             free(err)
@@ -97,54 +127,71 @@ extension RocksDB {
     private static func call<R>(
         _ data: Data...,
         fn: (inout UnsafeMutablePointer<Int8>?, [(ptr: UnsafeRawPointer, count: Int)]) -> R,
-        onErr: (String) throws(Error) -> Void
-    ) throws(Error) -> R {
+        onErr: (String) throws -> Void
+    ) throws -> R {
         try call(data, fn: fn, onErr: onErr)
     }
 
     private static func call<R>(
         _ data: Data...,
         fn: ([(ptr: UnsafeRawPointer, count: Int)]) -> R
-    ) throws(Error) -> R {
+    ) throws -> R {
         try call(data) { _, ptrs in
             fn(ptrs)
-        } onErr: { _ throws(Error) in
+        } onErr: { _ throws in
             // do nothing as it should never be called
         }
+    }
+
+    private func getHandle(column: CFKey) -> OpaquePointer {
+        cfHandles[Int(column.rawValue)].value
     }
 }
 
 // MARK: - public methods
 
 extension RocksDB {
-    public func put(key: Data, value: Data) throws(Error) {
+    public func put(column: CFKey, key: Data, value: Data) throws {
+        let handle = getHandle(column: column)
         try Self.call(key, value) { err, ptrs in
             let key = ptrs[0]
             let value = ptrs[1]
-            rocksdb_put(db.value, writeOptions.value, key.ptr, key.count, value.ptr, value.count, &err)
-        } onErr: { message throws(Error) in
+            rocksdb_put_cf(
+                db.value,
+                writeOptions.value,
+                handle,
+                key.ptr,
+                key.count,
+                value.ptr,
+                value.count,
+                &err
+            )
+        } onErr: { message throws in
             throw Error.putFailed(message: message)
         }
     }
 
-    public func get(key: Data) throws -> Data? {
+    public func get(column: CFKey, key: Data) throws -> Data? {
         var len = 0
+        let handle = getHandle(column: column)
 
         let ret = try Self.call(key) { err, ptrs in
             let key = ptrs[0]
-            return rocksdb_get(db.value, readOptions.value, key.ptr, key.count, &len, &err)
-        } onErr: { message throws(Error) in
+            return rocksdb_get_cf(db.value, readOptions.value, handle, key.ptr, key.count, &len, &err)
+        } onErr: { message throws in
             throw Error.getFailed(message: message)
         }
 
         return ret.map { Data(bytesNoCopy: $0, count: len, deallocator: .free) }
     }
 
-    public func delete(key: Data) throws {
+    public func delete(column: CFKey, key: Data) throws {
+        let handle = getHandle(column: column)
+
         try Self.call(key) { err, ptrs in
             let key = ptrs[0]
-            rocksdb_delete(db.value, writeOptions.value, key.ptr, key.count, &err)
-        } onErr: { message throws(Error) in
+            rocksdb_delete_cf(db.value, writeOptions.value, handle, key.ptr, key.count, &err)
+        } onErr: { message throws in
             throw Error.deleteFailed(message: message)
         }
     }
@@ -155,25 +202,27 @@ extension RocksDB {
 
         for operation in operations {
             switch operation {
-            case let .delete(key):
+            case let .delete(column, key):
+                let handle = getHandle(column: column)
                 try Self.call(key) { ptrs in
                     let key = ptrs[0]
-                    rocksdb_writebatch_delete(writeBatch, key.ptr, key.count)
+                    rocksdb_writebatch_delete_cf(writeBatch, handle, key.ptr, key.count)
                 }
 
-            case let .put(key, value):
+            case let .put(column, key, value):
+                let handle = getHandle(column: column)
                 try Self.call(key, value) { ptrs in
                     let key = ptrs[0]
                     let value = ptrs[1]
 
-                    rocksdb_writebatch_put(writeBatch, key.ptr, key.count, value.ptr, value.count)
+                    rocksdb_writebatch_put_cf(writeBatch, handle, key.ptr, key.count, value.ptr, value.count)
                 }
             }
         }
 
         try Self.call { err, _ in
             rocksdb_write(db.value, writeOptions.value, writeBatch, &err)
-        } onErr: { message throws(Error) in
+        } onErr: { message throws in
             throw Error.batchFailed(message: message)
         }
     }
