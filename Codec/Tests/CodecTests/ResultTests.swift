@@ -18,7 +18,6 @@ struct ResultCodingTests {
 
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             if container.contains(.success) {
                 let value = try container.decode(Success.self, forKey: .success)
                 self = .success(value)
@@ -43,6 +42,24 @@ struct ResultCodingTests {
         }
     }
 
+    struct TestStruct: Codable, Equatable {
+        let name: String
+    }
+
+    @Test func structTests() throws {
+        let successResult: MyResult<TestStruct> = .success(TestStruct(name: "Success"))
+        let failureResult: MyResult<TestStruct> = .failure(.unknownError("Test Error"))
+
+        let encodedSuccess = try JamEncoder.encode(successResult)
+        let encodedFailure = try JamEncoder.encode(failureResult)
+
+        let decodedSuccess = try JamDecoder.decode(MyResult<TestStruct>.self, from: encodedSuccess)
+        let decodedFailure = try JamDecoder.decode(MyResult<TestStruct>.self, from: encodedFailure)
+
+        #expect(decodedFailure != nil)
+        #expect(decodedSuccess != nil)
+    }
+
     @Test func result() throws {
         let successResult: MyResult<String> = .success("Success!")
         let failureResult: MyResult<String> = .failure(.unknownError("An unknown error occurred"))
@@ -56,10 +73,17 @@ struct ResultCodingTests {
         #expect(decodedSuccess != nil)
     }
 
-    @Test func invalidVariant() throws {
+    @Test func variant() throws {
+        let invalidData0 = Data([0x00] + "Variant".utf8)
+        let invalidData1 = Data([0x01] + "Variant".utf8)
         // Invalid variant value (e.g. value 2)
         let invalidData = Data([0x02] + "Invalid variant".utf8)
-
+        #expect(throws: Error.self) {
+            _ = try JamDecoder.decode(Result<String, ResultError>.self, from: invalidData0)
+        }
+        #expect(throws: Error.self) {
+            _ = try JamDecoder.decode(Result<String, ResultError>.self, from: invalidData1)
+        }
         // Expect decoding to fail and return nil
         #expect(throws: Error.self) {
             _ = try JamDecoder.decode(Result<String, ResultError>.self, from: invalidData)
