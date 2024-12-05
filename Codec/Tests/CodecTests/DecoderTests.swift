@@ -71,4 +71,11 @@ struct DecoderTests {
             _ = try JamDecoder.decode(Int8.self, from: invalidEncodedData)
         }
     }
+
+    @Test func decodeEmptyString() throws {
+        let invalidEncodedData = Data()
+        #expect(throws: Error.self) {
+            _ = try JamDecoder.decode(String.self, from: invalidEncodedData)
+        }
+    }
 }

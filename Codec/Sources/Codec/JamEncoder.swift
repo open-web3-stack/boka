@@ -501,6 +501,20 @@ private struct JamSingleValueEncodingContainer: SingleValueEncodingContainer {
         encoder.encodeInt(value)
     }
 
+    mutating func encode(_: Double) throws {
+        throw EncodingError.invalidValue(
+            Double.self,
+            EncodingError.Context(codingPath: codingPath, debugDescription: "Double is not supported")
+        )
+    }
+
+    mutating func encode(_: Float) throws {
+        throw EncodingError.invalidValue(
+            Float.self,
+            EncodingError.Context(codingPath: codingPath, debugDescription: "Float is not supported")
+        )
+    }
+
     mutating func encode(_ value: some Encodable) throws {
         try encoder.encode(value)
     }
