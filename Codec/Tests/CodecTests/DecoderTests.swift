@@ -70,6 +70,27 @@ struct DecoderTests {
         #expect(throws: Error.self) {
             _ = try JamDecoder.decode(Int8.self, from: invalidEncodedData)
         }
+        #expect(throws: Error.self) {
+            _ = try JamDecoder.decode(Double.self, from: Data())
+        }
+        #expect(throws: Error.self) {
+            _ = try JamDecoder.decode(Float.self, from: Data())
+        }
+        #expect(throws: Error.self) {
+            _ = try JamDecoder.decode(Int?.self, from: Data())
+        }
+        #expect(throws: Error.self) {
+            _ = try JamDecoder.decode(String.self, from: Data([1, 2, 3]))
+        }
+        #expect(throws: Error.self) {
+            _ = try JamDecoder.decode([Int].self, from: Data([21, 205, 91, 7, 0, 0, 0, 0]))
+        }
+        #expect(throws: Error.self) {
+            _ = try JamDecoder.decode([Data].self, from: Data([21, 205, 91, 7, 0, 0, 0, 0]))
+        }
+        #expect(throws: Error.self) {
+            _ = try JamDecoder.decode(Data.self, from: Data([21, 205, 91, 7, 0, 0, 0, 0]))
+        }
     }
 
     @Test func decodeEmptyString() throws {

@@ -176,8 +176,8 @@ struct EncoderTests {
         }
     }
 
-    struct UnkeyedTest: Encodable, Decodable {
-        let boolValue: Bool
+    struct UnkeyedTest: Codable {
+        var boolValue: Bool
         let stringValue: String
         let intValue: Int
         let int8Value: Int8
@@ -208,6 +208,55 @@ struct EncoderTests {
             try container.encode(uint64Value)
             try container.encode(dataValue)
             try container.encode(nestedValues)
+        }
+
+        init(boolValue: Bool = false,
+             stringValue: String = "",
+             intValue: Int = 0,
+             int8Value: Int8 = 0,
+             int16Value: Int16 = 0,
+             int32Value: Int32 = 0,
+             int64Value: Int64 = 0,
+             uintValue: UInt = 0,
+             uint8Value: UInt8 = 0,
+             uint16Value: UInt16 = 0,
+             uint32Value: UInt32 = 0,
+             uint64Value: UInt64 = 0,
+             dataValue: Data = Data(),
+             nestedValues: [UnkeyedTest] = [])
+        {
+            self.boolValue = boolValue
+            self.stringValue = stringValue
+            self.intValue = intValue
+            self.int8Value = int8Value
+            self.int16Value = int16Value
+            self.int32Value = int32Value
+            self.int64Value = int64Value
+            self.uintValue = uintValue
+            self.uint8Value = uint8Value
+            self.uint16Value = uint16Value
+            self.uint32Value = uint32Value
+            self.uint64Value = uint64Value
+            self.dataValue = dataValue
+            self.nestedValues = nestedValues
+        }
+
+        init(from decoder: Decoder) throws {
+            var container = try decoder.unkeyedContainer()
+            boolValue = try container.decode(Bool.self)
+            stringValue = try container.decode(String.self)
+            intValue = try container.decode(Int.self)
+            int8Value = try container.decode(Int8.self)
+            int16Value = try container.decode(Int16.self)
+            int32Value = try container.decode(Int32.self)
+            int64Value = try container.decode(Int64.self)
+            uintValue = try container.decode(UInt.self)
+            uint8Value = try container.decode(UInt8.self)
+            uint16Value = try container.decode(UInt16.self)
+            uint32Value = try container.decode(UInt32.self)
+            uint64Value = try container.decode(UInt64.self)
+            dataValue = try container.decode(Data.self)
+            nestedValues = try container.decode([UnkeyedTest].self)
         }
     }
 
@@ -248,7 +297,7 @@ struct EncoderTests {
 
         let encoded = try JamEncoder.encode(testData)
         #expect(encoded.count > 0)
-        let decoded = try JamDecoder.decode(UnkeyedTest.self, from: encoded)
+        let decoded = try JamDecoder.decode(UnkeyedTest.self, from: encoded, withConfig: testData)
         #expect(testData.intValue == decoded.intValue)
         #expect(testData.dataValue == decoded.dataValue)
     }
