@@ -40,6 +40,10 @@ public class VMState {
         Memory.Readonly(memory)
     }
 
+    public func getMemoryUnsafe() -> Memory {
+        memory
+    }
+
     public func readMemory(address: some FixedWidthInteger) throws -> UInt8 {
         try memory.read(address: UInt32(truncatingIfNeeded: address))
     }
