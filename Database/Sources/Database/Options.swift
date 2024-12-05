@@ -22,8 +22,12 @@ public struct Options: ~Copyable, Sendable {
         rocksdb_options_set_create_if_missing(ptr.value, createIfMissing ? 1 : 0)
     }
 
-    public func setLevelCompactionDynamicLevelBytes(levelCompactionDynamicLevelBytes: Bool) {
+    public func setLevelCompactionDynamicLevelBytes(_ levelCompactionDynamicLevelBytes: Bool) {
         rocksdb_options_set_level_compaction_dynamic_level_bytes(ptr.value, levelCompactionDynamicLevelBytes ? 1 : 0)
+    }
+
+    public func setCreateIfMissingColumnFamilies(_ createIfMissingColumnFamilies: Bool) {
+        rocksdb_options_set_create_missing_column_families(ptr.value, createIfMissingColumnFamilies ? 1 : 0)
     }
 }
 

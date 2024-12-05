@@ -1,6 +1,6 @@
 import Foundation
 
-enum FFIUtils {
+public enum FFIUtils {
     private static func _call<E: Error>(
         data: [Data],
         out: inout Data?,
@@ -8,7 +8,7 @@ enum FFIUtils {
         onErr: (Int) throws(E) -> Void
     ) throws(E) {
         func helper(data: ArraySlice<Data>, ptr: [(ptr: UnsafeRawPointer, count: UInt)]) -> Int {
-            if data.isEmpty {
+            guard let first = data.first else {
                 if var outData = out {
                     let res = outData.withUnsafeMutableBytes { (bufferPtr: UnsafeMutableRawBufferPointer) -> Int in
                         guard let bufferAddress = bufferPtr.baseAddress else {
@@ -22,7 +22,6 @@ enum FFIUtils {
                 return fn(ptr, nil)
             }
             let rest = data.dropFirst()
-            let first = data.first!
             return first.withUnsafeBytes { (bufferPtr: UnsafeRawBufferPointer) -> Int in
                 guard let bufferAddress = bufferPtr.baseAddress else {
                     fatalError("unreachable: bufferPtr.baseAddress is nil")
@@ -74,5 +73,23 @@ enum FFIUtils {
         var out2: Data? = out
         _call(data: data, out: &out2, fn: { ptrs, out_buf in fn(ptrs, out_buf!) }, onErr: { err in fatalError("unreachable: \(err)") })
         out = out2!
+    }
+
+    private static func _withCString<R>(
+        fn: ([UnsafePointer<CChar>?]) throws -> R,
+        str: ArraySlice<String>,
+        ptrs: [UnsafePointer<CChar>?]
+    ) rethrows -> R {
+        guard let first = str.first else {
+            return try fn(ptrs)
+        }
+        let rest = str.dropFirst()
+        return try first.withCString { ptr in
+            try _withCString(fn: fn, str: rest, ptrs: ptrs + [ptr])
+        }
+    }
+
+    public static func withCString<R>(_ str: [String], fn: ([UnsafePointer<CChar>?]) throws -> R) rethrows -> R {
+        try _withCString(fn: fn, str: str[...], ptrs: [])
     }
 }
