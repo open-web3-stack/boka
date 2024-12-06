@@ -14,17 +14,10 @@ extension DataInput {
     }
 
     public mutating func decodeUInt64() throws -> UInt64 {
-        // TODO: improve this by use `read(minLength: 8)` to avoid read byte by byte
-        let res = try IntegerCodec.decode { try self.read() }
-        guard let res else {
-            throw DecodingError.dataCorrupted(
-                DecodingError.Context(
-                    codingPath: [],
-                    debugDescription: "Not enough data to perform variable length integer decoding"
-                )
-            )
+        let data = try read(length: 8)
+        return data.withUnsafeBytes { (pointer: UnsafeRawBufferPointer) -> UInt64 in
+            pointer.load(as: UInt64.self)
         }
-        return res
     }
 }
 

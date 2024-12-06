@@ -4,6 +4,28 @@ import Testing
 @testable import Codec
 
 struct DecoderTests {
+    @Test func decodeLargeArray() throws {
+        let maxLength = 0xFFFF_FFFF
+        let encoded = try JamEncoder.encode(maxLength)
+        var data = Data()
+        data.append(contentsOf: encoded)
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode([Int].self, from: Data(data + Data(repeating: 0, count: maxLength)))
+        }
+    }
+
+    @Test func decodeInvalidLength() throws {
+        let value: UInt64 = 0x1_0000_0000
+        let data = withUnsafeBytes(of: value.littleEndian) { Data($0) }
+
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode(Data.self, from: Data(data))
+        }
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode([UInt8].self, from: Data(data))
+        }
+    }
+
     @Test func decodeData() throws {
         let encodedData = Data([3, 0, 1, 2])
         let decoded = try JamDecoder.decode(Data.self, from: encodedData)

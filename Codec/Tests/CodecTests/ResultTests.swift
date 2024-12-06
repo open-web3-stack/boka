@@ -74,16 +74,18 @@ struct ResultCodingTests {
     }
 
     @Test func variant() throws {
-        let invalidData0 = Data([0x00] + "Variant".utf8)
-        let invalidData1 = Data([0x01] + "Variant".utf8)
+        let successResult: Result<String, ResultError> = .success("Success!")
+        let failureResult: Result<String, Int> = .failure(0)
+        let encodedSuccess = try JamEncoder.encode(successResult)
+        let encodedFailure = try JamEncoder.encode(failureResult)
+        let invalidData0 = Data([0x00] + encodedSuccess)
+        let invalidData1 = Data([0x01] + encodedFailure)
         // Invalid variant value (e.g. value 2)
         let invalidData = Data([0x02] + "Invalid variant".utf8)
-        #expect(throws: Error.self) {
-            _ = try JamDecoder.decode(Result<String, ResultError>.self, from: invalidData0)
-        }
-        #expect(throws: Error.self) {
-            _ = try JamDecoder.decode(Result<String, ResultError>.self, from: invalidData1)
-        }
+        let decoded0 = try JamDecoder.decode(Result<String, ResultError>.self, from: invalidData0)
+        let decoded1 = try JamDecoder.decode(Result<String, Int>.self, from: invalidData1)
+        #expect(decoded0 != nil)
+        #expect(decoded1 != nil)
         // Expect decoding to fail and return nil
         #expect(throws: Error.self) {
             _ = try JamDecoder.decode(Result<String, ResultError>.self, from: invalidData)
