@@ -114,7 +114,7 @@ import Testing
     }
 
     @Test func PublicKey() throws {
-        let keyData1 = Data144.random()
+        let keyData1 = Data144()
         #expect(throws: Error.self) {
             _ = try BLS.PublicKey(data: keyData1)
         }

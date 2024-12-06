@@ -85,6 +85,16 @@ private class EncodeContext: Encoder {
         }
     }
 
+    fileprivate func encodeOptional(_ value: Encodable) throws {
+        let mirror = Mirror(reflecting: value)
+        if let someValue = mirror.children.first?.value as? Encodable {
+            data.append(UInt8(1)) // Encode presence flag
+            try encode(someValue) // Encode the unwrapped value
+        } else {
+            data.append(UInt8(0)) // Encode absence flag
+        }
+    }
+
     fileprivate func encode(_ value: some Encodable) throws {
         if let value = value as? Data {
             encodeData(value, lengthPrefix: true)
@@ -94,6 +104,8 @@ private class EncodeContext: Encoder {
             encodeData(value.data, lengthPrefix: false)
         } else if let value = value as? [Encodable] {
             try encodeArray(value)
+        } else if Mirror(reflecting: value).displayStyle == .optional {
+            try encodeOptional(value)
         } else {
             try value.encode(to: self)
         }
@@ -487,6 +499,20 @@ private struct JamSingleValueEncodingContainer: SingleValueEncodingContainer {
 
     mutating func encode(_ value: UInt64) throws {
         encoder.encodeInt(value)
+    }
+
+    mutating func encode(_: Double) throws {
+        throw EncodingError.invalidValue(
+            Double.self,
+            EncodingError.Context(codingPath: codingPath, debugDescription: "Double is not supported")
+        )
+    }
+
+    mutating func encode(_: Float) throws {
+        throw EncodingError.invalidValue(
+            Float.self,
+            EncodingError.Context(codingPath: codingPath, debugDescription: "Float is not supported")
+        )
     }
 
     mutating func encode(_ value: some Encodable) throws {
