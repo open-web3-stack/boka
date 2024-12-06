@@ -3,7 +3,7 @@
 import Foundation
 import Testing
 
-@testable import Database
+@testable import RocksDBSwift
 
 extension String {
     var data: Data { Data(utf8) }

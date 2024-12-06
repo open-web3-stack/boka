@@ -4,12 +4,12 @@ import Utils
 
 public protocol ColumnFamilyKey: Sendable, CaseIterable, Hashable, RawRepresentable<UInt8> {}
 
-public final class RocksDB<CFKey: ColumnFamilyKey>: Sendable {
-    public enum BatchOperation {
-        case delete(column: CFKey, key: Data)
-        case put(column: CFKey, key: Data, value: Data)
-    }
+public enum BatchOperation {
+    case delete(column: UInt8, key: Data)
+    case put(column: UInt8, key: Data, value: Data)
+}
 
+public final class RocksDB<CFKey: ColumnFamilyKey>: Sendable {
     public enum Error: Swift.Error {
         case openFailed(message: String)
         case putFailed(message: String)
@@ -17,6 +17,7 @@ public final class RocksDB<CFKey: ColumnFamilyKey>: Sendable {
         case deleteFailed(message: String)
         case batchFailed(message: String)
         case noData
+        case invalidColumn(UInt8)
     }
 
     private let writeOptions: WriteOptions
@@ -146,6 +147,10 @@ extension RocksDB {
     private func getHandle(column: CFKey) -> OpaquePointer {
         cfHandles[Int(column.rawValue)].value
     }
+
+    private func getHandle(column: UInt8) -> OpaquePointer? {
+        cfHandles[safe: Int(column)]?.value
+    }
 }
 
 // MARK: - public methods
@@ -203,14 +208,14 @@ extension RocksDB {
         for operation in operations {
             switch operation {
             case let .delete(column, key):
-                let handle = getHandle(column: column)
+                let handle = try getHandle(column: column).unwrap(orError: Error.invalidColumn(column))
                 try Self.call(key) { ptrs in
                     let key = ptrs[0]
                     rocksdb_writebatch_delete_cf(writeBatch, handle, key.ptr, key.count)
                 }
 
             case let .put(column, key, value):
-                let handle = getHandle(column: column)
+                let handle = try getHandle(column: column).unwrap(orError: Error.invalidColumn(column))
                 try Self.call(key, value) { ptrs in
                     let key = ptrs[0]
                     let value = ptrs[1]
