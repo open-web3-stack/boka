@@ -15,14 +15,15 @@ struct DecoderTests {
     }
 
     @Test func decodeInvalidLength() throws {
-        let value: UInt64 = 0x1_0000_0000
-        let data = withUnsafeBytes(of: value.littleEndian) { Data($0) }
-
+        let maxLength = 0x1_0000_0000
+        let encoded = try JamEncoder.encode(maxLength)
+        var data = Data()
+        data.append(contentsOf: encoded)
         #expect(throws: DecodingError.self) {
-            _ = try JamDecoder.decode(Data.self, from: Data(data))
+            _ = try JamDecoder.decode(Data.self, from: Data(data + Data(repeating: 0, count: maxLength)))
         }
         #expect(throws: DecodingError.self) {
-            _ = try JamDecoder.decode([UInt8].self, from: Data(data))
+            _ = try JamDecoder.decode([UInt8].self, from: Data(data + Data(repeating: 0, count: maxLength)))
         }
     }
 
