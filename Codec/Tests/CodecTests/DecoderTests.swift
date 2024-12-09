@@ -4,6 +4,79 @@ import Testing
 @testable import Codec
 
 struct DecoderTests {
+    @Test func decodeOverflowLength() throws {
+        let overflowLength = UInt64.max
+        let lengthData = Data([241]) + withUnsafeBytes(of: overflowLength) { Data($0) }
+        let data = Data(repeating: 0, count: 8)
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode(Data.self, from: lengthData + data)
+        }
+    }
+
+    @Test func decodeUnsupportedType() throws {
+        struct UnsupportedType: Codable {}
+        let unsupportedEncodedData = Data([0])
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode(UnsupportedType.self, from: unsupportedEncodedData)
+        }
+    }
+
+    @Test func decodeCorruptedString() throws {
+        let invalidUTF8Data = Data([0x02, 0xC3, 0x28])
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode(String.self, from: invalidUTF8Data)
+        }
+    }
+
+    @Test func decodeCorruptedNumericData() throws {
+        let corruptedNumericData = Data([0xFF, 0xFF, 0xFF, 0xFF])
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode(Int.self, from: corruptedNumericData)
+        }
+    }
+
+    @Test func decodeIncorrectEncoding() throws {
+        let incorrectEncodedData = Data([255, 255, 255])
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode(Int.self, from: incorrectEncodedData)
+        }
+    }
+
+    @Test func decodeInvalidKeyedContainer() throws {
+        let invalidKeyedData = Data([1, 1, 0, 0, 0, 0, 0, 0, 0])
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode([String: Int].self, from: invalidKeyedData)
+        }
+    }
+
+    @Test func decodeInvalidUnkeyedContainer() throws {
+        let invalidUnkeyedData = Data([5, 104, 101, 108])
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode([Int].self, from: invalidUnkeyedData)
+        }
+    }
+
+    @Test func decodeCorruptedNestedStructure() throws {
+        let corruptedEncodedData = Data([2, 3, 0, 1, 2])
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode([String: [Int]].self, from: corruptedEncodedData)
+        }
+    }
+
+    @Test func decodeEmptyDataForArray() throws {
+        let emptyData = Data()
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode([Int].self, from: emptyData)
+        }
+    }
+
+    @Test func decodeUnsupportedArrayFormat() throws {
+        let unsupportedArrayFormat = Data([5, 0, 0, 0, 0, 0, 0, 0])
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode([Int].self, from: unsupportedArrayFormat)
+        }
+    }
+
     @Test func decodeLargeArray() throws {
         let maxLength = 0xFFFF_FFFF
         let encoded = try JamEncoder.encode(maxLength)
