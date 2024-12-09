@@ -397,4 +397,31 @@ struct EncoderTests {
         #expect(encodedInt8 == Data([251])) // Int8 encoding (signed byte)
         #expect(encodedUInt64 == Data([21, 205, 91, 7, 0, 0, 0, 0])) // UInt64 encoding
     }
+
+    @Test func encodeFixedMoreTests() throws {
+        let int16Value: Int16 = 1
+        let int32Value: Int32 = 1
+        let int64Value: Int64 = 1
+        let uintValue: UInt = 65535
+        let uint16Value: UInt16 = 65535
+        let nilValue: Int64? = nil
+
+        let encodedInt16 = try JamEncoder.encode(int16Value)
+        #expect(encodedInt16 == Data([1, 0]))
+
+        let encodedInt32 = try JamEncoder.encode(int32Value)
+        #expect(encodedInt32 == Data([1, 0, 0, 0]))
+
+        let encodedInt64 = try JamEncoder.encode(int64Value)
+        #expect(encodedInt64 == Data([1, 0, 0, 0, 0, 0, 0, 0]))
+
+        let encodedUInt = try JamEncoder.encode(uintValue)
+        #expect(encodedUInt == Data([255, 255, 0, 0, 0, 0, 0, 0]))
+
+        let encodedUInt16 = try JamEncoder.encode(uint16Value)
+        #expect(encodedUInt16 == Data([255, 255]))
+
+        let encodedNil = try JamEncoder.encode(nilValue)
+        #expect(encodedNil == Data([0]))
+    }
 }

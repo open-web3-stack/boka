@@ -15,15 +15,18 @@ struct DecoderTests {
     }
 
     @Test func decodeInvalidLength() throws {
-        let maxLength = 0x1_0000_0000
+        let maxLength: UInt64 = 0x1_0000_0000
         let encoded = try JamEncoder.encode(maxLength)
-        var data = Data()
-        data.append(contentsOf: encoded)
+        #expect(encoded.count == 8)
+        let decoded = try JamDecoder.decode(UInt64.self, from: encoded)
+        #expect(decoded == maxLength)
+        let lengthData = Data([241, 0, 0, 0, 0, 0, 0, 0])
+        let data = Data(repeating: 0, count: Int(maxLength))
         #expect(throws: DecodingError.self) {
-            _ = try JamDecoder.decode(Data.self, from: Data(data + Data(repeating: 0, count: maxLength)))
+            _ = try JamDecoder.decode(Data.self, from: lengthData + data)
         }
         #expect(throws: DecodingError.self) {
-            _ = try JamDecoder.decode([UInt8].self, from: Data(data + Data(repeating: 0, count: maxLength)))
+            _ = try JamDecoder.decode([UInt8].self, from: lengthData + data)
         }
     }
 
@@ -78,7 +81,7 @@ struct DecoderTests {
     }
 
     @Test func decodeFixedWidthInteger() throws {
-        let encodedInt8 = Data([251])
+        var encodedInt8 = Data([251])
         let encodedUInt64 = Data([21, 205, 91, 7, 0, 0, 0, 0])
 
         let decodedInt8 = try JamDecoder.decode(Int8.self, from: encodedInt8)
@@ -86,6 +89,9 @@ struct DecoderTests {
 
         #expect(decodedInt8 == -5)
         #expect(decodedUInt64 == 123_456_789)
+        #expect(throws: Error.self) {
+            _ = try encodedInt8.read(length: 8)
+        }
     }
 
     @Test func decodeInvalidData() throws {

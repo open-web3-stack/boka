@@ -18,15 +18,8 @@ struct ResultCodingTests {
 
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            if container.contains(.success) {
-                let value = try container.decode(Success.self, forKey: .success)
-                self = .success(value)
-            } else if container.contains(.failure) {
-                let error = try container.decode(ResultError.self, forKey: .failure)
-                self = .failure(error)
-            } else {
-                throw DecodingError.dataCorruptedError(forKey: .failure, in: container, debugDescription: "Invalid data format")
-            }
+            let value = try container.decode(Success.self, forKey: .success)
+            self = .success(value)
         }
 
         // Encodable implementation
