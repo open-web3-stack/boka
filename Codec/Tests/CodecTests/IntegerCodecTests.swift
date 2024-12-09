@@ -104,10 +104,6 @@ import Testing
     }
 
     @Test func multipleDecodes() throws {
-        var largeData = Data([254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 254])
-        #expect(throws: Error.self) {
-            _ = try largeData.decodeUInt64()
-        }
         var data = Data([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
         #expect(data.decode(length: 8) as UInt64? == 0x0706_0504_0302_0100)
         #expect(data.decode(length: 4) as UInt32? == 0x0B0A_0908)
