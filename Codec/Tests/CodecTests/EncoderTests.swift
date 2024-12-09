@@ -334,8 +334,7 @@ struct EncoderTests {
     @Test func encodeString() throws {
         let stringValue = "hello"
         let encoded = try JamEncoder.encode(stringValue)
-
-        #expect(encoded == Data([5, 104, 101, 108, 108, 111])) // Length prefix of 5 bytes and UTF-8 encoding of "hello"
+        #expect(encoded == Data([5, 104, 101, 108, 108, 111]))
     }
 
     @Test func encodeArray() throws {
@@ -406,22 +405,28 @@ struct EncoderTests {
         let uint16Value: UInt16 = 65535
         let nilValue: Int64? = nil
 
+        let encodedNil = try JamEncoder.encode(nilValue)
+        #expect(encodedNil == Data([0]))
+        try #expect(JamDecoder.decode(Int64?.self, from: encodedNil) == nilValue)
+
         let encodedInt16 = try JamEncoder.encode(int16Value)
         #expect(encodedInt16 == Data([1, 0]))
+        try #expect(JamDecoder.decode(Int16.self, from: encodedInt16) == int16Value)
 
         let encodedInt32 = try JamEncoder.encode(int32Value)
         #expect(encodedInt32 == Data([1, 0, 0, 0]))
+        try #expect(JamDecoder.decode(Int32.self, from: encodedInt32) == int32Value)
 
         let encodedInt64 = try JamEncoder.encode(int64Value)
         #expect(encodedInt64 == Data([1, 0, 0, 0, 0, 0, 0, 0]))
+        try #expect(JamDecoder.decode(Int64.self, from: encodedInt64) == int64Value)
 
         let encodedUInt = try JamEncoder.encode(uintValue)
         #expect(encodedUInt == Data([255, 255, 0, 0, 0, 0, 0, 0]))
+        try #expect(JamDecoder.decode(UInt.self, from: encodedUInt) == uintValue)
 
         let encodedUInt16 = try JamEncoder.encode(uint16Value)
         #expect(encodedUInt16 == Data([255, 255]))
-
-        let encodedNil = try JamEncoder.encode(nilValue)
-        #expect(encodedNil == Data([0]))
+        try #expect(JamDecoder.decode(UInt16.self, from: encodedUInt16) == uint16Value)
     }
 }

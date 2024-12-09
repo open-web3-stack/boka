@@ -14,7 +14,12 @@ struct DecoderTests {
         }
     }
 
-    @Test func decodeInvalidLength() throws {
+    @Test func decodeInvalidInt() throws {
+        let encoded16 = try JamEncoder.encode(0xFFFF_FFFF)
+        #expect(throws: Error.self) {
+            _ = try JamDecoder.decode(UInt16.self, from: encoded16)
+        }
+
         let maxLength: UInt64 = 0x1_0000_0000
         let encoded = try JamEncoder.encode(maxLength)
         #expect(encoded.count == 8)
@@ -51,8 +56,11 @@ struct DecoderTests {
     @Test func decodeString() throws {
         let encoded = Data([5, 104, 101, 108, 108, 111])
         let decoded = try JamDecoder.decode(String.self, from: encoded)
-
         #expect(decoded == "hello")
+
+        #expect(throws: Error.self) {
+            _ = try JamDecoder.decode(String.self, from: Data([6, 104, 101, 108, 108, 111]))
+        }
     }
 
     @Test func decodeArray() throws {
