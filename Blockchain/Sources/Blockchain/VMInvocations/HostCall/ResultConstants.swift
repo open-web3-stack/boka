@@ -33,4 +33,6 @@ public enum HostCallResultCodeInner: UInt32 {
     case FAULT = 2
     /// HOST = 3: The invocation completed with a host-call fault.
     case HOST = 3
+    /// OOG = 4: The invocation completed by running out of gas.
+    case OOG = 4
 }
