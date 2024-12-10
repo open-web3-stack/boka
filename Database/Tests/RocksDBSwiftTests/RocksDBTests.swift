@@ -54,11 +54,11 @@ final class RocksDBTests {
         try rocksDB.put(column: .col1, key: "123".data, value: "qwe".data)
 
         try rocksDB.batch(operations: [
-            .delete(column: .col1, key: "123".data),
-            .put(column: .col1, key: "234".data, value: "wer".data),
-            .put(column: .col1, key: "345".data, value: "ert".data),
-            .delete(column: .col1, key: "234".data),
-            .put(column: .col1, key: "345".data, value: "ertert".data),
+            .delete(column: Columns.col1.rawValue, key: "123".data),
+            .put(column: Columns.col1.rawValue, key: "234".data, value: "wer".data),
+            .put(column: Columns.col1.rawValue, key: "345".data, value: "ert".data),
+            .delete(column: Columns.col1.rawValue, key: "234".data),
+            .put(column: Columns.col1.rawValue, key: "345".data, value: "ertert".data),
         ])
 
         #expect(try rocksDB.get(column: .col1, key: "123".data) == nil)
@@ -89,9 +89,9 @@ final class RocksDBTests {
     @Test func testBatchOperationsAcrossColumns() throws {
         // Test batch operations across different column families
         try rocksDB.batch(operations: [
-            .put(column: .col1, key: "batch1".data, value: "value1".data),
-            .put(column: .col2, key: "batch2".data, value: "value2".data),
-            .put(column: .col3, key: "batch3".data, value: "value3".data),
+            .put(column: Columns.col1.rawValue, key: "batch1".data, value: "value1".data),
+            .put(column: Columns.col2.rawValue, key: "batch2".data, value: "value2".data),
+            .put(column: Columns.col3.rawValue, key: "batch3".data, value: "value3".data),
         ])
 
         #expect(try rocksDB.get(column: .col1, key: "batch1".data) == "value1".data)
