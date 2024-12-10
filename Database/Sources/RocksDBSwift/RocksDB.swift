@@ -26,6 +26,8 @@ public final class RocksDB<CFKey: ColumnFamilyKey>: Sendable {
     private let cfHandles: [SendableOpaquePointer]
 
     public init(path: URL) throws {
+        try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
+
         let dbOptions = Options()
 
         // TODO: starting from options here

@@ -23,7 +23,7 @@ public final class RocksDBBackend: Sendable {
 
     public let genesisBlockHash: Data32
 
-    public init(path: URL, config: ProtocolConfigRef, genesisBlockHash: Data32) throws {
+    public init(path: URL, config: ProtocolConfigRef, genesisBlock: BlockRef, genesisStateData: [Data32: Data]) async throws {
         self.config = config
         db = try RocksDB(path: path)
         meta = Store(db: db, column: .meta, coder: NoopCoder())
@@ -36,7 +36,7 @@ public final class RocksDBBackend: Sendable {
         stateRefs = Store(db: db, column: .stateRefs, coder: JamCoder(config: config, prefix: Data([0])))
         stateRefsRaw = Store(db: db, column: .stateRefs, coder: JamCoder(config: config, prefix: Data([1])))
 
-        self.genesisBlockHash = genesisBlockHash
+        genesisBlockHash = genesisBlock.hash
 
         let genesis = try meta.get(key: MetaKey.genesisHash.key)
         if let genesis {
@@ -46,6 +46,11 @@ public final class RocksDBBackend: Sendable {
         } else {
             // must be a new db
             try meta.put(key: MetaKey.genesisHash.key, value: genesisBlockHash.data)
+            try await add(block: genesisBlock)
+            let backend = StateBackend(self, config: config, rootHash: Data32())
+            try await backend.writeRaw(Array(genesisStateData))
+            try setHeads([genesisBlockHash])
+            try await setFinalizedHead(hash: genesisBlockHash)
         }
     }
 
