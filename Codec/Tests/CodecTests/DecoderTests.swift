@@ -54,6 +54,24 @@ struct DecoderTests {
         #expect(throws: DecodingError.self) {
             _ = try JamDecoder.decode([Int].self, from: invalidUnkeyedData)
         }
+        struct UnkeyedDouble: Codable {
+            var doubleValue: Double
+        }
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode(UnkeyedDouble.self, from: invalidUnkeyedData)
+        }
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode(UnkeyedDouble?.self, from: invalidUnkeyedData)
+        }
+        struct UnkeyedFloat: Codable {
+            var floatValue: Float
+        }
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode(UnkeyedFloat?.self, from: invalidUnkeyedData)
+        }
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode(UnkeyedFloat.self, from: invalidUnkeyedData)
+        }
     }
 
     @Test func decodeCorruptedNestedStructure() throws {
@@ -188,6 +206,9 @@ struct DecoderTests {
         }
         #expect(throws: Error.self) {
             _ = try JamDecoder.decode(Int?.self, from: Data())
+        }
+        #expect(throws: Error.self) {
+            _ = try JamDecoder.decode(Int?.self, from: Data([2]))
         }
         #expect(throws: Error.self) {
             _ = try JamDecoder.decode(String.self, from: Data([1, 2, 3]))
