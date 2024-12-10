@@ -79,6 +79,9 @@ struct DecoderTests {
         #expect(throws: DecodingError.self) {
             _ = try JamDecoder.decode([String: [Int]].self, from: corruptedEncodedData)
         }
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode([String: [Int]]?.self, from: corruptedEncodedData)
+        }
     }
 
     @Test func decodeEmptyDataForArray() throws {

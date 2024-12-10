@@ -113,5 +113,8 @@ import Testing
         #expect(data.decode() == nil)
         #expect(data.decode(length: 20) as UInt64? == nil)
         #expect(data.decode(length: -1) as UInt64? == nil)
+        var emptyBytes: [UInt8] = []
+        let result = IntegerCodec.decode { emptyBytes.popLast() }
+        #expect(result == nil)
     }
 }
