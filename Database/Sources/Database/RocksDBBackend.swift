@@ -179,12 +179,6 @@ extension RocksDBBackend: StateBackendProtocol {
         let snapshot = db.createSnapshot()
         let readOptions = ReadOptions()
         readOptions.setSnapshot(snapshot)
-        if prefix.count > 0 {
-            var upperBound = prefix
-            if upperBound.last != 0xFF {
-                upperBound[upperBound.endIndex - 1] += 1
-            } // else we can't set an upper bound
-        } // else iterate the whole store so no upper bound
 
         let iterator = db.createIterator(column: .state, readOptions: readOptions)
         iterator.seek(to: startKey ?? prefix)
