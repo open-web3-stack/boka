@@ -54,10 +54,6 @@ public struct ReadOptions: ~Copyable, Sendable {
     public func setSnapshot(_ snapshot: borrowing Snapshot) {
         rocksdb_readoptions_set_snapshot(ptr.value, snapshot.value)
     }
-
-    public func setUpperBound(_ key: Data) {
-        key.withUnsafeBytes { rocksdb_readoptions_set_iterate_upper_bound(ptr.value, $0.baseAddress, key.count) }
-    }
 }
 
 public struct Snapshot: ~Copyable, Sendable {

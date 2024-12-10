@@ -117,4 +117,62 @@ final class RocksDBTests {
         let value = try rocksDB.get(column: .col1, key: "nonexistent".data)
         #expect(value == nil)
     }
+
+    @Test func testIterator() throws {
+        // Setup test data
+        let testData = [
+            ("key1", "value1"),
+            ("key2", "value2"),
+            ("key3", "value3"),
+            ("key4", "value4"),
+            ("key5", "value5"),
+        ]
+
+        // Insert test data
+        for (key, value) in testData {
+            try rocksDB.put(column: .col1, key: key.data, value: value.data)
+        }
+
+        // Test forward iteration
+        let readOptions = ReadOptions()
+        let iterator = rocksDB.createIterator(column: .col1, readOptions: readOptions)
+
+        iterator.seek(to: "key1".data)
+        var count = 0
+        while let pair = iterator.read() {
+            let key = String(data: pair.key, encoding: .utf8)!
+            let value = String(data: pair.value, encoding: .utf8)!
+            #expect(key == testData[count].0)
+            #expect(value == testData[count].1)
+            count += 1
+            iterator.next()
+        }
+        #expect(count == testData.count)
+    }
+
+    @Test func testSnapshot() throws {
+        // Insert initial data
+        try rocksDB.put(column: .col1, key: "key1".data, value: "value1".data)
+
+        // Create snapshot
+        let snapshot = rocksDB.createSnapshot()
+        let readOptions = ReadOptions()
+        readOptions.setSnapshot(snapshot)
+
+        // Modify data after snapshot
+        try rocksDB.put(column: .col1, key: "key1".data, value: "modified".data)
+        try rocksDB.put(column: .col1, key: "key2".data, value: "value2".data)
+
+        // Read using snapshot should see original value
+        let iterator = rocksDB.createIterator(column: .col1, readOptions: readOptions)
+        iterator.seek(to: "key1".data)
+        if let pair = iterator.read() {
+            let value = String(data: pair.value, encoding: .utf8)!
+            #expect(value == "value1")
+        }
+
+        // Regular read should see modified value
+        let currentValue = try rocksDB.get(column: .col1, key: "key1".data)
+        #expect(String(data: currentValue!, encoding: .utf8) == "modified")
+    }
 }
