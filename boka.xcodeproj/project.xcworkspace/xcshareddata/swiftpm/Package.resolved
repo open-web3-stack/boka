@@ -1,5 +1,5 @@
 {
-  "originHash" : "2856b6aedabfe15f31e49c84318b9d7a155b1858de6e4c24b935eed8adb6cc4c",
+  "originHash" : "8e21a58b6d7f842c098f4e974e374c6d0247726a1d3017dda720b3de822a747b",
   "pins" : [
     {
       "identity" : "async-channels",
@@ -71,6 +71,15 @@
       "state" : {
         "revision" : "8c9a227476555c55837e569be71944e02a056b72",
         "version" : "4.9.1"
+      }
+    },
+    {
+      "identity" : "runtime",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/wickwirew/Runtime.git",
+      "state" : {
+        "revision" : "b90e9ab1c66a964a9edf32fe38ea2774c0e5821b",
+        "version" : "2.2.7"
       }
     },
     {
@@ -164,6 +173,15 @@
       }
     },
     {
+      "identity" : "swift-json-schema",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ajevans99/swift-json-schema.git",
+      "state" : {
+        "revision" : "671f1777a96343b99435d2eb8af72bcb49d175bd",
+        "version" : "0.2.1"
+      }
+    },
+    {
       "identity" : "swift-log",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
@@ -229,7 +247,7 @@
     {
       "identity" : "swift-numerics",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-numerics",
+      "location" : "https://github.com/apple/swift-numerics.git",
       "state" : {
         "branch" : "main",
         "revision" : "e30276bff2ff5ed80566fbdca49f50aa160b0e83"

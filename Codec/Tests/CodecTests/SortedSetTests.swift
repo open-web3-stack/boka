@@ -13,6 +13,9 @@ struct SortedSetTests {
     @Test func decode() throws {
         let decoded = try JamDecoder.decode(SortedSet<UInt8>.self, from: Data([3, 1, 2, 3]))
         #expect(decoded.alias == [1, 2, 3])
+        #expect(throws: DecodingError.self) {
+            _ = try JamDecoder.decode(SortedSet<UInt8>.self, from: Data([3, 2, 1, 3]))
+        }
     }
 
     @Test func invalidData() throws {
