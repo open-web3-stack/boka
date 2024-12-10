@@ -170,8 +170,37 @@ extension RocksDBBackend: StateBackendProtocol {
         try stateTrie.get(key: key)
     }
 
-    public func readAll(prefix _: Data, startKey _: Data?, limit _: UInt32?) async throws -> [(key: Data, value: Data)] {
-        fatalError("unimplemented")
+    public func readAll(prefix: Data, startKey: Data?, limit: UInt32?) async throws -> [(key: Data, value: Data)] {
+        let snapshot = db.createSnapshot()
+        let readOptions = ReadOptions()
+        readOptions.setSnapshot(snapshot)
+        if prefix.count > 0 {
+            var upperBound = prefix
+            if upperBound.last != 0xFF {
+                upperBound[upperBound.endIndex - 1] += 1
+            } // else we can't set an upper bound
+        } // else iterate the whole store so no upper bound
+
+        let iterator = db.createIterator(column: .state, readOptions: readOptions)
+        iterator.seek(to: startKey ?? prefix)
+
+        var ret = [(key: Data, value: Data)]()
+        if let limit {
+            ret.reserveCapacity(Int(limit))
+        }
+        for _ in 0 ..< (limit ?? .max) {
+            iterator.next()
+            if let (key, value) = iterator.read() {
+                if key.starts(with: prefix) {
+                    ret.append((key, value))
+                } else {
+                    break
+                }
+            } else {
+                break
+            }
+        }
+        return ret
     }
 
     public func batchUpdate(_ updates: [StateBackendOperation]) async throws {

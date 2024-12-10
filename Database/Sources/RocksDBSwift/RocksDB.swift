@@ -231,4 +231,13 @@ extension RocksDB {
             throw Error.batchFailed(message: message)
         }
     }
+
+    public func createSnapshot() -> Snapshot {
+        Snapshot(db.ptr)
+    }
+
+    public func createIterator(column: CFKey, readOptions: borrowing ReadOptions) -> Iterator {
+        let handle = getHandle(column: column)
+        return Iterator(db.value, readOptions: readOptions, columnFamily: handle)
+    }
 }

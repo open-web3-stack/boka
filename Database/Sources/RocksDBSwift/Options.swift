@@ -1,3 +1,4 @@
+import Foundation
 import rocksdb
 import Utils
 
@@ -41,12 +42,91 @@ struct WriteOptions: ~Copyable, Sendable {
     }
 }
 
-struct ReadOptions: ~Copyable, Sendable {
+public struct ReadOptions: ~Copyable, Sendable {
     let ptr: SafePointer
 
     var value: OpaquePointer { ptr.value }
 
-    init() {
+    public init() {
         ptr = .init(ptr: rocksdb_readoptions_create(), free: rocksdb_readoptions_destroy)
+    }
+
+    public func setSnapshot(_ snapshot: borrowing Snapshot) {
+        rocksdb_readoptions_set_snapshot(ptr.value, snapshot.value)
+    }
+
+    public func setUpperBound(_ key: Data) {
+        key.withUnsafeBytes { rocksdb_readoptions_set_iterate_upper_bound(ptr.value, $0.baseAddress, key.count) }
+    }
+}
+
+public struct Snapshot: ~Copyable, Sendable {
+    let ptr: SafePointer
+
+    var value: OpaquePointer { ptr.value }
+
+    init(_ db: SendableOpaquePointer) {
+        ptr = .init(ptr: rocksdb_create_snapshot(db.value), free: { ptr in rocksdb_release_snapshot(db.value, ptr) })
+    }
+}
+
+public struct Iterator: ~Copyable, Sendable {
+    let ptr: SafePointer
+
+    var value: OpaquePointer { ptr.value }
+
+    init(_ db: OpaquePointer, readOptions: borrowing ReadOptions, columnFamily: OpaquePointer) {
+        ptr = .init(
+            ptr: rocksdb_create_iterator_cf(db, readOptions.value, columnFamily),
+            free: rocksdb_iter_destroy
+        )
+    }
+
+    public func seek(to key: Data) {
+        key.withUnsafeBytes { rocksdb_iter_seek(ptr.value, $0.baseAddress, key.count) }
+    }
+
+    // read the key-value pair at the current position
+    public func read() -> (key: Data, value: Data)? {
+        read { pair -> (key: Data, value: Data)? in
+            guard let pair else {
+                return nil
+            }
+            // copy key and value
+
+            let keyData = Data(buffer: pair.key)
+            let valueData = Data(buffer: pair.value)
+            return (key: keyData, value: valueData)
+        }
+    }
+
+    /// read the key-value pair at the current position
+    /// the passed key and values are only valid during the execution of the passed closure
+    public func read<R>(fn: ((key: UnsafeBufferPointer<CChar>, value: UnsafeBufferPointer<CChar>)?) throws -> R) rethrows -> R {
+        guard rocksdb_iter_valid(ptr.value) != 0 else {
+            return try fn(nil)
+        }
+
+        var keyLength = 0
+        var valueLength = 0
+        let key = rocksdb_iter_key(ptr.value, &keyLength)
+        let value = rocksdb_iter_value(ptr.value, &valueLength)
+
+        guard let key, let value else {
+            return try fn(nil)
+        }
+
+        let keyPtr = UnsafeBufferPointer(start: key, count: keyLength)
+        let valuePtr = UnsafeBufferPointer(start: value, count: valueLength)
+
+        return try fn((key: keyPtr, value: valuePtr))
+    }
+
+    public func next() {
+        rocksdb_iter_next(ptr.value)
+    }
+
+    public func prev() {
+        rocksdb_iter_prev(ptr.value)
     }
 }
