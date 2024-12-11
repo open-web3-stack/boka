@@ -10,7 +10,7 @@ public class OnTransferContext: InvocationContext {
         accounts: ServiceAccounts
     )
 
-    public var config: ProtocolConfigRef
+    public let config: ProtocolConfigRef
     public var context: ContextType
 
     public init(context: inout ContextType, config: ProtocolConfigRef) {

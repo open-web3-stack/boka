@@ -90,7 +90,8 @@ extension WorkReport: Validate {
         guard refinementContext.prerequisiteWorkPackages.count + lookup.count <= config.value.maxDepsInWorkReport else {
             throw .tooManyDependencies
         }
-        guard encodedSize <= config.value.maxEncodedWorkReportSize else {
+        let resultOutputSize = results.compactMap { result in try? result.output.result.get() }.reduce(0) { $0 + $1.count }
+        guard authorizationOutput.count + resultOutputSize <= config.value.maxWorkReportOutputSize else {
             throw .tooBig
         }
         guard coreIndex < UInt32(config.value.totalNumberOfCores) else {
