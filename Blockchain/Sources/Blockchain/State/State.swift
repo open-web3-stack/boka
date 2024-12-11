@@ -220,6 +220,7 @@ public struct State: Sendable {
     // TODO: we don't really want to write to the underlying backend here
     // instead, it should be writting to a in memory layer
     // and when actually saving the state, save the in memory layer to the presistent store
+    @discardableResult
     public func save() async throws -> Data32 {
         try await backend.write(layer.toKV())
         return await backend.rootHash

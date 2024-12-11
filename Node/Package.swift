@@ -21,6 +21,7 @@ let package = Package(
         .package(path: "../RPC"),
         .package(path: "../TracingUtils"),
         .package(path: "../Utils"),
+        .package(path: "../Database"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
         .package(url: "https://github.com/gh123man/Async-Channels.git", from: "1.0.2"),
     ],
@@ -34,6 +35,7 @@ let package = Package(
                 "RPC",
                 "TracingUtils",
                 "Utils",
+                "Database",
                 .product(name: "AsyncChannels", package: "Async-Channels"),
             ]
         ),

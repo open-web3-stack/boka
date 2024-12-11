@@ -14,7 +14,7 @@ public final class Runtime {
         case invalidReportAuthorizer
         case encodeError(any Swift.Error)
         case invalidExtrinsicHash
-        case invalidParentHash
+        case invalidParentHash(state: Data32, header: Data32)
         case invalidHeaderStateRoot
         case invalidHeaderEpochMarker
         case invalidHeaderWinningTickets
@@ -53,7 +53,7 @@ public final class Runtime {
         let block = block.value
 
         guard block.header.parentHash == state.value.lastBlockHash else {
-            throw Error.invalidParentHash
+            throw Error.invalidParentHash(state: state.value.lastBlockHash, header: block.header.parentHash)
         }
 
         guard block.header.priorStateRoot == context.stateRoot else {
@@ -189,6 +189,8 @@ public final class Runtime {
 
             // after reports as it need old recent history
             try updateRecentHistory(block: block, state: &newState)
+
+            try await newState.save()
         } catch let error as Error {
             throw error
         } catch let error as SafroleError {

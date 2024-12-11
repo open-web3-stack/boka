@@ -1,15 +1,18 @@
 import Foundation
 import rocksdb
+import TracingUtils
 import Utils
+
+private let logger = Logger(label: "RocksDB")
 
 public protocol ColumnFamilyKey: Sendable, CaseIterable, Hashable, RawRepresentable<UInt8> {}
 
-public final class RocksDB<CFKey: ColumnFamilyKey>: Sendable {
-    public enum BatchOperation {
-        case delete(column: CFKey, key: Data)
-        case put(column: CFKey, key: Data, value: Data)
-    }
+public enum BatchOperation {
+    case delete(column: UInt8, key: Data)
+    case put(column: UInt8, key: Data, value: Data)
+}
 
+public final class RocksDB<CFKey: ColumnFamilyKey>: Sendable {
     public enum Error: Swift.Error {
         case openFailed(message: String)
         case putFailed(message: String)
@@ -17,6 +20,7 @@ public final class RocksDB<CFKey: ColumnFamilyKey>: Sendable {
         case deleteFailed(message: String)
         case batchFailed(message: String)
         case noData
+        case invalidColumn(UInt8)
     }
 
     private let writeOptions: WriteOptions
@@ -25,6 +29,8 @@ public final class RocksDB<CFKey: ColumnFamilyKey>: Sendable {
     private let cfHandles: [SendableOpaquePointer]
 
     public init(path: URL) throws {
+        try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
+
         let dbOptions = Options()
 
         // TODO: starting from options here
@@ -146,12 +152,18 @@ extension RocksDB {
     private func getHandle(column: CFKey) -> OpaquePointer {
         cfHandles[Int(column.rawValue)].value
     }
+
+    private func getHandle(column: UInt8) -> OpaquePointer? {
+        cfHandles[safe: Int(column)]?.value
+    }
 }
 
 // MARK: - public methods
 
 extension RocksDB {
     public func put(column: CFKey, key: Data, value: Data) throws {
+        logger.trace("put() \(column) \(key.toHexString()) \(value.toHexString())")
+
         let handle = getHandle(column: column)
         try Self.call(key, value) { err, ptrs in
             let key = ptrs[0]
@@ -172,6 +184,8 @@ extension RocksDB {
     }
 
     public func get(column: CFKey, key: Data) throws -> Data? {
+        logger.trace("get() \(column) \(key.toHexString())")
+
         var len = 0
         let handle = getHandle(column: column)
 
@@ -186,6 +200,8 @@ extension RocksDB {
     }
 
     public func delete(column: CFKey, key: Data) throws {
+        logger.trace("delete() \(column) \(key.toHexString())")
+
         let handle = getHandle(column: column)
 
         try Self.call(key) { err, ptrs in
@@ -197,20 +213,26 @@ extension RocksDB {
     }
 
     public func batch(operations: [BatchOperation]) throws {
+        logger.trace("batch() \(operations.count) operations")
+
         let writeBatch = rocksdb_writebatch_create()
         defer { rocksdb_writebatch_destroy(writeBatch) }
 
         for operation in operations {
             switch operation {
             case let .delete(column, key):
-                let handle = getHandle(column: column)
+                logger.trace("batch() delete \(column) \(key.toHexString())")
+
+                let handle = try getHandle(column: column).unwrap(orError: Error.invalidColumn(column))
                 try Self.call(key) { ptrs in
                     let key = ptrs[0]
                     rocksdb_writebatch_delete_cf(writeBatch, handle, key.ptr, key.count)
                 }
 
             case let .put(column, key, value):
-                let handle = getHandle(column: column)
+                logger.trace("batch() put \(column) \(key.toHexString()) \(value.toHexString())")
+
+                let handle = try getHandle(column: column).unwrap(orError: Error.invalidColumn(column))
                 try Self.call(key, value) { ptrs in
                     let key = ptrs[0]
                     let value = ptrs[1]
@@ -225,5 +247,14 @@ extension RocksDB {
         } onErr: { message throws in
             throw Error.batchFailed(message: message)
         }
+    }
+
+    public func createSnapshot() -> Snapshot {
+        Snapshot(db.ptr)
+    }
+
+    public func createIterator(column: CFKey, readOptions: borrowing ReadOptions) -> Iterator {
+        let handle = getHandle(column: column)
+        return Iterator(db.value, readOptions: readOptions, columnFamily: handle)
     }
 }

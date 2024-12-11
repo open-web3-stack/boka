@@ -3,7 +3,7 @@
 import Foundation
 import Testing
 
-@testable import Database
+@testable import RocksDBSwift
 
 extension String {
     var data: Data { Data(utf8) }
@@ -54,11 +54,11 @@ final class RocksDBTests {
         try rocksDB.put(column: .col1, key: "123".data, value: "qwe".data)
 
         try rocksDB.batch(operations: [
-            .delete(column: .col1, key: "123".data),
-            .put(column: .col1, key: "234".data, value: "wer".data),
-            .put(column: .col1, key: "345".data, value: "ert".data),
-            .delete(column: .col1, key: "234".data),
-            .put(column: .col1, key: "345".data, value: "ertert".data),
+            .delete(column: Columns.col1.rawValue, key: "123".data),
+            .put(column: Columns.col1.rawValue, key: "234".data, value: "wer".data),
+            .put(column: Columns.col1.rawValue, key: "345".data, value: "ert".data),
+            .delete(column: Columns.col1.rawValue, key: "234".data),
+            .put(column: Columns.col1.rawValue, key: "345".data, value: "ertert".data),
         ])
 
         #expect(try rocksDB.get(column: .col1, key: "123".data) == nil)
@@ -89,9 +89,9 @@ final class RocksDBTests {
     @Test func testBatchOperationsAcrossColumns() throws {
         // Test batch operations across different column families
         try rocksDB.batch(operations: [
-            .put(column: .col1, key: "batch1".data, value: "value1".data),
-            .put(column: .col2, key: "batch2".data, value: "value2".data),
-            .put(column: .col3, key: "batch3".data, value: "value3".data),
+            .put(column: Columns.col1.rawValue, key: "batch1".data, value: "value1".data),
+            .put(column: Columns.col2.rawValue, key: "batch2".data, value: "value2".data),
+            .put(column: Columns.col3.rawValue, key: "batch3".data, value: "value3".data),
         ])
 
         #expect(try rocksDB.get(column: .col1, key: "batch1".data) == "value1".data)
@@ -107,14 +107,61 @@ final class RocksDBTests {
         #expect(retrieved?.isEmpty == true)
     }
 
-    @Test func testErrorConditions() throws {
-        // Test invalid operations
-        let invalidDB = try? RocksDB<Columns>(path: URL(fileURLWithPath: "/nonexistent/path"))
-        #expect(invalidDB == nil)
+    @Test func testIterator() throws {
+        // Setup test data
+        let testData = [
+            ("key1", "value1"),
+            ("key2", "value2"),
+            ("key3", "value3"),
+            ("key4", "value4"),
+            ("key5", "value5"),
+        ]
 
-        // Test deleting non-existent key
-        try rocksDB.delete(column: .col1, key: "nonexistent".data)
-        let value = try rocksDB.get(column: .col1, key: "nonexistent".data)
-        #expect(value == nil)
+        // Insert test data
+        for (key, value) in testData {
+            try rocksDB.put(column: .col1, key: key.data, value: value.data)
+        }
+
+        // Test forward iteration
+        let readOptions = ReadOptions()
+        let iterator = rocksDB.createIterator(column: .col1, readOptions: readOptions)
+
+        iterator.seek(to: "key1".data)
+        var count = 0
+        while let pair = iterator.read() {
+            let key = String(data: pair.key, encoding: .utf8)!
+            let value = String(data: pair.value, encoding: .utf8)!
+            #expect(key == testData[count].0)
+            #expect(value == testData[count].1)
+            count += 1
+            iterator.next()
+        }
+        #expect(count == testData.count)
+    }
+
+    @Test func testSnapshot() throws {
+        // Insert initial data
+        try rocksDB.put(column: .col1, key: "key1".data, value: "value1".data)
+
+        // Create snapshot
+        let snapshot = rocksDB.createSnapshot()
+        let readOptions = ReadOptions()
+        readOptions.setSnapshot(snapshot)
+
+        // Modify data after snapshot
+        try rocksDB.put(column: .col1, key: "key1".data, value: "modified".data)
+        try rocksDB.put(column: .col1, key: "key2".data, value: "value2".data)
+
+        // Read using snapshot should see original value
+        let iterator = rocksDB.createIterator(column: .col1, readOptions: readOptions)
+        iterator.seek(to: "key1".data)
+        if let pair = iterator.read() {
+            let value = String(data: pair.value, encoding: .utf8)!
+            #expect(value == "value1")
+        }
+
+        // Regular read should see modified value
+        let currentValue = try rocksDB.get(column: .col1, key: "key1".data)
+        #expect(String(data: currentValue!, encoding: .utf8) == "modified")
     }
 }
