@@ -379,6 +379,16 @@ struct EncoderTests {
         #expect(encodedNone == Data([0])) // None encoded as 1 byte (0)
     }
 
+    @Test func encodeOptionalData() throws {
+        let optionalValue: Data? = Data([1, 2, 3])
+        let encodedSome = try JamEncoder.encode(optionalValue)
+
+        let encodedNone = try JamEncoder.encode(Data?.none)
+
+        #expect(encodedSome == Data([1, 3, 1, 2, 3])) // Optional with value encoded
+        #expect(encodedNone == Data([0])) // None encoded as 1 byte (0)
+    }
+
     @Test func encodeInt() throws {
         let intValue = 123_456_789
         let encoded = try JamEncoder.encode(intValue)

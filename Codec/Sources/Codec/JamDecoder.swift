@@ -40,13 +40,23 @@ public class JamDecoder {
     }
 }
 
-protocol ArrayWrapper: Collection where Element: Decodable {
+private protocol ArrayWrapper: Collection where Element: Decodable {
     static func from(array: [Element]) -> Self
 }
 
 extension Array: ArrayWrapper where Element: Decodable {
     static func from(array: [Element]) -> Self {
         array
+    }
+}
+
+private protocol OptionalWrapper: Decodable {
+    static var wrappedType: Decodable.Type { get }
+}
+
+extension Optional: OptionalWrapper where Wrapped: Decodable {
+    static var wrappedType: Decodable.Type {
+        Wrapped.self
     }
 }
 
@@ -160,8 +170,28 @@ private class DecodeContext: Decoder {
         }
     }
 
+    fileprivate func decodeOptional<T: Decodable>(_ type: T.Type, key: CodingKey?) throws -> T? {
+        let byte = try input.read()
+        switch byte {
+        case 0:
+            return nil
+        case 1:
+            return try decode(type, key: key)
+        default:
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: codingPath,
+                    debugDescription: "Invalid boolean value: \(byte)"
+                )
+            )
+        }
+    }
+
     fileprivate func decode<T: Decodable>(_ type: T.Type, key: CodingKey?) throws -> T {
-        if type == Data.self {
+        // optional hanlding must be first to avoid type coercion
+        if let type = type as? any OptionalWrapper.Type {
+            try decodeOptional(type.wrappedType, key: key) as! T
+        } else if type == Data.self {
             try decodeData(codingPath: codingPath) as Data as! T
         } else if type == [UInt8].self {
             try decodeData(codingPath: codingPath) as [UInt8] as! T
