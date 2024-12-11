@@ -85,14 +85,17 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     // WM = 2^11: The maximum number of entries in a work-package manifest.
     public var maxWorkPackageManifestEntries: Int
 
-    // WP = 12 * 2^20: The maximum size of an encoded work-package together with its extrinsic data and import impli-
+    // WB = 12 * 2^20: The maximum size of an encoded work-package together with its extrinsic data and import impli-
     // cations, in octets.
     public var maxEncodedWorkPackageSize: Int
 
-    // WR = 96 * 2^10: The maximum size of an encoded work-report in octets.
-    public var maxEncodedWorkReportSize: Int
+    // WG = WP*WE = 4104: The size of a segment in octets.
+    public var segmentSize: Int
 
-    // WS = 6: The size of an exported segment in erasure-coded pieces.
+    // WR = 48 * 2^10: The maximum total size of all output blobs in a work-report, in octets.
+    public var maxWorkReportOutputSize: Int
+
+    // WP = 6: The number of erasure-coded pieces in a segment.
     public var erasureCodedSegmentSize: Int
 
     // WT = 128: The size of a transfer memo in octets.
@@ -143,7 +146,8 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         erasureCodedPieceSize: Int,
         maxWorkPackageManifestEntries: Int,
         maxEncodedWorkPackageSize: Int,
-        maxEncodedWorkReportSize: Int,
+        segmentSize: Int,
+        maxWorkReportOutputSize: Int,
         erasureCodedSegmentSize: Int,
         ticketSubmissionEndSlot: Int,
         pvmDynamicAddressAlignmentFactor: Int,
@@ -180,7 +184,8 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         self.erasureCodedPieceSize = erasureCodedPieceSize
         self.maxWorkPackageManifestEntries = maxWorkPackageManifestEntries
         self.maxEncodedWorkPackageSize = maxEncodedWorkPackageSize
-        self.maxEncodedWorkReportSize = maxEncodedWorkReportSize
+        self.segmentSize = segmentSize
+        self.maxWorkReportOutputSize = maxWorkReportOutputSize
         self.erasureCodedSegmentSize = erasureCodedSegmentSize
         self.ticketSubmissionEndSlot = ticketSubmissionEndSlot
         self.pvmDynamicAddressAlignmentFactor = pvmDynamicAddressAlignmentFactor
@@ -260,8 +265,9 @@ extension ProtocolConfig {
                 ? other.maxWorkPackageManifestEntries : maxWorkPackageManifestEntries,
             maxEncodedWorkPackageSize: other.maxEncodedWorkPackageSize != 0
                 ? other.maxEncodedWorkPackageSize : maxEncodedWorkPackageSize,
-            maxEncodedWorkReportSize: other.maxEncodedWorkReportSize != 0
-                ? other.maxEncodedWorkReportSize : maxEncodedWorkReportSize,
+            segmentSize: other.segmentSize != 0 ? other.segmentSize : segmentSize,
+            maxWorkReportOutputSize: other.maxWorkReportOutputSize != 0
+                ? other.maxWorkReportOutputSize : maxWorkReportOutputSize,
             erasureCodedSegmentSize: other.erasureCodedSegmentSize != 0
                 ? other.erasureCodedSegmentSize : erasureCodedSegmentSize,
             ticketSubmissionEndSlot: other.ticketSubmissionEndSlot != 0
@@ -347,8 +353,9 @@ extension ProtocolConfig {
         maxEncodedWorkPackageSize = try decode(
             .maxEncodedWorkPackageSize, defaultValue: 0, required: required
         )
-        maxEncodedWorkReportSize = try decode(
-            .maxEncodedWorkReportSize, defaultValue: 0, required: required
+        segmentSize = try decode(.segmentSize, defaultValue: 0, required: required)
+        maxWorkReportOutputSize = try decode(
+            .maxWorkReportOutputSize, defaultValue: 0, required: required
         )
         erasureCodedSegmentSize = try decode(
             .erasureCodedSegmentSize, defaultValue: 0, required: required
@@ -579,10 +586,17 @@ extension ProtocolConfig {
         }
     }
 
-    public enum MaxEncodedWorkReportSize: ReadInt {
+    public enum SegmentSize: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
-            config.value.maxEncodedWorkReportSize
+            config.value.segmentSize
+        }
+    }
+
+    public enum MaxWorkReportOutputSize: ReadInt {
+        public typealias TConfig = ProtocolConfigRef
+        public static func read(config: ProtocolConfigRef) -> Int {
+            config.value.maxWorkReportOutputSize
         }
     }
 

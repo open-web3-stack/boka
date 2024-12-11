@@ -362,6 +362,29 @@ extension State: ServiceAccounts {
         return try await backend.read(StateKeys.ServiceAccountPreimageInfoKey(index: index, hash: hash, length: length))
     }
 
+    public func historicalLookup(
+        serviceAccount index: ServiceIndex,
+        timeslot: TimeslotIndex,
+        preimageHash hash: Data32
+    ) async throws -> Data? {
+        if let preimage = try await get(serviceAccount: index, preimageHash: hash),
+           let preimageInfo = try await get(serviceAccount: index, preimageHash: hash, length: UInt32(preimage.count))
+        {
+            var isAvailable = false
+            if preimageInfo.count == 1 {
+                isAvailable = preimageInfo[0] <= timeslot
+            } else if preimageInfo.count == 2 {
+                isAvailable = preimageInfo[0] <= timeslot && timeslot < preimageInfo[1]
+            } else if preimageInfo.count == 3 {
+                isAvailable = preimageInfo[0] <= timeslot && timeslot < preimageInfo[1] && preimageInfo[2] <= timeslot
+            }
+
+            return isAvailable ? preimage : nil
+        } else {
+            return nil
+        }
+    }
+
     public mutating func set(serviceAccount index: ServiceIndex, account: ServiceAccountDetails?) {
         layer[serviceAccount: index] = account
     }
@@ -456,6 +479,7 @@ struct DummyFunction: AccumulateFunction, OnTransferFunction {
         config _: ProtocolConfigRef,
         service _: ServiceIndex,
         serviceAccounts _: inout some ServiceAccounts,
+        timeslot _: TimeslotIndex,
         transfers _: [DeferredTransfers]
     ) async throws {
         fatalError("not implemented")
