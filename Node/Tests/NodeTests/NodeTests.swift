@@ -1,7 +1,6 @@
 import Blockchain
 import Foundation
 import Testing
-import TracingUtils
 import Utils
 
 @testable import Node
@@ -22,7 +21,6 @@ final class NodeTests {
 
     @Test
     func validatorNodeInMemory() async throws {
-        setupTestLogger()
         let (nodes, scheduler) = try await Topology(
             nodes: [NodeDescription(isValidator: true)]
         ).build(genesis: .preset(.minimal))
@@ -53,7 +51,6 @@ final class NodeTests {
 
     @Test
     func validatorNodeRocksDB() async throws {
-        setupTestLogger()
         let (nodes, scheduler) = try await Topology(
             nodes: [NodeDescription(isValidator: true, database: getDatabase(0))]
         ).build(genesis: .preset(.minimal))
@@ -87,8 +84,8 @@ final class NodeTests {
         // Create validator and full node
         let (nodes, scheduler) = try await Topology(
             nodes: [
-                NodeDescription(isValidator: true),
-                NodeDescription(devSeed: 1),
+                NodeDescription(isValidator: true, database: getDatabase(0)),
+                NodeDescription(devSeed: 1, database: getDatabase(1)),
             ],
             connections: [(0, 1)]
         ).build(genesis: .preset(.minimal))
@@ -137,10 +134,10 @@ final class NodeTests {
         // Create multiple nodes
         let (nodes, scheduler) = try await Topology(
             nodes: [
-                NodeDescription(isValidator: true),
-                NodeDescription(isValidator: true, devSeed: 1),
-                NodeDescription(devSeed: 2),
-                NodeDescription(devSeed: 3),
+                NodeDescription(isValidator: true, database: getDatabase(0)),
+                NodeDescription(isValidator: true, devSeed: 1, database: getDatabase(1)),
+                NodeDescription(devSeed: 2, database: getDatabase(2)),
+                NodeDescription(devSeed: 3, database: .inMemory),
             ],
             connections: [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3)]
         ).build(genesis: .preset(.minimal))
