@@ -30,6 +30,16 @@ public class JamEncoder {
     }
 }
 
+private protocol OptionalWrapper: Encodable {
+    var wrapped: Encodable? { get }
+}
+
+extension Optional: OptionalWrapper where Wrapped: Encodable {
+    var wrapped: Encodable? {
+        self
+    }
+}
+
 private class EncodeContext: Encoder {
     var codingPath: [CodingKey] = []
     var userInfo: [CodingUserInfoKey: Any] = [
@@ -85,18 +95,20 @@ private class EncodeContext: Encoder {
         }
     }
 
-    fileprivate func encodeOptional(_ value: Encodable) throws {
-        let mirror = Mirror(reflecting: value)
-        if let someValue = mirror.children.first?.value as? Encodable {
+    fileprivate func encodeOptional(_ value: OptionalWrapper) throws {
+        if let value = value.wrapped {
             data.append(UInt8(1)) // Encode presence flag
-            try encode(someValue) // Encode the unwrapped value
+            try encode(value) // Encode the unwrapped value
         } else {
             data.append(UInt8(0)) // Encode absence flag
         }
     }
 
     fileprivate func encode(_ value: some Encodable) throws {
-        if let value = value as? Data {
+        // optional hanlding must be first to avoid type coercion
+        if let value = value as? OptionalWrapper {
+            try encodeOptional(value)
+        } else if let value = value as? Data {
             encodeData(value, lengthPrefix: true)
         } else if let value = value as? [UInt8] {
             encodeData(value)
@@ -104,8 +116,6 @@ private class EncodeContext: Encoder {
             encodeData(value.data, lengthPrefix: false)
         } else if let value = value as? [Encodable] {
             try encodeArray(value)
-        } else if Mirror(reflecting: value).displayStyle == .optional {
-            try encodeOptional(value)
         } else {
             try value.encode(to: self)
         }

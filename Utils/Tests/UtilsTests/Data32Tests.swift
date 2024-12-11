@@ -1,3 +1,4 @@
+import Codec
 import Foundation
 import Testing
 
@@ -49,5 +50,15 @@ struct Data32Tests {
         var arr = [c, b, a]
         arr.sort()
         #expect(arr == [a, b, c])
+    }
+
+    @Test func encodeArrayOptional() throws {
+        let value: [Data32?] = [Data32()]
+
+        let encoded = try JamEncoder.encode(value)
+        #expect(encoded == Data([1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))
+
+        let decoded = try JamDecoder.decode([Data32?].self, from: encoded)
+        #expect(decoded == value)
     }
 }

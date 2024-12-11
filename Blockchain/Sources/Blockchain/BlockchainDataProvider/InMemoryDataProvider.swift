@@ -34,35 +34,23 @@ extension InMemoryDataProvider: BlockchainDataProviderProtocol {
         heads.contains(hash)
     }
 
-    public func getBlockNumber(hash: Data32) async throws -> UInt32 {
-        guard let number = numberByHash[hash] else {
-            throw BlockchainDataProviderError.noData(hash: hash)
-        }
-        return number
+    public func getBlockNumber(hash: Data32) async throws -> UInt32? {
+        numberByHash[hash]
     }
 
-    public func getHeader(hash: Data32) throws -> HeaderRef {
-        guard let header = blockByHash[hash]?.header.asRef() else {
-            throw BlockchainDataProviderError.noData(hash: hash)
-        }
-        return header
+    public func getHeader(hash: Data32) throws -> HeaderRef? {
+        blockByHash[hash]?.header.asRef()
     }
 
-    public func getBlock(hash: Data32) throws -> BlockRef {
-        guard let block = blockByHash[hash] else {
-            throw BlockchainDataProviderError.noData(hash: hash)
-        }
-        return block
+    public func getBlock(hash: Data32) throws -> BlockRef? {
+        blockByHash[hash]
     }
 
-    public func getState(hash: Data32) throws -> StateRef {
-        guard let state = stateByBlockHash[hash] else {
-            throw BlockchainDataProviderError.noData(hash: hash)
-        }
-        return state
+    public func getState(hash: Data32) throws -> StateRef? {
+        stateByBlockHash[hash]
     }
 
-    public func getFinalizedHead() -> Data32 {
+    public func getFinalizedHead() -> Data32? {
         finalizedHead
     }
 
