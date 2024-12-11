@@ -3,6 +3,8 @@ import Foundation
 import TracingUtils
 import Utils
 
+private let logger = Logger(label: "ValidatorNode")
+
 public class ValidatorNode: Node {
     private var validator: ValidatorService!
 
@@ -34,12 +36,15 @@ public class ValidatorNode: Node {
         let dataProvider: BlockchainDataProvider = blockchain.dataProvider
         let local = config.local
         Task {
-            let genesisState = try await dataProvider.getState(hash: dataProvider.genesisBlockHash)
             if !local {
+                logger.trace("Waiting for sync")
                 await syncManager.waitForSyncCompletion()
             }
+            logger.trace("Sync completed")
             await validator.onSyncCompleted()
+            let genesisState = try await dataProvider.getState(hash: dataProvider.genesisBlockHash)
             if await dataProvider.bestHead.hash == dataProvider.genesisBlockHash {
+                logger.trace("Calling on(genesis:)")
                 await validator.on(genesis: genesisState)
             }
         }

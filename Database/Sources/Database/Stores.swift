@@ -13,6 +13,7 @@ enum StoreId: UInt8, ColumnFamilyKey {
     // 0x00 + timeslot => Set<BlockHash>
     // 0x01 + blockNumber => Set<BlockHash>
     // 0x02 + blockHash => blockNumber
+    // 0x03 + blockHash => stateRootHash
     case blockIndexes = 2
     // state trie
     // 0x00 + hash => trie node

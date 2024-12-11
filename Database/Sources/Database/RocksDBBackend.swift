@@ -2,7 +2,10 @@ import Blockchain
 import Codec
 import Foundation
 import RocksDBSwift
+import TracingUtils
 import Utils
+
+private let logger = Logger(label: "RocksDBBackend")
 
 public enum RocksDBBackendError: Error {
     case genesisHashMismatch(expected: Data32, actual: Data)
@@ -16,6 +19,7 @@ public final class RocksDBBackend: Sendable {
     private let blockHashByTimeslot: Store<StoreId, JamCoder<TimeslotIndex, Set<Data32>>>
     private let blockHashByNumber: Store<StoreId, JamCoder<UInt32, Set<Data32>>>
     private let blockNumberByHash: Store<StoreId, JamCoder<Data32, UInt32>>
+    private let stateRootByHash: Store<StoreId, JamCoder<Data32, Data32>>
     private let stateTrie: Store<StoreId, JamCoder<Data, Data>>
     private let stateValue: Store<StoreId, JamCoder<Data32, Data>>
     private let stateRefs: Store<StoreId, JamCoder<Data, UInt32>>
@@ -31,6 +35,7 @@ public final class RocksDBBackend: Sendable {
         blockHashByTimeslot = Store(db: db, column: .blockIndexes, coder: JamCoder(config: config, prefix: Data([0])))
         blockHashByNumber = Store(db: db, column: .blockIndexes, coder: JamCoder(config: config, prefix: Data([1])))
         blockNumberByHash = Store(db: db, column: .blockIndexes, coder: JamCoder(config: config, prefix: Data([2])))
+        stateRootByHash = Store(db: db, column: .blockIndexes, coder: JamCoder(config: config, prefix: Data([3])))
         stateTrie = Store(db: db, column: .state, coder: JamCoder(config: config, prefix: Data([0])))
         stateValue = Store(db: db, column: .state, coder: JamCoder(config: config, prefix: Data([1])))
         stateRefs = Store(db: db, column: .stateRefs, coder: JamCoder(config: config, prefix: Data([0])))
@@ -43,18 +48,25 @@ public final class RocksDBBackend: Sendable {
             guard genesis == genesisBlockHash.data else {
                 throw RocksDBBackendError.genesisHashMismatch(expected: genesisBlockHash, actual: genesis)
             }
+
+            logger.trace("DB loaded")
         } else {
             // must be a new db
             try meta.put(key: MetaKey.genesisHash.key, value: genesisBlockHash.data)
             try await add(block: genesisBlock)
             let backend = StateBackend(self, config: config, rootHash: Data32())
             try await backend.writeRaw(Array(genesisStateData))
+            let rootHash = await backend.rootHash
+            try stateRootByHash.put(key: genesisBlockHash, value: rootHash)
             try setHeads([genesisBlockHash])
             try await setFinalizedHead(hash: genesisBlockHash)
+
+            logger.trace("New DB initialized")
         }
     }
 
     private func setHeads(_ heads: Set<Data32>) throws {
+        logger.trace("setHeads() \(heads)")
         try meta.put(key: MetaKey.heads.key, value: JamEncoder.encode(heads))
     }
 }
@@ -65,7 +77,7 @@ extension RocksDBBackend: BlockchainDataProviderProtocol {
     }
 
     public func hasState(hash: Data32) async throws -> Bool {
-        try stateTrie.exists(key: hash.data)
+        try stateRootByHash.exists(key: hash)
     }
 
     public func isHead(hash: Data32) async throws -> Bool {
@@ -85,7 +97,12 @@ extension RocksDBBackend: BlockchainDataProviderProtocol {
     }
 
     public func getState(hash: Data32) async throws -> StateRef? {
-        try await State(backend: StateBackend(self, config: config, rootHash: hash)).asRef()
+        logger.trace("getState() \(hash)")
+
+        guard let rootHash = try stateRootByHash.get(key: hash) else {
+            return nil
+        }
+        return try await State(backend: StateBackend(self, config: config, rootHash: rootHash)).asRef()
     }
 
     public func getFinalizedHead() async throws -> Data32? {
@@ -109,6 +126,8 @@ extension RocksDBBackend: BlockchainDataProviderProtocol {
     }
 
     public func add(block: BlockRef) async throws {
+        logger.trace("add(block:) \(block.hash)")
+
         // TODO: batch put
 
         try blocks.put(key: block.hash, value: block)
@@ -129,15 +148,22 @@ extension RocksDBBackend: BlockchainDataProviderProtocol {
         try blockNumberByHash.put(key: block.hash, value: blockNumber)
     }
 
-    public func add(state _: StateRef) async throws {
-        // nothing to do
+    public func add(state: StateRef) async throws {
+        logger.trace("add(state:) \(state.value.lastBlockHash)")
+
+        let rootHash = await state.value.stateRoot
+        try stateRootByHash.put(key: state.value.lastBlockHash, value: rootHash)
     }
 
     public func setFinalizedHead(hash: Data32) async throws {
+        logger.trace("setFinalizedHead() \(hash)")
+
         try meta.put(key: MetaKey.finalizedHead.key, value: hash.data)
     }
 
     public func updateHead(hash: Data32, parent: Data32) async throws {
+        logger.trace("updateHead() \(hash) \(parent)")
+
         var heads = try await getHeads()
 
         // parent needs to be either
@@ -155,6 +181,8 @@ extension RocksDBBackend: BlockchainDataProviderProtocol {
     }
 
     public func remove(hash: Data32) async throws {
+        logger.trace("remove() \(hash)")
+
         // TODO: batch delete
 
         try blocks.delete(key: hash)
@@ -203,6 +231,8 @@ extension RocksDBBackend: StateBackendProtocol {
     }
 
     public func batchUpdate(_ updates: [StateBackendOperation]) async throws {
+        logger.trace("batchUpdate() \(updates.count) operations")
+
         // TODO: implement this using merge operator to perform atomic increment
         // so we can do the whole thing in a single batch
         for update in updates {
@@ -228,6 +258,8 @@ extension RocksDBBackend: StateBackendProtocol {
     }
 
     public func gc(callback _: @Sendable (Data) -> Data32?) async throws {
+        logger.trace("gc()")
+
         // TODO: implement
     }
 }

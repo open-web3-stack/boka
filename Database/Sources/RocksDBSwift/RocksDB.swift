@@ -1,6 +1,9 @@
 import Foundation
 import rocksdb
+import TracingUtils
 import Utils
+
+private let logger = Logger(label: "RocksDB")
 
 public protocol ColumnFamilyKey: Sendable, CaseIterable, Hashable, RawRepresentable<UInt8> {}
 
@@ -159,6 +162,8 @@ extension RocksDB {
 
 extension RocksDB {
     public func put(column: CFKey, key: Data, value: Data) throws {
+        logger.trace("put() \(column) \(key.toHexString()) \(value.toHexString())")
+
         let handle = getHandle(column: column)
         try Self.call(key, value) { err, ptrs in
             let key = ptrs[0]
@@ -179,6 +184,8 @@ extension RocksDB {
     }
 
     public func get(column: CFKey, key: Data) throws -> Data? {
+        logger.trace("get() \(column) \(key.toHexString())")
+
         var len = 0
         let handle = getHandle(column: column)
 
@@ -193,6 +200,8 @@ extension RocksDB {
     }
 
     public func delete(column: CFKey, key: Data) throws {
+        logger.trace("delete() \(column) \(key.toHexString())")
+
         let handle = getHandle(column: column)
 
         try Self.call(key) { err, ptrs in
@@ -204,12 +213,16 @@ extension RocksDB {
     }
 
     public func batch(operations: [BatchOperation]) throws {
+        logger.trace("batch() \(operations.count) operations")
+
         let writeBatch = rocksdb_writebatch_create()
         defer { rocksdb_writebatch_destroy(writeBatch) }
 
         for operation in operations {
             switch operation {
             case let .delete(column, key):
+                logger.trace("batch() delete \(column) \(key.toHexString())")
+
                 let handle = try getHandle(column: column).unwrap(orError: Error.invalidColumn(column))
                 try Self.call(key) { ptrs in
                     let key = ptrs[0]
@@ -217,6 +230,8 @@ extension RocksDB {
                 }
 
             case let .put(column, key, value):
+                logger.trace("batch() put \(column) \(key.toHexString()) \(value.toHexString())")
+
                 let handle = try getHandle(column: column).unwrap(orError: Error.invalidColumn(column))
                 try Self.call(key, value) { ptrs in
                     let key = ptrs[0]

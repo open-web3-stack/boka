@@ -1,15 +1,61 @@
 import Blockchain
 import Foundation
 import Testing
+import TracingUtils
 import Utils
 
 @testable import Node
 
-struct NodeTests {
+final class NodeTests {
+    let path = {
+        let tmpDir = FileManager.default.temporaryDirectory
+        return tmpDir.appendingPathComponent("\(UUID().uuidString)")
+    }()
+
+    func getDatabase(_ idx: Int) -> Database {
+        Database.rocksDB(path: path.appendingPathComponent("\(idx)"))
+    }
+
+    deinit {
+        try? FileManager.default.removeItem(at: path)
+    }
+
     @Test
-    func validatorNode() async throws {
+    func validatorNodeInMemory() async throws {
+        setupTestLogger()
         let (nodes, scheduler) = try await Topology(
             nodes: [NodeDescription(isValidator: true)]
+        ).build(genesis: .preset(.minimal))
+
+        let (validatorNode, storeMiddlware) = nodes[0]
+
+        // Get initial state
+        let initialBestHead = await validatorNode.dataProvider.bestHead
+        let initialTimeslot = initialBestHead.timeslot
+
+        // Advance time
+        for _ in 0 ..< 10 {
+            await scheduler.advance(by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds))
+            await storeMiddlware.wait()
+        }
+
+        // Wait for block production
+        try await Task.sleep(for: .milliseconds(500))
+
+        // Get new state
+        let newBestHead = await validatorNode.dataProvider.bestHead
+        let newTimeslot = newBestHead.timeslot
+
+        // Verify block was produced
+        #expect(newTimeslot > initialTimeslot)
+        #expect(try await validatorNode.blockchain.dataProvider.hasBlock(hash: newBestHead.hash))
+    }
+
+    @Test
+    func validatorNodeRocksDB() async throws {
+        setupTestLogger()
+        let (nodes, scheduler) = try await Topology(
+            nodes: [NodeDescription(isValidator: true, database: getDatabase(0))]
         ).build(genesis: .preset(.minimal))
 
         let (validatorNode, storeMiddlware) = nodes[0]
