@@ -14,32 +14,32 @@ public enum RocksDBBackendError: Error {
 public final class RocksDBBackend: Sendable {
     private let config: ProtocolConfigRef
     private let db: RocksDB<StoreId>
-    private let meta: Store<StoreId, NoopCoder>
+    private let meta: Store<StoreId, RawCoder>
     private let blocks: Store<StoreId, JamCoder<Data32, BlockRef>>
-    private let blockHashByTimeslot: Store<StoreId, JamCoder<TimeslotIndex, Set<Data32>>>
-    private let blockHashByNumber: Store<StoreId, JamCoder<UInt32, Set<Data32>>>
-    private let blockNumberByHash: Store<StoreId, JamCoder<Data32, UInt32>>
-    private let stateRootByHash: Store<StoreId, JamCoder<Data32, Data32>>
-    private let stateTrie: Store<StoreId, JamCoder<Data, Data>>
-    private let stateValue: Store<StoreId, JamCoder<Data32, Data>>
-    private let stateRefs: Store<StoreId, JamCoder<Data, UInt32>>
-    private let stateRefsRaw: Store<StoreId, JamCoder<Data32, UInt32>>
+    private let blockHashByTimeslot: Store<StoreId, BinaryCoder<TimeslotIndex, Set<Data32>>>
+    private let blockHashByNumber: Store<StoreId, BinaryCoder<UInt32, Set<Data32>>>
+    private let blockNumberByHash: Store<StoreId, BinaryCoder<Data32, UInt32>>
+    private let stateRootByHash: Store<StoreId, BinaryCoder<Data32, Data32>>
+    private let stateTrie: Store<StoreId, BinaryCoder<Data, Data>>
+    private let stateValue: Store<StoreId, BinaryCoder<Data32, Data>>
+    private let stateRefs: Store<StoreId, BinaryCoder<Data, UInt32>>
+    private let stateRefsRaw: Store<StoreId, BinaryCoder<Data32, UInt32>>
 
     public let genesisBlockHash: Data32
 
     public init(path: URL, config: ProtocolConfigRef, genesisBlock: BlockRef, genesisStateData: [Data32: Data]) async throws {
         self.config = config
         db = try RocksDB(path: path)
-        meta = Store(db: db, column: .meta, coder: NoopCoder())
+        meta = Store(db: db, column: .meta, coder: RawCoder())
         blocks = Store(db: db, column: .blocks, coder: JamCoder(config: config))
-        blockHashByTimeslot = Store(db: db, column: .blockIndexes, coder: JamCoder(config: config, prefix: Data([0])))
-        blockHashByNumber = Store(db: db, column: .blockIndexes, coder: JamCoder(config: config, prefix: Data([1])))
-        blockNumberByHash = Store(db: db, column: .blockIndexes, coder: JamCoder(config: config, prefix: Data([2])))
-        stateRootByHash = Store(db: db, column: .blockIndexes, coder: JamCoder(config: config, prefix: Data([3])))
-        stateTrie = Store(db: db, column: .state, coder: JamCoder(config: config, prefix: Data([0])))
-        stateValue = Store(db: db, column: .state, coder: JamCoder(config: config, prefix: Data([1])))
-        stateRefs = Store(db: db, column: .stateRefs, coder: JamCoder(config: config, prefix: Data([0])))
-        stateRefsRaw = Store(db: db, column: .stateRefs, coder: JamCoder(config: config, prefix: Data([1])))
+        blockHashByTimeslot = Store(db: db, column: .blockIndexes, coder: BinaryCoder(config: config, prefix: Data([0])))
+        blockHashByNumber = Store(db: db, column: .blockIndexes, coder: BinaryCoder(config: config, prefix: Data([1])))
+        blockNumberByHash = Store(db: db, column: .blockIndexes, coder: BinaryCoder(config: config, prefix: Data([2])))
+        stateRootByHash = Store(db: db, column: .blockIndexes, coder: BinaryCoder(config: config, prefix: Data([3])))
+        stateTrie = Store(db: db, column: .state, coder: BinaryCoder(config: config, prefix: Data([0])))
+        stateValue = Store(db: db, column: .state, coder: BinaryCoder(config: config, prefix: Data([1])))
+        stateRefs = Store(db: db, column: .stateRefs, coder: BinaryCoder(config: config, prefix: Data([0])))
+        stateRefsRaw = Store(db: db, column: .stateRefs, coder: BinaryCoder(config: config, prefix: Data([1])))
 
         genesisBlockHash = genesisBlock.hash
 

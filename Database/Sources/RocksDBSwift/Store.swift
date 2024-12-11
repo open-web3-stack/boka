@@ -1,8 +1,8 @@
 import Foundation
 
 public protocol StoreCoder<Key, Value>: Sendable {
-    associatedtype Key: Encodable
-    associatedtype Value: Decodable
+    associatedtype Key
+    associatedtype Value
 
     func encode(key: Key) throws -> Data
     func encode(value: Value) throws -> Data

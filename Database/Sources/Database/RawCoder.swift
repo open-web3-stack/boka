@@ -1,7 +1,7 @@
 import Foundation
 import RocksDBSwift
 
-struct NoopCoder: StoreCoder {
+struct RawCoder: StoreCoder {
     typealias Key = Data
     typealias Value = Data
 
