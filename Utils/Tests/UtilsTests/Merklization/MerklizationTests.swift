@@ -17,7 +17,7 @@ extension Blake2b256 {
 struct MerklizationTests {
     @Test
     func testHash() throws {
-        var mmr = MMR([])
+        let mmr = MMR([])
         let emptyHash = try JamEncoder.encode(mmr).keccakHash()
         #expect(mmr.hash() == emptyHash)
     }
@@ -30,7 +30,6 @@ struct MerklizationTests {
             Data("node3".utf8),
         ]
         let result = Merklization.binaryMerklize(input)
-        print("result = \(result)")
         let expected = Blake2b256.hash("node",
                                        Blake2b256.hash("node",
                                                        Data("node1".utf8),

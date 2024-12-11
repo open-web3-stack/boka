@@ -6,10 +6,12 @@ import Utils
 struct NodeDescription {
     let isValidator: Bool
     let devSeed: UInt32
+    let database: Database
 
-    public init(isValidator: Bool = false, devSeed: UInt32 = 0) {
+    public init(isValidator: Bool = false, devSeed: UInt32 = 0, database: Database = .inMemory) {
         self.isValidator = isValidator
         self.devSeed = devSeed
+        self.database = database
     }
 }
 
@@ -41,7 +43,8 @@ struct Topology {
                     key: keystore.get(Ed25519.self, publicKey: keys.ed25519)!
                 ),
                 peers: [],
-                local: nodes.count == 1
+                local: nodes.count == 1,
+                database: desc.database
             )
             let nodeCls = desc.isValidator ? ValidatorNode.self : Node.self
             let node = try await nodeCls.init(

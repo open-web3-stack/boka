@@ -3,7 +3,7 @@ import Foundation
 import Utils
 
 public enum StateBackendError: Error {
-    case missingState
+    case missingState(key: Sendable)
     case invalidData
 }
 
@@ -35,7 +35,7 @@ public final class StateBackend: Sendable {
         if Key.optional {
             return nil
         }
-        throw StateBackendError.missingState
+        throw StateBackendError.missingState(key: key)
     }
 
     public func batchRead(_ keys: [any StateKey]) async throws -> [(key: any StateKey, value: (Codable & Sendable)?)] {
@@ -73,5 +73,9 @@ public final class StateBackend: Sendable {
             }
             return nil
         }
+    }
+
+    public func debugPrint() async throws {
+        try await trie.debugPrint()
     }
 }

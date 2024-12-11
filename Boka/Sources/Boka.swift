@@ -116,9 +116,11 @@ struct Boka: AsyncParsableCommand {
             logger.info("Node name: \(name)")
         }
 
-        if let basePath {
-            logger.info("Base path: \(basePath)")
-        }
+        let database: Database = basePath.map {
+            var path = URL(fileURLWithPath: $0)
+            path.append(path: "db")
+            return .rocksDB(path: path)
+        } ?? .inMemory
 
         logger.info("Peers: \(peers)")
 
@@ -168,7 +170,8 @@ struct Boka: AsyncParsableCommand {
             network: networkConfig,
             peers: peers,
             local: local,
-            name: name
+            name: name,
+            database: database
         )
 
         let node: Node = if validator {

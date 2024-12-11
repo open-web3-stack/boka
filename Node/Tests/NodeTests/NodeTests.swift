@@ -5,11 +5,54 @@ import Utils
 
 @testable import Node
 
-struct NodeTests {
+final class NodeTests {
+    let path = {
+        let tmpDir = FileManager.default.temporaryDirectory
+        return tmpDir.appendingPathComponent("\(UUID().uuidString)")
+    }()
+
+    func getDatabase(_ idx: Int) -> Database {
+        Database.rocksDB(path: path.appendingPathComponent("\(idx)"))
+    }
+
+    deinit {
+        try? FileManager.default.removeItem(at: path)
+    }
+
     @Test
-    func validatorNode() async throws {
+    func validatorNodeInMemory() async throws {
         let (nodes, scheduler) = try await Topology(
             nodes: [NodeDescription(isValidator: true)]
+        ).build(genesis: .preset(.minimal))
+
+        let (validatorNode, storeMiddlware) = nodes[0]
+
+        // Get initial state
+        let initialBestHead = await validatorNode.dataProvider.bestHead
+        let initialTimeslot = initialBestHead.timeslot
+
+        // Advance time
+        for _ in 0 ..< 10 {
+            await scheduler.advance(by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds))
+            await storeMiddlware.wait()
+        }
+
+        // Wait for block production
+        try await Task.sleep(for: .milliseconds(500))
+
+        // Get new state
+        let newBestHead = await validatorNode.dataProvider.bestHead
+        let newTimeslot = newBestHead.timeslot
+
+        // Verify block was produced
+        #expect(newTimeslot > initialTimeslot)
+        #expect(try await validatorNode.blockchain.dataProvider.hasBlock(hash: newBestHead.hash))
+    }
+
+    @Test
+    func validatorNodeRocksDB() async throws {
+        let (nodes, scheduler) = try await Topology(
+            nodes: [NodeDescription(isValidator: true, database: getDatabase(0))]
         ).build(genesis: .preset(.minimal))
 
         let (validatorNode, storeMiddlware) = nodes[0]
@@ -41,8 +84,8 @@ struct NodeTests {
         // Create validator and full node
         let (nodes, scheduler) = try await Topology(
             nodes: [
-                NodeDescription(isValidator: true),
-                NodeDescription(devSeed: 1),
+                NodeDescription(isValidator: true, database: getDatabase(0)),
+                NodeDescription(devSeed: 1, database: getDatabase(1)),
             ],
             connections: [(0, 1)]
         ).build(genesis: .preset(.minimal))
@@ -91,10 +134,10 @@ struct NodeTests {
         // Create multiple nodes
         let (nodes, scheduler) = try await Topology(
             nodes: [
-                NodeDescription(isValidator: true),
-                NodeDescription(isValidator: true, devSeed: 1),
-                NodeDescription(devSeed: 2),
-                NodeDescription(devSeed: 3),
+                NodeDescription(isValidator: true, database: getDatabase(0)),
+                NodeDescription(isValidator: true, devSeed: 1, database: getDatabase(1)),
+                NodeDescription(devSeed: 2, database: getDatabase(2)),
+                NodeDescription(devSeed: 3, database: .inMemory),
             ],
             connections: [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3)]
         ).build(genesis: .preset(.minimal))

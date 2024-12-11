@@ -182,6 +182,17 @@ struct DecoderTests {
         #expect(decodedNone == .none)
     }
 
+    @Test func decodeOptionalData() throws {
+        let encodedSome = Data([1, 3, 1, 2, 3])
+        let encodedNone = Data([0])
+
+        let decodedSome = try JamDecoder.decode(Data?.self, from: encodedSome)
+        let decodedNone = try JamDecoder.decode(Data?.self, from: encodedNone)
+
+        #expect(decodedSome == .some(Data([1, 2, 3])))
+        #expect(decodedNone == .none)
+    }
+
     @Test func decodeFixedWidthInteger() throws {
         var encodedInt8 = Data([251])
         let encodedUInt64 = Data([21, 205, 91, 7, 0, 0, 0, 0])

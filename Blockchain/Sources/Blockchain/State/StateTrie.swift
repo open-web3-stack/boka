@@ -24,7 +24,7 @@ private struct TrieNode {
         right = Data32(data.data.suffix(32))!
         self.isNew = isNew
         rawValue = nil
-        switch data.data[0] & 0b1100_0000 {
+        switch data.data.first! & 0b1100_0000 {
         case 0b1000_0000:
             type = .embeddedLeaf
         case 0b1100_0000:
@@ -66,7 +66,7 @@ private struct TrieNode {
         guard type == .embeddedLeaf else {
             return nil
         }
-        let len = left.data[0] & 0b0011_1111
+        let len = left.data.first! & 0b0011_1111
         return right.data[relative: 0 ..< Int(len)]
     }
 
@@ -85,7 +85,7 @@ private struct TrieNode {
 
     static func branch(left: Data32, right: Data32) -> TrieNode {
         var left = left.data
-        left[0] = left[0] & 0b0111_1111 // clear the highest bit
+        left[left.startIndex] = left[left.startIndex] & 0b0111_1111 // clear the highest bit
         return .init(left: Data32(left)!, right: right, type: .branch, isNew: true, rawValue: nil)
     }
 }
@@ -352,6 +352,7 @@ public actor StateTrie: Sendable {
             }
         }
 
+        logger.info("Root hash: \(rootHash.toHexString())")
         try await printNode(rootHash, depth: 0)
     }
 }

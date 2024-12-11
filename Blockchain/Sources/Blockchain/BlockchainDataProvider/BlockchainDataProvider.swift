@@ -9,6 +9,11 @@ public struct HeadInfo: Sendable {
     public var number: UInt32
 }
 
+public enum BlockchainDataProviderError: Error, Equatable {
+    case noData(hash: Data32)
+    case uncanonical(hash: Data32)
+}
+
 public actor BlockchainDataProvider: Sendable {
     public private(set) var bestHead: HeadInfo
     public private(set) var finalizedHead: HeadInfo
@@ -18,21 +23,21 @@ public actor BlockchainDataProvider: Sendable {
         let heads = try await dataProvider.getHeads()
         var bestHead = HeadInfo(hash: dataProvider.genesisBlockHash, timeslot: 0, number: 0)
         for head in heads {
-            let header = try await dataProvider.getHeader(hash: head)
+            let header = try await dataProvider.getHeader(hash: head).unwrap()
             if header.value.timeslot > bestHead.timeslot {
-                let number = try await dataProvider.getBlockNumber(hash: head)
+                let number = try await dataProvider.getBlockNumber(hash: head).unwrap()
                 bestHead = HeadInfo(hash: head, timeslot: header.value.timeslot, number: number)
             }
         }
 
         self.bestHead = bestHead
 
-        let finalizedHeadHash = try await dataProvider.getFinalizedHead()
+        let finalizedHeadHash = try await dataProvider.getFinalizedHead().unwrap()
 
         finalizedHead = try await HeadInfo(
             hash: finalizedHeadHash,
-            timeslot: dataProvider.getHeader(hash: finalizedHeadHash).value.timeslot,
-            number: dataProvider.getBlockNumber(hash: finalizedHeadHash)
+            timeslot: dataProvider.getHeader(hash: finalizedHeadHash).unwrap().value.timeslot,
+            number: dataProvider.getBlockNumber(hash: finalizedHeadHash).unwrap()
         )
 
         self.dataProvider = dataProvider
@@ -44,7 +49,7 @@ public actor BlockchainDataProvider: Sendable {
         try await dataProvider.updateHead(hash: block.hash, parent: block.header.parentHash)
 
         if block.header.timeslot > bestHead.timeslot {
-            let number = try await dataProvider.getBlockNumber(hash: block.hash)
+            let number = try await getBlockNumber(hash: block.hash)
             bestHead = HeadInfo(hash: block.hash, timeslot: block.header.timeslot, number: number)
         }
 
@@ -66,19 +71,19 @@ extension BlockchainDataProvider {
     }
 
     public func getBlockNumber(hash: Data32) async throws -> UInt32 {
-        try await dataProvider.getBlockNumber(hash: hash)
+        try await dataProvider.getBlockNumber(hash: hash).unwrap(orError: BlockchainDataProviderError.noData(hash: hash))
     }
 
     public func getHeader(hash: Data32) async throws -> HeaderRef {
-        try await dataProvider.getHeader(hash: hash)
+        try await dataProvider.getHeader(hash: hash).unwrap(orError: BlockchainDataProviderError.noData(hash: hash))
     }
 
     public func getBlock(hash: Data32) async throws -> BlockRef {
-        try await dataProvider.getBlock(hash: hash)
+        try await dataProvider.getBlock(hash: hash).unwrap(orError: BlockchainDataProviderError.noData(hash: hash))
     }
 
     public func getState(hash: Data32) async throws -> StateRef {
-        try await dataProvider.getState(hash: hash)
+        try await dataProvider.getState(hash: hash).unwrap(orError: BlockchainDataProviderError.noData(hash: hash))
     }
 
     public func getHeads() async throws -> Set<Data32> {
@@ -122,7 +127,7 @@ extension BlockchainDataProvider {
         logger.debug("setting finalized head: \(hash)")
 
         let oldFinalizedHead = finalizedHead
-        let number = try await dataProvider.getBlockNumber(hash: hash)
+        let number = try await getBlockNumber(hash: hash)
 
         var hashToCheck = hash
         var hashToCheckNumber = number
@@ -132,11 +137,11 @@ extension BlockchainDataProvider {
                 logger.trace("purge block: \(hash)")
                 try await dataProvider.remove(hash: hash)
             }
-            hashToCheck = try await dataProvider.getHeader(hash: hashToCheck).value.parentHash
+            hashToCheck = try await getHeader(hash: hashToCheck).value.parentHash
             hashToCheckNumber -= 1
         }
 
-        let header = try await dataProvider.getHeader(hash: hash)
+        let header = try await getHeader(hash: hash)
         finalizedHead = HeadInfo(hash: hash, timeslot: header.value.timeslot, number: number)
         try await dataProvider.setFinalizedHead(hash: hash)
     }
@@ -152,6 +157,6 @@ extension BlockchainDataProvider {
     }
 
     public func getBestState() async throws -> StateRef {
-        try await dataProvider.getState(hash: bestHead.hash)
+        try await dataProvider.getState(hash: bestHead.hash).unwrap(orError: BlockchainDataProviderError.noData(hash: bestHead.hash))
     }
 }

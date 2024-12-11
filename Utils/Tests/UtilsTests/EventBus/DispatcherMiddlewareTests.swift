@@ -21,10 +21,6 @@ final class MiddlewareTests {
 
         let parallelMiddleware = Middleware.parallel(firstMiddleware, secondMiddleware)
 
-        let handler: MiddlewareHandler<Void> = { _ in
-            await orderManager.appendOrder(2)
-        }
-
         try await parallelMiddleware.handle((), next: {
             await orderManager.appendOrder(1)
         })
