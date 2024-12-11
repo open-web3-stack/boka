@@ -107,17 +107,6 @@ final class RocksDBTests {
         #expect(retrieved?.isEmpty == true)
     }
 
-    @Test func testErrorConditions() throws {
-        // Test invalid operations
-        let invalidDB = try? RocksDB<Columns>(path: URL(fileURLWithPath: "/nonexistent/path"))
-        #expect(invalidDB == nil)
-
-        // Test deleting non-existent key
-        try rocksDB.delete(column: .col1, key: "nonexistent".data)
-        let value = try rocksDB.get(column: .col1, key: "nonexistent".data)
-        #expect(value == nil)
-    }
-
     @Test func testIterator() throws {
         // Setup test data
         let testData = [

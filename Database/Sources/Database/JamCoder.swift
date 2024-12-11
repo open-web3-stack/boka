@@ -29,20 +29,3 @@ struct JamCoder<Key: Encodable, Value: Codable>: StoreCoder {
         try JamDecoder.decode(Value.self, from: data, withConfig: config)
     }
 }
-
-struct NoopCoder: StoreCoder {
-    typealias Key = Data
-    typealias Value = Data
-
-    func encode(key: Key) throws -> Data {
-        key
-    }
-
-    func encode(value: Value) throws -> Data {
-        value
-    }
-
-    func decode(data: Data) throws -> Value {
-        data
-    }
-}
