@@ -124,7 +124,7 @@ public final class QuicConnection: Sendable {
         }
     }
 
-    fileprivate func close() {
+    func close() {
         storage.write { storage in
             storage = nil
         }
