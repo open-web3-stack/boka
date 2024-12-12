@@ -63,11 +63,11 @@ extension Guaranteeing {
         }
     }
 
-    private func toCoreAssignment(_ source: [UInt32], n: UInt32, max: UInt32) -> [CoreIndex] {
+    public static func toCoreAssignment(_ source: [UInt32], n: UInt32, max: UInt32) -> [CoreIndex] {
         source.map { CoreIndex(($0 + n) % max) }
     }
 
-    private func getCoreAssignment(config: ProtocolConfigRef, randomness: Data32, timeslot: TimeslotIndex) -> [CoreIndex] {
+    public static func getCoreAssignment(config: ProtocolConfigRef, randomness: Data32, timeslot: TimeslotIndex) -> [CoreIndex] {
         var source = Array(repeating: UInt32(0), count: config.value.totalNumberOfValidators)
         for i in 0 ..< config.value.totalNumberOfValidators {
             source[i] = UInt32(config.value.totalNumberOfCores * i / config.value.totalNumberOfValidators)
@@ -94,14 +94,14 @@ extension Guaranteeing {
     > {
         let coreAssignmentRotationPeriod = UInt32(config.value.coreAssignmentRotationPeriod)
 
-        let currentCoreAssignment = getCoreAssignment(config: config, randomness: entropyPool.t2, timeslot: timeslot)
+        let currentCoreAssignment = Self.getCoreAssignment(config: config, randomness: entropyPool.t2, timeslot: timeslot)
         let currentCoreKeys = withoutOffenders(keys: currentValidators.map(\.ed25519))
 
         let isEpochChanging = (timeslot % UInt32(config.value.epochLength)) < coreAssignmentRotationPeriod
         let previousRandomness = isEpochChanging ? entropyPool.t3 : entropyPool.t2
         let previousValidators = isEpochChanging ? previousValidators : currentValidators
 
-        let previousCoreAssignment = getCoreAssignment(
+        let previousCoreAssignment = Self.getCoreAssignment(
             config: config,
             randomness: previousRandomness,
             timeslot: timeslot - coreAssignmentRotationPeriod
