@@ -4,12 +4,46 @@ import Utils
 // I
 public struct WorkItem: Sendable, Equatable, Codable {
     public struct ImportedDataSegment: Sendable, Equatable, Codable {
-        public var root: Data32
+        public enum DataSegmentRootKind: Sendable, Equatable {
+            case segmentRoot(Data32)
+            case workPackageHash(Data32)
+        }
+
+        public var root: DataSegmentRootKind
         public var index: UInt16
 
-        public init(root: Data32, index: UInt16) {
+        public init(root: DataSegmentRootKind, index: UInt16) {
             self.root = root
             self.index = index
+        }
+
+        // Encodable
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.unkeyedContainer()
+            var indexValue = index
+            switch root {
+            case let .segmentRoot(root):
+                try container.encode(root)
+            case let .workPackageHash(hash):
+                try container.encode(hash)
+                indexValue |= 1 << 15
+            }
+            try container.encode(indexValue)
+        }
+
+        // Decodable
+        public init(from decoder: Decoder) throws {
+            var container = try decoder.unkeyedContainer()
+            let root = try container.decode(Data32.self)
+            let index = try container.decode(UInt16.self)
+            let flag = index >> 15
+            if flag == 0 {
+                self.root = .segmentRoot(root)
+                self.index = index
+            } else {
+                self.root = .workPackageHash(root)
+                self.index = index & 0x7FFF
+            }
         }
     }
 
@@ -23,7 +57,10 @@ public struct WorkItem: Sendable, Equatable, Codable {
     public var payloadBlob: Data
 
     // g
-    public var gasLimit: Gas
+    public var refineGasLimit: Gas
+
+    // a
+    public var accumulateGasLimit: Gas
 
     // i: a sequence of imported data segments which identify a prior exported segment through an index
     public var inputs: [ImportedDataSegment]
@@ -38,7 +75,8 @@ public struct WorkItem: Sendable, Equatable, Codable {
         serviceIndex: ServiceIndex,
         codeHash: Data32,
         payloadBlob: Data,
-        gasLimit: Gas,
+        refineGasLimit: Gas,
+        accumulateGasLimit: Gas,
         inputs: [ImportedDataSegment],
         outputs: [HashAndLength],
         outputDataSegmentsCount: UInt16
@@ -46,7 +84,8 @@ public struct WorkItem: Sendable, Equatable, Codable {
         self.serviceIndex = serviceIndex
         self.codeHash = codeHash
         self.payloadBlob = payloadBlob
-        self.gasLimit = gasLimit
+        self.refineGasLimit = refineGasLimit
+        self.accumulateGasLimit = accumulateGasLimit
         self.inputs = inputs
         self.outputs = outputs
         self.outputDataSegmentsCount = outputDataSegmentsCount
@@ -60,7 +99,8 @@ extension WorkItem: Dummy {
             serviceIndex: 0,
             codeHash: Data32(),
             payloadBlob: Data(),
-            gasLimit: Gas(0),
+            refineGasLimit: Gas(0),
+            accumulateGasLimit: Gas(0),
             inputs: [],
             outputs: [],
             outputDataSegmentsCount: 0
