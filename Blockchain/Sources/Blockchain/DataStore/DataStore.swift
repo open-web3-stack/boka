@@ -10,7 +10,7 @@ public final class DataStore: Sendable {
     private let impl: DataStoreProtocol
     private let basePath: URL
 
-    public init(impl: DataStoreProtocol, basePath: URL) {
+    public init(_ impl: DataStoreProtocol, basePath: URL) {
         self.impl = impl
         self.basePath = basePath
     }

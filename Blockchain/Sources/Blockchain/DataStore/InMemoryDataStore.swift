@@ -3,15 +3,17 @@ import Foundation
 public actor InMemoryDataStore: DataStoreProtocol {
     private var store: [URL: Data] = [:]
 
-    public func read(name: URL) async throws -> Data? {
-        store[name]
+    public init() {}
+
+    public func read(path: URL) async throws -> Data? {
+        store[path]
     }
 
-    public func write(name: URL, value: Data) async throws {
-        store[name] = value
+    public func write(path: URL, value: Data) async throws {
+        store[path] = value
     }
 
-    public func delete(name: URL) async throws {
-        store[name] = nil
+    public func delete(path: URL) async throws {
+        store[path] = nil
     }
 }
