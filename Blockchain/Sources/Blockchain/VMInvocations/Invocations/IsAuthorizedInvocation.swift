@@ -11,10 +11,12 @@ public protocol IsAuthorizedFunction {
 }
 
 extension IsAuthorizedFunction {
-    public func invoke(config: ProtocolConfigRef, package: WorkPackage,
-                       coreIndex: CoreIndex) async throws -> Result<Data, WorkResultError>
-    {
-        let args = try JamEncoder.encode(package) + JamEncoder.encode(coreIndex)
+    public func invoke(
+        config: ProtocolConfigRef,
+        package: WorkPackage,
+        coreIndex: CoreIndex
+    ) async throws -> Result<Data, WorkResultError> {
+        let args = try JamEncoder.encode(package, coreIndex)
         let ctx = IsAuthorizedContext(config: config)
 
         let (exitReason, _, output) = await invokePVM(
