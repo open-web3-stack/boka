@@ -55,15 +55,15 @@ extension Extrinsic: Validate {}
 extension Extrinsic {
     public func hash() -> Data32 {
         do {
-            return try JamEncoder.encode([
+            return try JamEncoder.encode(
                 JamEncoder.encode(tickets).blake2b256hash(),
                 JamEncoder.encode(preimages).blake2b256hash(),
                 JamEncoder.encode(reports.guarantees.array.map { item in
-                    try JamEncoder.encode(item.workReport.hash()) + JamEncoder.encode(item.timeslot) + JamEncoder.encode(item.credential)
+                    try JamEncoder.encode(item.workReport.hash(), item.timeslot, item.credential)
                 }).blake2b256hash(),
                 JamEncoder.encode(availability).blake2b256hash(),
-                JamEncoder.encode(disputes).blake2b256hash(),
-            ]).blake2b256hash()
+                JamEncoder.encode(disputes).blake2b256hash()
+            ).blake2b256hash()
         } catch {
             logger.error("Failed to encode extrinsic, returning empty hash", metadata: ["error": "\(error)"])
             return Data32()
