@@ -16,29 +16,31 @@ public final class DataStore: Sendable {
     }
 
     // partitioning files so that we won't have too many files in a single directory
-    private func path(for name: String) -> URL {
-        var path = basePath
+    private func getPath(path: String, name: String) -> URL {
+        var ret = basePath
+        ret.append(component: path)
         var name = name[...]
         if let first = name.first {
-            path = path.appendingPathComponent(String(first), isDirectory: true)
+            ret.append(component: String(first), directoryHint: .isDirectory)
             name = name.dropFirst()
         }
         if let second = name.first {
-            path = path.appendingPathComponent(String(second), isDirectory: true)
+            ret.append(component: String(second), directoryHint: .isDirectory)
             name = name.dropFirst()
         }
-        return path.appendingPathComponent(String(name), isDirectory: false)
+        ret.append(component: String(name), directoryHint: .notDirectory)
+        return ret
     }
 
-    public func read(name: String) async throws -> Data? {
-        try await impl.read(path: path(for: name))
+    public func read(path: String, name: String) async throws -> Data? {
+        try await impl.read(path: getPath(path: path, name: name))
     }
 
-    public func write(name: String, value: Data) async throws {
-        try await impl.write(path: path(for: name), value: value)
+    public func write(path: String, name: String, value: Data) async throws {
+        try await impl.write(path: getPath(path: path, name: name), value: value)
     }
 
-    public func delete(name: String) async throws {
-        try await impl.delete(path: path(for: name))
+    public func delete(path: String, name: String) async throws {
+        try await impl.delete(path: getPath(path: path, name: name))
     }
 }

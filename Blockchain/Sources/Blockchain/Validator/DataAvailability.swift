@@ -2,6 +2,11 @@ import Foundation
 import TracingUtils
 import Utils
 
+enum DataAvailabilityStore: String, Sendable {
+    case imports
+    case audits
+}
+
 public final class DataAvailability: ServiceBase2, @unchecked Sendable {
     private let dataProvider: BlockchainDataProvider
     private let dataStore: DataStore
