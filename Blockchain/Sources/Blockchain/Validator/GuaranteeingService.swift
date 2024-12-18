@@ -63,18 +63,17 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         let coreCount = currentCoreAssignment.count
         for coreIndex in 0 ..< coreCount {
             let core = currentCoreAssignment[coreIndex]
-            // workpackagepoolService workpackagepoolService same as ExtrinsicPoolService
-            let workPackage = await workPackagePool.getWorkPackage(for: core)
-//            let workPackage = WorkPackage.dummy(config: config)
-            // validateWorkPackage & mock wp
-//            let validateWP = try validateWorkPackage(workPackage)
-//            if validateWP {
-//                let workReport = try await createWorkReport(for: workPackage, core: core)
-//                // sign work report
-//                // eventbus
-//            } else {
-//                logger.error("WorkPackage validation failed")
-//            }
+            let workPackages = await workPackagePool.getWorkPackage(for: core)
+            for workPackage in workPackages.array {
+                let validateWP = try validateWorkPackage(workPackage.workPackage)
+                if validateWP {
+                    let workReport = try await createWorkReport(for: workPackage.workPackage, core: core)
+                    // sign work report
+                    // eventbus
+                } else {
+                    logger.error("WorkPackage validation failed")
+                }
+            }
 
             //
         }
@@ -84,6 +83,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         // TODO:
         // RefineInvocation ouput
         // outdata -> workreport struct
+
         WorkReport.dummy(config: config)
     }
 
@@ -96,19 +96,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         logger.debug("Processing guarantees for epoch \(epoch)")
         await withSpan("GuaranteeingService.onBeforeEpoch", logger: logger) { _ in
             guarantees.value = []
-            let timeslot = epoch.epochToTimeslotIndex(config: config)
-
-            let bestHead = await dataProvider.bestHead
-            let bestHeadEpoch = bestHead.timeslot.timeslotToEpochIndex(config: config)
-            if bestHeadEpoch >= epoch {
-                logger.error("Attempting to process guarantees for epoch \(epoch) but best head epoch is \(bestHeadEpoch)")
-                return
-            }
-
-            let state = try await dataProvider.getState(hash: bestHead.hash)
-            let coreAuthorizationPool = state.value.coreAuthorizationPool
-
-            // await scheduleGuaranteeTasks()
+            try await scheduleGuaranteeTasks(epoch: epoch)
         }
     }
 
