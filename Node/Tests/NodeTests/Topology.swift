@@ -35,7 +35,7 @@ struct Topology {
             let eventBus = EventBus(eventMiddleware: .serial(Middleware(storeMiddleware), .noError), handlerMiddleware: .noError)
             let keystore = try await DevKeyStore(devKeysCount: 0)
             let keys = try await keystore.addDevKeys(seed: desc.devSeed)
-            let nodeConfig = await Node.Config(
+            let nodeConfig = await Config(
                 rpc: nil,
                 network: Network.Config(
                     role: desc.isValidator ? .validator : .builder,
