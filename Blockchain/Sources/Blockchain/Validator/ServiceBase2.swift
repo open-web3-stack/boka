@@ -85,4 +85,19 @@ public class ServiceBase2: ServiceBase, @unchecked Sendable {
             }
         }
     }
+
+    @discardableResult
+    public func scheduleForGuaranteeing(_ id: UniqueId, timeslot: TimeslotIndex,
+                                        task: @escaping @Sendable () async -> Void) -> Cancellable
+    {
+        let scheduleTime = config.scheduleTimeForGuaranteeing(timeslot: timeslot)
+        let now = timeProvider.getTimeInterval()
+        var delay = scheduleTime - now
+        if delay < 0 {
+            logger.info("\(id): late guaranteeing for timeslot \(timeslot), expectedDelay \(delay)")
+            delay = 0
+        }
+        logger.info("\(id): scheduling guaranteeing for timeslot \(timeslot) in \(delay)")
+        return schedule(id: id, delay: delay, task: task)
+    }
 }
