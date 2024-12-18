@@ -3,7 +3,7 @@ import Utils
 
 private actor WorkPackageStorage {
     var logger: Logger!
-    var pendingWorkPackages: SortedUniqueArray<WorkPackageAndOutput> = .init()
+    var workPackages: SortedUniqueArray<WorkPackageAndOutput> = .init()
     var epoch: EpochIndex = 0
     // add core
     // var core: CoreIndex = 0
@@ -29,7 +29,7 @@ private actor WorkPackageStorage {
             verifier = Bandersnatch.Verifier(ctx: ringContext, commitment: commitment)
             epoch = newEpoch
             entropy = state.value.entropyPool.t3
-            pendingWorkPackages.removeAll()
+            workPackages.removeAll()
         }
     }
 
@@ -39,7 +39,7 @@ private actor WorkPackageStorage {
                 logger.warning("Invalid work package: \(package)")
                 continue
             }
-            pendingWorkPackages.append(contentsOf: [package])
+            workPackages.append(contentsOf: [package])
         }
     }
 
@@ -48,14 +48,14 @@ private actor WorkPackageStorage {
         true
     }
 
-    func removeWorkPackages(workPackages: [WorkPackageAndOutput]) {
-        pendingWorkPackages.remove { guarantee in
-            workPackages.contains { $0 == guarantee }
+    func removeWorkPackages(_ packages: [WorkPackageAndOutput]) {
+        workPackages.remove { guarantee in
+            packages.contains { $0 == guarantee }
         }
     }
 
     func getWorkPackage(for _: CoreIndex) -> SortedUniqueArray<WorkPackageAndOutput> {
-        pendingWorkPackages
+        workPackages
     }
 }
 
@@ -80,7 +80,7 @@ public final class WorkPackagePoolService: ServiceBase, @unchecked Sendable {
             try await self?.on(workPackagesGenerated: event)
         }
         // TODO: add remove subscribe
-        // TODO: add receive subscribe
+        // TODO: add receive subscribe?
     }
 
     private func on(workPackagesGenerated event: RuntimeEvents.WorkPackagesGenerated) async throws {

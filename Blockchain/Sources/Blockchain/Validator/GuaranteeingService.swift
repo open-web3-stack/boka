@@ -79,12 +79,40 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
     }
 
-    private func createWorkReport(for _: WorkPackage, core _: CoreIndex) async throws -> WorkReport {
+//    public protocol RefineInvocation {
+//        func invoke(
+//            config: ProtocolConfigRef,
+//            serviceAccounts: some ServiceAccounts,
+//            codeHash: Data,
+//            gas: Gas,
+//            service: ServiceIndex,
+//            workPackageHash: Data32,
+//            workPayload: Data,
+//            refinementCtx: RefinementContext,
+//            authorizerHash: Data32,
+//            authorizationOutput: Data,
+//            importSegments: [Data], // array of Data4104
+//            extrinsicDataBlobs: [Data],
+//            exportSegmentOffset: UInt64
+//        ) async throws -> (result: Result<Data, WorkResultError>, exports: [Data])
+//    }
+
+    private func createWorkReport(for workPackage: WorkPackage, core _: CoreIndex) async throws -> WorkReport {
         // TODO:
         // RefineInvocation ouput
         // outdata -> workreport struct
-
-        WorkReport.dummy(config: config)
+        var gas = Gas(0)
+        var serviceAccounts = [ServiceIndex: ServiceAccount]()
+        var ServiceIndex = workPackage.authorizationServiceIndex
+        let workPackageHash = Data32.random()
+        let workPayload = Data()
+        let refinementCtx = workPackage.context
+        let authorizerHash = workPackage.authorizationCodeHash
+        let authorizationOutput = Data()
+        let importSegments: [Data] = []
+        let extrinsicDataBlobs: [Data] = []
+        let exportSegmentOffset: UInt64 = 0
+        return WorkReport.dummy(config: config)
     }
 
     private func validateWorkPackage(_: WorkPackage) throws -> Bool {
