@@ -23,7 +23,8 @@ struct ValidatorServiceTests {
             keystore: services.keystore,
             eventBus: services.eventBus,
             scheduler: services.scheduler,
-            dataProvider: services.dataProvider
+            dataProvider: services.dataProvider,
+            dataStore: services.dataStore
         )
         await validatorService.onSyncCompleted()
         return (services, validatorService)
