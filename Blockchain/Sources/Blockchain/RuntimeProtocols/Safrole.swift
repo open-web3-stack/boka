@@ -302,7 +302,7 @@ extension Safrole {
 
             let epochMark = try isEpochChange ? EpochMarker(
                 entropy: newEntropyPool.1,
-                ticketsEntropy: Data32(), // TODO:
+                ticketsEntropy: newEntropyPool.2,
                 validators: ConfigFixedSizeArray(config: config, array: newNextValidators.map(\.bandersnatch))
             ) : nil
 
