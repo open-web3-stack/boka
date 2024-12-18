@@ -67,14 +67,14 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             let workPackage = await workPackagePool.getWorkPackage(for: core)
 //            let workPackage = WorkPackage.dummy(config: config)
             // validateWorkPackage & mock wp
-            let validateWP = try validateWorkPackage(workPackage)
-            if validateWP {
-                let workReport = try await createWorkReport(for: workPackage, core: core)
-                // sign work report
-                // eventbus
-            } else {
-                logger.error("WorkPackage validation failed")
-            }
+//            let validateWP = try validateWorkPackage(workPackage)
+//            if validateWP {
+//                let workReport = try await createWorkReport(for: workPackage, core: core)
+//                // sign work report
+//                // eventbus
+//            } else {
+//                logger.error("WorkPackage validation failed")
+//            }
 
             //
         }

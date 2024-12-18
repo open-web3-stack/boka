@@ -16,7 +16,7 @@ public struct TicketItemAndOutput: Comparable, Sendable, Codable {
 }
 
 public struct WorkPackageAndOutput: Comparable, Sendable, Codable {
-    public let guarantee: ExtrinsicGuarantees.GuaranteeItem
+    public let workPackage: WorkPackage
     public let output: Data32
 
     public static func < (lhs: WorkPackageAndOutput, rhs: WorkPackageAndOutput) -> Bool {
@@ -24,7 +24,7 @@ public struct WorkPackageAndOutput: Comparable, Sendable, Codable {
     }
 
     public static func == (lhs: WorkPackageAndOutput, rhs: WorkPackageAndOutput) -> Bool {
-        lhs.output == rhs.output && lhs.guarantee == rhs.guarantee
+        lhs.output == rhs.output && lhs.workPackage == rhs.workPackage
     }
 }
 
@@ -130,27 +130,5 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
         }
 
         return tickets
-    }
-
-    public static func generateWorkPackages(
-        core _: CoreIndex,
-        validators: [ValidatorKey],
-        entropy: Data32,
-        ringContext: Bandersnatch.RingContext,
-        secret: Bandersnatch.SecretKey,
-        idx: UInt32
-    ) throws -> [WorkPackageAndOutput] {
-        let pubkeys = try validators.map {
-            try Bandersnatch.PublicKey(data: $0.bandersnatch)
-        }
-
-        let prover = Bandersnatch.Prover(sercret: secret, ring: pubkeys, proverIdx: UInt(idx), ctx: ringContext)
-
-        var vrfInputData = SigningContext.entropyInputData(entropy: entropy)
-
-        var wps: [WorkPackageAndOutput] = []
-        // TODO: generateWorkPackages
-
-        return wps
     }
 }

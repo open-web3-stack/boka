@@ -39,7 +39,7 @@ private actor WorkPackageStorage {
                 logger.warning("Invalid work package: \(package)")
                 continue
             }
-            pendingWorkPackages.insert(package)
+            pendingWorkPackages.append(contentsOf: [package])
         }
     }
 
@@ -50,12 +50,11 @@ private actor WorkPackageStorage {
 
     func removeWorkPackages(workPackages: [WorkPackageAndOutput]) {
         pendingWorkPackages.remove { guarantee in
-            workPackages.contains { $0.guarantee == guarantee.guarantee }
+            workPackages.contains { $0 == guarantee }
         }
     }
 
     func getWorkPackage(for _: CoreIndex) -> SortedUniqueArray<WorkPackageAndOutput> {
-        // return pendingWorkPackages.filter { $0.guarantee.workReport.coreIndex == core }
         pendingWorkPackages
     }
 }
@@ -80,21 +79,14 @@ public final class WorkPackagePoolService: ServiceBase, @unchecked Sendable {
         await subscribe(RuntimeEvents.WorkPackagesGenerated.self, id: "WorkPackagePool.WorkPackagesGenerated") { [weak self] event in
             try await self?.on(workPackagesGenerated: event)
         }
-
-        await subscribe(RuntimeEvents.BlockFinalized.self, id: "WorkPackagePool.BlockFinalized") { [weak self] event in
-            try await self?.on(blockFinalized: event)
-        }
+        // TODO: add remove subscribe
+        // TODO: add receive subscribe
     }
 
     private func on(workPackagesGenerated event: RuntimeEvents.WorkPackagesGenerated) async throws {
         let state = try await dataProvider.getBestState()
         try await storage.update(state: state, config: config)
         await storage.add(packages: event.items, config: config)
-    }
-
-    private func on(blockFinalized event: RuntimeEvents.BlockFinalized) async throws {
-        let block = try await dataProvider.getBlock(hash: event.hash)
-//        await storage.removeWorkPackages(workPackages: block.extrinsic.reports.guarantees.)
     }
 
     public func update(state: StateRef, config: ProtocolConfigRef) async throws {

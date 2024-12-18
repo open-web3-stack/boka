@@ -31,7 +31,6 @@ struct WorkPackagePoolServiceTests {
         keystore = try await DevKeyStore(devKeysCount: config.value.totalNumberOfValidators)
 
         workPackagecPoolService = await WorkPackagePoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
-        try await workPackagecPoolService.addWorkPackages(packages: [])
         ringContext = try Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
 
         // setupTestLogger()
@@ -39,22 +38,16 @@ struct WorkPackagePoolServiceTests {
 
     @Test
     func testAddPendingWorkPackage() async throws {
-        let state = try await dataProvider.getBestState()
-
-        var allWorkPackages = SortedUniqueArray<WorkPackageAndOutput>()
-
-        for (i, validatorKey) in state.value.nextValidators.enumerated() {
-            let secretKey = try await keystore.get(Bandersnatch.self, publicKey: Bandersnatch.PublicKey(data: validatorKey.bandersnatch))!
-            // generate work package
-            // eventBus.publish
-            // Wait for the event to be processed
-            await storeMiddleware.wait()
+        var allWorkPackages = [WorkPackageAndOutput]()
+        for _ in 0 ..< config.value.totalNumberOfCores {
+            let workpackage = WorkPackage.dummy(config: config)
+            let wpOut = WorkPackageAndOutput(workPackage: workpackage, output: Data32.random())
+            allWorkPackages.append(wpOut)
         }
-    }
-
-    @Test
-    func testAddAndInvalidWorkPackage() async throws {
-        let state = try await dataProvider.getBestState()
-        let validatorKey = state.value.currentValidators[0]
+        await eventBus.publish(RuntimeEvents.WorkPackagesGenerated(items: allWorkPackages))
+        // Wait for the event to be processedBlockchain.RefinementContext
+        await storeMiddleware.wait()
+        let workPackages = await workPackagecPoolService.getWorkPackage(for: CoreIndex(0))
+        #expect(workPackages.array == Array(allWorkPackages).sorted())
     }
 }
