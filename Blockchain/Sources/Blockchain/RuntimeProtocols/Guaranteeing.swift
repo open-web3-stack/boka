@@ -168,7 +168,7 @@ extension Guaranteeing {
             }
         }
 
-        guard totalMinGasRequirement <= config.value.coreAccumulationGas else {
+        guard totalMinGasRequirement <= config.value.workReportAccumulationGas else {
             throw .outOfGas
         }
 
