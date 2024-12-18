@@ -120,7 +120,7 @@ struct CodecTests {
         if value is WorkResult {
             return [
                 "code_hash": json["codeHash"]!,
-                "gas": json["gasRatio"]!,
+                "accumulate_gas": json["gasRatio"]!,
                 "payload_hash": json["payloadHash"]!,
                 "service_id": json["serviceIndex"]!,
                 "result": json["output"]!["success"] == nil ? json["output"]! : [
@@ -133,7 +133,8 @@ struct CodecTests {
                 "service": json["serviceIndex"]!,
                 "code_hash": json["codeHash"]!,
                 "payload": json["payloadBlob"]!,
-                "gas_limit": json["gasLimit"]!,
+                "refine_gas_limit": json["refineGasLimit"]!,
+                "accumulate_gas_limit": json["accumulateGasLimit"]!,
                 "import_segments": json["inputs"]!.array!.map { item in
                     [
                         "tree_root": item["root"]!,
@@ -210,12 +211,19 @@ struct CodecTests {
                 "parent_state_root": json["priorStateRoot"]!,
                 "extrinsic_hash": json["extrinsicsHash"]!,
                 "slot": json["timeslot"]!,
-                "epoch_mark": json["epoch"] ?? .null,
+                "epoch_mark": transform(json["epoch"] ?? .null, value: value.epoch as Any),
                 "tickets_mark": transform(json["winningTickets"] ?? .null, value: value.winningTickets as Any),
                 "offenders_mark": transform(json["offendersMarkers"]!, value: value.offendersMarkers),
                 "author_index": json["authorIndex"]!,
                 "entropy_source": json["vrfSignature"]!,
                 "seal": json["seal"]!,
+            ].json
+        }
+        if value is EpochMarker {
+            return [
+                "entropy": json["entropy"]!,
+                "tickets_entropy": json["ticketsEntropy"]!,
+                "validators": json["validators"]!,
             ].json
         }
 
@@ -297,18 +305,14 @@ struct CodecTests {
 
     @Test
     func work_item() throws {
-        withKnownIssue("need bump test vectors") {
-            let (actual, expected) = try Self.test(WorkItem.self, path: "work_item")
-            #expect(actual == expected)
-        }
+        let (actual, expected) = try Self.test(WorkItem.self, path: "work_item")
+        #expect(actual == expected)
     }
 
     @Test
     func work_package() throws {
-        withKnownIssue("need bump test vectors") {
-            let (actual, expected) = try Self.test(WorkPackage.self, path: "work_package")
-            #expect(actual == expected)
-        }
+        let (actual, expected) = try Self.test(WorkPackage.self, path: "work_package")
+        #expect(actual == expected)
     }
 
     @Test

@@ -9,6 +9,11 @@ public struct WorkItem: Sendable, Equatable, Codable {
             case workPackageHash(Data32)
         }
 
+        enum CodingKeys: String, CodingKey {
+            case root
+            case index
+        }
+
         public var root: DataSegmentRootKind
         public var index: UInt16
 
@@ -19,16 +24,27 @@ public struct WorkItem: Sendable, Equatable, Codable {
 
         // Encodable
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.unkeyedContainer()
-            var indexValue = index
-            switch root {
-            case let .segmentRoot(root):
-                try container.encode(root)
-            case let .workPackageHash(hash):
-                try container.encode(hash)
-                indexValue |= 1 << 15
+            if encoder.isJamCodec {
+                var container = encoder.unkeyedContainer()
+                var indexValue = index
+                switch root {
+                case let .segmentRoot(root):
+                    try container.encode(root)
+                case let .workPackageHash(hash):
+                    try container.encode(hash)
+                    indexValue |= 1 << 15
+                }
+                try container.encode(indexValue)
+            } else {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                switch root {
+                case let .segmentRoot(root):
+                    try container.encode(root, forKey: .root)
+                case let .workPackageHash(hash):
+                    try container.encode(hash, forKey: .root)
+                }
+                try container.encode(index, forKey: .index)
             }
-            try container.encode(indexValue)
         }
 
         // Decodable
