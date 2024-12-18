@@ -28,12 +28,13 @@ public class ValidatorNode: Node {
             keystore: keystore,
             eventBus: eventBus,
             scheduler: scheduler,
-            dataProvider: dataProvider
+            dataProvider: dataProvider,
+            dataStore: config.dataStore.create()
         )
         self.validator = validator
 
         let syncManager = network.syncManager
-        let dataProvider: BlockchainDataProvider = blockchain.dataProvider
+        let dataProvider = dataProvider
         let local = config.local
         Task {
             if !local {

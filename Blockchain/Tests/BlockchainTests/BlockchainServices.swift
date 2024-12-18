@@ -1,10 +1,12 @@
 import Blockchain
+import Foundation
 import Utils
 
 class BlockchainServices {
     let config: ProtocolConfigRef
     let timeProvider: MockTimeProvider
     let dataProvider: BlockchainDataProvider
+    let dataStore: DataStore
     let eventBus: EventBus
     let scheduler: MockScheduler
     let keystore: DevKeyStore
@@ -30,6 +32,7 @@ class BlockchainServices {
         self.genesisBlock = genesisBlock
         self.genesisState = genesisState
         dataProvider = try! await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
+        dataStore = DataStore(InMemoryDataStore(), basePath: URL(fileURLWithPath: "/tmp/boka-test-data"))
 
         storeMiddleware = StoreMiddleware()
         eventBus = EventBus(eventMiddleware: .serial(Middleware(storeMiddleware), .noError), handlerMiddleware: .noError)
