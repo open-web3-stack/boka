@@ -51,13 +51,15 @@ extension RefineInvocation {
             return (.failure(.codeTooLarge), [])
         }
 
-        let argumentData = try JamEncoder.encode(service) +
-            JamEncoder.encode(workPayload) +
-            JamEncoder.encode(workPackageHash) +
-            JamEncoder.encode(refinementCtx) +
-            JamEncoder.encode(authorizerHash) +
-            JamEncoder.encode(authorizationOutput) +
-            JamEncoder.encode(extrinsicDataBlobs)
+        let argumentData = try JamEncoder.encode(
+            service,
+            workPayload,
+            workPackageHash,
+            refinementCtx,
+            authorizerHash,
+            authorizationOutput,
+            extrinsicDataBlobs
+        )
         let ctx = RefineContext(
             config: config,
             context: (pvms: [:], exports: []),

@@ -34,7 +34,7 @@ extension AccumulateFunction {
             y: resultCtx
         )
         let ctx = AccumulateContext(context: &contextContent, config: config, timeslot: timeslot)
-        let argument = try JamEncoder.encode(timeslot) + JamEncoder.encode(serviceIndex) + JamEncoder.encode(arguments)
+        let argument = try JamEncoder.encode(timeslot, serviceIndex, arguments)
 
         let (exitReason, gas, output) = await invokePVM(
             config: config,

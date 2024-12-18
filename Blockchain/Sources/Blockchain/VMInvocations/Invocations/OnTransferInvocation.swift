@@ -24,7 +24,7 @@ extension OnTransferFunction {
         var contextContent = OnTransferContext.ContextType(service, serviceAccounts)
         let ctx = OnTransferContext(context: &contextContent, config: config)
         let gasLimitSum = transfers.reduce(Balance(0)) { $0 + $1.gasLimit }
-        let argument = try JamEncoder.encode(timeslot) + JamEncoder.encode(service) + JamEncoder.encode(transfers)
+        let argument = try JamEncoder.encode(timeslot, service, transfers)
 
         _ = await invokePVM(
             config: config,

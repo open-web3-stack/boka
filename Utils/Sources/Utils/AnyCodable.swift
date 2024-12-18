@@ -13,12 +13,12 @@
 /// A type-erased codable value.
 ///
 /// An `AnyCodable` value forwards encoding and decoding operations to the underlying base.
-public struct AnyCodable: Codable, CustomDebugStringConvertible {
+public struct AnyCodable: Codable, CustomDebugStringConvertible, Sendable {
     /// The base encodable value.
-    public var value: Encodable
+    public var value: Encodable & Sendable
 
     /// Creates a codable value that wraps the given base.
-    public init(_ encodable: Encodable) {
+    public init(_ encodable: Encodable & Sendable) {
         value = encodable
     }
 

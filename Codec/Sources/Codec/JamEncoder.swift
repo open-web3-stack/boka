@@ -25,6 +25,14 @@ public class JamEncoder {
         return encoder.data
     }
 
+    public static func encode(_ values: any Encodable...) throws -> Data {
+        let encoder = JamEncoder()
+        for value in values {
+            try encoder.encode(value)
+        }
+        return encoder.data
+    }
+
     public var data: Data {
         encoder.data
     }

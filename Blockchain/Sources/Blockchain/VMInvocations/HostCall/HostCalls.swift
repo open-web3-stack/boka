@@ -943,7 +943,7 @@ public class Invoke: HostCall {
         let engine = Engine(config: DefaultPvmConfig())
         let exitReason = await engine.execute(program: program, state: vm)
 
-        try state.writeMemory(address: startAddr, values: JamEncoder.encode(vm.getGas()) + JamEncoder.encode(vm.getRegisters()))
+        try state.writeMemory(address: startAddr, values: JamEncoder.encode(vm.getGas(), vm.getRegisters()))
         context.pvms[pvmIndex]?.memory = vm.getMemoryUnsafe()
 
         switch exitReason {
