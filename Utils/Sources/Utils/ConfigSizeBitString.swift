@@ -35,7 +35,7 @@ public struct ConfigSizeBitString<TBitLength: ReadInt>: Equatable, Sendable, Cod
     private func at(unchecked index: Int) -> Bool {
         let byteIndex = index / 8
         let bitIndex = index % 8
-        return (bytes[byteIndex] & (1 << bitIndex)) != 0
+        return (bytes[relative: byteIndex] & (1 << bitIndex)) != 0
     }
 
     /// Formats the bitstring in binary digits.
@@ -59,9 +59,9 @@ public struct ConfigSizeBitString<TBitLength: ReadInt>: Equatable, Sendable, Cod
         let byteIndex = index / 8
         let bitIndex = index % 8
         if value {
-            bytes[byteIndex] |= (1 << bitIndex)
+            bytes[bytes.relative(offset: byteIndex)] |= (1 << bitIndex)
         } else {
-            bytes[byteIndex] &= ~(1 << bitIndex)
+            bytes[bytes.relative(offset: byteIndex)] &= ~(1 << bitIndex)
         }
     }
 }
