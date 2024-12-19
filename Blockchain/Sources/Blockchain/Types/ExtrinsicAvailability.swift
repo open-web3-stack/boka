@@ -58,7 +58,7 @@ extension ExtrinsicAvailability: Validate {
             throw .assurancesNotSorted
         }
         for assurance in assurances {
-            guard assurance.validatorIndex < UInt32(config.value.totalNumberOfCores) else {
+            guard assurance.validatorIndex < UInt32(config.value.totalNumberOfValidators) else {
                 throw .invalidValidatorIndex
             }
         }

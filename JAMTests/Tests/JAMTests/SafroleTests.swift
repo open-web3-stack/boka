@@ -10,7 +10,6 @@ struct SafroleInput: Codable {
     var slot: UInt32
     var entropy: Data32
     var extrinsics: ExtrinsicTickets
-    var offenders: [Ed25519PublicKey]
 }
 
 struct OutputMarks: Codable {
@@ -22,18 +21,6 @@ struct OutputMarks: Codable {
 }
 
 struct SafroleState: Equatable, Safrole, Codable {
-    enum CodingKeys: String, CodingKey {
-        case timeslot
-        case entropyPool
-        case previousValidators
-        case currentValidators
-        case nextValidators
-        case validatorQueue
-        case ticketsAccumulator
-        case ticketsOrKeys
-        case ticketsVerifier
-    }
-
     // tau
     var timeslot: UInt32
     // eta
@@ -74,6 +61,9 @@ struct SafroleState: Equatable, Safrole, Codable {
     // gammaZ
     var ticketsVerifier: BandersnatchRingVRFRoot
 
+    // ψo
+    var offenders: [Ed25519PublicKey]
+
     public mutating func mergeWith(postState: SafrolePostState) {
         timeslot = postState.timeslot
         entropyPool = postState.entropyPool
@@ -98,17 +88,10 @@ enum SafroleTestVariants: String, CaseIterable {
     case tiny
     case full
 
-    static let tinyConfig = ProtocolConfigRef.mainnet.mutate { config in
-        config.totalNumberOfValidators = 6
-        config.epochLength = 12
-        // 10 = 12 * 500/600, not sure what this should be for tiny, but this passes tests
-        config.ticketSubmissionEndSlot = 10
-    }
-
     var config: ProtocolConfigRef {
         switch self {
         case .tiny:
-            Self.tinyConfig
+            ProtocolConfigRef.tiny
         case .full:
             ProtocolConfigRef.mainnet
         }
@@ -130,7 +113,7 @@ struct SafroleTests {
                 config: config,
                 slot: testcase.input.slot,
                 entropy: testcase.input.entropy,
-                offenders: Set(testcase.input.offenders),
+                offenders: Set(testcase.preState.offenders),
                 extrinsics: testcase.input.extrinsics
             )
         }

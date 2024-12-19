@@ -18,7 +18,7 @@ struct RecentHistoryInput: Codable {
     var workPackages: [ReportedWorkPackage]
 }
 
-struct RecentHisoryTestcase: Codable {
+struct RecentHistoryTestcase: Codable {
     var input: RecentHistoryInput
     var preState: RecentHistory
     var postState: RecentHistory
@@ -32,7 +32,7 @@ struct RecentHistoryTests {
     @Test(arguments: try loadTests())
     func recentHistory(_ testcase: Testcase) throws {
         let config = ProtocolConfigRef.mainnet
-        let testcase = try JamDecoder.decode(RecentHisoryTestcase.self, from: testcase.data, withConfig: config)
+        let testcase = try JamDecoder.decode(RecentHistoryTestcase.self, from: testcase.data, withConfig: config)
 
         var state = testcase.preState
         state.update(

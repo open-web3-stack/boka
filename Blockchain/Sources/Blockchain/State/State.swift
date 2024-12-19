@@ -444,6 +444,8 @@ extension State: Safrole {
     }
 }
 
+extension State: Assurances {}
+
 extension State: Disputes {
     public mutating func mergeWith(postState: DisputePostState) {
         judgements = postState.judgements
