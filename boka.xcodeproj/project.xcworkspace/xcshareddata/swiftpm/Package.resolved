@@ -1,5 +1,5 @@
 {
-  "originHash" : "8e21a58b6d7f842c098f4e974e374c6d0247726a1d3017dda720b3de822a747b",
+  "originHash" : "df8d708ee631530dce6fd56811e5100a965c55290ef02b21f0ffdb94c192448c",
   "pins" : [
     {
       "identity" : "async-channels",
@@ -247,7 +247,7 @@
     {
       "identity" : "swift-numerics",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-numerics.git",
+      "location" : "https://github.com/apple/swift-numerics",
       "state" : {
         "branch" : "main",
         "revision" : "e30276bff2ff5ed80566fbdca49f50aa160b0e83"
@@ -292,7 +292,7 @@
     {
       "identity" : "swift-syntax",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-syntax.git",
+      "location" : "https://github.com/swiftlang/swift-syntax.git",
       "state" : {
         "revision" : "4c6cc0a3b9e8f14b3ae2307c5ccae4de6167ac2c",
         "version" : "600.0.0-prerelease-2024-06-12"

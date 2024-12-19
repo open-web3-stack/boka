@@ -343,36 +343,16 @@ public final class Runtime {
 
     // returns available reports
     public func updateReports(block: BlockRef, state newState: inout State) throws -> [WorkReport] {
-        for assurance in block.extrinsic.availability.assurances {
-            let hash = Blake2b256.hash(assurance.parentHash, assurance.assurance)
-            let payload = SigningContext.available + hash.data
-            let validatorKey = try newState.currentValidators.at(Int(assurance.validatorIndex))
-            let pubkey = try Ed25519.PublicKey(from: validatorKey.ed25519)
-            guard pubkey.verify(signature: assurance.signature, message: payload) else {
-                throw Error.invalidAssuranceSignature
-            }
-        }
+        let (
+            newReports: newReports, availableReports: availableReports
+        ) = try newState.update(
+            config: config,
+            timeslot: block.header.timeslot,
+            extrinsic: block.extrinsic.availability,
+            parentHash: block.header.parentHash
+        )
 
-        var availabilityCount = Array(repeating: 0, count: config.value.totalNumberOfCores)
-        for assurance in block.extrinsic.availability.assurances {
-            for bit in assurance.assurance where bit {
-                // ExtrinsicAvailability.validate() ensures that validatorIndex is in range
-                availabilityCount[Int(assurance.validatorIndex)] += 1
-            }
-        }
-
-        var availableReports = [WorkReport]()
-
-        for (idx, count) in availabilityCount.enumerated() where count > 0 {
-            guard let report = newState.reports[idx] else {
-                throw Error.assuranceForEmptyCore
-            }
-            if count >= ProtocolConfig.TwoThirdValidatorsPlusOne.read(config: config) {
-                availableReports.append(report.workReport)
-                newState.reports[idx] = nil // remove available report from pending reports
-            }
-        }
-
+        newState.reports = newReports
         newState.reports = try newState.update(config: config, extrinsic: block.extrinsic.reports)
 
         return availableReports
