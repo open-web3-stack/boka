@@ -106,9 +106,6 @@ struct MerklizationTests {
 
         let result2 = Merklization.generateJustification(input, size: 2, index: 0)
         let expected2: [Data32] = [
-            Blake2b256.hash("node",
-                            Blake2b256.hash("node", Blake2b256.hash("leaf", "node1"), Blake2b256.hash("leaf", "node2")),
-                            Blake2b256.hash("node", Blake2b256.hash("leaf", "node3"), Blake2b256.hash("leaf", "node4"))),
         ]
         #expect(result2 == expected2)
 
@@ -125,6 +122,22 @@ struct MerklizationTests {
             Blake2b256.hash("leaf", "node1"),
         ]
         #expect(result4 == expected4)
+    }
+
+    @Test
+    func testLeafPage() {
+        let input: [Data] = [
+            Data("node1".utf8),
+            Data("node2".utf8),
+            Data("node3".utf8),
+            Data("node4".utf8),
+        ]
+
+        let result = Merklization.leafPage(input, size: 1, index: 1)
+        let expected: [Data32] = [
+            Blake2b256.hash("leaf", "node3"), Blake2b256.hash("leaf", "node4"),
+        ]
+        #expect(result == expected)
     }
 
     @Test

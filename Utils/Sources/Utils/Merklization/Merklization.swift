@@ -142,13 +142,12 @@ public enum Merklization {
         let pageSize = 1 << size
 
         traceImpl(constancyPreprocessor(nodes, hasher: hasher), index: pageSize * index, hasher: hasher) { res.append($0.unwrapped) }
-        print(res, calculatePathLength(size: size, nodesCount: nodes.count))
 
         return Array(res.prefix(calculatePathLength(size: size, nodesCount: nodes.count)))
     }
 
     // provides a single page of leaves, themselves hashed, prefixed data
-    public static func leavesPage<T>(
+    public static func leafPage<T>(
         _ nodes: T,
         size: Int,
         index: T.Index,
