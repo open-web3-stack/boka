@@ -87,10 +87,6 @@ struct MerklizationTests {
             Data("node3".utf8),
             Data("node4".utf8),
         ]
-        print("node1 is \(Blake2b256.hash("leaf", "node1"))")
-        print("node2 is \(Blake2b256.hash("leaf", "node2"))")
-        print("node3 is \(Blake2b256.hash("leaf", "node3"))")
-        print("node4 is \(Blake2b256.hash("leaf", "node4"))")
 
         let result = Merklization.generateJustification(input, size: 1, index: 1)
         let expected: [Data32] = [
