@@ -101,11 +101,16 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         // TODO:
         // RefineInvocation ouput
         // outdata -> workreport struct
+        let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
+
         var gas = Gas(0)
-        var serviceAccounts = [ServiceIndex: ServiceAccount]()
+//        var ServiceAccountDetails = try await state.value.get(serviceAccount: workPackage.authorizationServiceIndex)
+        // how to get service accounts
+        var serviceAccounts = state.value.serviceAccount
+        var newServiceAccounts = [ServiceIndex: ServiceAccount]()
         var ServiceIndex = workPackage.authorizationServiceIndex
-        let workPackageHash = Data32.random()
-        let workPayload = Data()
+        let workPackageHash = workPackage.hash() // workPackage hash
+        let workPayload = workPackage.payload() // workpackage payload
         let refinementCtx = workPackage.context
         let authorizerHash = workPackage.authorizationCodeHash
         let authorizationOutput = Data()
