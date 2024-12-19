@@ -114,15 +114,60 @@ public enum Merklization {
         binaryMerklizeHelper(constancyPreprocessor(nodes, hasher: hasher)).unwrapped
     }
 
+    private static func calculatePathLength(size: Int, nodesCount: Int) -> Int {
+        // bitwise impl of max(0, Int(ceil(log2(Double(max(1, nodes.count))) - Double(size))))
+        let nodesCount = max(1, nodesCount)
+        var log2Value = 0
+        var n = nodesCount
+        while n > 1 {
+            n >>= 1
+            log2Value += 1
+        }
+        if (1 << log2Value) < nodesCount {
+            log2Value += 1
+        }
+        return max(0, log2Value - size)
+    }
+
+    // provides the Merkle path to a single page
     public static func generateJustification<T>(
         _ nodes: T,
-        index: T.Index,
+        size: Int,
+        index: T.Index, // page index
         hasher: Hashing.Type = Blake2b256.self
     ) -> [Data32]
         where T: RandomAccessCollection<Data>, T.Index == Int
     {
         var res: [Data32] = []
-        traceImpl(constancyPreprocessor(nodes, hasher: hasher), index: index, hasher: hasher) { res.append($0.unwrapped) }
+        let pageSize = 1 << size
+
+        traceImpl(constancyPreprocessor(nodes, hasher: hasher), index: pageSize * index, hasher: hasher) { res.append($0.unwrapped) }
+        print(res, calculatePathLength(size: size, nodesCount: nodes.count))
+
+        return Array(res.prefix(calculatePathLength(size: size, nodesCount: nodes.count)))
+    }
+
+    // provides a single page of leaves, themselves hashed, prefixed data
+    public static func leavesPage<T>(
+        _ nodes: T,
+        size: Int,
+        index: T.Index,
+        hasher: Hashing.Type = Blake2b256.self
+    ) -> [Data32]
+        where T: RandomAccessCollection<Data>, T.Index == Int
+    {
+        let pageSize = 1 << size
+        var res: [Data32] = []
+        res.reserveCapacity(pageSize)
+        let startIndex = index * pageSize
+        let endIndex = min(nodes.count, startIndex + pageSize)
+        for i in startIndex ..< endIndex {
+            if i < nodes.count {
+                res.append(hasher.hash("leaf", nodes[i]))
+            } else {
+                res.append(Data32())
+            }
+        }
         return res
     }
 }
