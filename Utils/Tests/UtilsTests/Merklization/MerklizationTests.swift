@@ -18,8 +18,15 @@ struct MerklizationTests {
     @Test
     func testHash() throws {
         let mmr = MMR([])
-        let emptyHash = try JamEncoder.encode(mmr).keccakHash()
-        #expect(mmr.hash() == emptyHash)
+        #expect(mmr.superPeak() == Data32())
+
+        let peak = Data32.random()
+        let mmr1 = MMR([peak])
+        #expect(mmr1.superPeak() == peak)
+
+        let peaks = [Data32.random(), Data32.random(), Data32.random()]
+        let mmr2 = MMR(peaks)
+        #expect(mmr2.superPeak() == Keccak.hash("node", Keccak.hash("node", peaks[0], peaks[1]), peaks[2]))
     }
 
     @Test
@@ -80,14 +87,53 @@ struct MerklizationTests {
             Data("node3".utf8),
             Data("node4".utf8),
         ]
-        let index = 2
-        let result = Merklization.generateJustification(input, index: index)
 
+        let result = Merklization.generateJustification(input, size: 1, index: 1)
         let expected: [Data32] = [
             Blake2b256.hash("node", Blake2b256.hash("leaf", "node3"), Blake2b256.hash("leaf", "node4")),
         ]
+        #expect(result == expected)
 
-        #expect(result.first == expected.first)
+        let result1 = Merklization.generateJustification(input, size: 1, index: 0)
+        let expected1: [Data32] = [
+            Blake2b256.hash("node", Blake2b256.hash("leaf", "node1"), Blake2b256.hash("leaf", "node2")),
+        ]
+        #expect(result1 == expected1)
+
+        let result2 = Merklization.generateJustification(input, size: 2, index: 0)
+        let expected2: [Data32] = [
+        ]
+        #expect(result2 == expected2)
+
+        let result3 = Merklization.generateJustification(input, size: 0, index: 0)
+        let expected3: [Data32] = [
+            Blake2b256.hash("node", Blake2b256.hash("leaf", "node1"), Blake2b256.hash("leaf", "node2")),
+            Blake2b256.hash("leaf", "node3"),
+        ]
+        #expect(result3 == expected3)
+
+        let result4 = Merklization.generateJustification(input, size: 0, index: 2)
+        let expected4: [Data32] = [
+            Blake2b256.hash("node", Blake2b256.hash("leaf", "node3"), Blake2b256.hash("leaf", "node4")),
+            Blake2b256.hash("leaf", "node1"),
+        ]
+        #expect(result4 == expected4)
+    }
+
+    @Test
+    func testLeafPage() {
+        let input: [Data] = [
+            Data("node1".utf8),
+            Data("node2".utf8),
+            Data("node3".utf8),
+            Data("node4".utf8),
+        ]
+
+        let result = Merklization.leafPage(input, size: 1, index: 1)
+        let expected: [Data32] = [
+            Blake2b256.hash("leaf", "node3"), Blake2b256.hash("leaf", "node4"),
+        ]
+        #expect(result == expected)
     }
 
     @Test
@@ -96,7 +142,7 @@ struct MerklizationTests {
 
         let binaryResult = Merklization.binaryMerklize(emptyInput)
         let constantDepthResult = Merklization.constantDepthMerklize(emptyInput)
-        let justificationResult = Merklization.generateJustification(emptyInput, index: 0)
+        let justificationResult = Merklization.generateJustification(emptyInput, size: 1, index: 0)
 
         #expect(binaryResult == Data32())
         #expect(constantDepthResult == Data32())

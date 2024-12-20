@@ -7,7 +7,7 @@
 		"additionalMinBalancePerStateItem" : 10,
 		"auditBiasFactor" : 2,
 		"auditTranchePeriod" : 8,
-		"coreAccumulationGas" : 10000000,
+		"workReportAccumulationGas" : 10000000,
 		"coreAssignmentRotationPeriod" : 6,
 		"epochLength" : 6,
 		"erasureCodedPieceSize" : 684,
@@ -38,7 +38,7 @@
 		"transferMemoSize" : 128,
 		"workPackageAuthorizerGas" : 10000000,
 		"workPackageRefineGas" : 10000000,
-		"totalAccumulationGas": 341000000,
+		"totalAccumulationGas": 35000000,
 		"maxDepsInWorkReport": 8
 	},
 	"state" : {},

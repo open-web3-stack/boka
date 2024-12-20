@@ -168,7 +168,7 @@ extension Guaranteeing {
             }
         }
 
-        guard totalMinGasRequirement <= config.value.coreAccumulationGas else {
+        guard totalMinGasRequirement <= config.value.workReportAccumulationGas else {
             throw .outOfGas
         }
 
@@ -197,7 +197,7 @@ extension Guaranteeing {
             guard context.anchor.stateRoot == history.stateRoot else {
                 throw .invalidContext
             }
-            guard context.anchor.beefyRoot == history.mmr.hash() else {
+            guard context.anchor.beefyRoot == history.mmr.superPeak() else {
                 throw .invalidContext
             }
             guard context.lookupAnchor.timeslot >= timeslot - UInt32(config.value.maxLookupAnchorAge) else {

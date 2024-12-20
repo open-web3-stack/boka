@@ -332,7 +332,7 @@ extension Accumulation {
         workReports: [WorkReport]
     ) async throws -> (numAccumulated: Int, state: AccumulateState, commitments: Set<Commitment>) {
         let sumPrevilegedGas = privilegedServices.basicGas.values.reduce(Gas(0)) { $0 + $1.value }
-        let minTotalGas = config.value.coreAccumulationGas * Gas(config.value.totalNumberOfCores) + sumPrevilegedGas
+        let minTotalGas = config.value.workReportAccumulationGas * Gas(config.value.totalNumberOfCores) + sumPrevilegedGas
         let gasLimit = max(config.value.totalAccumulationGas, minTotalGas)
 
         let res = try await outerAccumulate(

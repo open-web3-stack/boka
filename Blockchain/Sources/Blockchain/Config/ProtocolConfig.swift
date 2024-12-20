@@ -1,119 +1,119 @@
 import PolkaVM
 import Utils
 
-// constants defined in the graypaper
+/// constants defined in the graypaper
 public struct ProtocolConfig: Sendable, Codable, Equatable {
-    // A = 8: The period, in seconds, between audit tranches.
+    /// A = 8: The period, in seconds, between audit tranches.
     public var auditTranchePeriod: Int
 
-    // BI = 10: The additional minimum balance required per item of elective service state.
+    /// BI = 10: The additional minimum balance required per item of elective service state.
     public var additionalMinBalancePerStateItem: Int
 
-    // BL = 1: The additional minimum balance required per octet of elective service state.
+    /// BL = 1: The additional minimum balance required per octet of elective service state.
     public var additionalMinBalancePerStateByte: Int
 
-    // BS = 100: The basic minimum balance which all services require.
+    /// BS = 100: The basic minimum balance which all services require.
     public var serviceMinBalance: Int
 
-    // C = 341: The total number of cores.
+    /// C = 341: The total number of cores.
     public var totalNumberOfCores: Int
 
-    // D = 28, 800: The period in timeslots after which an unreferenced preimage may be expunged.
+    /// D = 28, 800: The period in timeslots after which an unreferenced preimage may be expunged.
     public var preimagePurgePeriod: Int
 
-    // E = 600: The length of an epoch in timeslots.
+    /// E = 600: The length of an epoch in timeslots.
     public var epochLength: Int
 
-    // F = 2: The audit bias factor, the expected number of additional validators who will audit a work-report in the
-    // following tranche for each no-show in the previous.
+    /// F = 2: The audit bias factor, the expected number of additional validators who will audit a work-report in the
+    /// following tranche for each no-show in the previous.
     public var auditBiasFactor: Int
 
-    // GA: The total gas allocated to a core for Accumulation.
-    public var coreAccumulationGas: Gas
+    /// GA: The gas allocated to invoke a work-report's Accumulation logic.
+    public var workReportAccumulationGas: Gas
 
-    // GI: The gas allocated to invoke a work-package’s Is-Authorized logic.
+    /// GI: The gas allocated to invoke a work-package’s Is-Authorized logic.
     public var workPackageAuthorizerGas: Gas
 
-    // GR: The total gas allocated for a work-package’s Refine logic.
+    /// GR: The gas allocated to invoke a work-package's Refine logic.
     public var workPackageRefineGas: Gas
 
-    // GT: The total gas allocated across all cores for Accumulation.
+    /// GT: The total gas allocated across for all Accumulation.
     public var totalAccumulationGas: Gas
 
-    // H = 8: The size of recent history, in blocks.
+    /// H = 8: The size of recent history, in blocks.
     public var recentHistorySize: Int
 
-    // I = 4: The maximum amount of work items in a package.
+    /// I = 4: The maximum amount of work items in a package.
     public var maxWorkItems: Int
 
-    // J = 8: The maximum sum of dependency items in a work-report.
+    /// J = 8: The maximum sum of dependency items in a work-report.
     public var maxDepsInWorkReport: Int
 
-    // K = 16: The maximum number of tickets which may be submitted in a single extrinsic.
+    /// K = 16: The maximum number of tickets which may be submitted in a single extrinsic.
     public var maxTicketsPerExtrinsic: Int
 
-    // L = 14, 400: The maximum age in timeslots of the lookup anchor.
+    /// L = 14, 400: The maximum age in timeslots of the lookup anchor.
     public var maxLookupAnchorAge: Int
 
-    // N = 2: The number of ticket entries per validator.
+    /// N = 2: The number of ticket entries per validator.
     public var ticketEntriesPerValidator: Int
 
-    // O = 8: The maximum number of items in the authorizations pool.
+    /// O = 8: The maximum number of items in the authorizations pool.
     public var maxAuthorizationsPoolItems: Int
 
-    // P = 6: The slot period, in seconds.
+    /// P = 6: The slot period, in seconds.
     public var slotPeriodSeconds: Int
 
-    // Q = 80: The number of items in the authorizations queue.
+    /// Q = 80: The number of items in the authorizations queue.
     public var maxAuthorizationsQueueItems: Int
 
-    // R = 10: The rotation period of validator-core assignments, in timeslots.
+    /// R = 10: The rotation period of validator-core assignments, in timeslots.
     public var coreAssignmentRotationPeriod: Int
 
-    // U = 5: The period in timeslots after which reported but unavailable work may be replaced.
+    /// U = 5: The period in timeslots after which reported but unavailable work may be replaced.
     public var preimageReplacementPeriod: Int
 
-    // V = 1023: The total number of validators.
+    /// V = 1023: The total number of validators.
     public var totalNumberOfValidators: Int
 
-    // WC = 4,000,000: The maximum size of service code in octets.
+    /// WC = 4,000,000: The maximum size of service code in octets.
     public var maxServiceCodeSize: Int
 
-    // WE = 684: The basic size of our erasure-coded pieces.
+    /// WE = 684: The basic size of our erasure-coded pieces.
     public var erasureCodedPieceSize: Int
 
-    // WM = 2^11: The maximum number of entries in a work-package manifest.
+    /// WM = 2^11: The maximum number of entries in a work-package manifest.
     public var maxWorkPackageManifestEntries: Int
 
-    // WB = 12 * 2^20: The maximum size of an encoded work-package together with its extrinsic data and import impli-
-    // cations, in octets.
+    /// WB = 12 * 2^20: The maximum size of an encoded work-package together with its extrinsic data and import impli-
+    /// cations, in octets.
     public var maxEncodedWorkPackageSize: Int
 
-    // WG = WP*WE = 4104: The size of a segment in octets.
+    /// WG = WP*WE = 4104: The size of a segment in octets.
     public var segmentSize: Int
 
-    // WR = 48 * 2^10: The maximum total size of all output blobs in a work-report, in octets.
+    /// WR = 48 * 2^10: The maximum total size of all output blobs in a work-report, in octets.
     public var maxWorkReportOutputSize: Int
 
-    // WP = 6: The number of erasure-coded pieces in a segment.
+    /// WP = 6: The number of erasure-coded pieces in a segment.
     public var erasureCodedSegmentSize: Int
 
-    // WT = 128: The size of a transfer memo in octets.
+    /// WT = 128: The size of a transfer memo in octets.
     public var transferMemoSize: Int
 
-    // Y = 500: The number of slots into an epoch at which ticket-submission ends.
+    /// Y = 500: The number of slots into an epoch at which ticket-submission ends.
     public var ticketSubmissionEndSlot: Int
 
-    // ZA = 2: The pvm dynamic address alignment factor.
+    /// ZA = 2: The pvm dynamic address alignment factor.
     public var pvmDynamicAddressAlignmentFactor: Int
 
-    // ZI = 2^24: The standard pvm program initialization input data size.
+    /// ZI = 2^24: The standard pvm program initialization input data size.
     public var pvmProgramInitInputDataSize: Int
 
-    // ZZ = 2^16: The standard pvm program initialization zone size.
+    /// ZZ = 2^16: The standard pvm program initialization zone size.
     public var pvmProgramInitZoneSize: Int
 
-    // ZP = 2^12: The pvm memory page size.
+    /// ZP = 2^12: The pvm memory page size.
     public var pvmMemoryPageSize: Int
 
     public init(
@@ -125,7 +125,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         preimagePurgePeriod: Int,
         epochLength: Int,
         auditBiasFactor: Int,
-        coreAccumulationGas: Gas,
+        workReportAccumulationGas: Gas,
         workPackageAuthorizerGas: Gas,
         workPackageRefineGas: Gas,
         totalAccumulationGas: Gas,
@@ -163,7 +163,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         self.preimagePurgePeriod = preimagePurgePeriod
         self.epochLength = epochLength
         self.auditBiasFactor = auditBiasFactor
-        self.coreAccumulationGas = coreAccumulationGas
+        self.workReportAccumulationGas = workReportAccumulationGas
         self.workPackageAuthorizerGas = workPackageAuthorizerGas
         self.workPackageRefineGas = workPackageRefineGas
         self.totalAccumulationGas = totalAccumulationGas
@@ -198,7 +198,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
 public typealias ProtocolConfigRef = Ref<ProtocolConfig>
 
 extension ProtocolConfig: PvmConfig {}
-// silence the warning about cross module conformances as we owns all the code
+/// silence the warning about cross module conformances as we owns all the code
 extension Ref: @retroactive PvmConfig where T == ProtocolConfig {
     public var pvmDynamicAddressAlignmentFactor: Int { value.pvmDynamicAddressAlignmentFactor }
     public var pvmProgramInitInputDataSize: Int { value.pvmProgramInitInputDataSize }
@@ -224,8 +224,8 @@ extension ProtocolConfig {
             epochLength: other.epochLength != 0 ? other.epochLength : epochLength,
             auditBiasFactor: other.auditBiasFactor != 0
                 ? other.auditBiasFactor : auditBiasFactor,
-            coreAccumulationGas: other.coreAccumulationGas.value != 0
-                ? other.coreAccumulationGas : coreAccumulationGas,
+            workReportAccumulationGas: other.workReportAccumulationGas.value != 0
+                ? other.workReportAccumulationGas : workReportAccumulationGas,
             workPackageAuthorizerGas: other.workPackageAuthorizerGas.value != 0
                 ? other.workPackageAuthorizerGas : workPackageAuthorizerGas,
             workPackageRefineGas: other.workPackageRefineGas.value != 0
@@ -306,8 +306,8 @@ extension ProtocolConfig {
         preimagePurgePeriod = try decode(.preimagePurgePeriod, defaultValue: 0, required: required)
         epochLength = try decode(.epochLength, defaultValue: 0, required: required)
         auditBiasFactor = try decode(.auditBiasFactor, defaultValue: 0, required: required)
-        coreAccumulationGas = try decode(
-            .coreAccumulationGas, defaultValue: Gas(0), required: required
+        workReportAccumulationGas = try decode(
+            .workReportAccumulationGas, defaultValue: Gas(0), required: required
         )
         workPackageAuthorizerGas = try decode(
             .workPackageAuthorizerGas, defaultValue: Gas(0), required: required
@@ -435,11 +435,11 @@ extension ProtocolConfig {
         }
     }
 
-    public enum CoreAccumulationGas: ReadGas {
+    public enum WorkReportAccumulationGas: ReadGas {
         public typealias TConfig = ProtocolConfigRef
         public typealias TOutput = Gas
         public static func read(config: ProtocolConfigRef) -> Gas {
-            config.value.coreAccumulationGas
+            config.value.workReportAccumulationGas
         }
     }
 
