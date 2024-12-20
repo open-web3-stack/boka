@@ -23,7 +23,18 @@ public struct MMR: Sendable, Equatable, Codable {
         }
     }
 
-    public func hash() -> Data32 {
-        try! JamEncoder.encode(self).keccakHash()
+    public func superPeak() -> Data32 {
+        func helper(_ peaks: ArraySlice<Data32>) -> Data32 {
+            if peaks.count == 0 {
+                Data32()
+            } else if peaks.count == 1 {
+                peaks[0]
+            } else {
+                Keccak.hash("node", helper(peaks[0 ..< peaks.count - 1]), peaks.last!)
+            }
+        }
+
+        let nonNilPeaks = peaks.compactMap { $0 }
+        return helper(nonNilPeaks[...])
     }
 }
