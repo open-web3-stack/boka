@@ -162,7 +162,7 @@ final class NodeTests {
             await node2StoreMiddlware.wait()
         }
 
-        try await Task.sleep(for: .milliseconds(500))
+        try await Task.sleep(for: .milliseconds(1000))
 
         let validator1BestHead = await validator1.dataProvider.bestHead
         let validator2BestHead = await validator2.dataProvider.bestHead
