@@ -9,7 +9,7 @@ private let logger = Logger(label: "Runtime")
 public final class Runtime {
     public enum Error: Swift.Error {
         case safroleError(SafroleError)
-        case DisputeError(DisputeError)
+        case disputesError(DisputesError)
         case invalidTimeslot(got: TimeslotIndex, context: TimeslotIndex)
         case invalidReportAuthorizer
         case encodeError(any Swift.Error)
@@ -195,8 +195,8 @@ public final class Runtime {
             throw error
         } catch let error as SafroleError {
             throw .safroleError(error)
-        } catch let error as DisputeError {
-            throw .DisputeError(error)
+        } catch let error as DisputesError {
+            throw .disputesError(error)
         } catch {
             throw .other(error)
         }
