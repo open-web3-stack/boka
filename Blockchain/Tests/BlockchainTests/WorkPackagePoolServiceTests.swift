@@ -17,9 +17,7 @@ struct WorkPackagePoolServiceTests {
     let ringContext: Bandersnatch.RingContext
 
     init() async throws {
-        config = ProtocolConfigRef.dev.mutate { config in
-            config.ticketEntriesPerValidator = 4
-        }
+        config = ProtocolConfigRef.dev
         timeProvider = MockTimeProvider(time: 1000)
 
         let (genesisState, genesisBlock) = try State.devGenesis(config: config)
@@ -45,9 +43,8 @@ struct WorkPackagePoolServiceTests {
             allWorkPackages.append(wpOut)
         }
         await eventBus.publish(RuntimeEvents.WorkPackagesGenerated(items: allWorkPackages))
-        // Wait for the event to be processedBlockchain.RefinementContext
         await storeMiddleware.wait()
-        let workPackages = await workPackagecPoolService.getWorkPackage(for: CoreIndex(0))
+        let workPackages = await workPackagecPoolService.getWorkPackage()
         #expect(workPackages.array == Array(allWorkPackages).sorted())
     }
 }

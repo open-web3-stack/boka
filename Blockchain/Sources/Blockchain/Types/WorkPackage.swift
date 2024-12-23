@@ -48,18 +48,8 @@ public struct WorkPackage: Sendable, Equatable, Codable {
 }
 
 extension WorkPackage {
-    // workpackage to hash ?
     public func hash() -> Data32 {
         try! JamEncoder.encode(self).blake2b256hash()
-    }
-
-    // GP section 15.1 & 15.2
-    public func payload() -> Data32 {
-        // WorkPackage simple & the work result computation function
-        // TODO: Computation of Work Results 14.11
-        // TODO: 15.1
-        // TODO: 15.2
-        Data32.random()
     }
 }
 

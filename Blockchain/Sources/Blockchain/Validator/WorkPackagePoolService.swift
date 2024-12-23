@@ -4,13 +4,10 @@ import Utils
 private actor WorkPackageStorage {
     var logger: Logger!
     var workPackages: SortedUniqueArray<WorkPackageAndOutput> = .init()
-    var epoch: EpochIndex = 0
-    // add core
-    // var core: CoreIndex = 0
     let ringContext: Bandersnatch.RingContext
     var verifier: Bandersnatch.Verifier!
     var entropy: Data32 = .init()
-
+    // TODO: add serviceIndex: ServiceIndex?
     init(ringContext: Bandersnatch.RingContext) {
         self.ringContext = ringContext
     }
@@ -19,19 +16,7 @@ private actor WorkPackageStorage {
         self.logger = logger
     }
 
-    func update(state: StateRef, config: ProtocolConfigRef) throws {
-        // change epoch to core?
-        let newEpoch = state.value.timeslot.timeslotToEpochIndex(config: config)
-        if epoch != newEpoch {
-            logger.info("Updating verifier for epoch \(newEpoch)")
-            // TODO: change to core verifier
-            let commitment = try Bandersnatch.RingCommitment(data: state.value.safroleState.ticketsVerifier)
-            verifier = Bandersnatch.Verifier(ctx: ringContext, commitment: commitment)
-            epoch = newEpoch
-            entropy = state.value.entropyPool.t3
-            workPackages.removeAll()
-        }
-    }
+    func update(state _: StateRef, config _: ProtocolConfigRef) throws {}
 
     func add(packages: [WorkPackageAndOutput], config: ProtocolConfigRef) {
         for package in packages {
@@ -49,12 +34,12 @@ private actor WorkPackageStorage {
     }
 
     func removeWorkPackages(_ packages: [WorkPackageAndOutput]) {
-        workPackages.remove { guarantee in
-            packages.contains { $0 == guarantee }
+        workPackages.remove { workPackage in
+            packages.contains { $0 == workPackage }
         }
     }
 
-    func getWorkPackage(for _: CoreIndex) -> SortedUniqueArray<WorkPackageAndOutput> {
+    func getWorkPackage() -> SortedUniqueArray<WorkPackageAndOutput> {
         workPackages
     }
 }
@@ -97,7 +82,7 @@ public final class WorkPackagePoolService: ServiceBase, @unchecked Sendable {
         await storage.add(packages: packages, config: config)
     }
 
-    public func getWorkPackage(for core: CoreIndex) async -> SortedUniqueArray<WorkPackageAndOutput> {
-        await storage.getWorkPackage(for: core)
+    public func getWorkPackage() async -> SortedUniqueArray<WorkPackageAndOutput> {
+        await storage.getWorkPackage()
     }
 }

@@ -50,8 +50,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
     }
 
-    public func scheduleGuaranteeTasks(epoch _: EpochIndex) async throws {
-        // let timeslot = epoch.epochToTimeslotIndex(config: config)
+    public func scheduleGuaranteeTasks() async throws {
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
         // The most recent block’s τimeslot.
         let timeslot = state.value.timeslot
@@ -61,21 +60,14 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             timeslot: timeslot
         )
         let coreCount = currentCoreAssignment.count
-        for coreIndex in 0 ..< coreCount {
-            let core = currentCoreAssignment[coreIndex]
-            let workPackages = await workPackagePool.getWorkPackage(for: core)
-            for workPackage in workPackages.array {
-                let validateWP = try validateWorkPackage(workPackage.workPackage)
-                if validateWP {
-                    let workReport = try await createWorkReport(for: workPackage.workPackage, core: core)
-                    // sign work report
-                    // eventbus
-                } else {
-                    logger.error("WorkPackage validation failed")
-                }
+        let workPackages = await workPackagePool.getWorkPackage()
+        for workPackage in workPackages.array {
+            let validateWP = try validateWorkPackage(workPackage.workPackage)
+            if validateWP {
+                let workReport = try await createWorkReport(for: workPackage.workPackage)
+            } else {
+                logger.error("WorkPackage validation failed")
             }
-
-            //
         }
     }
 
@@ -97,31 +89,48 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
 //        ) async throws -> (result: Result<Data, WorkResultError>, exports: [Data])
 //    }
 
-    private func createWorkReport(for workPackage: WorkPackage, core _: CoreIndex) async throws -> WorkReport {
-        // TODO:
-        // RefineInvocation ouput
-        // outdata -> workreport struct
+    private func createWorkReport(for workPackage: WorkPackage) async throws -> WorkReport {
+        // TODO: B.3. Refine Invocation
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
+        // workpackage from l2 p2p server
+        // workpackage -> workresult -> workreport -> chunk & publish
+        var ServiceAccountDetails = try await state.value.get(serviceAccount: workPackage.authorizationServiceIndex)
+        let packageHash = workPackage.hash()
+        var serviceAccounts = [ServiceIndex: ServiceAccount]()
+        for item in workPackage.workItems {
+            let gas = Gas(0)
+            var serviceIndex = item.serviceIndex
+            let workPackageHash = packageHash
+            let workPayload = item.payloadBlob
+            let refinementCtx = workPackage.context
+            let authorizerHash = workPackage.authorizationCodeHash
+            let authorizationOutput = Data() // isAuthorizaFunction
+            // 14.2.1. Segments, Imports and Exports. Imports DA
+            let importSegments: [Data] = []
+            // from off-chain preimage
+            let extrinsicDataBlobs: [Data] = []
+            // TODO: 14.3.1. Exporting.
+            let exportSegmentOffset: UInt64 = 0 // Export -> DA
+            // RefineInvocation invoke up data to workresult
+            logger.info("gas: \(gas)")
+            logger.info("serviceIndex: \(serviceIndex)")
+            logger.info("workPackageHash: \(workPackageHash)")
+            logger.info("workPayload: \(workPayload)")
+            logger.info("refinementCtx: \(refinementCtx)")
+            logger.info("authorizerHash: \(authorizerHash)")
+            logger.info("authorizationOutput: \(authorizationOutput)")
+            logger.info("importSegments: \(importSegments)")
+            logger.info("extrinsicDataBlobs: \(extrinsicDataBlobs)")
+            logger.info("exportSegmentOffset: \(exportSegmentOffset)")
+            logger.info("workPackage: \(workPackage)")
+            logger.info("newServiceAccounts: \(serviceAccounts.count)")
+        }
 
-        var gas = Gas(0)
-//        var ServiceAccountDetails = try await state.value.get(serviceAccount: workPackage.authorizationServiceIndex)
-        // how to get service accounts
-        var serviceAccounts = state.value.serviceAccount
-        var newServiceAccounts = [ServiceIndex: ServiceAccount]()
-        var ServiceIndex = workPackage.authorizationServiceIndex
-        let workPackageHash = workPackage.hash() // workPackage hash
-        let workPayload = workPackage.payload() // workpackage payload
-        let refinementCtx = workPackage.context
-        let authorizerHash = workPackage.authorizationCodeHash
-        let authorizationOutput = Data()
-        let importSegments: [Data] = []
-        let extrinsicDataBlobs: [Data] = []
-        let exportSegmentOffset: UInt64 = 0
         return WorkReport.dummy(config: config)
     }
 
     private func validateWorkPackage(_: WorkPackage) throws -> Bool {
-        // Add validate func
+        // TODO: Add validate func
         true
     }
 
@@ -129,7 +138,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         logger.debug("Processing guarantees for epoch \(epoch)")
         await withSpan("GuaranteeingService.onBeforeEpoch", logger: logger) { _ in
             guarantees.value = []
-            try await scheduleGuaranteeTasks(epoch: epoch)
+            try await scheduleGuaranteeTasks()
         }
     }
 
