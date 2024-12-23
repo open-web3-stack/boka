@@ -9,6 +9,8 @@ import Utils
 // if successful, create a work report and publish it
 // chunk the work package and exported data
 // publish the chunks
+struct DefaultAuthorizationFunction: IsAuthorizedFunction {}
+
 public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore
@@ -16,6 +18,9 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     private let extrinsicPool: ExtrinsicPoolService
     private let workPackagePool: WorkPackagePoolService
     private let guarantees: ThreadSafeContainer<[RuntimeEvents.GuaranteeGenerated]> = .init([])
+    // add DefaultAuthorizationFunction
+    private let authorizationFunction: DefaultAuthorizationFunction
+    private let daataAvailability: DataAvailability
 
     public init(
         config: ProtocolConfigRef,
@@ -24,13 +29,22 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         dataProvider: BlockchainDataProvider,
         keystore: KeyStore,
         runtime: Runtime,
-        extrinsicPool: ExtrinsicPoolService
+        extrinsicPool: ExtrinsicPoolService,
+        dataStore: DataStore
     ) async {
         self.dataProvider = dataProvider
         self.keystore = keystore
         self.runtime = runtime
         self.extrinsicPool = extrinsicPool
+        authorizationFunction = DefaultAuthorizationFunction()
         workPackagePool = await WorkPackagePoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
+        daataAvailability = await DataAvailability(
+            config: config,
+            eventBus: eventBus,
+            scheduler: scheduler,
+            dataProvider: dataProvider,
+            dataStore: dataStore
+        )
         super.init(id: "GuaranteeingService", config: config, eventBus: eventBus, scheduler: scheduler)
 
         await subscribe(RuntimeEvents.GuaranteeGenerated.self, id: "GuaranteeingService.GuaranteeGenerated") { [weak self] event in
@@ -54,17 +68,22 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
         // The most recent block’s τimeslot.
         let timeslot = state.value.timeslot
-        let currentCoreAssignment = state.value.getCoreAssignment(
-            config: config,
-            randomness: state.value.entropyPool.t2,
-            timeslot: timeslot
-        )
-        let coreCount = currentCoreAssignment.count
+        let coreAssignmentRotationPeriod = UInt32(config.value.coreAssignmentRotationPeriod)
+        let nowTimeslot = timeProvider.getTime().timeToTimeslot(config: config)
+        // bool isCurrent
+        let isCurrent = (nowTimeslot / coreAssignmentRotationPeriod) == (timeslot / coreAssignmentRotationPeriod)
+        // coreAuthorizationPool
+        var pool = state.value.coreAuthorizationPool
+        for coreIndex in 0 ..< pool.count {
+            var corePool = pool[coreIndex]
+            logger.info("corePool: \(corePool)")
+        }
+
         let workPackages = await workPackagePool.getWorkPackage()
         for workPackage in workPackages.array {
-            let validateWP = try validateWorkPackage(workPackage.workPackage)
-            if validateWP {
+            if try validate(workPackage: workPackage.workPackage) {
                 let workReport = try await createWorkReport(for: workPackage.workPackage)
+                logger.info("workReport: \(workReport)")
             } else {
                 logger.error("WorkPackage validation failed")
             }
@@ -89,47 +108,66 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
 //        ) async throws -> (result: Result<Data, WorkResultError>, exports: [Data])
 //    }
 
+    // workpackage from l2 p2p server
+    // workpackage -> workresult -> workreport
     private func createWorkReport(for workPackage: WorkPackage) async throws -> WorkReport {
         // TODO: B.3. Refine Invocation
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
-        // workpackage from l2 p2p server
-        // workpackage -> workresult -> workreport -> chunk & publish
-        var ServiceAccountDetails = try await state.value.get(serviceAccount: workPackage.authorizationServiceIndex)
         let packageHash = workPackage.hash()
+        // TODO: find out service account & add it
         var serviceAccounts = [ServiceIndex: ServiceAccount]()
-        for item in workPackage.workItems {
-            let gas = Gas(0)
-            var serviceIndex = item.serviceIndex
-            let workPackageHash = packageHash
-            let workPayload = item.payloadBlob
-            let refinementCtx = workPackage.context
-            let authorizerHash = workPackage.authorizationCodeHash
-            let authorizationOutput = Data() // isAuthorizaFunction
-            // 14.2.1. Segments, Imports and Exports. Imports DA
-            let importSegments: [Data] = []
-            // from off-chain preimage
-            let extrinsicDataBlobs: [Data] = []
-            // TODO: 14.3.1. Exporting.
-            let exportSegmentOffset: UInt64 = 0 // Export -> DA
-            // RefineInvocation invoke up data to workresult
-            logger.info("gas: \(gas)")
-            logger.info("serviceIndex: \(serviceIndex)")
-            logger.info("workPackageHash: \(workPackageHash)")
-            logger.info("workPayload: \(workPayload)")
-            logger.info("refinementCtx: \(refinementCtx)")
-            logger.info("authorizerHash: \(authorizerHash)")
-            logger.info("authorizationOutput: \(authorizationOutput)")
-            logger.info("importSegments: \(importSegments)")
-            logger.info("extrinsicDataBlobs: \(extrinsicDataBlobs)")
-            logger.info("exportSegmentOffset: \(exportSegmentOffset)")
-            logger.info("workPackage: \(workPackage)")
-            logger.info("newServiceAccounts: \(serviceAccounts.count)")
+        // TODO: add current coreIndex
+        let coreIndex = CoreIndex(0)
+        // IsAuthorizedFunction invoke
+        let res = try await authorizationFunction.invoke(config: config, package: workPackage, coreIndex: coreIndex)
+        switch res {
+        case let .success(data):
+            for item in workPackage.workItems {
+                let gas = item.refineGasLimit
+                let serviceIndex = item.serviceIndex
+                let workPackageHash = packageHash
+                let workPayload = item.payloadBlob
+                let refinementCtx = workPackage.context
+                let authorizerHash = workPackage.authorizationCodeHash
+                let authorizationOutput = data
+                // 14.2.1. Segments, Imports and Exports. Imports DA
+                var importSegments = [Data]()
+                for importSegment in item.inputs {
+                    switch importSegment.root {
+                    case let .segmentRoot(data):
+                        importSegments.append(data.data)
+                    case let .workPackageHash(data):
+                        importSegments.append(data.data)
+                    }
+                }
+                // TODO: exportSegments
+                try await daataAvailability.exportSegments(data: importSegments)
+                // from off-chain preimage
+                let extrinsicDataBlobs: [Data] = []
+                // TODO: 14.3.1. Exporting.
+                let exportSegmentOffset: UInt64 = 0 // Export -> DA
+                // RefineInvocation invoke up data to workresult
+                logger.info("gas: \(gas)")
+                logger.info("serviceIndex: \(serviceIndex)")
+                logger.info("workPackageHash: \(workPackageHash)")
+                logger.info("workPayload: \(workPayload)")
+                logger.info("refinementCtx: \(refinementCtx)")
+                logger.info("authorizerHash: \(authorizerHash)")
+                logger.info("authorizationOutput: \(authorizationOutput)")
+                logger.info("importSegments: \(importSegments)")
+                logger.info("extrinsicDataBlobs: \(extrinsicDataBlobs)")
+                logger.info("exportSegmentOffset: \(exportSegmentOffset)")
+                logger.info("workPackage: \(workPackage)")
+                logger.info("newServiceAccounts: \(serviceAccounts.count)")
+            }
+        case let .failure(error):
+            logger.error("Authorization failed with error: \(error)")
         }
 
         return WorkReport.dummy(config: config)
     }
 
-    private func validateWorkPackage(_: WorkPackage) throws -> Bool {
+    private func validate(workPackage _: WorkPackage) throws -> Bool {
         // TODO: Add validate func
         true
     }

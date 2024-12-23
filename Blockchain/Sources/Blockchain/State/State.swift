@@ -463,7 +463,15 @@ extension State: Guaranteeing {
     }
 }
 
-struct DummyFunction: AccumulateFunction, OnTransferFunction {
+struct DummyFunction: AccumulateFunction, OnTransferFunction, IsAuthorizedFunction {
+    func invoke(
+        config _: ProtocolConfigRef,
+        package _: WorkPackage,
+        coreIndex _: CoreIndex
+    ) async throws -> Result<Data, WorkResultError> {
+        fatalError("not implemented")
+    }
+
     func invoke(
         config _: ProtocolConfigRef,
         accounts _: inout some ServiceAccounts,
@@ -494,6 +502,10 @@ extension State: Accumulation {
     }
 
     public var onTransferFunction: OnTransferFunction {
+        DummyFunction()
+    }
+
+    public var isAuthorizedFunction: IsAuthorizedFunction {
         DummyFunction()
     }
 }

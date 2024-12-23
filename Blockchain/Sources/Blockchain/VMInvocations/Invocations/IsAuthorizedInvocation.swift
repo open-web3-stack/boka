@@ -7,7 +7,7 @@ public protocol IsAuthorizedFunction {
         config: ProtocolConfigRef,
         package: WorkPackage,
         coreIndex: CoreIndex
-    ) throws -> Result<Data, WorkResultError>
+    ) async throws -> Result<Data, WorkResultError>
 }
 
 extension IsAuthorizedFunction {

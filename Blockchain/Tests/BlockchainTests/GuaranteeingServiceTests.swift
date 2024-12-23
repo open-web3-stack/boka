@@ -32,7 +32,8 @@ struct GuaranteeingServiceTests {
             dataProvider: services.dataProvider,
             keystore: services.keystore,
             runtime: runtime,
-            extrinsicPool: extrinsicPoolService
+            extrinsicPool: extrinsicPoolService,
+            dataStore: services.dataStore
         )
         return (services, guaranteeingService)
     }
@@ -50,6 +51,6 @@ struct GuaranteeingServiceTests {
         // Check if xxx events were published
 
         // Check if block author tasks were scheduled
-        #expect(scheduler.taskCount == 0)
+        #expect(scheduler.taskCount == 1)
     }
 }
