@@ -84,26 +84,12 @@ struct SafroleTestcase: Codable {
     var postState: SafroleState
 }
 
-enum SafroleTestVariants: String, CaseIterable {
-    case tiny
-    case full
-
-    var config: ProtocolConfigRef {
-        switch self {
-        case .tiny:
-            ProtocolConfigRef.tiny
-        case .full:
-            ProtocolConfigRef.mainnet
-        }
-    }
-}
-
 struct SafroleTests {
-    static func loadTests(variant: SafroleTestVariants) throws -> [Testcase] {
+    static func loadTests(variant: TestVariants) throws -> [Testcase] {
         try TestLoader.getTestcases(path: "safrole/\(variant)", extension: "bin")
     }
 
-    func safroleTests(_ input: Testcase, variant: SafroleTestVariants) throws {
+    func safroleTests(_ input: Testcase, variant: TestVariants) throws {
         let config = variant.config
         let testcase = try JamDecoder.decode(SafroleTestcase.self, from: input.data, withConfig: config)
 

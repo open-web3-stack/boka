@@ -1,3 +1,4 @@
+import Blockchain
 import Foundation
 
 // somehow without this the GH Actions CI fails
@@ -6,6 +7,20 @@ extension Foundation.Bundle: @unchecked @retroactive Sendable {}
 struct Testcase: CustomStringConvertible {
     var description: String
     var data: Data
+}
+
+enum TestVariants: String, CaseIterable {
+    case tiny
+    case full
+
+    var config: ProtocolConfigRef {
+        switch self {
+        case .tiny:
+            ProtocolConfigRef.tiny
+        case .full:
+            ProtocolConfigRef.mainnet
+        }
+    }
 }
 
 enum TestLoader {

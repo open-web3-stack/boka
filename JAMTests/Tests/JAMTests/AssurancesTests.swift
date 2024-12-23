@@ -25,26 +25,12 @@ struct AssurancesTestcase: Codable {
     var postState: AssuranceState
 }
 
-enum AssurancesTestVariants: String, CaseIterable {
-    case tiny
-    case full
-
-    var config: ProtocolConfigRef {
-        switch self {
-        case .tiny:
-            ProtocolConfigRef.tiny
-        case .full:
-            ProtocolConfigRef.mainnet
-        }
-    }
-}
-
 struct AssurancesTests {
-    static func loadTests(variant: AssurancesTestVariants) throws -> [Testcase] {
+    static func loadTests(variant: TestVariants) throws -> [Testcase] {
         try TestLoader.getTestcases(path: "assurances/\(variant)", extension: "bin")
     }
 
-    func assurancesTests(_ testcase: Testcase, variant: AssurancesTestVariants) throws {
+    func assurancesTests(_ testcase: Testcase, variant: TestVariants) throws {
         let config = variant.config
         let decoder = JamDecoder(data: testcase.data, config: config)
         let testcase = try decoder.decode(AssurancesTestcase.self)
