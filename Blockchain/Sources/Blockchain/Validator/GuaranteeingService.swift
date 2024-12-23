@@ -10,6 +10,7 @@ import Utils
 // chunk the work package and exported data
 // publish the chunks
 struct DefaultAuthorizationFunction: IsAuthorizedFunction {}
+struct DefaultRefineInvocation: RefineInvocation {}
 
 public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     private let dataProvider: BlockchainDataProvider
@@ -21,6 +22,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     // add DefaultAuthorizationFunction
     private let authorizationFunction: DefaultAuthorizationFunction
     private let daataAvailability: DataAvailability
+    private let refineInvocation: DefaultRefineInvocation
 
     public init(
         config: ProtocolConfigRef,
@@ -37,6 +39,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         self.runtime = runtime
         self.extrinsicPool = extrinsicPool
         authorizationFunction = DefaultAuthorizationFunction()
+        refineInvocation = DefaultRefineInvocation()
         workPackagePool = await WorkPackagePoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
         daataAvailability = await DataAvailability(
             config: config,
@@ -123,12 +126,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         switch res {
         case let .success(data):
             for item in workPackage.workItems {
-                let gas = item.refineGasLimit
-                let serviceIndex = item.serviceIndex
-                let workPackageHash = packageHash
-                let workPayload = item.payloadBlob
-                let refinementCtx = workPackage.context
-                let authorizerHash = workPackage.authorizationCodeHash
                 let authorizationOutput = data
                 // 14.2.1. Segments, Imports and Exports. Imports DA
                 var importSegments = [Data]()
@@ -143,22 +140,26 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                 // TODO: exportSegments
                 try await daataAvailability.exportSegments(data: importSegments)
                 // from off-chain preimage
-                let extrinsicDataBlobs: [Data] = []
                 // TODO: 14.3.1. Exporting.
                 let exportSegmentOffset: UInt64 = 0 // Export -> DA
                 // RefineInvocation invoke up data to workresult
-                logger.info("gas: \(gas)")
-                logger.info("serviceIndex: \(serviceIndex)")
-                logger.info("workPackageHash: \(workPackageHash)")
-                logger.info("workPayload: \(workPayload)")
-                logger.info("refinementCtx: \(refinementCtx)")
-                logger.info("authorizerHash: \(authorizerHash)")
-                logger.info("authorizationOutput: \(authorizationOutput)")
-                logger.info("importSegments: \(importSegments)")
-                logger.info("extrinsicDataBlobs: \(extrinsicDataBlobs)")
-                logger.info("exportSegmentOffset: \(exportSegmentOffset)")
-                logger.info("workPackage: \(workPackage)")
-                logger.info("newServiceAccounts: \(serviceAccounts.count)")
+                let refineRes = try await refineInvocation
+                    .invoke(
+                        config: config,
+                        serviceAccounts: state.value,
+                        codeHash: workPackage.authorizationCodeHash, // codeHash
+                        gas: item.refineGasLimit,
+                        service: item.serviceIndex,
+                        workPackageHash: packageHash,
+                        workPayload: item.payloadBlob,
+                        refinementCtx: workPackage.context,
+                        authorizerHash: Data32(), // ??
+                        authorizationOutput: Data(), // ?
+                        importSegments: importSegments,
+                        extrinsicDataBlobs: [], // from off-chain preimage
+                        exportSegmentOffset: 0 // Export -> DA
+                    )
+                logger.info("Refined work package: \(refineRes)")
             }
         case let .failure(error):
             logger.error("Authorization failed with error: \(error)")
