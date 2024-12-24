@@ -126,7 +126,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                     }
                 }
                 // the import segments and extrinsic data blobs as dictated by the work-item ?
-                // from off-chain preimage ?
                 // Extrinsic data are blobs generally by the work-package builder.
                 let extrinsicDataBlobs = [Data]()
                 // TODO: fix exportSegments func
@@ -148,13 +147,15 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                         extrinsicDataBlobs: extrinsicDataBlobs,
                         exportSegmentOffset: exportSegmentOffset
                     )
-                // Export -> DA ？ or exportSegmentOffset + outputDataSegmentsCount ？
+                // Export -> DA or exportSegmentOffset + outputDataSegmentsCount ？
                 exportSegmentOffset += UInt64(item.outputDataSegmentsCount)
                 logger.info("Refined work package: \(refineRes)")
+                // TODO: generate payloadHash the hash of the payload (l) within the work item
+                // which was executed in the refine stage to give this result.
                 let workResult = WorkResult(
                     serviceIndex: item.serviceIndex,
                     codeHash: workPackage.authorizationCodeHash,
-                    payloadHash: Data32(), // TODO: generate payloadHash
+                    payloadHash: Data32(),
                     gas: item.refineGasLimit,
                     output: WorkOutput(refineRes.result)
                 )
