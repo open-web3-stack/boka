@@ -9,8 +9,8 @@ import Utils
 // if successful, create a work report and publish it
 // chunk the work package and exported data
 // publish the chunks
-struct DefaultAuthorizationFunction: IsAuthorizedFunction {}
-struct DefaultRefineInvocation: RefineInvocation {}
+struct GuaranteeingAuthorizationFunction: IsAuthorizedFunction {}
+struct GuaranteeingRefineInvocation: RefineInvocation {}
 
 public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     private let dataProvider: BlockchainDataProvider
@@ -20,9 +20,9 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     private let workPackagePool: WorkPackagePoolService
     private let guarantees: ThreadSafeContainer<[RuntimeEvents.GuaranteeGenerated]> = .init([])
     // add DefaultAuthorizationFunction
-    private let authorizationFunction: DefaultAuthorizationFunction
-    private let daataAvailability: DataAvailability
-    private let refineInvocation: DefaultRefineInvocation
+    private let authorizationFunction: GuaranteeingAuthorizationFunction
+    private let dataAvailability: DataAvailability
+    private let refineInvocation: GuaranteeingRefineInvocation
 
     public init(
         config: ProtocolConfigRef,
@@ -38,10 +38,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         self.keystore = keystore
         self.runtime = runtime
         self.extrinsicPool = extrinsicPool
-        authorizationFunction = DefaultAuthorizationFunction()
-        refineInvocation = DefaultRefineInvocation()
+        authorizationFunction = GuaranteeingAuthorizationFunction()
+        refineInvocation = GuaranteeingRefineInvocation()
         workPackagePool = await WorkPackagePoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
-        daataAvailability = await DataAvailability(
+        dataAvailability = await DataAvailability(
             config: config,
             eventBus: eventBus,
             scheduler: scheduler,
@@ -93,38 +93,19 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
     }
 
-//    public protocol RefineInvocation {
-//        func invoke(
-//            config: ProtocolConfigRef,
-//            serviceAccounts: some ServiceAccounts,
-//            codeHash: Data,
-//            gas: Gas,
-//            service: ServiceIndex,
-//            workPackageHash: Data32,
-//            workPayload: Data,
-//            refinementCtx: RefinementContext,
-//            authorizerHash: Data32,
-//            authorizationOutput: Data,
-//            importSegments: [Data], // array of Data4104
-//            extrinsicDataBlobs: [Data],
-//            exportSegmentOffset: UInt64
-//        ) async throws -> (result: Result<Data, WorkResultError>, exports: [Data])
-//    }
-
     // workpackage from l2 p2p server
     // workpackage -> workresult -> workreport
     private func createWorkReport(for workPackage: WorkPackage) async throws -> WorkReport {
         // TODO: B.3. Refine Invocation
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
         let packageHash = workPackage.hash()
-        // TODO: find out service account & add it
-        var serviceAccounts = [ServiceIndex: ServiceAccount]()
-        // TODO: add current coreIndex
+        // TODO: fid out current coreIndex
         let coreIndex = CoreIndex(0)
         // IsAuthorizedFunction invoke
         let res = try await authorizationFunction.invoke(config: config, package: workPackage, coreIndex: coreIndex)
         switch res {
         case let .success(data):
+            var workResults = [WorkResult]()
             for item in workPackage.workItems {
                 let authorizationOutput = data
                 // 14.2.1. Segments, Imports and Exports. Imports DA
@@ -137,9 +118,9 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                         importSegments.append(data.data)
                     }
                 }
-                // TODO: exportSegments
-                try await daataAvailability.exportSegments(data: importSegments)
-                // from off-chain preimage
+                let extrinsicData = [Data]() // from off-chain preimage
+                // TODO: fix exportSegments func
+                try await dataAvailability.exportSegments(data: importSegments)
                 // TODO: 14.3.1. Exporting.
                 let exportSegmentOffset: UInt64 = 0 // Export -> DA
                 // RefineInvocation invoke up data to workresult
@@ -153,14 +134,33 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                         workPackageHash: packageHash,
                         workPayload: item.payloadBlob,
                         refinementCtx: workPackage.context,
-                        authorizerHash: Data32(), // ??
-                        authorizationOutput: Data(), // ?
+                        authorizerHash: Data32(), // TODO: add authorizerHash
+                        authorizationOutput: Data(), // TODO: add authorizationOutput
                         importSegments: importSegments,
-                        extrinsicDataBlobs: [], // from off-chain preimage
-                        exportSegmentOffset: 0 // Export -> DA
+                        extrinsicDataBlobs: extrinsicData,
+                        exportSegmentOffset: exportSegmentOffset // Export -> DA
                     )
                 logger.info("Refined work package: \(refineRes)")
+                let workResult = WorkResult(
+                    serviceIndex: item.serviceIndex,
+                    codeHash: workPackage.authorizationCodeHash,
+                    payloadHash: Data32(), // TODO: generate payloadHash
+                    gas: item.refineGasLimit,
+                    output: WorkOutput(refineRes.result)
+                )
+                workResults.append(workResult)
             }
+            // TODO: generate or find AvailabilitySpecifications
+            let packageSpecification = AvailabilitySpecifications.dummy(config: config)
+            return try WorkReport(
+                authorizerHash: Data32(), // TODO: add authorizerHash
+                coreIndex: coreIndex,
+                authorizationOutput: Data(), // TODO: add authorizationOutput
+                refinementContext: workPackage.context,
+                packageSpecification: packageSpecification,
+                lookup: [Data32: Data32](), // TODO: find out lookup
+                results: ConfigLimitedSizeArray(config: config, array: workResults)
+            )
         case let .failure(error):
             logger.error("Authorization failed with error: \(error)")
         }
