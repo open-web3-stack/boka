@@ -46,10 +46,7 @@ struct GuaranteeingServiceTests {
 
         await validatorService.on(genesis: genesisState)
 
-        let events = await storeMiddleware.wait()
-
-        // Check if xxx events were published
-
+        await storeMiddleware.wait()
         // Check if block author tasks were scheduled
         #expect(scheduler.taskCount == 1)
     }

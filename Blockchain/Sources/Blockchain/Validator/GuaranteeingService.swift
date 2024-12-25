@@ -72,16 +72,15 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         // The most recent block’s τimeslot.
         let timeslot = state.value.timeslot
         let coreAssignmentRotationPeriod = UInt32(config.value.coreAssignmentRotationPeriod)
+        let currentCoreAssignment = state.value.getCoreAssignment(
+            config: config,
+            randomness: state.value.entropyPool.t2,
+            timeslot: timeslot
+        )
+        let ed25519PublicKeys = state.value.currentValidators.map(\.ed25519)
+
         let nowTimeslot = timeProvider.getTime().timeToTimeslot(config: config)
-        // bool isCurrent
-        let isCurrent = (nowTimeslot / coreAssignmentRotationPeriod) == (timeslot / coreAssignmentRotationPeriod)
-        // coreAuthorizationPool
-        var pool = state.value.coreAuthorizationPool
-        for coreIndex in 0 ..< pool.count {
-            var corePool = pool[coreIndex]
-            logger.info("corePool: \(corePool)")
-        }
-        // TODO: find out current coreIndex
+        // TODO: find out the core on which it should be executed
         let coreIndex = CoreIndex(0)
 
         let workPackages = await workPackagePool.getWorkPackage()
@@ -90,7 +89,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                 let workReport = try await createWorkReport(for: workPackage.workPackage, coreIndex: coreIndex)
                 logger.info("workReport: \(workReport)")
                 // TODO: eventbus publish workReport
-                // eventBus.publish()
+                let addEvent = RuntimeEvents.WorkReportGenerated(items: [workReport])
+                publish(addEvent)
             } else {
                 logger.error("WorkPackage validation failed")
             }
@@ -100,21 +100,24 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     // workpackage from l2 p2p server
     // workpackage -> workresult -> workreport
     private func createWorkReport(for workPackage: WorkPackage, coreIndex: CoreIndex) async throws -> WorkReport {
-        // TODO: B.3. Refine Invocation
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
         let packageHash = workPackage.hash()
+        // We define the work-package’s implied authorizer as pa,
+        // the hash of the concatenation of the authorization code and the parameterization.
+        // We define the authorization code as pc and require that it be available at the time
+        // of the lookup anchor block from the historical lookup of service ph
+        // The historical lookup function, Λ, is defined in equation 9.7.
         // TODO: add authorizerHash
         let authorizerHash = Data32()
         // TODO: add authorizationOutput
-        let authorizationOutput = Data()
         var exportSegmentOffset: UInt64 = 0
-        // IsAuthorizedFunction invoke
+        // B.2. Is-Authorized Invocation
         let res = try await authorizationFunction.invoke(config: config, package: workPackage, coreIndex: coreIndex)
         switch res {
-        case let .success(data):
+        // authorizationFunction -> authorizationOutput
+        case let .success(authorizationOutput):
             var workResults = [WorkResult]()
             for item in workPackage.workItems {
-                let authorizationOutput = data
                 // 14.2.1. Segments, Imports and Exports. Imports DA
                 var importSegments = [Data]()
                 for importSegment in item.inputs {
@@ -125,6 +128,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                         importSegments.append(data.data)
                     }
                 }
+
                 // the import segments and extrinsic data blobs as dictated by the work-item ?
                 // Extrinsic data are blobs generally by the work-package builder.
                 let extrinsicDataBlobs = [Data]()
@@ -152,6 +156,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                 logger.info("Refined work package: \(refineRes)")
                 // TODO: generate payloadHash the hash of the payload (l) within the work item
                 // which was executed in the refine stage to give this result.
+                // Computation of Work Results
                 let workResult = WorkResult(
                     serviceIndex: item.serviceIndex,
                     codeHash: workPackage.authorizationCodeHash,
@@ -162,14 +167,25 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                 workResults.append(workResult)
             }
             // TODO: generate or find AvailabilitySpecifications
-            let packageSpecification = AvailabilitySpecifications.dummy(config: config)
+            let packageSpecification = AvailabilitySpecifications(
+                workPackageHash: packageHash,
+                length: 0,
+                erasureRoot: Data32(),
+                segmentRoot: Data32(),
+                segmentCount: UInt16(exportSegmentOffset)
+            )
+            // TODO: find out lookup
+            var oldLookups = [Data32: Data32]()
+            for item in state.value.recentHistory.items {
+                oldLookups.merge(item.lookup, uniquingKeysWith: { _, new in new })
+            }
             return try WorkReport(
                 authorizerHash: authorizerHash,
                 coreIndex: coreIndex,
                 authorizationOutput: authorizationOutput,
                 refinementContext: workPackage.context,
                 packageSpecification: packageSpecification,
-                lookup: [:], // TODO: find out lookup
+                lookup: oldLookups,
                 results: ConfigLimitedSizeArray(config: config, array: workResults)
             )
 
