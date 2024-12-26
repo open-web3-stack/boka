@@ -56,14 +56,14 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     public func on(genesis _: StateRef) async {
-        let nowTimeslot = timeProvider.getTime().timeToTimeslot(config: config)
-        let epoch = nowTimeslot.timeslotToEpochIndex(config: config)
-        await onGuaranteeingEpoch(epoch: epoch)
+//        let nowTimeslot = timeProvider.getTime().timeToTimeslot(config: config)
+//        let epoch = nowTimeslot.timeslotToEpochIndex(config: config)
+        await onGuaranteeing()
     }
 
     public func onSyncCompleted() async {
-        scheduleForNextEpoch("GuaranteeingService.scheduleForNextEpoch") { [weak self] epoch in
-            await self?.onGuaranteeingEpoch(epoch: epoch)
+        scheduleForNextEpoch("GuaranteeingService.scheduleForNextEpoch") { [weak self] _ in
+            await self?.onGuaranteeing()
         }
     }
 
@@ -88,7 +88,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             if try validate(workPackage: workPackage.workPackage) {
                 let workReport = try await createWorkReport(for: workPackage.workPackage, coreIndex: coreIndex)
                 logger.info("workReport: \(workReport)")
-                // TODO: eventbus publish workReport
                 let addEvent = RuntimeEvents.WorkReportGenerated(items: [workReport])
                 publish(addEvent)
             } else {
@@ -169,12 +168,12 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             // TODO: generate or find AvailabilitySpecifications
             let packageSpecification = AvailabilitySpecifications(
                 workPackageHash: packageHash,
-                length: 0,
+                length: 0, // xx
                 erasureRoot: Data32(),
                 segmentRoot: Data32(),
                 segmentCount: UInt16(exportSegmentOffset)
             )
-            // TODO: find out lookup
+
             var oldLookups = [Data32: Data32]()
             for item in state.value.recentHistory.items {
                 oldLookups.merge(item.lookup, uniquingKeysWith: { _, new in new })
@@ -200,10 +199,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         true
     }
 
-    private func onGuaranteeingEpoch(epoch: EpochIndex) async {
-        logger.debug("Processing guarantees for epoch \(epoch)")
+    private func onGuaranteeing() async {
         await withSpan("GuaranteeingService.onBeforeEpoch", logger: logger) { _ in
-            guarantees.value = []
             try await scheduleGuaranteeTasks()
         }
     }
