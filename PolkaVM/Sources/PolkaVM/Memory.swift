@@ -81,12 +81,12 @@ public class PageMap {
 
     public init(pageMap: [(address: UInt32, length: UInt32, access: PageAccess)], config: PvmConfig) {
         self.config = config
-        isReadableCache = LRUCache<Range<UInt32>, Bool>(totalCostLimit: 0, countLimit: 1024)
-        isWritableCache = LRUCache<Range<UInt32>, Bool>(totalCostLimit: 0, countLimit: 1024)
+        isReadableCache = .init(totalCostLimit: 0, countLimit: 1024)
+        isWritableCache = .init(totalCostLimit: 0, countLimit: 1024)
 
         for entry in pageMap {
             let startIndex = entry.address / UInt32(config.pvmMemoryPageSize)
-            let pages = StandardProgram.alignToPageSize(size: entry.length, config: config)
+            let pages = alignToNumberOfPages(size: entry.length)
 
             for i in startIndex ..< startIndex + pages {
                 pageTable[i] = entry.access
@@ -94,17 +94,22 @@ public class PageMap {
         }
     }
 
-    public func isReadable(pageStart: UInt32, pages: Int) -> Bool {
-        let pageRange = pageStart ..< pageStart + UInt32(pages)
+    private func alignToNumberOfPages(size: UInt32) -> UInt32 {
+        let pageSize = UInt32(config.pvmMemoryPageSize)
+        return (size + pageSize - 1) / pageSize
+    }
 
+    public func isReadable(pageStart: UInt32, pages: Int) -> Bool {
+        if pages == 0 { return false }
+        let pageRange = pageStart ..< pageStart + UInt32(pages)
         let cacheValue = isReadableCache.value(forKey: pageRange)
         if let cacheValue {
             return cacheValue
         }
 
-        var result = false
+        var result = true
         for i in pageRange {
-            result = result || (pageTable[i]?.isReadable() ?? false)
+            result = result && (pageTable[i]?.isReadable() ?? false)
         }
         isReadableCache.setValue(result, forKey: pageRange)
         return result
@@ -112,19 +117,19 @@ public class PageMap {
 
     public func isReadable(address: UInt32, length: Int) -> Bool {
         let startPageIndex = address / UInt32(config.pvmMemoryPageSize)
-        let pages = StandardProgram.alignToPageSize(size: UInt32(length), config: config)
+        let pages = alignToNumberOfPages(size: UInt32(length))
         return isReadable(pageStart: startPageIndex, pages: Int(pages))
     }
 
     public func isWritable(pageStart: UInt32, pages: Int) -> Bool {
+        if pages == 0 { return false }
         let pageRange = pageStart ..< pageStart + UInt32(pages)
-
         let cacheValue = isWritableCache.value(forKey: pageRange)
         if let cacheValue {
             return cacheValue
         }
 
-        var result = false
+        var result = true
         for i in pageRange {
             result = result && (pageTable[i]?.isWritable() ?? false)
         }
@@ -134,13 +139,13 @@ public class PageMap {
 
     public func isWritable(address: UInt32, length: Int) -> Bool {
         let startPageIndex = address / UInt32(config.pvmMemoryPageSize)
-        let pages = StandardProgram.alignToPageSize(size: UInt32(length), config: config)
+        let pages = alignToNumberOfPages(size: UInt32(length))
         return isWritable(pageStart: startPageIndex, pages: Int(pages))
     }
 
     public func update(address: UInt32, length: Int, access: PageAccess) {
         let startPageIndex = address / UInt32(config.pvmMemoryPageSize)
-        let pages = StandardProgram.alignToPageSize(size: UInt32(length), config: config)
+        let pages = alignToNumberOfPages(size: UInt32(length))
         let pageRange = startPageIndex ..< startPageIndex + pages
 
         for i in pageRange {
