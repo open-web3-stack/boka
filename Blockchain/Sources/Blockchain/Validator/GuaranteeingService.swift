@@ -56,15 +56,11 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     public func on(genesis _: StateRef) async {
-//        let nowTimeslot = timeProvider.getTime().timeToTimeslot(config: config)
-//        let epoch = nowTimeslot.timeslotToEpochIndex(config: config)
         await onGuaranteeing()
     }
 
     public func onSyncCompleted() async {
-        scheduleForNextEpoch("GuaranteeingService.scheduleForNextEpoch") { [weak self] _ in
-            await self?.onGuaranteeing()
-        }
+        await onGuaranteeing()
     }
 
     public func scheduleGuaranteeTasks() async throws {
@@ -78,9 +74,13 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             timeslot: timeslot
         )
         let ed25519PublicKeys = state.value.currentValidators.map(\.ed25519)
-
+        // 先获取 vindex -> coreIndex
+        // 找到第一个符合条件的 coreIndex
+        // keystore -> key -> currentCoreAssignment -> coreIndex
+        // validIndex -> coreIndex
         let nowTimeslot = timeProvider.getTime().timeToTimeslot(config: config)
         // TODO: find out the core on which it should be executed
+        // workpackage seviceIndex  core
         let coreIndex = CoreIndex(0)
 
         let workPackages = await workPackagePool.getWorkPackage()
@@ -88,8 +88,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             if try validate(workPackage: workPackage.workPackage) {
                 let workReport = try await createWorkReport(for: workPackage.workPackage, coreIndex: coreIndex)
                 logger.info("workReport: \(workReport)")
-                let addEvent = RuntimeEvents.WorkReportGenerated(items: [workReport])
-                publish(addEvent)
+                let event = RuntimeEvents.WorkReportGenerated(items: [workReport])
+                publish(event)
             } else {
                 logger.error("WorkPackage validation failed")
             }
@@ -101,23 +101,17 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     private func createWorkReport(for workPackage: WorkPackage, coreIndex: CoreIndex) async throws -> WorkReport {
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
         let packageHash = workPackage.hash()
-        // We define the work-package’s implied authorizer as pa,
-        // the hash of the concatenation of the authorization code and the parameterization.
-        // We define the authorization code as pc and require that it be available at the time
-        // of the lookup anchor block from the historical lookup of service ph
-        // The historical lookup function, Λ, is defined in equation 9.7.
-        // TODO: add authorizerHash
-        let authorizerHash = Data32()
-        // TODO: add authorizationOutput
+        let corePool = state.value.coreAuthorizationPool[UInt16(coreIndex)]
+        // TODO: fix empty data
+        var authorizerHash = corePool.array.first ?? Data32()
         var exportSegmentOffset: UInt64 = 0
-        // B.2. Is-Authorized Invocation
+        // B.2. the authorization output, the result of the Is-Authorized function
         let res = try await authorizationFunction.invoke(config: config, package: workPackage, coreIndex: coreIndex)
         switch res {
         // authorizationFunction -> authorizationOutput
         case let .success(authorizationOutput):
             var workResults = [WorkResult]()
             for item in workPackage.workItems {
-                // 14.2.1. Segments, Imports and Exports. Imports DA
                 var importSegments = [Data]()
                 for importSegment in item.inputs {
                     switch importSegment.root {
@@ -128,8 +122,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                     }
                 }
 
-                // the import segments and extrinsic data blobs as dictated by the work-item ?
-                // Extrinsic data are blobs generally by the work-package builder.
+                // TODO: generally by the work-package builder.
                 let extrinsicDataBlobs = [Data]()
                 // TODO: fix exportSegments func
                 try await dataAvailability.exportSegments(data: importSegments)
@@ -152,28 +145,28 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                     )
                 // Export -> DA or exportSegmentOffset + outputDataSegmentsCount ？
                 exportSegmentOffset += UInt64(item.outputDataSegmentsCount)
-                logger.info("Refined work package: \(refineRes)")
-                // TODO: generate payloadHash the hash of the payload (l) within the work item
-                // which was executed in the refine stage to give this result.
-                // Computation of Work Results
                 let workResult = WorkResult(
                     serviceIndex: item.serviceIndex,
                     codeHash: workPackage.authorizationCodeHash,
-                    payloadHash: Data32(),
+                    payloadHash: item.payloadBlob.blake2b256hash(),
                     gas: item.refineGasLimit,
                     output: WorkOutput(refineRes.result)
                 )
                 workResults.append(workResult)
             }
-            // TODO: generate or find AvailabilitySpecifications
+            // TODO: generate or find AvailabilitySpecifications  14.4.1 work-package bundle
+            // an auditable work bundle length l
+            // The erasure-root (u) section 14
+            // The segment-root (e) is the hashes of each of the exported segments of each work-item
             let packageSpecification = AvailabilitySpecifications(
                 workPackageHash: packageHash,
-                length: 0, // xx
+                length: 0,
                 erasureRoot: Data32(),
                 segmentRoot: Data32(),
                 segmentCount: UInt16(exportSegmentOffset)
             )
-
+            // the lookup anchor block from the historical lookup of service ph
+            // The historical lookup function, Λ, is defined in equation 9.7.
             var oldLookups = [Data32: Data32]()
             for item in state.value.recentHistory.items {
                 oldLookups.merge(item.lookup, uniquingKeysWith: { _, new in new })
@@ -200,7 +193,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     private func onGuaranteeing() async {
-        await withSpan("GuaranteeingService.onBeforeEpoch", logger: logger) { _ in
+        await withSpan("GuaranteeingService.onGuaranteeing", logger: logger) { _ in
             try await scheduleGuaranteeTasks()
         }
     }

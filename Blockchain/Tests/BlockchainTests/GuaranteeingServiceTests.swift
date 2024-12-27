@@ -44,8 +44,14 @@ struct GuaranteeingServiceTests {
         let storeMiddleware = services.storeMiddleware
         let scheduler = services.scheduler
 
+        var allWorkPackages = [WorkPackageAndOutput]()
+        for _ in 0 ..< services.config.value.totalNumberOfCores {
+            let workpackage = WorkPackage.dummy(config: services.config)
+            let wpOut = WorkPackageAndOutput(workPackage: workpackage, output: Data32.random())
+            allWorkPackages.append(wpOut)
+        }
+        await services.eventBus.publish(RuntimeEvents.WorkPackagesGenerated(items: allWorkPackages))
         await validatorService.on(genesis: genesisState)
-
         await storeMiddleware.wait()
         // Check if block author tasks were scheduled
         #expect(scheduler.taskCount == 1)
