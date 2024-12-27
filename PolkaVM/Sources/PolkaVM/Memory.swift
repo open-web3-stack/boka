@@ -458,13 +458,11 @@ public class GeneralMemory: Memory {
     }
 
     public func sbrk(_ increment: UInt32) throws(MemoryError) -> UInt32 {
-        for i in 0 ..< chunks.count - 1 {
-            if chunks[i].endAddress + increment < chunks[i + 1].startAddress {
-                let prevEnd = chunks[i].endAddress
-                chunks[i].endAddress += increment
-                pageMap.update(address: prevEnd, length: Int(increment), access: .readWrite)
-                return prevEnd
-            }
+        for i in 0 ..< chunks.count - 1 where chunks[i].endAddress + increment < chunks[i + 1].startAddress {
+            let prevEnd = chunks[i].endAddress
+            chunks[i].endAddress += increment
+            pageMap.update(address: prevEnd, length: Int(increment), access: .readWrite)
+            return prevEnd
         }
         throw .outOfMemory(chunks.last?.endAddress ?? 0)
     }
