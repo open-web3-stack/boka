@@ -76,8 +76,8 @@ public class PageMap {
     private let config: PvmConfig
 
     // cache for multi page queries
-    private var isReadableCache: LRUCache<Range<UInt32>, Bool>
-    private var isWritableCache: LRUCache<Range<UInt32>, Bool>
+    private let isReadableCache: LRUCache<Range<UInt32>, Bool>
+    private let isWritableCache: LRUCache<Range<UInt32>, Bool>
 
     public init(pageMap: [(address: UInt32, length: UInt32, access: PageAccess)], config: PvmConfig) {
         self.config = config
@@ -235,13 +235,13 @@ public class MemoryChunk {
 
 /// Standard Program Memory
 public class StandardMemory: Memory {
-    public private(set) var pageMap: PageMap
+    public let pageMap: PageMap
     private let config: PvmConfig
 
-    private var readOnly: MemoryChunk
-    private var heap: MemoryChunk
-    private var stack: MemoryChunk
-    private var argument: MemoryChunk
+    private let readOnly: MemoryChunk
+    private let heap: MemoryChunk
+    private let stack: MemoryChunk
+    private let argument: MemoryChunk
 
     public init(readOnlyData: Data, readWriteData: Data, argumentData: Data, heapEmptyPagesSize: UInt32, stackSize: UInt32) {
         let config = DefaultPvmConfig()
@@ -365,7 +365,7 @@ public class StandardMemory: Memory {
 
 /// General Program Memory
 public class GeneralMemory: Memory {
-    public private(set) var pageMap: PageMap
+    public let pageMap: PageMap
     private let config: PvmConfig
     // TODO: can be improved by using a more efficient data structure
     private var chunks: [MemoryChunk] = []
