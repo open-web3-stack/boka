@@ -1,271 +1,505 @@
 import Foundation
+import LRUCache
 
-public class MemorySection {
-    /// lowest address bound
-    public let startAddressBound: UInt32
-    /// highest address bound
-    public let endAddressBound: UInt32
-    /// is the section writable
-    public let isWritable: Bool
-    /// allocated data
-    fileprivate var data: Data
+public enum MemoryError: Swift.Error {
+    case pageFault(UInt32)
+    case notReadable(UInt32)
+    case notWritable(UInt32)
+    case outOfMemory(UInt32)
 
-    /// current data end address, also the start address of empty space
-    public var currentEnd: UInt32 {
-        startAddressBound + UInt32(data.count)
-    }
-
-    public init(startAddressBound: UInt32, endAddressBound: UInt32, data: Data, isWritable: Bool) {
-        self.startAddressBound = startAddressBound
-        self.endAddressBound = endAddressBound
-        self.data = data
-        self.isWritable = isWritable
+    public var address: UInt32 {
+        switch self {
+        case let .pageFault(address):
+            address
+        case let .notWritable(address):
+            address
+        case let .outOfMemory(address):
+            address
+        case let .notReadable(address):
+            address
+        }
     }
 }
 
-extension MemorySection {
-    public func read(address: UInt32, length: Int) throws(Memory.Error) -> Data {
-        guard startAddressBound <= address, address + UInt32(length) < endAddressBound else {
-            throw Memory.Error.pageFault(address)
+public enum PageAccess {
+    case readOnly
+    case readWrite
+    case noAccess
+
+    public func isReadable() -> Bool {
+        switch self {
+        case .readOnly:
+            true
+        case .readWrite:
+            true
+        case .noAccess:
+            false
         }
-        let start = address - startAddressBound
-        let end = start + UInt32(length)
+    }
 
-        let validCount = min(end, UInt32(data.count))
-        let dataToRead = data[start ..< validCount]
+    public func isWritable() -> Bool {
+        switch self {
+        case .readWrite:
+            true
+        default:
+            false
+        }
+    }
+}
 
-        let zeroCount = max(0, Int(end - validCount))
+public protocol Memory {
+    var pageMap: PageMap { get }
+
+    func isReadable(address: UInt32, length: Int) -> Bool
+    func isWritable(address: UInt32, length: Int) -> Bool
+    func isReadable(pageStart: UInt32, pages: Int) -> Bool
+    func isWritable(pageStart: UInt32, pages: Int) -> Bool
+
+    func read(address: UInt32) throws -> UInt8
+    func read(address: UInt32, length: Int) throws -> Data
+    func write(address: UInt32, value: UInt8) throws
+    func write(address: UInt32, values: some Sequence<UInt8>) throws
+
+    func zero(pageIndex: UInt32, pages: Int) throws
+    func void(pageIndex: UInt32, pages: Int) throws
+    func sbrk(_ increment: UInt32) throws -> UInt32
+}
+
+public class PageMap {
+    private var pageTable: [UInt32: PageAccess] = [:]
+    private let config: PvmConfig
+
+    // cache for multi page queries
+    private var isReadableCache: LRUCache<Range<UInt32>, Bool>
+    private var isWritableCache: LRUCache<Range<UInt32>, Bool>
+
+    public init(pageMap: [(address: UInt32, length: UInt32, access: PageAccess)], config: PvmConfig) {
+        self.config = config
+        isReadableCache = LRUCache<Range<UInt32>, Bool>(totalCostLimit: 0, countLimit: 1024)
+        isWritableCache = LRUCache<Range<UInt32>, Bool>(totalCostLimit: 0, countLimit: 1024)
+
+        for entry in pageMap {
+            let startIndex = entry.address / UInt32(config.pvmMemoryPageSize)
+            let pages = StandardProgram.alignToPageSize(size: entry.length, config: config)
+
+            for i in startIndex ..< startIndex + pages {
+                pageTable[i] = entry.access
+            }
+        }
+    }
+
+    public func isReadable(pageStart: UInt32, pages: Int) -> Bool {
+        let pageRange = pageStart ..< pageStart + UInt32(pages)
+
+        let cacheValue = isReadableCache.value(forKey: pageRange)
+        if let cacheValue {
+            return cacheValue
+        }
+
+        var result = false
+        for i in pageRange {
+            result = result || (pageTable[i]?.isReadable() ?? false)
+        }
+        isReadableCache.setValue(result, forKey: pageRange)
+        return result
+    }
+
+    public func isReadable(address: UInt32, length: Int) -> Bool {
+        let startPageIndex = address / UInt32(config.pvmMemoryPageSize)
+        let pages = StandardProgram.alignToPageSize(size: UInt32(length), config: config)
+        return isReadable(pageStart: startPageIndex, pages: Int(pages))
+    }
+
+    public func isWritable(pageStart: UInt32, pages: Int) -> Bool {
+        let pageRange = pageStart ..< pageStart + UInt32(pages)
+
+        let cacheValue = isWritableCache.value(forKey: pageRange)
+        if let cacheValue {
+            return cacheValue
+        }
+
+        var result = false
+        for i in pageRange {
+            result = result && (pageTable[i]?.isWritable() ?? false)
+        }
+        isWritableCache.setValue(result, forKey: pageRange)
+        return result
+    }
+
+    public func isWritable(address: UInt32, length: Int) -> Bool {
+        let startPageIndex = address / UInt32(config.pvmMemoryPageSize)
+        let pages = StandardProgram.alignToPageSize(size: UInt32(length), config: config)
+        return isWritable(pageStart: startPageIndex, pages: Int(pages))
+    }
+
+    public func update(address: UInt32, length: Int, access: PageAccess) {
+        let startPageIndex = address / UInt32(config.pvmMemoryPageSize)
+        let pages = StandardProgram.alignToPageSize(size: UInt32(length), config: config)
+        let pageRange = startPageIndex ..< startPageIndex + pages
+
+        for i in pageRange {
+            pageTable[i] = access
+        }
+
+        isReadableCache.removeAllValues()
+        isWritableCache.removeAllValues()
+    }
+
+    public func update(pageIndex: UInt32, pages: Int, access: PageAccess) {
+        for i in pageIndex ..< pageIndex + UInt32(pages) {
+            pageTable[i] = access
+        }
+        isReadableCache.removeAllValues()
+        isWritableCache.removeAllValues()
+    }
+}
+
+public class MemoryChunk {
+    public var startAddress: UInt32
+    public var endAddress: UInt32
+    public private(set) var data: Data
+
+    public init(startAddress: UInt32, endAddress: UInt32, data: Data) {
+        self.startAddress = startAddress
+        self.endAddress = endAddress
+        self.data = data
+    }
+
+    public func read(address: UInt32, length: Int) throws(MemoryError) -> Data {
+        guard startAddress <= address, address + UInt32(length) < endAddress else {
+            throw .pageFault(address)
+        }
+        let startIndex = address - startAddress
+        let endIndex = startIndex + UInt32(length)
+
+        let validCount = min(endIndex, UInt32(data.count))
+        let dataToRead = data[startIndex ..< validCount]
+
+        let zeroCount = max(0, Int(endIndex - validCount))
         let zeros = Data(repeating: 0, count: zeroCount)
 
         return dataToRead + zeros
     }
 
-    public func write(address: UInt32, values: some Sequence<UInt8>) throws(Memory.Error) {
+    public func write(address: UInt32, values: some Sequence<UInt8>) throws(MemoryError) {
         let valuesData = Data(values)
-        guard isWritable else {
-            throw Memory.Error.notWritable(address)
-        }
-        guard startAddressBound <= address, address + UInt32(valuesData.count) < endAddressBound else {
-            throw Memory.Error.notWritable(address)
+        guard startAddress <= address, address + UInt32(valuesData.count) < endAddress else {
+            throw .pageFault(address)
         }
 
-        let start = address - startAddressBound
-        let end = start + UInt32(valuesData.count)
-        guard end < data.count else {
-            throw Memory.Error.notWritable(address)
+        let startIndex = address - startAddress
+        let endIndex = startIndex + UInt32(valuesData.count)
+        guard endIndex < data.count else {
+            throw .notWritable(address)
         }
 
-        data[start ..< end] = valuesData
+        data[startIndex ..< endIndex] = valuesData
     }
 }
 
-public class Memory {
-    public enum Error: Swift.Error {
-        case pageFault(UInt32)
-        case notWritable(UInt32)
-        case outOfMemory(UInt32)
+/// Standard Program Memory
+public class StandardMemory: Memory {
+    public private(set) var pageMap: PageMap
+    private let config: PvmConfig
 
-        public var address: UInt32 {
-            switch self {
-            case let .pageFault(address):
-                address
-            case let .notWritable(address):
-                address
-            case let .outOfMemory(address):
-                address
-            }
-        }
-    }
+    private var readOnly: MemoryChunk
+    private var heap: MemoryChunk
+    private var stack: MemoryChunk
+    private var argument: MemoryChunk
 
-    // standard program sections
-    private var readOnly: MemorySection?
-    private var heap: MemorySection?
-    private var stack: MemorySection?
-    private var argument: MemorySection?
-
-    // general program sections
-    private var memorySections: [MemorySection] = []
-
-    /// General program init with a fixed page map and some initial data
-    public init(pageMap: [(address: UInt32, length: UInt32, writable: Bool)], chunks: [(address: UInt32, data: Data)]) {
-        readOnly = nil
-        heap = nil
-        stack = nil
-        argument = nil
-        memorySections = []
-
-        let sortedPageMap = pageMap.sorted(by: { $0.address < $1.address })
-        let sortedChunks = chunks.sorted(by: { $0.address < $1.address })
-
-        for (address, length, writable) in sortedPageMap {
-            var data = Data(repeating: 0, count: Int(length))
-            if sortedChunks.count != 0 {
-                let chunkIndex = Memory.binarySearch(array: sortedChunks.map(\.address), value: address)
-                let chunk = sortedChunks[chunkIndex]
-                if address <= chunk.address, chunk.address + UInt32(chunk.data.count) <= address + length {
-                    data = chunk.data
-                }
-            }
-            let section = MemorySection(
-                startAddressBound: address,
-                endAddressBound: address + length,
-                data: data,
-                isWritable: writable
-            )
-            memorySections.append(section)
-        }
-    }
-
-    /// Standard Program init
-    ///
-    /// Init with some read only data, writable data and argument data
     public init(readOnlyData: Data, readWriteData: Data, argumentData: Data, heapEmptyPagesSize: UInt32, stackSize: UInt32) {
         let config = DefaultPvmConfig()
         let P = StandardProgram.alignToPageSize
         let Q = StandardProgram.alignToZoneSize
         let ZZ = UInt32(config.pvmProgramInitZoneSize)
+
         let readOnlyLen = UInt32(readOnlyData.count)
         let readWriteLen = UInt32(readWriteData.count)
-        let argumentDataLen = UInt32(argumentData.count)
 
         let heapStart = 2 * ZZ + Q(readOnlyLen, config)
+        let heapDataLen = P(readWriteLen, config)
+
         let stackPageAlignedSize = P(stackSize, config)
+        let stackBaseAddr = UInt32(config.pvmProgramInitStackBaseAddress) - stackPageAlignedSize
 
-        readOnly = MemorySection(
-            startAddressBound: ZZ,
-            endAddressBound: ZZ + P(readOnlyLen, config),
-            data: readWriteData,
-            isWritable: false
+        let argumentDataLen = UInt32(argumentData.count)
+
+        readOnly = MemoryChunk(
+            startAddress: ZZ,
+            endAddress: ZZ + P(readOnlyLen, config),
+            data: readOnlyData
         )
-        heap = MemorySection(
-            startAddressBound: heapStart,
-            endAddressBound: heapStart + P(readWriteLen, config) + heapEmptyPagesSize,
-            data: readWriteData,
-            isWritable: true
+
+        heap = MemoryChunk(
+            startAddress: heapStart,
+            endAddress: heapStart + heapDataLen + heapEmptyPagesSize,
+            data: readWriteData
         )
-        stack = MemorySection(
-            startAddressBound: UInt32(config.pvmProgramInitStackBaseAddress) - stackPageAlignedSize,
-            endAddressBound: UInt32(config.pvmProgramInitStackBaseAddress),
-            // TODO: check is this necessary
-            data: Data(repeating: 0, count: Int(stackPageAlignedSize)),
-            isWritable: true
+        stack = MemoryChunk(
+            startAddress: stackBaseAddr,
+            endAddress: UInt32(config.pvmProgramInitStackBaseAddress),
+            data: Data(repeating: 0, count: Int(stackPageAlignedSize))
         )
-        argument = MemorySection(
-            startAddressBound: UInt32(config.pvmProgramInitInputStartAddress),
-            endAddressBound: UInt32(config.pvmProgramInitInputStartAddress) + P(argumentDataLen, config),
-            data: argumentData,
-            isWritable: false
+        argument = MemoryChunk(
+            startAddress: UInt32(config.pvmProgramInitInputStartAddress),
+            endAddress: UInt32(config.pvmProgramInitInputStartAddress) + P(argumentDataLen, config),
+            data: argumentData
         )
+
+        pageMap = PageMap(pageMap: [
+            (ZZ, P(readOnlyLen, config), .readOnly),
+            (heapStart, heapDataLen + heapEmptyPagesSize, .readWrite),
+            (stackBaseAddr, stackPageAlignedSize, .readWrite),
+            (UInt32(config.pvmProgramInitInputStartAddress), P(argumentDataLen, config), .readOnly),
+        ], config: config)
+
+        self.config = config
     }
 
-    /// if value not in array, return the index of the previous element or 0
-    static func binarySearch(array: [UInt32], value: UInt32) -> Int {
-        var low = 0
-        var high = array.count - 1
-        while low <= high {
-            let mid = (low + high) / 2
-            if array[mid] < value {
-                low = mid + 1
-            } else if array[mid] > value {
-                high = mid - 1
-            } else {
-                return mid
-            }
-        }
-        return max(0, low - 1)
-    }
-
-    private func getSection(forAddress: UInt32) throws(Error) -> MemorySection {
+    private func getChunk(forAddress: UInt32) throws(MemoryError) -> MemoryChunk {
         let address = forAddress & UInt32.max
-        if memorySections.count != 0 {
-            return memorySections[Memory.binarySearch(array: memorySections.map(\.startAddressBound), value: address)]
-        } else if let readOnly {
-            if address >= readOnly.startAddressBound, address < readOnly.endAddressBound {
-                return readOnly
+        if address >= readOnly.startAddress, address < readOnly.endAddress {
+            return readOnly
+        } else if address >= heap.startAddress, address < heap.endAddress {
+            return heap
+        } else if address >= stack.startAddress, address < stack.endAddress {
+            return stack
+        } else if address >= argument.startAddress, address < argument.endAddress {
+            return argument
+        }
+        throw .pageFault(address)
+    }
+
+    public func read(address: UInt32) throws(MemoryError) -> UInt8 {
+        guard isReadable(address: address, length: 1) else {
+            throw .notReadable(address)
+        }
+        return try getChunk(forAddress: address).read(address: address, length: 1).first ?? 0
+    }
+
+    public func read(address: UInt32, length: Int) throws(MemoryError) -> Data {
+        guard isReadable(address: address, length: length) else {
+            throw .notReadable(address)
+        }
+        return try getChunk(forAddress: address).read(address: address, length: length)
+    }
+
+    public func write(address: UInt32, value: UInt8) throws(MemoryError) {
+        guard isWritable(address: address, length: 1) else {
+            throw .notWritable(address)
+        }
+        try getChunk(forAddress: address).write(address: address, values: [value])
+    }
+
+    public func write(address: UInt32, values: some Sequence<UInt8>) throws(MemoryError) {
+        guard isWritable(address: address, length: values.underestimatedCount) else {
+            throw .notWritable(address)
+        }
+        try getChunk(forAddress: address).write(address: address, values: values)
+    }
+
+    public func zero(pageIndex: UInt32, pages: Int) throws {
+        let address = pageIndex * UInt32(config.pvmMemoryPageSize)
+        try getChunk(forAddress: address).write(
+            address: address,
+            values: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize))
+        )
+        pageMap.update(pageIndex: pageIndex, pages: pages, access: .readWrite)
+    }
+
+    public func void(pageIndex: UInt32, pages: Int) throws {
+        let address = pageIndex * UInt32(config.pvmMemoryPageSize)
+        try getChunk(forAddress: address).write(
+            address: address,
+            values: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize))
+        )
+        pageMap.update(pageIndex: pageIndex, pages: pages, access: .noAccess)
+    }
+
+    public func sbrk(_ increment: UInt32) throws(MemoryError) -> UInt32 {
+        let prevHeapEnd = heap.endAddress
+        guard prevHeapEnd + increment < stack.startAddress else {
+            throw .outOfMemory(prevHeapEnd)
+        }
+        pageMap.update(address: prevHeapEnd, length: Int(increment), access: .readWrite)
+        heap.endAddress += increment
+        return prevHeapEnd
+    }
+}
+
+/// General Program Memory
+public class GeneralMemory: Memory {
+    public private(set) var pageMap: PageMap
+    private let config: PvmConfig
+    private var chunks: [MemoryChunk] = []
+
+    public init(pageMap: [(address: UInt32, length: UInt32, writable: Bool)], chunks: [(address: UInt32, data: Data)]) throws {
+        let config = DefaultPvmConfig()
+        self.pageMap = PageMap(
+            pageMap: pageMap.map { (address: $0.address, length: $0.length, access: $0.writable ? .readWrite : .readOnly) },
+            config: config
+        )
+        for chunk in chunks {
+            try GeneralMemory.insertChunk(address: chunk.address, data: chunk.data, chunks: &self.chunks)
+        }
+        self.config = config
+    }
+
+    // modify chunks array, always merge adjacent chunks, overwrite existing data
+    private static func insertChunk(address: UInt32, data: Data, chunks: inout [MemoryChunk]) throws {
+        let newEnd = address + UInt32(data.count)
+
+        // find overlapping chunks
+        var firstIndex = searchChunk(for: address, in: chunks).index
+        if firstIndex > 0, chunks[firstIndex - 1].endAddress > address {
+            firstIndex -= 1
+        }
+        var lastIndex = firstIndex
+        while lastIndex < chunks.count, chunks[lastIndex].startAddress < newEnd {
+            lastIndex += 1
+        }
+
+        // no overlaps
+        if firstIndex == lastIndex {
+            chunks.insert(MemoryChunk(startAddress: address, endAddress: newEnd, data: data), at: firstIndex)
+            return
+        }
+
+        // have overlaps
+        // calculate merged chunk boundaries
+        let startAddr = min(chunks[firstIndex].startAddress, address)
+        let endAddr = max(chunks[lastIndex - 1].endAddress, newEnd)
+        let newChunk = MemoryChunk(startAddress: startAddr, endAddress: endAddr, data: Data())
+        // copy existing chunks
+        for i in firstIndex ..< lastIndex {
+            let chunk = chunks[i]
+            try newChunk.write(
+                address: chunk.startAddress,
+                values: chunk.data
+            )
+        }
+        // overwrite existing data with input
+        try newChunk.write(address: address, values: data)
+        // replace old chunks
+        chunks.replaceSubrange(firstIndex ..< lastIndex, with: [newChunk])
+    }
+
+    // binary search for the index containing the address or index to to inserted
+    private static func searchChunk(for address: UInt32, in chunks: [MemoryChunk]) -> (index: Int, found: Bool) {
+        var low = 0
+        var high = chunks.endIndex
+        while low < high {
+            let mid = low + (high - low) / 2
+            if chunks[mid].startAddress < address {
+                low = mid + 1
+            } else if chunks[mid].startAddress > address {
+                high = mid
+            } else {
+                return (mid, true)
             }
-        } else if let heap {
-            if address >= heap.startAddressBound, address < heap.endAddressBound {
-                return heap
+        }
+        return (low, false)
+    }
+
+    private func getChunk(forAddress: UInt32) throws(MemoryError) -> MemoryChunk {
+        let (index, found) = GeneralMemory.searchChunk(for: forAddress, in: chunks)
+        if found {
+            return chunks[index]
+        }
+        throw .pageFault(forAddress)
+    }
+
+    public func read(address: UInt32) throws(MemoryError) -> UInt8 {
+        guard isReadable(address: address, length: 1) else {
+            throw .notReadable(address)
+        }
+        return try getChunk(forAddress: address).read(address: address, length: 1).first ?? 0
+    }
+
+    public func read(address: UInt32, length: Int) throws(MemoryError) -> Data {
+        guard isReadable(address: address, length: length) else {
+            throw .notReadable(address)
+        }
+        return try getChunk(forAddress: address).read(address: address, length: length)
+    }
+
+    public func write(address: UInt32, value: UInt8) throws(MemoryError) {
+        guard isWritable(address: address, length: 1) else {
+            throw .notWritable(address)
+        }
+        try getChunk(forAddress: address).write(address: address, values: [value])
+    }
+
+    public func write(address: UInt32, values: some Sequence<UInt8>) throws(MemoryError) {
+        guard isWritable(address: address, length: values.underestimatedCount) else {
+            throw .notWritable(address)
+        }
+        try getChunk(forAddress: address).write(address: address, values: values)
+    }
+
+    public func zero(pageIndex: UInt32, pages: Int) throws {
+        let address = pageIndex * UInt32(config.pvmMemoryPageSize)
+        try GeneralMemory.insertChunk(
+            address: address,
+            data: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize)),
+            chunks: &chunks
+        )
+        pageMap.update(pageIndex: pageIndex, pages: pages, access: .readWrite)
+    }
+
+    public func void(pageIndex: UInt32, pages: Int) throws {
+        let address = pageIndex * UInt32(config.pvmMemoryPageSize)
+        try GeneralMemory.insertChunk(
+            address: address,
+            data: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize)),
+            chunks: &chunks
+        )
+        pageMap.update(pageIndex: pageIndex, pages: pages, access: .noAccess)
+    }
+
+    public func sbrk(_ increment: UInt32) throws(MemoryError) -> UInt32 {
+        for i in 0 ..< chunks.count - 1 {
+            if chunks[i].endAddress + increment < chunks[i + 1].startAddress {
+                let prevEnd = chunks[i].endAddress
+                chunks[i].endAddress += increment
+                pageMap.update(address: prevEnd, length: Int(increment), access: .readWrite)
+                return prevEnd
             }
-        } else if let stack {
-            if address >= stack.startAddressBound, address < stack.endAddressBound {
-                return stack
-            }
-        } else if let argument {
-            if address >= argument.startAddressBound, address < argument.endAddressBound {
-                return argument
-            }
         }
-        throw Error.pageFault(address)
-    }
-
-    public func isReadable(address: UInt32, length: Int) -> Bool {
-        do {
-            let section = try getSection(forAddress: address)
-            return section.startAddressBound <= address && address + UInt32(length) < section.endAddressBound
-        } catch {
-            return false
-        }
-    }
-
-    public func read(address: UInt32) throws(Error) -> UInt8 {
-        try getSection(forAddress: address).read(address: address, length: 1).first ?? 0
-    }
-
-    public func read(address: UInt32, length: Int) throws(Error) -> Data {
-        try getSection(forAddress: address).read(address: address, length: length)
-    }
-
-    public func isWritable(address: UInt32, length: Int) -> Bool {
-        do {
-            let section = try getSection(forAddress: address)
-            return section.isWritable && section.startAddressBound <= address && address + UInt32(length) < section.endAddressBound
-        } catch {
-            return false
-        }
-    }
-
-    public func write(address: UInt32, value: UInt8) throws(Error) {
-        try getSection(forAddress: address).write(address: address, values: Data([value]))
-    }
-
-    public func write(address: UInt32, values: some Sequence<UInt8>) throws(Error) {
-        try getSection(forAddress: address).write(address: address, values: values)
-    }
-
-    public func sbrk(_ increment: UInt32) throws -> UInt32 {
-        var section: MemorySection
-        if let heap {
-            section = heap
-        } else if memorySections.count != 0 {
-            section = memorySections.last!
-        } else {
-            throw Error.pageFault(0)
-        }
-
-        let oldSectionEnd = section.currentEnd
-        guard section.isWritable, oldSectionEnd + increment < section.endAddressBound else {
-            throw Error.outOfMemory(oldSectionEnd)
-        }
-        section.data.append(Data(repeating: 0, count: Int(increment)))
-        return oldSectionEnd
+        throw .outOfMemory(chunks.last?.endAddress ?? 0)
     }
 }
 
 extension Memory {
-    public class Readonly {
-        private let memory: Memory
+    public func isReadable(address: UInt32, length: Int) -> Bool {
+        pageMap.isReadable(address: address, length: length)
+    }
 
-        public init(_ memory: Memory) {
-            self.memory = memory
-        }
+    public func isWritable(address: UInt32, length: Int) -> Bool {
+        pageMap.isWritable(address: address, length: length)
+    }
 
-        public func read(address: UInt32) throws -> UInt8 {
-            try memory.read(address: address)
-        }
+    public func isReadable(pageStart: UInt32, pages: Int) -> Bool {
+        pageMap.isReadable(pageStart: pageStart, pages: pages)
+    }
 
-        public func read(address: UInt32, length: Int) throws -> Data {
-            try memory.read(address: address, length: length)
-        }
+    public func isWritable(pageStart: UInt32, pages: Int) -> Bool {
+        pageMap.isWritable(pageStart: pageStart, pages: pages)
+    }
+}
+
+public class ReadonlyMemory {
+    private let memory: Memory
+
+    public init(_ memory: Memory) {
+        self.memory = memory
+    }
+
+    public func read(address: UInt32) throws -> UInt8 {
+        try memory.read(address: address)
+    }
+
+    public func read(address: UInt32, length: Int) throws -> Data {
+        try memory.read(address: address, length: length)
     }
 }

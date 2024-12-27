@@ -36,12 +36,16 @@ public class VMState {
         gas
     }
 
-    public func getMemory() -> Memory.Readonly {
-        Memory.Readonly(memory)
+    public func getMemory() -> ReadonlyMemory {
+        ReadonlyMemory(memory)
     }
 
     public func getMemoryUnsafe() -> Memory {
         memory
+    }
+
+    public func isMemoryReadable(address: some FixedWidthInteger, length: Int) -> Bool {
+        memory.isReadable(address: UInt32(truncatingIfNeeded: address), length: length)
     }
 
     public func readMemory(address: some FixedWidthInteger) throws -> UInt8 {
@@ -50,10 +54,6 @@ public class VMState {
 
     public func readMemory(address: some FixedWidthInteger, length: Int) throws -> Data {
         try memory.read(address: UInt32(truncatingIfNeeded: address), length: length)
-    }
-
-    public func isMemoryReadable(address: some FixedWidthInteger, length: Int) -> Bool {
-        memory.isReadable(address: UInt32(truncatingIfNeeded: address), length: length)
     }
 
     public func isMemoryWritable(address: some FixedWidthInteger, length: Int) -> Bool {
