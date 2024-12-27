@@ -2,20 +2,26 @@ import Foundation
 import LRUCache
 
 public enum MemoryError: Swift.Error {
-    case pageFault(UInt32)
+    case chunkNotFound(UInt32)
+    case exceedChunkBoundary(UInt32)
     case notReadable(UInt32)
     case notWritable(UInt32)
     case outOfMemory(UInt32)
+    case notContiguous(UInt32)
 
     public var address: UInt32 {
         switch self {
-        case let .pageFault(address):
+        case let .chunkNotFound(address):
+            address
+        case let .exceedChunkBoundary(address):
+            address
+        case let .notReadable(address):
             address
         case let .notWritable(address):
             address
         case let .outOfMemory(address):
             address
-        case let .notReadable(address):
+        case let .notContiguous(address):
             address
         }
     }
@@ -155,8 +161,8 @@ public class PageMap {
 }
 
 public class MemoryChunk {
-    public var startAddress: UInt32
-    public var endAddress: UInt32
+    public private(set) var startAddress: UInt32
+    public private(set) var endAddress: UInt32
     public private(set) var data: Data
 
     public init(startAddress: UInt32, endAddress: UInt32, data: Data) {
@@ -167,7 +173,7 @@ public class MemoryChunk {
 
     public func read(address: UInt32, length: Int) throws(MemoryError) -> Data {
         guard startAddress <= address, address + UInt32(length) < endAddress else {
-            throw .pageFault(address)
+            throw .exceedChunkBoundary(address)
         }
         let startIndex = address - startAddress
         let endIndex = startIndex + UInt32(length)
@@ -184,7 +190,7 @@ public class MemoryChunk {
     public func write(address: UInt32, values: some Sequence<UInt8>) throws(MemoryError) {
         let valuesData = Data(values)
         guard startAddress <= address, address + UInt32(valuesData.count) < endAddress else {
-            throw .pageFault(address)
+            throw .exceedChunkBoundary(address)
         }
 
         let startIndex = address - startAddress
@@ -194,6 +200,31 @@ public class MemoryChunk {
         }
 
         data[startIndex ..< endIndex] = valuesData
+    }
+
+    public func incrementEnd(size increment: UInt32) throws(MemoryError) {
+        guard endAddress + increment <= UInt32.max else {
+            throw .outOfMemory(endAddress)
+        }
+        endAddress += increment
+    }
+
+    public func merge(chunk newChunk: MemoryChunk) throws(MemoryError) {
+        guard newChunk.endAddress <= UInt32.max else {
+            throw .outOfMemory(endAddress)
+        }
+        guard endAddress == newChunk.startAddress else {
+            throw .notContiguous(newChunk.startAddress)
+        }
+        endAddress = newChunk.endAddress
+        zeroPad()
+        data.append(newChunk.data)
+    }
+
+    private func zeroPad() {
+        if data.count < Int(endAddress - startAddress) {
+            data.append(Data(repeating: 0, count: Int(endAddress - startAddress) - data.count))
+        }
     }
 }
 
@@ -267,7 +298,7 @@ public class StandardMemory: Memory {
         } else if address >= argument.startAddress, address < argument.endAddress {
             return argument
         }
-        throw .pageFault(address)
+        throw .chunkNotFound(address)
     }
 
     public func read(address: UInt32) throws(MemoryError) -> UInt8 {
@@ -322,7 +353,7 @@ public class StandardMemory: Memory {
             throw .outOfMemory(prevHeapEnd)
         }
         pageMap.update(address: prevHeapEnd, length: Int(increment), access: .readWrite)
-        heap.endAddress += increment
+        try heap.incrementEnd(size: increment)
         return prevHeapEnd
     }
 }
@@ -331,6 +362,7 @@ public class StandardMemory: Memory {
 public class GeneralMemory: Memory {
     public private(set) var pageMap: PageMap
     private let config: PvmConfig
+    // TODO: can be improved by using a more efficient data structure
     private var chunks: [MemoryChunk] = []
 
     public init(pageMap: [(address: UInt32, length: UInt32, writable: Bool)], chunks: [(address: UInt32, data: Data)]) throws {
@@ -346,6 +378,7 @@ public class GeneralMemory: Memory {
     }
 
     // modify chunks array, always merge adjacent chunks, overwrite existing data
+    // note: caller should rmb to handle corresponding page map updates
     private static func insertChunk(address: UInt32, data: Data, chunks: inout [MemoryChunk]) throws {
         let newEnd = address + UInt32(data.count)
 
@@ -370,13 +403,9 @@ public class GeneralMemory: Memory {
         let startAddr = min(chunks[firstIndex].startAddress, address)
         let endAddr = max(chunks[lastIndex - 1].endAddress, newEnd)
         let newChunk = MemoryChunk(startAddress: startAddr, endAddress: endAddr, data: Data())
-        // copy existing chunks
+        // merge existing chunks
         for i in firstIndex ..< lastIndex {
-            let chunk = chunks[i]
-            try newChunk.write(
-                address: chunk.startAddress,
-                values: chunk.data
-            )
+            try newChunk.merge(chunk: chunks[i])
         }
         // overwrite existing data with input
         try newChunk.write(address: address, values: data)
@@ -406,7 +435,7 @@ public class GeneralMemory: Memory {
         if found {
             return chunks[index]
         }
-        throw .pageFault(forAddress)
+        throw .chunkNotFound(forAddress)
     }
 
     public func read(address: UInt32) throws(MemoryError) -> UInt8 {
@@ -438,9 +467,8 @@ public class GeneralMemory: Memory {
     }
 
     public func zero(pageIndex: UInt32, pages: Int) throws {
-        let address = pageIndex * UInt32(config.pvmMemoryPageSize)
         try GeneralMemory.insertChunk(
-            address: address,
+            address: pageIndex * UInt32(config.pvmMemoryPageSize),
             data: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize)),
             chunks: &chunks
         )
@@ -448,9 +476,8 @@ public class GeneralMemory: Memory {
     }
 
     public func void(pageIndex: UInt32, pages: Int) throws {
-        let address = pageIndex * UInt32(config.pvmMemoryPageSize)
         try GeneralMemory.insertChunk(
-            address: address,
+            address: pageIndex * UInt32(config.pvmMemoryPageSize),
             data: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize)),
             chunks: &chunks
         )
@@ -458,9 +485,27 @@ public class GeneralMemory: Memory {
     }
 
     public func sbrk(_ increment: UInt32) throws(MemoryError) -> UInt32 {
-        for i in 0 ..< chunks.count - 1 where chunks[i].endAddress + increment < chunks[i + 1].startAddress {
-            let prevEnd = chunks[i].endAddress
-            chunks[i].endAddress += increment
+        // find a gap if any
+        for i in 0 ..< chunks.count - 1 {
+            let currentChunk = chunks[i]
+            let nextChunk = chunks[i + 1]
+            // check if there's enough space between the current and next chunk
+            if currentChunk.endAddress + increment < nextChunk.startAddress {
+                let prevEnd = currentChunk.endAddress
+                try currentChunk.incrementEnd(size: increment)
+                pageMap.update(address: prevEnd, length: Int(increment), access: .readWrite)
+                // merge with the next chunk if they become adjacent
+                if currentChunk.endAddress == nextChunk.startAddress {
+                    try currentChunk.merge(chunk: nextChunk)
+                    chunks.remove(at: i + 1)
+                }
+                return prevEnd
+            }
+        }
+        // extend last chunk
+        if let lastChunk = chunks.last {
+            let prevEnd = lastChunk.endAddress
+            try lastChunk.incrementEnd(size: increment)
             pageMap.update(address: prevEnd, length: Int(increment), access: .readWrite)
             return prevEnd
         }
