@@ -7,7 +7,6 @@ private actor WorkPackageStorage {
     let ringContext: Bandersnatch.RingContext
     var verifier: Bandersnatch.Verifier!
     var entropy: Data32 = .init()
-    // TODO: add serviceIndex: ServiceIndex?
     init(ringContext: Bandersnatch.RingContext) {
         self.ringContext = ringContext
     }

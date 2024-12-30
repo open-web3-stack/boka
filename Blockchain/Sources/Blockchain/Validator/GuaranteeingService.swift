@@ -3,12 +3,9 @@ import Synchronization
 import TracingUtils
 import Utils
 
-// find out when and which core we are guaranteeing for and schedule a task for it
-// get work package from the pool
-// try to guarantee the work package
-// if successful, create a work report and publish it
-// chunk the work package and exported data
-// publish the chunks
+public enum GuaranteeingServiceError: Error {
+    case invalidValidatorIndex
+}
 
 struct GuaranteeingAuthorizationFunction: IsAuthorizedFunction {}
 struct GuaranteeingRefineInvocation: RefineInvocation {}
@@ -72,17 +69,11 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             randomness: state.value.entropyPool.t2,
             timeslot: state.value.timeslot
         )
-
-        // let ed25519PublicKeys = state.value.currentValidators.map(\.ed25519)
-        for currentValidator in state.value.currentValidators.array {
-            let secretKey = try await keystore.get(Ed25519.self, publicKey: Ed25519.PublicKey(from: currentValidator.ed25519))!
+        guard authorIndex < ValidatorIndex(currentCoreAssignment.count) else {
+            logger.error("AuthorIndex not found")
+            throw GuaranteeingServiceError.invalidValidatorIndex
         }
-
-        // change validatorIndex -> coreIndex
-        // find coreIndex
-        // keystore -> key -> currentCoreAssignment -> coreIndex
-        // validatorIndex -> coreIndex
-        let coreIndex = CoreIndex(0)
+        let coreIndex = CoreIndex(currentCoreAssignment[Int(authorIndex)])
         let workPackages = await workPackagePool.getWorkPackage()
         for workPackage in workPackages.array {
             if try validate(workPackage: workPackage.workPackage) {
@@ -96,7 +87,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
     }
 
-    // workpackage from l2 p2p server
     // workpackage -> workresult -> workreport
     private func createWorkReport(for workPackage: WorkPackage, coreIndex: CoreIndex) async throws -> WorkReport {
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
