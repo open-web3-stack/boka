@@ -65,24 +65,24 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
 
     public func scheduleGuaranteeTasks() async throws {
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
-        // The most recent block’s τimeslot.
-        let timeslot = state.value.timeslot
-        let coreAssignmentRotationPeriod = UInt32(config.value.coreAssignmentRotationPeriod)
+        let header = try await dataProvider.getHeader(hash: dataProvider.bestHead.hash)
+        let authorIndex = header.value.authorIndex
         let currentCoreAssignment = state.value.getCoreAssignment(
             config: config,
             randomness: state.value.entropyPool.t2,
-            timeslot: timeslot
+            timeslot: state.value.timeslot
         )
-        let ed25519PublicKeys = state.value.currentValidators.map(\.ed25519)
-        // 先获取 vindex -> coreIndex
-        // 找到第一个符合条件的 coreIndex
-        // keystore -> key -> currentCoreAssignment -> coreIndex
-        // validIndex -> coreIndex
-        let nowTimeslot = timeProvider.getTime().timeToTimeslot(config: config)
-        // TODO: find out the core on which it should be executed
-        // workpackage seviceIndex  core
-        let coreIndex = CoreIndex(0)
 
+        // let ed25519PublicKeys = state.value.currentValidators.map(\.ed25519)
+        for currentValidator in state.value.currentValidators.array {
+            let secretKey = try await keystore.get(Ed25519.self, publicKey: Ed25519.PublicKey(from: currentValidator.ed25519))!
+        }
+
+        // change validatorIndex -> coreIndex
+        // find coreIndex
+        // keystore -> key -> currentCoreAssignment -> coreIndex
+        // validatorIndex -> coreIndex
+        let coreIndex = CoreIndex(0)
         let workPackages = await workPackagePool.getWorkPackage()
         for workPackage in workPackages.array {
             if try validate(workPackage: workPackage.workPackage) {
