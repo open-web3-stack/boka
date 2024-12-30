@@ -5,6 +5,7 @@ import Utils
 
 public enum GuaranteeingServiceError: Error {
     case invalidValidatorIndex
+    case customValidatorNotFound
 }
 
 struct GuaranteeingAuthorizationFunction: IsAuthorizedFunction {}
@@ -64,6 +65,11 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
         let header = try await dataProvider.getHeader(hash: dataProvider.bestHead.hash)
         let authorIndex = header.value.authorIndex
+        let authorKey = try Ed25519.PublicKey(from: state.value.currentValidators[Int(authorIndex)].ed25519)
+        let key = await keystore.get(Ed25519.self, publicKey: authorKey)
+        if key == nil {
+            throw GuaranteeingServiceError.customValidatorNotFound
+        }
         let currentCoreAssignment = state.value.getCoreAssignment(
             config: config,
             randomness: state.value.entropyPool.t2,
