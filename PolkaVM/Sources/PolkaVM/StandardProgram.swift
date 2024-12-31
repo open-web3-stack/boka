@@ -59,7 +59,7 @@ public class StandardProgram {
 
         initialRegisters = Registers(config: config, argumentData: argumentData)
 
-        initialMemory = StandardMemory(
+        initialMemory = try StandardMemory(
             readOnlyData: readOnlyData,
             readWriteData: readWriteData,
             argumentData: argumentData ?? Data(),

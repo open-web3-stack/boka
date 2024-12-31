@@ -1,13 +1,14 @@
 import Foundation
 import LRUCache
 
-public enum MemoryError: Swift.Error {
+public enum MemoryError: Error, Equatable {
     case chunkNotFound(UInt32)
     case exceedChunkBoundary(UInt32)
     case notReadable(UInt32)
     case notWritable(UInt32)
     case outOfMemory(UInt32)
     case notContiguous(UInt32)
+    case invalidChunk(UInt32)
 
     public var address: UInt32 {
         switch self {
@@ -22,6 +23,8 @@ public enum MemoryError: Swift.Error {
         case let .outOfMemory(address):
             address
         case let .notContiguous(address):
+            address
+        case let .invalidChunk(address):
             address
         }
     }
@@ -170,45 +173,50 @@ public class MemoryChunk {
     public private(set) var endAddress: UInt32
     public private(set) var data: Data
 
-    public init(startAddress: UInt32, endAddress: UInt32, data: Data) {
+    public init(startAddress: UInt32, endAddress: UInt32, data: Data) throws(MemoryError) {
+        guard startAddress <= endAddress, endAddress - startAddress >= UInt32(data.count) else {
+            throw .invalidChunk(startAddress)
+        }
         self.startAddress = startAddress
         self.endAddress = endAddress
         self.data = data
     }
 
     public func read(address: UInt32, length: Int) throws(MemoryError) -> Data {
-        guard startAddress <= address, address + UInt32(length) < endAddress else {
+        guard startAddress <= address, address + UInt32(length) <= endAddress else {
             throw .exceedChunkBoundary(address)
         }
         let startIndex = address - startAddress
-        let endIndex = startIndex + UInt32(length)
 
-        let validCount = min(endIndex, UInt32(data.count))
-        let dataToRead = data[startIndex ..< validCount]
+        if startIndex >= data.count {
+            return Data(repeating: 0, count: length)
+        } else {
+            let validCount = min(length, data.count - Int(startIndex))
+            let dataToRead = data.count > 0 ? data[startIndex ..< startIndex + UInt32(validCount)] : Data()
 
-        let zeroCount = max(0, Int(endIndex - validCount))
-        let zeros = Data(repeating: 0, count: zeroCount)
+            let zeroCount = max(0, length - validCount)
+            let zeros = Data(repeating: 0, count: zeroCount)
 
-        return dataToRead + zeros
+            return dataToRead + zeros
+        }
     }
 
     public func write(address: UInt32, values: some Sequence<UInt8>) throws(MemoryError) {
         let valuesData = Data(values)
-        guard startAddress <= address, address + UInt32(valuesData.count) < endAddress else {
+        guard startAddress <= address, address + UInt32(valuesData.count) <= endAddress else {
             throw .exceedChunkBoundary(address)
         }
 
         let startIndex = address - startAddress
         let endIndex = startIndex + UInt32(valuesData.count)
-        guard endIndex < data.count else {
-            throw .notWritable(address)
-        }
+
+        try zeroPad(until: startAddress + endIndex)
 
         data[startIndex ..< endIndex] = valuesData
     }
 
     public func incrementEnd(size increment: UInt32) throws(MemoryError) {
-        guard endAddress + increment <= UInt32.max else {
+        guard UInt32.max - endAddress >= increment else {
             throw .outOfMemory(endAddress)
         }
         endAddress += increment
@@ -221,14 +229,18 @@ public class MemoryChunk {
         guard endAddress == newChunk.startAddress else {
             throw .notContiguous(newChunk.startAddress)
         }
+        try zeroPad()
         endAddress = newChunk.endAddress
-        zeroPad()
         data.append(newChunk.data)
     }
 
-    private func zeroPad() {
-        if data.count < Int(endAddress - startAddress) {
-            data.append(Data(repeating: 0, count: Int(endAddress - startAddress) - data.count))
+    private func zeroPad(until address: UInt32? = nil) throws(MemoryError) {
+        let end = address ?? endAddress
+        guard end >= startAddress, end <= endAddress else {
+            throw .exceedChunkBoundary(end)
+        }
+        if data.count < Int(end - startAddress) {
+            data.append(Data(repeating: 0, count: Int(end - startAddress) - data.count))
         }
     }
 }
@@ -243,40 +255,40 @@ public class StandardMemory: Memory {
     private let stack: MemoryChunk
     private let argument: MemoryChunk
 
-    public init(readOnlyData: Data, readWriteData: Data, argumentData: Data, heapEmptyPagesSize: UInt32, stackSize: UInt32) {
+    public init(readOnlyData: Data, readWriteData: Data, argumentData: Data, heapEmptyPagesSize: UInt32, stackSize: UInt32) throws {
         let config = DefaultPvmConfig()
         let P = StandardProgram.alignToPageSize
-        let Q = StandardProgram.alignToZoneSize
+        let Z = StandardProgram.alignToZoneSize
         let ZZ = UInt32(config.pvmProgramInitZoneSize)
 
         let readOnlyLen = UInt32(readOnlyData.count)
         let readWriteLen = UInt32(readWriteData.count)
 
-        let heapStart = 2 * ZZ + Q(readOnlyLen, config)
-        let heapDataLen = P(readWriteLen, config)
+        let heapStart = 2 * ZZ + Z(readOnlyLen, config)
+        let heapDataPagesLen = P(readWriteLen, config)
 
         let stackPageAlignedSize = P(stackSize, config)
-        let stackBaseAddr = UInt32(config.pvmProgramInitStackBaseAddress) - stackPageAlignedSize
+        let stackStartAddr = UInt32(config.pvmProgramInitStackBaseAddress) - stackPageAlignedSize
 
         let argumentDataLen = UInt32(argumentData.count)
 
-        readOnly = MemoryChunk(
+        readOnly = try MemoryChunk(
             startAddress: ZZ,
             endAddress: ZZ + P(readOnlyLen, config),
             data: readOnlyData
         )
 
-        heap = MemoryChunk(
+        heap = try MemoryChunk(
             startAddress: heapStart,
-            endAddress: heapStart + heapDataLen + heapEmptyPagesSize,
+            endAddress: heapStart + heapDataPagesLen + heapEmptyPagesSize,
             data: readWriteData
         )
-        stack = MemoryChunk(
-            startAddress: stackBaseAddr,
+        stack = try MemoryChunk(
+            startAddress: stackStartAddr,
             endAddress: UInt32(config.pvmProgramInitStackBaseAddress),
             data: Data(repeating: 0, count: Int(stackPageAlignedSize))
         )
-        argument = MemoryChunk(
+        argument = try MemoryChunk(
             startAddress: UInt32(config.pvmProgramInitInputStartAddress),
             endAddress: UInt32(config.pvmProgramInitInputStartAddress) + P(argumentDataLen, config),
             data: argumentData
@@ -284,16 +296,15 @@ public class StandardMemory: Memory {
 
         pageMap = PageMap(pageMap: [
             (ZZ, P(readOnlyLen, config), .readOnly),
-            (heapStart, heapDataLen + heapEmptyPagesSize, .readWrite),
-            (stackBaseAddr, stackPageAlignedSize, .readWrite),
+            (heapStart, heapDataPagesLen + heapEmptyPagesSize, .readWrite),
+            (stackStartAddr, stackPageAlignedSize, .readWrite),
             (UInt32(config.pvmProgramInitInputStartAddress), P(argumentDataLen, config), .readOnly),
         ], config: config)
 
         self.config = config
     }
 
-    private func getChunk(forAddress: UInt32) throws(MemoryError) -> MemoryChunk {
-        let address = forAddress & UInt32.max
+    private func getChunk(address: UInt32) throws(MemoryError) -> MemoryChunk {
         if address >= readOnly.startAddress, address < readOnly.endAddress {
             return readOnly
         } else if address >= heap.startAddress, address < heap.endAddress {
@@ -310,42 +321,44 @@ public class StandardMemory: Memory {
         guard isReadable(address: address, length: 1) else {
             throw .notReadable(address)
         }
-        return try getChunk(forAddress: address).read(address: address, length: 1).first ?? 0
+        return try getChunk(address: address).read(address: address, length: 1).first ?? 0
     }
 
     public func read(address: UInt32, length: Int) throws(MemoryError) -> Data {
         guard isReadable(address: address, length: length) else {
             throw .notReadable(address)
         }
-        return try getChunk(forAddress: address).read(address: address, length: length)
+        return try getChunk(address: address).read(address: address, length: length)
     }
 
     public func write(address: UInt32, value: UInt8) throws(MemoryError) {
         guard isWritable(address: address, length: 1) else {
             throw .notWritable(address)
         }
-        try getChunk(forAddress: address).write(address: address, values: [value])
+        try getChunk(address: address).write(address: address, values: [value])
     }
 
     public func write(address: UInt32, values: some Sequence<UInt8>) throws(MemoryError) {
         guard isWritable(address: address, length: values.underestimatedCount) else {
             throw .notWritable(address)
         }
-        try getChunk(forAddress: address).write(address: address, values: values)
+        try getChunk(address: address).write(address: address, values: values)
     }
 
+    // TODO: check whether need this
     public func zero(pageIndex: UInt32, pages: Int) throws {
         let address = pageIndex * UInt32(config.pvmMemoryPageSize)
-        try getChunk(forAddress: address).write(
+        try getChunk(address: address).write(
             address: address,
             values: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize))
         )
         pageMap.update(pageIndex: pageIndex, pages: pages, access: .readWrite)
     }
 
+    // TODO: check whether need this
     public func void(pageIndex: UInt32, pages: Int) throws {
         let address = pageIndex * UInt32(config.pvmMemoryPageSize)
-        try getChunk(forAddress: address).write(
+        try getChunk(address: address).write(
             address: address,
             values: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize))
         )
@@ -365,6 +378,7 @@ public class StandardMemory: Memory {
 
 /// General Program Memory
 public class GeneralMemory: Memory {
+    // TODO: check if need paged aligned access for general memory
     public let pageMap: PageMap
     private let config: PvmConfig
     // TODO: can be improved by using a more efficient data structure
@@ -382,10 +396,23 @@ public class GeneralMemory: Memory {
         self.config = config
     }
 
+    // assume chunks is sorted by address
     // modify chunks array, always merge adjacent chunks, overwrite existing data
     // note: caller should rmb to handle corresponding page map updates
     private static func insertChunk(address: UInt32, data: Data, chunks: inout [MemoryChunk]) throws {
         let newEnd = address + UInt32(data.count)
+
+        // new item at last index
+        if address >= chunks.last?.endAddress ?? UInt32.max {
+            let chunk = try MemoryChunk(startAddress: address, endAddress: newEnd, data: data)
+            if chunks.last?.endAddress == address {
+                try chunks.last?.merge(chunk: chunk)
+                return
+            } else {
+                chunks.append(chunk)
+                return
+            }
+        }
 
         // find overlapping chunks
         var firstIndex = searchChunk(for: address, in: chunks).index
@@ -399,20 +426,19 @@ public class GeneralMemory: Memory {
 
         // no overlaps
         if firstIndex == lastIndex {
-            chunks.insert(MemoryChunk(startAddress: address, endAddress: newEnd, data: data), at: firstIndex)
+            try chunks.insert(MemoryChunk(startAddress: address, endAddress: newEnd, data: data), at: firstIndex)
             return
         }
 
         // have overlaps
-        // calculate merged chunk boundaries
+        // calculate overlapping chunk boundaries
         let startAddr = min(chunks[firstIndex].startAddress, address)
         let endAddr = max(chunks[lastIndex - 1].endAddress, newEnd)
-        let newChunk = MemoryChunk(startAddress: startAddr, endAddress: endAddr, data: Data())
-        // merge existing chunks
+        let newChunk = try MemoryChunk(startAddress: startAddr, endAddress: endAddr, data: Data())
         for i in firstIndex ..< lastIndex {
-            try newChunk.merge(chunk: chunks[i])
+            try newChunk.write(address: chunks[i].startAddress, values: chunks[i].data)
         }
-        // overwrite existing data with input
+        // lastly, overwrite existing data with input
         try newChunk.write(address: address, values: data)
         // replace old chunks
         chunks.replaceSubrange(firstIndex ..< lastIndex, with: [newChunk])
@@ -424,51 +450,51 @@ public class GeneralMemory: Memory {
         var high = chunks.endIndex
         while low < high {
             let mid = low + (high - low) / 2
-            if chunks[mid].startAddress < address {
-                low = mid + 1
+            if chunks[mid].startAddress <= address, address < chunks[mid].endAddress {
+                return (mid, true)
             } else if chunks[mid].startAddress > address {
                 high = mid
             } else {
-                return (mid, true)
+                low = mid + 1
             }
         }
         return (low, false)
     }
 
-    private func getChunk(forAddress: UInt32) throws(MemoryError) -> MemoryChunk {
-        let (index, found) = GeneralMemory.searchChunk(for: forAddress, in: chunks)
+    private func getChunk(address: UInt32) throws(MemoryError) -> MemoryChunk {
+        let (index, found) = GeneralMemory.searchChunk(for: address, in: chunks)
         if found {
             return chunks[index]
         }
-        throw .chunkNotFound(forAddress)
+        throw .chunkNotFound(address)
     }
 
     public func read(address: UInt32) throws(MemoryError) -> UInt8 {
         guard isReadable(address: address, length: 1) else {
             throw .notReadable(address)
         }
-        return try getChunk(forAddress: address).read(address: address, length: 1).first ?? 0
+        return try getChunk(address: address).read(address: address, length: 1).first ?? 0
     }
 
     public func read(address: UInt32, length: Int) throws(MemoryError) -> Data {
         guard isReadable(address: address, length: length) else {
             throw .notReadable(address)
         }
-        return try getChunk(forAddress: address).read(address: address, length: length)
+        return try getChunk(address: address).read(address: address, length: length)
     }
 
     public func write(address: UInt32, value: UInt8) throws(MemoryError) {
         guard isWritable(address: address, length: 1) else {
             throw .notWritable(address)
         }
-        try getChunk(forAddress: address).write(address: address, values: [value])
+        try getChunk(address: address).write(address: address, values: [value])
     }
 
     public func write(address: UInt32, values: some Sequence<UInt8>) throws(MemoryError) {
         guard isWritable(address: address, length: values.underestimatedCount) else {
             throw .notWritable(address)
         }
-        try getChunk(forAddress: address).write(address: address, values: values)
+        try getChunk(address: address).write(address: address, values: values)
     }
 
     public func zero(pageIndex: UInt32, pages: Int) throws {
