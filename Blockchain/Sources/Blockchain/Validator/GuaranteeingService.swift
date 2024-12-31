@@ -84,7 +84,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         for workPackage in workPackages.array {
             if try validate(workPackage: workPackage.workPackage) {
                 let workReport = try await createWorkReport(for: workPackage.workPackage, coreIndex: coreIndex)
-                logger.info("workReport: \(workReport)")
+                logger.debug("workReport: \(workReport)")
                 let event = RuntimeEvents.WorkReportGenerated(items: [workReport])
                 publish(event)
             } else {
@@ -151,9 +151,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                 workResults.append(workResult)
             }
             // TODO: generate or find AvailabilitySpecifications  14.4.1 work-package bundle
-            // an auditable work bundle length l
-            // The erasure-root (u) section 14
-            // The segment-root (e) is the hashes of each of the exported segments of each work-item
             let packageSpecification = AvailabilitySpecifications(
                 workPackageHash: packageHash,
                 length: 0,
@@ -161,7 +158,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                 segmentRoot: Data32(),
                 segmentCount: UInt16(exportSegmentOffset)
             )
-            // the lookup anchor block from the historical lookup of service ph
             // The historical lookup function, Λ, is defined in equation 9.7.
             var oldLookups = [Data32: Data32]()
             for item in state.value.recentHistory.items {
