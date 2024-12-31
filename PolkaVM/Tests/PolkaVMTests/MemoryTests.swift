@@ -210,7 +210,7 @@ enum MemoryTests {
         }
 
         @Test func sbrk() throws {
-            #expect(memory.isReadable(address: heapEnd, length: Int(stackEnd - heapEnd)) == false)
+            #expect(memory.isReadable(address: heapEnd, length: config.pvmMemoryPageSize) == false)
             #expect(try memory.sbrk(100) == heapEnd)
             #expect(memory.isReadable(address: heapEnd, length: config.pvmMemoryPageSize) == true)
             #expect(memory.isWritable(address: heapEnd, length: config.pvmMemoryPageSize) == true)

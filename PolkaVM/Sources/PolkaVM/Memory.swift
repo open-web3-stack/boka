@@ -367,11 +367,12 @@ public class StandardMemory: Memory {
 
     public func sbrk(_ increment: UInt32) throws(MemoryError) -> UInt32 {
         let prevHeapEnd = heap.endAddress
-        guard prevHeapEnd + increment < stack.startAddress else {
+        let incrementAlignToPage = StandardProgram.alignToPageSize(size: increment, config: config)
+        guard prevHeapEnd + incrementAlignToPage < stack.startAddress else {
             throw .outOfMemory(prevHeapEnd)
         }
-        pageMap.update(address: prevHeapEnd, length: Int(increment), access: .readWrite)
-        try heap.incrementEnd(size: increment)
+        pageMap.update(address: prevHeapEnd, length: Int(incrementAlignToPage), access: .readWrite)
+        try heap.incrementEnd(size: incrementAlignToPage)
         return prevHeapEnd
     }
 }
