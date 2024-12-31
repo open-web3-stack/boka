@@ -99,7 +99,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         let packageHash = workPackage.hash()
         let corePool = state.value.coreAuthorizationPool[UInt16(coreIndex)]
         // TODO: fix empty data
-        var authorizerHash = corePool.array.first ?? Data32()
+        let authorizerHash = corePool.array.first ?? Data32()
         var exportSegmentOffset: UInt64 = 0
         // B.2. the authorization output, the result of the Is-Authorized function
         let res = try await authorizationFunction.invoke(config: config, package: workPackage, coreIndex: coreIndex)
