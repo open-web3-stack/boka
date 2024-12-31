@@ -15,6 +15,19 @@ public struct TicketItemAndOutput: Comparable, Sendable, Codable {
     }
 }
 
+public struct WorkPackageAndOutput: Comparable, Sendable, Codable {
+    public let workPackage: WorkPackage
+    public let output: Data32
+
+    public static func < (lhs: WorkPackageAndOutput, rhs: WorkPackageAndOutput) -> Bool {
+        lhs.output < rhs.output
+    }
+
+    public static func == (lhs: WorkPackageAndOutput, rhs: WorkPackageAndOutput) -> Bool {
+        lhs.output == rhs.output && lhs.workPackage == rhs.workPackage
+    }
+}
+
 public final class SafroleService: ServiceBase, @unchecked Sendable {
     private let keystore: KeyStore
     private let ringContext: Bandersnatch.RingContext

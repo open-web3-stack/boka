@@ -1,3 +1,4 @@
+import Codec
 import Foundation
 import Utils
 
@@ -43,6 +44,12 @@ public struct WorkPackage: Sendable, Equatable, Codable {
         self.parameterizationBlob = parameterizationBlob
         self.context = context
         self.workItems = workItems
+    }
+}
+
+extension WorkPackage {
+    public func hash() -> Data32 {
+        try! JamEncoder.encode(self).blake2b256hash()
     }
 }
 
