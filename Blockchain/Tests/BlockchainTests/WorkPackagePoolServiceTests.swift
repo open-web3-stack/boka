@@ -46,5 +46,10 @@ struct WorkPackagePoolServiceTests {
         await storeMiddleware.wait()
         let workPackages = await workPackagecPoolService.getWorkPackage()
         #expect(workPackages.array == Array(allWorkPackages).sorted())
+        let workpackage = WorkPackage.dummy(config: config)
+        let wpOut = WorkPackageAndOutput(workPackage: workpackage, output: Data32.random())
+        try await workPackagecPoolService.addWorkPackages(packages: [wpOut])
+        try await workPackagecPoolService.removeWorkPackages(packages: [wpOut])
+        #expect(workPackages.array.count == config.value.totalNumberOfCores)
     }
 }

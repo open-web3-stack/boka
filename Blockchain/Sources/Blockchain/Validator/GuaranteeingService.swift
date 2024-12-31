@@ -57,10 +57,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         await onGuaranteeing()
     }
 
-    public func onSyncCompleted() async {
-        await onGuaranteeing()
-    }
-
     public func scheduleGuaranteeTasks() async throws {
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
         let header = try await dataProvider.getHeader(hash: dataProvider.bestHead.hash)

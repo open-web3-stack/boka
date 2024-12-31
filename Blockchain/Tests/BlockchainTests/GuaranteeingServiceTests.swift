@@ -53,7 +53,6 @@ struct GuaranteeingServiceTests {
         await services.eventBus.publish(RuntimeEvents.WorkPackagesGenerated(items: allWorkPackages))
         await validatorService.on(genesis: genesisState)
         await storeMiddleware.wait()
-        // Check if block author tasks were scheduled
         #expect(scheduler.taskCount == 1)
     }
 }

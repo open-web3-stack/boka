@@ -81,6 +81,10 @@ public final class WorkPackagePoolService: ServiceBase, @unchecked Sendable {
         await storage.add(packages: packages, config: config)
     }
 
+    public func removeWorkPackages(packages: [WorkPackageAndOutput]) async throws {
+        await storage.removeWorkPackages(packages)
+    }
+
     public func getWorkPackage() async -> SortedUniqueArray<WorkPackageAndOutput> {
         await storage.getWorkPackage()
     }
