@@ -18,10 +18,10 @@ extension IsAuthorizedFunction {
     ) async throws -> Result<Data, WorkResultError> {
         let args = try JamEncoder.encode(package, coreIndex)
         let ctx = IsAuthorizedContext(config: config)
-
+        // TODO: change blob: package.authorizationCodeHash.data to parameterizationBlob
         let (exitReason, _, output) = await invokePVM(
             config: config,
-            blob: package.authorizationCodeHash.data,
+            blob: package.parameterizationBlob,
             pc: 0,
             gas: config.value.workPackageAuthorizerGas,
             argumentData: args,
