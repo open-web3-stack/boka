@@ -19,7 +19,6 @@ public enum GuaranteeingError: Error {
 
 public protocol Guaranteeing {
     var entropyPool: EntropyPool { get }
-    var timeslot: TimeslotIndex { get }
     var currentValidators: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
     > { get }
@@ -87,11 +86,16 @@ extension Guaranteeing {
 
     public func update(
         config: ProtocolConfigRef,
+        timeslot: TimeslotIndex,
         extrinsic: ExtrinsicGuarantees
-    ) throws(GuaranteeingError) -> ConfigFixedSizeArray<
-        ReportItem?,
-        ProtocolConfig.TotalNumberOfCores
-    > {
+    ) throws(GuaranteeingError) -> (
+        newReports: ConfigFixedSizeArray<
+            ReportItem?,
+            ProtocolConfig.TotalNumberOfCores
+        >,
+        reported: [WorkReport],
+        reporters: [Ed25519PublicKey]
+    ) {
         let coreAssignmentRotationPeriod = UInt32(config.value.coreAssignmentRotationPeriod)
 
         let currentCoreAssignment = getCoreAssignment(config: config, randomness: entropyPool.t2, timeslot: timeslot)
@@ -113,6 +117,8 @@ extension Guaranteeing {
         var totalMinGasRequirement = Gas(0)
 
         var oldLookups = [Data32: Data32]()
+
+        var reporters = [Ed25519PublicKey]()
 
         for guarantee in extrinsic.guarantees {
             let report = guarantee.workReport
@@ -137,6 +143,8 @@ extension Guaranteeing {
                 guard coreAssignment[Int(credential.index)] == report.coreIndex else { // TODO: it should accepts the last core index?
                     throw .invalidGuaranteeCore
                 }
+
+                reporters.append(key)
             }
 
             let coreIndex = Int(report.coreIndex)
@@ -220,6 +228,7 @@ extension Guaranteeing {
         }
 
         var newReports = reports
+        var reported = [WorkReport]()
 
         for guarantee in extrinsic.guarantees {
             let report = guarantee.workReport
@@ -228,8 +237,9 @@ extension Guaranteeing {
                 workReport: report,
                 timeslot: timeslot
             )
+            reported.append(report)
         }
 
-        return newReports
+        return (newReports, reported, reporters)
     }
 }

@@ -353,7 +353,11 @@ public final class Runtime {
         )
 
         newState.reports = newReports
-        newState.reports = try newState.update(config: config, extrinsic: block.extrinsic.reports)
+        let result = try newState.update(
+            config: config, timeslot: newState.timeslot, extrinsic: block.extrinsic.reports
+        )
+
+        newState.reports = result.newReports
 
         return availableReports
     }
