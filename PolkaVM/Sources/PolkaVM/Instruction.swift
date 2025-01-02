@@ -35,7 +35,7 @@ extension Instruction {
             }
             logger.debug("execution success! updating pc...")
             return updatePC(context: context, skip: skip)
-        } catch let e as Memory.Error {
+        } catch let e as MemoryError {
             logger.debug("memory error: \(e)")
             return .exit(.pageFault(e.address))
         } catch let e {
