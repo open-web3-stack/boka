@@ -19,6 +19,7 @@ let package = Package(
         .package(path: "../TracingUtils"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.0"),
+        .package(url: "https://github.com/nicklockwood/LRUCache.git", from: "1.0.7"),
     ],
     targets: [
         .target(
@@ -27,6 +28,7 @@ let package = Package(
                 "Utils",
                 "TracingUtils",
                 .product(name: "Logging", package: "swift-log"),
+                .product(name: "LRUCache", package: "LRUCache"),
             ]
         ),
         .testTarget(

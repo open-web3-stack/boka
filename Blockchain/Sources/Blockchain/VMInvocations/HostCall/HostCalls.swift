@@ -763,7 +763,7 @@ public class Machine: HostCall {
         let innerVmIndex = UInt64(context.pvms.count)
         let code = isReadable ? try state.readMemory(address: regs[0], length: Int(regs[1])) : nil
         let pc = UInt32(truncatingIfNeeded: regs[2])
-        let mem = Memory(pageMap: [], chunks: [])
+        let mem = try GeneralMemory(pageMap: [], chunks: [])
 
         if code == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
@@ -852,7 +852,7 @@ public class Zero: HostCall {
         self.context = context
     }
 
-    public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
+    public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         let regs: [UInt64] = state.readRegisters(in: 7 ..< 10)
 
         if context.pvms[regs[0]] == nil {
@@ -864,11 +864,7 @@ public class Zero: HostCall {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
-            // TODO: update after pvm memory is updated to have pages and able to allocate with accessiblity
-            try context.pvms[regs[0]]!.memory.write(
-                address: UInt32(truncatingIfNeeded: regs[1] * UInt64(config.value.pvmMemoryPageSize)),
-                values: Data(repeating: 0, count: Int(regs[2] * UInt64(config.value.pvmMemoryPageSize)))
-            )
+            try context.pvms[regs[0]]!.memory.zero(pageIndex: UInt32(truncatingIfNeeded: regs[1]), pages: Int(regs[2]))
         }
     }
 }
@@ -883,7 +879,7 @@ public class VoidFn: HostCall {
         self.context = context
     }
 
-    public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
+    public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         let regs: [UInt64] = state.readRegisters(in: 7 ..< 10)
 
         if context.pvms[regs[0]] == nil {
@@ -891,16 +887,13 @@ public class VoidFn: HostCall {
             return
         }
 
-        // TODO: update when can check if pages are inaccessible
-        if (regs[1] + regs[2]) >= (1 << 32) {
+        if (regs[1] + regs[2]) >= (1 << 32) ||
+            !context.pvms[regs[0]]!.memory.isReadable(pageStart: UInt32(truncatingIfNeeded: regs[1]), pages: Int(regs[2]))
+        {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
-            // TODO: update after pvm memory is updated to have pages and able to allocate with accessiblity
-            try context.pvms[regs[0]]!.memory.write(
-                address: UInt32(truncatingIfNeeded: regs[1] * UInt64(config.value.pvmMemoryPageSize)),
-                values: Data(repeating: 0, count: Int(regs[2] * UInt64(config.value.pvmMemoryPageSize)))
-            )
+            try context.pvms[regs[0]]!.memory.void(pageIndex: UInt32(truncatingIfNeeded: regs[1]), pages: Int(regs[2]))
         }
     }
 }
