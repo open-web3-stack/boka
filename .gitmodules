@@ -1,3 +1,6 @@
 [submodule "JAMTests/jamtestvectors"]
 	path = JAMTests/jamtestvectors
 	url = https://github.com/open-web3-stack/jamtestvectors.git
+[submodule "JAMTests/jamtestnet"]
+	path = JAMTests/jamtestnet
+	url = https://github.com/jam-duna/jamtestnet
