@@ -1,5 +1,5 @@
 {
-  "originHash" : "17f4ae5a80611e62767d9518a6a540647730a59e27203409910c40368018fcbe",
+  "originHash" : "2e1e8e50337213cfabbfa2873f36444e76badd3762318552a0add386e1cc8e55",
   "pins" : [
     {
       "identity" : "async-channels",
@@ -53,6 +53,15 @@
       "state" : {
         "revision" : "6a90b7e77e29f9bda6c2b3a4165a40d6c02cfda1",
         "version" : "1.23.0"
+      }
+    },
+    {
+      "identity" : "lrucache",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/nicklockwood/LRUCache.git",
+      "state" : {
+        "revision" : "542f0449556327415409ededc9c43a4bd0a397dc",
+        "version" : "1.0.7"
       }
     },
     {
@@ -247,7 +256,7 @@
     {
       "identity" : "swift-numerics",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-numerics",
+      "location" : "https://github.com/apple/swift-numerics.git",
       "state" : {
         "branch" : "main",
         "revision" : "e30276bff2ff5ed80566fbdca49f50aa160b0e83"
@@ -294,8 +303,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-syntax.git",
       "state" : {
-        "revision" : "4c6cc0a3b9e8f14b3ae2307c5ccae4de6167ac2c",
-        "version" : "600.0.0-prerelease-2024-06-12"
+        "revision" : "0687f71944021d616d34d922343dcef086855920",
+        "version" : "600.0.1"
       }
     },
     {

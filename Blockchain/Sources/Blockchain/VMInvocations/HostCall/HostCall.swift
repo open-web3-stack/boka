@@ -22,7 +22,7 @@ extension HostCall {
         do {
             try await _callImpl(config: config, state: state)
             return .continued
-        } catch let e as Memory.Error {
+        } catch let e as MemoryError {
             logger.error("memory error: \(e)")
             return .exit(.pageFault(e.address))
         } catch VMInvocationsError.forceHalt {
