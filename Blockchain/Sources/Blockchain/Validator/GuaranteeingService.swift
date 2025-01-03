@@ -98,7 +98,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         let authorizerHash = corePool.array.first ?? Data32()
         var exportSegmentOffset: UInt64 = 0
         // B.2. the authorization output, the result of the Is-Authorized function
-        let res = try await authorizationFunction.invoke(config: config, package: workPackage, coreIndex: coreIndex)
+        // TODO: waiting for authorizationFunction is done
+        // let res = try await authorizationFunction.invoke(config: config, package: workPackage, coreIndex: coreIndex)
+        // Mock a result
+        let res = Result<Data, WorkResultError>.success(Data())
         switch res {
         // authorizationFunction -> authorizationOutput
         case let .success(authorizationOutput):

@@ -69,12 +69,13 @@ struct GuaranteeingServiceTests {
         let scheduler = services.scheduler
 
         var allWorkPackages = [WorkPackageAndOutput]()
+        let blob = createSimpleBlob()
         for _ in 0 ..< services.config.value.totalNumberOfCores {
             let workpackage = WorkPackage(
                 authorizationToken: Data(),
                 authorizationServiceIndex: 0,
-                authorizationCodeHash: Data32(),
-                parameterizationBlob: createSimpleBlob(),
+                authorizationCodeHash: Data32.random(),
+                parameterizationBlob: blob,
                 context: RefinementContext.dummy(config: services.config),
                 workItems: try! ConfigLimitedSizeArray(config: services.config, defaultValue: WorkItem.dummy(config: services.config))
             )
