@@ -15,6 +15,7 @@ public enum GuaranteeingError: Error {
     case invalidServiceGas
     case invalidPublicKey
     case invalidSegmentLookup
+    case futureReportSlot
 }
 
 public protocol Guaranteeing {
@@ -112,7 +113,7 @@ extension Guaranteeing {
         )
         let pareviousCoreKeys = withoutOffenders(keys: previousValidators.map(\.ed25519))
 
-        var workReportHashes = Set<Data32>()
+        var workPackageHashes = Set<Data32>()
 
         var totalMinGasRequirement = Gas(0)
 
@@ -123,6 +124,10 @@ extension Guaranteeing {
         for guarantee in extrinsic.guarantees {
             let report = guarantee.workReport
 
+            guard guarantee.timeslot <= timeslot else {
+                throw .futureReportSlot
+            }
+
             oldLookups[report.packageSpecification.workPackageHash] = report.packageSpecification.segmentRoot
 
             for credential in guarantee.credential {
@@ -130,7 +135,7 @@ extension Guaranteeing {
                 let keys = isCurrent ? currentCoreKeys : pareviousCoreKeys
                 let key = keys[Int(credential.index)]
                 let reportHash = report.hash()
-                workReportHashes.insert(reportHash)
+                workPackageHashes.insert(report.packageSpecification.workPackageHash)
                 let payload = SigningContext.guarantee + reportHash.data
                 let pubkey = try Result { try Ed25519.PublicKey(from: key) }
                     .mapError { _ in GuaranteeingError.invalidPublicKey }
@@ -180,14 +185,14 @@ extension Guaranteeing {
             throw .outOfGas
         }
 
-        let recentWorkReportHashes: Set<Data32> = Set(recentHistory.items.flatMap(\.lookup.keys))
+        let recentWorkPackageHashes: Set<Data32> = Set(recentHistory.items.flatMap(\.lookup.keys))
         let accumulateHistoryReports = Set(accumulationHistory.array.flatMap { $0 })
         let accumulateQueueReports = Set(accumulationQueue.array.flatMap { $0 }
             .flatMap(\.workReport.refinementContext.prerequisiteWorkPackages))
         let pendingWorkReportHashes = Set(reports.array.flatMap { $0?.workReport.refinementContext.prerequisiteWorkPackages ?? [] })
-        let pipelinedWorkReportHashes = recentWorkReportHashes.union(accumulateHistoryReports).union(accumulateQueueReports)
+        let pipelinedWorkReportHashes = recentWorkPackageHashes.union(accumulateHistoryReports).union(accumulateQueueReports)
             .union(pendingWorkReportHashes)
-        guard pipelinedWorkReportHashes.isDisjoint(with: workReportHashes) else {
+        guard pipelinedWorkReportHashes.isDisjoint(with: workPackageHashes) else {
             throw .duplicatedWorkPackage
         }
 
@@ -208,13 +213,13 @@ extension Guaranteeing {
             guard context.anchor.beefyRoot == history.mmr.superPeak() else {
                 throw .invalidContext
             }
-            guard context.lookupAnchor.timeslot >= timeslot - UInt32(config.value.maxLookupAnchorAge) else {
+            guard context.lookupAnchor.timeslot >= Int64(timeslot) - Int64(config.value.maxLookupAnchorAge) else {
                 throw .invalidContext
             }
 
             for prerequisiteWorkPackage in context.prerequisiteWorkPackages.union(report.lookup.keys) {
-                guard recentWorkReportHashes.contains(prerequisiteWorkPackage) ||
-                    workReportHashes.contains(prerequisiteWorkPackage)
+                guard recentWorkPackageHashes.contains(prerequisiteWorkPackage) ||
+                    workPackageHashes.contains(prerequisiteWorkPackage)
                 else {
                     throw .prerequisiteNotFound
                 }
@@ -239,6 +244,9 @@ extension Guaranteeing {
             )
             reported.append(report)
         }
+
+        reported.sort { $0.packageSpecification.workPackageHash < $1.packageSpecification.workPackageHash }
+        reporters.sort()
 
         return (newReports, reported, reporters)
     }
