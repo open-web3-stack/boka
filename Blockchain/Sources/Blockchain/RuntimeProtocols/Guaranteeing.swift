@@ -115,13 +115,12 @@ extension Guaranteeing {
 
         var workPackageHashes = Set<Data32>()
 
-        var totalMinGasRequirement = Gas(0)
-
         var oldLookups = [Data32: Data32]()
 
         var reporters = [Ed25519PublicKey]()
 
         for guarantee in extrinsic.guarantees {
+            var totalGasUsage = Gas(0)
             let report = guarantee.workReport
 
             guard guarantee.timeslot <= timeslot else {
@@ -177,12 +176,12 @@ extension Guaranteeing {
                     throw .invalidServiceGas
                 }
 
-                totalMinGasRequirement += acc.minAccumlateGas
+                totalGasUsage += result.gasRatio
             }
-        }
 
-        guard totalMinGasRequirement <= config.value.workReportAccumulationGas else {
-            throw .outOfGas
+            guard totalGasUsage <= config.value.workReportAccumulationGas else {
+                throw .outOfGas
+            }
         }
 
         let recentWorkPackageHashes: Set<Data32> = Set(recentHistory.items.flatMap(\.lookup.keys))
