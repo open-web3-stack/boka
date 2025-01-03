@@ -1,4 +1,3 @@
-@testable import Blockchain
 import Foundation
 import PolkaVM
 import Testing
@@ -29,7 +28,6 @@ struct StandardProgramTests {
     }
 
     @Test func initialization() throws {
-        print("createBlob = \(createBlob().toHexString())")
         _ = try StandardProgram(blob: createBlob(), argumentData: nil)
     }
 }
