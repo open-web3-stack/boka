@@ -58,7 +58,7 @@ public class StandardProgram {
 
         initialRegisters = Registers(config: config, argumentData: argumentData)
 
-        initialMemory = Memory(
+        initialMemory = try StandardMemory(
             readOnlyData: readOnlyData,
             readWriteData: readWriteData,
             argumentData: argumentData ?? Data(),
@@ -67,12 +67,12 @@ public class StandardProgram {
         )
     }
 
-    static func alignToPageSize(size: UInt32, config: PvmConfig) -> UInt32 {
+    public static func alignToPageSize(size: UInt32, config: PvmConfig) -> UInt32 {
         let pageSize = UInt32(config.pvmMemoryPageSize)
         return (size + pageSize - 1) / pageSize * pageSize
     }
 
-    static func alignToZoneSize(size: UInt32, config: PvmConfig) -> UInt32 {
+    public static func alignToZoneSize(size: UInt32, config: PvmConfig) -> UInt32 {
         let zoneSize = UInt32(config.pvmProgramInitZoneSize)
         return (size + zoneSize - 1) / zoneSize * zoneSize
     }
