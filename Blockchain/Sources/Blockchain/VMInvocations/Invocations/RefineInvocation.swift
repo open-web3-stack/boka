@@ -7,15 +7,15 @@ public protocol RefineInvocation {
     func invoke(
         config: ProtocolConfigRef,
         serviceAccounts: some ServiceAccounts,
-        codeHash: Data,
+        codeHash: Data32,
         gas: Gas,
         service: ServiceIndex,
         workPackageHash: Data32,
-        workPayload: Data,
-        refinementCtx: RefinementContext,
+        workPayload: Data, // y
+        refinementCtx: RefinementContext, // c
         authorizerHash: Data32,
         authorizationOutput: Data,
-        importSegments: [Data], // array of Data4104
+        importSegments: [Data],
         extrinsicDataBlobs: [Data],
         exportSegmentOffset: UInt64
     ) async throws -> (result: Result<Data, WorkResultError>, exports: [Data])
