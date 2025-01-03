@@ -28,13 +28,13 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     /// following tranche for each no-show in the previous.
     public var auditBiasFactor: Int
 
-    /// GA: The gas allocated to invoke a work-report's Accumulation logic.
+    /// GA = 10,000,000: The gas allocated to invoke a work-report's Accumulation logic.
     public var workReportAccumulationGas: Gas
 
-    /// GI: The gas allocated to invoke a work-package’s Is-Authorized logic.
+    /// GI = 50,000,000: The gas allocated to invoke a work-package’s Is-Authorized logic.
     public var workPackageAuthorizerGas: Gas
 
-    /// GR: The gas allocated to invoke a work-package's Refine logic.
+    /// GR = 5,000,000,000: The gas allocated to invoke a work-package's Refine logic.
     public var workPackageRefineGas: Gas
 
     /// GT: The total gas allocated across for all Accumulation.

@@ -561,7 +561,7 @@ public class Solicit: HostCall {
             if notRequestedYet {
                 x.serviceAccounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: [])
             } else if isPreviouslyAvailable, var preimageInfo {
-                preimageInfo.append(timeslot)
+                try preimageInfo.append(timeslot)
                 x.serviceAccounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: preimageInfo)
             }
         }
@@ -602,7 +602,7 @@ public class Forget: HostCall {
                 x.serviceAccounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: nil)
                 x.serviceAccounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, value: nil)
             } else if isAvailable1, var preimageInfo {
-                preimageInfo.append(timeslot)
+                try preimageInfo.append(timeslot)
                 x.serviceAccounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: preimageInfo)
             } else if isAvailable3, var preimageInfo {
                 preimageInfo = [preimageInfo[2], timeslot]

@@ -31,21 +31,21 @@ struct LimitedSizeArrayTests {
 
     @Test func appendElement() throws {
         var array = LimitedSizeArray<Int, ConstInt5, ConstInt10>([1, 2, 3, 4, 5])
-        array.append(6)
+        try array.append(6)
         #expect(array.array == [1, 2, 3, 4, 5, 6])
         #expect(array.count == 6)
     }
 
     @Test func insertElement() throws {
         var array = LimitedSizeArray<Int, ConstInt5, ConstInt10>([1, 2, 3, 4, 5])
-        array.insert(0, at: 2)
+        try array.insert(0, at: 2)
         #expect(array.array == [1, 2, 0, 3, 4, 5])
         #expect(array.count == 6)
     }
 
     @Test func removeElement() throws {
         var array = LimitedSizeArray<Int, ConstInt5, ConstInt10>([1, 2, 3, 4, 5, 6])
-        let removed = array.remove(at: 2)
+        let removed = try array.remove(at: 2)
         #expect(removed == 3)
         #expect(array.array == [1, 2, 4, 5, 6])
         #expect(array.count == 5)

@@ -1,5 +1,10 @@
 import Codec
 
+public enum LimitedSizeArrayError: Swift.Error {
+    case tooFewElements
+    case tooManyElements
+}
+
 public struct LimitedSizeArray<T, TMinLength: ConstInt, TMaxLength: ConstInt> {
     public private(set) var array: [T]
     public static var minLength: Int {
@@ -25,6 +30,15 @@ public struct LimitedSizeArray<T, TMinLength: ConstInt, TMaxLength: ConstInt> {
     private func validate() {
         assert(array.count >= Self.minLength)
         assert(array.count <= Self.maxLength)
+    }
+
+    private func validateThrowing() throws(LimitedSizeArrayError) {
+        guard array.count >= Self.minLength else {
+            throw LimitedSizeArrayError.tooFewElements
+        }
+        guard array.count <= Self.maxLength else {
+            throw LimitedSizeArrayError.tooManyElements
+        }
     }
 }
 
@@ -100,19 +114,20 @@ extension LimitedSizeArray: RandomAccessCollection {
 }
 
 extension LimitedSizeArray {
-    public mutating func append(_ newElement: T) {
+    public mutating func append(_ newElement: T) throws(LimitedSizeArrayError) {
         array.append(newElement)
-        validate()
+        try validateThrowing()
     }
 
-    public mutating func insert(_ newElement: T, at i: Int) {
+    public mutating func insert(_ newElement: T, at i: Int) throws(LimitedSizeArrayError) {
         array.insert(newElement, at: i)
-        validate()
+        try validateThrowing()
     }
 
-    public mutating func remove(at i: Int) -> T {
-        defer { validate() }
-        return array.remove(at: i)
+    public mutating func remove(at i: Int) throws(LimitedSizeArrayError) -> T {
+        let ret = array.remove(at: i)
+        try validateThrowing()
+        return ret
     }
 }
 
@@ -155,6 +170,8 @@ extension LimitedSizeArray: Decodable where T: Decodable {
         for _ in 0 ..< length {
             try array.append(container.decode(T.self))
         }
+
+        try validateThrowing()
     }
 }
 
