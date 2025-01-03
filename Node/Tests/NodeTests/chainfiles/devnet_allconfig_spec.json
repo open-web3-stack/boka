@@ -36,9 +36,9 @@
 		"totalNumberOfCores" : 1,
 		"totalNumberOfValidators" : 3,
 		"transferMemoSize" : 128,
-		"workPackageAuthorizerGas" : 10000000,
-		"workPackageRefineGas" : 10000000,
-		"totalAccumulationGas": 35000000,
+		"workPackageAuthorizerGas" : 50000000,
+		"workPackageRefineGas" : 5000000000,
+		"totalAccumulationGas": 3500000000,
 		"maxDepsInWorkReport": 8
 	},
 	"state" : {},

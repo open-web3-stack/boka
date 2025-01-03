@@ -4,8 +4,12 @@ import Foundation
 public enum WorkResultError: Error, CaseIterable {
     case outOfGas
     case panic
+    /// the number of exports made was invalidly reported
+    case badExports
+    /// the service's code was not available for lookup in state at the posterior state of the lookup-anchor block
     case invalidCode
-    case codeTooLarge // code larger than MaxServiceCodeSize
+    /// code larger than MaxServiceCodeSize
+    case codeTooLarge
 }
 
 public struct WorkOutput: Sendable, Equatable {
@@ -21,6 +25,7 @@ extension WorkOutput: Codable {
         case success
         case outOfGas
         case panic
+        case badExports
         case invalidCode
         case codeTooLarge
     }
@@ -37,8 +42,10 @@ extension WorkOutput: Codable {
             case 2:
                 self = .init(.failure(.panic))
             case 3:
-                self = .init(.failure(.invalidCode))
+                self = .init(.failure(.badExports))
             case 4:
+                self = .init(.failure(.invalidCode))
+            case 5:
                 self = .init(.failure(.codeTooLarge))
             default:
                 throw DecodingError.dataCorrupted(
@@ -56,6 +63,8 @@ extension WorkOutput: Codable {
                 self = .init(.failure(.outOfGas))
             } else if container.contains(.panic) {
                 self = .init(.failure(.panic))
+            } else if container.contains(.badExports) {
+                self = .init(.failure(.badExports))
             } else if container.contains(.invalidCode) {
                 self = .init(.failure(.invalidCode))
             } else if container.contains(.codeTooLarge) {
@@ -84,10 +93,12 @@ extension WorkOutput: Codable {
                     try container.encode(UInt8(1))
                 case .panic:
                     try container.encode(UInt8(2))
-                case .invalidCode:
+                case .badExports:
                     try container.encode(UInt8(3))
-                case .codeTooLarge:
+                case .invalidCode:
                     try container.encode(UInt8(4))
+                case .codeTooLarge:
+                    try container.encode(UInt8(5))
                 }
             }
         } else {
@@ -101,6 +112,8 @@ extension WorkOutput: Codable {
                     try container.encodeNil(forKey: .outOfGas)
                 case .panic:
                     try container.encodeNil(forKey: .panic)
+                case .badExports:
+                    try container.encodeNil(forKey: .badExports)
                 case .invalidCode:
                     try container.encodeNil(forKey: .invalidCode)
                 case .codeTooLarge:
