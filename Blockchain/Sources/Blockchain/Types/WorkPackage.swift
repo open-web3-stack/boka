@@ -9,7 +9,7 @@ public struct WorkPackage: Sendable, Equatable, Codable {
     // h
     public var authorizationServiceIndex: ServiceIndex
 
-    // c
+    // u
     public var authorizationCodeHash: Data32
 
     // p
