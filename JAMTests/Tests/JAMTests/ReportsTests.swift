@@ -146,8 +146,8 @@ struct ReportsTests {
         try reportsTests(testcase, variant: .tiny)
     }
 
-    // @Test(arguments: try ReportsTests.loadTests(variant: .full))
-    // func fullTests(_ testcase: Testcase) throws {
-    //     try reportsTests(testcase, variant: .full)
-    // }
+    @Test(arguments: try ReportsTests.loadTests(variant: .full))
+    func fullTests(_ testcase: Testcase) throws {
+        try reportsTests(testcase, variant: .full)
+    }
 }
