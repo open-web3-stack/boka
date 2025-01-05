@@ -427,8 +427,8 @@ public class Transfer: HostCall {
     }
 
     public func gasCost(state: VMState) -> Gas {
-        let (reg8, reg9): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 8), Registers.Index(raw: 9))
-        return Gas(10) + Gas(reg8) + Gas(0x1_0000_0000) * Gas(reg9)
+        let reg9: UInt64 = state.readRegister(Registers.Index(raw: 9))
+        return Gas(10) + Gas(reg9)
     }
 
     public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
@@ -454,8 +454,6 @@ public class Transfer: HostCall {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
         } else if gasLimit < destAcc!.minOnTransferGas {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.LOW.rawValue)
-        } else if Gas(state.getGas()) < gasLimit {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HIGH.rawValue)
         } else if let acc, acc.balance - amount < acc.thresholdBalance(config: config) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.CASH.rawValue)
         } else if var acc {
