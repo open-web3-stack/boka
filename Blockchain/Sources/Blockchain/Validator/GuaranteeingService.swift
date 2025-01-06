@@ -76,7 +76,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             throw GuaranteeingServiceError.invalidValidatorIndex
         }
         let coreIndex = CoreIndex(currentCoreAssignment[Int(authorIndex)])
-        let workPackages = await workPackagePool.getWorkPackage()
+        let workPackages = await workPackagePool.getWorkPackages()
         for workPackage in workPackages.array {
             if try validate(workPackage: workPackage.workPackage) {
                 let workReport = try await createWorkReport(for: workPackage.workPackage, coreIndex: coreIndex)
@@ -98,9 +98,9 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         let authorizerHash = corePool.array.first ?? Data32()
         var exportSegmentOffset: UInt64 = 0
         // B.2. the authorization output, the result of the Is-Authorized function
-        // TODO: waiting for authorizationFunction is done
-        // let res = try await authorizationFunction.invoke(config: config, package: workPackage, coreIndex: coreIndex)
-        // Mock a result
+        // TODO: waiting for authorizationFunction done  Mock a result
+        // let res = try await authorizationFunction.invoke(config: config, serviceAccounts: state.value, package: workPackage, coreIndex:
+        // coreIndex)
         let res = Result<Data, WorkResultError>.success(Data())
         switch res {
         // authorizationFunction -> authorizationOutput

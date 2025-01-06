@@ -5,6 +5,7 @@ import PolkaVM
 public protocol IsAuthorizedFunction {
     func invoke(
         config: ProtocolConfigRef,
+        serviceAccounts: some ServiceAccounts,
         package: WorkPackage,
         coreIndex: CoreIndex
     ) async throws -> Result<Data, WorkResultError>
@@ -13,15 +14,15 @@ public protocol IsAuthorizedFunction {
 extension IsAuthorizedFunction {
     public func invoke(
         config: ProtocolConfigRef,
+        serviceAccounts: some ServiceAccounts,
         package: WorkPackage,
         coreIndex: CoreIndex
     ) async throws -> Result<Data, WorkResultError> {
         let args = try JamEncoder.encode(package, coreIndex)
         let ctx = IsAuthorizedContext(config: config)
-        // TODO: change blob: package.authorizationCodeHash.data to parameterizationBlob
-        let (exitReason, _, output) = await invokePVM(
+        let (exitReason, _, output) = try await invokePVM(
             config: config,
-            blob: package.parameterizationBlob,
+            blob: package.authorizationCode(serviceAccounts: serviceAccounts),
             pc: 0,
             gas: config.value.workPackageAuthorizerGas,
             argumentData: args,

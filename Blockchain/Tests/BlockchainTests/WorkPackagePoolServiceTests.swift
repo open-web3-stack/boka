@@ -30,8 +30,6 @@ struct WorkPackagePoolServiceTests {
 
         workPackagecPoolService = await WorkPackagePoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
         ringContext = try Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
-
-        // setupTestLogger()
     }
 
     @Test
@@ -44,7 +42,7 @@ struct WorkPackagePoolServiceTests {
         }
         await eventBus.publish(RuntimeEvents.WorkPackagesGenerated(items: allWorkPackages))
         await storeMiddleware.wait()
-        let workPackages = await workPackagecPoolService.getWorkPackage()
+        let workPackages = await workPackagecPoolService.getWorkPackages()
         #expect(workPackages.array == Array(allWorkPackages).sorted())
         let workpackage = WorkPackage.dummy(config: config)
         let wpOut = WorkPackageAndOutput(workPackage: workpackage, output: Data32.random())
