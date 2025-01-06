@@ -469,6 +469,8 @@ extension State: Authorization {
     }
 }
 
+extension State: ActivityStatistics {}
+
 struct DummyFunction: AccumulateFunction, OnTransferFunction {
     func invoke(
         config _: ProtocolConfigRef,
