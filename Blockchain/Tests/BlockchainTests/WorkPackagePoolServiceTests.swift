@@ -34,20 +34,18 @@ struct WorkPackagePoolServiceTests {
 
     @Test
     func testAddPendingWorkPackage() async throws {
-        var allWorkPackages = [WorkPackageAndOutput]()
+        var allWorkPackages = [WorkPackage]()
         for _ in 0 ..< config.value.totalNumberOfCores {
             let workpackage = WorkPackage.dummy(config: config)
-            let wpOut = WorkPackageAndOutput(workPackage: workpackage, output: Data32.random())
-            allWorkPackages.append(wpOut)
+            allWorkPackages.append(workpackage)
         }
         await eventBus.publish(RuntimeEvents.WorkPackagesGenerated(items: allWorkPackages))
         await storeMiddleware.wait()
         let workPackages = await workPackagecPoolService.getWorkPackages()
         #expect(workPackages.array == Array(allWorkPackages).sorted())
         let workpackage = WorkPackage.dummy(config: config)
-        let wpOut = WorkPackageAndOutput(workPackage: workpackage, output: Data32.random())
-        try await workPackagecPoolService.addWorkPackages(packages: [wpOut])
-        try await workPackagecPoolService.removeWorkPackages(packages: [wpOut])
+        try await workPackagecPoolService.addWorkPackages(packages: [workpackage])
+        try await workPackagecPoolService.removeWorkPackages(packages: [workpackage])
         #expect(workPackages.array.count == config.value.totalNumberOfCores)
     }
 }

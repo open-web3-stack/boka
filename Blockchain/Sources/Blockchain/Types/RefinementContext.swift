@@ -3,8 +3,8 @@ import Utils
 
 // A refinement context, denoted by the set X, describes the context of the chain
 // at the point that the report’s corresponding work-package was evaluated.
-public struct RefinementContext: Sendable, Equatable, Codable {
-    public struct Anchor: Sendable, Equatable, Codable {
+public struct RefinementContext: Comparable, Sendable, Equatable, Codable {
+    public struct Anchor: Comparable, Sendable, Equatable, Codable {
         // a
         public var headerHash: Data32
         // s
@@ -21,9 +21,19 @@ public struct RefinementContext: Sendable, Equatable, Codable {
             self.stateRoot = stateRoot
             self.beefyRoot = beefyRoot
         }
+
+        public static func < (lhs: Anchor, rhs: Anchor) -> Bool {
+            if lhs.headerHash != rhs.headerHash {
+                return lhs.headerHash < rhs.headerHash
+            }
+            if lhs.stateRoot != rhs.stateRoot {
+                return lhs.stateRoot < rhs.stateRoot
+            }
+            return lhs.beefyRoot < rhs.beefyRoot
+        }
     }
 
-    public struct LookupAnchor: Sendable, Equatable, Codable, Hashable {
+    public struct LookupAnchor: Comparable, Sendable, Equatable, Codable, Hashable {
         // l
         public var headerHash: Data32
         // t
@@ -35,6 +45,13 @@ public struct RefinementContext: Sendable, Equatable, Codable {
         ) {
             self.headerHash = headerHash
             self.timeslot = timeslot
+        }
+
+        public static func < (lhs: LookupAnchor, rhs: LookupAnchor) -> Bool {
+            if lhs.headerHash != rhs.headerHash {
+                return lhs.headerHash < rhs.headerHash
+            }
+            return lhs.timeslot < rhs.timeslot
         }
     }
 
@@ -49,6 +66,13 @@ public struct RefinementContext: Sendable, Equatable, Codable {
         self.anchor = anchor
         self.lookupAnchor = lookupAnchor
         self.prerequisiteWorkPackages = prerequisiteWorkPackages
+    }
+
+    public static func < (lhs: RefinementContext, rhs: RefinementContext) -> Bool {
+        if lhs.anchor != rhs.anchor {
+            return lhs.anchor < rhs.anchor
+        }
+        return lhs.lookupAnchor < rhs.lookupAnchor
     }
 }
 

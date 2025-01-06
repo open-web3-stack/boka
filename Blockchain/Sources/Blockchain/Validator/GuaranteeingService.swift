@@ -78,9 +78,9 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         let coreIndex = CoreIndex(currentCoreAssignment[Int(authorIndex)])
         let workPackages = await workPackagePool.getWorkPackages()
         for workPackage in workPackages.array {
-            if try validate(workPackage: workPackage.workPackage) {
-                let workReport = try await createWorkReport(for: workPackage.workPackage, coreIndex: coreIndex)
-                logger.debug("workReport: \(workReport)")
+            if try validate(workPackage: workPackage) {
+                let workReport = try await createWorkReport(for: workPackage, coreIndex: coreIndex)
+                try await workPackagePool.removeWorkPackages(packages: [workPackage])
                 let event = RuntimeEvents.WorkReportGenerated(items: [workReport])
                 publish(event)
             } else {
