@@ -83,6 +83,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                 try await workPackagePool.removeWorkPackages(packages: [workPackage])
                 let event = RuntimeEvents.WorkReportGenerated(items: [workReport])
                 publish(event)
+                break
             } else {
                 logger.error("WorkPackage validation failed")
             }
