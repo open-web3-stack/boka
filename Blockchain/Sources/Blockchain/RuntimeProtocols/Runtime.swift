@@ -11,7 +11,7 @@ public final class Runtime {
         case safroleError(SafroleError)
         case disputesError(DisputesError)
         case invalidTimeslot(got: TimeslotIndex, context: TimeslotIndex)
-        case invalidReportAuthorizer
+        case authorizationError(AuthorizationError)
         case encodeError(any Swift.Error)
         case invalidExtrinsicHash
         case invalidParentHash(state: Data32, header: Data32)
@@ -179,9 +179,16 @@ public final class Runtime {
                 prevTimeslot: prevState.value.timeslot
             )
 
-            newState.coreAuthorizationPool = try updateAuthorizationPool(
-                block: block, state: prevState
-            )
+            do {
+                let authorizationResult = try newState.update(
+                    config: config,
+                    timeslot: block.header.timeslot,
+                    auths: block.extrinsic.reports.guarantees.map { ($0.workReport.coreIndex, $0.workReport.authorizerHash) }
+                )
+                newState.mergeWith(postState: authorizationResult)
+            } catch let error as AuthorizationError {
+                throw Error.authorizationError(error)
+            }
 
             newState.activityStatistics = try updateValidatorActivityStatistics(
                 block: block, state: prevState
@@ -302,43 +309,6 @@ public final class Runtime {
         guard offenders == block.header.offendersMarkers else {
             throw Error.invalidHeaderOffendersMarkers
         }
-    }
-
-    // TODO: add tests
-    public func updateAuthorizationPool(block: BlockRef, state: StateRef) throws -> ConfigFixedSizeArray<
-        ConfigLimitedSizeArray<
-            Data32,
-            ProtocolConfig.Int0,
-            ProtocolConfig.MaxAuthorizationsPoolItems
-        >,
-        ProtocolConfig.TotalNumberOfCores
-    > {
-        var pool = state.value.coreAuthorizationPool
-
-        for coreIndex in 0 ..< pool.count {
-            var corePool = pool[coreIndex]
-            let coreQueue = state.value.authorizationQueue[coreIndex]
-            if coreQueue.count == 0 {
-                continue
-            }
-            let newItem = coreQueue[Int(block.header.timeslot) % coreQueue.count]
-
-            // remove used authorizers from pool
-            for report in block.extrinsic.reports.guarantees {
-                let authorizer = report.workReport.authorizerHash
-                if let idx = corePool.firstIndex(of: authorizer) {
-                    _ = try corePool.remove(at: idx)
-                } else {
-                    throw Error.invalidReportAuthorizer
-                }
-            }
-
-            // add new item from queue
-            corePool.safeAppend(newItem)
-            pool[coreIndex] = corePool
-        }
-
-        return pool
     }
 
     // returns available reports

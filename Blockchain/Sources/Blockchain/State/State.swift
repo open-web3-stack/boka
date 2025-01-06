@@ -463,6 +463,12 @@ extension State: Guaranteeing {
     }
 }
 
+extension State: Authorization {
+    public mutating func mergeWith(postState: AuthorizationPostState) {
+        coreAuthorizationPool = postState.coreAuthorizationPool
+    }
+}
+
 struct DummyFunction: AccumulateFunction, OnTransferFunction {
     func invoke(
         config _: ProtocolConfigRef,
