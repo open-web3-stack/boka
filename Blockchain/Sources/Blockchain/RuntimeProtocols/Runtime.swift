@@ -336,38 +336,9 @@ public final class Runtime {
     }
 
     public func updatePreimages(block: BlockRef, state newState: inout State, prevState: StateRef) async throws {
-        let preimages = block.extrinsic.preimages.preimages
-
-        guard preimages.isSortedAndUnique() else {
-            throw Error.preimagesNotSorted
-        }
-
-        for preimage in preimages {
-            let hash = preimage.data.blake2b256hash()
-
-            // check prior state
-            let prevPreimageData: Data? = try await prevState.value.get(serviceAccount: preimage.serviceIndex, preimageHash: hash)
-            let prevInfo = try await prevState.value.get(
-                serviceAccount: preimage.serviceIndex, preimageHash: hash, length: UInt32(preimage.data.count)
-            )
-            guard prevPreimageData == nil, prevInfo == nil else {
-                throw Error.duplicatedPreimage
-            }
-
-            // disregard no longer useful ones in new state
-            let preimageData: Data? = try await newState.get(serviceAccount: preimage.serviceIndex, preimageHash: hash)
-            let info = try await newState.get(
-                serviceAccount: preimage.serviceIndex, preimageHash: hash, length: UInt32(preimage.data.count)
-            )
-            if preimageData != nil || info != nil {
-                continue
-            }
-
-            // update state
-            newState[serviceAccount: preimage.serviceIndex, preimageHash: hash] = preimage.data
-            newState[
-                serviceAccount: preimage.serviceIndex, preimageHash: hash, length: UInt32(preimage.data.count)
-            ] = .init([newState.timeslot])
-        }
+        let res = try await prevState.value.updatePreimages(
+            config: config, timeslot: newState.timeslot, preimages: block.extrinsic.preimages
+        )
+        newState.mergeWith(postState: res)
     }
 }
