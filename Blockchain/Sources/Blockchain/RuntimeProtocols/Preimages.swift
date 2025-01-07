@@ -31,7 +31,11 @@ public struct PreimagesPostState: Sendable, Equatable {
     }
 }
 
-public protocol Preimages: ServiceAccounts {
+public protocol Preimages {
+    func get(serviceAccount index: ServiceIndex, preimageHash hash: Data32) async throws -> Data?
+    func get(serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32) async throws
+        -> LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>?
+
     mutating func mergeWith(postState: PreimagesPostState)
 }
 
@@ -55,24 +59,9 @@ extension Preimages {
             let prevPreimageData = try await Result {
                 try await get(serviceAccount: preimage.serviceIndex, preimageHash: hash)
             }.mapError { _ in PreimagesError.invalidServiceIndex }.get()
-            let prevInfo = try await Result {
-                try await get(serviceAccount: preimage.serviceIndex, preimageHash: hash, length: UInt32(preimage.data.count))
-            }.mapError { _ in PreimagesError.invalidServiceIndex }.get()
 
-            guard prevPreimageData == nil, prevInfo == nil else {
+            guard prevPreimageData == nil else {
                 throw PreimagesError.duplicatedPreimage
-            }
-
-            // disregard no longer useful ones in new state
-            let preimageData = try await Result {
-                try await self.get(serviceAccount: preimage.serviceIndex, preimageHash: hash)
-            }.mapError { _ in PreimagesError.invalidServiceIndex }.get()
-            let info = try await Result {
-                try await self.get(serviceAccount: preimage.serviceIndex, preimageHash: hash, length: UInt32(preimage.data.count))
-            }.mapError { _ in PreimagesError.invalidServiceIndex }.get()
-
-            if preimageData != nil || info != nil {
-                continue
             }
 
             updates.append(PreimageUpdate(

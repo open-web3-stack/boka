@@ -1,5 +1,5 @@
 {
-  "originHash" : "7b96cffee59bcf3ffc3dd86f84561500dff49efc82bcdd615bb1d37430c8c096",
+  "originHash" : "0eb45f2fc8fa9cfa864623c83d1048088ec88a1e8a0d9e55289c5970e6ea29bd",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -35,6 +35,15 @@
       "state" : {
         "revision" : "78c0dd739df8cb9ee14a8bbbf770facc4fc3402a",
         "version" : "4.15.0"
+      }
+    },
+    {
+      "identity" : "lrucache",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/nicklockwood/LRUCache.git",
+      "state" : {
+        "revision" : "542f0449556327415409ededc9c43a4bd0a397dc",
+        "version" : "1.0.7"
       }
     },
     {
@@ -175,7 +184,7 @@
     {
       "identity" : "swift-numerics",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-numerics",
+      "location" : "https://github.com/apple/swift-numerics.git",
       "state" : {
         "branch" : "main",
         "revision" : "e30276bff2ff5ed80566fbdca49f50aa160b0e83"
