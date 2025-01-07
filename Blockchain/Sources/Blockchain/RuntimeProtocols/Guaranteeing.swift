@@ -67,7 +67,7 @@ extension Guaranteeing {
         source.map { CoreIndex(($0 + n) % max) }
     }
 
-    private func getCoreAssignment(config: ProtocolConfigRef, randomness: Data32, timeslot: TimeslotIndex) -> [CoreIndex] {
+    public func getCoreAssignment(config: ProtocolConfigRef, randomness: Data32, timeslot: TimeslotIndex) -> [CoreIndex] {
         var source = Array(repeating: UInt32(0), count: config.value.totalNumberOfValidators)
         for i in 0 ..< config.value.totalNumberOfValidators {
             source[i] = UInt32(config.value.totalNumberOfCores * i / config.value.totalNumberOfValidators)

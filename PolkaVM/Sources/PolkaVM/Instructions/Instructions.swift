@@ -33,7 +33,6 @@ public enum Instructions {
         public static var opcode: UInt8 { 0 }
 
         public init(data _: Data = .init()) {}
-
         public func _executeImpl(context _: ExecutionContext) -> ExecOutcome {
             .exit(.panic(.trap))
         }
