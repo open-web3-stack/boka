@@ -72,7 +72,7 @@ extension WorkPackage: Dummy {
         WorkPackage(
             authorizationToken: Data(),
             authorizationServiceIndex: 0,
-            authorizationCodeHash: Data32.random(),
+            authorizationCodeHash: Data32(),
             parameterizationBlob: Data(),
             context: RefinementContext.dummy(config: config),
             workItems: try! ConfigLimitedSizeArray(config: config, defaultValue: WorkItem.dummy(config: config))

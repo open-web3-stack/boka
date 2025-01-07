@@ -46,7 +46,14 @@ struct GuaranteeingServiceTests {
 
         var allWorkPackages = [WorkPackage]()
         for _ in 0 ..< services.config.value.totalNumberOfCores {
-            let workpackage = WorkPackage.dummy(config: services.config)
+            let workpackage = WorkPackage(
+                authorizationToken: Data(),
+                authorizationServiceIndex: 0,
+                authorizationCodeHash: Data32.random(),
+                parameterizationBlob: Data(),
+                context: RefinementContext.dummy(config: services.config),
+                workItems: try! ConfigLimitedSizeArray(config: services.config, defaultValue: WorkItem.dummy(config: services.config))
+            )
             allWorkPackages.append(workpackage)
         }
         await services.eventBus.publish(RuntimeEvents.WorkPackagesGenerated(items: allWorkPackages))
