@@ -1,8 +1,9 @@
+import Codec
 import Foundation
 import Utils
 
 // P
-public struct WorkPackage: Sendable, Equatable, Codable {
+public struct WorkPackage: Comparable, Sendable, Equatable, Codable {
     // j
     public var authorizationToken: Data
 
@@ -43,6 +44,25 @@ public struct WorkPackage: Sendable, Equatable, Codable {
         self.parameterizationBlob = parameterizationBlob
         self.context = context
         self.workItems = workItems
+    }
+
+    public static func < (lhs: WorkPackage, rhs: WorkPackage) -> Bool {
+        if lhs.authorizationServiceIndex != rhs.authorizationServiceIndex {
+            return lhs.authorizationServiceIndex < rhs.authorizationServiceIndex
+        }
+        if lhs.authorizationCodeHash != rhs.authorizationCodeHash {
+            return lhs.authorizationCodeHash < rhs.authorizationCodeHash
+        }
+        if lhs.context != rhs.context {
+            return lhs.context < rhs.context
+        }
+        return lhs.workItems.count < rhs.workItems.count
+    }
+}
+
+extension WorkPackage {
+    public func hash() -> Data32 {
+        try! JamEncoder.encode(self).blake2b256hash()
     }
 }
 

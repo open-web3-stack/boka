@@ -54,7 +54,6 @@ public class StandardProgram {
         guard totalSize <= Int32.max else {
             throw Error.invalidTotalMemorySize
         }
-
         code = try ProgramCode(blob[relative: slice.startIndex ..< slice.startIndex + Int(codeLength)])
 
         initialRegisters = Registers(config: config, argumentData: argumentData)
