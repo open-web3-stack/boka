@@ -471,6 +471,16 @@ extension State: Authorization {
 
 extension State: ActivityStatistics {}
 
+extension State: Preimages {
+    public mutating func mergeWith(postState: PreimagesPostState) {
+        for update in postState.updates {
+            self[serviceAccount: update.serviceIndex, preimageHash: update.hash] = update.data
+            self[serviceAccount: update.serviceIndex, preimageHash: update.hash, length: update.length] =
+                LimitedSizeArray([update.timeslot])
+        }
+    }
+}
+
 struct DummyFunction: AccumulateFunction, OnTransferFunction {
     func invoke(
         config _: ProtocolConfigRef,
