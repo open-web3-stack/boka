@@ -42,7 +42,6 @@ final class NodeTests {
         #expect(newTimeslot > initialTimeslot)
         #expect(try await validatorNode.blockchain.dataProvider.hasBlock(hash: newBestHead.hash))
     }
-    
     @Test func validatorNodeRocksDB() async throws {
         let (nodes, scheduler) = try await Topology(
             nodes: [NodeDescription(isValidator: true, database: getDatabase(0))]
@@ -65,7 +64,6 @@ final class NodeTests {
         #expect(newTimeslot > initialTimeslot)
         #expect(try await validatorNode.blockchain.dataProvider.hasBlock(hash: newBestHead.hash))
     }
-    
     @Test func sync() async throws {
         // Create validator and full node
         let (nodes, scheduler) = try await Topology(
@@ -104,7 +102,6 @@ final class NodeTests {
         #expect(newValidatorBestHead.hash == newNodeBestHead.hash)
         #expect(newValidatorBestHead.timeslot > validatorBestHead.timeslot)
     }
-    
     @Test func multiplePeers() async throws {
         // Create multiple nodes
         let (nodes, scheduler) = try await Topology(
@@ -141,7 +138,6 @@ final class NodeTests {
         #expect(validator1BestHead.hash == node2BestHead.hash)
         #expect(validator2BestHead.hash == node1BestHead.hash)
     }
-    
     @Test func moreMultiplePeers() async throws {
         // Create multiple nodes
         var nodeDescriptions: [NodeDescription] = [
