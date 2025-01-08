@@ -19,8 +19,7 @@ final class NodeTests {
         try? FileManager.default.removeItem(at: path)
     }
 
-    @Test 
-    func validatorNodeInMemory() async throws {
+    @Test func validatorNodeInMemory() async throws {
         let (nodes, scheduler) = try await Topology(
             nodes: [NodeDescription(isValidator: true)]
         ).build(genesis: .preset(.minimal))
@@ -44,8 +43,7 @@ final class NodeTests {
         #expect(try await validatorNode.blockchain.dataProvider.hasBlock(hash: newBestHead.hash))
     }
     
-    @Test
-    func validatorNodeRocksDB() async throws {
+    @Test func validatorNodeRocksDB() async throws {
         let (nodes, scheduler) = try await Topology(
             nodes: [NodeDescription(isValidator: true, database: getDatabase(0))]
         ).build(genesis: .preset(.minimal))
@@ -68,8 +66,7 @@ final class NodeTests {
         #expect(try await validatorNode.blockchain.dataProvider.hasBlock(hash: newBestHead.hash))
     }
     
-    @Test
-    func sync() async throws {
+    @Test func sync() async throws {
         // Create validator and full node
         let (nodes, scheduler) = try await Topology(
             nodes: [
@@ -108,8 +105,7 @@ final class NodeTests {
         #expect(newValidatorBestHead.timeslot > validatorBestHead.timeslot)
     }
     
-    @Test
-    func multiplePeers() async throws {
+    @Test func multiplePeers() async throws {
         // Create multiple nodes
         let (nodes, scheduler) = try await Topology(
             nodes: [
@@ -146,8 +142,7 @@ final class NodeTests {
         #expect(validator2BestHead.hash == node1BestHead.hash)
     }
     
-    @Test
-    func moreMultiplePeers() async throws {
+    @Test func moreMultiplePeers() async throws {
         // Create multiple nodes
         var nodeDescriptions: [NodeDescription] = [
             NodeDescription(isValidator: true, database: getDatabase(0)),
