@@ -10,23 +10,22 @@ final class NodeTests {
         let tmpDir = FileManager.default.temporaryDirectory
         return tmpDir.appendingPathComponent("\(UUID().uuidString)")
     }()
-    
+
     func getDatabase(_ idx: Int) -> Database {
         Database.rocksDB(path: path.appendingPathComponent("\(idx)"))
     }
-    
+
     deinit {
         try? FileManager.default.removeItem(at: path)
     }
-    
-    @Test
+
+    @Test 
     func validatorNodeInMemory() async throws {
         let (nodes, scheduler) = try await Topology(
             nodes: [NodeDescription(isValidator: true)]
         ).build(genesis: .preset(.minimal))
-        
+
         let (validatorNode, storeMiddlware) = nodes[0]
-        
         // Get initial state
         let initialBestHead = await validatorNode.dataProvider.bestHead
         let initialTimeslot = initialBestHead.timeslot
@@ -180,25 +179,21 @@ final class NodeTests {
             NodeDescription(isValidator: true, database: getDatabase(0)),
             NodeDescription(isValidator: true, devSeed: 1, database: getDatabase(1))
         ]
-        
         // Add 18 non-validator nodes
         for i in 2...19 {
             nodeDescriptions.append(NodeDescription(devSeed: UInt32(i), database: .inMemory))
         }
-        
+
         let (nodes, scheduler) = try await Topology(
             nodes: nodeDescriptions,
             connections: (0..<20).flatMap { i in
                 (i + 1..<20).map { j in (i, j) } // Fully connected topology
             }
         ).build(genesis: .preset(.minimal))
-        
         let (validator1, validator1StoreMiddlware) = nodes[0]
         let (validator2, validator2StoreMiddlware) = nodes[1]
-        
         // Extract non-validator nodes and their middleware
         let nonValidatorNodes = nodes[2...].map { $0 }
-        
         try await Task.sleep(for: .milliseconds(nodes.count * 100))
         let (node1, node1StoreMiddlware) = nonValidatorNodes[0]
         let (node2, node2StoreMiddlware) = nonValidatorNodes[1]
@@ -215,12 +210,11 @@ final class NodeTests {
                 await middleware.wait()
             }
         }
-        
         try await Task.sleep(for: .milliseconds(nodes.count * 200))
-        
+
         let validator1BestHead = await validator1.dataProvider.bestHead
         let validator2BestHead = await validator2.dataProvider.bestHead
-        
+
         for (node, _) in nonValidatorNodes {
             let nodeBestHead = await node.dataProvider.bestHead
             #expect(validator1BestHead.hash == nodeBestHead.hash)
