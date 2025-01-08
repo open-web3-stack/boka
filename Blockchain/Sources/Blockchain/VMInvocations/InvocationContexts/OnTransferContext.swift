@@ -35,6 +35,8 @@ public class OnTransferContext: InvocationContext {
         case Info.identifier:
             return await Info(serviceIndex: context.index, accounts: context.accounts)
                 .call(config: config, state: state)
+        case Log.identifier:
+            return await Log(service: index).call(config: config, state: state)
         default:
             state.consumeGas(Gas(10))
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHAT.rawValue)

@@ -45,9 +45,10 @@ public class RefineContext: InvocationContext {
     public func dispatch(index: UInt32, state: VMState) async -> ExecOutcome {
         logger.debug("dispatching host-call: \(index)")
 
-        if index == GasFn.identifier {
+        switch UInt8(index) {
+        case GasFn.identifier:
             return await GasFn().call(config: config, state: state)
-        } else if index == HistoricalLookup.identifier {
+        case HistoricalLookup.identifier:
             return await HistoricalLookup(
                 context: context,
                 service: service,
@@ -55,25 +56,27 @@ public class RefineContext: InvocationContext {
                 lookupAnchorTimeslot: lookupAnchorTimeslot
             )
             .call(config: config, state: state)
-        } else if index == Import.identifier {
+        case Import.identifier:
             return await Import(context: context, importSegments: importSegments).call(config: config, state: state)
-        } else if index == Export.identifier {
+        case Export.identifier:
             return await Export(context: &context, exportSegmentOffset: exportSegmentOffset).call(config: config, state: state)
-        } else if index == Machine.identifier {
+        case Machine.identifier:
             return await Machine(context: &context).call(config: config, state: state)
-        } else if index == Peek.identifier {
+        case Peek.identifier:
             return await Peek(context: context).call(config: config, state: state)
-        } else if index == Zero.identifier {
+        case Zero.identifier:
             return await Zero(context: &context).call(config: config, state: state)
-        } else if index == Poke.identifier {
+        case Poke.identifier:
             return await Poke(context: &context).call(config: config, state: state)
-        } else if index == VoidFn.identifier {
+        case VoidFn.identifier:
             return await VoidFn(context: &context).call(config: config, state: state)
-        } else if index == Invoke.identifier {
+        case Invoke.identifier:
             return await Invoke(context: &context).call(config: config, state: state)
-        } else if index == Expunge.identifier {
+        case Expunge.identifier:
             return await Expunge(context: &context).call(config: config, state: state)
-        } else {
+        case Log.identifier:
+            return await Log(service: service).call(config: config, state: state)
+        default:
             state.consumeGas(Gas(10))
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHAT.rawValue)
             return .continued

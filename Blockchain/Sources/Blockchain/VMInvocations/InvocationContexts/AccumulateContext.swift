@@ -61,6 +61,8 @@ public class AccumulateContext: InvocationContext {
             return await Solicit(x: &context.x, timeslot: timeslot).call(config: config, state: state)
         case Forget.identifier:
             return await Forget(x: &context.x, timeslot: timeslot).call(config: config, state: state)
+        case Log.identifier:
+            return await Log(service: context.x.serviceIndex).call(config: config, state: state)
         default:
             state.consumeGas(Gas(10))
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHAT.rawValue)
