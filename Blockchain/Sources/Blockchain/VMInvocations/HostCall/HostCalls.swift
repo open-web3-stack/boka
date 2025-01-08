@@ -909,7 +909,7 @@ public class Invoke: HostCall {
         self.context = context
     }
 
-    public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
+    public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         let pvmIndex: UInt64 = state.readRegister(Registers.Index(raw: 7))
         let startAddr: UInt32 = state.readRegister(Registers.Index(raw: 8))
 

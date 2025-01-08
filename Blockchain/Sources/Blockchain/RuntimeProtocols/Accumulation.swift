@@ -319,7 +319,7 @@ extension Accumulation {
 
         let rightQueueItems = accumulationQueue.array[index...]
         let leftQueueItems = accumulationQueue.array[0 ..< index]
-        var allQueueItems = rightQueueItems.flatMap { $0 } + leftQueueItems.flatMap { $0 } + newQueueItems
+        var allQueueItems = rightQueueItems.flatMap(\.self) + leftQueueItems.flatMap(\.self) + newQueueItems
 
         editAccumulatedItems(items: &allQueueItems, accumulatedPackages: Set(zeroPrereqReports.map(\.packageSpecification.workPackageHash)))
 
