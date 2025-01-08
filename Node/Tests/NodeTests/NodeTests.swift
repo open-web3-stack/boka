@@ -168,7 +168,6 @@ final class NodeTests {
         let validator2BestHead = await validator2.dataProvider.bestHead
         let node1BestHead = await node1.dataProvider.bestHead
         let node2BestHead = await node2.dataProvider.bestHead
-        
         #expect(validator1BestHead.hash == node1BestHead.hash)
         #expect(validator1BestHead.hash == node2BestHead.hash)
         #expect(validator2BestHead.hash == node1BestHead.hash)
