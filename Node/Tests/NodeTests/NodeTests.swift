@@ -147,7 +147,7 @@ final class NodeTests {
         let (node1, node1StoreMiddlware) = nodes[2]
         let (node2, node2StoreMiddlware) = nodes[3]
         
-        try await Task.sleep(for: .milliseconds(nodes.count * 500))
+        try await Task.sleep(for: .milliseconds(nodes.count * 200))
         
         // Verify connections
         #expect(node1.network.peersCount == 2)
@@ -199,7 +199,7 @@ final class NodeTests {
         // Extract non-validator nodes and their middleware
         let nonValidatorNodes = nodes[2...].map { $0 }
         
-        try await Task.sleep(for: .milliseconds(nodes.count * 200))
+        try await Task.sleep(for: .milliseconds(nodes.count * 100))
         let (node1, node1StoreMiddlware) = nonValidatorNodes[0]
         let (node2, node2StoreMiddlware) = nonValidatorNodes[1]
         // Verify connections for a sample of non-validator nodes
