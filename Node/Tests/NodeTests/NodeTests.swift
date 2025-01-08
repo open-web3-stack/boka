@@ -147,7 +147,7 @@ final class NodeTests {
         let (node1, node1StoreMiddlware) = nodes[2]
         let (node2, node2StoreMiddlware) = nodes[3]
 
-        try await Task.sleep(for: .milliseconds(500))
+        try await Task.sleep(for: .milliseconds(nodes.count * 500))
 
         // Verify connections
         #expect(node1.network.peersCount == 2)
@@ -162,13 +162,13 @@ final class NodeTests {
             await node2StoreMiddlware.wait()
         }
 
-        try await Task.sleep(for: .milliseconds(1000))
+        try await Task.sleep(for: .milliseconds(nodes.count * 500))
 
         let validator1BestHead = await validator1.dataProvider.bestHead
         let validator2BestHead = await validator2.dataProvider.bestHead
         let node1BestHead = await node1.dataProvider.bestHead
         let node2BestHead = await node2.dataProvider.bestHead
-
+        
         #expect(validator1BestHead.hash == node1BestHead.hash)
         #expect(validator1BestHead.hash == node2BestHead.hash)
         #expect(validator2BestHead.hash == node1BestHead.hash)

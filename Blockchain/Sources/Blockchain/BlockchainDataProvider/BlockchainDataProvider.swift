@@ -53,7 +53,7 @@ public actor BlockchainDataProvider: Sendable {
             bestHead = HeadInfo(hash: block.hash, timeslot: block.header.timeslot, number: number)
         }
 
-        logger.debug("block imported: \(block.hash)")
+        logger.info("block Imported: #\(bestHead.timeslot) \(block.hash)")
     }
 }
 
