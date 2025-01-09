@@ -27,6 +27,8 @@ public actor BlockchainDataProvider: Sendable {
             if header.value.timeslot > bestHead.timeslot {
                 let number = try await dataProvider.getBlockNumber(hash: head).unwrap()
                 bestHead = HeadInfo(hash: head, timeslot: header.value.timeslot, number: number)
+            } else {
+                logger.warning("Found a block with timeslot \(header.value.timeslot) but best head is \(bestHead.timeslot)")
             }
         }
 

@@ -144,7 +144,7 @@ public actor SyncManager: Sendable {
     }
 
     private func importBlock(currentTimeslot: TimeslotIndex, newHeader: HeaderRef, peer: PeerId) {
-        logger.debug("importing block", metadata: ["hash": "\(newHeader.hash)", "remote": "\(peer)"])
+        logger.info("importing block", metadata: ["hash": "\(newHeader.hash)", "remote": "\(peer)"])
         let blockchain = blockchain
         let network = network
         Task.detached {
@@ -163,6 +163,7 @@ public actor SyncManager: Sendable {
                     }
                     // reverse to import old block first
                     for block in blocks.reversed() {
+                        logger.info("blocks reversed", metadata: ["hash": "\(String(describing: block.hash))"])
                         try await blockchain.importBlock(block)
                     }
                 } catch {
