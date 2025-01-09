@@ -6,13 +6,16 @@ import Utils
 @testable import Node
 
 final class NodeTests {
+    var dataBaseIndex: Int = 0;
+    
     let path = {
         let tmpDir = FileManager.default.temporaryDirectory
         return tmpDir.appendingPathComponent("\(UUID().uuidString)")
     }()
 
-    func getDatabase(_ idx: Int) -> Database {
-        Database.rocksDB(path: path.appendingPathComponent("\(idx)"))
+    func getDatabase() -> Database {
+        dataBaseIndex += 1;
+        return Database.rocksDB(path: path.appendingPathComponent("\(dataBaseIndex)"))
     }
 
     deinit {
@@ -49,7 +52,7 @@ final class NodeTests {
 
     @Test func validatorNodeRocksDB() async throws {
         let (nodes, scheduler) = try await Topology(
-            nodes: [NodeDescription(isValidator: true, database: getDatabase(0))]
+            nodes: [NodeDescription(isValidator: true, database: getDatabase())]
         ).build(genesis: .preset(.minimal))
 
         let (validatorNode, storeMiddlware) = nodes[0]
@@ -80,8 +83,8 @@ final class NodeTests {
         // Create validator and full node
         let (nodes, scheduler) = try await Topology(
             nodes: [
-                NodeDescription(isValidator: true, database: getDatabase(0)),
-                NodeDescription(devSeed: 1, database: getDatabase(1)),
+                NodeDescription(isValidator: true, database: getDatabase()),
+                NodeDescription(devSeed: 1, database: getDatabase()),
             ],
             connections: [(0, 1)]
         ).build(genesis: .preset(.minimal))
@@ -129,9 +132,9 @@ final class NodeTests {
         // Create multiple nodes
         let (nodes, scheduler) = try await Topology(
             nodes: [
-                NodeDescription(isValidator: true, database: getDatabase(0)),
-                NodeDescription(isValidator: true, devSeed: 1, database: getDatabase(1)),
-                NodeDescription(devSeed: 2, database: getDatabase(2)),
+                NodeDescription(isValidator: true, database: getDatabase()),
+                NodeDescription(isValidator: true, devSeed: 1, database: getDatabase()),
+                NodeDescription(devSeed: 2, database: getDatabase()),
                 NodeDescription(devSeed: 3, database: .inMemory),
             ],
             connections: [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3)]
@@ -171,8 +174,8 @@ final class NodeTests {
     @Test func moreMultiplePeers() async throws {
         // Create multiple nodes
         var nodeDescriptions: [NodeDescription] = [
-            NodeDescription(isValidator: true, database: getDatabase(0)),
-            NodeDescription(isValidator: true, devSeed: 1, database: getDatabase(1)),
+            NodeDescription(isValidator: true, database: getDatabase()),
+            NodeDescription(isValidator: true, devSeed: 1, database: getDatabase()),
         ]
 
         // Add 18 non-validator nodes
@@ -210,7 +213,7 @@ final class NodeTests {
             }
         }
 
-        try await Task.sleep(for: .milliseconds(nodes.count * 200))
+        try await Task.sleep(for: .milliseconds(nodes.count * 500))
 
         let validator1BestHead = await validator1.dataProvider.bestHead
         let validator2BestHead = await validator2.dataProvider.bestHead
