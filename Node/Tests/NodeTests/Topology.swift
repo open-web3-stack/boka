@@ -65,7 +65,6 @@ struct Topology {
             let toNode = ret[to].0
             let conn = try fromNode.network.network.connect(to: toNode.network.network.listenAddress(), role: .validator)
             try? await conn.ready()
-            try await Task.sleep(for: .milliseconds(50))
         }
         return (ret, scheduler)
     }

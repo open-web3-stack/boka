@@ -18,7 +18,7 @@ public enum Database {
     public func open(chainspec: ChainSpec) async throws -> BlockchainDataProvider {
         switch self {
         case let .rocksDB(path):
-            logger.info("Using RocksDB backend at \(path.absoluteString)")
+            logger.debug("Using RocksDB backend at \(path.absoluteString)")
             let backend = try await RocksDBBackend(
                 path: path,
                 config: chainspec.getConfig(),
@@ -27,7 +27,7 @@ public enum Database {
             )
             return try await BlockchainDataProvider(backend)
         case .inMemory:
-            logger.info("Using in-memory backend")
+            logger.debug("Using in-memory backend")
             let genesisBlock = try chainspec.getBlock()
             let genesisStateData = try chainspec.getState()
             let backend = try StateBackend(InMemoryBackend(), config: chainspec.getConfig(), rootHash: Data32())

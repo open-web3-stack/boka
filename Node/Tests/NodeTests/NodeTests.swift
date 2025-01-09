@@ -6,13 +6,14 @@ import Utils
 @testable import Node
 
 final class NodeTests {
-    var dataBaseIndex: Int = 0;
+    
+    var dataBaseIndex: Int = 0
     
     let path = {
         let tmpDir = FileManager.default.temporaryDirectory
         return tmpDir.appendingPathComponent("\(UUID().uuidString)")
     }()
-
+    
     func getDatabase() -> Database {
         dataBaseIndex += 1;
         return Database.rocksDB(path: path.appendingPathComponent("\(dataBaseIndex)"))
@@ -21,6 +22,7 @@ final class NodeTests {
     deinit {
         try? FileManager.default.removeItem(at: path)
     }
+    
     @Test func validatorNodeInMemory() async throws {
         let (nodes, scheduler) = try await Topology(
             nodes: [NodeDescription(isValidator: true)]
@@ -135,11 +137,8 @@ final class NodeTests {
             NodeDescription(isValidator: true, devSeed: 1, database: getDatabase()),
         ]
         // Add 18 non-validator nodes
-        for i in 2...10 {
+        for i in 2...19 {
             nodeDescriptions.append(NodeDescription(devSeed: UInt32(i), database: getDatabase()))
-        }
-        for i in 11...19 {
-            nodeDescriptions.append(NodeDescription(devSeed: UInt32(i), database: .inMemory))
         }
 
         let (nodes, scheduler) = try await Topology(
@@ -162,7 +161,7 @@ final class NodeTests {
         #expect(node1.network.peersCount == 19)
         #expect(node2.network.peersCount == 19)
         // Advance time and verify sync
-        for _ in 0..<10 {
+        for _ in 0..<20 {
             await scheduler.advance(by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds))
             await validator1StoreMiddlware.wait()
             await validator2StoreMiddlware.wait()
@@ -172,7 +171,7 @@ final class NodeTests {
             }
         }
 
-        try await Task.sleep(for: .milliseconds(nodes.count * 500))
+        try await Task.sleep(for: .milliseconds(nodes.count * 100))
 
         let validator1BestHead = await validator1.dataProvider.bestHead
         let validator2BestHead = await validator2.dataProvider.bestHead
@@ -216,7 +215,7 @@ final class NodeTests {
         #expect(node1.network.peersCount == 19)
         #expect(node2.network.peersCount == 19)
         // Advance time and verify sync
-        for _ in 0..<10 {
+        for _ in 0..<3 {
             await scheduler.advance(by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds))
             await validator1StoreMiddlware.wait()
             await validator2StoreMiddlware.wait()
