@@ -6,23 +6,22 @@ import Utils
 @testable import Node
 
 final class NodeTests {
-    
     var dataBaseIndex: Int = 0
-    
+
     let path = {
         let tmpDir = FileManager.default.temporaryDirectory
         return tmpDir.appendingPathComponent("\(UUID().uuidString)")
     }()
-    
+
     func getDatabase() -> Database {
-        dataBaseIndex += 1;
+        dataBaseIndex += 1
         return Database.rocksDB(path: path.appendingPathComponent("\(dataBaseIndex)"))
     }
 
     deinit {
         try? FileManager.default.removeItem(at: path)
     }
-    
+
     @Test func validatorNodeInMemory() async throws {
         let (nodes, scheduler) = try await Topology(
             nodes: [NodeDescription(isValidator: true)]
@@ -36,7 +35,8 @@ final class NodeTests {
 
         // Advance time
         for _ in 0..<10 {
-            await scheduler.advance(by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds))
+            await scheduler.advance(
+                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds))
             await storeMiddlware.wait()
         }
 
@@ -65,7 +65,8 @@ final class NodeTests {
 
         // Advance time
         for _ in 0..<10 {
-            await scheduler.advance(by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds))
+            await scheduler.advance(
+                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds))
             await storeMiddlware.wait()
         }
 
@@ -96,7 +97,8 @@ final class NodeTests {
 
         // Advance time to produce blocks
         for _ in 0..<10 {
-            await scheduler.advance(by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds))
+            await scheduler.advance(
+                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds))
             await validatorStoreMiddlware.wait()
             await nodeStoreMiddlware.wait()
         }
@@ -112,7 +114,8 @@ final class NodeTests {
 
         // Produce more blocks
         for _ in 0..<10 {
-            await scheduler.advance(by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds))
+            await scheduler.advance(
+                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds))
             await validatorStoreMiddlware.wait()
             await nodeStoreMiddlware.wait()
         }
@@ -155,14 +158,15 @@ final class NodeTests {
         let nonValidatorNodes = nodes[2...].map(\.self)
 
         try await Task.sleep(for: .milliseconds(nodes.count * 100))
-        let (node1, _ ) = nonValidatorNodes[0]
-        let (node2, _ ) = nonValidatorNodes[1]
+        let (node1, _) = nonValidatorNodes[0]
+        let (node2, _) = nonValidatorNodes[1]
         // Verify connections for a sample of non-validator nodes
         #expect(node1.network.peersCount == 19)
         #expect(node2.network.peersCount == 19)
         // Advance time and verify sync
         for _ in 0..<20 {
-            await scheduler.advance(by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds))
+            await scheduler.advance(
+                by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds))
             await validator1StoreMiddlware.wait()
             await validator2StoreMiddlware.wait()
 
@@ -209,14 +213,15 @@ final class NodeTests {
         let nonValidatorNodes = nodes[2...].map(\.self)
 
         try await Task.sleep(for: .milliseconds(nodes.count * 100))
-        let (node1, _ ) = nonValidatorNodes[0]
-        let (node2, _ ) = nonValidatorNodes[1]
+        let (node1, _) = nonValidatorNodes[0]
+        let (node2, _) = nonValidatorNodes[1]
         // Verify connections for a sample of non-validator nodes
         #expect(node1.network.peersCount == 19)
         #expect(node2.network.peersCount == 19)
         // Advance time and verify sync
         for _ in 0..<3 {
-            await scheduler.advance(by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds))
+            await scheduler.advance(
+                by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds))
             await validator1StoreMiddlware.wait()
             await validator2StoreMiddlware.wait()
 
