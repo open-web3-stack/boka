@@ -129,7 +129,7 @@ struct PresistentStreamHandlerImpl: PresistentStreamHandler {
     }
 
     func handle(connection: any ConnectionInfoProtocol, message: Message) async throws {
-        impl.logger.trace("handling message: \(message) from \(connection.id)")
+        impl.logger.debug("handling message: \(message) from \(connection.id)")
 
         try await impl.handler.handle(connection: connection, upMessage: message)
     }

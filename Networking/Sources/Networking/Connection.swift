@@ -280,7 +280,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                     let resp = try await impl.ephemeralStreamHandler.handle(connection: self, request: request)
                     try stream.send(message: resp, finish: true)
                 } catch {
-                    logger.debug("Failed to handle request", metadata: ["error": "\(error)"])
+                    logger.info("Failed to handle request", metadata: ["error": "\(error)"])
                     stream.close(abort: true)
                 }
             }
@@ -318,7 +318,7 @@ private func receiveMaybeData(stream: Stream<some StreamHandler>) async throws -
     // TODO: pick better value
     guard length < 1024 * 1024 * 10 else {
         stream.close(abort: true)
-        logger.debug("Invalid request length: \(length)")
+        logger.info("Invalid request length: \(length)")
         // TODO: report bad peer
         throw ConnectionError.invalidLength
     }
@@ -336,7 +336,7 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
         do {
             try await handler.streamOpened(connection: connection, stream: stream, kind: kind)
         } catch {
-            logger.debug(
+            logger.error(
                 "Failed to setup presistent stream",
                 metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)", "error": "\(error)"]
             )
@@ -348,11 +348,13 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
         var decoder = handler.createDecoder(kind: kind)
         do {
             while let data = try await receiveMaybeData(stream: stream) {
+                logger.debug("receiveMaybeData length: \(data.count) from \(connection.id)")
                 let msg = try decoder.decode(data: data)
+                logger.debug("handling message: \(msg) from \(connection.id)")
                 try await handler.handle(connection: connection, message: msg)
             }
         } catch {
-            logger.debug("UP stream run loop failed: \(error)")
+            logger.error("UP stream run loop failed: \(error)  from \(connection.id)")
             stream.close(abort: true)
         }
 

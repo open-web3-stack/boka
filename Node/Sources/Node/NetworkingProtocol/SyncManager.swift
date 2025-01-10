@@ -139,7 +139,7 @@ public actor SyncManager: Sendable {
             status = .syncing
             syncContinuation.forEach { $0.resume() }
             syncContinuation = []
-            logger.info("sync completed")
+            logger.debug("sync completed")
         }
     }
 

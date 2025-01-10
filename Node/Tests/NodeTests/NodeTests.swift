@@ -174,7 +174,6 @@ final class NodeTests {
                 await middleware.wait()
             }
         }
-        
         let validator1BestHead = await validator1.dataProvider.bestHead
         let validator2BestHead = await validator2.dataProvider.bestHead
 
@@ -217,7 +216,7 @@ final class NodeTests {
         #expect(node1.network.peersCount == 19)
         #expect(node2.network.peersCount == 19)
         // Advance time to produce blocks
-        for _ in 0..<10 {
+        for _ in 0..<30 {
             await scheduler.advance(
                 by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds))
             await validator1StoreMiddlware.wait()
@@ -227,7 +226,7 @@ final class NodeTests {
                 await middleware.wait()
             }
         }
-        try await Task.sleep(for: .milliseconds(nodes.count * 200))
+        try await Task.sleep(for: .milliseconds(nodes.count * 100))
         let validator1BestHead = await validator1.dataProvider.bestHead
         let validator2BestHead = await validator2.dataProvider.bestHead
 
