@@ -27,7 +27,6 @@ public actor BlockchainDataProvider: Sendable {
             if header.value.timeslot > bestHead.timeslot {
                 let number = try await dataProvider.getBlockNumber(hash: head).unwrap()
                 bestHead = HeadInfo(hash: head, timeslot: header.value.timeslot, number: number)
-                logger.info("best head with timeslot \(header.value.timeslot) updated to \(bestHead.hash)")
             } else {
                 logger.warning("Found a block with timeslot \(header.value.timeslot) but best head is \(bestHead.timeslot)")
             }
@@ -103,7 +102,7 @@ extension BlockchainDataProvider {
 
     // add forks of finalized head is not allowed
     public func add(block: BlockRef) async throws {
-        logger.info("adding block: \(block.hash)")
+        logger.debug("adding block: \(block.hash)")
 
         // require parent exists (i.e. not purged) and block is not fork of any finalized block
         guard try await hasBlock(hash: block.header.parentHash), block.header.timeslot > finalizedHead.timeslot else {

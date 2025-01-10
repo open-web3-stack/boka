@@ -75,7 +75,7 @@ public final class QuicStream: Sendable {
     }
 
     public func shutdown(errorCode: QuicErrorCode = .success) throws {
-        logger.info("closing stream \(errorCode)")
+        logger.debug("closing stream \(errorCode)")
 
         try storage.write { storage in
             guard let storage2 = storage else {
@@ -94,7 +94,7 @@ public final class QuicStream: Sendable {
     }
 
     public func send(data: Data, start: Bool = false, finish: Bool = false) throws {
-        logger.info("Sending \(data.count) bytes")
+        logger.debug("Sending \(data.count) bytes")
 
         try storage.read { storage in
             guard let storage, let api = storage.connection.api else {
@@ -104,7 +104,7 @@ public final class QuicStream: Sendable {
             let messageLength = data.count
 
             if messageLength == 0 {
-                logger.info("No data to send.")
+                logger.debug("No data to send.")
                 throw SendError.emptyData // Throw a specific error or return
             }
 
@@ -173,7 +173,7 @@ private class StreamHandle {
     fileprivate func callbackHandler(event: UnsafePointer<QUIC_STREAM_EVENT>) -> QuicStatus {
         switch event.pointee.Type {
         case QUIC_STREAM_EVENT_SEND_COMPLETE:
-            logger.info("Stream send completed")
+            logger.debug("Stream send completed")
             if let clientContext = event.pointee.SEND_COMPLETE.ClientContext {
                 clientContext.deallocate() // !! deallocate
             }
@@ -188,7 +188,7 @@ private class StreamHandle {
                 totalSize += Int(buffer.Length)
             }
 
-            logger.info("Stream received \(totalSize) bytes")
+            logger.debug("Stream received \(totalSize) bytes")
 
             var receivedData = Data(capacity: totalSize)
 
@@ -207,16 +207,16 @@ private class StreamHandle {
             }
 
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
-            logger.info("Peer send shutdown")
+            logger.trace("Peer send shutdown")
             if let stream {
                 stream.handler.dataReceived(stream, data: nil)
             }
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
-            logger.info("Peer send aborted")
+            logger.trace("Peer send aborted")
 
         case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
-            logger.info("Stream shutdown complete")
+            logger.trace("Stream shutdown complete")
 
             let evtData = event.pointee.SHUTDOWN_COMPLETE
             if let stream {

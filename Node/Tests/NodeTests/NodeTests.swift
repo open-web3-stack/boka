@@ -163,7 +163,7 @@ final class NodeTests {
         // Verify connections for a sample of non-validator nodes
         #expect(node1.network.peersCount == 19)
         #expect(node2.network.peersCount == 19)
-        // Advance time and verify sync
+        // Advance time to produce blocks
         for _ in 0..<20 {
             await scheduler.advance(
                 by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds))
@@ -174,8 +174,6 @@ final class NodeTests {
                 await middleware.wait()
             }
         }
-
-        try await Task.sleep(for: .milliseconds(nodes.count * 100))
 
         let validator1BestHead = await validator1.dataProvider.bestHead
         let validator2BestHead = await validator2.dataProvider.bestHead
@@ -218,8 +216,8 @@ final class NodeTests {
         // Verify connections for a sample of non-validator nodes
         #expect(node1.network.peersCount == 19)
         #expect(node2.network.peersCount == 19)
-        // Advance time and verify sync
-        for _ in 0..<3 {
+        // Advance time to produce blocks
+        for _ in 0..<20 {
             await scheduler.advance(
                 by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds))
             await validator1StoreMiddlware.wait()
@@ -229,8 +227,6 @@ final class NodeTests {
                 await middleware.wait()
             }
         }
-
-        try await Task.sleep(for: .milliseconds(nodes.count * 500))
 
         let validator1BestHead = await validator1.dataProvider.bestHead
         let validator2BestHead = await validator2.dataProvider.bestHead
