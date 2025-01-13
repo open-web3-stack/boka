@@ -14,7 +14,7 @@ public enum BlockchainDataProviderError: Error, Equatable {
     case uncanonical(hash: Data32)
 }
 
-public actor BlockchainDataProvider: Sendable {
+public actor BlockchainDataProvider {
     public private(set) var bestHead: HeadInfo
     public private(set) var finalizedHead: HeadInfo
     private let dataProvider: BlockchainDataProviderProtocol

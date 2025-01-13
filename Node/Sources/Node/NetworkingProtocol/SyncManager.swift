@@ -20,7 +20,7 @@ enum SyncStatus {
 // - sync peer rotation
 // - fast sync mode (no verification)
 // - re-enter to bulk sync mode if new peer with better head is discovered
-public actor SyncManager: Sendable {
+public actor SyncManager {
     private let blockchain: Blockchain
     private let network: Network
     private let peerManager: PeerManager
