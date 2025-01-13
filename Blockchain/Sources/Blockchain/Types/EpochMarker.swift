@@ -24,7 +24,7 @@ public struct EpochMarker: Sendable, Equatable, Codable {
 
 extension EpochMarker: Dummy {
     public typealias Config = ProtocolConfigRef
-    
+
     public static func dummy(config: Config) -> EpochMarker {
         EpochMarker(
             entropy: Data32(),

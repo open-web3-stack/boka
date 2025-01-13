@@ -6,14 +6,13 @@ import Utils
 @testable import Node
 
 final class NodeTests {
-
     let path = {
         let tmpDir = FileManager.default.temporaryDirectory
         return tmpDir.appendingPathComponent("\(UUID().uuidString)")
     }()
 
     func getDatabase(_ index: Int) -> Database {
-        return Database.rocksDB(path: path.appendingPathComponent("\(index)"))
+        Database.rocksDB(path: path.appendingPathComponent("\(index)"))
     }
 
     deinit {
@@ -32,9 +31,10 @@ final class NodeTests {
         let initialTimeslot = initialBestHead.timeslot
 
         // Advance time
-        for _ in 0..<10 {
+        for _ in 0 ..< 10 {
             await scheduler.advance(
-                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds))
+                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds)
+            )
             await storeMiddlware.wait()
         }
 
@@ -62,9 +62,10 @@ final class NodeTests {
         let initialTimeslot = initialBestHead.timeslot
 
         // Advance time
-        for _ in 0..<10 {
+        for _ in 0 ..< 10 {
             await scheduler.advance(
-                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds))
+                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds)
+            )
             await storeMiddlware.wait()
         }
 
@@ -94,9 +95,10 @@ final class NodeTests {
         let (node, nodeStoreMiddlware) = nodes[1]
 
         // Advance time to produce blocks
-        for _ in 0..<10 {
+        for _ in 0 ..< 10 {
             await scheduler.advance(
-                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds))
+                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds)
+            )
             await validatorStoreMiddlware.wait()
             await nodeStoreMiddlware.wait()
         }
@@ -111,9 +113,10 @@ final class NodeTests {
         #expect(validatorBestHead.hash == nodeBestHead.hash)
 
         // Produce more blocks
-        for _ in 0..<10 {
+        for _ in 0 ..< 10 {
             await scheduler.advance(
-                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds))
+                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds)
+            )
             await validatorStoreMiddlware.wait()
             await nodeStoreMiddlware.wait()
         }
@@ -138,14 +141,14 @@ final class NodeTests {
             NodeDescription(isValidator: true, devSeed: 1, database: getDatabase(1)),
         ]
         // Add 18 non-validator nodes
-        for i in 2...19 {
+        for i in 2 ... 19 {
             nodeDescriptions.append(NodeDescription(devSeed: UInt32(i), database: getDatabase(i)))
         }
 
         let (nodes, scheduler) = try await Topology(
             nodes: nodeDescriptions,
-            connections: (0..<20).flatMap { i in
-                (i + 1..<20).map { j in (i, j) }  // Fully connected topology
+            connections: (0 ..< 20).flatMap { i in
+                (i + 1 ..< 20).map { j in (i, j) } // Fully connected topology
             }
         ).build(genesis: .preset(.minimal))
 
@@ -162,9 +165,10 @@ final class NodeTests {
         #expect(node1.network.peersCount == 19)
         #expect(node2.network.peersCount == 19)
         // Advance time to produce blocks
-        for _ in 0..<20 {
+        for _ in 0 ..< 20 {
             await scheduler.advance(
-                by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds))
+                by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds)
+            )
             await validator1StoreMiddlware.wait()
             await validator2StoreMiddlware.wait()
 
@@ -190,14 +194,14 @@ final class NodeTests {
         ]
 
         // Add 18 non-validator nodes
-        for i in 2...19 {
+        for i in 2 ... 19 {
             nodeDescriptions.append(NodeDescription(devSeed: UInt32(i), database: .inMemory))
         }
 
         let (nodes, scheduler) = try await Topology(
             nodes: nodeDescriptions,
-            connections: (0..<2).flatMap { i in
-                (2..<20).map { j in (i, j) }  //connected topology
+            connections: (0 ..< 2).flatMap { i in
+                (2 ..< 20).map { j in (i, j) } // connected topology
             }
         ).build(genesis: .preset(.minimal))
 
@@ -214,9 +218,10 @@ final class NodeTests {
         #expect(node1.network.peersCount == 2)
         #expect(node2.network.peersCount == 2)
         // Advance time to produce blocks
-        for _ in 0..<30 {
+        for _ in 0 ..< 30 {
             await scheduler.advance(
-                by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds))
+                by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds)
+            )
             await validator1StoreMiddlware.wait()
             await validator2StoreMiddlware.wait()
 
