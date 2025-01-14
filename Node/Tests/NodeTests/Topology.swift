@@ -64,6 +64,10 @@ struct Topology {
             let fromNode = ret[from].0
             let toNode = ret[to].0
             let conn = try fromNode.network.network.connect(to: toNode.network.network.listenAddress(), role: .validator)
+            try print(
+                "connect from \(fromNode.network.network.listenAddress().description) to \(toNode.network.network.listenAddress().description)"
+            )
+            print("connect \(conn.id) address: \(conn.remoteAddress)")
             try? await conn.ready()
         }
         return (ret, scheduler)

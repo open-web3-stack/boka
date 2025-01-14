@@ -234,7 +234,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         impl.addStream(stream)
         Task {
             guard let byte = await stream.receiveByte() else {
-                logger.debug("stream closed without receiving kind. status: \(stream.status)")
+                logger.info("stream closed without receiving kind. status: \(stream.status)")
                 return
             }
             if let upKind = Handler.PresistentHandler.StreamKind(rawValue: byte) {
@@ -246,14 +246,14 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                     if existingStream.stream.id < stream.stream.id {
                         // The new stream has a higher ID, so reset the existing one
                         existingStream.close(abort: false)
-                        logger.debug(
+                        logger.info(
                             "Reset older UP stream with lower ID",
                             metadata: ["existingStreamId": "\(existingStream.stream.id)", "newStreamId": "\(stream.stream.id)"]
                         )
                     } else {
                         // The existing stream has a higher ID or is equal, so reset the new one
                         stream.close(abort: false)
-                        logger.debug(
+                        logger.info(
                             "Duplicate UP stream detected, closing new stream with lower or equal ID",
                             metadata: ["existingStreamId": "\(existingStream.stream.id)", "newStreamId": "\(stream.stream.id)"]
                         )
@@ -278,9 +278,13 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                     let data = try await receiveData(stream: stream)
                     let request = try decoder.decode(data: data)
                     let resp = try await impl.ephemeralStreamHandler.handle(connection: self, request: request)
+//                    logger
+//                        .info(
+//                            "sending addr \(remoteAddress.description) request data \(resp.toHexString())  with \(resp.count) bytes "
+//                        )
                     try stream.send(message: resp, finish: true)
                 } catch {
-                    logger.info("Failed to handle request", metadata: ["error": "\(error)"])
+                    logger.error("Failed to handle request", metadata: ["error": "\(error)"])
                     stream.close(abort: true)
                 }
             }
@@ -348,13 +352,15 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
         var decoder = handler.createDecoder(kind: kind)
         do {
             while let data = try await receiveMaybeData(stream: stream) {
-                logger.debug("receiveMaybeData length: \(data.count) from \(connection.id)")
+                logger
+                    .debug(
+                        "receiveMaybeData \(data.count) length from \(connection.id) stream \(stream.id) data \(String(describing: data.toHexString()))"
+                    )
                 let msg = try decoder.decode(data: data)
-                logger.debug("handling message: \(msg) from \(connection.id)")
                 try await handler.handle(connection: connection, message: msg)
             }
         } catch {
-            logger.error("UP stream run loop failed: \(error)  from \(connection.id)")
+            logger.error("UP stream run loop failed: \(error)  from \(connection.remoteAddress) \(connection.id) \(stream.id)")
             stream.close(abort: true)
         }
 

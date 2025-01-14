@@ -196,6 +196,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
                         metadata: [
                             "connectionId": "\(connection.id)",
                             "kind": "\(kind)",
+                            "message": "\(messageData)",
                             "error": "\(error)",
                         ]
                     )
@@ -298,7 +299,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
         var state = reconnectStates.read { reconnectStates in
             reconnectStates[address] ?? .init()
         }
-
+        logger.info("reconnecting to \(address) \(state.attempt) attempts")
         guard state.attempt < maxRetryAttempts else {
             logger.warning("reconnecting to \(address) exceeded max attempts")
             return
@@ -338,6 +339,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
             states[connection.id] ?? .init()
         }
 
+        logger.info("Reopen attempt for stream \(kind) on connection \(connection.id) \(state.attempt) attempts")
         guard state.attempt < maxRetryAttempts else {
             logger.warning("Reopen attempt for stream \(kind) on connection \(connection.id) exceeded max attempts")
             return

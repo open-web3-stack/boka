@@ -94,8 +94,7 @@ public final class QuicStream: Sendable {
     }
 
     public func send(data: Data, start: Bool = false, finish: Bool = false) throws {
-        logger.debug("Sending \(data.count) bytes")
-
+        logger.debug("Stream \(id) sending \(data.count) bytes data \(data.toHexString())")
         try storage.read { storage in
             guard let storage, let api = storage.connection.api else {
                 throw QuicError.alreadyClosed
