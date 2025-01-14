@@ -350,17 +350,18 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
             metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)"]
         )
         var decoder = handler.createDecoder(kind: kind)
+        var msg = Data()
         do {
             while let data = try await receiveMaybeData(stream: stream) {
-                logger
-                    .debug(
-                        "receiveMaybeData \(data.count) length from \(connection.id) stream \(stream.id) data \(String(describing: data.toHexString()))"
-                    )
+                msg = data
                 let msg = try decoder.decode(data: data)
                 try await handler.handle(connection: connection, message: msg)
             }
         } catch {
-            logger.error("UP stream run loop failed: \(error)  from \(connection.remoteAddress) \(connection.id) \(stream.id)")
+            logger
+                .error(
+                    "UP stream run loop failed: \(error)  from \(connection.remoteAddress) \(connection.id) \(stream.id) data \(msg.toHexString())"
+                )
             stream.close(abort: true)
         }
 

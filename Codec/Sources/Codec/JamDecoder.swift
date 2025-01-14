@@ -310,7 +310,7 @@ private struct JamKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPr
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: decoder.codingPath,
-                    debugDescription: "Invalid boolean value: \(byte)"
+                    debugDescription: "Decode key \(key.stringValue) with invalid boolean value: \(byte)"
                 )
             )
         }
