@@ -397,10 +397,6 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             )
             return .code(.alpnNegFailure)
         }
-        logger
-            .info(
-                "new connection: \(connection.id) local addr: \(info.localAddress) remote addr: \(info.remoteAddress), role: \(role)"
-            )
         if impl.addConnection(connection, addr: addr, role: role) {
             return .code(.success)
         } else {

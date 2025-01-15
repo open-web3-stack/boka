@@ -21,7 +21,7 @@ public struct StoreMiddleware: MiddlewareProtocol {
 
     @discardableResult
     public func wait() async -> [Sendable] {
-        try? await Task.sleep(for: .milliseconds(50))
+        try? await Task.sleep(for: .milliseconds(5))
 
         let value = storage.value
 

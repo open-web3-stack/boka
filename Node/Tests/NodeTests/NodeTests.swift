@@ -228,7 +228,6 @@ final class NodeTests {
             for (_, middleware) in nonValidatorNodes {
                 await middleware.wait()
             }
-            try await Task.sleep(for: .milliseconds(100))
         }
         try await Task.sleep(for: .milliseconds(nodes.count * 100))
         let validator1BestHead = await validator1.dataProvider.bestHead
