@@ -14,7 +14,7 @@ public struct ServiceAccountDetails: Sendable, Equatable, Codable {
     // m
     public var minOnTransferGas: Gas
 
-    // l: the total number of octets used in storage
+    // o: the total number of octets used in storage
     public var totalByteLength: UInt64
 
     // i: number of items in storage
@@ -104,7 +104,7 @@ extension ServiceAccount {
         UInt32(2 * preimageInfos.count + storage.count)
     }
 
-    // l: the total number of octets used in storage
+    // o: the total number of octets used in storage
     public var totalByteLength: UInt64 {
         let preimageInfosBytes = preimageInfos.keys.reduce(into: 0) { $0 += 81 + $1.length }
         let storageBytes = storage.values.reduce(into: 0) { $0 += 32 + $1.count }
