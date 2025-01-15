@@ -99,7 +99,7 @@ public final class QuicStream: Sendable {
                 throw QuicError.alreadyClosed
             }
 
-            logger.info("\(storage.connection.id) \(id) sending \(data.count) bytes data \(data.toHexString())")
+            logger.debug("\(storage.connection.id) \(id) sending \(data.count) bytes data \(data.toHexString())")
             let messageLength = data.count
 
             if messageLength == 0 {

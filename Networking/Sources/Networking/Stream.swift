@@ -27,8 +27,37 @@ public protocol StreamProtocol<Message> {
 
     var id: UniqueId { get }
     var status: StreamStatus { get }
-    func send(message: Message) throws
+    func send(message: Message) async throws
     func close(abort: Bool)
+}
+
+actor StreamSender {
+    private let stream: QuicStream
+    private var status: StreamStatus
+
+    init(stream: QuicStream, status: StreamStatus) {
+        self.stream = stream
+        self.status = status
+    }
+
+    func send(message: Data, finish: Bool = false) throws {
+        guard status == .open || status == .sendOnly else {
+            throw StreamError.notOpen
+        }
+
+        let length = UInt32(message.count)
+        var lengthData = Data(repeating: 0, count: 4)
+        lengthData.withUnsafeMutableBytes { ptr in
+            ptr.storeBytes(of: UInt32(littleEndian: length), as: UInt32.self)
+        }
+
+        try stream.send(data: lengthData, finish: false)
+        try stream.send(data: message, finish: finish)
+
+        if finish {
+            status = .receiveOnly
+        }
+    }
 }
 
 final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
@@ -41,6 +70,7 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
     private let channel: Channel<Data> = .init(capacity: 100)
     private let nextData: Mutex<Data?> = .init(nil)
     private let _status: ThreadSafeContainer<StreamStatus> = .init(.open)
+    private let sender: StreamSender
     let connectionId: UniqueId
     let kind: Handler.PresistentHandler.StreamKind?
 
@@ -63,10 +93,11 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         self.connectionId = connectionId
         self.impl = impl
         self.kind = kind
+        sender = StreamSender(stream: stream, status: .open)
     }
 
-    public func send(message: Handler.PresistentHandler.Message) throws {
-        try send(message: message.encode(), finish: false)
+    public func send(message: Handler.PresistentHandler.Message) async throws {
+        try await send(message: message.encode(), finish: false)
     }
 
     /// send raw data
@@ -91,21 +122,8 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
     }
 
     // send message with length prefix
-    func send(message: Data, finish: Bool = false) throws {
-        guard canSend else {
-            throw StreamError.notOpen
-        }
-
-        let length = UInt32(message.count)
-        var lengthData = Data(repeating: 0, count: 4)
-        lengthData.withUnsafeMutableBytes { ptr in
-            ptr.storeBytes(of: UInt32(littleEndian: length), as: UInt32.self)
-        }
-        try stream.send(data: lengthData, finish: false)
-        try stream.send(data: message, finish: finish)
-        if finish {
-            status = .receiveOnly
-        }
+    func send(message: Data, finish: Bool = false) async throws {
+        try await sender.send(message: message, finish: finish)
     }
 
     func received(data: Data?) {

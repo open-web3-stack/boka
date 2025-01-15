@@ -186,20 +186,24 @@ public final class Peer<Handler: StreamHandler>: Sendable {
         }
         for connection in connections {
             if let stream = try? connection.createPreistentStream(kind: kind) {
-                let res = Result(catching: { try stream.send(message: messageData) })
-                switch res {
-                case .success:
-                    break
-                case let .failure(error):
-                    impl.logger.warning(
-                        "Failed to send message",
-                        metadata: [
-                            "connectionId": "\(connection.id)",
-                            "kind": "\(kind)",
-                            "message": "\(messageData)",
-                            "error": "\(error)",
-                        ]
-                    )
+                Task {
+                    let res = await Result {
+                        try await stream.send(message: messageData)
+                    }
+                    switch res {
+                    case .success:
+                        break
+                    case let .failure(error):
+                        impl.logger.warning(
+                            "Failed to send message",
+                            metadata: [
+                                "connectionId": "\(connection.id)",
+                                "kind": "\(kind)",
+                                "message": "\(messageData)",
+                                "error": "\(error)",
+                            ]
+                        )
+                    }
                 }
             }
         }
@@ -299,7 +303,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
         var state = reconnectStates.read { reconnectStates in
             reconnectStates[address] ?? .init()
         }
-        logger.info("reconnecting to \(address) \(state.attempt) attempts")
+        logger.debug("reconnecting to \(address) \(state.attempt) attempts")
         guard state.attempt < maxRetryAttempts else {
             logger.warning("reconnecting to \(address) exceeded max attempts")
             return
@@ -339,7 +343,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
             states[connection.id] ?? .init()
         }
 
-        logger.info("Reopen attempt for stream \(kind) on connection \(connection.id) \(state.attempt) attempts")
+        logger.debug("Reopen attempt for stream \(kind) on connection \(connection.id) \(state.attempt) attempts")
         guard state.attempt < maxRetryAttempts else {
             logger.warning("Reopen attempt for stream \(kind) on connection \(connection.id) exceeded max attempts")
             return
@@ -395,7 +399,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         }
         logger
             .info(
-                "new connection: \(addr) id: \(connection.id) local addr: \(info.localAddress) remote addr: \(info.remoteAddress), role: \(role)"
+                "new connection: \(connection.id) local addr: \(info.localAddress) remote addr: \(info.remoteAddress), role: \(role)"
             )
         if impl.addConnection(connection, addr: addr, role: role) {
             return .code(.success)

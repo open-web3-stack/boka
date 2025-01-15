@@ -57,10 +57,4 @@ final class BlockAnnouncementDecoderTests {
             _ = try JamDecoder.decode(BlockAnnouncement.self, from: data, withConfig: config)
         }
     }
-
-    @Test
-    func decodeNotAllDataWasConsumed() throws {}
-
-    @Test
-    func decodeNilValue() throws {}
 }

@@ -176,7 +176,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         let data = try request.encode()
         let kind = request.kind
         let stream = try createStream(kind: kind)
-        try stream.send(message: data)
+        try await stream.send(message: data)
 
         return try await receiveData(stream: stream)
     }
@@ -234,7 +234,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         impl.addStream(stream)
         Task {
             guard let byte = await stream.receiveByte() else {
-                logger.info("stream closed without receiving kind. status: \(stream.status)")
+                logger.warning("stream closed without receiving kind. status: \(stream.status)")
                 return
             }
             if let upKind = Handler.PresistentHandler.StreamKind(rawValue: byte) {
@@ -278,11 +278,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                     let data = try await receiveData(stream: stream)
                     let request = try decoder.decode(data: data)
                     let resp = try await impl.ephemeralStreamHandler.handle(connection: self, request: request)
-//                    logger
-//                        .info(
-//                            "sending addr \(remoteAddress.description) request data \(resp.toHexString())  with \(resp.count) bytes "
-//                        )
-                    try stream.send(message: resp, finish: true)
+                    try await stream.send(message: resp, finish: true)
                 } catch {
                     logger.error("Failed to handle request", metadata: ["error": "\(error)"])
                     stream.close(abort: true)
@@ -322,7 +318,7 @@ private func receiveMaybeData(stream: Stream<some StreamHandler>) async throws -
     // TODO: pick better value
     guard length < 1024 * 1024 * 10 else {
         stream.close(abort: true)
-        logger.info("Invalid request length: \(length)")
+        logger.error("Invalid request length: \(length)")
         // TODO: report bad peer
         throw ConnectionError.invalidLength
     }
@@ -360,7 +356,7 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
         } catch {
             logger
                 .error(
-                    "UP stream run loop failed: \(error)  from \(connection.remoteAddress) \(connection.id) \(stream.id) data \(msg.toHexString())"
+                    "UP stream run loop failed: \(error)  remote \(connection.remoteAddress) \(connection.id) \(stream.id) kind: \(kind) data \(msg.toHexString()) bytes \(msg.count)"
                 )
             stream.close(abort: true)
         }
