@@ -338,7 +338,7 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
         } catch {
             logger.error(
                 "Failed to setup presistent stream",
-                metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)", "error": "\(error)"]
+                metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "error": "\(error)"]
             )
         }
         logger.debug(
@@ -346,18 +346,13 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
             metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)"]
         )
         var decoder = handler.createDecoder(kind: kind)
-        var msg = Data()
         do {
             while let data = try await receiveMaybeData(stream: stream) {
-                msg = data
                 let msg = try decoder.decode(data: data)
                 try await handler.handle(connection: connection, message: msg)
             }
         } catch {
-            logger
-                .error(
-                    "UP stream run loop failed: \(error)  remote \(connection.remoteAddress) \(connection.id) \(stream.id) kind: \(kind) data \(msg.toHexString()) bytes \(msg.count)"
-                )
+            logger.error("UP stream run loop failed: \(error) \(connection.id) \(stream.id)")
             stream.close(abort: true)
         }
 
