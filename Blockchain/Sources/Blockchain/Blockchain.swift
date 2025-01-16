@@ -48,8 +48,6 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
             try await dataProvider.blockImported(block: block, state: state)
 
             publish(RuntimeEvents.BlockImported(block: block, state: state, parentState: parent))
-
-            logger.info("Block imported: #\(block.header.timeslot) \(block.hash)")
         }
     }
 

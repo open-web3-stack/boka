@@ -20,7 +20,7 @@ enum SyncStatus {
 // - sync peer rotation
 // - fast sync mode (no verification)
 // - re-enter to bulk sync mode if new peer with better head is discovered
-public actor SyncManager: Sendable {
+public actor SyncManager {
     private let blockchain: Blockchain
     private let network: Network
     private let peerManager: PeerManager
@@ -139,7 +139,7 @@ public actor SyncManager: Sendable {
             status = .syncing
             syncContinuation.forEach { $0.resume() }
             syncContinuation = []
-            logger.info("sync completed")
+            logger.debug("sync completed")
         }
     }
 
@@ -163,6 +163,7 @@ public actor SyncManager: Sendable {
                     }
                     // reverse to import old block first
                     for block in blocks.reversed() {
+                        logger.debug("blocks reversed", metadata: ["hash": "\(String(describing: block.hash))"])
                         try await blockchain.importBlock(block)
                     }
                 } catch {

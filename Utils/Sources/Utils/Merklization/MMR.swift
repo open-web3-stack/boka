@@ -34,7 +34,7 @@ public struct MMR: Sendable, Equatable, Codable {
             }
         }
 
-        let nonNilPeaks = peaks.compactMap { $0 }
+        let nonNilPeaks = peaks.compactMap(\.self)
         return helper(nonNilPeaks[...])
     }
 }

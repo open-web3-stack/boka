@@ -63,7 +63,8 @@ struct Topology {
         for (from, to) in connections {
             let fromNode = ret[from].0
             let toNode = ret[to].0
-            _ = try fromNode.network.network.connect(to: toNode.network.network.listenAddress(), role: .validator)
+            let conn = try fromNode.network.network.connect(to: toNode.network.network.listenAddress(), role: .validator)
+            try? await conn.ready()
         }
         return (ret, scheduler)
     }

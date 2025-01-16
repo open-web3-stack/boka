@@ -20,7 +20,7 @@ public struct PeerInfo: Sendable {
 // - distinguish between connect peers and offline peers
 // - peer reputation
 // - purge offline peers
-public actor PeerManager: Sendable {
+public actor PeerManager {
     private let eventBus: EventBus
 
     public private(set) var peers: [Data: PeerInfo] = [:]

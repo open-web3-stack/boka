@@ -126,7 +126,7 @@ extension RocksDBBackend: BlockchainDataProviderProtocol {
     }
 
     public func add(block: BlockRef) async throws {
-        logger.trace("add(block:) \(block.hash)")
+        logger.debug("add(block:) \(block.hash)")
 
         // TODO: batch put
 

@@ -163,7 +163,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         await withSpan("BlockAuthor.newBlock", logger: logger) { _ in
             // TODO: add timeout
             let block = try await createNewBlock(timeslot: timeslot, claim: claim)
-            logger.info("New block created: #\(block.header.timeslot) \(block.hash) on parent #\(block.header.parentHash)")
+            logger.debug("New block created: #\(block.header.timeslot) \(block.hash) on parent #\(block.header.parentHash)")
             publish(RuntimeEvents.BlockAuthored(block: block))
         }
     }
