@@ -168,13 +168,13 @@ extension HeaderRef: Codable {
 
 extension Header.Unsigned: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(config _: Config) -> Header.Unsigned {
+    public static func dummy(config: Config) -> Header.Unsigned {
         Header.Unsigned(
             parentHash: Data32(),
             priorStateRoot: Data32(),
             extrinsicsHash: Data32(),
             timeslot: 0,
-            epoch: nil,
+            epoch: EpochMarker.dummy(config: config),
             winningTickets: nil,
             offendersMarkers: [],
             authorIndex: 0,

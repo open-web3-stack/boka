@@ -94,17 +94,16 @@ public final class QuicStream: Sendable {
     }
 
     public func send(data: Data, start: Bool = false, finish: Bool = false) throws {
-        logger.trace("Sending \(data.count) bytes")
-
         try storage.read { storage in
             guard let storage, let api = storage.connection.api else {
                 throw QuicError.alreadyClosed
             }
 
+            logger.debug("\(storage.connection.id) \(id) sending \(data.count) bytes data \(data.toHexString())")
             let messageLength = data.count
 
             if messageLength == 0 {
-                logger.trace("No data to send.")
+                logger.debug("No data to send.")
                 throw SendError.emptyData // Throw a specific error or return
             }
 
@@ -173,7 +172,7 @@ private class StreamHandle {
     fileprivate func callbackHandler(event: UnsafePointer<QUIC_STREAM_EVENT>) -> QuicStatus {
         switch event.pointee.Type {
         case QUIC_STREAM_EVENT_SEND_COMPLETE:
-            logger.trace("Stream send completed")
+            logger.debug("Stream send completed")
             if let clientContext = event.pointee.SEND_COMPLETE.ClientContext {
                 clientContext.deallocate() // !! deallocate
             }
@@ -188,7 +187,7 @@ private class StreamHandle {
                 totalSize += Int(buffer.Length)
             }
 
-            logger.trace("Stream received \(totalSize) bytes")
+            logger.debug("Stream received \(totalSize) bytes")
 
             var receivedData = Data(capacity: totalSize)
 

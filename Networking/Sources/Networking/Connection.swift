@@ -176,7 +176,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         let data = try request.encode()
         let kind = request.kind
         let stream = try createStream(kind: kind)
-        try stream.send(message: data)
+        try await stream.send(message: data)
 
         return try await receiveData(stream: stream)
     }
@@ -234,7 +234,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         impl.addStream(stream)
         Task {
             guard let byte = await stream.receiveByte() else {
-                logger.debug("stream closed without receiving kind. status: \(stream.status)")
+                logger.warning("stream closed without receiving kind. status: \(stream.status)")
                 return
             }
             if let upKind = Handler.PresistentHandler.StreamKind(rawValue: byte) {
@@ -246,14 +246,14 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                     if existingStream.stream.id < stream.stream.id {
                         // The new stream has a higher ID, so reset the existing one
                         existingStream.close(abort: false)
-                        logger.debug(
+                        logger.info(
                             "Reset older UP stream with lower ID",
                             metadata: ["existingStreamId": "\(existingStream.stream.id)", "newStreamId": "\(stream.stream.id)"]
                         )
                     } else {
                         // The existing stream has a higher ID or is equal, so reset the new one
                         stream.close(abort: false)
-                        logger.debug(
+                        logger.info(
                             "Duplicate UP stream detected, closing new stream with lower or equal ID",
                             metadata: ["existingStreamId": "\(existingStream.stream.id)", "newStreamId": "\(stream.stream.id)"]
                         )
@@ -278,9 +278,9 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                     let data = try await receiveData(stream: stream)
                     let request = try decoder.decode(data: data)
                     let resp = try await impl.ephemeralStreamHandler.handle(connection: self, request: request)
-                    try stream.send(message: resp, finish: true)
+                    try await stream.send(message: resp, finish: true)
                 } catch {
-                    logger.debug("Failed to handle request", metadata: ["error": "\(error)"])
+                    logger.error("Failed to handle request", metadata: ["error": "\(error)"])
                     stream.close(abort: true)
                 }
             }
@@ -318,7 +318,7 @@ private func receiveMaybeData(stream: Stream<some StreamHandler>) async throws -
     // TODO: pick better value
     guard length < 1024 * 1024 * 10 else {
         stream.close(abort: true)
-        logger.debug("Invalid request length: \(length)")
+        logger.error("Invalid request length: \(length)")
         // TODO: report bad peer
         throw ConnectionError.invalidLength
     }
@@ -336,9 +336,9 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
         do {
             try await handler.streamOpened(connection: connection, stream: stream, kind: kind)
         } catch {
-            logger.debug(
+            logger.error(
                 "Failed to setup presistent stream",
-                metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)", "error": "\(error)"]
+                metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "error": "\(error)"]
             )
         }
         logger.debug(
@@ -352,7 +352,7 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
                 try await handler.handle(connection: connection, message: msg)
             }
         } catch {
-            logger.debug("UP stream run loop failed: \(error)")
+            logger.error("UP stream run loop failed: \(error) \(connection.id) \(stream.id)")
             stream.close(abort: true)
         }
 

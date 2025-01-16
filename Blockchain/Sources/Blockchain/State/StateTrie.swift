@@ -95,7 +95,7 @@ public enum StateTrieError: Error {
     case invalidParent
 }
 
-public actor StateTrie: Sendable {
+public actor StateTrie {
     private let backend: StateBackendProtocol
     public private(set) var rootHash: Data32
     private var nodes: [Data: TrieNode] = [:]

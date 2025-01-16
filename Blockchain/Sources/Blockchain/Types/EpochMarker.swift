@@ -21,3 +21,15 @@ public struct EpochMarker: Sendable, Equatable, Codable {
         self.validators = validators
     }
 }
+
+extension EpochMarker: Dummy {
+    public typealias Config = ProtocolConfigRef
+
+    public static func dummy(config: Config) -> EpochMarker {
+        EpochMarker(
+            entropy: Data32(),
+            ticketsEntropy: Data32(),
+            validators: try! ConfigFixedSizeArray(config: config, defaultValue: Data32())
+        )
+    }
+}

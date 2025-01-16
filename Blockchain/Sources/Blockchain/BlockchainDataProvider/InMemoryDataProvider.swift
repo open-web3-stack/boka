@@ -1,6 +1,6 @@
 import Utils
 
-public actor InMemoryDataProvider: Sendable {
+public actor InMemoryDataProvider {
     public private(set) var heads: Set<Data32>
     public private(set) var finalizedHead: Data32
 

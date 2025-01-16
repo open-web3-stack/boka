@@ -185,8 +185,8 @@ extension Guaranteeing {
         }
 
         let recentWorkPackageHashes: Set<Data32> = Set(recentHistory.items.flatMap(\.lookup.keys))
-        let accumulateHistoryReports = Set(accumulationHistory.array.flatMap { $0 })
-        let accumulateQueueReports = Set(accumulationQueue.array.flatMap { $0 }
+        let accumulateHistoryReports = Set(accumulationHistory.array.flatMap(\.self))
+        let accumulateQueueReports = Set(accumulationQueue.array.flatMap(\.self)
             .flatMap(\.workReport.refinementContext.prerequisiteWorkPackages))
         let pendingWorkReportHashes = Set(reports.array.flatMap { $0?.workReport.refinementContext.prerequisiteWorkPackages ?? [] })
         let pipelinedWorkReportHashes = recentWorkPackageHashes.union(accumulateHistoryReports).union(accumulateQueueReports)

@@ -273,7 +273,7 @@ struct HandlerImpl: NetworkProtocolHandler {
                 heads: headsWithTimeslot
             )
 
-            try stream.send(message: .blockAnnouncementHandshake(handshake))
+            try await stream.send(message: .blockAnnouncementHandshake(handshake))
         }
     }
 }
