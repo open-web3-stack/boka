@@ -49,18 +49,19 @@ public class AccumulateContext: InvocationContext {
         case New.identifier:
             return await New(x: &context.x).call(config: config, state: state)
         case Upgrade.identifier:
-            return await Upgrade(x: &context.x)
-                .call(config: config, state: state)
+            return await Upgrade(x: &context.x).call(config: config, state: state)
         case Transfer.identifier:
-            return await Transfer(x: &context.x)
-                .call(config: config, state: state)
-        case Quit.identifier:
-            return await Quit(x: &context.x)
-                .call(config: config, state: state)
+            return await Transfer(x: &context.x).call(config: config, state: state)
+        case Eject.identifier:
+            return await Eject(x: &context.x, timeslot: timeslot).call(config: config, state: state)
+        case Query.identifier:
+            return await Query(x: &context.x).call(config: config, state: state)
         case Solicit.identifier:
             return await Solicit(x: &context.x, timeslot: timeslot).call(config: config, state: state)
         case Forget.identifier:
             return await Forget(x: &context.x, timeslot: timeslot).call(config: config, state: state)
+        case Yield.identifier:
+            return await Yield(x: &context.x).call(config: config, state: state)
         case Log.identifier:
             return await Log(service: context.x.serviceIndex).call(config: config, state: state)
         default:

@@ -54,14 +54,14 @@ extension AccumulateFunction {
         exitReason: ExitReason, output: Data?, context: AccumulateContext.ContextType, gas: Gas
     ) throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
         switch exitReason {
-        case .halt:
+        case .panic, .outOfGas:
+            (context.y.accumulateState, context.y.transfers, context.y.yield, gas)
+        default:
             if let output, let o = Data32(output) {
                 (context.x.accumulateState, context.x.transfers, o, gas)
             } else {
-                (context.x.accumulateState, context.x.transfers, nil, gas)
+                (context.x.accumulateState, context.x.transfers, context.x.yield, gas)
             }
-        default:
-            (context.y.accumulateState, context.y.transfers, nil, gas)
         }
     }
 }

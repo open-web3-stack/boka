@@ -382,8 +382,11 @@ public class New: HostCall {
             x.serviceAccounts.set(serviceAccount: x.serviceIndex, account: acc)
 
             state.writeRegister(Registers.Index(raw: 7), x.nextAccountIndex)
-            x.accumulateState.serviceAccounts.merge([x.nextAccountIndex: newAccount]) { _, new in new }
-            x.nextAccountIndex = AccumulateContext.check(i: bump(i: x.nextAccountIndex), serviceAccounts: x.accumulateState.serviceAccounts)
+            x.accumulateState.newServiceAccounts.merge([x.nextAccountIndex: newAccount]) { _, new in new }
+            x.nextAccountIndex = AccumulateContext.check(
+                i: bump(i: x.nextAccountIndex),
+                serviceAccounts: x.accumulateState.newServiceAccounts
+            )
         } else if codeHash == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
         } else {
@@ -445,8 +448,8 @@ public class Transfer: HostCall {
 
         let destAcc: ServiceAccountDetails? = if try await x.serviceAccounts.get(serviceAccount: dest) != nil {
             try await x.serviceAccounts.get(serviceAccount: dest)
-        } else if x.accumulateState.serviceAccounts[dest] != nil {
-            x.accumulateState.serviceAccounts[dest]?.toDetails()
+        } else if x.accumulateState.newServiceAccounts[dest] != nil {
+            x.accumulateState.newServiceAccounts[dest]?.toDetails()
         } else {
             nil
         }
@@ -474,9 +477,62 @@ public class Transfer: HostCall {
     }
 }
 
-/// Quit (remove) a service account
-public class Quit: HostCall {
+/// Eject (remove) a service account
+public class Eject: HostCall {
     public static var identifier: UInt8 { 12 }
+
+    public var x: AccumlateResultContext
+    public let timeslot: TimeslotIndex
+
+    public init(x: inout AccumlateResultContext, timeslot: TimeslotIndex) {
+        self.x = x
+        self.timeslot = timeslot
+    }
+
+    public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
+        let (reg7, reg8): (UInt64, UInt64) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
+        let ejectIndex = ServiceIndex(truncatingIfNeeded: reg7)
+        let preimageHash = try? state.readMemory(address: reg8, length: 32)
+        let ejectAccount: ServiceAccountDetails? = if ejectIndex == x.serviceIndex {
+            nil
+        } else if try await x.serviceAccounts.get(serviceAccount: ejectIndex) != nil {
+            try await x.serviceAccounts.get(serviceAccount: ejectIndex)
+        } else if x.accumulateState.newServiceAccounts[ejectIndex] != nil {
+            x.accumulateState.newServiceAccounts[ejectIndex]?.toDetails()
+        } else {
+            nil
+        }
+        let minHoldPeriod = TimeslotIndex(config.value.preimagePurgePeriod)
+
+        if preimageHash == nil {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+        } else if ejectAccount == nil || ejectAccount?.codeHash.data != Data(x.serviceIndex.encode(method: .fixedWidth(32))) {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
+        }
+
+        let preimageInfo = try await x.serviceAccounts.get(
+            serviceAccount: ejectIndex,
+            preimageHash: Data32(preimageHash!)!,
+            length: max(81, UInt32(ejectAccount!.totalByteLength)) - 81
+        )
+
+        if ejectAccount!.itemsCount != 2 || preimageInfo == nil {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
+        } else if preimageInfo!.count == 2, preimageInfo![1] < timeslot - minHoldPeriod {
+            var destAccount = try await x.serviceAccounts.get(serviceAccount: x.serviceIndex)
+            destAccount?.balance += ejectAccount!.balance
+            x.serviceAccounts.set(serviceAccount: ejectIndex, account: nil)
+            x.serviceAccounts.set(serviceAccount: x.serviceIndex, account: destAccount)
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
+        } else {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
+        }
+    }
+}
+
+/// Query preimage info
+public class Query: HostCall {
+    public static var identifier: UInt8 { 13 }
 
     public var x: AccumlateResultContext
 
@@ -484,54 +540,44 @@ public class Quit: HostCall {
         self.x = x
     }
 
-    public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
-        let (dest, startAddr): (UInt64, UInt64) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
-        let acc = try await x.serviceAccounts.get(serviceAccount: x.serviceIndex).expect("service account not found")
-        let amount = acc.balance - acc.thresholdBalance(config: config) + Balance(config.value.serviceMinBalance)
-        let gasLimit = Gas(state.getGas())
-
-        let isValidDest = dest == x.serviceIndex || dest == UInt64.max
-        let memoData = try? state.readMemory(address: startAddr, length: config.value.transferMemoSize)
-        let memo = memoData != nil ? try JamDecoder.decode(Data128.self, from: memoData!) : nil
-        let destination = ServiceIndex(truncatingIfNeeded: dest)
-
-        let destAcc: ServiceAccountDetails? = if try await x.serviceAccounts.get(serviceAccount: destination) != nil {
-            try await x.serviceAccounts.get(serviceAccount: destination)
-        } else if x.accumulateState.serviceAccounts[destination] != nil {
-            x.accumulateState.serviceAccounts[destination]?.toDetails()
-        } else {
-            nil
+    public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
+        let (startAddr, length): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
+        let preimageHash = try? state.readMemory(address: startAddr, length: 32)
+        if preimageHash == nil {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+            return
         }
 
-        if isValidDest {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
-            x.serviceAccounts.set(serviceAccount: x.serviceIndex, account: nil)
-            throw VMInvocationsError.forceHalt
-        } else if memo == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
-        } else if destAcc == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
-        } else if gasLimit < destAcc!.minOnTransferGas {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.LOW.rawValue)
-        } else {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
-            // TODO: need to remove all storage and preimages?
-            x.serviceAccounts.set(serviceAccount: x.serviceIndex, account: nil)
-            x.transfers.append(DeferredTransfers(
-                sender: x.serviceIndex,
-                destination: destination,
-                amount: amount,
-                memo: memo!,
-                gasLimit: gasLimit
-            ))
-            throw VMInvocationsError.forceHalt
+        let preimageInfo = try await x.serviceAccounts.get(
+            serviceAccount: x.serviceIndex,
+            preimageHash: Data32(preimageHash!)!,
+            length: length
+        )
+        if preimageInfo == nil {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
+            state.writeRegister(Registers.Index(raw: 8), 0)
+            return
+        }
+
+        if preimageInfo!.isEmpty {
+            state.writeRegister(Registers.Index(raw: 7), 0)
+            state.writeRegister(Registers.Index(raw: 8), 0)
+        } else if preimageInfo!.count == 1 {
+            state.writeRegister(Registers.Index(raw: 7), 1 + (1 << 32) * preimageInfo![0])
+            state.writeRegister(Registers.Index(raw: 8), 0)
+        } else if preimageInfo!.count == 2 {
+            state.writeRegister(Registers.Index(raw: 7), 2 + (1 << 32) * preimageInfo![0])
+            state.writeRegister(Registers.Index(raw: 8), preimageInfo![1])
+        } else if preimageInfo!.count == 3 {
+            state.writeRegister(Registers.Index(raw: 7), 3 + (1 << 32) * preimageInfo![0])
+            state.writeRegister(Registers.Index(raw: 8), preimageInfo![1] + (1 << 32) * preimageInfo![2])
         }
     }
 }
 
 /// Solicit data to be made available in-core (through preimage lookups)
 public class Solicit: HostCall {
-    public static var identifier: UInt8 { 13 }
+    public static var identifier: UInt8 { 14 }
 
     public var x: AccumlateResultContext
     public let timeslot: TimeslotIndex
@@ -571,7 +617,7 @@ public class Solicit: HostCall {
 
 /// Forget data made available in-core (through preimage lookups)
 public class Forget: HostCall {
-    public static var identifier: UInt8 { 14 }
+    public static var identifier: UInt8 { 15 }
 
     public var x: AccumlateResultContext
     public let timeslot: TimeslotIndex
@@ -613,9 +659,31 @@ public class Forget: HostCall {
     }
 }
 
+/// Yield accumulation hash
+public class Yield: HostCall {
+    public static var identifier: UInt8 { 16 }
+
+    public var x: AccumlateResultContext
+
+    public init(x: inout AccumlateResultContext) {
+        self.x = x
+    }
+
+    public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
+        let startAddr: UInt32 = state.readRegister(Registers.Index(raw: 7))
+        let hash = try? state.readMemory(address: startAddr, length: 32)
+        if hash == nil {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+        } else {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
+            x.yield = Data32(hash!)!
+        }
+    }
+}
+
 /// Historical lookup
 public class HistoricalLookup: HostCall {
-    public static var identifier: UInt8 { 15 }
+    public static var identifier: UInt8 { 17 }
 
     public let context: RefineContext.ContextType
     public let service: ServiceIndex
@@ -672,7 +740,7 @@ public class HistoricalLookup: HostCall {
 
 /// Import a segment to memory
 public class Import: HostCall {
-    public static var identifier: UInt8 { 16 }
+    public static var identifier: UInt8 { 18 }
 
     public let context: RefineContext.ContextType
     public let importSegments: [Data]
@@ -709,7 +777,7 @@ public class Import: HostCall {
 
 /// Export a segment from memory
 public class Export: HostCall {
-    public static var identifier: UInt8 { 17 }
+    public static var identifier: UInt8 { 19 }
 
     public var context: RefineContext.ContextType
     public let exportSegmentOffset: UInt64
@@ -748,7 +816,7 @@ public class Export: HostCall {
 
 /// Create an inner PVM
 public class Machine: HostCall {
-    public static var identifier: UInt8 { 18 }
+    public static var identifier: UInt8 { 20 }
 
     public var context: RefineContext.ContextType
 
@@ -777,7 +845,7 @@ public class Machine: HostCall {
 
 /// Peek (read inner memory into outer memory)
 public class Peek: HostCall {
-    public static var identifier: UInt8 { 19 }
+    public static var identifier: UInt8 { 21 }
 
     public let context: RefineContext.ContextType
 
@@ -811,7 +879,7 @@ public class Peek: HostCall {
 
 /// Poke (write outer memory into inner memory)
 public class Poke: HostCall {
-    public static var identifier: UInt8 { 20 }
+    public static var identifier: UInt8 { 22 }
 
     public var context: RefineContext.ContextType
 
@@ -845,7 +913,7 @@ public class Poke: HostCall {
 
 /// Make some pages zero and writable in the inner PVM
 public class Zero: HostCall {
-    public static var identifier: UInt8 { 21 }
+    public static var identifier: UInt8 { 23 }
 
     public var context: RefineContext.ContextType
 
@@ -872,7 +940,7 @@ public class Zero: HostCall {
 
 /// Make some pages zero and inaccessible in the inner PVM
 public class VoidFn: HostCall {
-    public static var identifier: UInt8 { 22 }
+    public static var identifier: UInt8 { 24 }
 
     public var context: RefineContext.ContextType
 
@@ -901,7 +969,7 @@ public class VoidFn: HostCall {
 
 /// Invoke an inner PVM
 public class Invoke: HostCall {
-    public static var identifier: UInt8 { 23 }
+    public static var identifier: UInt8 { 25 }
 
     public var context: RefineContext.ContextType
 
@@ -960,7 +1028,7 @@ public class Invoke: HostCall {
 
 /// Expunge an inner PVM
 public class Expunge: HostCall {
-    public static var identifier: UInt8 { 24 }
+    public static var identifier: UInt8 { 26 }
 
     public var context: RefineContext.ContextType
 
@@ -1050,8 +1118,8 @@ public class Log: HostCall {
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         let regs: [UInt32] = state.readRegisters(in: 7 ..< 12)
         let level = regs[0]
-        let target = regs[1] == 0 && regs[2] == 0 ? nil : try state.readMemory(address: regs[1], length: Int(regs[2]))
-        let message = try state.readMemory(address: regs[3], length: Int(regs[4]))
+        let target = regs[1] == 0 && regs[2] == 0 ? nil : try? state.readMemory(address: regs[1], length: Int(regs[2]))
+        let message = try? state.readMemory(address: regs[3], length: Int(regs[4]))
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH-mm-ss"
@@ -1061,7 +1129,7 @@ public class Log: HostCall {
             time: time,
             level: Level(rawValue: level) ?? .debug,
             target: target,
-            message: message,
+            message: message ?? Data(),
             core: core,
             service: service
         )
