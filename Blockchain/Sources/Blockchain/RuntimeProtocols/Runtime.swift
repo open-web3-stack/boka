@@ -235,7 +235,7 @@ public final class Runtime {
         state.authorizationQueue = accumulateState.authorizationQueue
         state.validatorQueue = accumulateState.validatorQueue
         state.privilegedServices = accumulateState.privilegedServices
-        for (service, account) in accumulateState.serviceAccounts {
+        for (service, account) in accumulateState.newServiceAccounts {
             state[serviceAccount: service] = account.toDetails()
             for (hash, value) in account.storage {
                 state[serviceAccount: service, storageKey: hash] = value

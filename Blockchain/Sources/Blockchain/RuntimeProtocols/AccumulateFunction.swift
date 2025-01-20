@@ -44,7 +44,7 @@ public struct DeferredTransfers: Codable {
 ///    which are both needed and mutable by the accumulation process.
 public struct AccumulateState {
     /// d
-    public var serviceAccounts: [ServiceIndex: ServiceAccount]
+    public var newServiceAccounts: [ServiceIndex: ServiceAccount]
     /// i
     public var validatorQueue: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
@@ -63,7 +63,7 @@ public struct AccumulateState {
 
 /// X
 public struct AccumlateResultContext {
-    /// d
+    /// d: all existing service accounts
     public var serviceAccounts: ServiceAccounts
     /// s: the accumulating service account index
     public var serviceIndex: ServiceIndex
@@ -73,6 +73,8 @@ public struct AccumlateResultContext {
     public var nextAccountIndex: ServiceIndex
     /// t: deferred transfers
     public var transfers: [DeferredTransfers]
+    /// y
+    public var yield: Data32?
 }
 
 public protocol AccumulateFunction {
