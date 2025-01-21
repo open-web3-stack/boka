@@ -6,7 +6,7 @@ import TracingUtils
 import Vapor
 import XCTVapor
 
-public final class NodeDataSource: Sendable {
+public final class DummyNodeDataSource: Sendable {
     public let chainDataProvider: BlockchainDataProvider
     public init(
         chainDataProvider: BlockchainDataProvider
@@ -15,7 +15,7 @@ public final class NodeDataSource: Sendable {
     }
 }
 
-extension NodeDataSource: ChainDataSource {
+extension DummyNodeDataSource: ChainDataSource {
     public func getBestBlock() async throws -> BlockRef {
         try await chainDataProvider.getBlock(hash: chainDataProvider.bestHead.hash)
     }
@@ -40,37 +40,24 @@ extension NodeDataSource: ChainDataSource {
 
 final class ChainRPCControllerTests {
     var app: Application!
+    var dataProvider: BlockchainDataProvider!
 
     func setUp() async throws {
         app = try await Application.make(.testing)
         let (genesisState, genesisBlock) = try! State.devGenesis(config: .minimal)
-        let dataProvider = try! await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
-        let rpcController = JSONRPCController(handlers: ChainHandlers.getHandlers(source: NodeDataSource(chainDataProvider: dataProvider)))
+        dataProvider = try! await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
+        let rpcController = JSONRPCController(handlers: ChainHandlers
+            .getHandlers(source: DummyNodeDataSource(chainDataProvider: dataProvider)))
 //        let rpcController = JSONRPCController(handlers: SystemHandlers.getHandlers(source: DummySource()))
 
         try app.register(collection: rpcController)
     }
 
-//    @Test func health() async throws {
-//        try await setUp()
-//
-//        let req = JSONRequest(jsonrpc: "2.0", method: "system_health", params: nil, id: 1)
-//        var buffer = ByteBuffer()
-//        try buffer.writeJSONEncodable(req)
-//        try await app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
-//            #expect(res.status == .ok)
-//            print("resp \(res.body.string)")
-//            let resp = try! res.content.decode(JSONResponse.self, using: JSONDecoder())
-//            #expect((resp.result!.value as! Utils.JSON).bool == true)
-//
-//        }
-//        try await app.asyncShutdown()
-//
-//    }
-
     @Test func getBlock() async throws {
         try await setUp()
-        let req = JSONRequest(jsonrpc: "2.0", method: "chain_getBlock", params: nil, id: 1)
+        let hashHex = await dataProvider.bestHead.hash.toHexString()
+        let params = JSON.array([.string(hashHex)])
+        let req = JSONRequest(jsonrpc: "2.0", method: "chain_getBlock", params: params, id: 1)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
         try await app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
