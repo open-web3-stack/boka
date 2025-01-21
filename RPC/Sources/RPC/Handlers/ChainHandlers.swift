@@ -7,7 +7,7 @@ public enum ChainHandlers {
     public static let handlers: [any RPCHandler.Type] = [
         GetBlock.self,
         GetBlockHash.self,
-        GetFinalziedHead.self,
+        GetFinalizedHead.self,
         GetHeader.self,
     ]
 
@@ -15,7 +15,7 @@ public enum ChainHandlers {
         [
             GetBlock(source: source),
             GetBlockHash(source: source),
-            GetFinalziedHead(source: source),
+            GetFinalizedHead(source: source),
             GetHeader(source: source),
         ]
     }
@@ -64,11 +64,11 @@ public enum ChainHandlers {
         }
     }
 
-    public struct GetFinalziedHead: RPCHandler {
+    public struct GetFinalizedHead: RPCHandler {
         public typealias Request = VoidRequest
         public typealias Response = Data32?
 
-        public static var method: String { "chain_getFinalziedHead" }
+        public static var method: String { "chain_getFinalizedHead" }
         public static var summary: String? { "Get hash of the last finalized block in the canon chain." }
 
         private let source: ChainDataSource
