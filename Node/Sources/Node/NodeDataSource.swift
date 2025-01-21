@@ -37,6 +37,14 @@ extension NodeDataSource: ChainDataSource {
         let state = try await chainDataProvider.getState(hash: blockHash)
         return try await state.value.read(key: key)
     }
+
+    public func getBlockHash(byTimeslot timeslot: TimeslotIndex) async throws -> Set<Data32> {
+        try await chainDataProvider.getBlockHash(byTimeslot: timeslot)
+    }
+
+    public func getHeader(hash: Data32) async throws -> HeaderRef? {
+        try await chainDataProvider.getHeader(hash: hash)
+    }
 }
 
 extension NodeDataSource: TelemetryDataSource {
