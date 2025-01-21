@@ -660,10 +660,180 @@ public enum Instructions {
         }
     }
 
+    public struct CountSetBits64: Instruction {
+        public static var opcode: UInt8 { 102 }
+
+        public let ra: Registers.Index
+        public let dest: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, dest) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let regVal: UInt64 = context.state.readRegister(ra)
+            context.state.writeRegister(dest, regVal.nonzeroBitCount)
+            return .continued
+        }
+    }
+
+    public struct CountSetBits32: Instruction {
+        public static var opcode: UInt8 { 103 }
+
+        public let ra: Registers.Index
+        public let dest: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, dest) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let regVal: UInt32 = context.state.readRegister(ra)
+            context.state.writeRegister(dest, regVal.nonzeroBitCount)
+            return .continued
+        }
+    }
+
+    public struct LeadingZeroBits64: Instruction {
+        public static var opcode: UInt8 { 104 }
+
+        public let ra: Registers.Index
+        public let dest: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, dest) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let regVal: UInt64 = context.state.readRegister(ra)
+            context.state.writeRegister(dest, regVal.leadingZeroBitCount)
+            return .continued
+        }
+    }
+
+    public struct LeadingZeroBits32: Instruction {
+        public static var opcode: UInt8 { 105 }
+
+        public let ra: Registers.Index
+        public let dest: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, dest) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let regVal: UInt32 = context.state.readRegister(ra)
+            context.state.writeRegister(dest, regVal.leadingZeroBitCount)
+            return .continued
+        }
+    }
+
+    public struct TrailingZeroBits64: Instruction {
+        public static var opcode: UInt8 { 106 }
+
+        public let ra: Registers.Index
+        public let dest: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, dest) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let regVal: UInt64 = context.state.readRegister(ra)
+            context.state.writeRegister(dest, regVal.trailingZeroBitCount)
+            return .continued
+        }
+    }
+
+    public struct TrailingZeroBits32: Instruction {
+        public static var opcode: UInt8 { 107 }
+
+        public let ra: Registers.Index
+        public let dest: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, dest) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let regVal: UInt32 = context.state.readRegister(ra)
+            context.state.writeRegister(dest, regVal.trailingZeroBitCount)
+            return .continued
+        }
+    }
+
+    public struct SignExtend8: Instruction {
+        public static var opcode: UInt8 { 108 }
+
+        public let ra: Registers.Index
+        public let dest: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, dest) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let regVal: UInt8 = context.state.readRegister(ra)
+            context.state.writeRegister(dest, UInt64(bitPattern: Int64(Int8(bitPattern: regVal))))
+            return .continued
+        }
+    }
+
+    public struct SignExtend16: Instruction {
+        public static var opcode: UInt8 { 109 }
+
+        public let ra: Registers.Index
+        public let dest: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, dest) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let regVal: UInt16 = context.state.readRegister(ra)
+            context.state.writeRegister(dest, UInt64(bitPattern: Int64(Int16(bitPattern: regVal))))
+            return .continued
+        }
+    }
+
+    public struct ZeroExtend16: Instruction {
+        public static var opcode: UInt8 { 110 }
+
+        public let ra: Registers.Index
+        public let dest: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, dest) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let regVal: UInt16 = context.state.readRegister(ra)
+            context.state.writeRegister(dest, regVal)
+            return .continued
+        }
+    }
+
+    public struct ReverseBytes: Instruction {
+        public static var opcode: UInt8 { 111 }
+
+        public let ra: Registers.Index
+        public let dest: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, dest) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            let regVal: UInt64 = context.state.readRegister(ra)
+            context.state.writeRegister(dest, regVal.byteSwapped)
+            return .continued
+        }
+    }
+
     // MARK: Instructions with Arguments of Two Registers & One Immediate (5.10)
 
     public struct StoreIndU8: Instruction {
-        public static var opcode: UInt8 { 110 }
+        public static var opcode: UInt8 { 120 }
 
         public let src: Registers.Index
         public let dest: Registers.Index
@@ -682,7 +852,7 @@ public enum Instructions {
     }
 
     public struct StoreIndU16: Instruction {
-        public static var opcode: UInt8 { 111 }
+        public static var opcode: UInt8 { 121 }
 
         public let src: Registers.Index
         public let dest: Registers.Index
@@ -701,7 +871,7 @@ public enum Instructions {
     }
 
     public struct StoreIndU32: Instruction {
-        public static var opcode: UInt8 { 112 }
+        public static var opcode: UInt8 { 122 }
 
         public let src: Registers.Index
         public let dest: Registers.Index
@@ -720,7 +890,7 @@ public enum Instructions {
     }
 
     public struct StoreIndU64: Instruction {
-        public static var opcode: UInt8 { 113 }
+        public static var opcode: UInt8 { 123 }
 
         public let src: Registers.Index
         public let dest: Registers.Index
@@ -739,7 +909,7 @@ public enum Instructions {
     }
 
     public struct LoadIndU8: Instruction {
-        public static var opcode: UInt8 { 114 }
+        public static var opcode: UInt8 { 124 }
 
         public let src: Registers.Index
         public let dest: Registers.Index
@@ -758,7 +928,7 @@ public enum Instructions {
     }
 
     public struct LoadIndI8: Instruction {
-        public static var opcode: UInt8 { 115 }
+        public static var opcode: UInt8 { 125 }
 
         public let src: Registers.Index
         public let dest: Registers.Index
@@ -777,7 +947,7 @@ public enum Instructions {
     }
 
     public struct LoadIndU16: Instruction {
-        public static var opcode: UInt8 { 116 }
+        public static var opcode: UInt8 { 126 }
 
         public let src: Registers.Index
         public let dest: Registers.Index
@@ -797,7 +967,7 @@ public enum Instructions {
     }
 
     public struct LoadIndI16: Instruction {
-        public static var opcode: UInt8 { 117 }
+        public static var opcode: UInt8 { 127 }
 
         public let src: Registers.Index
         public let dest: Registers.Index
@@ -817,7 +987,7 @@ public enum Instructions {
     }
 
     public struct LoadIndU32: Instruction {
-        public static var opcode: UInt8 { 118 }
+        public static var opcode: UInt8 { 128 }
 
         public let src: Registers.Index
         public let dest: Registers.Index
@@ -837,7 +1007,7 @@ public enum Instructions {
     }
 
     public struct LoadIndI32: Instruction {
-        public static var opcode: UInt8 { 119 }
+        public static var opcode: UInt8 { 129 }
 
         public let src: Registers.Index
         public let dest: Registers.Index
@@ -857,7 +1027,7 @@ public enum Instructions {
     }
 
     public struct LoadIndU64: Instruction {
-        public static var opcode: UInt8 { 120 }
+        public static var opcode: UInt8 { 130 }
 
         public let src: Registers.Index
         public let dest: Registers.Index
@@ -877,7 +1047,7 @@ public enum Instructions {
     }
 
     public struct AddImm32: Instruction {
-        public static var opcode: UInt8 { 121 }
+        public static var opcode: UInt8 { 131 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -896,7 +1066,7 @@ public enum Instructions {
     }
 
     public struct AndImm: Instruction {
-        public static var opcode: UInt8 { 122 }
+        public static var opcode: UInt8 { 132 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -915,7 +1085,7 @@ public enum Instructions {
     }
 
     public struct XorImm: Instruction {
-        public static var opcode: UInt8 { 123 }
+        public static var opcode: UInt8 { 133 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -934,7 +1104,7 @@ public enum Instructions {
     }
 
     public struct OrImm: Instruction {
-        public static var opcode: UInt8 { 124 }
+        public static var opcode: UInt8 { 134 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -953,7 +1123,7 @@ public enum Instructions {
     }
 
     public struct MulImm32: Instruction {
-        public static var opcode: UInt8 { 125 }
+        public static var opcode: UInt8 { 135 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -972,7 +1142,7 @@ public enum Instructions {
     }
 
     public struct SetLtUImm: Instruction {
-        public static var opcode: UInt8 { 126 }
+        public static var opcode: UInt8 { 136 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -991,7 +1161,7 @@ public enum Instructions {
     }
 
     public struct SetLtSImm: Instruction {
-        public static var opcode: UInt8 { 127 }
+        public static var opcode: UInt8 { 137 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1010,7 +1180,7 @@ public enum Instructions {
     }
 
     public struct ShloLImm32: Instruction {
-        public static var opcode: UInt8 { 128 }
+        public static var opcode: UInt8 { 138 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1030,7 +1200,7 @@ public enum Instructions {
     }
 
     public struct ShloRImm32: Instruction {
-        public static var opcode: UInt8 { 129 }
+        public static var opcode: UInt8 { 139 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1050,7 +1220,7 @@ public enum Instructions {
     }
 
     public struct SharRImm32: Instruction {
-        public static var opcode: UInt8 { 130 }
+        public static var opcode: UInt8 { 140 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1070,7 +1240,7 @@ public enum Instructions {
     }
 
     public struct NegAddImm32: Instruction {
-        public static var opcode: UInt8 { 131 }
+        public static var opcode: UInt8 { 141 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1089,7 +1259,7 @@ public enum Instructions {
     }
 
     public struct SetGtUImm: Instruction {
-        public static var opcode: UInt8 { 132 }
+        public static var opcode: UInt8 { 142 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1108,7 +1278,7 @@ public enum Instructions {
     }
 
     public struct SetGtSImm: Instruction {
-        public static var opcode: UInt8 { 133 }
+        public static var opcode: UInt8 { 143 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1127,7 +1297,7 @@ public enum Instructions {
     }
 
     public struct ShloLImmAlt32: Instruction {
-        public static var opcode: UInt8 { 134 }
+        public static var opcode: UInt8 { 144 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1147,7 +1317,7 @@ public enum Instructions {
     }
 
     public struct ShloRImmAlt32: Instruction {
-        public static var opcode: UInt8 { 135 }
+        public static var opcode: UInt8 { 145 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1167,7 +1337,7 @@ public enum Instructions {
     }
 
     public struct SharRImmAlt32: Instruction {
-        public static var opcode: UInt8 { 136 }
+        public static var opcode: UInt8 { 146 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1187,7 +1357,7 @@ public enum Instructions {
     }
 
     public struct CmovIzImm: Instruction {
-        public static var opcode: UInt8 { 137 }
+        public static var opcode: UInt8 { 147 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1208,7 +1378,7 @@ public enum Instructions {
     }
 
     public struct CmovNzImm: Instruction {
-        public static var opcode: UInt8 { 86 }
+        public static var opcode: UInt8 { 148 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1227,7 +1397,7 @@ public enum Instructions {
     }
 
     public struct AddImm64: Instruction {
-        public static var opcode: UInt8 { 139 }
+        public static var opcode: UInt8 { 149 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1246,7 +1416,7 @@ public enum Instructions {
     }
 
     public struct MulImm64: Instruction {
-        public static var opcode: UInt8 { 140 }
+        public static var opcode: UInt8 { 150 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1265,7 +1435,7 @@ public enum Instructions {
     }
 
     public struct ShloLImm64: Instruction {
-        public static var opcode: UInt8 { 141 }
+        public static var opcode: UInt8 { 151 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1285,7 +1455,7 @@ public enum Instructions {
     }
 
     public struct ShloRImm64: Instruction {
-        public static var opcode: UInt8 { 142 }
+        public static var opcode: UInt8 { 152 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1305,7 +1475,7 @@ public enum Instructions {
     }
 
     public struct SharRImm64: Instruction {
-        public static var opcode: UInt8 { 143 }
+        public static var opcode: UInt8 { 153 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1325,7 +1495,7 @@ public enum Instructions {
     }
 
     public struct NegAddImm64: Instruction {
-        public static var opcode: UInt8 { 144 }
+        public static var opcode: UInt8 { 154 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1344,7 +1514,7 @@ public enum Instructions {
     }
 
     public struct ShloLImmAlt64: Instruction {
-        public static var opcode: UInt8 { 145 }
+        public static var opcode: UInt8 { 155 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1364,7 +1534,7 @@ public enum Instructions {
     }
 
     public struct ShloRImmAlt64: Instruction {
-        public static var opcode: UInt8 { 146 }
+        public static var opcode: UInt8 { 156 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1384,7 +1554,7 @@ public enum Instructions {
     }
 
     public struct SharRImmAlt64: Instruction {
-        public static var opcode: UInt8 { 147 }
+        public static var opcode: UInt8 { 157 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1403,10 +1573,86 @@ public enum Instructions {
         }
     }
 
+    public struct RotR64Imm: Instruction {
+        public static var opcode: UInt8 { 158 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let value: UInt64
+
+        public init(data: Data) throws {
+            (ra, rb) = try Instructions.deocdeRegisters(data)
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        }
+
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let rbVal: UInt64 = context.state.readRegister(rb)
+            context.state.writeRegister(ra, rbVal.rotated(right: value))
+            return .continued
+        }
+    }
+
+    public struct RotR64ImmAlt: Instruction {
+        public static var opcode: UInt8 { 159 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let value: UInt64
+
+        public init(data: Data) throws {
+            (ra, rb) = try Instructions.deocdeRegisters(data)
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        }
+
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let rbVal: UInt64 = context.state.readRegister(rb)
+            context.state.writeRegister(ra, value.rotated(right: rbVal))
+            return .continued
+        }
+    }
+
+    public struct RotR32Imm: Instruction {
+        public static var opcode: UInt8 { 160 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let value: UInt32
+
+        public init(data: Data) throws {
+            (ra, rb) = try Instructions.deocdeRegisters(data)
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        }
+
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let rbVal: UInt32 = context.state.readRegister(rb)
+            context.state.writeRegister(ra, Int32(bitPattern: rbVal.rotated(right: value)))
+            return .continued
+        }
+    }
+
+    public struct RotR32ImmAlt: Instruction {
+        public static var opcode: UInt8 { 161 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let value: UInt32
+
+        public init(data: Data) throws {
+            (ra, rb) = try Instructions.deocdeRegisters(data)
+            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        }
+
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let rbVal: UInt32 = context.state.readRegister(rb)
+            context.state.writeRegister(ra, Int32(bitPattern: value.rotated(right: rbVal)))
+            return .continued
+        }
+    }
+
     // MARK: Instructions with Arguments of Two Registers & One Offset (5.11)
 
     public struct BranchEq: BranchInstructionBase2 {
-        public static var opcode: UInt8 { 150 }
+        public static var opcode: UInt8 { 170 }
         typealias Compare = CompareEq
 
         var r1: Registers.Index
@@ -1416,7 +1662,7 @@ public enum Instructions {
     }
 
     public struct BranchNe: BranchInstructionBase2 {
-        public static var opcode: UInt8 { 151 }
+        public static var opcode: UInt8 { 171 }
         typealias Compare = CompareNe
 
         var r1: Registers.Index
@@ -1426,7 +1672,7 @@ public enum Instructions {
     }
 
     public struct BranchLtU: BranchInstructionBase2 {
-        public static var opcode: UInt8 { 152 }
+        public static var opcode: UInt8 { 172 }
         typealias Compare = CompareLtU
 
         var r1: Registers.Index
@@ -1436,7 +1682,7 @@ public enum Instructions {
     }
 
     public struct BranchLtS: BranchInstructionBase2 {
-        public static var opcode: UInt8 { 153 }
+        public static var opcode: UInt8 { 173 }
         typealias Compare = CompareLtS
 
         var r1: Registers.Index
@@ -1446,7 +1692,7 @@ public enum Instructions {
     }
 
     public struct BranchGeU: BranchInstructionBase2 {
-        public static var opcode: UInt8 { 154 }
+        public static var opcode: UInt8 { 174 }
         typealias Compare = CompareGeU
 
         var r1: Registers.Index
@@ -1456,7 +1702,7 @@ public enum Instructions {
     }
 
     public struct BranchGeS: BranchInstructionBase2 {
-        public static var opcode: UInt8 { 155 }
+        public static var opcode: UInt8 { 175 }
         typealias Compare = CompareGeS
 
         var r1: Registers.Index
@@ -1468,7 +1714,7 @@ public enum Instructions {
     // MARK: Instruction with Arguments of Two Registers and Two Immediates (5.12)
 
     public struct LoadImmJumpInd: Instruction {
-        public static var opcode: UInt8 { 160 }
+        public static var opcode: UInt8 { 180 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1494,7 +1740,7 @@ public enum Instructions {
     // MARK: Instructions with Arguments of Three Registers (5.13)
 
     public struct Add32: Instruction {
-        public static var opcode: UInt8 { 170 }
+        public static var opcode: UInt8 { 190 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1512,7 +1758,7 @@ public enum Instructions {
     }
 
     public struct Sub32: Instruction {
-        public static var opcode: UInt8 { 171 }
+        public static var opcode: UInt8 { 191 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1530,7 +1776,7 @@ public enum Instructions {
     }
 
     public struct Mul32: Instruction {
-        public static var opcode: UInt8 { 172 }
+        public static var opcode: UInt8 { 192 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1548,7 +1794,7 @@ public enum Instructions {
     }
 
     public struct DivU32: Instruction {
-        public static var opcode: UInt8 { 173 }
+        public static var opcode: UInt8 { 193 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1570,7 +1816,7 @@ public enum Instructions {
     }
 
     public struct DivS32: Instruction {
-        public static var opcode: UInt8 { 174 }
+        public static var opcode: UInt8 { 194 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1596,7 +1842,7 @@ public enum Instructions {
     }
 
     public struct RemU32: Instruction {
-        public static var opcode: UInt8 { 175 }
+        public static var opcode: UInt8 { 195 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1618,7 +1864,7 @@ public enum Instructions {
     }
 
     public struct RemS32: Instruction {
-        public static var opcode: UInt8 { 176 }
+        public static var opcode: UInt8 { 196 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1644,7 +1890,7 @@ public enum Instructions {
     }
 
     public struct ShloL32: Instruction {
-        public static var opcode: UInt8 { 177 }
+        public static var opcode: UInt8 { 197 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1663,7 +1909,7 @@ public enum Instructions {
     }
 
     public struct ShloR32: Instruction {
-        public static var opcode: UInt8 { 178 }
+        public static var opcode: UInt8 { 198 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1682,7 +1928,7 @@ public enum Instructions {
     }
 
     public struct SharR32: Instruction {
-        public static var opcode: UInt8 { 179 }
+        public static var opcode: UInt8 { 199 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1701,7 +1947,7 @@ public enum Instructions {
     }
 
     public struct Add64: Instruction {
-        public static var opcode: UInt8 { 180 }
+        public static var opcode: UInt8 { 200 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1719,7 +1965,7 @@ public enum Instructions {
     }
 
     public struct Sub64: Instruction {
-        public static var opcode: UInt8 { 181 }
+        public static var opcode: UInt8 { 201 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1737,7 +1983,7 @@ public enum Instructions {
     }
 
     public struct Mul64: Instruction {
-        public static var opcode: UInt8 { 182 }
+        public static var opcode: UInt8 { 202 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1755,7 +2001,7 @@ public enum Instructions {
     }
 
     public struct DivU64: Instruction {
-        public static var opcode: UInt8 { 183 }
+        public static var opcode: UInt8 { 203 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1777,7 +2023,7 @@ public enum Instructions {
     }
 
     public struct DivS64: Instruction {
-        public static var opcode: UInt8 { 184 }
+        public static var opcode: UInt8 { 204 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1803,7 +2049,7 @@ public enum Instructions {
     }
 
     public struct RemU64: Instruction {
-        public static var opcode: UInt8 { 185 }
+        public static var opcode: UInt8 { 205 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1825,7 +2071,7 @@ public enum Instructions {
     }
 
     public struct RemS64: Instruction {
-        public static var opcode: UInt8 { 186 }
+        public static var opcode: UInt8 { 206 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1851,7 +2097,7 @@ public enum Instructions {
     }
 
     public struct ShloL64: Instruction {
-        public static var opcode: UInt8 { 187 }
+        public static var opcode: UInt8 { 207 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1870,7 +2116,7 @@ public enum Instructions {
     }
 
     public struct ShloR64: Instruction {
-        public static var opcode: UInt8 { 188 }
+        public static var opcode: UInt8 { 208 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1889,7 +2135,7 @@ public enum Instructions {
     }
 
     public struct SharR64: Instruction {
-        public static var opcode: UInt8 { 189 }
+        public static var opcode: UInt8 { 209 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1908,7 +2154,7 @@ public enum Instructions {
     }
 
     public struct And: Instruction {
-        public static var opcode: UInt8 { 190 }
+        public static var opcode: UInt8 { 210 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1926,7 +2172,7 @@ public enum Instructions {
     }
 
     public struct Xor: Instruction {
-        public static var opcode: UInt8 { 191 }
+        public static var opcode: UInt8 { 211 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1944,7 +2190,7 @@ public enum Instructions {
     }
 
     public struct Or: Instruction {
-        public static var opcode: UInt8 { 192 }
+        public static var opcode: UInt8 { 212 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1962,7 +2208,7 @@ public enum Instructions {
     }
 
     public struct MulUpperSS: Instruction {
-        public static var opcode: UInt8 { 193 }
+        public static var opcode: UInt8 { 213 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -1983,7 +2229,7 @@ public enum Instructions {
     }
 
     public struct MulUpperUU: Instruction {
-        public static var opcode: UInt8 { 194 }
+        public static var opcode: UInt8 { 214 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -2001,7 +2247,7 @@ public enum Instructions {
     }
 
     public struct MulUpperSU: Instruction {
-        public static var opcode: UInt8 { 195 }
+        public static var opcode: UInt8 { 215 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -2022,7 +2268,7 @@ public enum Instructions {
     }
 
     public struct SetLtU: Instruction {
-        public static var opcode: UInt8 { 196 }
+        public static var opcode: UInt8 { 216 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -2040,7 +2286,7 @@ public enum Instructions {
     }
 
     public struct SetLtS: Instruction {
-        public static var opcode: UInt8 { 197 }
+        public static var opcode: UInt8 { 217 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -2058,7 +2304,7 @@ public enum Instructions {
     }
 
     public struct CmovIz: Instruction {
-        public static var opcode: UInt8 { 198 }
+        public static var opcode: UInt8 { 218 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -2078,7 +2324,7 @@ public enum Instructions {
     }
 
     public struct CmovNz: Instruction {
-        public static var opcode: UInt8 { 199 }
+        public static var opcode: UInt8 { 219 }
 
         public let ra: Registers.Index
         public let rb: Registers.Index
@@ -2093,6 +2339,204 @@ public enum Instructions {
             if rbVal != 0 {
                 context.state.writeRegister(rd, raVal)
             }
+            return .continued
+        }
+    }
+
+    public struct RotL64: Instruction {
+        public static var opcode: UInt8 { 220 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, raVal.rotated(left: rbVal))
+            return .continued
+        }
+    }
+
+    public struct RotL32: Instruction {
+        public static var opcode: UInt8 { 221 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, Int32(bitPattern: raVal.rotated(left: rbVal)))
+            return .continued
+        }
+    }
+
+    public struct RotR64: Instruction {
+        public static var opcode: UInt8 { 222 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, raVal.rotated(right: rbVal))
+            return .continued
+        }
+    }
+
+    public struct RotR32: Instruction {
+        public static var opcode: UInt8 { 223 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, Int32(bitPattern: raVal.rotated(right: rbVal)))
+            return .continued
+        }
+    }
+
+    public struct AndInv: Instruction {
+        public static var opcode: UInt8 { 224 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, raVal & ~rbVal)
+            return .continued
+        }
+    }
+
+    public struct OrInv: Instruction {
+        public static var opcode: UInt8 { 225 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, raVal | ~rbVal)
+            return .continued
+        }
+    }
+
+    public struct Xnor: Instruction {
+        public static var opcode: UInt8 { 226 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, ~(raVal ^ rbVal))
+            return .continued
+        }
+    }
+
+    public struct Max: Instruction {
+        public static var opcode: UInt8 { 227 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, max(Int64(bitPattern: raVal), Int64(bitPattern: rbVal)))
+            return .continued
+        }
+    }
+
+    public struct MaxU: Instruction {
+        public static var opcode: UInt8 { 228 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, max(raVal, rbVal))
+            return .continued
+        }
+    }
+
+    public struct Min: Instruction {
+        public static var opcode: UInt8 { 229 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, min(Int64(bitPattern: raVal), Int64(bitPattern: rbVal)))
+            return .continued
+        }
+    }
+
+    public struct MinU: Instruction {
+        public static var opcode: UInt8 { 230 }
+
+        public let ra: Registers.Index
+        public let rb: Registers.Index
+        public let rd: Registers.Index
+
+        public init(data: Data) throws {
+            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        }
+
+        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+            context.state.writeRegister(rd, min(raVal, rbVal))
             return .continued
         }
     }

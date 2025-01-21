@@ -179,7 +179,7 @@ extension Accumulation {
             }
 
             // new service accounts
-            for (service, account) in singleOutput.state.serviceAccounts {
+            for (service, account) in singleOutput.state.newServiceAccounts {
                 guard newServiceAccounts[service] == nil, try await get(serviceAccount: service) == nil else {
                     throw AccumulationError.duplicatedServiceIndex
                 }
@@ -201,7 +201,7 @@ extension Accumulation {
         return ParallelAccumulationOutput(
             gasUsed: gasUsed,
             state: AccumulateState(
-                serviceAccounts: newServiceAccounts,
+                newServiceAccounts: newServiceAccounts,
                 validatorQueue: newValidatorQueue ?? validatorQueue,
                 authorizationQueue: newAuthorizationQueue ?? authorizationQueue,
                 privilegedServices: newPrivilegedServices ?? privilegedServices
@@ -339,7 +339,7 @@ extension Accumulation {
             config: config,
             block: block,
             state: AccumulateState(
-                serviceAccounts: [:],
+                newServiceAccounts: [:],
                 validatorQueue: validatorQueue,
                 authorizationQueue: authorizationQueue,
                 privilegedServices: privilegedServices
