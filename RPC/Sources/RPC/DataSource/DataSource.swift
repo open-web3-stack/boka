@@ -8,6 +8,8 @@ public protocol ChainDataSource: Sendable {
     func getBestBlock() async throws -> BlockRef
     func getBlock(hash: Data32) async throws -> BlockRef?
     func getState(blockHash: Data32, key: Data32) async throws -> Data?
+    func getBlockHash(byTimeslot timeslot: TimeslotIndex) async throws -> Set<Data32>
+    func getBestBlockHash() async throws -> Set<Data32>
 }
 
 public protocol TelemetryDataSource: Sendable {

@@ -25,6 +25,11 @@ public final class NodeDataSource: Sendable {
 extension NodeDataSource: SystemDataSource {}
 
 extension NodeDataSource: ChainDataSource {
+    public func getBestBlockHash() async throws -> Set<Data32> {
+        let timeslot = blockchain.timeProvider.getTime().timeToTimeslot(config: blockchain.config)
+        return try await chainDataProvider.getBlockHash(byTimeslot: timeslot)
+    }
+
     public func getBestBlock() async throws -> BlockRef {
         try await chainDataProvider.getBlock(hash: chainDataProvider.bestHead.hash)
     }

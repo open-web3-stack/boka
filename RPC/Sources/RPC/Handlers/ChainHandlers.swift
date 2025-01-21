@@ -1,7 +1,19 @@
 import Blockchain
 import Codec
+import Database
 import Foundation
+import Rocksdb
 import Utils
+
+extension Set<Data32> {
+    func encode() throws -> Data {
+        var data = Data(capacity: count * 32)
+        for element in self {
+            data.append(element.data)
+        }
+        return data
+    }
+}
 
 public enum ChainHandlers {
     public static let handlers: [any RPCHandler.Type] = [
@@ -58,9 +70,14 @@ public enum ChainHandlers {
             self.source = source
         }
 
-        public func handle(request _: Request) async throws -> Response? {
-            // TODO: implement
-            nil
+        public func handle(request: Request) async throws -> Response? {
+            let blockHash = if let timeslot = request.value {
+                try await source.getBlockHash(byTimeslot: timeslot)
+            } else {
+                try await source.getBestBlockHash()
+            }
+            print("blockHash \(blockHash)")
+            return try blockHash.encode()
         }
     }
 
