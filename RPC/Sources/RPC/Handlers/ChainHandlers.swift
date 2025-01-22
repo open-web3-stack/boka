@@ -1,8 +1,6 @@
 import Blockchain
 import Codec
-import Database
 import Foundation
-import Rocksdb
 import Utils
 
 extension Set<Data32> {
@@ -76,7 +74,6 @@ public enum ChainHandlers {
             } else {
                 try await source.getBestBlockHash()
             }
-            print("blockHash \(blockHash)")
             return try blockHash.encode()
         }
     }
@@ -114,9 +111,13 @@ public enum ChainHandlers {
             self.source = source
         }
 
-        public func handle(request _: Request) async throws -> Response? {
-            // TODO: implement
-            nil
+        public func handle(request: Request) async throws -> Response? {
+            let header = if let hash = request.value {
+                try await source.getHeader(hash: hash)?.value
+            } else {
+                try await source.getBestBlock().header
+            }
+            return try header.map { try JamEncoder.encode($0) }
         }
     }
 }
