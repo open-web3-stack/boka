@@ -98,6 +98,10 @@ extension BlockchainDataProvider {
         try await dataProvider.getBlockHash(byNumber: number)
     }
 
+    public func getFinalizedHead() async throws -> Data32? {
+        try await dataProvider.getFinalizedHead()
+    }
+
     // add forks of finalized head is not allowed
     public func add(block: BlockRef) async throws {
         logger.debug("adding block: \(block.hash)")

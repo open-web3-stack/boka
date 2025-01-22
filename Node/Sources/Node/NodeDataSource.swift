@@ -50,6 +50,10 @@ extension NodeDataSource: ChainDataSource {
     public func getHeader(hash: Data32) async throws -> HeaderRef? {
         try await chainDataProvider.getHeader(hash: hash)
     }
+
+    public func getFinalizedHead() async throws -> Data32? {
+        try await chainDataProvider.getFinalizedHead()
+    }
 }
 
 extension NodeDataSource: TelemetryDataSource {

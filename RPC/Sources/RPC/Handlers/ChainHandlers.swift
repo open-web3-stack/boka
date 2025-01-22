@@ -92,8 +92,7 @@ public enum ChainHandlers {
         }
 
         public func handle(request _: Request) async throws -> Response? {
-            // TODO: implement
-            nil
+            try await source.getFinalizedHead()
         }
     }
 

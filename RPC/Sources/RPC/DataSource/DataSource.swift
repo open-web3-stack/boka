@@ -11,6 +11,7 @@ public protocol ChainDataSource: Sendable {
     func getBlockHash(byTimeslot timeslot: TimeslotIndex) async throws -> Set<Data32>
     func getBestBlockHash() async throws -> Set<Data32>
     func getHeader(hash: Data32) async throws -> HeaderRef?
+    func getFinalizedHead() async throws -> Data32?
 }
 
 public protocol TelemetryDataSource: Sendable {

@@ -21,6 +21,10 @@ extension DummyNodeDataSource: ChainDataSource {
         return try await chainDataProvider.getBlockHash(byTimeslot: timeslot)
     }
 
+    public func getFinalizedHead() async throws -> Data32? {
+        try await chainDataProvider.getFinalizedHead()
+    }
+
     public func getBestBlock() async throws -> BlockRef {
         try await chainDataProvider.getBlock(hash: chainDataProvider.bestHead.hash)
     }
@@ -65,32 +69,36 @@ final class ChainRPCControllerTests {
         try buffer.writeJSONEncodable(req)
         try await app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
+            let resp = try! res.content.decode(JSONResponse.self, using: JSONDecoder())
+            #expect(resp.result!.value != nil)
         }
         try await app.asyncShutdown()
     }
 
     @Test func getBlockHash() async throws {
         try await setUp()
-        let hashHex = await dataProvider.bestHead.hash.toHexString()
-        let params = JSON.array([.string(hashHex)])
-        let req = JSONRequest(jsonrpc: "2.0", method: "chain_getBlockHash", params: params, id: 1)
+        let timeslot = await dataProvider.bestHead.timeslot
+        let params = JSON.array([JSON(integerLiteral: Int32(timeslot))])
+        let req = JSONRequest(jsonrpc: "2.0", method: "chain_getBlockHash", params: params, id: 2)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
         try await app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
+            let resp = try! res.content.decode(JSONResponse.self, using: JSONDecoder())
+            #expect(resp.result!.value != nil)
         }
         try await app.asyncShutdown()
     }
 
     @Test func getFinalizedHead() async throws {
         try await setUp()
-        let hashHex = await dataProvider.bestHead.hash.toHexString()
-        let params = JSON.array([.string(hashHex)])
-        let req = JSONRequest(jsonrpc: "2.0", method: "chain_getFinalziedHead", params: params, id: 1)
+        let req = JSONRequest(jsonrpc: "2.0", method: "chain_getFinalizedHead", params: nil, id: 3)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
         try await app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
+            let resp = try! res.content.decode(JSONResponse.self, using: JSONDecoder())
+            #expect(resp.result!.value != nil)
         }
         try await app.asyncShutdown()
     }
@@ -99,11 +107,13 @@ final class ChainRPCControllerTests {
         try await setUp()
         let hashHex = await dataProvider.bestHead.hash.toHexString()
         let params = JSON.array([.string(hashHex)])
-        let req = JSONRequest(jsonrpc: "2.0", method: "chain_getHeader", params: params, id: 1)
+        let req = JSONRequest(jsonrpc: "2.0", method: "chain_getHeader", params: params, id: 4)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
         try await app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
+            let resp = try! res.content.decode(JSONResponse.self, using: JSONDecoder())
+            #expect(resp.result!.value != nil)
         }
         try await app.asyncShutdown()
     }
