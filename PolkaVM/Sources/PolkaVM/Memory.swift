@@ -188,10 +188,10 @@ public class MemoryChunk {
         }
         let startIndex = Int(address - startAddress) + data.startIndex
 
-        if startIndex >= data.count {
+        if startIndex >= data.endIndex {
             return Data(repeating: 0, count: length)
         } else {
-            let validCount = min(length, data.count - Int(startIndex))
+            let validCount = min(length, data.endIndex - startIndex)
             let dataToRead = data.count > 0 ? data[startIndex ..< startIndex + validCount] : Data()
 
             let zeroCount = max(0, length - validCount)
