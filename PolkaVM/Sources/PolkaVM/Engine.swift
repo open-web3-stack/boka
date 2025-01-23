@@ -13,13 +13,13 @@ public class Engine {
         self.invocationContext = invocationContext
     }
 
-    public func execute(program: ProgramCode, state: VMState) async -> ExitReason {
+    public func execute(state: VMState) async -> ExitReason {
         let context = ExecutionContext(state: state, config: config)
         while true {
             guard state.getGas() > GasInt(0) else {
                 return .outOfGas
             }
-            if case let .exit(reason) = step(program: program, context: context) {
+            if case let .exit(reason) = step(program: state.program, context: context) {
                 switch reason {
                 case let .hostCall(callIndex):
                     if case let .exit(hostExitReason) = await hostCall(state: state, callIndex: callIndex) {

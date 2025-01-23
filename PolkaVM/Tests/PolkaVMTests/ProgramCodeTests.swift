@@ -1,10 +1,15 @@
 import Foundation
 import Testing
+import TracingUtils
 import Utils
 
 @testable import PolkaVM
 
 struct ProgramTests {
+    init() {
+        setupTestLogger()
+    }
+
     @Test func empty() {
         let blob = Data()
         #expect(throws: ProgramCode.Error.invalidJumpTableEntriesCount) { try ProgramCode(blob) }
@@ -47,8 +52,6 @@ struct ProgramTests {
         _ = try ProgramCode(data)
     }
 
-    // TODO: add more Program parsing tests
-
     @Test(arguments: [
         (Data(), 0, 0),
         (Data([0]), 0, 7),
@@ -65,5 +68,21 @@ struct ProgramTests {
     ] as[(Data, UInt32, UInt32)])
     func skip(testCase: (Data, UInt32, UInt32)) {
         #expect(ProgramCode.skip(start: testCase.1, bitmask: testCase.0) == testCase.2)
+    }
+
+    @Test(arguments: [
+        // inst_branch_eq_imm_nok
+        Data([0, 0, 16, 51, 7, 210, 4, 81, 39, 211, 4, 6, 0, 51, 7, 239, 190, 173, 222, 17, 6]),
+        // inst_branch_greater_unsigned_imm_ok
+        Data([0, 0, 14, 51, 7, 246, 86, 23, 10, 5, 0, 51, 7, 239, 190, 173, 222, 137, 1]),
+        // fibonacci general program
+        // swiftformat:disable wrap wrapArguments
+        Data([0, 0, 33, 51, 8, 1, 51, 9, 1, 40, 3, 0, 149, 119, 255, 81, 7, 12, 100, 138, 200, 152, 8, 100, 169, 40, 243, 100, 135, 51, 8, 51, 9, 1, 50, 0, 73, 147, 82, 213, 0])
+    ])
+    func parseProgramCode(testCase: Data) throws {
+        let program = try ProgramCode(testCase)
+        #expect(program.jumpTableEntrySize == 0)
+        #expect(program.jumpTable == Data())
+        #expect(program.code == testCase[3 ..< testCase[2] + 3])
     }
 }
