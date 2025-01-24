@@ -76,8 +76,10 @@ struct ProgramTests {
         // inst_branch_greater_unsigned_imm_ok
         Data([0, 0, 14, 51, 7, 246, 86, 23, 10, 5, 0, 51, 7, 239, 190, 173, 222, 137, 1]),
         // fibonacci general program (from pvm debuger example_)
-        // swiftformat:disable wrap wrapArguments
-        Data([0, 0, 33, 51, 8, 1, 51, 9, 1, 40, 3, 0, 149, 119, 255, 81, 7, 12, 100, 138, 200, 152, 8, 100, 169, 40, 243, 100, 135, 51, 8, 51, 9, 1, 50, 0, 73, 147, 82, 213, 0])
+        Data([
+            0, 0, 33, 51, 8, 1, 51, 9, 1, 40, 3, 0, 149, 119, 255, 81, 7, 12, 100, 138,
+            200, 152, 8, 100, 169, 40, 243, 100, 135, 51, 8, 51, 9, 1, 50, 0, 73, 147, 82, 213, 0,
+        ])
     ])
     func parseProgramCode(testCase: Data) throws {
         let program = try ProgramCode(testCase)
