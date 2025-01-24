@@ -210,7 +210,7 @@ public class MemoryChunk {
         let startIndex = Int(address - startAddress) + data.startIndex
         let endIndex = startIndex + valuesData.count
 
-        try zeroPad(until: startAddress + UInt32(valuesData.count))
+        try zeroPad(until: startAddress + UInt32(endIndex))
 
         data.replaceSubrange(startIndex ..< endIndex, with: valuesData)
     }
