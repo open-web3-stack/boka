@@ -1,6 +1,5 @@
 import Foundation
 import Testing
-import TracingUtils
 import Utils
 
 @testable import PolkaVM
@@ -9,17 +8,17 @@ import Utils
 let empty = Data([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0])
 let fibonacci = Data([
     0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 61, 0, 0, 0, 0, 0, 51, 128, 119, 0,
-    51, 8, 1, 51, 9, 1, 40, 3, 0, 149, 119, 255, 81, 7, 12, 100, 138, 200, 152,
-    8, 100, 169, 40, 243, 100, 135, 51, 8, 51, 9, 61, 7, 0, 0, 2, 0, 51, 8, 4,
-    51, 7, 0, 0, 2, 0, 1, 50, 0, 73, 154, 148, 170, 130, 4, 3,
+    51, 8, 1, 51, 9, 1, 40, 3, 0, 149, 119, 255, 81, 7, 12, 100, 138, 200,
+    152, 8, 100, 169, 40, 243, 100, 135, 51, 8, 51, 9, 61, 7, 0, 0, 2, 0,
+    51, 8, 4, 51, 7, 0, 0, 2, 0, 1, 50, 0, 73, 154, 148, 170, 130, 4, 3,
 ])
-// let sumThree
-
+let sumToN = Data([
+    0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 46, 0, 0, 0, 0, 0, 38, 128, 119, 0,
+    51, 8, 0, 100, 121, 40, 3, 0, 200, 137, 8, 149, 153, 255, 86, 9, 250,
+    61, 8, 0, 0, 2, 0, 51, 8, 4, 51, 7, 0, 0, 2, 0, 1, 50, 0, 73, 77, 18,
+    36, 24,
+])
 struct InvokePVMTests {
-    init() {
-        // setupTestLogger()
-    }
-
     @Test func testEmptyProgram() async throws {
         let config = DefaultPvmConfig()
         let (exitReason, gas, output) = await invokePVM(
@@ -62,7 +61,33 @@ struct InvokePVMTests {
         }
     }
 
-    @Test func testSumThree() async throws {}
+    @Test(arguments: [
+        (1, 1, 999_988),
+        (4, 10, 999_979),
+        (5, 15, 999_976),
+    ])
+    func testSumToN(testCase: (input: UInt8, output: UInt8, gas: UInt64)) async throws {
+        let config = DefaultPvmConfig()
+        let (exitReason, gas, output) = await invokePVM(
+            config: config,
+            blob: sumToN,
+            pc: 0,
+            gas: Gas(1_000_000),
+            argumentData: Data([testCase.input]),
+            ctx: nil
+        )
+
+        let value = output?.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } ?? 0
+
+        switch exitReason {
+        case .halt:
+            #expect(value == testCase.output)
+            #expect(gas == Gas(testCase.gas))
+        default:
+            Issue.record("Expected halt, got \(exitReason)")
+        }
+    }
 
     // TODO: add tests with a fake InvocationContext
+    @Test func testInvocationContext() async throws {}
 }
