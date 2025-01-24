@@ -44,14 +44,14 @@ public class Engine {
             case let .pageFault(address):
                 return .exit(.pageFault(address))
             case let .hostCall(callIndexInner):
-                let pc = state.pc
-                let skip = state.program.skip(pc)
-                state.increasePC(skip + 1)
                 return await hostCall(state: state, callIndex: callIndexInner)
             default:
                 return .exit(reason)
             }
         case .continued:
+            let pc = state.pc
+            let skip = state.program.skip(pc)
+            state.increasePC(skip + 1)
             return .continued
         }
     }

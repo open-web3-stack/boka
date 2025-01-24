@@ -18,6 +18,13 @@ let sumToN = Data([
     61, 8, 0, 0, 2, 0, 51, 8, 4, 51, 7, 0, 0, 2, 0, 1, 50, 0, 73, 77, 18,
     36, 24,
 ])
+let sumToNWithHostCall = Data([
+    0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 48, 0, 0, 0, 0, 0, 40, 128, 119, 0,
+    51, 8, 0, 100, 121, 40, 3, 0, 200, 137, 8, 149, 153, 255, 86, 9, 250,
+    61, 8, 0, 0, 2, 0, 51, 8, 4, 51, 7, 0, 0, 2, 0, 10, 1, 1, 50, 0, 73,
+    77, 18, 36, 104,
+])
+
 struct InvokePVMTests {
     @Test func testEmptyProgram() async throws {
         let config = DefaultPvmConfig()
@@ -88,6 +95,45 @@ struct InvokePVMTests {
         }
     }
 
-    // TODO: add tests with a fake InvocationContext
-    @Test func testInvocationContext() async throws {}
+    @Test func testInvocationContext() async throws {
+        let config = DefaultPvmConfig()
+
+        struct TestInvocationContext: InvocationContext {
+            public typealias ContextType = Void
+
+            public var context: ContextType = ()
+
+            public func dispatch(index _: UInt32, state: VMState) async -> ExecOutcome {
+                // perform output * 2
+                do {
+                    let (ouputAddr, len): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
+                    let output = try state.readMemory(address: ouputAddr, length: Int(len))
+                    let value = output.withUnsafeBytes { $0.load(as: UInt32.self) }
+                    let newOutput = withUnsafeBytes(of: value << 1) { Data($0) }
+                    try state.writeMemory(address: ouputAddr, values: newOutput)
+                    return .continued
+                } catch {
+                    return .exit(.panic(.trap))
+                }
+            }
+        }
+
+        let (exitReason, _, output) = await invokePVM(
+            config: config,
+            blob: sumToNWithHostCall,
+            pc: 0,
+            gas: Gas(1_000_000),
+            argumentData: Data([5]),
+            ctx: TestInvocationContext()
+        )
+
+        let value = output?.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } ?? 0
+
+        switch exitReason {
+        case .halt:
+            #expect(value == 30)
+        default:
+            Issue.record("Expected halt, got \(exitReason)")
+        }
+    }
 }
