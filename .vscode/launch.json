@@ -1,64 +1,64 @@
 {
-    "configurations": [
-        {
-            "type": "lldb",
-            "request": "launch",
-            "sourceLanguages": [
-                "swift"
-            ],
-            "args": [],
-            "cwd": "${workspaceFolder:boka}/Boka",
-            "name": "Debug Boka (Boka)",
-            "program": "${workspaceFolder:boka}/Boka/.build/debug/Boka",
-            "preLaunchTask": "swift: Build Debug Boka (Boka)"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "sourceLanguages": [
-                "swift"
-            ],
-            "args": [],
-            "cwd": "${workspaceFolder:boka}/Boka",
-            "name": "Release Boka (Boka)",
-            "program": "${workspaceFolder:boka}/Boka/.build/release/Boka",
-            "preLaunchTask": "swift: Build Release Boka (Boka)"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "args": [],
-            "cwd": "${workspaceFolder:boka}/Cli",
-            "name": "Debug Cli (Cli)",
-            "program": "${workspaceFolder:boka}/Cli/.build/debug/Cli",
-            "preLaunchTask": "swift: Build Debug Cli (Cli)"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "args": [],
-            "cwd": "${workspaceFolder:boka}/Cli",
-            "name": "Release Cli (Cli)",
-            "program": "${workspaceFolder:boka}/Cli/.build/release/Cli",
-            "preLaunchTask": "swift: Build Release Cli (Cli)"
-        },
-        {
-            "type": "swift-lldb",
-            "request": "launch",
-            "args": [],
-            "cwd": "${workspaceFolder:boka}/PVMShell",
-            "name": "Debug PVMShell (PVMShell)",
-            "program": "${workspaceFolder:boka}/PVMShell/.build/debug/PVMShell",
-            "preLaunchTask": "swift: Build Debug PVMShell (PVMShell)"
-        },
-        {
-            "type": "swift-lldb",
-            "request": "launch",
-            "args": [],
-            "cwd": "${workspaceFolder:boka}/PVMShell",
-            "name": "Release PVMShell (PVMShell)",
-            "program": "${workspaceFolder:boka}/PVMShell/.build/release/PVMShell",
-            "preLaunchTask": "swift: Build Release PVMShell (PVMShell)"
-        }
-    ]
+	"configurations": [
+		{
+			"type": "lldb",
+			"request": "launch",
+			"sourceLanguages": [
+				"swift"
+			],
+			"args": [],
+			"cwd": "${workspaceFolder:boka}/Boka",
+			"name": "Debug Boka (Boka)",
+			"program": "${workspaceFolder:boka}/Boka/.build/debug/Boka",
+			"preLaunchTask": "swift: Build Debug Boka (Boka)"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"sourceLanguages": [
+				"swift"
+			],
+			"args": [],
+			"cwd": "${workspaceFolder:boka}/Boka",
+			"name": "Release Boka (Boka)",
+			"program": "${workspaceFolder:boka}/Boka/.build/release/Boka",
+			"preLaunchTask": "swift: Build Release Boka (Boka)"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:boka}/Cli",
+			"name": "Debug Cli (Cli)",
+			"program": "${workspaceFolder:boka}/Cli/.build/debug/Cli",
+			"preLaunchTask": "swift: Build Debug Cli (Cli)"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:boka}/Cli",
+			"name": "Release Cli (Cli)",
+			"program": "${workspaceFolder:boka}/Cli/.build/release/Cli",
+			"preLaunchTask": "swift: Build Release Cli (Cli)"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:boka}/Tools",
+			"name": "Debug Tools (Tools)",
+			"program": "${workspaceFolder:boka}/Tools/.build/debug/Tools",
+			"preLaunchTask": "swift: Build Debug Tools (Tools)"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:boka}/Tools",
+			"name": "Release Tools (Tools)",
+			"program": "${workspaceFolder:boka}/Tools/.build/release/Tools",
+			"preLaunchTask": "swift: Build Release Tools (Tools)"
+		}
+	]
 }

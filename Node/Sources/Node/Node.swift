@@ -1,47 +1,69 @@
 import Blockchain
+import Database
+import Foundation
+import Networking
 import RPC
 import TracingUtils
 import Utils
 
-let logger = Logger(label: "node")
-
-public typealias RPCConfig = Server.Config
+private let logger = Logger(label: "node")
 
 public class Node {
-    public class Config {
-        public let rpc: Server.Config
+    public let config: Config
+    public let blockchain: Blockchain
+    public let rpcServer: Server?
+    public let scheduler: Scheduler
+    public let dataProvider: BlockchainDataProvider
+    public let keystore: KeyStore
+    public let network: NetworkManager
 
-        public init(rpc: Server.Config) {
-            self.rpc = rpc
+    public required init(
+        config: Config,
+        genesis: Genesis,
+        eventBus: EventBus,
+        keystore: KeyStore,
+        scheduler: Scheduler = DispatchQueueScheduler(timeProvider: SystemTimeProvider())
+    ) async throws {
+        self.config = config
+
+        let chainspec = try await genesis.load()
+        let protocolConfig = try chainspec.getConfig()
+
+        dataProvider = try await config.database.open(chainspec: chainspec)
+
+        logger.info("Genesis: \(dataProvider.genesisBlockHash)")
+
+        self.scheduler = scheduler
+        let blockchain = try await Blockchain(
+            config: protocolConfig,
+            dataProvider: dataProvider,
+            timeProvider: scheduler.timeProvider,
+            eventBus: eventBus
+        )
+        self.blockchain = blockchain
+
+        self.keystore = keystore
+
+        network = try await NetworkManager(
+            config: config.network,
+            blockchain: blockchain,
+            eventBus: eventBus,
+            devPeers: Set(config.peers)
+        )
+
+        let nodeDataSource = NodeDataSource(
+            blockchain: blockchain,
+            chainDataProvider: dataProvider,
+            networkManager: network,
+            name: config.name
+        )
+
+        rpcServer = try config.rpc.map {
+            try Server(config: $0, source: nodeDataSource)
         }
     }
 
-    public let blockchain: Blockchain
-    public let rpcServer: Server
-    public let timeProvider: TimeProvider
-    public let dataProvider: BlockchainDataProvider
-
-    public init(
-        config: Config,
-        genesis: Genesis,
-        eventBus: EventBus
-    ) async throws {
-        logger.debug("Initializing node")
-
-        let (genesisState, protocolConfig) = try await genesis.load()
-        dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesis: genesisState))
-        timeProvider = SystemTimeProvider()
-        blockchain = try await Blockchain(
-            config: protocolConfig,
-            dataProvider: dataProvider,
-            timeProvider: timeProvider,
-            eventBus: eventBus
-        )
-
-        rpcServer = try Server(config: config.rpc, source: blockchain)
-    }
-
     public func wait() async throws {
-        try await rpcServer.wait()
+        try await rpcServer?.wait()
     }
 }

@@ -1,6 +1,6 @@
 import Utils
 
-public enum DisputeError: Error {
+public enum DisputesError: Error {
     case invalidEpoch
     case invalidValidatorIndex
     case invalidJudgementSignature
@@ -11,6 +11,8 @@ public enum DisputeError: Error {
     case expectInFaults
     case expectInCulprits
     case invalidPublicKey
+    case invalidFaults
+    case invalidCulprit
 }
 
 public struct ReportItem: Sendable, Equatable, Codable {
@@ -30,7 +32,7 @@ extension ReportItem: Validate {
     public typealias Config = ProtocolConfigRef
 }
 
-public struct DisputePostState: Sendable, Equatable {
+public struct DisputesPostState: Sendable, Equatable {
     public var judgements: JudgementsState
     public var reports: ConfigFixedSizeArray<
         ReportItem?,
@@ -63,17 +65,17 @@ public protocol Disputes {
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
     > { get }
 
-    func update(config: ProtocolConfigRef, disputes: ExtrinsicDisputes) throws(DisputeError) -> (
-        state: DisputePostState,
+    func update(config: ProtocolConfigRef, disputes: ExtrinsicDisputes) throws(DisputesError) -> (
+        state: DisputesPostState,
         offenders: [Ed25519PublicKey]
     )
 
-    mutating func mergeWith(postState: DisputePostState)
+    mutating func mergeWith(postState: DisputesPostState)
 }
 
 extension Disputes {
-    public func update(config: ProtocolConfigRef, disputes: ExtrinsicDisputes) throws(DisputeError) -> (
-        state: DisputePostState,
+    public func update(config: ProtocolConfigRef, disputes: ExtrinsicDisputes) throws(DisputesError) -> (
+        state: DisputesPostState,
         offenders: [Ed25519PublicKey]
     ) {
         var newJudgements = judgements
@@ -101,7 +103,7 @@ extension Disputes {
                 let prefix = judgement.isValid ? SigningContext.valid : SigningContext.invalid
                 let payload = prefix + verdict.reportHash.data
                 let pubkey = try Result { try Ed25519.PublicKey(from: signer) }
-                    .mapError { _ in DisputeError.invalidPublicKey }
+                    .mapError { _ in DisputesError.invalidPublicKey }
                     .get()
                 guard pubkey.verify(signature: judgement.signature, message: payload) else {
                     throw .invalidJudgementSignature
@@ -151,28 +153,50 @@ extension Disputes {
         let two_third_plus_one_validators = config.value.totalNumberOfValidators * 2 / 3 + 1
         for (hash, vote) in votes {
             if vote == 0 {
-                // any verdict containing solely valid judgements
-                // implies the same report having at least one valid entry in the faults sequence f
-                guard disputes.faults.contains(where: { $0.reportHash == hash }) else {
-                    throw .expectInFaults
+                // Any verdict containing solely invalid judgements
+                // implies the same report having at least two valid entries in the culprits sequence c
+                let culprits = disputes.culprits.filter { $0.reportHash == hash }
+                guard culprits.count >= 2 else {
+                    throw .expectInCulprits
                 }
 
                 tobeRemoved.insert(hash)
                 newJudgements.banSet.insert(hash)
+
+                let faults = disputes.faults.filter { $0.reportHash == hash }
+                for fault in faults {
+                    // check faults are indeed invalid
+                    guard fault.vote else {
+                        throw .invalidFaults
+                    }
+                }
             } else if vote == third_validators {
                 // wonky
                 tobeRemoved.insert(hash)
                 newJudgements.wonkySet.insert(hash)
             } else if vote == two_third_plus_one_validators {
-                // Any verdict containing solely invalid judgements
-                // implies the same report having at least two valid entries in the culprits sequence c
-                guard disputes.culprits.count(where: { $0.reportHash == hash }) >= 2 else {
-                    throw .expectInCulprits
+                // any verdict containing solely valid judgements
+                // implies the same report having at least one valid entry in the faults sequence f
+                let faults = disputes.faults.filter { $0.reportHash == hash }
+                guard faults.count >= 1 else {
+                    throw .expectInFaults
+                }
+                for fault in faults {
+                    // check faults are indeed invalid
+                    guard !fault.vote else {
+                        throw .invalidFaults
+                    }
                 }
 
                 newJudgements.goodSet.insert(hash)
             } else {
                 throw .invalidJudgementsCount
+            }
+        }
+
+        for culprit in disputes.culprits {
+            guard newJudgements.banSet.contains(culprit.reportHash) else {
+                throw .invalidCulprit
             }
         }
 
@@ -185,9 +209,12 @@ extension Disputes {
             }
         }
 
-        return (state: DisputePostState(
-            judgements: newJudgements,
-            reports: newReports
-        ), offenders: offenders)
+        return (
+            state: DisputesPostState(
+                judgements: newJudgements,
+                reports: newReports
+            ),
+            offenders: offenders
+        )
     }
 }

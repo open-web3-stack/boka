@@ -3,6 +3,20 @@ import Codec
 public enum Either<Left, Right> {
     case left(Left)
     case right(Right)
+
+    public var left: Left? {
+        if case let .left(left) = self {
+            return left
+        }
+        return nil
+    }
+
+    public var right: Right? {
+        if case let .right(right) = self {
+            return right
+        }
+        return nil
+    }
 }
 
 extension Either: Equatable where Left: Equatable, Right: Equatable {}
@@ -31,10 +45,10 @@ extension Either: Codable where Left: Codable, Right: Codable {
             var container = encoder.unkeyedContainer()
             switch self {
             case let .left(a):
-                try container.encode(0)
+                try container.encode(UInt8(0))
                 try container.encode(a)
             case let .right(b):
-                try container.encode(1)
+                try container.encode(UInt8(1))
                 try container.encode(b)
             }
         } else {
@@ -104,3 +118,5 @@ extension Either: EncodedSize where Left: EncodedSize, Right: EncodedSize {
         return nil
     }
 }
+
+extension Either: Hashable where Left: Hashable, Right: Hashable {}

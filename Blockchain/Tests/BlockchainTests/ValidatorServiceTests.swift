@@ -6,49 +6,37 @@ import Utils
 @testable import Blockchain
 
 struct ValidatorServiceTests {
-    let config: ProtocolConfigRef
-    let timeProvider: MockTimeProvider
-    let dataProvider: BlockchainDataProvider
-    let eventBus: EventBus
-    let scheduler: MockScheduler
-    let keystore: KeyStore
-    let validatorService: ValidatorService
-    let storeMiddleware: StoreMiddleware
-
-    init() async throws {
+    func setup(
+        config: ProtocolConfigRef = .dev,
+        time: TimeInterval = 988,
+        keysCount: Int = 12
+    ) async throws -> (BlockchainServices, ValidatorService) {
         // setupTestLogger()
 
-        config = ProtocolConfigRef.dev
-        timeProvider = MockTimeProvider(time: 988)
-
-        dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesis: StateRef(State.devGenesis(config: config))))
-
-        storeMiddleware = StoreMiddleware()
-        eventBus = EventBus(eventMiddleware: Middleware(storeMiddleware))
-
-        scheduler = MockScheduler(timeProvider: timeProvider)
-
-        keystore = try await DevKeyStore(devKeysCount: config.value.totalNumberOfValidators)
-
-        let blockchain = try await Blockchain(
+        let services = await BlockchainServices(
             config: config,
-            dataProvider: dataProvider,
-            timeProvider: timeProvider,
-            eventBus: eventBus
+            timeProvider: MockTimeProvider(time: time),
+            keysCount: keysCount
         )
-
-        validatorService = await ValidatorService(
-            blockchain: blockchain,
-            keystore: keystore,
-            eventBus: eventBus,
-            scheduler: scheduler,
-            dataProvider: dataProvider
+        let validatorService = await ValidatorService(
+            blockchain: services.blockchain,
+            keystore: services.keystore,
+            eventBus: services.eventBus,
+            scheduler: services.scheduler,
+            dataProvider: services.dataProvider,
+            dataStore: services.dataStore
         )
+        await validatorService.onSyncCompleted()
+        return (services, validatorService)
     }
 
     @Test
     func onGenesis() async throws {
-        let genesisState = try await dataProvider.getState(hash: Data32())
+        let (services, validatorService) = try await setup()
+        let genesisState = services.genesisState
+        let storeMiddleware = services.storeMiddleware
+        let config = services.config
+        let scheduler = services.scheduler
 
         await validatorService.on(genesis: genesisState)
 
@@ -59,12 +47,19 @@ struct ValidatorServiceTests {
         #expect(safroleEvents.count == config.value.totalNumberOfValidators)
 
         // Check if block author tasks were scheduled
-        #expect(scheduler.storage.value.tasks.count > 0)
+        #expect(scheduler.taskCount > 0)
     }
 
     @Test
     func produceBlocks() async throws {
-        let genesisState = try await dataProvider.getState(hash: Data32())
+        let (services, validatorService) = try await setup()
+        let genesisState = services.genesisState
+        let storeMiddleware = services.storeMiddleware
+        let config = services.config
+        let scheduler = services.scheduler
+        let timeProvider = services.timeProvider
+        let keystore = services.keystore
+        let dataProvider = services.dataProvider
 
         await validatorService.on(genesis: genesisState)
 
@@ -92,7 +87,7 @@ struct ValidatorServiceTests {
         #expect(await keystore.contains(publicKey: publicKey))
 
         // Check the blockchain head is updated
-        #expect(dataProvider.bestHead == block.hash)
+        #expect(await dataProvider.bestHead.hash == block.hash)
 
         // Check block is stored in database
         #expect(try await dataProvider.hasBlock(hash: block.hash))
@@ -101,18 +96,58 @@ struct ValidatorServiceTests {
         #expect(try await dataProvider.getHeads().contains(block.hash))
     }
 
-    @Test
-    func makeManyBlocks() async throws {
-        let genesisState = try await dataProvider.getState(hash: Data32())
+    // try different genesis time offset to ensure edge cases are covered
+    @Test(arguments: [988, 1000, 1003, 1021])
+    func makeManyBlocksWithAllKeys(time: Int) async throws {
+        let (services, validatorService) = try await setup(time: TimeInterval(time))
+        let genesisState = services.genesisState
+        let storeMiddleware = services.storeMiddleware
+        let config = services.config
+        let scheduler = services.scheduler
 
         await validatorService.on(genesis: genesisState)
 
-        await scheduler.advance(by: TimeInterval(config.value.slotPeriodSeconds) * 20)
+        await storeMiddleware.wait()
+
+        for _ in 0 ..< 25 {
+            await scheduler.advance(by: TimeInterval(config.value.slotPeriodSeconds))
+            await storeMiddleware.wait() // let events to be processed
+        }
 
         let events = await storeMiddleware.wait()
 
         let blockAuthoredEvents = events.filter { $0 is RuntimeEvents.BlockAuthored }
 
-        #expect(blockAuthoredEvents.count == 20)
+        #expect(blockAuthoredEvents.count == 25)
+    }
+
+    @Test
+    func makeManyBlocksWithSingleKey() async throws {
+        let (services, validatorService) = try await setup(
+            config: .minimal,
+            keysCount: 0
+        )
+        let genesisState = services.genesisState
+        let storeMiddleware = services.storeMiddleware
+        let config = services.config
+        let scheduler = services.scheduler
+        let keystore = services.keystore
+
+        try await keystore.addDevKeys(seed: 0)
+
+        await validatorService.on(genesis: genesisState)
+
+        await storeMiddleware.wait()
+
+        for _ in 0 ..< 50 {
+            await scheduler.advance(by: TimeInterval(config.value.slotPeriodSeconds))
+            await storeMiddleware.wait() // let events to be processed
+        }
+
+        let events = await storeMiddleware.wait()
+
+        let blockAuthoredEvents = events.filter { $0 is RuntimeEvents.BlockAuthored }
+
+        #expect(blockAuthoredEvents.count > 0)
     }
 }

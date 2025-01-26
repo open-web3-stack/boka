@@ -10,14 +10,16 @@ public enum GuaranteeingError: Error {
     case outOfGas
     case invalidContext
     case duplicatedWorkPackage
-    case prerequistieNotFound
+    case prerequisiteNotFound
     case invalidResultCodeHash
+    case invalidServiceGas
     case invalidPublicKey
+    case invalidSegmentLookup
+    case futureReportSlot
 }
 
 public protocol Guaranteeing {
     var entropyPool: EntropyPool { get }
-    var timeslot: TimeslotIndex { get }
     var currentValidators: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
     > { get }
@@ -36,9 +38,18 @@ public protocol Guaranteeing {
         >,
         ProtocolConfig.TotalNumberOfCores
     > { get }
-    var serviceAccounts: [ServiceIndex: ServiceAccount] { get }
     var recentHistory: RecentHistory { get }
     var offenders: Set<Ed25519PublicKey> { get }
+    var accumulationQueue: ConfigFixedSizeArray<
+        [AccumulationQueueItem],
+        ProtocolConfig.EpochLength
+    > { get }
+    var accumulationHistory: ConfigFixedSizeArray<
+        Set<Data32>,
+        ProtocolConfig.EpochLength
+    > { get }
+
+    func serviceAccount(index: ServiceIndex) -> ServiceAccountDetails?
 }
 
 extension Guaranteeing {
@@ -56,7 +67,7 @@ extension Guaranteeing {
         source.map { CoreIndex(($0 + n) % max) }
     }
 
-    private func getCoreAssignment(config: ProtocolConfigRef, randomness: Data32, timeslot: TimeslotIndex) -> [CoreIndex] {
+    public func getCoreAssignment(config: ProtocolConfigRef, randomness: Data32, timeslot: TimeslotIndex) -> [CoreIndex] {
         var source = Array(repeating: UInt32(0), count: config.value.totalNumberOfValidators)
         for i in 0 ..< config.value.totalNumberOfValidators {
             source[i] = UInt32(config.value.totalNumberOfCores * i / config.value.totalNumberOfValidators)
@@ -68,13 +79,24 @@ extension Guaranteeing {
         return toCoreAssignment(source, n: n, max: UInt32(config.value.totalNumberOfCores))
     }
 
+    public func requiredStorageKeys(extrinsic: ExtrinsicGuarantees) -> [any StateKey] {
+        extrinsic.guarantees
+            .flatMap(\.workReport.results)
+            .map { StateKeys.ServiceAccountKey(index: $0.serviceIndex) }
+    }
+
     public func update(
         config: ProtocolConfigRef,
+        timeslot: TimeslotIndex,
         extrinsic: ExtrinsicGuarantees
-    ) throws(GuaranteeingError) -> ConfigFixedSizeArray<
-        ReportItem?,
-        ProtocolConfig.TotalNumberOfCores
-    > {
+    ) throws(GuaranteeingError) -> (
+        newReports: ConfigFixedSizeArray<
+            ReportItem?,
+            ProtocolConfig.TotalNumberOfCores
+        >,
+        reported: [WorkReport],
+        reporters: [Ed25519PublicKey]
+    ) {
         let coreAssignmentRotationPeriod = UInt32(config.value.coreAssignmentRotationPeriod)
 
         let currentCoreAssignment = getCoreAssignment(config: config, randomness: entropyPool.t2, timeslot: timeslot)
@@ -91,19 +113,28 @@ extension Guaranteeing {
         )
         let pareviousCoreKeys = withoutOffenders(keys: previousValidators.map(\.ed25519))
 
-        var workReportHashes = Set<Data32>()
+        var workPackageHashes = Set<Data32>()
 
-        var totalMinGasRequirement = Gas(0)
+        var oldLookups = [Data32: Data32]()
+
+        var reporters = [Ed25519PublicKey]()
 
         for guarantee in extrinsic.guarantees {
+            var totalGasUsage = Gas(0)
             let report = guarantee.workReport
+
+            guard guarantee.timeslot <= timeslot else {
+                throw .futureReportSlot
+            }
+
+            oldLookups[report.packageSpecification.workPackageHash] = report.packageSpecification.segmentRoot
 
             for credential in guarantee.credential {
                 let isCurrent = (guarantee.timeslot / coreAssignmentRotationPeriod) == (timeslot / coreAssignmentRotationPeriod)
                 let keys = isCurrent ? currentCoreKeys : pareviousCoreKeys
                 let key = keys[Int(credential.index)]
                 let reportHash = report.hash()
-                workReportHashes.insert(reportHash)
+                workPackageHashes.insert(report.packageSpecification.workPackageHash)
                 let payload = SigningContext.guarantee + reportHash.data
                 let pubkey = try Result { try Ed25519.PublicKey(from: key) }
                     .mapError { _ in GuaranteeingError.invalidPublicKey }
@@ -116,6 +147,8 @@ extension Guaranteeing {
                 guard coreAssignment[Int(credential.index)] == report.coreIndex else { // TODO: it should accepts the last core index?
                     throw .invalidGuaranteeCore
                 }
+
+                reporters.append(key)
             }
 
             let coreIndex = Int(report.coreIndex)
@@ -131,7 +164,7 @@ extension Guaranteeing {
             }
 
             for result in report.results {
-                guard let acc = serviceAccounts[result.serviceIndex] else {
+                guard let acc = serviceAccount(index: result.serviceIndex) else {
                     throw .invalidServiceIndex
                 }
 
@@ -139,22 +172,36 @@ extension Guaranteeing {
                     throw .invalidResultCodeHash
                 }
 
-                totalMinGasRequirement += acc.minAccumlateGas
+                guard result.gasRatio >= acc.minAccumlateGas else {
+                    throw .invalidServiceGas
+                }
+
+                totalGasUsage += result.gasRatio
+            }
+
+            guard totalGasUsage <= config.value.workReportAccumulationGas else {
+                throw .outOfGas
             }
         }
 
-        guard totalMinGasRequirement <= config.value.coreAccumulationGas else {
-            throw .outOfGas
-        }
-
-        let allRecentWorkReportHashes = Set(recentHistory.items.flatMap(\.workReportHashes.array))
-        guard allRecentWorkReportHashes.isDisjoint(with: workReportHashes) else {
+        let recentWorkPackageHashes: Set<Data32> = Set(recentHistory.items.flatMap(\.lookup.keys))
+        let accumulateHistoryReports = Set(accumulationHistory.array.flatMap(\.self))
+        let accumulateQueueReports = Set(accumulationQueue.array.flatMap(\.self)
+            .flatMap(\.workReport.refinementContext.prerequisiteWorkPackages))
+        let pendingWorkReportHashes = Set(reports.array.flatMap { $0?.workReport.refinementContext.prerequisiteWorkPackages ?? [] })
+        let pipelinedWorkReportHashes = recentWorkPackageHashes.union(accumulateHistoryReports).union(accumulateQueueReports)
+            .union(pendingWorkReportHashes)
+        guard pipelinedWorkReportHashes.isDisjoint(with: workPackageHashes) else {
             throw .duplicatedWorkPackage
         }
 
-        let contexts = Set(extrinsic.guarantees.map(\.workReport.refinementContext))
+        for item in recentHistory.items {
+            oldLookups.merge(item.lookup, uniquingKeysWith: { _, new in new })
+        }
 
-        for context in contexts {
+        for guarantee in extrinsic.guarantees {
+            let report = guarantee.workReport
+            let context = report.refinementContext
             let history = recentHistory.items.first { $0.headerHash == context.anchor.headerHash }
             guard let history else {
                 throw .invalidContext
@@ -162,23 +209,30 @@ extension Guaranteeing {
             guard context.anchor.stateRoot == history.stateRoot else {
                 throw .invalidContext
             }
-            guard context.anchor.beefyRoot == history.mmr.hash() else {
+            guard context.anchor.beefyRoot == history.mmr.superPeak() else {
                 throw .invalidContext
             }
-            guard context.lokupAnchor.timeslot >= timeslot - UInt32(config.value.maxLookupAnchorAge) else {
+            guard context.lookupAnchor.timeslot >= Int64(timeslot) - Int64(config.value.maxLookupAnchorAge) else {
                 throw .invalidContext
             }
 
-            if let prerequistieWorkPackage = context.prerequistieWorkPackage {
-                guard allRecentWorkReportHashes.contains(prerequistieWorkPackage) ||
-                    workReportHashes.contains(prerequistieWorkPackage)
+            for prerequisiteWorkPackage in context.prerequisiteWorkPackages.union(report.lookup.keys) {
+                guard recentWorkPackageHashes.contains(prerequisiteWorkPackage) ||
+                    workPackageHashes.contains(prerequisiteWorkPackage)
                 else {
-                    throw .prerequistieNotFound
+                    throw .prerequisiteNotFound
+                }
+            }
+
+            for (hash, root) in report.lookup {
+                guard oldLookups[hash] == root else {
+                    throw .invalidSegmentLookup
                 }
             }
         }
 
         var newReports = reports
+        var reported = [WorkReport]()
 
         for guarantee in extrinsic.guarantees {
             let report = guarantee.workReport
@@ -187,8 +241,12 @@ extension Guaranteeing {
                 workReport: report,
                 timeslot: timeslot
             )
+            reported.append(report)
         }
 
-        return newReports
+        reported.sort { $0.packageSpecification.workPackageHash < $1.packageSpecification.workPackageHash }
+        reporters.sort()
+
+        return (newReports, reported, reporters)
     }
 }

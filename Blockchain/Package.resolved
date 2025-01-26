@@ -1,5 +1,5 @@
 {
-  "originHash" : "64fa76cb48bfb721e9426cf0d246c06245d80b6c98b16ca1a7c9ba00acfabb1b",
+  "originHash" : "72d6aa1fce2803c836be5d4b1c239fb67e531e7ed4619f96c34745064c756ba8",
   "pins" : [
     {
       "identity" : "blake2.swift",
@@ -11,12 +11,12 @@
       }
     },
     {
-      "identity" : "swift-atomics",
+      "identity" : "lrucache",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-atomics.git",
+      "location" : "https://github.com/nicklockwood/LRUCache.git",
       "state" : {
-        "revision" : "cd142fd2f64be2100422d658e7411e39489da985",
-        "version" : "1.2.0"
+        "revision" : "542f0449556327415409ededc9c43a4bd0a397dc",
+        "version" : "1.0.7"
       }
     },
     {

@@ -102,11 +102,11 @@ struct CodecTests {
         if value is RefinementContext {
             return [
                 "anchor": json["anchor"]!["headerHash"]!,
-                "beefy_root": json["anchor"]!["beefyRoot"]!,
-                "lookup_anchor": json["lokupAnchor"]!["headerHash"]!,
-                "lookup_anchor_slot": json["lokupAnchor"]!["timeslot"]!,
-                "prerequisite": json["prerequistieWorkPackage"] ?? .null,
                 "state_root": json["anchor"]!["stateRoot"]!,
+                "beefy_root": json["anchor"]!["beefyRoot"]!,
+                "lookup_anchor": json["lookupAnchor"]!["headerHash"]!,
+                "lookup_anchor_slot": json["lookupAnchor"]!["timeslot"]!,
+                "prerequisites": json["prerequisiteWorkPackages"] ?? .null,
             ].json
         }
         if value is ExtrinsicTickets {
@@ -120,9 +120,9 @@ struct CodecTests {
         if value is WorkResult {
             return [
                 "code_hash": json["codeHash"]!,
-                "gas_ratio": json["gasRatio"]!,
+                "accumulate_gas": json["gasRatio"]!,
                 "payload_hash": json["payloadHash"]!,
-                "service": json["serviceIndex"]!,
+                "service_id": json["serviceIndex"]!,
                 "result": json["output"]!["success"] == nil ? json["output"]! : [
                     "ok": json["output"]!["success"]!,
                 ].json,
@@ -133,7 +133,8 @@ struct CodecTests {
                 "service": json["serviceIndex"]!,
                 "code_hash": json["codeHash"]!,
                 "payload": json["payloadBlob"]!,
-                "gas_limit": json["gasLimit"]!,
+                "refine_gas_limit": json["refineGasLimit"]!,
+                "accumulate_gas_limit": json["accumulateGasLimit"]!,
                 "import_segments": json["inputs"]!.array!.map { item in
                     [
                         "tree_root": item["root"]!,
@@ -169,14 +170,16 @@ struct CodecTests {
                 "authorizer_hash": json["authorizerHash"]!,
                 "auth_output": json["authorizationOutput"]!,
                 "results": transform(json["results"]!, value: value.results),
+                "segment_root_lookup": transform(json["lookup"]!, value: value.lookup),
             ].json
         }
         if value is AvailabilitySpecifications {
             return [
                 "hash": json["workPackageHash"]!,
-                "len": json["length"]!,
+                "length": json["length"]!,
                 "erasure_root": json["erasureRoot"]!,
                 "exports_root": json["segmentRoot"]!,
+                "exports_count": json["segmentCount"]!,
             ].json
         }
         if let value = value as? ExtrinsicGuarantees {
@@ -196,10 +199,10 @@ struct CodecTests {
         if let value = value as? Extrinsic {
             return [
                 "tickets": transform(json["tickets"]!, value: value.tickets),
-                "disputes": transform(json["judgements"]!, value: value.judgements),
                 "preimages": transform(json["preimages"]!, value: value.preimages),
-                "assurances": transform(json["availability"]!, value: value.availability),
                 "guarantees": transform(json["reports"]!, value: value.reports),
+                "assurances": transform(json["availability"]!, value: value.availability),
+                "disputes": transform(json["disputes"]!, value: value.disputes),
             ].json
         }
         if let value = value as? Header {
@@ -208,12 +211,19 @@ struct CodecTests {
                 "parent_state_root": json["priorStateRoot"]!,
                 "extrinsic_hash": json["extrinsicsHash"]!,
                 "slot": json["timeslot"]!,
-                "epoch_mark": json["epoch"] ?? .null,
+                "epoch_mark": transform(json["epoch"] ?? .null, value: value.epoch as Any),
                 "tickets_mark": transform(json["winningTickets"] ?? .null, value: value.winningTickets as Any),
                 "offenders_mark": transform(json["offendersMarkers"]!, value: value.offendersMarkers),
                 "author_index": json["authorIndex"]!,
                 "entropy_source": json["vrfSignature"]!,
                 "seal": json["seal"]!,
+            ].json
+        }
+        if value is EpochMarker {
+            return [
+                "entropy": json["entropy"]!,
+                "tickets_entropy": json["ticketsEntropy"]!,
+                "validators": json["validators"]!,
             ].json
         }
 

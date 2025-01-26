@@ -1,0 +1,6 @@
+[workspace]
+members = [
+	"Utils/Sources/bandersnatch",
+	"Utils/Sources/bls",
+	"Utils/Sources/erasure-coding",
+]

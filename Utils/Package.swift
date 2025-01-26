@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "Utils",
     platforms: [
-        .macOS(.v14),
+        .macOS(.v15),
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
@@ -21,7 +21,6 @@ let package = Package(
         .package(url: "https://github.com/tesseract-one/Blake2.swift.git", from: "0.2.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0" ..< "4.0.0"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
-        .package(url: "https://github.com/apple/swift-atomics.git", from: "1.2.0"),
         .package(url: "https://github.com/apple/swift-numerics.git", branch: "main"),
     ],
     targets: [
@@ -34,9 +33,8 @@ let package = Package(
                 "TracingUtils",
                 .product(name: "Blake2", package: "Blake2.swift"),
                 .product(name: "Crypto", package: "swift-crypto"),
-                .product(name: "Atomics", package: "swift-atomics"),
                 .product(name: "Numerics", package: "swift-numerics"),
-                "blst",
+                "bls",
                 "bandersnatch_vrfs",
                 "erasure_coding",
                 "SHA3IUF",
@@ -55,7 +53,7 @@ let package = Package(
             publicHeadersPath: "."
         ),
         .systemLibrary(
-            name: "blst",
+            name: "bls",
             path: "Sources"
         ),
         .systemLibrary(

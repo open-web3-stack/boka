@@ -11,11 +11,11 @@ public class JamEncoder {
         encoder = EncodeContext(Data(capacity: capacity))
     }
 
-    public func encode(_ value: some Encodable) throws {
+    public func encode(_ value: any Encodable) throws {
         try encoder.encode(value)
     }
 
-    public static func encode(_ value: some Encodable) throws -> Data {
+    public static func encode(_ value: any Encodable) throws -> Data {
         let encoder = if let value = value as? EncodedSize {
             JamEncoder(capacity: value.encodedSize)
         } else {
@@ -25,8 +25,26 @@ public class JamEncoder {
         return encoder.data
     }
 
+    public static func encode(_ values: any Encodable...) throws -> Data {
+        let encoder = JamEncoder()
+        for value in values {
+            try encoder.encode(value)
+        }
+        return encoder.data
+    }
+
     public var data: Data {
         encoder.data
+    }
+}
+
+private protocol OptionalWrapper: Encodable {
+    var wrapped: Encodable? { get }
+}
+
+extension Optional: OptionalWrapper where Wrapped: Encodable {
+    var wrapped: Encodable? {
+        self
     }
 }
 
@@ -85,8 +103,20 @@ private class EncodeContext: Encoder {
         }
     }
 
+    fileprivate func encodeOptional(_ value: OptionalWrapper) throws {
+        if let value = value.wrapped {
+            data.append(UInt8(1)) // Encode presence flag
+            try encode(value) // Encode the unwrapped value
+        } else {
+            data.append(UInt8(0)) // Encode absence flag
+        }
+    }
+
     fileprivate func encode(_ value: some Encodable) throws {
-        if let value = value as? Data {
+        // optional hanlding must be first to avoid type coercion
+        if let value = value as? OptionalWrapper {
+            try encodeOptional(value)
+        } else if let value = value as? Data {
             encodeData(value, lengthPrefix: true)
         } else if let value = value as? [UInt8] {
             encodeData(value)
@@ -487,6 +517,20 @@ private struct JamSingleValueEncodingContainer: SingleValueEncodingContainer {
 
     mutating func encode(_ value: UInt64) throws {
         encoder.encodeInt(value)
+    }
+
+    mutating func encode(_: Double) throws {
+        throw EncodingError.invalidValue(
+            Double.self,
+            EncodingError.Context(codingPath: codingPath, debugDescription: "Double is not supported")
+        )
+    }
+
+    mutating func encode(_: Float) throws {
+        throw EncodingError.invalidValue(
+            Float.self,
+            EncodingError.Context(codingPath: codingPath, debugDescription: "Float is not supported")
+        )
     }
 
     mutating func encode(_ value: some Encodable) throws {

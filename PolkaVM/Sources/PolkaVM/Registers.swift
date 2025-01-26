@@ -24,33 +24,23 @@ public struct Registers: Equatable {
         }
     }
 
-    public var reg1: UInt32 = 0
-    public var reg2: UInt32 = 0
-    public var reg3: UInt32 = 0
-    public var reg4: UInt32 = 0
-    public var reg5: UInt32 = 0
-    public var reg6: UInt32 = 0
-    public var reg7: UInt32 = 0
-    public var reg8: UInt32 = 0
-    public var reg9: UInt32 = 0
-    public var reg10: UInt32 = 0
-    public var reg11: UInt32 = 0
-    public var reg12: UInt32 = 0
-    public var reg13: UInt32 = 0
+    public var reg1: UInt64 = 0
+    public var reg2: UInt64 = 0
+    public var reg3: UInt64 = 0
+    public var reg4: UInt64 = 0
+    public var reg5: UInt64 = 0
+    public var reg6: UInt64 = 0
+    public var reg7: UInt64 = 0
+    public var reg8: UInt64 = 0
+    public var reg9: UInt64 = 0
+    public var reg10: UInt64 = 0
+    public var reg11: UInt64 = 0
+    public var reg12: UInt64 = 0
+    public var reg13: UInt64 = 0
 
     public init() {}
 
-    public init(data: Data) throws {
-        guard data.count == 13 * MemoryLayout<UInt32>.size else {
-            throw Error.invalidInitDataLength
-        }
-        let values = data.withUnsafeBytes {
-            Array($0.bindMemory(to: UInt32.self))
-        }
-        self.init(values)
-    }
-
-    public init(_ values: [UInt32]) {
+    public init(_ values: [UInt64]) {
         assert(values.count == 13)
         reg1 = values[0]
         reg2 = values[1]
@@ -69,13 +59,13 @@ public struct Registers: Equatable {
 
     /// standard program init registers
     public init(config: DefaultPvmConfig, argumentData: Data?) {
-        reg1 = UInt32(config.pvmProgramInitRegister1Value)
-        reg2 = UInt32(config.pvmProgramInitStackBaseAddress)
-        reg10 = UInt32(config.pvmProgramInitInputStartAddress)
-        reg11 = UInt32(argumentData?.count ?? 0)
+        self[Index(raw: 0)] = UInt64(config.pvmProgramInitRegister1Value)
+        self[Index(raw: 1)] = UInt64(config.pvmProgramInitStackBaseAddress)
+        self[Index(raw: 7)] = UInt64(config.pvmProgramInitInputStartAddress)
+        self[Index(raw: 8)] = UInt64(argumentData?.count ?? 0)
     }
 
-    public subscript(index: Index) -> UInt32 {
+    public subscript(index: Index) -> UInt64 {
         get {
             switch index.value {
             case 0:
@@ -139,6 +129,26 @@ public struct Registers: Equatable {
             default:
                 fatalError("unreachable: index out of bounds \(index.value)")
             }
+        }
+    }
+}
+
+extension Registers: Codable {
+    public init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+
+        var registers = [UInt64](repeating: 0, count: 13)
+        for i in 0 ..< 13 {
+            registers[i] = try container.decode(UInt64.self)
+        }
+        self.init(registers)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.unkeyedContainer()
+
+        for i in 0 ..< 13 {
+            try container.encode(self[Registers.Index(raw: UInt8(i))])
         }
     }
 }

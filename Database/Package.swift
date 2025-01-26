@@ -16,15 +16,26 @@ let package = Package(
         ),
     ],
     dependencies: [
+        .package(path: "../Blockchain"),
+        .package(path: "../Codec"),
+        .package(path: "../Utils"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
     ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "Database",
             dependencies: [
+                "RocksDBSwift",
+                "Blockchain",
+                "Codec",
+                "Utils",
+            ]
+        ),
+        .target(
+            name: "RocksDBSwift",
+            dependencies: [
                 "rocksdb",
+                "Utils",
             ],
             linkerSettings: [
                 .unsafeFlags(["-L../.lib", "-L/opt/homebrew/lib"]),
@@ -42,6 +53,13 @@ let package = Package(
             name: "DatabaseTests",
             dependencies: [
                 "Database",
+                .product(name: "Testing", package: "swift-testing"),
+            ]
+        ),
+        .testTarget(
+            name: "RocksDBSwiftTests",
+            dependencies: [
+                "RocksDBSwift",
                 .product(name: "Testing", package: "swift-testing"),
             ]
         ),

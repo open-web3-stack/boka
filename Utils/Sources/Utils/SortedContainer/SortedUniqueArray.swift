@@ -1,4 +1,3 @@
-// TODO: add tests
 public struct SortedUniqueArray<T: Comparable>: SortedContainer {
     public private(set) var array: [T]
 
@@ -35,7 +34,7 @@ public struct SortedUniqueArray<T: Comparable>: SortedContainer {
         var begin = 0
         for element in other.array {
             let idx = insertIndex(element, begin: begin)
-            if idx > array.count || array[idx] != element {
+            if idx == array.count || array[idx] != element {
                 array.insert(element, at: idx)
             }
             begin = idx + 1

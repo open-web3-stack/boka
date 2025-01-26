@@ -1,23 +1,23 @@
 import Foundation
 
 public class JamDecoder {
-    private var data: Data
+    private var input: DataInput
     private let config: Any?
 
-    public init(data: Data, config: Any? = nil) {
-        self.data = data
+    public init(data: DataInput, config: Any? = nil) {
+        input = data
         self.config = config
     }
 
     public func decode<T: Decodable>(_ type: T.Type) throws -> T {
-        let context = DecodeContext(data: data)
+        let context = DecodeContext(input: input)
         context.userInfo[.config] = config
         let res = try context.decode(type, key: nil)
-        data = context.data
+        input = context.input
         return res
     }
 
-    public static func decode<T: Decodable>(_ type: T.Type, from data: Data, withConfig config: Any? = nil) throws -> T {
+    public static func decode<T: Decodable>(_ type: T.Type, from data: DataInput, withConfig config: Any? = nil) throws -> T {
         let decoder = JamDecoder(data: data, config: config)
         let val = try decoder.decode(type)
         try decoder.finalize()
@@ -25,7 +25,7 @@ public class JamDecoder {
     }
 
     public func finalize() throws {
-        guard data.isEmpty else {
+        guard input.isEmpty else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: [],
@@ -34,15 +34,29 @@ public class JamDecoder {
             )
         }
     }
+
+    public var isAtEnd: Bool {
+        input.isEmpty
+    }
 }
 
-protocol ArrayWrapper: Collection where Element: Decodable {
+private protocol ArrayWrapper: Collection where Element: Decodable {
     static func from(array: [Element]) -> Self
 }
 
 extension Array: ArrayWrapper where Element: Decodable {
     static func from(array: [Element]) -> Self {
         array
+    }
+}
+
+private protocol OptionalWrapper: Decodable {
+    static var wrappedType: Decodable.Type { get }
+}
+
+extension Optional: OptionalWrapper where Wrapped: Decodable {
+    static var wrappedType: Decodable.Type {
+        Wrapped.self
     }
 }
 
@@ -71,12 +85,12 @@ private class DecodeContext: Decoder {
     var codingPath: [CodingKey] = []
     var userInfo: [CodingUserInfoKey: Any] = [:]
 
-    var data: Data
+    var input: DataInput
 
-    init(data: Data, codingPath: [CodingKey] = [], userInfo: [CodingUserInfoKey: Any] = [:]) {
+    init(input: DataInput, codingPath: [CodingKey] = [], userInfo: [CodingUserInfoKey: Any] = [:]) {
         self.codingPath = codingPath
         self.userInfo = userInfo
-        self.data = data
+        self.input = input
         self.userInfo[.isJamCodec] = true
     }
 
@@ -92,72 +106,51 @@ private class DecodeContext: Decoder {
         JamSingleValueDecodingContainer(codingPath: codingPath, decoder: self)
     }
 
-    fileprivate func decodeInt<T: FixedWidthInteger>(codingPath: @autoclosure () -> [CodingKey]) throws -> T {
-        guard data.count >= MemoryLayout<T>.size else {
-            throw DecodingError.dataCorrupted(
-                DecodingError.Context(
-                    codingPath: codingPath(),
-                    debugDescription: "Not enough data to decode \(T.self)"
-                )
-            )
-        }
-        let res = data.withUnsafeBytes { ptr in
+    fileprivate func decodeInt<T: FixedWidthInteger>(codingPath _: @autoclosure () -> [CodingKey]) throws -> T {
+        let data = try input.read(length: MemoryLayout<T>.size)
+        return data.withUnsafeBytes { ptr in
             ptr.loadUnaligned(as: T.self)
         }
-        data.removeFirst(MemoryLayout<T>.size)
-        return res
     }
 
     fileprivate func decodeData(codingPath: @autoclosure () -> [CodingKey]) throws -> Data {
-        guard let length = data.decode() else {
+        let length = try input.decodeUInt64()
+        // sanity check: length must be less than 4gb
+        guard length < 0x1_0000_0000 else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: codingPath(),
-                    debugDescription: "Unable to decode data length"
+                    debugDescription: "Invalid data length"
                 )
             )
         }
-        guard data.count >= Int(length) else {
-            throw DecodingError.dataCorrupted(
-                DecodingError.Context(
-                    codingPath: codingPath(),
-                    debugDescription: "Not enough data to decode"
-                )
-            )
-        }
-        let res = data[data.startIndex ..< data.startIndex + Int(length)]
-        data.removeFirst(Int(length))
+        let res = try input.read(length: Int(length))
         return res
     }
 
     fileprivate func decodeData(codingPath: @autoclosure () -> [CodingKey]) throws -> [UInt8] {
-        guard let length = data.decode() else {
+        let length = try input.decodeUInt64()
+        // sanity check: length must be less than 4gb
+        guard length < 0x1_0000_0000 else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: codingPath(),
-                    debugDescription: "Unable to decode data length"
+                    debugDescription: "Invalid data length"
                 )
             )
         }
-        guard data.count >= Int(length) else {
-            throw DecodingError.dataCorrupted(
-                DecodingError.Context(
-                    codingPath: codingPath(),
-                    debugDescription: "Not enough data to decode"
-                )
-            )
-        }
-        let res = Array(data[data.startIndex ..< data.startIndex + Int(length)])
-        data.removeFirst(Int(length))
-        return res
+        let res = try input.read(length: Int(length))
+        return Array(res)
     }
 
     fileprivate func decodeArray<T: ArrayWrapper>(_ type: T.Type, key: CodingKey?) throws -> T {
-        guard let length = data.decode(), length < 0xFFFFFF else {
+        let length = try input.decodeUInt64()
+        // sanity check: length can't be unreasonably large
+        guard length < 0xFFFFFF else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: codingPath,
-                    debugDescription: "Unable to decode array length"
+                    debugDescription: "Invalid array length"
                 )
             )
         }
@@ -172,22 +165,33 @@ private class DecodeContext: Decoder {
     fileprivate func decodeFixedLengthData<T: FixedLengthData>(_ type: T.Type, key: CodingKey?) throws -> T {
         try withExtendedLifetime(PushCodingPath(decoder: self, key: key)) {
             let length = try type.length(decoder: self)
-            guard data.count >= length else {
-                throw DecodingError.dataCorrupted(
-                    DecodingError.Context(
-                        codingPath: codingPath,
-                        debugDescription: "Not enough data to decode \(T.self)"
-                    )
+            let data = try input.read(length: length)
+            return try type.init(decoder: self, data: data)
+        }
+    }
+
+    fileprivate func decodeOptional<T: Decodable>(_ type: T.Type, key: CodingKey?) throws -> T? {
+        let byte = try input.read()
+        switch byte {
+        case 0:
+            return nil
+        case 1:
+            return try decode(type, key: key)
+        default:
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: codingPath,
+                    debugDescription: "Invalid boolean value: \(byte)"
                 )
-            }
-            let value = data[data.startIndex ..< data.startIndex + length]
-            data.removeFirst(length)
-            return try type.init(decoder: self, data: value)
+            )
         }
     }
 
     fileprivate func decode<T: Decodable>(_ type: T.Type, key: CodingKey?) throws -> T {
-        if type == Data.self {
+        // optional hanlding must be first to avoid type coercion
+        if let type = type as? any OptionalWrapper.Type {
+            try decodeOptional(type.wrappedType, key: key) as! T
+        } else if type == Data.self {
             try decodeData(codingPath: codingPath) as Data as! T
         } else if type == [UInt8].self {
             try decodeData(codingPath: codingPath) as [UInt8] as! T
@@ -214,24 +218,16 @@ private struct JamKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPr
     }
 
     func contains(_: K) -> Bool {
-        decoder.data.count > 0
+        !decoder.input.isEmpty
     }
 
-    func decodeNil(forKey key: K) throws -> Bool {
-        guard let byte = decoder.data.next() else {
-            throw DecodingError.keyNotFound(
-                key, DecodingError.Context(codingPath: codingPath, debugDescription: "Unexpected end of data")
-            )
-        }
+    func decodeNil(forKey _: K) throws -> Bool {
+        let byte = try decoder.input.read()
         return byte == 0
     }
 
-    func decode(_: Bool.Type, forKey key: K) throws -> Bool {
-        guard let byte = decoder.data.next() else {
-            throw DecodingError.keyNotFound(
-                key, DecodingError.Context(codingPath: codingPath, debugDescription: "Unexpected end of data")
-            )
-        }
+    func decode(_: Bool.Type, forKey _: K) throws -> Bool {
+        let byte = try decoder.input.read()
         return byte == 1
     }
 
@@ -258,11 +254,9 @@ private struct JamKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPr
         return value
     }
 
-    func decode(_: Int8.Type, forKey key: K) throws -> Int8 {
-        guard let value = decoder.data.next() else {
-            throw DecodingError.keyNotFound(key, DecodingError.Context(codingPath: codingPath, debugDescription: "Unexpected end of data"))
-        }
-        return Int8(bitPattern: value)
+    func decode(_: Int8.Type, forKey _: K) throws -> Int8 {
+        let byte = try decoder.input.read()
+        return Int8(bitPattern: byte)
     }
 
     func decode(_: Int16.Type, forKey key: K) throws -> Int16 {
@@ -284,11 +278,9 @@ private struct JamKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPr
         return value
     }
 
-    func decode(_: UInt8.Type, forKey key: K) throws -> UInt8 {
-        guard let value = decoder.data.next() else {
-            throw DecodingError.keyNotFound(key, DecodingError.Context(codingPath: codingPath, debugDescription: "Unexpected end of data"))
-        }
-        return value
+    func decode(_: UInt8.Type, forKey _: K) throws -> UInt8 {
+        let byte = try decoder.input.read()
+        return byte
     }
 
     func decode(_: UInt16.Type, forKey key: K) throws -> UInt16 {
@@ -305,6 +297,23 @@ private struct JamKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPr
 
     func decode<T: Decodable>(_ type: T.Type, forKey key: K) throws -> T {
         try decoder.decode(type, key: key)
+    }
+
+    func decodeIfPresent<T: Decodable>(_ type: T.Type, forKey key: K) throws -> T? {
+        let byte = try decoder.input.read()
+        switch byte {
+        case 0:
+            return nil
+        case 1:
+            return try decoder.decode(type, key: key)
+        default:
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Decode key \(key.stringValue) with invalid boolean value: \(byte)"
+                )
+            )
+        }
     }
 
     func nestedContainer<NestedKey>(keyedBy _: NestedKey.Type, forKey _: K) throws -> KeyedDecodingContainer<NestedKey>
@@ -330,7 +339,7 @@ private struct JamUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     var codingPath: [CodingKey] = []
     let count: Int? = nil
     var isAtEnd: Bool {
-        decoder.data.count == 0
+        decoder.input.isEmpty
     }
 
     var currentIndex: Int = 0
@@ -338,17 +347,13 @@ private struct JamUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     let decoder: DecodeContext
 
     mutating func decodeNil() throws -> Bool {
-        guard let byte = decoder.data.next() else {
-            throw DecodingError.dataCorruptedError(in: self, debugDescription: "Unexpected end of data")
-        }
+        let byte = try decoder.input.read()
         currentIndex += 1
         return byte == 0
     }
 
     mutating func decode(_: Bool.Type) throws -> Bool {
-        guard let byte = decoder.data.next() else {
-            throw DecodingError.dataCorruptedError(in: self, debugDescription: "Unexpected end of data")
-        }
+        let byte = try decoder.input.read()
         currentIndex += 1
         return byte == 1
     }
@@ -379,11 +384,9 @@ private struct JamUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
 
     mutating func decode(_: Int8.Type) throws -> Int8 {
-        guard let value = decoder.data.next() else {
-            throw DecodingError.dataCorruptedError(in: self, debugDescription: "Unexpected end of data")
-        }
+        let byte = try decoder.input.read()
         currentIndex += 1
-        return Int8(bitPattern: value)
+        return Int8(bitPattern: byte)
     }
 
     mutating func decode(_: Int16.Type) throws -> Int16 {
@@ -410,11 +413,9 @@ private struct JamUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
 
     mutating func decode(_: UInt8.Type) throws -> UInt8 {
-        guard let value = decoder.data.next() else {
-            throw DecodingError.dataCorruptedError(in: self, debugDescription: "Unexpected end of data")
-        }
+        let byte = try decoder.input.read()
         currentIndex += 1
-        return value
+        return byte
     }
 
     mutating func decode(_: UInt16.Type) throws -> UInt16 {
@@ -458,13 +459,12 @@ private struct JamSingleValueDecodingContainer: SingleValueDecodingContainer {
     let decoder: DecodeContext
 
     func decodeNil() -> Bool {
-        decoder.data.next() == 0
+        let byte = try? decoder.input.read()
+        return byte == 0
     }
 
     func decode(_: Bool.Type) throws -> Bool {
-        guard let byte = decoder.data.next() else {
-            throw DecodingError.dataCorruptedError(in: self, debugDescription: "Unexpected end of data")
-        }
+        let byte = try decoder.input.read()
         return byte == 1
     }
 
@@ -492,10 +492,8 @@ private struct JamSingleValueDecodingContainer: SingleValueDecodingContainer {
     }
 
     func decode(_: Int8.Type) throws -> Int8 {
-        guard let value = decoder.data.next() else {
-            throw DecodingError.dataCorruptedError(in: self, debugDescription: "Unexpected end of data")
-        }
-        return Int8(bitPattern: value)
+        let byte = try decoder.input.read()
+        return Int8(bitPattern: byte)
     }
 
     func decode(_: Int16.Type) throws -> Int16 {
@@ -518,10 +516,8 @@ private struct JamSingleValueDecodingContainer: SingleValueDecodingContainer {
     }
 
     func decode(_: UInt8.Type) throws -> UInt8 {
-        guard let value = decoder.data.next() else {
-            throw DecodingError.dataCorruptedError(in: self, debugDescription: "Unexpected end of data")
-        }
-        return value
+        let byte = try decoder.input.read()
+        return byte
     }
 
     func decode(_: UInt16.Type) throws -> UInt16 {

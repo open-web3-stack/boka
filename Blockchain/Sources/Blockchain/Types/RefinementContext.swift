@@ -3,8 +3,8 @@ import Utils
 
 // A refinement context, denoted by the set X, describes the context of the chain
 // at the point that the report’s corresponding work-package was evaluated.
-public struct RefinementContext: Sendable, Equatable, Codable, Hashable {
-    public struct Anchor: Sendable, Equatable, Codable, Hashable {
+public struct RefinementContext: Comparable, Sendable, Equatable, Codable {
+    public struct Anchor: Comparable, Sendable, Equatable, Codable {
         // a
         public var headerHash: Data32
         // s
@@ -21,9 +21,19 @@ public struct RefinementContext: Sendable, Equatable, Codable, Hashable {
             self.stateRoot = stateRoot
             self.beefyRoot = beefyRoot
         }
+
+        public static func < (lhs: Anchor, rhs: Anchor) -> Bool {
+            if lhs.headerHash != rhs.headerHash {
+                return lhs.headerHash < rhs.headerHash
+            }
+            if lhs.stateRoot != rhs.stateRoot {
+                return lhs.stateRoot < rhs.stateRoot
+            }
+            return lhs.beefyRoot < rhs.beefyRoot
+        }
     }
 
-    public struct LokupAnchor: Sendable, Equatable, Codable, Hashable {
+    public struct LookupAnchor: Comparable, Sendable, Equatable, Codable, Hashable {
         // l
         public var headerHash: Data32
         // t
@@ -36,19 +46,33 @@ public struct RefinementContext: Sendable, Equatable, Codable, Hashable {
             self.headerHash = headerHash
             self.timeslot = timeslot
         }
+
+        public static func < (lhs: LookupAnchor, rhs: LookupAnchor) -> Bool {
+            if lhs.headerHash != rhs.headerHash {
+                return lhs.headerHash < rhs.headerHash
+            }
+            return lhs.timeslot < rhs.timeslot
+        }
     }
 
     public var anchor: Anchor
 
-    public var lokupAnchor: LokupAnchor
+    public var lookupAnchor: LookupAnchor
 
     // p
-    public var prerequistieWorkPackage: Data32?
+    @CodingAs<SortedSet<Data32>> public var prerequisiteWorkPackages: Set<Data32>
 
-    public init(anchor: Anchor, lokupAnchor: LokupAnchor, prerequistieWorkPackage: Data32?) {
+    public init(anchor: Anchor, lookupAnchor: LookupAnchor, prerequisiteWorkPackages: Set<Data32>) {
         self.anchor = anchor
-        self.lokupAnchor = lokupAnchor
-        self.prerequistieWorkPackage = prerequistieWorkPackage
+        self.lookupAnchor = lookupAnchor
+        self.prerequisiteWorkPackages = prerequisiteWorkPackages
+    }
+
+    public static func < (lhs: RefinementContext, rhs: RefinementContext) -> Bool {
+        if lhs.anchor != rhs.anchor {
+            return lhs.anchor < rhs.anchor
+        }
+        return lhs.lookupAnchor < rhs.lookupAnchor
     }
 }
 
@@ -61,11 +85,11 @@ extension RefinementContext: Dummy {
                 stateRoot: Data32(),
                 beefyRoot: Data32()
             ),
-            lokupAnchor: LokupAnchor(
+            lookupAnchor: LookupAnchor(
                 headerHash: Data32(),
                 timeslot: 0
             ),
-            prerequistieWorkPackage: nil
+            prerequisiteWorkPackages: Set()
         )
     }
 }
@@ -80,7 +104,7 @@ extension RefinementContext.Anchor: EncodedSize {
     }
 }
 
-extension RefinementContext.LokupAnchor: EncodedSize {
+extension RefinementContext.LookupAnchor: EncodedSize {
     public var encodedSize: Int {
         headerHash.encodedSize + timeslot.encodedSize
     }
@@ -92,7 +116,7 @@ extension RefinementContext.LokupAnchor: EncodedSize {
 
 extension RefinementContext: EncodedSize {
     public var encodedSize: Int {
-        anchor.encodedSize + lokupAnchor.encodedSize + prerequistieWorkPackage.encodedSize
+        anchor.encodedSize + lookupAnchor.encodedSize + prerequisiteWorkPackages.encodedSize
     }
 
     public static var encodeedSizeHint: Int? {

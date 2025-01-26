@@ -4,6 +4,14 @@ import Testing
 
 @testable import Utils
 
+struct MinLengthNegated: ReadInt {
+    typealias TConfig = Int
+
+    static func read(config _: Int) -> Int {
+        -1
+    }
+}
+
 struct MinLength3: ReadInt {
     typealias TConfig = Int
 
@@ -20,13 +28,24 @@ struct MaxLength5: ReadInt {
     }
 }
 
+struct MaxLength8: ReadInt {
+    typealias TConfig = Int
+
+    static func read(config _: Int) -> Int {
+        8
+    }
+}
+
 struct ConfigLimitedSizeArrayTests {
     @Test func initWithDefaultValue() throws {
         let config = 0
         let defaultValue = 1
-        let array = try ConfigLimitedSizeArray<Int, MinLength3, MaxLength5>(config: config, defaultValue: defaultValue)
+        var array = try ConfigLimitedSizeArray<Int, MinLength3, MaxLength5>(config: config, defaultValue: defaultValue)
         #expect(array.array == [1, 1, 1])
         #expect(array.count == 3)
+        #expect(array[0] == 1)
+        array[0] = 0
+        #expect(array[0] != 1)
     }
 
     @Test func initWithArrayWithinBounds() throws {
@@ -140,5 +159,46 @@ struct ConfigLimitedSizeArrayTests {
         let encoded = try JamEncoder.encode(array)
         let decoded = try JamDecoder.decode(ConfigLimitedSizeArray<Int, MinLength3, MaxLength5>.self, from: encoded, withConfig: config)
         #expect(decoded == array)
+    }
+
+    @Test func throwLength() throws {
+        #expect(throws: Error.self) {
+            _ = try ConfigLimitedSizeArray<Int, MinLengthNegated, MaxLength5>(config: 0, array: [1, 2, 3])
+        }
+        #expect(throws: Error.self) {
+            _ = try ConfigLimitedSizeArray<Int, MaxLength5, MinLength3>(config: 0, array: [1, 2, 3])
+        }
+    }
+
+    @Test func randomAccessCollection() throws {
+        let value = try ConfigLimitedSizeArray<Int, MinLength3, MaxLength8>(config: 0, array: [1, 2, 3, 4, 5, 6, 7, 8])
+        #expect(value.startIndex == 0)
+        #expect(value.endIndex == 8)
+
+        var idx = value.startIndex
+        value.formIndex(after: &idx)
+        #expect(idx == 1)
+
+        value.formIndex(before: &idx)
+        #expect(idx == 0)
+
+        let dist = value.distance(from: 0, to: 7)
+        #expect(dist == 7)
+
+        let indexForward = value.index(0, offsetBy: 3)
+        #expect(indexForward == 3)
+
+        let indexWithinLimit = value.index(0, offsetBy: 3, limitedBy: 5)
+        #expect(indexWithinLimit == 3)
+        #expect(value.index(after: indexWithinLimit!) == 4)
+        #expect(value.index(before: indexWithinLimit!) == 2)
+        #expect(value.index(from: indexWithinLimit!) == 3)
+    }
+
+    @Test func description() throws {
+        let config = 0
+        let array = try ConfigLimitedSizeArray<Int, MinLength3, MaxLength5>(config: config, array: [1, 2, 3, 4, 5])
+        #expect(array.description == "[1, 2, 3, 4, 5]")
+        #expect(array.debugDescription == "ConfigLimitedSizeArray<Int, 3, 5>([1, 2, 3, 4, 5])")
     }
 }

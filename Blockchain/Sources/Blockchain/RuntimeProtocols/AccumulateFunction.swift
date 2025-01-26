@@ -2,9 +2,13 @@ import Foundation
 import Utils
 
 public struct AccumulateArguments: Codable {
+    /// o
     public var result: WorkResult
+    /// l
     public var paylaodHash: Data32
+    /// k
     public var packageHash: Data32
+    /// a
     public var authorizationOutput: Data
 
     public init(result: WorkResult, paylaodHash: Data32, packageHash: Data32, authorizationOutput: Data) {
@@ -36,10 +40,16 @@ public struct DeferredTransfers: Codable {
     }
 }
 
-public struct AccumlateResultContext {
-    // s: updated current account
-    public var account: ServiceAccount?
-    // c
+/// U: a characterization (i.e. values capable of representing) of state components
+///    which are both needed and mutable by the accumulation process.
+public struct AccumulateState {
+    /// d
+    public var newServiceAccounts: [ServiceIndex: ServiceAccount]
+    /// i
+    public var validatorQueue: ConfigFixedSizeArray<
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+    >
+    /// q
     public var authorizationQueue: ConfigFixedSizeArray<
         ConfigFixedSizeArray<
             Data32,
@@ -47,67 +57,40 @@ public struct AccumlateResultContext {
         >,
         ProtocolConfig.TotalNumberOfCores
     >
-    // v
-    public var validatorQueue: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
-    >
-    // i
-    public var serviceIndex: ServiceIndex
-    // t
-    public var transfers: [DeferredTransfers]
-    // n
-    public var newAccounts: [ServiceIndex: ServiceAccount]
-    // p
+    /// x
     public var privilegedServices: PrivilegedServices
+}
 
-    public init(
-        account: ServiceAccount?,
-        authorizationQueue: ConfigFixedSizeArray<
-            ConfigFixedSizeArray<
-                Data32,
-                ProtocolConfig.MaxAuthorizationsQueueItems
-            >,
-            ProtocolConfig.TotalNumberOfCores
-        >,
-        validatorQueue: ConfigFixedSizeArray<
-            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
-        >,
-        serviceIndex: ServiceIndex,
-        transfers: [DeferredTransfers],
-        newAccounts: [ServiceIndex: ServiceAccount],
-        privilegedServices: PrivilegedServices
-    ) {
-        self.account = account
-        self.authorizationQueue = authorizationQueue
-        self.validatorQueue = validatorQueue
-        self.serviceIndex = serviceIndex
-        self.transfers = transfers
-        self.newAccounts = newAccounts
-        self.privilegedServices = privilegedServices
-    }
+/// X
+public struct AccumlateResultContext {
+    /// d: all existing service accounts
+    public var serviceAccounts: ServiceAccounts
+    /// s: the accumulating service account index
+    public var serviceIndex: ServiceIndex
+    /// u
+    public var accumulateState: AccumulateState
+    /// i
+    public var nextAccountIndex: ServiceIndex
+    /// t: deferred transfers
+    public var transfers: [DeferredTransfers]
+    /// y
+    public var yield: Data32?
 }
 
 public protocol AccumulateFunction {
     func invoke(
         config: ProtocolConfigRef,
+        // prior accounts
+        accounts: inout some ServiceAccounts,
+        // u
+        state: AccumulateState,
+        // s
         serviceIndex: ServiceIndex,
-        code: Data,
-        serviceAccounts: [ServiceIndex: ServiceAccount],
+        // g
         gas: Gas,
+        // o
         arguments: [AccumulateArguments],
-        // other inputs needed (not directly in GP's Accumulation function signature)
-        validatorQueue: ConfigFixedSizeArray<
-            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
-        >,
-        authorizationQueue: ConfigFixedSizeArray<
-            ConfigFixedSizeArray<
-                Data32,
-                ProtocolConfig.MaxAuthorizationsQueueItems
-            >,
-            ProtocolConfig.TotalNumberOfCores
-        >,
-        privilegedServices: PrivilegedServices,
         initialIndex: ServiceIndex,
         timeslot: TimeslotIndex
-    ) throws -> (ctx: AccumlateResultContext, result: Data32?)
+    ) async throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas)
 }

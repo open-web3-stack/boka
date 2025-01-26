@@ -21,10 +21,10 @@ struct SafroleServiceTests {
         }
         timeProvider = MockTimeProvider(time: 1000)
 
-        genesisState = try StateRef(State.devGenesis(config: config))
+        (genesisState, _) = try State.devGenesis(config: config)
 
         storeMiddleware = StoreMiddleware()
-        eventBus = EventBus(eventMiddleware: Middleware(storeMiddleware))
+        eventBus = EventBus(eventMiddleware: .serial(Middleware(storeMiddleware), .noError), handlerMiddleware: .noError)
 
         keystore = try await DevKeyStore(devKeysCount: 2)
 
@@ -62,7 +62,7 @@ struct SafroleServiceTests {
                 headerHash: newBlock.hash,
                 mmr: MMR([]),
                 stateRoot: Data32(),
-                workReportHashes: ConfigLimitedSizeArray(config: config)
+                lookup: [Data32: Data32]()
             ))
         }
 
@@ -91,7 +91,7 @@ struct SafroleServiceTests {
                 headerHash: newBlock.hash,
                 mmr: MMR([]),
                 stateRoot: Data32(),
-                workReportHashes: ConfigLimitedSizeArray(config: config)
+                lookup: [Data32: Data32]()
             ))
         }
 

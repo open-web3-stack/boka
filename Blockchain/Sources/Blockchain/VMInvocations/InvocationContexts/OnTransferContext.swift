@@ -6,44 +6,40 @@ private let logger = Logger(label: "OnTransferContext")
 
 public class OnTransferContext: InvocationContext {
     public typealias ContextType = (
-        account: ServiceAccount,
         index: ServiceIndex,
-        accounts: [ServiceIndex: ServiceAccount]
+        accounts: ServiceAccounts
     )
 
-    public var config: ProtocolConfigRef
+    public let config: ProtocolConfigRef
     public var context: ContextType
 
-    public init(context: ContextType, config: ProtocolConfigRef) {
+    public init(context: inout ContextType, config: ProtocolConfigRef) {
         self.config = config
         self.context = context
     }
 
-    public func dispatch(index: UInt32, state: VMState) -> ExecOutcome {
+    public func dispatch(index: UInt32, state: VMState) async -> ExecOutcome {
         logger.debug("dispatching host-call: \(index)")
         switch UInt8(index) {
         case Lookup.identifier:
-            return Lookup(account: context.account, serviceIndex: context.index, accounts: context.accounts)
+            return await Lookup(serviceIndex: context.index, accounts: context.accounts)
                 .call(config: config, state: state)
         case Read.identifier:
-            return Read(account: context.account, serviceIndex: context.index, accounts: context.accounts)
+            return await Read(serviceIndex: context.index, accounts: context.accounts)
                 .call(config: config, state: state)
         case Write.identifier:
-            return Write(account: &context.account, serviceIndex: context.index)
+            return await Write(serviceIndex: context.index, accounts: &context.accounts)
                 .call(config: config, state: state)
         case GasFn.identifier:
-            return GasFn().call(config: config, state: state)
+            return await GasFn().call(config: config, state: state)
         case Info.identifier:
-            return Info(
-                account: context.account,
-                serviceIndex: context.index,
-                accounts: context.accounts,
-                newAccounts: [:]
-            )
-            .call(config: config, state: state)
+            return await Info(serviceIndex: context.index, accounts: context.accounts)
+                .call(config: config, state: state)
+        case Log.identifier:
+            return await Log(service: index).call(config: config, state: state)
         default:
             state.consumeGas(Gas(10))
-            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHAT.rawValue)
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHAT.rawValue)
             return .continued
         }
     }

@@ -28,8 +28,6 @@ public class ExecutionContext {
 
 extension Instruction {
     public func execute(context: ExecutionContext, skip: UInt32) -> ExecOutcome {
-        context.state.consumeGas(gasCost())
-        logger.debug("consumed \(gasCost()) gas")
         do {
             let execRes = try _executeImpl(context: context)
             if case .exit = execRes {
@@ -37,9 +35,7 @@ extension Instruction {
             }
             logger.debug("execution success! updating pc...")
             return updatePC(context: context, skip: skip)
-        } catch let e as Memory.Error {
-            // this passes test vector
-            context.state.consumeGas(gasCost())
+        } catch let e as MemoryError {
             logger.debug("memory error: \(e)")
             return .exit(.pageFault(e.address))
         } catch let e {

@@ -79,7 +79,7 @@ public struct BokaLogger<T: LoggerFragment>: LogHandler, Sendable {
         }
 
         let defaultLevel = defaultLevel
-        return filters.mutate { filters in
+        return filters.write { filters in
             for (key, value) in filters where label.hasPrefix(key) {
                 filters[label] = value
                 return value

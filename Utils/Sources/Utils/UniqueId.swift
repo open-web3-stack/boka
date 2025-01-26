@@ -1,20 +1,29 @@
-import Atomics
+import Synchronization
+import TracingUtils
 
 public struct UniqueId: Sendable {
-    private static let idGenerator: ManagedAtomic<Int> = ManagedAtomic(0)
+    private static let idGenerator: Atomic<Int> = .init(0)
 
     public let id: Int
     public let name: String
 
-    public init(_ name: String) {
-        id = UniqueId.idGenerator.loadThenWrappingIncrement(ordering: .relaxed)
+    public init(_ name: String = "") {
+        (_, id) = UniqueId.idGenerator.wrappingAdd(1, ordering: .relaxed)
         self.name = name
+    }
+
+    public var idString: String {
+        String(id, radix: 16)
     }
 }
 
 extension UniqueId: Equatable {
     public static func == (lhs: UniqueId, rhs: UniqueId) -> Bool {
         lhs.id == rhs.id
+    }
+
+    public static func < (lhs: UniqueId, rhs: UniqueId) -> Bool {
+        lhs.id < rhs.id
     }
 }
 
@@ -38,12 +47,18 @@ extension UniqueId: ExpressibleByStringLiteral {
 
 extension UniqueId: CustomStringConvertible {
     public var description: String {
-        "\(name)#\(id)"
+        "\(name)#\(idString)"
     }
 }
 
 extension String {
     public var uniqueId: UniqueId {
         UniqueId(self)
+    }
+}
+
+extension Logger {
+    public init(label: UniqueId) {
+        self.init(label: label.description)
     }
 }

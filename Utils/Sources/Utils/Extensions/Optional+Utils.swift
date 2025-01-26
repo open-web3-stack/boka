@@ -16,4 +16,11 @@ extension Optional {
         }
         return self
     }
+
+    public func expect(_ msg: String) -> Wrapped {
+        guard let self else {
+            fatalError(msg)
+        }
+        return self
+    }
 }

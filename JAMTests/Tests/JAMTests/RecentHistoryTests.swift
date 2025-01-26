@@ -6,14 +6,19 @@ import Utils
 
 @testable import JAMTests
 
+struct ReportedWorkPackage: Codable {
+    var hash: Data32
+    var exportsRoot: Data32
+}
+
 struct RecentHistoryInput: Codable {
     var headerHash: Data32
     var parentStateRoot: Data32
     var accumulateRoot: Data32
-    var workPackages: [Data32]
+    var workPackages: [ReportedWorkPackage]
 }
 
-struct RecentHisoryTestcase: Codable {
+struct RecentHistoryTestcase: Codable {
     var input: RecentHistoryInput
     var preState: RecentHistory
     var postState: RecentHistory
@@ -27,14 +32,17 @@ struct RecentHistoryTests {
     @Test(arguments: try loadTests())
     func recentHistory(_ testcase: Testcase) throws {
         let config = ProtocolConfigRef.mainnet
-        let testcase = try JamDecoder.decode(RecentHisoryTestcase.self, from: testcase.data, withConfig: config)
+        let testcase = try JamDecoder.decode(RecentHistoryTestcase.self, from: testcase.data, withConfig: config)
 
         var state = testcase.preState
-        try state.update(
+        state.update(
             headerHash: testcase.input.headerHash,
             parentStateRoot: testcase.input.parentStateRoot,
             accumulateRoot: testcase.input.accumulateRoot,
-            workReportHashes: ConfigLimitedSizeArray(config: config, array: testcase.input.workPackages)
+            lookup: Dictionary(uniqueKeysWithValues: testcase.input.workPackages.map { (
+                $0.hash,
+                $0.exportsRoot
+            ) })
         )
 
         #expect(state == testcase.postState)

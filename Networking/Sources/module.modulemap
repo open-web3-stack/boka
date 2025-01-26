@@ -1,4 +1,9 @@
 module msquic {
-  header "include/msquic.h"
+  header "include/msquic/msquic.h"
   link "msquic"
+}
+
+module openssl {
+	header "include/openssl/ssl3.h"
+	export *
 }

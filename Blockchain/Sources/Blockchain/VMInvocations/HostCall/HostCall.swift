@@ -7,11 +7,11 @@ public protocol HostCall {
     static var identifier: UInt8 { get }
 
     func gasCost(state: VMState) -> Gas
-    func _callImpl(config: ProtocolConfigRef, state: VMState) throws
+    func _callImpl(config: ProtocolConfigRef, state: VMState) async throws
 }
 
 extension HostCall {
-    public func call(config: ProtocolConfigRef, state: VMState) -> ExecOutcome {
+    public func call(config: ProtocolConfigRef, state: VMState) async -> ExecOutcome {
         guard hasEnoughGas(state: state) else {
             logger.debug("not enough gas")
             return .exit(.outOfGas)
@@ -20,9 +20,9 @@ extension HostCall {
         logger.debug("consumed \(gasCost(state: state)) gas")
 
         do {
-            try _callImpl(config: config, state: state)
+            try await _callImpl(config: config, state: state)
             return .continued
-        } catch let e as Memory.Error {
+        } catch let e as MemoryError {
             logger.error("memory error: \(e)")
             return .exit(.pageFault(e.address))
         } catch VMInvocationsError.forceHalt {

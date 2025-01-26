@@ -187,6 +187,16 @@ extension ConfigLimitedSizeArray {
     }
 }
 
+extension ConfigLimitedSizeArray: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String {
+        array.description
+    }
+
+    public var debugDescription: String {
+        "ConfigLimitedSizeArray<\(T.self), \(minLength), \(maxLength)>(\(description))"
+    }
+}
+
 public typealias ConfigFixedSizeArray<T, TLength: ReadInt> = ConfigLimitedSizeArray<T, TLength, TLength>
 
 extension ConfigLimitedSizeArray: Decodable where T: Decodable {
@@ -215,8 +225,16 @@ extension ConfigLimitedSizeArray: Decodable where T: Decodable {
         } else {
             // variable size array
             var container = try decoder.unkeyedContainer()
-            let array = try container.decode([T].self)
-            try self.init(array, minLength: minLength, maxLength: maxLength)
+            if decoder.isJamCodec {
+                let array = try container.decode([T].self)
+                try self.init(array, minLength: minLength, maxLength: maxLength)
+            } else {
+                var array = [T]()
+                while !container.isAtEnd {
+                    try array.append(container.decode(T.self))
+                }
+                try self.init(array, minLength: minLength, maxLength: maxLength)
+            }
         }
     }
 }

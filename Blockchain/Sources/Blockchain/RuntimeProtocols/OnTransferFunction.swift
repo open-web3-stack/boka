@@ -4,8 +4,8 @@ public protocol OnTransferFunction {
     func invoke(
         config: ProtocolConfigRef,
         service: ServiceIndex,
-        code: Data,
-        serviceAccounts: [ServiceIndex: ServiceAccount],
+        serviceAccounts: inout some ServiceAccounts,
+        timeslot: TimeslotIndex,
         transfers: [DeferredTransfers]
-    ) throws -> ServiceAccount
+    ) async throws
 }

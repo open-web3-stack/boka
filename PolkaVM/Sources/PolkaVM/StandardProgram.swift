@@ -41,25 +41,24 @@ public class StandardProgram {
 
         let config = DefaultPvmConfig()
 
-        let Q = StandardProgram.alignToSegmentSize
-        let ZP = config.pvmProgramInitPageSize
-        let ZQ = config.pvmProgramInitSegmentSize
+        let Q = StandardProgram.alignToZoneSize
+        let ZZ = config.pvmProgramInitZoneSize
+        let ZP = config.pvmMemoryPageSize
         let ZI = config.pvmProgramInitInputDataSize
         let readOnlyAlignedSize = Int(Q(readOnlyLen, config))
         let heapEmptyPagesSize = Int(heapPages) * ZP
         let readWriteAlignedSize = Int(Q(readWriteLen + UInt32(heapEmptyPagesSize), config))
         let stackAlignedSize = Int(Q(stackSize, config))
 
-        let totalSize = 5 * ZQ + readOnlyAlignedSize + readWriteAlignedSize + stackAlignedSize + ZI
+        let totalSize = 5 * ZZ + readOnlyAlignedSize + readWriteAlignedSize + stackAlignedSize + ZI
         guard totalSize <= Int32.max else {
             throw Error.invalidTotalMemorySize
         }
-
         code = try ProgramCode(blob[relative: slice.startIndex ..< slice.startIndex + Int(codeLength)])
 
         initialRegisters = Registers(config: config, argumentData: argumentData)
 
-        initialMemory = Memory(
+        initialMemory = try StandardMemory(
             readOnlyData: readOnlyData,
             readWriteData: readWriteData,
             argumentData: argumentData ?? Data(),
@@ -68,13 +67,13 @@ public class StandardProgram {
         )
     }
 
-    static func alignToPageSize(size: UInt32, config: PvmConfig) -> UInt32 {
-        let pageSize = UInt32(config.pvmProgramInitPageSize)
+    public static func alignToPageSize(size: UInt32, config: PvmConfig) -> UInt32 {
+        let pageSize = UInt32(config.pvmMemoryPageSize)
         return (size + pageSize - 1) / pageSize * pageSize
     }
 
-    static func alignToSegmentSize(size: UInt32, config: PvmConfig) -> UInt32 {
-        let segmentSize = UInt32(config.pvmProgramInitSegmentSize)
-        return (size + segmentSize - 1) / segmentSize * segmentSize
+    public static func alignToZoneSize(size: UInt32, config: PvmConfig) -> UInt32 {
+        let zoneSize = UInt32(config.pvmProgramInitZoneSize)
+        return (size + zoneSize - 1) / zoneSize * zoneSize
     }
 }

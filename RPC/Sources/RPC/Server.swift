@@ -23,12 +23,21 @@ public class Server {
     public init(config: Config, source: DataSource) throws {
         self.config = config
         self.source = source
-
-        let env = try Environment.detect()
+        // TODO: add env to arguments
+        let env = try Environment.detect(arguments: ["--env"])
         app = Application(env)
 
-        var handlers: [String: JSONRPCHandler] = SystemHandler.getHandlers()
-        handlers.merge(ChainHandler.getHandlers(source: source)) { _, new in new }
+        // TODO: configure cors origins
+        let corsConfiguration = CORSMiddleware.Configuration(
+            allowedOrigin: .all,
+            allowedMethods: [.GET, .POST, .PUT, .OPTIONS],
+            allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith, .userAgent, .accessControlAllowOrigin]
+        )
+        let cors = CORSMiddleware(configuration: corsConfiguration)
+        // cors middleware should come before default error middleware using `at: .beginning`
+        app.middleware.use(cors, at: .beginning)
+
+        let handlers = AllHandlers.getHandlers(source: source)
 
         // Register routes
         let rpcController = JSONRPCController(handlers: handlers)

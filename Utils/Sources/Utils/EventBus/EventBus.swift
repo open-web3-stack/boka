@@ -1,11 +1,34 @@
-import Atomics
 import Foundation
 import TracingUtils
 
 private let logger = Logger(label: "EventBus")
 
-public actor EventBus: Sendable {
-    public struct SubscriptionToken: Hashable, Sendable {
+public protocol SubscriptionTokenProtocol: Sendable {}
+
+public protocol Subscribable: AnyObject, Sendable {
+    associatedtype SubscriptionToken: SubscriptionTokenProtocol
+
+    func subscribe<T: Event>(
+        _ eventType: T.Type,
+        id: UniqueId,
+        handler: @escaping @Sendable (T) async throws -> Void
+    ) async -> SubscriptionToken
+
+    func unsubscribe(token: SubscriptionToken) async
+}
+
+extension Subscribable {
+    public func subscribe<T: Event>(
+        _ eventType: T.Type,
+        id: UniqueId = "",
+        handler: @escaping @Sendable (T) async throws -> Void
+    ) async -> SubscriptionToken {
+        await subscribe(eventType, id: id, handler: handler)
+    }
+}
+
+public actor EventBus: Subscribable {
+    public struct SubscriptionToken: SubscriptionTokenProtocol, Hashable {
         fileprivate let id: UniqueId
         fileprivate let eventTypeId: ObjectIdentifier
 

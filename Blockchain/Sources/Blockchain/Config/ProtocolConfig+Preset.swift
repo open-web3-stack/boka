@@ -2,6 +2,47 @@ import Utils
 
 extension Ref where T == ProtocolConfig {
     // TODO: pick some good numbers for dev env
+    public static let minimal = Ref(ProtocolConfig(
+        auditTranchePeriod: 8,
+        additionalMinBalancePerStateItem: 10,
+        additionalMinBalancePerStateByte: 1,
+        serviceMinBalance: 100,
+        totalNumberOfCores: 1,
+        preimagePurgePeriod: 28800,
+        epochLength: 6,
+        auditBiasFactor: 2,
+        workReportAccumulationGas: Gas(10_000_000),
+        workPackageAuthorizerGas: Gas(50_000_000),
+        workPackageRefineGas: Gas(5_000_000_000),
+        totalAccumulationGas: Gas(3_500_000_000),
+        recentHistorySize: 8,
+        maxWorkItems: 4,
+        maxDepsInWorkReport: 8,
+        maxTicketsPerExtrinsic: 4,
+        maxLookupAnchorAge: 14400,
+        transferMemoSize: 128,
+        ticketEntriesPerValidator: 2,
+        maxAuthorizationsPoolItems: 8,
+        slotPeriodSeconds: 4,
+        maxAuthorizationsQueueItems: 10,
+        coreAssignmentRotationPeriod: 6,
+        maxServiceCodeSize: 4_000_000,
+        preimageReplacementPeriod: 5,
+        totalNumberOfValidators: 3,
+        erasureCodedPieceSize: 684,
+        maxWorkPackageManifestEntries: 1 << 11,
+        maxEncodedWorkPackageSize: 12 * 1 << 20,
+        segmentSize: 4104,
+        maxWorkReportOutputSize: 48 * 1 << 10,
+        erasureCodedSegmentSize: 6,
+        ticketSubmissionEndSlot: 2,
+        pvmDynamicAddressAlignmentFactor: 2,
+        pvmProgramInitInputDataSize: 1 << 24,
+        pvmProgramInitZoneSize: 1 << 16,
+        pvmMemoryPageSize: 1 << 12
+    ))
+
+    // TODO: pick some good numbers for dev env
     public static let dev = Ref(ProtocolConfig(
         auditTranchePeriod: 8,
         additionalMinBalancePerStateItem: 10,
@@ -11,11 +52,13 @@ extension Ref where T == ProtocolConfig {
         preimagePurgePeriod: 28800,
         epochLength: 12,
         auditBiasFactor: 2,
-        coreAccumulationGas: Gas(10_000_000), // TODO: check this
-        workPackageAuthorizerGas: Gas(10_000_000), // TODO: check this
-        workPackageRefineGas: Gas(10_000_000), // TODO: check this
+        workReportAccumulationGas: Gas(10_000_000),
+        workPackageAuthorizerGas: Gas(50_000_000),
+        workPackageRefineGas: Gas(5_000_000_000),
+        totalAccumulationGas: Gas(3_500_000_000),
         recentHistorySize: 8,
         maxWorkItems: 4,
+        maxDepsInWorkReport: 8,
         maxTicketsPerExtrinsic: 16,
         maxLookupAnchorAge: 14400,
         transferMemoSize: 128,
@@ -30,13 +73,54 @@ extension Ref where T == ProtocolConfig {
         erasureCodedPieceSize: 684,
         maxWorkPackageManifestEntries: 1 << 11,
         maxEncodedWorkPackageSize: 12 * 1 << 20,
-        maxEncodedWorkReportSize: 96 * 1 << 10,
+        segmentSize: 4104,
+        maxWorkReportOutputSize: 48 * 1 << 10,
         erasureCodedSegmentSize: 6,
         ticketSubmissionEndSlot: 10,
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
-        pvmProgramInitPageSize: 1 << 14,
-        pvmProgramInitSegmentSize: 1 << 16
+        pvmProgramInitZoneSize: 1 << 16,
+        pvmMemoryPageSize: 1 << 12
+    ))
+
+    public static let tiny = Ref(ProtocolConfig(
+        auditTranchePeriod: 8,
+        additionalMinBalancePerStateItem: 10,
+        additionalMinBalancePerStateByte: 1,
+        serviceMinBalance: 100,
+        totalNumberOfCores: 2,
+        preimagePurgePeriod: 28800,
+        epochLength: 12,
+        auditBiasFactor: 2,
+        workReportAccumulationGas: Gas(10_000_000),
+        workPackageAuthorizerGas: Gas(50_000_000),
+        workPackageRefineGas: Gas(5_000_000_000),
+        totalAccumulationGas: Gas(3_500_000_000),
+        recentHistorySize: 8,
+        maxWorkItems: 4,
+        maxDepsInWorkReport: 8,
+        maxTicketsPerExtrinsic: 3,
+        maxLookupAnchorAge: 14400,
+        transferMemoSize: 128,
+        ticketEntriesPerValidator: 3,
+        maxAuthorizationsPoolItems: 8,
+        slotPeriodSeconds: 6,
+        maxAuthorizationsQueueItems: 80,
+        coreAssignmentRotationPeriod: 4,
+        maxServiceCodeSize: 4_000_000,
+        preimageReplacementPeriod: 5,
+        totalNumberOfValidators: 6,
+        erasureCodedPieceSize: 684,
+        maxWorkPackageManifestEntries: 1 << 11,
+        maxEncodedWorkPackageSize: 12 * 1 << 20,
+        segmentSize: 4104,
+        maxWorkReportOutputSize: 48 * 1 << 10,
+        erasureCodedSegmentSize: 6,
+        ticketSubmissionEndSlot: 10,
+        pvmDynamicAddressAlignmentFactor: 2,
+        pvmProgramInitInputDataSize: 1 << 24,
+        pvmProgramInitZoneSize: 1 << 16,
+        pvmMemoryPageSize: 1 << 12
     ))
 
     public static let mainnet = Ref(ProtocolConfig(
@@ -48,11 +132,13 @@ extension Ref where T == ProtocolConfig {
         preimagePurgePeriod: 28800,
         epochLength: 600,
         auditBiasFactor: 2,
-        coreAccumulationGas: Gas(10_000_000), // TODO: check this
-        workPackageAuthorizerGas: Gas(10_000_000), // TODO: check this
-        workPackageRefineGas: Gas(10_000_000), // TODO: check this
+        workReportAccumulationGas: Gas(10_000_000),
+        workPackageAuthorizerGas: Gas(50_000_000),
+        workPackageRefineGas: Gas(5_000_000_000),
+        totalAccumulationGas: Gas(3_500_000_000),
         recentHistorySize: 8,
         maxWorkItems: 4,
+        maxDepsInWorkReport: 8,
         maxTicketsPerExtrinsic: 16,
         maxLookupAnchorAge: 14400,
         transferMemoSize: 128,
@@ -67,12 +153,13 @@ extension Ref where T == ProtocolConfig {
         erasureCodedPieceSize: 684,
         maxWorkPackageManifestEntries: 1 << 11,
         maxEncodedWorkPackageSize: 12 * 1 << 20,
-        maxEncodedWorkReportSize: 96 * 1 << 10,
+        segmentSize: 4104,
+        maxWorkReportOutputSize: 48 * 1 << 10,
         erasureCodedSegmentSize: 6,
         ticketSubmissionEndSlot: 500,
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
-        pvmProgramInitPageSize: 1 << 14,
-        pvmProgramInitSegmentSize: 1 << 16
+        pvmProgramInitZoneSize: 1 << 16,
+        pvmMemoryPageSize: 1 << 12
     ))
 }

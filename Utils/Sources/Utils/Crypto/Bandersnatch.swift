@@ -2,83 +2,6 @@ import bandersnatch_vrfs
 import Foundation
 import TracingUtils
 
-private let logger = Logger(label: "Bandersnatch")
-
-private func _call<E: Error>(
-    data: [Data],
-    out: inout Data?,
-    fn: ([(ptr: UnsafeRawPointer, count: UInt)], (ptr: UnsafeMutableRawPointer, count: UInt)?) -> Int,
-    onErr: (Int) throws(E) -> Void
-) throws(E) {
-    func helper(data: ArraySlice<Data>, ptr: [(ptr: UnsafeRawPointer, count: UInt)]) -> Int {
-        if data.isEmpty {
-            if var outData = out {
-                let res = outData.withUnsafeMutableBytes { (bufferPtr: UnsafeMutableRawBufferPointer) -> Int in
-                    guard let bufferAddress = bufferPtr.baseAddress else {
-                        fatalError("unreachable: bufferPtr.baseAddress is nil")
-                    }
-                    return fn(ptr, (ptr: bufferAddress, count: UInt(bufferPtr.count)))
-                }
-                out = outData
-                return res
-            }
-            return fn(ptr, nil)
-        }
-        let rest = data.dropFirst()
-        let first = data.first!
-        return first.withUnsafeBytes { (bufferPtr: UnsafeRawBufferPointer) -> Int in
-            guard let bufferAddress = bufferPtr.baseAddress else {
-                fatalError("unreachable: bufferPtr.baseAddress is nil")
-            }
-            return helper(data: rest, ptr: ptr + [(bufferAddress, UInt(bufferPtr.count))])
-        }
-    }
-
-    let ret = helper(data: data[...], ptr: [])
-
-    if ret != 0 {
-        try onErr(ret)
-    }
-}
-
-private func call<E: Error>(
-    _ data: Data...,
-    fn: ([(ptr: UnsafeRawPointer, count: UInt)]) -> Int,
-    onErr: (Int) throws(E) -> Void
-) throws(E) {
-    var out: Data?
-    try _call(data: data, out: &out, fn: { ptrs, _ in fn(ptrs) }, onErr: onErr)
-}
-
-private func call(
-    _ data: Data...,
-    fn: ([(ptr: UnsafeRawPointer, count: UInt)]) -> Int
-) {
-    var out: Data?
-    _call(data: data, out: &out, fn: { ptrs, _ in fn(ptrs) }, onErr: { err in fatalError("unreachable: \(err)") })
-}
-
-private func call<E: Error>(
-    _ data: Data...,
-    out: inout Data,
-    fn: ([(ptr: UnsafeRawPointer, count: UInt)], (ptr: UnsafeMutableRawPointer, count: UInt)) -> Int,
-    onErr: (Int) throws(E) -> Void
-) throws(E) {
-    var out2: Data? = out
-    try _call(data: data, out: &out2, fn: { ptrs, out_buf in fn(ptrs, out_buf!) }, onErr: onErr)
-    out = out2!
-}
-
-private func call(
-    _ data: Data...,
-    out: inout Data,
-    fn: ([(ptr: UnsafeRawPointer, count: UInt)], (ptr: UnsafeMutableRawPointer, count: UInt)) -> Int
-) {
-    var out2: Data? = out
-    _call(data: data, out: &out2, fn: { ptrs, out_buf in fn(ptrs, out_buf!) }, onErr: { err in fatalError("unreachable: \(err)") })
-    out = out2!
-}
-
 public enum Bandersnatch: KeyType {
     public enum Error: Swift.Error {
         case createSecretFailed(Int)
@@ -93,41 +16,32 @@ public enum Bandersnatch: KeyType {
         case getOutputFailed(Int)
     }
 
-    public final class SecretKey: SecretKeyProtocol, @unchecked Sendable {
-        fileprivate let ptr: OpaquePointer
+    public final class SecretKey: SecretKeyProtocol, Sendable {
+        fileprivate let ptr: SafePointer
         public let publicKey: PublicKey
 
         public init(from seed: Data32) throws(Error) {
             var ptr: OpaquePointer!
 
-            try call(seed.data) { ptrs in
+            try FFIUtils.call(seed.data) { ptrs in
                 secret_new(ptrs[0].ptr, ptrs[0].count, &ptr)
             } onErr: { err throws(Error) in
                 throw .createSecretFailed(err)
             }
 
-            self.ptr = ptr
-            publicKey = try PublicKey(secretKey: ptr)
-        }
-
-        deinit {
-            secret_free(ptr)
+            self.ptr = SafePointer(ptr: ptr, free: secret_free)
+            publicKey = try PublicKey(secretKey: self.ptr.ptr.value)
         }
 
         /// Non-Anonymous VRF signature.
         ///
         /// Used for ticket claiming during block production.
         public func ietfVRFSign(vrfInputData: Data, auxData: Data = Data()) throws -> Data96 {
-            logger.trace(
-                "ietfVRFSign",
-                metadata: ["vrfInputData": "\(vrfInputData.toDebugHexString())", "auxData": "\(auxData.toDebugHexString())"]
-            )
-
             var output = Data(repeating: 0, count: 96)
 
-            try call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
+            try FFIUtils.call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
                 prover_ietf_vrf_sign(
-                    ptr,
+                    ptr.ptr.value,
                     ptrs[0].ptr,
                     ptrs[0].count,
                     ptrs[1].ptr,
@@ -143,13 +57,11 @@ public enum Bandersnatch: KeyType {
         }
 
         public func getOutput(vrfInputData: Data) throws -> Data32 {
-            logger.trace("getOutput", metadata: ["vrfInputData": "\(vrfInputData.toDebugHexString())"])
-
             var output = Data(repeating: 0, count: 32)
 
-            try call(vrfInputData, out: &output) { ptrs, out_buf in
+            try FFIUtils.call(vrfInputData, out: &output) { ptrs, out_buf in
                 secret_output(
-                    ptr,
+                    ptr.ptr.value,
                     ptrs[0].ptr,
                     ptrs[0].count,
                     out_buf.ptr,
@@ -163,40 +75,40 @@ public enum Bandersnatch: KeyType {
         }
     }
 
-    public final class PublicKey: PublicKeyProtocol, Hashable, @unchecked Sendable, CustomStringConvertible {
-        fileprivate let ptr: OpaquePointer
+    public final class PublicKey: PublicKeyProtocol, Hashable, Sendable, CustomStringConvertible {
+        fileprivate let ptr: SendableOpaquePointer
         public let data: Data32
 
         public init(data: Data32) throws(Error) {
             var ptr: OpaquePointer!
-            try call(data.data) { ptrs in
+            try FFIUtils.call(data.data) { ptrs in
                 public_new_from_data(ptrs[0].ptr, ptrs[0].count, &ptr)
             } onErr: { err throws(Error) in
                 throw .createPublicKeyFailed(err)
             }
-            self.ptr = ptr
+            self.ptr = ptr.asSendable
             self.data = data
         }
 
         fileprivate init(secretKey: OpaquePointer) throws(Error) {
             var ptr: OpaquePointer!
-            try call { _ in
+            try FFIUtils.call { _ in
                 public_new_from_secret(secretKey, &ptr)
             } onErr: { err throws(Error) in
                 throw .createRingContextFailed(err)
             }
 
             var data = Data(repeating: 0, count: 32)
-            call(out: &data) { _, out_buf in
+            FFIUtils.call(out: &data) { _, out_buf in
                 public_serialize_compressed(ptr, out_buf.ptr, out_buf.count)
             }
 
-            self.ptr = ptr
+            self.ptr = ptr.asSendable
             self.data = Data32(data)!
         }
 
         deinit {
-            public_free(ptr)
+            public_free(ptr.value)
         }
 
         public convenience init(from decoder: Decoder) throws {
@@ -231,20 +143,11 @@ public enum Bandersnatch: KeyType {
         public func ietfVRFVerify(
             vrfInputData: Data, auxData: Data = Data(), signature: Data96
         ) throws(Error) -> Data32 {
-            logger.trace(
-                "ietfVRFVerify",
-                metadata: [
-                    "vrfInputData": "\(vrfInputData.toDebugHexString())",
-                    "auxData": "\(auxData.toDebugHexString())",
-                    "signature": "\(signature.data.toDebugHexString())",
-                ]
-            )
-
             var output = Data(repeating: 0, count: 32)
 
-            try call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in
+            try FFIUtils.call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in
                 verifier_ietf_vrf_verify(
-                    ptr,
+                    ptr.value,
                     ptrs[0].ptr,
                     ptrs[0].count,
                     ptrs[1].ptr,
@@ -262,21 +165,21 @@ public enum Bandersnatch: KeyType {
         }
     }
 
-    public final class RingContext: @unchecked Sendable {
-        fileprivate let ptr: OpaquePointer
+    public final class RingContext: Sendable {
+        fileprivate let ptr: SendableOpaquePointer
 
         public init(size: UInt) throws(Error) {
             var ptr: OpaquePointer!
-            try call { _ in
+            try FFIUtils.call { _ in
                 ring_context_new(size, &ptr)
             } onErr: { err throws(Error) in
                 throw .createRingContextFailed(err)
             }
-            self.ptr = ptr
+            self.ptr = ptr.asSendable
         }
 
         deinit {
-            ring_context_free(ptr)
+            ring_context_free(ptr.value)
         }
     }
 
@@ -292,28 +195,23 @@ public enum Bandersnatch: KeyType {
             self.ring = ring
             self.proverIdx = proverIdx
             self.ctx = ctx
-            ringPtrs = ring.map { $0?.ptr }
+            ringPtrs = ring.map { $0?.ptr.value }
         }
 
         /// Anonymous VRF signature.
         ///
         /// Used for tickets submission.
         public func ringVRFSign(vrfInputData: Data, auxData: Data = Data()) throws(Error) -> Data784 {
-            logger.trace(
-                "ringVRFSign",
-                metadata: ["vrfInputData": "\(vrfInputData.toDebugHexString())", "auxData": "\(auxData.toDebugHexString())"]
-            )
-
             var output = Data(repeating: 0, count: 784)
 
-            try call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
+            try FFIUtils.call(vrfInputData, auxData, out: &output) { ptrs, out_buf in
                 ringPtrs.withUnsafeBufferPointer { ringPtrs in
                     prover_ring_vrf_sign(
-                        secret.ptr,
+                        secret.ptr.ptr.value,
                         ringPtrs.baseAddress,
                         UInt(ringPtrs.count),
                         proverIdx,
-                        ctx.ptr,
+                        ctx.ptr.value,
                         ptrs[0].ptr,
                         ptrs[0].count,
                         ptrs[1].ptr,
@@ -330,20 +228,20 @@ public enum Bandersnatch: KeyType {
         }
     }
 
-    public final class RingCommitment: @unchecked Sendable {
-        fileprivate let ptr: OpaquePointer
+    public final class RingCommitment: Sendable {
+        fileprivate let ptr: SendableOpaquePointer
         public let data: Data144
 
         public init(ring: [PublicKey?], ctx: RingContext) throws(Error) {
-            let ringPtrs = ring.map { $0?.ptr as OpaquePointer? }
+            let ringPtrs = ring.map { $0?.ptr.value as OpaquePointer? }
 
             var ptr: OpaquePointer!
-            try call { _ in
+            try FFIUtils.call { _ in
                 ringPtrs.withUnsafeBufferPointer { ringPtrs in
                     ring_commitment_new_from_ring(
                         ringPtrs.baseAddress,
                         UInt(ringPtrs.count),
-                        ctx.ptr,
+                        ctx.ptr.value,
                         &ptr
                     )
                 }
@@ -353,29 +251,29 @@ public enum Bandersnatch: KeyType {
             }
 
             var out = Data(repeating: 0, count: 144)
-            try call(out: &out) { _, out_buf in
+            try FFIUtils.call(out: &out) { _, out_buf in
                 ring_commitment_serialize(ptr, out_buf.ptr, out_buf.count)
             } onErr: { err throws(Error) in
                 throw .serializeRingCommitmentFailed(err)
             }
 
-            self.ptr = ptr
+            self.ptr = ptr.asSendable
             data = Data144(out)!
         }
 
         public init(data: Data144) throws(Error) {
             var ptr: OpaquePointer!
-            try call(data.data) { ptrs in
+            try FFIUtils.call(data.data) { ptrs in
                 ring_commitment_new_from_data(ptrs[0].ptr, ptrs[0].count, &ptr)
             } onErr: { err throws(Error) in
                 throw .createRingCommitmentFailed(err)
             }
-            self.ptr = ptr
+            self.ptr = ptr.asSendable
             self.data = data
         }
 
         deinit {
-            ring_commitment_free(ptr)
+            ring_commitment_free(ptr.value)
         }
     }
 
@@ -394,21 +292,12 @@ public enum Bandersnatch: KeyType {
         ///
         /// On success returns the VRF output hash.
         public func ringVRFVerify(vrfInputData: Data, auxData: Data = Data(), signature: Data784) throws(Error) -> Data32 {
-            logger.trace(
-                "ringVRFVerify",
-                metadata: [
-                    "vrfInputData": "\(vrfInputData.toDebugHexString())",
-                    "auxData": "\(auxData.toDebugHexString())",
-                    "signature": "\(signature.data.toDebugHexString())",
-                ]
-            )
-
             var output = Data(repeating: 0, count: 32)
 
-            try call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in
+            try FFIUtils.call(vrfInputData, auxData, signature.data, out: &output) { ptrs, out_buf in
                 verifier_ring_vrf_verify(
-                    ctx.ptr,
-                    commitment.ptr,
+                    ctx.ptr.value,
+                    commitment.ptr.value,
                     ptrs[0].ptr,
                     ptrs[0].count,
                     ptrs[1].ptr,

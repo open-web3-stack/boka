@@ -1,27 +1,41 @@
 import Utils
 import Vapor
 
-struct JSONRequest: Content {
-    let jsonrpc: String
-    let method: String
-    let params: JSON?
-    let id: Int
+public struct JSONRequest: Content {
+    public let jsonrpc: String
+    public let method: String
+    public let params: JSON?
+    public let id: JSON
 }
 
-struct JSONResponse: Content {
-    let jsonrpc: String
-    let result: AnyCodable?
-    let error: JSONError?
-    let id: Int?
+public struct JSONResponse: Content {
+    public let jsonrpc: String
+    public let result: AnyCodable?
+    public let error: JSONError?
+    public let id: JSON?
+
+    public init(id: JSON?, result: (any Encodable)?) {
+        jsonrpc = "2.0"
+        self.result = result.map(AnyCodable.init)
+        error = nil
+        self.id = id
+    }
+
+    public init(id: JSON?, error: JSONError) {
+        jsonrpc = "2.0"
+        result = nil
+        self.error = error
+        self.id = id
+    }
 }
 
-struct JSONError: Content, Error {
+public struct JSONError: Content, Error {
     let code: Int
     let message: String
 }
 
 extension JSONError {
-    static func methodNotFound(_ method: String) -> JSONError {
+    public static func methodNotFound(_ method: String) -> JSONError {
         JSONError(code: -32601, message: "Method not found: \(method)")
     }
 }

@@ -1,6 +1,6 @@
-module blst {
-  header "blst/bindings/blst.h"
-  link "blst"
+module bls {
+  header "bls/bindings.h"
+  link "bls"
 }
 
 module bandersnatch_vrfs {

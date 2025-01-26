@@ -1,13 +1,16 @@
-import XCTest
+import Blockchain
+import Foundation
+import Node
+import Testing
 
 @testable import Boka
 
-final class BokaTests: XCTestCase {
-    func testExample() throws {
-        // XCTest Documentation
-        // https://developer.apple.com/documentation/xctest
-
-        // Defining Test Cases and Test Methods
-        // https://developer.apple.com/documentation/xctest/defining_test_cases_and_test_methods
+struct BokaTests {
+    @Test func commandWithWrongFilePath() async throws {
+        let sepc = "/path/to/wrong/file.json"
+        var boka = try Boka.parseAsRoot(["--chain", sepc]) as! Boka
+        await #expect(throws: GenesisError.self) {
+            try await boka.run()
+        }
     }
 }

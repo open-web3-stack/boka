@@ -5,19 +5,24 @@ import PolkaVM
 public protocol IsAuthorizedFunction {
     func invoke(
         config: ProtocolConfigRef,
+        serviceAccounts: some ServiceAccounts,
         package: WorkPackage,
         coreIndex: CoreIndex
-    ) throws -> Result<Data, WorkResultError>
+    ) async throws -> Result<Data, WorkResultError>
 }
 
 extension IsAuthorizedFunction {
-    public func invoke(config: ProtocolConfigRef, package: WorkPackage, coreIndex: CoreIndex) throws -> Result<Data, WorkResultError> {
-        let args = try JamEncoder.encode(package) + JamEncoder.encode(coreIndex)
+    public func invoke(
+        config: ProtocolConfigRef,
+        serviceAccounts: some ServiceAccounts,
+        package: WorkPackage,
+        coreIndex: CoreIndex
+    ) async throws -> Result<Data, WorkResultError> {
+        let args = try JamEncoder.encode(package, coreIndex)
         let ctx = IsAuthorizedContext(config: config)
-
-        let (exitReason, _, _, output) = invokePVM(
+        let (exitReason, _, output) = try await invokePVM(
             config: config,
-            blob: package.authorizationCodeHash.data,
+            blob: package.authorizationCode(serviceAccounts: serviceAccounts),
             pc: 0,
             gas: config.value.workPackageAuthorizerGas,
             argumentData: args,

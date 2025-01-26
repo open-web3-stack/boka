@@ -6,82 +6,62 @@ import Utils
 extension AccumulateFunction {
     public func invoke(
         config: ProtocolConfigRef,
+        accounts: inout some ServiceAccounts,
+        state: AccumulateState,
         serviceIndex: ServiceIndex,
-        code _: Data,
-        serviceAccounts: [ServiceIndex: ServiceAccount],
         gas: Gas,
         arguments: [AccumulateArguments],
-        validatorQueue: ConfigFixedSizeArray<
-            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
-        >,
-        authorizationQueue: ConfigFixedSizeArray<
-            ConfigFixedSizeArray<
-                Data32,
-                ProtocolConfig.MaxAuthorizationsQueueItems
-            >,
-            ProtocolConfig.TotalNumberOfCores
-        >,
-        privilegedServices: PrivilegedServices,
         initialIndex: ServiceIndex,
         timeslot: TimeslotIndex
-    ) throws -> (ctx: AccumlateResultContext, result: Data32?) {
-        var defaultCtx = AccumlateResultContext(
-            account: serviceAccounts[serviceIndex],
-            authorizationQueue: authorizationQueue,
-            validatorQueue: validatorQueue,
-            serviceIndex: serviceIndex,
-            transfers: [],
-            newAccounts: [:],
-            privilegedServices: privilegedServices
-        )
-
-        if serviceAccounts[serviceIndex]?.codeHash.data == nil {
-            return (ctx: defaultCtx, result: nil)
+    ) async throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
+        guard let accumulatingAccountDetails = try await accounts.get(serviceAccount: serviceIndex) else {
+            return (state, [], nil, Gas(0))
         }
 
-        defaultCtx.serviceIndex = try AccumulateContext.check(
-            i: initialIndex & (serviceIndexModValue - 1) + 256,
-            serviceAccounts: serviceAccounts
-        )
-
-        let ctx = AccumulateContext(
-            context: (
-                x: defaultCtx,
-                y: defaultCtx,
-                serviceIndex: serviceIndex,
-                accounts: serviceAccounts,
-                timeslot: timeslot
+        let resultCtx = AccumlateResultContext(
+            serviceAccounts: accounts,
+            serviceIndex: serviceIndex,
+            accumulateState: state,
+            nextAccountIndex: AccumulateContext.check(
+                i: initialIndex & (serviceIndexModValue - 1) + 256,
+                serviceAccounts: [:]
             ),
-            config: config
+            transfers: []
         )
-        let argument = try JamEncoder.encode(arguments)
 
-        let (exitReason, _, _, output) = invokePVM(
+        var contextContent = AccumulateContext.ContextType(
+            x: resultCtx,
+            y: resultCtx
+        )
+        let ctx = AccumulateContext(context: &contextContent, config: config, timeslot: timeslot)
+        let argument = try JamEncoder.encode(timeslot, serviceIndex, arguments)
+
+        let (exitReason, gas, output) = await invokePVM(
             config: config,
-            blob: serviceAccounts[serviceIndex]!.codeHash.data,
-            pc: 10,
+            blob: accumulatingAccountDetails.codeHash.data,
+            pc: 5,
             gas: gas,
             argumentData: argument,
             ctx: ctx
         )
 
-        return try collapse(exitReason: exitReason, output: output, context: ctx.context)
+        return try collapse(exitReason: exitReason, output: output, context: ctx.context, gas: gas)
     }
 
     // collapse function C selects one of the two dimensions of context depending on whether the virtual
     // machine’s halt was regular or exceptional
     private func collapse(
-        exitReason: ExitReason, output: Data?, context: AccumulateContext.ContextType
-    ) throws -> (ctx: AccumlateResultContext, result: Data32?) {
+        exitReason: ExitReason, output: Data?, context: AccumulateContext.ContextType, gas: Gas
+    ) throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
         switch exitReason {
-        case .halt:
-            if let output, let o = Data32(output) {
-                (ctx: context.x, result: o)
-            } else {
-                (ctx: context.x, result: nil)
-            }
+        case .panic, .outOfGas:
+            (context.y.accumulateState, context.y.transfers, context.y.yield, gas)
         default:
-            (ctx: context.y, result: nil)
+            if let output, let o = Data32(output) {
+                (context.x.accumulateState, context.x.transfers, o, gas)
+            } else {
+                (context.x.accumulateState, context.x.transfers, context.x.yield, gas)
+            }
         }
     }
 }

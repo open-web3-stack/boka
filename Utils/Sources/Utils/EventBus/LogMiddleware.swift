@@ -13,7 +13,7 @@ public final class LogMiddleware: MiddlewareProtocol {
         logger.debug(">>> dispatching event: \(event)")
         do {
             try await next(event)
-            logger.debug("<<< event dispatched: \(event)")
+            logger.debug("<<< event dispatched: \(T.self)")
         } catch {
             logger.error("<<! event dispatch failed: \(event) with error: \(error)")
             if propagateError {

@@ -27,7 +27,7 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
         self.keystore = keystore
         ringContext = try! Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
 
-        super.init(logger: Logger(label: "SafroleService"), config: config, eventBus: eventBus)
+        super.init(id: "SafroleService", config: config, eventBus: eventBus)
 
         await subscribe(RuntimeEvents.BlockImported.self, id: "SafroleService.BlockImported") { [weak self] event in
             try await self?.on(blockImported: event)
@@ -66,8 +66,6 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
                 continue
             }
 
-            logger.debug("Generating tickets for validator \(pubkey)")
-
             try withSpan("generateTickets") { _ in
                 let tickets = try SafroleService.generateTickets(
                     count: TicketIndex(config.value.ticketEntriesPerValidator),
@@ -79,6 +77,7 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
                 )
 
                 events.append(.init(
+                    epochIndex: state.value.timeslot.timeslotToEpochIndex(config: config),
                     items: tickets,
                     publicKey: secret.publicKey
                 ))
@@ -86,7 +85,7 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
         }
 
         if events.isEmpty {
-            logger.debug("Not in next validators")
+            logger.trace("Not in next validators")
         }
 
         return events

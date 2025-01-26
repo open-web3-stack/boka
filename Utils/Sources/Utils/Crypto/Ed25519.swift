@@ -15,6 +15,10 @@ public enum Ed25519: KeyType {
             let signature = try secretKey.signature(for: message)
             return Data64(signature)!
         }
+
+        public var rawRepresentation: Data {
+            secretKey.rawRepresentation
+        }
     }
 
     public final class PublicKey: PublicKeyProtocol, @unchecked Sendable {

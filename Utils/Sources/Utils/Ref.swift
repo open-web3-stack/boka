@@ -1,6 +1,4 @@
-import Atomics
-
-open class Ref<T: Sendable>: @unchecked Sendable, AtomicReference, CustomStringConvertible {
+open class Ref<T: Sendable>: @unchecked Sendable, CustomStringConvertible {
     public let value: T
 
     public required init(_ value: T) {

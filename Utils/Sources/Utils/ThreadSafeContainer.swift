@@ -1,27 +1,28 @@
 import Foundation
 
-public final class ThreadSafeContainer<T: Sendable>: @unchecked Sendable {
+public final class ThreadSafeContainer<T>: @unchecked Sendable {
     private var storage: T
-    private let queue: DispatchQueue
+    private let lock: ReadWriteLock = .init()
 
-    public init(_ initialValue: T, label: String = "boka.threadsafecontainer") {
+    public init(_ initialValue: T) {
         storage = initialValue
-        queue = DispatchQueue(label: label, attributes: .concurrent)
     }
 
-    public func read<U>(_ action: (T) -> U) -> U {
-        queue.sync { action(self.storage) }
+    public func read<U>(_ action: (T) throws -> U) rethrows -> U {
+        try lock.withReadLock { try action(self.storage) }
     }
 
-    public func write(_ action: @escaping @Sendable (inout T) -> Void) {
-        queue.async(flags: .barrier) {
-            action(&self.storage)
+    public func write<U>(_ action: (inout T) throws -> U) rethrows -> U {
+        try lock.withWriteLock {
+            try action(&self.storage)
         }
     }
 
-    public func mutate<U>(_ action: @escaping (inout T) throws -> U) rethrows -> U {
-        try queue.sync(flags: .barrier) {
-            try action(&self.storage)
+    public func exchange(_ value: T) -> T {
+        lock.withWriteLock {
+            let ret = self.storage
+            self.storage = value
+            return ret
         }
     }
 

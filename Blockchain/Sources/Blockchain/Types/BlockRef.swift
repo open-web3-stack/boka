@@ -32,3 +32,12 @@ extension BlockRef: Codable {
         try value.encode(to: encoder)
     }
 }
+
+extension BlockRef {
+    public static func dummy(config: ProtocolConfigRef, parent: BlockRef) -> BlockRef {
+        dummy(config: config).mutate {
+            $0.header.unsigned.parentHash = parent.hash
+            $0.header.unsigned.timeslot = parent.header.timeslot + 1
+        }
+    }
+}

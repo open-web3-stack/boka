@@ -1,29 +1,25 @@
 import Utils
 
-public enum BlockchainDataProviderError: Error, Equatable {
-    case noData(hash: Data32)
-}
-
 public protocol BlockchainDataProviderProtocol: Sendable {
     func hasBlock(hash: Data32) async throws -> Bool
     func hasState(hash: Data32) async throws -> Bool
     func isHead(hash: Data32) async throws -> Bool
 
-    /// throw BlockchainDataProviderError.noData if not found
-    func getHeader(hash: Data32) async throws -> HeaderRef
+    func getBlockNumber(hash: Data32) async throws -> UInt32?
 
-    /// throw BlockchainDataProviderError.noData if not found
-    func getBlock(hash: Data32) async throws -> BlockRef
+    func getHeader(hash: Data32) async throws -> HeaderRef?
 
-    /// throw BlockchainDataProviderError.noData if not found
-    func getState(hash: Data32) async throws -> StateRef
+    func getBlock(hash: Data32) async throws -> BlockRef?
 
-    /// throw BlockchainDataProviderError.noData if not found
-    func getFinalizedHead() async throws -> Data32
+    func getState(hash: Data32) async throws -> StateRef?
+
+    func getFinalizedHead() async throws -> Data32?
     func getHeads() async throws -> Set<Data32>
 
     /// return empty set if not found
     func getBlockHash(byTimeslot timeslot: TimeslotIndex) async throws -> Set<Data32>
+    /// return empty set if not found
+    func getBlockHash(byNumber number: UInt32) async throws -> Set<Data32>
 
     func add(block: BlockRef) async throws
     func add(state: StateRef) async throws
@@ -34,4 +30,6 @@ public protocol BlockchainDataProviderProtocol: Sendable {
 
     /// remove header, block and state
     func remove(hash: Data32) async throws
+
+    var genesisBlockHash: Data32 { get }
 }

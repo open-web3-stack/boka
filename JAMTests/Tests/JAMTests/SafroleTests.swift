@@ -10,7 +10,6 @@ struct SafroleInput: Codable {
     var slot: UInt32
     var entropy: Data32
     var extrinsics: ExtrinsicTickets
-    var offenders: [Ed25519PublicKey]
 }
 
 struct OutputMarks: Codable {
@@ -22,18 +21,6 @@ struct OutputMarks: Codable {
 }
 
 struct SafroleState: Equatable, Safrole, Codable {
-    enum CodingKeys: String, CodingKey {
-        case timeslot
-        case entropyPool
-        case previousValidators
-        case currentValidators
-        case nextValidators
-        case validatorQueue
-        case ticketsAccumulator
-        case ticketsOrKeys
-        case ticketsVerifier
-    }
-
     // tau
     var timeslot: UInt32
     // eta
@@ -74,6 +61,9 @@ struct SafroleState: Equatable, Safrole, Codable {
     // gammaZ
     var ticketsVerifier: BandersnatchRingVRFRoot
 
+    // ψo
+    var offenders: [Ed25519PublicKey]
+
     public mutating func mergeWith(postState: SafrolePostState) {
         timeslot = postState.timeslot
         entropyPool = postState.entropyPool
@@ -94,33 +84,12 @@ struct SafroleTestcase: Codable {
     var postState: SafroleState
 }
 
-enum SafroleTestVariants: String, CaseIterable {
-    case tiny
-    case full
-
-    static let tinyConfig = ProtocolConfigRef.mainnet.mutate { config in
-        config.totalNumberOfValidators = 6
-        config.epochLength = 12
-        // 10 = 12 * 500/600, not sure what this should be for tiny, but this passes tests
-        config.ticketSubmissionEndSlot = 10
-    }
-
-    var config: ProtocolConfigRef {
-        switch self {
-        case .tiny:
-            Self.tinyConfig
-        case .full:
-            ProtocolConfigRef.mainnet
-        }
-    }
-}
-
 struct SafroleTests {
-    static func loadTests(variant: SafroleTestVariants) throws -> [Testcase] {
+    static func loadTests(variant: TestVariants) throws -> [Testcase] {
         try TestLoader.getTestcases(path: "safrole/\(variant)", extension: "bin")
     }
 
-    func safroleTests(_ input: Testcase, variant: SafroleTestVariants) throws {
+    func safroleTests(_ input: Testcase, variant: TestVariants) throws {
         let config = variant.config
         let testcase = try JamDecoder.decode(SafroleTestcase.self, from: input.data, withConfig: config)
 
@@ -130,7 +99,7 @@ struct SafroleTests {
                 config: config,
                 slot: testcase.input.slot,
                 entropy: testcase.input.entropy,
-                offenders: Set(testcase.input.offenders),
+                offenders: Set(testcase.preState.offenders),
                 extrinsics: testcase.input.extrinsics
             )
         }

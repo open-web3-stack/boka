@@ -1,10 +1,10 @@
 #!/bin/bash
 
-if which swiftlint >/dev/null; then
-  swiftlint lint --fix --quiet
-else
-  echo "warning: SwiftLint not installed, download from https://github.com/realm/SwiftLint"
-fi
+# if which swiftlint >/dev/null; then
+#   swiftlint lint --fix --quiet
+# else
+#   echo "warning: SwiftLint not installed, download from https://github.com/realm/SwiftLint"
+# fi
 
 git diff --diff-filter=d --staged --name-only | grep -e '\(.*\).swift$' | while read line; do
   swiftformat "${line}";

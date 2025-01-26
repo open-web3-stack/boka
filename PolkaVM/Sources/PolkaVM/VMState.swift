@@ -36,32 +36,36 @@ public class VMState {
         gas
     }
 
-    public func getMemory() -> Memory.Readonly {
-        Memory.Readonly(memory)
+    public func getMemory() -> ReadonlyMemory {
+        ReadonlyMemory(memory)
     }
 
-    public func readMemory(address: UInt32) throws -> UInt8 {
-        try memory.read(address: address)
+    public func getMemoryUnsafe() -> Memory {
+        memory
     }
 
-    public func readMemory(address: UInt32, length: Int) throws -> Data {
-        try memory.read(address: address, length: length)
+    public func isMemoryReadable(address: some FixedWidthInteger, length: Int) -> Bool {
+        memory.isReadable(address: UInt32(truncatingIfNeeded: address), length: length)
     }
 
-    public func isMemoryReadable(address: UInt32, length: Int) -> Bool {
-        memory.isReadable(address: address, length: length)
+    public func readMemory(address: some FixedWidthInteger) throws -> UInt8 {
+        try memory.read(address: UInt32(truncatingIfNeeded: address))
     }
 
-    public func isMemoryWritable(address: UInt32, length: Int) -> Bool {
-        memory.isWritable(address: address, length: length)
+    public func readMemory(address: some FixedWidthInteger, length: Int) throws -> Data {
+        try memory.read(address: UInt32(truncatingIfNeeded: address), length: length)
     }
 
-    public func writeMemory(address: UInt32, value: UInt8) throws {
-        try memory.write(address: address, value: value)
+    public func isMemoryWritable(address: some FixedWidthInteger, length: Int) -> Bool {
+        memory.isWritable(address: UInt32(truncatingIfNeeded: address), length: length)
     }
 
-    public func writeMemory(address: UInt32, values: some Sequence<UInt8>) throws {
-        try memory.write(address: address, values: values)
+    public func writeMemory(address: some FixedWidthInteger, value: UInt8) throws {
+        try memory.write(address: UInt32(truncatingIfNeeded: address), value: value)
+    }
+
+    public func writeMemory(address: some FixedWidthInteger, values: some Sequence<UInt8>) throws {
+        try memory.write(address: UInt32(truncatingIfNeeded: address), values: values)
     }
 
     public func sbrk(_ increment: UInt32) throws -> UInt32 {
@@ -82,19 +86,19 @@ public class VMState {
         pc = newPC
     }
 
-    public func readRegister(_ index: Registers.Index) -> UInt32 {
-        registers[index]
+    public func readRegister<T: FixedWidthInteger>(_ index: Registers.Index) -> T {
+        T(truncatingIfNeeded: registers[index])
     }
 
-    public func readRegister(_ index: Registers.Index, _ index2: Registers.Index) -> (UInt32, UInt32) {
-        (registers[index], registers[index2])
+    public func readRegister<T: FixedWidthInteger>(_ index: Registers.Index, _ index2: Registers.Index) -> (T, T) {
+        (T(truncatingIfNeeded: registers[index]), T(truncatingIfNeeded: registers[index2]))
     }
 
-    public func readRegisters(in range: Range<UInt8>) -> [UInt32] {
-        range.map { registers[Registers.Index(raw: $0)] }
+    public func readRegisters<T: FixedWidthInteger>(in range: Range<UInt8>) -> [T] {
+        range.map { T(truncatingIfNeeded: registers[Registers.Index(raw: $0)]) }
     }
 
-    public func writeRegister(_ index: Registers.Index, _ value: UInt32) {
-        registers[index] = value
+    public func writeRegister(_ index: Registers.Index, _ value: some FixedWidthInteger) {
+        registers[index] = UInt64(truncatingIfNeeded: value)
     }
 }
