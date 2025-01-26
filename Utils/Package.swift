@@ -41,7 +41,6 @@ let package = Package(
             ],
             swiftSettings: [
                 .define("DEBUG_ASSERT", .when(configuration: .debug)),
-                .define("EXCLUDE_STATIC_LIB"),
             ],
             linkerSettings: [
                 .unsafeFlags(["-L../.lib"]),
