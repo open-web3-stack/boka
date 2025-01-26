@@ -7,7 +7,31 @@ import XCTVapor
 @testable import RPC
 @testable import Utils
 
-struct DummySource: SystemDataSource {}
+struct DummySource: SystemDataSource {
+    func getProperties() async throws -> JSON {
+        JSON.array([])
+    }
+
+    func getChainName() async throws -> String {
+        "dev"
+    }
+
+    func getNodeRoles() async throws -> [String] {
+        []
+    }
+
+    func getVersion() async throws -> String {
+        "0.0.1"
+    }
+
+    func getHealth() async throws -> Bool {
+        true
+    }
+
+    func getImplementation() async throws -> String {
+        "Boka"
+    }
+}
 
 final class SystemHandlersTests {
     var app: Application

@@ -22,14 +22,37 @@ public final class NodeDataSource: Sendable {
     }
 }
 
-extension NodeDataSource: SystemDataSource {}
-
-extension NodeDataSource: ChainDataSource {
-    public func getBestBlockHash() async throws -> Set<Data32> {
-        let timeslot = blockchain.timeProvider.getTime().timeToTimeslot(config: blockchain.config)
-        return try await chainDataProvider.getBlockHash(byTimeslot: timeslot)
+extension NodeDataSource: SystemDataSource {
+    public func getProperties() async throws -> JSON {
+        // TODO: Get a custom set of properties as a JSON object, defined in the chain spec
+        JSON.array([])
     }
 
+    public func getChainName() async throws -> String {
+        blockchain.config.value.presetName() ?? ""
+    }
+
+    public func getNodeRoles() async throws -> [String] {
+        // TODO: Returns the roles the node is running as.
+        []
+    }
+
+    public func getVersion() async throws -> String {
+        // TODO: From spec or config
+        "0.0.1"
+    }
+
+    public func getHealth() async throws -> Bool {
+        // TODO: Check health status
+        true
+    }
+
+    public func getImplementation() async throws -> String {
+        name
+    }
+}
+
+extension NodeDataSource: ChainDataSource {
     public func getBestBlock() async throws -> BlockRef {
         try await chainDataProvider.getBlock(hash: chainDataProvider.bestHead.hash)
     }

@@ -69,12 +69,11 @@ public enum ChainHandlers {
         }
 
         public func handle(request: Request) async throws -> Response? {
-            let blockHash = if let timeslot = request.value {
-                try await source.getBlockHash(byTimeslot: timeslot)
-            } else {
-                try await source.getBestBlockHash()
+            if let timeslot = request.value {
+                let block = try await source.getBlockHash(byTimeslot: timeslot)
+                return try block.encode()
             }
-            return try blockHash.encode()
+            return nil
         }
     }
 

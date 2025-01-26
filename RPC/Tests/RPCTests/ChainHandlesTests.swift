@@ -16,11 +16,6 @@ public final class DummyNodeDataSource: Sendable {
 }
 
 extension DummyNodeDataSource: ChainDataSource {
-    public func getBestBlockHash() async throws -> Set<Data32> {
-        let timeslot = await chainDataProvider.bestHead.timeslot
-        return try await chainDataProvider.getBlockHash(byTimeslot: timeslot)
-    }
-
     public func getFinalizedHead() async throws -> Data32? {
         try await chainDataProvider.getFinalizedHead()
     }
