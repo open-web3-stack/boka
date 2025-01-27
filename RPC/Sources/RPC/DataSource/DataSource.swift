@@ -23,6 +23,7 @@ public protocol ChainDataSource: Sendable {
 public protocol TelemetryDataSource: Sendable {
     func name() async throws -> String
     func getPeersCount() async throws -> Int
+    func getNetworkKey() async throws -> String
 }
 
 public typealias DataSource = ChainDataSource & SystemDataSource & TelemetryDataSource

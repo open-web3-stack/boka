@@ -87,4 +87,8 @@ extension NodeDataSource: TelemetryDataSource {
     public func getPeersCount() async throws -> Int {
         networkManager.peersCount
     }
+
+    public func getNetworkKey() async throws -> String {
+        networkManager.network.networkKey
+    }
 }
