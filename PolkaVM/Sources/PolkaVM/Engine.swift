@@ -13,13 +13,13 @@ public class Engine {
         self.invocationContext = invocationContext
     }
 
-    public func execute(program: ProgramCode, state: VMState) async -> ExitReason {
+    public func execute(state: VMState) async -> ExitReason {
         let context = ExecutionContext(state: state, config: config)
         while true {
             guard state.getGas() > GasInt(0) else {
                 return .outOfGas
             }
-            if case let .exit(reason) = step(program: program, context: context) {
+            if case let .exit(reason) = step(program: state.program, context: context) {
                 switch reason {
                 case let .hostCall(callIndex):
                     if case let .exit(hostExitReason) = await hostCall(state: state, callIndex: callIndex) {
@@ -44,14 +44,14 @@ public class Engine {
             case let .pageFault(address):
                 return .exit(.pageFault(address))
             case let .hostCall(callIndexInner):
-                let pc = state.pc
-                let skip = state.program.skip(pc)
-                state.increasePC(skip + 1)
                 return await hostCall(state: state, callIndex: callIndexInner)
             default:
                 return .exit(reason)
             }
         case .continued:
+            let pc = state.pc
+            let skip = state.program.skip(pc)
+            state.increasePC(skip + 1)
             return .continued
         }
     }

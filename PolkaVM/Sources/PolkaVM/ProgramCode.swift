@@ -146,7 +146,7 @@ public class ProgramCode {
 
         var value: UInt32 = 0
         if (beginIndex + 4) < bitmask.endIndex { // if enough bytes
-            value = bitmask.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: beginIndex, as: UInt32.self) }
+            value = bitmask.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: beginIndex - bitmask.startIndex, as: UInt32.self) }
         } else {
             let byte1 = UInt32(bitmask[beginIndex])
             let byte2 = UInt32(bitmask[safe: beginIndex + 1] ?? 0xFF)

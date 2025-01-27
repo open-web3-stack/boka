@@ -1003,7 +1003,7 @@ public class Invoke: HostCall {
         let program = try ProgramCode(innerPvm.code)
         let vm = VMState(program: program, pc: innerPvm.pc, registers: Registers(registers), gas: Gas(gas), memory: innerPvm.memory)
         let engine = Engine(config: DefaultPvmConfig())
-        let exitReason = await engine.execute(program: program, state: vm)
+        let exitReason = await engine.execute(state: vm)
 
         try state.writeMemory(address: startAddr, values: JamEncoder.encode(vm.getGas(), vm.getRegisters()))
         context.pvms[pvmIndex]?.memory = vm.getMemoryUnsafe()

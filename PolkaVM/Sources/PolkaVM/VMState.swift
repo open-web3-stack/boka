@@ -65,7 +65,7 @@ public class VMState {
     }
 
     public func writeMemory(address: some FixedWidthInteger, values: some Sequence<UInt8>) throws {
-        try memory.write(address: UInt32(truncatingIfNeeded: address), values: values)
+        try memory.write(address: UInt32(truncatingIfNeeded: address), values: Data(values))
     }
 
     public func sbrk(_ increment: UInt32) throws -> UInt32 {

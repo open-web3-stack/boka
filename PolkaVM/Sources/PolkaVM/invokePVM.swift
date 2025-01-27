@@ -11,12 +11,12 @@ public func invokePVM(
     pc: UInt32,
     gas: Gas,
     argumentData: Data?,
-    ctx: any InvocationContext
+    ctx: (any InvocationContext)?
 ) async -> (ExitReason, Gas, Data?) {
     do {
         let state = try VMState(standardProgramBlob: blob, pc: pc, gas: gas, argumentData: argumentData)
         let engine = Engine(config: config, invocationContext: ctx)
-        let exitReason = await engine.execute(program: state.program, state: state)
+        let exitReason = await engine.execute(state: state)
 
         switch exitReason {
         case .outOfGas:

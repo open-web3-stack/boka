@@ -1,4 +1,4 @@
-public enum ExitReason {
+public enum ExitReason: Equatable {
     public enum PanicReason {
         case trap
         case invalidInstructionIndex
