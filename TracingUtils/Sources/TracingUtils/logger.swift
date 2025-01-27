@@ -15,6 +15,7 @@ public func setupTestLogger() {
     TestLogger.setupOnce
 }
 
+#if !os(WASI)
 public func withSpan<T>(
     _ operationName: String,
     logger: Logger,
@@ -56,3 +57,4 @@ public func withSpan<T>(
         }
     }
 }
+#endif

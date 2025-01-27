@@ -8,10 +8,12 @@ public final class TracingMiddleware: MiddlewareProtocol {
     }
 
     public func handle<T>(_ event: T, next: MiddlewareHandler<T>) async throws {
+        #if !os(WASI)
         try await withSpan(String(describing: type(of: event))) { span in
             span.attributes.event = String(describing: event)
             try await next(event)
         }
+        #endif
     }
 }
 

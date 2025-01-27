@@ -3,9 +3,9 @@ import Foundation
 import msquic
 
 #if canImport(Glibc)
-    import Glibc
+import Glibc
 #elseif canImport(Darwin)
-    import Darwin
+import Darwin
 #endif
 
 public struct NetAddr: Sendable, Equatable, Hashable {

@@ -2,3 +2,4 @@
 --maxwidth 140
 --asynccapturing debugCheck
 --closurevoid preserve
+--ifdef no-indent

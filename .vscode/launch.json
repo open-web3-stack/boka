@@ -59,6 +59,24 @@
 			"name": "Release Tools (Tools)",
 			"program": "${workspaceFolder:boka}/Tools/.build/release/Tools",
 			"preLaunchTask": "swift: Build Release Tools (Tools)"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:boka}/PVMShell",
+			"name": "Debug PVMShell (PVMShell)",
+			"program": "${workspaceFolder:boka}/PVMShell/.build/debug/PVMShell",
+			"preLaunchTask": "swift: Build Debug PVMShell (PVMShell)"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:boka}/PVMShell",
+			"name": "Release PVMShell (PVMShell)",
+			"program": "${workspaceFolder:boka}/PVMShell/.build/release/PVMShell",
+			"preLaunchTask": "swift: Build Release PVMShell (PVMShell)"
 		}
 	]
 }

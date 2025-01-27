@@ -1,5 +1,5 @@
 {
-  "originHash" : "5f5f6662e0a341792801f498df286aec16ade8bbccd3121439d34662fc774385",
+  "originHash" : "f3794cc871c9a1f415ca1f607f105e56f2e9dd332b5ba1ae50b7505ea261f64a",
   "pins" : [
     {
       "identity" : "blake2.swift",
@@ -13,10 +13,10 @@
     {
       "identity" : "lrucache",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/nicklockwood/LRUCache.git",
+      "location" : "https://github.com/qiweiii/LRUCache.git",
       "state" : {
-        "revision" : "542f0449556327415409ededc9c43a4bd0a397dc",
-        "version" : "1.0.7"
+        "branch" : "no-notification",
+        "revision" : "84e4d3a71f66dbdf2e480a56744e5afaf0bf74dd"
       }
     },
     {
@@ -29,15 +29,6 @@
       }
     },
     {
-      "identity" : "swift-distributed-tracing",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-distributed-tracing.git",
-      "state" : {
-        "revision" : "11c756c5c4d7de0eeed8595695cadd7fa107aa19",
-        "version" : "1.1.1"
-      }
-    },
-    {
       "identity" : "swift-log",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
@@ -47,30 +38,12 @@
       }
     },
     {
-      "identity" : "swift-metrics",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-metrics.git",
-      "state" : {
-        "revision" : "e0165b53d49b413dd987526b641e05e246782685",
-        "version" : "2.5.0"
-      }
-    },
-    {
       "identity" : "swift-numerics",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-numerics",
+      "location" : "https://github.com/qiweiii/swift-numerics.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "e30276bff2ff5ed80566fbdca49f50aa160b0e83"
-      }
-    },
-    {
-      "identity" : "swift-service-context",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-service-context.git",
-      "state" : {
-        "revision" : "0c62c5b4601d6c125050b5c3a97f20cce881d32b",
-        "version" : "1.1.0"
+        "branch" : "wasm-fix",
+        "revision" : "13c8553a4845302fc41d942c7b86af05ed550d21"
       }
     },
     {

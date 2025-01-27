@@ -1,4 +1,5 @@
 import Codec
+#if !os(WASI)
 import Numerics
 
 public struct SaturatingNumber<T: FixedWidthInteger & Sendable>: Sendable {
@@ -145,3 +146,5 @@ extension SaturatingNumber: EncodedSize {
         MemoryLayout<T>.size
     }
 }
+
+#endif

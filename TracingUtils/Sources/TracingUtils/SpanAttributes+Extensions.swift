@@ -1,3 +1,4 @@
+#if !os(WASI)
 extension SpanAttributes {
     public var blockHash: SpanAttributeConvertible? {
         get {
@@ -17,3 +18,4 @@ extension SpanAttributes {
         }
     }
 }
+#endif
