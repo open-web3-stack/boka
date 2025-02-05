@@ -254,7 +254,7 @@ enum MemoryTests {
 
         @Test func read() throws {
             #expect(try memory.read(address: 0, length: 4) == Data([1, 2, 3, 4]))
-            #expect(throws: MemoryError.chunkNotFound(1024)) { try memory.read(address: 1024, length: 4) }
+            #expect(try memory.read(address: 1024, length: 4) == Data([0, 0, 0, 0]))
             #expect(try memory.read(address: 2048, length: 2) == Data([1, 2]))
             #expect(throws: MemoryError.exceedChunkBoundary(2048)) { try memory.read(address: 2048, length: 10) }
         }

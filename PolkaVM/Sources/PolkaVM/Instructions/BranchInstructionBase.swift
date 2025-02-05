@@ -35,7 +35,7 @@ protocol BranchInstructionBase<Compare>: Branch {
 
 extension BranchInstructionBase {
     public static func parse(data: Data) throws -> (Registers.Index, UInt64, UInt32) {
-        let register = try Registers.Index(ra: data.at(relative: 0))
+        let register = try Registers.Index(r1: data.at(relative: 0))
         let (value, offset): (UInt64, UInt32) = try Instructions.decodeImmediate2(data, divideBy: 16)
         return (register, value, offset)
     }
@@ -59,8 +59,8 @@ protocol BranchInstructionBase2<Compare>: Branch {
 extension BranchInstructionBase2 {
     public static func parse(data: Data) throws -> (Registers.Index, Registers.Index, UInt32) {
         let offset: UInt32 = try Instructions.decodeImmediate(data.at(relative: 1...))
-        let r1 = try Registers.Index(ra: data.at(relative: 0))
-        let r2 = try Registers.Index(rb: data.at(relative: 0))
+        let r1 = try Registers.Index(r1: data.at(relative: 0))
+        let r2 = try Registers.Index(r2: data.at(relative: 0))
         return (r1, r2, offset)
     }
 

@@ -25,15 +25,17 @@ extension Instructions {
     static func decodeImmediate2<T: FixedWidthInteger, U: FixedWidthInteger>(
         _ data: Data,
         divideBy: UInt8 = 1,
-        minus: Int = 1
+        minus: Int = 1,
+        startIdx: Int = 0
     ) throws -> (T, U) {
-        let lX1 = try Int((data.at(relative: 0) / divideBy) & 0b111)
+        let lX1 = try Int((data.at(relative: startIdx) / divideBy) & 0b111)
         let lX = min(4, lX1)
         let lY = min(4, max(0, data.count - Int(lX) - minus))
 
-        let vX: UInt64 = try decodeImmediate(data.at(relative: 1 ..< (1 + lX)))
-        let vY: UInt64 = try decodeImmediate(data.at(relative: (1 + lX) ..< (1 + lX + lY)))
-        return (T(truncatingIfNeeded: vX), U(truncatingIfNeeded: vY))
+        let start = startIdx + 1
+        let vX: T = decodeImmediate((try? data.at(relative: start ..< (start + lX))) ?? Data())
+        let vY: U = decodeImmediate((try? data.at(relative: (start + lX) ..< (start + lX + lY))) ?? Data())
+        return (vX, vY)
     }
 
     static func isBranchValid(context: ExecutionContext, offset: UInt32) -> Bool {
@@ -45,7 +47,7 @@ extension Instructions {
         return !(a == 0 ||
             a > context.state.program.jumpTable.count * za ||
             Int(a) % za != 0 ||
-            context.state.program.basicBlockIndices.contains(targetAligned))
+            !context.state.program.basicBlockIndices.contains(targetAligned))
     }
 
     static func djump(context: ExecutionContext, target: UInt32) -> ExecOutcome {
@@ -56,6 +58,11 @@ extension Instructions {
         let entrySize = Int(context.state.program.jumpTableEntrySize)
         let start = ((Int(target) / context.config.pvmDynamicAddressAlignmentFactor) - 1) * entrySize
         let end = start + entrySize
+
+        guard (context.state.program.jumpTable.startIndex ... context.state.program.jumpTable.endIndex).contains(start ..< end) else {
+            return .exit(.panic(.invalidDynamicJump))
+        }
+
         var targetAlignedData = context.state.program.jumpTable[relative: start ..< end]
         guard let targetAligned = targetAlignedData.decode() else {
             return .exit(.panic(.trap))
@@ -70,15 +77,15 @@ extension Instructions {
     }
 
     static func deocdeRegisters(_ data: Data) throws -> (Registers.Index, Registers.Index) {
-        let ra = try Registers.Index(ra: data.at(relative: 0))
-        let rb = try Registers.Index(rb: data.at(relative: 0))
+        let ra = try Registers.Index(r1: data.at(relative: 0))
+        let rb = try Registers.Index(r2: data.at(relative: 0))
         return (ra, rb)
     }
 
     static func deocdeRegisters(_ data: Data) throws -> (Registers.Index, Registers.Index, Registers.Index) {
-        let ra = try Registers.Index(ra: data.at(relative: 0))
-        let rb = try Registers.Index(rb: data.at(relative: 0))
-        let rd = try Registers.Index(rd: data.at(relative: 1))
+        let ra = try Registers.Index(r1: data.at(relative: 0))
+        let rb = try Registers.Index(r2: data.at(relative: 0))
+        let rd = try Registers.Index(r3: data.at(relative: 1))
         return (ra, rb, rd)
     }
 }

@@ -10,22 +10,29 @@ public enum MemoryError: Error, Equatable {
     case notContiguous(UInt32)
     case invalidChunk(UInt32)
 
+    // align to page start address
+    private func alignToPageStart(address: UInt32) -> UInt32 {
+        let config = DefaultPvmConfig()
+        let pageSize = UInt32(config.pvmMemoryPageSize)
+        return (address / pageSize) * pageSize
+    }
+
     public var address: UInt32 {
         switch self {
         case let .chunkNotFound(address):
-            address
+            alignToPageStart(address: address)
         case let .exceedChunkBoundary(address):
-            address
+            alignToPageStart(address: address)
         case let .notReadable(address):
-            address
+            alignToPageStart(address: address)
         case let .notWritable(address):
-            address
+            alignToPageStart(address: address)
         case let .outOfMemory(address):
-            address
+            alignToPageStart(address: address)
         case let .notContiguous(address):
-            address
+            alignToPageStart(address: address)
         case let .invalidChunk(address):
-            address
+            alignToPageStart(address: address)
         }
     }
 }
@@ -378,9 +385,9 @@ public class StandardMemory: Memory {
 
 /// General Program Memory
 public class GeneralMemory: Memory {
+    private let config: PvmConfig
     // TODO: check if need paged aligned access for general memory
     public let pageMap: PageMap
-    private let config: PvmConfig
     // TODO: can be improved by using a more efficient data structure
     private var chunks: [MemoryChunk] = []
 
@@ -391,26 +398,31 @@ public class GeneralMemory: Memory {
             config: config
         )
         for chunk in chunks {
-            try GeneralMemory.insertChunk(address: chunk.address, data: chunk.data, chunks: &self.chunks)
+            let _ = try GeneralMemory.insertChunk(address: chunk.address, data: chunk.data, chunks: &self.chunks)
         }
         self.config = config
     }
 
-    // assume chunks is sorted by address
-    // modify chunks array, always merge adjacent chunks, overwrite existing data
-    // note: caller should rmb to handle corresponding page map updates
-    private static func insertChunk(address: UInt32, data: Data, chunks: inout [MemoryChunk]) throws {
-        let newEnd = address + UInt32(data.count)
+    /// Insert into the memory chunks
+    /// Return index of the chunk containing the address
+    ///
+    /// Note this method will modify input chunks array and assumes chunks is sorted by address.
+    /// It will always merge adjacent chunks, overwrite existing data if needed.
+    ///
+    /// IMPT Note: caller should remember to handle corresponding page map updates
+    private static func insertChunk(address: UInt32, length: Int = 0, data: Data, chunks: inout [MemoryChunk]) throws -> Int {
+        // use the longer one as the chunk end address
+        let newEnd = address + UInt32(max(length, data.count))
 
         // new item at last index
         if address >= chunks.last?.endAddress ?? UInt32.max {
             let chunk = try MemoryChunk(startAddress: address, endAddress: newEnd, data: data)
             if chunks.last?.endAddress == address {
                 try chunks.last?.merge(chunk: chunk)
-                return
+                return chunks.endIndex - 1
             } else {
                 chunks.append(chunk)
-                return
+                return chunks.endIndex - 1
             }
         }
 
@@ -427,7 +439,7 @@ public class GeneralMemory: Memory {
         // no overlaps
         if firstIndex == lastIndex {
             try chunks.insert(MemoryChunk(startAddress: address, endAddress: newEnd, data: data), at: firstIndex)
-            return
+            return firstIndex
         }
 
         // have overlaps
@@ -442,9 +454,11 @@ public class GeneralMemory: Memory {
         try newChunk.write(address: address, values: data)
         // replace old chunks
         chunks.replaceSubrange(firstIndex ..< lastIndex, with: [newChunk])
+
+        return firstIndex
     }
 
-    // binary search for the index containing the address or index to to inserted
+    // binary search for the index containing the address or index to be inserted
     private static func searchChunk(for address: UInt32, in chunks: [MemoryChunk]) -> (index: Int, found: Bool) {
         var low = 0
         var high = chunks.endIndex
@@ -461,44 +475,46 @@ public class GeneralMemory: Memory {
         return (low, false)
     }
 
-    private func getChunk(address: UInt32) throws(MemoryError) -> MemoryChunk {
+    private func getChunkOrInit(address: UInt32, length: Int = 1) throws -> MemoryChunk {
         let (index, found) = GeneralMemory.searchChunk(for: address, in: chunks)
         if found {
             return chunks[index]
+        } else {
+            let index = try GeneralMemory.insertChunk(address: address, length: length, data: Data(), chunks: &chunks)
+            return chunks[index]
         }
-        throw .chunkNotFound(address)
     }
 
-    public func read(address: UInt32) throws(MemoryError) -> UInt8 {
+    public func read(address: UInt32) throws -> UInt8 {
         guard isReadable(address: address, length: 1) else {
-            throw .notReadable(address)
+            throw MemoryError.notReadable(address)
         }
-        return try getChunk(address: address).read(address: address, length: 1).first ?? 0
+        return try getChunkOrInit(address: address).read(address: address, length: 1).first ?? 0
     }
 
-    public func read(address: UInt32, length: Int) throws(MemoryError) -> Data {
+    public func read(address: UInt32, length: Int) throws -> Data {
         guard isReadable(address: address, length: length) else {
-            throw .notReadable(address)
+            throw MemoryError.notReadable(address)
         }
-        return try getChunk(address: address).read(address: address, length: length)
+        return try getChunkOrInit(address: address, length: length).read(address: address, length: length)
     }
 
-    public func write(address: UInt32, value: UInt8) throws(MemoryError) {
+    public func write(address: UInt32, value: UInt8) throws {
         guard isWritable(address: address, length: 1) else {
-            throw .notWritable(address)
+            throw MemoryError.notWritable(address)
         }
-        try getChunk(address: address).write(address: address, values: Data([value]))
+        try getChunkOrInit(address: address).write(address: address, values: Data([value]))
     }
 
-    public func write(address: UInt32, values: Data) throws(MemoryError) {
+    public func write(address: UInt32, values: Data) throws {
         guard isWritable(address: address, length: values.count) else {
-            throw .notWritable(address)
+            throw MemoryError.notWritable(address)
         }
-        try getChunk(address: address).write(address: address, values: values)
+        try getChunkOrInit(address: address, length: values.count).write(address: address, values: values)
     }
 
     public func zero(pageIndex: UInt32, pages: Int) throws {
-        try GeneralMemory.insertChunk(
+        let _ = try GeneralMemory.insertChunk(
             address: pageIndex * UInt32(config.pvmMemoryPageSize),
             data: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize)),
             chunks: &chunks
@@ -507,7 +523,7 @@ public class GeneralMemory: Memory {
     }
 
     public func void(pageIndex: UInt32, pages: Int) throws {
-        try GeneralMemory.insertChunk(
+        let _ = try GeneralMemory.insertChunk(
             address: pageIndex * UInt32(config.pvmMemoryPageSize),
             data: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize)),
             chunks: &chunks

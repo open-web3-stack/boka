@@ -3,16 +3,16 @@ import Foundation
 public struct Registers: Equatable {
     public struct Index {
         public let value: UInt8
-        public init(ra: UInt8) {
-            value = min(ra & 0b1111, 12)
+        public init(r1: UInt8) {
+            value = min(r1 & 0b1111, 12)
         }
 
-        public init(rb: UInt8) {
-            value = min(rb >> 4, 12)
+        public init(r2: UInt8) {
+            value = min(r2 >> 4, 12)
         }
 
-        public init(rd: UInt8) {
-            value = min(rd, 12)
+        public init(r3: UInt8) {
+            value = min(r3, 12)
         }
 
         public init(raw: UInt8) {
