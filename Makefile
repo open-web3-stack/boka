@@ -81,7 +81,7 @@ format-clang:
 
 .PHONY: run
 run: githooks
-	swift run --package-path Boka Boka --validator
+	SWIFT_BACKTRACE=enable=yes swift run --package-path Boka Boka --validator
 
 .PHONY: devnet
 devnet:
