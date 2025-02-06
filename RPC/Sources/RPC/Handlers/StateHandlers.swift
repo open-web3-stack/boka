@@ -29,9 +29,8 @@ public enum StateHandlers {
             self.source = source
         }
 
-        public func handle(request _: Request) async throws -> Response? {
-            // TODO: implement
-            []
+        public func handle(request: Request) async throws -> Response? {
+            try await source.getKeys(prefix: request.value.0, count: request.value.1, startKey: request.value.2, blockHash: request.value.3)
         }
     }
 
@@ -49,9 +48,8 @@ public enum StateHandlers {
             self.source = source
         }
 
-        public func handle(request _: Request) async throws -> Response? {
-            // TODO: implement
-            []
+        public func handle(request: Request) async throws -> Response? {
+            try await source.getStorage(key: request.value.0, blockHash: request.value.1)
         }
     }
 }

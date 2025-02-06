@@ -53,6 +53,15 @@ extension NodeDataSource: SystemDataSource {
 }
 
 extension NodeDataSource: ChainDataSource {
+    public func getKeys(prefix: Data32, count: UInt32, startKey: Data32?, blockHash: Data32?) async throws -> [String] {
+        // TODO:
+        try await chainDataProvider.getKeys(prefix: prefix, count: count, startKey: startKey, blockHash: blockHash)
+    }
+
+    public func getStorage(key: Data32, blockHash: Utils.Data32?) async throws -> [String] {
+        try await chainDataProvider.getStorage(key: key, blockHash: blockHash)
+    }
+
     public func getBestBlock() async throws -> BlockRef {
         try await chainDataProvider.getBlock(hash: chainDataProvider.bestHead.hash)
     }

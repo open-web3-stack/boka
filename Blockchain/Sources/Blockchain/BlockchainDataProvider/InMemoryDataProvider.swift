@@ -22,6 +22,25 @@ public actor InMemoryDataProvider {
 }
 
 extension InMemoryDataProvider: BlockchainDataProviderProtocol {
+    public func getKeys(prefix: Data32, count: UInt32, startKey: Data32?, blockHash: Data32?) async throws -> [String] {
+        guard let stateRef = try getState(hash: blockHash ?? genesisBlockHash) else {
+            return []
+        }
+
+        return try await stateRef.value.backend.getKeys(prefix, startKey, count).map { $0.key.toHexString() }
+    }
+
+    public func getStorage(key: Data32, blockHash: Data32?) async throws -> [String] {
+        guard let stateRef = try getState(hash: blockHash ?? genesisBlockHash) else {
+            return []
+        }
+
+        guard let value = try await stateRef.value.backend.readRaw(key) else {
+            throw StateBackendError.missingState(key: key)
+        }
+        return [value.toHexString()]
+    }
+
     public func hasBlock(hash: Data32) -> Bool {
         blockByHash[hash] != nil
     }
