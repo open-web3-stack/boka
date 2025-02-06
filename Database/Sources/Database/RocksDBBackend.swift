@@ -73,10 +73,11 @@ public final class RocksDBBackend: Sendable {
 
 extension RocksDBBackend: BlockchainDataProviderProtocol {
     public func getKeys(prefix: Data32, count: UInt32, startKey: Data32?, blockHash: Data32?) async throws -> [String] {
-        logger
-            .trace(
-                "getKeys() prefix: \(prefix), count: \(count), startKey: \(String(describing: startKey)), blockHash: \(String(describing: blockHash))"
-            )
+        logger.trace("""
+        getKeys() prefix: \(prefix), count: \(count),
+        startKey: \(String(describing: startKey)), blockHash: \(String(describing: blockHash))
+        """)
+
         guard let stateRef = try await getState(hash: blockHash ?? genesisBlockHash) else {
             return []
         }
