@@ -81,7 +81,7 @@ final class NodeTests {
         #expect(newTimeslot > initialTimeslot)
         #expect(try await validatorNode.blockchain.dataProvider.hasBlock(hash: newBestHead.hash))
         #expect(try await validatorNode.blockchain.dataProvider.getKeys(prefix: Data32(), count: 0, startKey: nil, blockHash: nil).isEmpty)
-        await #expect(throws: RocksDBBackendError.self) {
+        await #expect(throws: StateBackendError.self) {
             _ = try await validatorNode.blockchain.dataProvider.getStorage(key: Data32.random(), blockHash: nil)
         }
     }

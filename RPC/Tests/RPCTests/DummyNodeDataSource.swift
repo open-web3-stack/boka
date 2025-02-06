@@ -21,7 +21,7 @@ public class DummyNodeDataSource {
         let eventBus = EventBus(eventMiddleware: .serial(Middleware(storeMiddleware), .noError), handlerMiddleware: .noError)
         let (genesisState, genesisBlock) = try! State.devGenesis(config: .minimal)
 
-        config = await Config(
+        let config = await Config(
             rpc: nil,
             network: Network.Config(
                 role: .builder,
@@ -29,7 +29,7 @@ public class DummyNodeDataSource {
                 key: keystore.get(Ed25519.self, publicKey: keys.ed25519)!
             ),
             peers: [],
-            local: true,
+            local: true
         )
 
         let chainspec = try await genesis.load()
