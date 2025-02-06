@@ -13,10 +13,11 @@ final class StateHandlersTests {
 
     func setUp() async throws {
         app = try await Application.make(.testing)
+        let dummyNodeDataSource = DummyNodeDataSource(genesis: .minimal)
+        dataProvider = dummyNodeDataSource.dataProvider
         let (genesisState, genesisBlock) = try! State.devGenesis(config: .minimal)
-        dataProvider = try! await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
-        let rpcController = JSONRPCController(handlers: StateHandlers
-            .getHandlers(source: DummyNodeDataSource(chainDataProvider: dataProvider)))
+        let rpcController = JSONRPCController(handlers: ChainHandlers
+            .getHandlers(source: dummyNodeDataSource))
         try app.register(collection: rpcController)
     }
 
