@@ -67,7 +67,7 @@ public protocol Memory {
     func read(address: UInt32) throws -> UInt8
     func read(address: UInt32, length: Int) throws -> Data
     func write(address: UInt32, value: UInt8) throws
-    func write(address: UInt32, values: some Sequence<UInt8>) throws
+    func write(address: UInt32, values: Data) throws
 
     func zero(pageIndex: UInt32, pages: Int) throws
     func void(pageIndex: UInt32, pages: Int) throws
@@ -186,13 +186,13 @@ public class MemoryChunk {
         guard startAddress <= address, address + UInt32(length) <= endAddress else {
             throw .exceedChunkBoundary(address)
         }
-        let startIndex = address - startAddress
+        let startIndex = Int(address - startAddress) + data.startIndex
 
-        if startIndex >= data.count {
+        if startIndex >= data.endIndex {
             return Data(repeating: 0, count: length)
         } else {
-            let validCount = min(length, data.count - Int(startIndex))
-            let dataToRead = data.count > 0 ? data[startIndex ..< startIndex + UInt32(validCount)] : Data()
+            let validCount = min(length, data.endIndex - startIndex)
+            let dataToRead = data.count > 0 ? data[startIndex ..< startIndex + validCount] : Data()
 
             let zeroCount = max(0, length - validCount)
             let zeros = Data(repeating: 0, count: zeroCount)
@@ -201,18 +201,17 @@ public class MemoryChunk {
         }
     }
 
-    public func write(address: UInt32, values: some Sequence<UInt8>) throws(MemoryError) {
-        let valuesData = Data(values)
-        guard startAddress <= address, address + UInt32(valuesData.count) <= endAddress else {
+    public func write(address: UInt32, values: Data) throws(MemoryError) {
+        guard startAddress <= address, address + UInt32(values.count) <= endAddress else {
             throw .exceedChunkBoundary(address)
         }
 
-        let startIndex = address - startAddress
-        let endIndex = startIndex + UInt32(valuesData.count)
+        let startIndex = Int(address - startAddress) + data.startIndex
+        let endIndex = startIndex + values.count
 
-        try zeroPad(until: startAddress + endIndex)
+        try zeroPad(until: startAddress + UInt32(endIndex))
 
-        data[startIndex ..< endIndex] = valuesData
+        data.replaceSubrange(startIndex ..< endIndex, with: values)
     }
 
     public func incrementEnd(size increment: UInt32) throws(MemoryError) {
@@ -335,11 +334,11 @@ public class StandardMemory: Memory {
         guard isWritable(address: address, length: 1) else {
             throw .notWritable(address)
         }
-        try getChunk(address: address).write(address: address, values: [value])
+        try getChunk(address: address).write(address: address, values: Data([value]))
     }
 
-    public func write(address: UInt32, values: some Sequence<UInt8>) throws(MemoryError) {
-        guard isWritable(address: address, length: values.underestimatedCount) else {
+    public func write(address: UInt32, values: Data) throws(MemoryError) {
+        guard isWritable(address: address, length: values.count) else {
             throw .notWritable(address)
         }
         try getChunk(address: address).write(address: address, values: values)
@@ -488,11 +487,11 @@ public class GeneralMemory: Memory {
         guard isWritable(address: address, length: 1) else {
             throw .notWritable(address)
         }
-        try getChunk(address: address).write(address: address, values: [value])
+        try getChunk(address: address).write(address: address, values: Data([value]))
     }
 
-    public func write(address: UInt32, values: some Sequence<UInt8>) throws(MemoryError) {
-        guard isWritable(address: address, length: values.underestimatedCount) else {
+    public func write(address: UInt32, values: Data) throws(MemoryError) {
+        guard isWritable(address: address, length: values.count) else {
             throw .notWritable(address)
         }
         try getChunk(address: address).write(address: address, values: values)

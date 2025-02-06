@@ -78,7 +78,7 @@ public actor SyncManager {
         }
 
         let currentHead = await blockchain.dataProvider.bestHead
-        if currentHead.timeslot >= networkBest!.timeslot {
+        if let networkBest, currentHead.timeslot >= networkBest.timeslot {
             syncCompleted()
             return
         }

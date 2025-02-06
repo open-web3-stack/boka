@@ -80,7 +80,7 @@ enum MemoryTests {
 
         @Test func write() throws {
             let chunk = try MemoryChunk(startAddress: 0, endAddress: 10, data: Data())
-            try chunk.write(address: 0, values: [1])
+            try chunk.write(address: 0, values: Data([1]))
             #expect(chunk.data == Data([1]))
             try chunk.write(address: 1, values: Data([2]))
             #expect(chunk.data == Data([1, 2]))
@@ -199,7 +199,7 @@ enum MemoryTests {
             #expect(memory.isWritable(address: stackStart, length: Int(stackEnd - stackStart)) == true)
             try memory.write(address: stackStart, value: 1)
             #expect(try memory.read(address: stackStart, length: 2) == Data([1, 0]))
-            try memory.write(address: stackEnd - 2, values: [1, 2])
+            try memory.write(address: stackEnd - 2, values: Data([1, 2]))
             #expect(try memory.read(address: stackEnd - 4, length: 4) == Data([0, 0, 1, 2]))
 
             // argument
@@ -260,9 +260,9 @@ enum MemoryTests {
         }
 
         @Test func write() throws {
-            try memory.write(address: 2, values: [9, 8])
+            try memory.write(address: 2, values: Data([9, 8]))
             #expect(try memory.read(address: 0, length: 4) == Data([1, 2, 9, 8]))
-            #expect(throws: MemoryError.notWritable(4096)) { try memory.write(address: 4096, values: [0]) }
+            #expect(throws: MemoryError.notWritable(4096)) { try memory.write(address: 4096, values: Data([0])) }
         }
 
         @Test func sbrk() throws {
@@ -271,7 +271,7 @@ enum MemoryTests {
             #expect(memory.isWritable(address: oldEnd, length: 512) == true)
             #expect(memory.isWritable(address: 0, length: Int(oldEnd)) == true)
 
-            try memory.write(address: oldEnd, values: [1, 2, 3])
+            try memory.write(address: oldEnd, values: Data([1, 2, 3]))
             #expect(try memory.read(address: oldEnd - 1, length: 5) == Data([7, 1, 2, 3, 0]))
         }
 
