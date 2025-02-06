@@ -40,8 +40,12 @@ public class VMState {
         ReadonlyMemory(memory)
     }
 
-    public func getMemoryUnsafe() -> Memory {
-        memory
+    public func getMemoryUnsafe() -> GeneralMemory {
+        if let memory = memory as? GeneralMemory {
+            memory
+        } else {
+            fatalError("cannot get memory of type \(type(of: memory))")
+        }
     }
 
     public func isMemoryReadable(address: some FixedWidthInteger, length: Int) -> Bool {

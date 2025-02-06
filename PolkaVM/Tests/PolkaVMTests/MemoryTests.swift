@@ -10,25 +10,23 @@ enum MemoryTests {
 
         @Test func emptyPageMap() {
             let pageMap = PageMap(pageMap: [], config: config)
-            #expect(pageMap.isReadable(pageStart: 0, pages: 1) == false)
-            #expect(pageMap.isReadable(address: 0, length: 0) == false)
-            #expect(pageMap.isReadable(address: 0, length: 1) == false)
-            #expect(pageMap.isReadable(address: 1, length: 1) == false)
-            #expect(pageMap.isWritable(pageStart: 0, pages: 1) == false)
-            #expect(pageMap.isWritable(address: 0, length: 0) == false)
-            #expect(pageMap.isWritable(address: 0, length: 1) == false)
-            #expect(pageMap.isWritable(address: 1, length: 1) == false)
+            #expect(pageMap.isReadable(pageStart: 0, pages: 1).result == false)
+            #expect(pageMap.isReadable(address: 0, length: 1).result == false)
+            #expect(pageMap.isReadable(address: 1, length: 1).result == false)
+            #expect(pageMap.isWritable(pageStart: 0, pages: 1).result == false)
+            #expect(pageMap.isWritable(address: 0, length: 1).result == false)
+            #expect(pageMap.isWritable(address: 1, length: 1).result == false)
         }
 
         @Test func initIncompletePage() {
             let pageMap = PageMap(pageMap: [(address: 0, length: 1, access: .readOnly)], config: config)
 
-            #expect(pageMap.isReadable(pageStart: 0, pages: 1) == true)
-            #expect(pageMap.isWritable(pageStart: 0, pages: 1) == false)
+            #expect(pageMap.isReadable(pageStart: 0, pages: 1).result == true)
+            #expect(pageMap.isWritable(pageStart: 0, pages: 1).result == false)
 
-            #expect(pageMap.isReadable(address: 0, length: 1) == true)
-            #expect(pageMap.isReadable(address: UInt32(config.pvmMemoryPageSize) - 1, length: 1) == true)
-            #expect(pageMap.isReadable(address: UInt32(config.pvmMemoryPageSize), length: 1) == false)
+            #expect(pageMap.isReadable(address: 0, length: 1).result == true)
+            #expect(pageMap.isReadable(address: UInt32(config.pvmMemoryPageSize) - 1, length: 1).result == true)
+            #expect(pageMap.isReadable(address: UInt32(config.pvmMemoryPageSize), length: 1).result == false)
         }
 
         @Test func updatePageMap() {
@@ -40,22 +38,22 @@ enum MemoryTests {
                 config: config
             )
 
-            #expect(pageMap.isReadable(pageStart: 0, pages: 1) == true)
-            #expect(pageMap.isWritable(pageStart: 0, pages: 1) == false)
-            #expect(pageMap.isReadable(pageStart: 1, pages: 1) == true)
-            #expect(pageMap.isWritable(pageStart: 1, pages: 1) == false)
+            #expect(pageMap.isReadable(pageStart: 0, pages: 1).result == true)
+            #expect(pageMap.isWritable(pageStart: 0, pages: 1).result == false)
+            #expect(pageMap.isReadable(pageStart: 1, pages: 1).result == true)
+            #expect(pageMap.isWritable(pageStart: 1, pages: 1).result == false)
 
             pageMap.update(pageIndex: 1, pages: 1, access: .readWrite)
 
-            #expect(pageMap.isReadable(pageStart: 1, pages: 1) == true)
-            #expect(pageMap.isWritable(pageStart: 0, pages: 1) == false)
-            #expect(pageMap.isWritable(pageStart: 1, pages: 1) == true)
+            #expect(pageMap.isReadable(pageStart: 1, pages: 1).result == true)
+            #expect(pageMap.isWritable(pageStart: 0, pages: 1).result == false)
+            #expect(pageMap.isWritable(pageStart: 1, pages: 1).result == true)
 
             pageMap.update(address: 0, length: config.pvmMemoryPageSize, access: .noAccess)
 
-            #expect(pageMap.isReadable(pageStart: 0, pages: 1) == false)
-            #expect(pageMap.isWritable(pageStart: 0, pages: 1) == false)
-            #expect(pageMap.isReadable(pageStart: 1, pages: 1) == true)
+            #expect(pageMap.isReadable(pageStart: 0, pages: 1).result == false)
+            #expect(pageMap.isWritable(pageStart: 0, pages: 1).result == false)
+            #expect(pageMap.isReadable(pageStart: 1, pages: 1).result == true)
         }
     }
 
@@ -149,7 +147,7 @@ enum MemoryTests {
         @Test func read() throws {
             // readonly
             #expect(throws: MemoryError.notReadable(0)) { try memory.read(address: 0) }
-            #expect(throws: MemoryError.notReadable(readOnlyStart - 1)) { try memory.read(address: readOnlyStart - 1) }
+            #expect(throws: MemoryError.notReadable(readOnlyStart - 4096)) { try memory.read(address: readOnlyStart - 1) }
             #expect(memory.isReadable(address: 0, length: config.pvmProgramInitZoneSize) == false)
             #expect(try memory.read(address: readOnlyStart, length: 4) == Data([1, 2, 3, 0]))
             #expect(try memory.read(address: readOnlyStart, length: 4) == Data([1, 2, 3, 0]))
@@ -181,7 +179,7 @@ enum MemoryTests {
         @Test func write() throws {
             // readonly
             #expect(throws: MemoryError.notWritable(0)) { try memory.write(address: 0, value: 0) }
-            #expect(throws: MemoryError.notWritable(readOnlyStart - 1)) { try memory.write(address: readOnlyStart - 1, value: 0) }
+            #expect(throws: MemoryError.notWritable(readOnlyStart - 4096)) { try memory.write(address: readOnlyStart - 1, value: 0) }
             #expect(memory.isWritable(address: 0, length: config.pvmProgramInitZoneSize) == false)
             #expect(throws: MemoryError.notWritable(readOnlyStart)) { try memory.write(address: readOnlyStart, value: 4) }
             #expect(try memory.read(address: readOnlyStart, length: 4) == Data([1, 2, 3, 0]))
@@ -228,7 +226,7 @@ enum MemoryTests {
             memory = try GeneralMemory(
                 pageMap: [
                     (address: 0, length: UInt32(config.pvmMemoryPageSize), writable: true),
-                    (address: UInt32(config.pvmMemoryPageSize) + 2, length: UInt32(config.pvmMemoryPageSize), writable: false),
+                    (address: UInt32(config.pvmMemoryPageSize), length: UInt32(config.pvmMemoryPageSize), writable: false),
                     (address: UInt32(config.pvmMemoryPageSize) * 4, length: UInt32(config.pvmMemoryPageSize) / 2, writable: true),
                 ],
                 chunks: [

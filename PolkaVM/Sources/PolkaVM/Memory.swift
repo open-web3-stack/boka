@@ -76,8 +76,6 @@ public protocol Memory {
     func write(address: UInt32, value: UInt8) throws
     func write(address: UInt32, values: Data) throws
 
-    func zero(pageIndex: UInt32, pages: Int) throws
-    func void(pageIndex: UInt32, pages: Int) throws
     func sbrk(_ increment: UInt32) throws -> UInt32
 }
 
@@ -86,8 +84,9 @@ public class PageMap {
     private let config: PvmConfig
 
     // cache for multi page queries
-    private let isReadableCache: LRUCache<Range<UInt32>, Bool>
-    private let isWritableCache: LRUCache<Range<UInt32>, Bool>
+    // if the result is false, the page is the fault page, otherwise the page is the first page
+    private let isReadableCache: LRUCache<Range<UInt32>, (result: Bool, page: UInt32)>
+    private let isWritableCache: LRUCache<Range<UInt32>, (result: Bool, page: UInt32)>
 
     public init(pageMap: [(address: UInt32, length: UInt32, access: PageAccess)], config: PvmConfig) {
         self.config = config
@@ -96,7 +95,7 @@ public class PageMap {
 
         for entry in pageMap {
             let startIndex = entry.address / UInt32(config.pvmMemoryPageSize)
-            let pages = alignToNumberOfPages(size: entry.length)
+            let pages = numberOfPagesToAccess(address: entry.address, length: Int(entry.length))
 
             for i in startIndex ..< startIndex + pages {
                 pageTable[i] = entry.access
@@ -104,13 +103,19 @@ public class PageMap {
         }
     }
 
-    private func alignToNumberOfPages(size: UInt32) -> UInt32 {
-        let pageSize = UInt32(config.pvmMemoryPageSize)
-        return (size + pageSize - 1) / pageSize
+    private func numberOfPagesToAccess(address: UInt32, length: Int) -> UInt32 {
+        if length == 0 {
+            return 0
+        }
+        let addressPageIndex = address / UInt32(config.pvmMemoryPageSize)
+        let endPageIndex = (address + UInt32(length) - 1) / UInt32(config.pvmMemoryPageSize)
+        return endPageIndex - addressPageIndex + 1
     }
 
-    public func isReadable(pageStart: UInt32, pages: Int) -> Bool {
-        if pages == 0 { return false }
+    /// If the pages are readable, return (true, pageStart)
+    ///
+    /// If the pages are not readable, return (false, faultPageIndex).
+    public func isReadable(pageStart: UInt32, pages: Int) -> (result: Bool, page: UInt32) {
         let pageRange = pageStart ..< pageStart + UInt32(pages)
         let cacheValue = isReadableCache.value(forKey: pageRange)
         if let cacheValue {
@@ -118,21 +123,33 @@ public class PageMap {
         }
 
         var result = true
+        var page = pageStart
         for i in pageRange {
-            result = result && (pageTable[i]?.isReadable() ?? false)
+            let curResult = pageTable[i]?.isReadable() ?? false
+            if !curResult {
+                result = false
+                page = i
+                break
+            }
         }
-        isReadableCache.setValue(result, forKey: pageRange)
-        return result
+        isReadableCache.setValue((result, page), forKey: pageRange)
+        return (result, page)
     }
 
-    public func isReadable(address: UInt32, length: Int) -> Bool {
+    /// If the pages are writable, return (true, address)
+    ///
+    /// If the pages are not writable, return (false, faultPage start address).
+    public func isReadable(address: UInt32, length: Int) -> (result: Bool, address: UInt32) {
         let startPageIndex = address / UInt32(config.pvmMemoryPageSize)
-        let pages = alignToNumberOfPages(size: UInt32(length))
-        return isReadable(pageStart: startPageIndex, pages: Int(pages))
+        let pages = numberOfPagesToAccess(address: address, length: length)
+        let (result, page) = isReadable(pageStart: startPageIndex, pages: Int(pages))
+        return (result, page * UInt32(config.pvmMemoryPageSize))
     }
 
-    public func isWritable(pageStart: UInt32, pages: Int) -> Bool {
-        if pages == 0 { return false }
+    /// If the pages are writable, return (true, pageStart)
+    ///
+    /// If the pages are not writable, return (false, faultPageIndex).
+    public func isWritable(pageStart: UInt32, pages: Int) -> (result: Bool, page: UInt32) {
         let pageRange = pageStart ..< pageStart + UInt32(pages)
         let cacheValue = isWritableCache.value(forKey: pageRange)
         if let cacheValue {
@@ -140,22 +157,32 @@ public class PageMap {
         }
 
         var result = true
+        var page = pageStart
         for i in pageRange {
-            result = result && (pageTable[i]?.isWritable() ?? false)
+            let curResult = pageTable[i]?.isWritable() ?? false
+            if !curResult {
+                result = false
+                page = i
+                break
+            }
         }
-        isWritableCache.setValue(result, forKey: pageRange)
-        return result
+        isWritableCache.setValue((result, page), forKey: pageRange)
+        return (result, page)
     }
 
-    public func isWritable(address: UInt32, length: Int) -> Bool {
+    /// If the pages are writable, return (true, address)
+    ///
+    /// If the pages are not writable, return (false, faultPage start address).
+    public func isWritable(address: UInt32, length: Int) -> (result: Bool, address: UInt32) {
         let startPageIndex = address / UInt32(config.pvmMemoryPageSize)
-        let pages = alignToNumberOfPages(size: UInt32(length))
-        return isWritable(pageStart: startPageIndex, pages: Int(pages))
+        let pages = numberOfPagesToAccess(address: address, length: length)
+        let (result, page) = isWritable(pageStart: startPageIndex, pages: Int(pages))
+        return (result, page * UInt32(config.pvmMemoryPageSize))
     }
 
     public func update(address: UInt32, length: Int, access: PageAccess) {
         let startPageIndex = address / UInt32(config.pvmMemoryPageSize)
-        let pages = alignToNumberOfPages(size: UInt32(length))
+        let pages = numberOfPagesToAccess(address: address, length: length)
         let pageRange = startPageIndex ..< startPageIndex + pages
 
         for i in pageRange {
@@ -324,51 +351,23 @@ public class StandardMemory: Memory {
     }
 
     public func read(address: UInt32) throws(MemoryError) -> UInt8 {
-        guard isReadable(address: address, length: 1) else {
-            throw .notReadable(address)
-        }
+        try ensureReadable(address: address, length: 1)
         return try getChunk(address: address).read(address: address, length: 1).first ?? 0
     }
 
     public func read(address: UInt32, length: Int) throws(MemoryError) -> Data {
-        guard isReadable(address: address, length: length) else {
-            throw .notReadable(address)
-        }
+        try ensureReadable(address: address, length: length)
         return try getChunk(address: address).read(address: address, length: length)
     }
 
     public func write(address: UInt32, value: UInt8) throws(MemoryError) {
-        guard isWritable(address: address, length: 1) else {
-            throw .notWritable(address)
-        }
+        try ensureWritable(address: address, length: 1)
         try getChunk(address: address).write(address: address, values: Data([value]))
     }
 
     public func write(address: UInt32, values: Data) throws(MemoryError) {
-        guard isWritable(address: address, length: values.count) else {
-            throw .notWritable(address)
-        }
+        try ensureWritable(address: address, length: values.count)
         try getChunk(address: address).write(address: address, values: values)
-    }
-
-    // TODO: check whether need this
-    public func zero(pageIndex: UInt32, pages: Int) throws {
-        let address = pageIndex * UInt32(config.pvmMemoryPageSize)
-        try getChunk(address: address).write(
-            address: address,
-            values: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize))
-        )
-        pageMap.update(pageIndex: pageIndex, pages: pages, access: .readWrite)
-    }
-
-    // TODO: check whether need this
-    public func void(pageIndex: UInt32, pages: Int) throws {
-        let address = pageIndex * UInt32(config.pvmMemoryPageSize)
-        try getChunk(address: address).write(
-            address: address,
-            values: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize))
-        )
-        pageMap.update(pageIndex: pageIndex, pages: pages, access: .noAccess)
     }
 
     public func sbrk(_ increment: UInt32) throws(MemoryError) -> UInt32 {
@@ -386,7 +385,6 @@ public class StandardMemory: Memory {
 /// General Program Memory
 public class GeneralMemory: Memory {
     private let config: PvmConfig
-    // TODO: check if need paged aligned access for general memory
     public let pageMap: PageMap
     // TODO: can be improved by using a more efficient data structure
     private var chunks: [MemoryChunk] = []
@@ -398,7 +396,7 @@ public class GeneralMemory: Memory {
             config: config
         )
         for chunk in chunks {
-            let _ = try GeneralMemory.insertChunk(address: chunk.address, data: chunk.data, chunks: &self.chunks)
+            _ = try GeneralMemory.insertChunk(address: chunk.address, data: chunk.data, chunks: &self.chunks)
         }
         self.config = config
     }
@@ -486,35 +484,27 @@ public class GeneralMemory: Memory {
     }
 
     public func read(address: UInt32) throws -> UInt8 {
-        guard isReadable(address: address, length: 1) else {
-            throw MemoryError.notReadable(address)
-        }
+        try ensureReadable(address: address, length: 1)
         return try getChunkOrInit(address: address).read(address: address, length: 1).first ?? 0
     }
 
     public func read(address: UInt32, length: Int) throws -> Data {
-        guard isReadable(address: address, length: length) else {
-            throw MemoryError.notReadable(address)
-        }
+        try ensureReadable(address: address, length: length)
         return try getChunkOrInit(address: address, length: length).read(address: address, length: length)
     }
 
     public func write(address: UInt32, value: UInt8) throws {
-        guard isWritable(address: address, length: 1) else {
-            throw MemoryError.notWritable(address)
-        }
+        try ensureWritable(address: address, length: 1)
         try getChunkOrInit(address: address).write(address: address, values: Data([value]))
     }
 
     public func write(address: UInt32, values: Data) throws {
-        guard isWritable(address: address, length: values.count) else {
-            throw MemoryError.notWritable(address)
-        }
+        try ensureWritable(address: address, length: values.count)
         try getChunkOrInit(address: address, length: values.count).write(address: address, values: values)
     }
 
     public func zero(pageIndex: UInt32, pages: Int) throws {
-        let _ = try GeneralMemory.insertChunk(
+        _ = try GeneralMemory.insertChunk(
             address: pageIndex * UInt32(config.pvmMemoryPageSize),
             data: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize)),
             chunks: &chunks
@@ -523,7 +513,7 @@ public class GeneralMemory: Memory {
     }
 
     public func void(pageIndex: UInt32, pages: Int) throws {
-        let _ = try GeneralMemory.insertChunk(
+        _ = try GeneralMemory.insertChunk(
             address: pageIndex * UInt32(config.pvmMemoryPageSize),
             data: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize)),
             chunks: &chunks
@@ -562,19 +552,33 @@ public class GeneralMemory: Memory {
 
 extension Memory {
     public func isReadable(address: UInt32, length: Int) -> Bool {
-        pageMap.isReadable(address: address, length: length)
-    }
-
-    public func isWritable(address: UInt32, length: Int) -> Bool {
-        pageMap.isWritable(address: address, length: length)
+        pageMap.isReadable(address: address, length: length).result
     }
 
     public func isReadable(pageStart: UInt32, pages: Int) -> Bool {
-        pageMap.isReadable(pageStart: pageStart, pages: pages)
+        pageMap.isReadable(pageStart: pageStart, pages: pages).result
+    }
+
+    public func ensureReadable(address: UInt32, length: Int) throws(MemoryError) {
+        let (result, address) = pageMap.isReadable(address: address, length: length)
+        guard result else {
+            throw .notReadable(address)
+        }
+    }
+
+    public func isWritable(address: UInt32, length: Int) -> Bool {
+        pageMap.isWritable(address: address, length: length).result
     }
 
     public func isWritable(pageStart: UInt32, pages: Int) -> Bool {
-        pageMap.isWritable(pageStart: pageStart, pages: pages)
+        pageMap.isWritable(pageStart: pageStart, pages: pages).result
+    }
+
+    public func ensureWritable(address: UInt32, length: Int) throws(MemoryError) {
+        let (result, address) = pageMap.isWritable(address: address, length: length)
+        guard result else {
+            throw .notWritable(address)
+        }
     }
 }
 
