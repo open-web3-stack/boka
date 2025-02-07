@@ -60,8 +60,8 @@ public enum ChainHandlers {
 
         public func handle(request: Request) async throws -> Response? {
             if let timeslot = request.value {
-                let block = try await source.getBlockHash(byTimeslot: timeslot)
-                return block.reduce(into: Data(capacity: block.count * 32)) { $0.append($1.data) }
+                let blocks = try await source.getBlockHash(byTimeslot: timeslot)
+                return blocks.first
             }
             return nil
         }
