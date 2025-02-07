@@ -33,6 +33,7 @@ public enum Instructions {
         public static var opcode: UInt8 { 0 }
 
         public init(data _: Data = .init()) {}
+
         public func _executeImpl(context _: ExecutionContext) -> ExecOutcome {
             .exit(.panic(.trap))
         }
@@ -479,7 +480,7 @@ public enum Instructions {
 
         public let register: Registers.Index
         public let address: UInt32
-        public let value: UInt32
+        public let value: UInt64
 
         public init(data: Data) throws {
             register = try Registers.Index(r1: data.at(relative: 0))
@@ -1727,13 +1728,16 @@ public enum Instructions {
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+            // need to read rb value first in case ra and rb are the same
+            let rbVal: UInt32 = context.state.readRegister(rb)
+
             context.state.writeRegister(ra, value)
-            return .continued
+
+            return Instructions.djump(context: context, target: rbVal &+ offset)
         }
 
-        public func updatePC(context: ExecutionContext, skip _: UInt32) -> ExecOutcome {
-            let rbVal: UInt32 = context.state.readRegister(rb)
-            return Instructions.djump(context: context, target: rbVal &+ offset)
+        public func updatePC(context _: ExecutionContext, skip _: UInt32) -> ExecOutcome {
+            .continued
         }
     }
 
