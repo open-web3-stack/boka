@@ -13,11 +13,10 @@ final class StateHandlersTests {
 
     func setUp() async throws {
         app = try await Application.make(.testing)
-        let dummyNodeDataSource = DummyNodeDataSource(genesis: .minimal)
-        dataProvider = dummyNodeDataSource.dataProvider
         let (genesisState, genesisBlock) = try! State.devGenesis(config: .minimal)
-        let rpcController = JSONRPCController(handlers: ChainHandlers
-            .getHandlers(source: dummyNodeDataSource))
+        dataProvider = try! await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
+        let rpcController = JSONRPCController(handlers: StateHandlers
+            .getHandlers(source: DummyNodeDataSource(chainDataProvider: dataProvider)))
         try app.register(collection: rpcController)
     }
 
@@ -37,7 +36,6 @@ final class StateHandlersTests {
         try buffer.writeJSONEncodable(req)
         try await app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
-            print("res body \(res.body.string)")
             let resp = try! res.content.decode(JSONResponse.self, using: JSONDecoder())
             #expect(resp.result!.value != nil)
         }
