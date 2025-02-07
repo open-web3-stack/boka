@@ -69,8 +69,6 @@ private let logger = Logger(label: "PVMTests")
 
 // TODO: pass these
 let knownFailedTestCases = [
-    // "leave these to the last"
-    "inst_load_imm_and_jump_indirect_",
     "riscv_",
 ]
 
@@ -82,9 +80,9 @@ struct PVMTests {
     static func loadTests() throws -> [Testcase] {
         try TestLoader.getTestcases(path: "pvm/programs", extension: "json")
         let files = try TestLoader.getTestcases(path: "pvm/programs", extension: "json")
-        // return files.filter { $0.description == "inst_store_indirect_u8_with_offset_nok.json" }
-        return files.filter { $0.description.starts(with: "inst_") }
-        // return files.filter { $0.description.starts(with: "inst_load_indirect_i32") }
+        // return files.filter { $0.description == "inst_load_imm_and_jump_indirect_misaligned_djump_same_regs_without_offset_nok.json" }
+        // return files.filter { $0.description.starts(with: "inst_") }
+        return files.filter { $0.description.starts(with: "inst_load_imm_and_jump_indirect_") }
         // return files.filter { $0.description.starts(with: "riscv_") }
     }
 
@@ -132,9 +130,7 @@ struct PVMTests {
             }
             #expect(vmState.getGas() == testCase.expectedGas)
         } when: {
-            knownFailedTestCases.reduce(false) { result, name in
-                result || testCase.name.starts(with: name)
-            }
+            knownFailedTestCases.contains { testCase.name.starts(with: $0) }
         }
     }
 }

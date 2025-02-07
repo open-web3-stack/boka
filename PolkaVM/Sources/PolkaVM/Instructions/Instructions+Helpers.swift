@@ -19,7 +19,7 @@ extension Instructions {
         // shift left so that the MSB is the sign bit
         // and then do signed shift right to fill the empty bits using the sign bit
         let signExtendedValue = Int32(bitPattern: value << shift) >> shift
-        return T(truncatingIfNeeded: UInt64(bitPattern: Int64(signExtendedValue)))
+        return T(truncatingIfNeeded: signExtendedValue)
     }
 
     static func decodeImmediate2<T: FixedWidthInteger, U: FixedWidthInteger>(
@@ -66,7 +66,7 @@ extension Instructions {
 
         var targetAlignedData = jumpTable[relative: start ..< end]
         guard let targetAligned = targetAlignedData.decode() else {
-            return .exit(.panic(.trap))
+            return .exit(.panic(.invalidDynamicJump))
         }
 
         guard isDjumpValid(context: context, target: target, targetAligned: UInt32(truncatingIfNeeded: targetAligned)) else {

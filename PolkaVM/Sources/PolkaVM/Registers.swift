@@ -1,7 +1,7 @@
 import Foundation
 
 public struct Registers: Equatable {
-    public struct Index {
+    public struct Index: Equatable {
         public let value: UInt8
         public init(r1: UInt8) {
             value = min(r1 & 0b1111, 12)

@@ -105,7 +105,7 @@ public class ProgramCode {
             }
             i += skip + 1
         }
-        // assume trap at the end
+        // assume a trap at the end
         blockGasCosts[currentBlockStart] = currentBlockGasCost + Instructions.Trap().gasCost()
         instCache[i] = Instructions.Trap()
         basicBlockIndices.insert(i)
