@@ -58,12 +58,13 @@ extension Instructions {
         let entrySize = Int(context.state.program.jumpTableEntrySize)
         let start = ((Int(target) / context.config.pvmDynamicAddressAlignmentFactor) - 1) * entrySize
         let end = start + entrySize
+        let jumpTable = context.state.program.jumpTable
 
-        guard (context.state.program.jumpTable.startIndex ... context.state.program.jumpTable.endIndex).contains(start ..< end) else {
+        guard jumpTable.count >= (end - start), jumpTable.startIndex + end <= jumpTable.endIndex else {
             return .exit(.panic(.invalidDynamicJump))
         }
 
-        var targetAlignedData = context.state.program.jumpTable[relative: start ..< end]
+        var targetAlignedData = jumpTable[relative: start ..< end]
         guard let targetAligned = targetAlignedData.decode() else {
             return .exit(.panic(.trap))
         }
