@@ -3,16 +3,6 @@ import Codec
 import Foundation
 import Utils
 
-extension Set<Data32> {
-    func encode() throws -> Data {
-        var data = Data(capacity: count * 32)
-        for element in self {
-            data.append(element.data)
-        }
-        return data
-    }
-}
-
 public enum ChainHandlers {
     public static let handlers: [any RPCHandler.Type] = [
         GetBlock.self,
@@ -71,7 +61,7 @@ public enum ChainHandlers {
         public func handle(request: Request) async throws -> Response? {
             if let timeslot = request.value {
                 let block = try await source.getBlockHash(byTimeslot: timeslot)
-                return try block.encode()
+                return block.reduce(into: Data(capacity: block.count * 32)) { $0.append($1.data) }
             }
             return nil
         }
