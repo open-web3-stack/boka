@@ -2,7 +2,7 @@ import Foundation
 import TracingUtils
 import Utils
 
-private let logger = Logger(label: "Engine")
+private let logger = Logger(label: "Engine  ")
 
 public class Engine {
     let config: PvmConfig
@@ -65,14 +65,13 @@ public class Engine {
             return .exit(.panic(.invalidInstructionIndex))
         }
 
-        // TODO: check after GP specified the behavior
         if context.state.program.basicBlockIndices.contains(pc) {
             let blockGas = context.state.program.getBlockGasCosts(pc: pc)
             context.state.consumeGas(blockGas)
-            logger.debug("consumed \(blockGas) gas for block at pc: \(pc)")
         }
 
-        logger.debug("executing \(inst)", metadata: ["skip": "\(skip)", "pc": "\(context.state.pc)"])
+        logger.trace("======== pc(\(pc))=========")
+        logger.trace("inst  \(inst)  skip=\(skip)")
 
         return inst.execute(context: context, skip: skip)
     }

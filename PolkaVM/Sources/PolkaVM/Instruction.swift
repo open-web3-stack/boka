@@ -33,7 +33,6 @@ extension Instruction {
             if case .exit = execRes {
                 return execRes
             }
-            logger.debug("execution success! updating pc...")
             return updatePC(context: context, skip: skip)
         } catch let e as MemoryError {
             logger.debug("memory error: \(e)")

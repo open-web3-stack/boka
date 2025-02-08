@@ -1,7 +1,7 @@
 import Foundation
 
 public struct Registers: Equatable {
-    public struct Index: Equatable {
+    public struct Index: Equatable, CustomStringConvertible {
         public let value: UInt8
         public init(r1: UInt8) {
             value = min(r1 & 0b1111, 12)
@@ -17,6 +17,10 @@ public struct Registers: Equatable {
 
         public init(raw: UInt8) {
             value = raw
+        }
+
+        public var description: String {
+            "w\(value)"
         }
     }
 
