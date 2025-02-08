@@ -59,6 +59,8 @@ public class Engine {
     func step(program: ProgramCode, context: ExecutionContext) -> ExecOutcome {
         let pc = context.state.pc
         let skip = program.skip(pc)
+        logger.trace("======== pc(\(pc)) skip(\(skip)) =========")
+
         let inst = program.getInstructionAt(pc: pc)
 
         guard let inst else {
@@ -70,8 +72,7 @@ public class Engine {
             context.state.consumeGas(blockGas)
         }
 
-        logger.trace("======== pc(\(pc))=========")
-        logger.trace("inst  \(inst)  skip=\(skip)")
+        logger.trace("exec  \(inst)")
 
         return inst.execute(context: context, skip: skip)
     }
