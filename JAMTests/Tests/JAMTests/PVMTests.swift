@@ -74,7 +74,7 @@ let knownFailedTestCases = [
 
 struct PVMTests {
     init() {
-        setupTestLogger()
+        // setupTestLogger()
     }
 
     static func loadTests() throws -> [Testcase] {
@@ -82,8 +82,8 @@ struct PVMTests {
         let files = try TestLoader.getTestcases(path: "pvm/programs", extension: "json")
         // return files.filter { $0.description.starts(with: "inst_") }
         // return files.filter { $0.description.starts(with: "inst_load_imm_and_jump_indirect_") }
-        // return files.filter { $0.description.starts(with: "riscv_") }
-        return files.filter { $0.description == "riscv_rv64uzbb_minu.json" }
+        return files.filter { $0.description.starts(with: "riscv_") }
+        // return files.filter { $0.description == "riscv_rv64uzbb_zext_h.json" }
     }
 
     @Test(arguments: try loadTests())

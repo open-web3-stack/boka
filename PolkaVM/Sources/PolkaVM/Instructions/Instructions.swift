@@ -1,5 +1,8 @@
 import Foundation
+import TracingUtils
 import Utils
+
+private let logger = Logger(label: "Insts   ")
 
 public let BASIC_BLOCK_INSTRUCTIONS: Set<UInt8> = [
     Instructions.Trap.opcode,
@@ -136,7 +139,7 @@ public enum Instructions {
         public static var opcode: UInt8 { 33 }
 
         public let address: UInt32
-        public let value: UInt32
+        public let value: UInt64
 
         public init(data: Data) throws {
             (address, value) = try Instructions.decodeImmediate2(data)
@@ -668,7 +671,7 @@ public enum Instructions {
         public let dest: Registers.Index
 
         public init(data: Data) throws {
-            (ra, dest) = try Instructions.deocdeRegisters(data)
+            (dest, ra) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -685,7 +688,7 @@ public enum Instructions {
         public let dest: Registers.Index
 
         public init(data: Data) throws {
-            (ra, dest) = try Instructions.deocdeRegisters(data)
+            (dest, ra) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -702,7 +705,7 @@ public enum Instructions {
         public let dest: Registers.Index
 
         public init(data: Data) throws {
-            (ra, dest) = try Instructions.deocdeRegisters(data)
+            (dest, ra) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -719,7 +722,7 @@ public enum Instructions {
         public let dest: Registers.Index
 
         public init(data: Data) throws {
-            (ra, dest) = try Instructions.deocdeRegisters(data)
+            (dest, ra) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -736,7 +739,7 @@ public enum Instructions {
         public let dest: Registers.Index
 
         public init(data: Data) throws {
-            (ra, dest) = try Instructions.deocdeRegisters(data)
+            (dest, ra) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -753,7 +756,7 @@ public enum Instructions {
         public let dest: Registers.Index
 
         public init(data: Data) throws {
-            (ra, dest) = try Instructions.deocdeRegisters(data)
+            (dest, ra) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -770,7 +773,7 @@ public enum Instructions {
         public let dest: Registers.Index
 
         public init(data: Data) throws {
-            (ra, dest) = try Instructions.deocdeRegisters(data)
+            (dest, ra) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -787,7 +790,7 @@ public enum Instructions {
         public let dest: Registers.Index
 
         public init(data: Data) throws {
-            (ra, dest) = try Instructions.deocdeRegisters(data)
+            (dest, ra) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -804,7 +807,7 @@ public enum Instructions {
         public let dest: Registers.Index
 
         public init(data: Data) throws {
-            (ra, dest) = try Instructions.deocdeRegisters(data)
+            (dest, ra) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -821,7 +824,7 @@ public enum Instructions {
         public let dest: Registers.Index
 
         public init(data: Data) throws {
-            (ra, dest) = try Instructions.deocdeRegisters(data)
+            (dest, ra) = try Instructions.deocdeRegisters(data)
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -1449,7 +1452,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt64 = context.state.readRegister(rb)
-            let shift = value & 0x1F
+            let shift = value & 0x3F
             context.state.writeRegister(ra, Int64(bitPattern: regVal << shift))
             return .continued
         }
@@ -1469,7 +1472,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt64 = context.state.readRegister(rb)
-            let shift = value & 0x1F
+            let shift = value & 0x3F
             context.state.writeRegister(ra, Int64(bitPattern: regVal >> shift))
             return .continued
         }
@@ -1489,7 +1492,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt64 = context.state.readRegister(rb)
-            let shift = value & 0x1F
+            let shift = value & 0x3F
             context.state.writeRegister(ra, Int64(bitPattern: regVal) >> shift)
             return .continued
         }
@@ -1528,7 +1531,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt64 = context.state.readRegister(rb)
-            let shift = regVal & 0x1F
+            let shift = regVal & 0x3F
             context.state.writeRegister(ra, UInt64(truncatingIfNeeded: value << shift))
             return .continued
         }
@@ -1548,7 +1551,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt64 = context.state.readRegister(rb)
-            let shift = regVal & 0x1F
+            let shift = regVal & 0x3F
             context.state.writeRegister(ra, value >> shift)
             return .continued
         }
@@ -1568,7 +1571,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let regVal: UInt64 = context.state.readRegister(rb)
-            let shift = regVal & 0x1F
+            let shift = regVal & 0x3F
             context.state.writeRegister(ra, Int64(bitPattern: value) >> shift)
             return .continued
         }
@@ -2113,7 +2116,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            let shift = rbVal & 0x1F
+            let shift = rbVal & 0x3F
             context.state.writeRegister(rd, UInt64(truncatingIfNeeded: raVal << shift))
             return .continued
         }
@@ -2132,7 +2135,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            let shift = rbVal & 0x1F
+            let shift = rbVal & 0x3F
             context.state.writeRegister(rd, raVal >> shift)
             return .continued
         }
@@ -2151,7 +2154,7 @@ public enum Instructions {
 
         public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
             let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            let shift = rbVal & 0x1F
+            let shift = rbVal & 0x3F
             context.state.writeRegister(rd, Int64(bitPattern: raVal) >> shift)
             return .continued
         }
