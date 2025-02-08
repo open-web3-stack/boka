@@ -22,9 +22,46 @@ public final class NodeDataSource: Sendable {
     }
 }
 
-extension NodeDataSource: SystemDataSource {}
+extension NodeDataSource: SystemDataSource {
+    public func getProperties() async throws -> JSON {
+        // TODO: Get a custom set of properties as a JSON object, defined in the chain spec
+        JSON.array([])
+    }
+
+    public func getChainName() async throws -> String {
+        blockchain.config.value.presetName() ?? ""
+    }
+
+    public func getNodeRoles() async throws -> [String] {
+        // TODO: Returns the roles the node is running as.
+        []
+    }
+
+    public func getVersion() async throws -> String {
+        // TODO: From spec or config
+        "0.0.1"
+    }
+
+    public func getHealth() async throws -> Bool {
+        // TODO: Check health status
+        true
+    }
+
+    public func getImplementation() async throws -> String {
+        name
+    }
+}
 
 extension NodeDataSource: ChainDataSource {
+    public func getKeys(prefix: Data32, count: UInt32, startKey: Data32?, blockHash: Data32?) async throws -> [String] {
+        // TODO:
+        try await chainDataProvider.getKeys(prefix: prefix, count: count, startKey: startKey, blockHash: blockHash)
+    }
+
+    public func getStorage(key: Data32, blockHash: Utils.Data32?) async throws -> [String] {
+        try await chainDataProvider.getStorage(key: key, blockHash: blockHash)
+    }
+
     public func getBestBlock() async throws -> BlockRef {
         try await chainDataProvider.getBlock(hash: chainDataProvider.bestHead.hash)
     }
@@ -37,6 +74,18 @@ extension NodeDataSource: ChainDataSource {
         let state = try await chainDataProvider.getState(hash: blockHash)
         return try await state.value.read(key: key)
     }
+
+    public func getBlockHash(byTimeslot timeslot: TimeslotIndex) async throws -> Set<Data32> {
+        try await chainDataProvider.getBlockHash(byTimeslot: timeslot)
+    }
+
+    public func getHeader(hash: Data32) async throws -> HeaderRef? {
+        try await chainDataProvider.getHeader(hash: hash)
+    }
+
+    public func getFinalizedHead() async throws -> Data32? {
+        try await chainDataProvider.getFinalizedHead()
+    }
 }
 
 extension NodeDataSource: TelemetryDataSource {
@@ -46,5 +95,9 @@ extension NodeDataSource: TelemetryDataSource {
 
     public func getPeersCount() async throws -> Int {
         networkManager.peersCount
+    }
+
+    public func getNetworkKey() async throws -> String {
+        networkManager.network.networkKey
     }
 }

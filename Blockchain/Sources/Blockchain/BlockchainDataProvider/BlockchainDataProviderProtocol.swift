@@ -14,7 +14,12 @@ public protocol BlockchainDataProviderProtocol: Sendable {
     func getState(hash: Data32) async throws -> StateRef?
 
     func getFinalizedHead() async throws -> Data32?
+
     func getHeads() async throws -> Set<Data32>
+
+    func getKeys(prefix: Data32, count: UInt32, startKey: Data32?, blockHash: Data32?) async throws -> [String]
+
+    func getStorage(key: Data32, blockHash: Data32?) async throws -> [String]
 
     /// return empty set if not found
     func getBlockHash(byTimeslot timeslot: TimeslotIndex) async throws -> Set<Data32>

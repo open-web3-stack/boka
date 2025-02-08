@@ -72,6 +72,31 @@ public final class RocksDBBackend: Sendable {
 }
 
 extension RocksDBBackend: BlockchainDataProviderProtocol {
+    public func getKeys(prefix: Data32, count: UInt32, startKey: Data32?, blockHash: Data32?) async throws -> [String] {
+        logger.trace("""
+        getKeys() prefix: \(prefix), count: \(count),
+        startKey: \(String(describing: startKey)), blockHash: \(String(describing: blockHash))
+        """)
+
+        guard let stateRef = try await getState(hash: blockHash ?? genesisBlockHash) else {
+            return []
+        }
+        return try await stateRef.value.backend.getKeys(prefix, startKey, count).map { $0.key.toHexString() }
+    }
+
+    public func getStorage(key: Data32, blockHash: Data32?) async throws -> [String] {
+        logger.trace("getStorage() key: \(key), blockHash: \(String(describing: blockHash))")
+
+        guard let stateRef = try await getState(hash: blockHash ?? genesisBlockHash) else {
+            return []
+        }
+
+        guard let value = try await stateRef.value.backend.readRaw(key) else {
+            throw StateBackendError.missingState(key: key)
+        }
+        return [value.toHexString()]
+    }
+
     public func hasBlock(hash: Data32) async throws -> Bool {
         try blocks.exists(key: hash)
     }

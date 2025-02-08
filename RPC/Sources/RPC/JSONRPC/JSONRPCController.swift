@@ -63,7 +63,7 @@ final class JSONRPCController: RouteCollection, Sendable {
             let responseData = try encoder.encode(jsonResponse)
             try await ws.send(raw: responseData, opcode: .text)
         } catch {
-            logger.debug("Failed to decode JSON request: \(error)")
+            logger.error("Failed to decode JSON request: \(error)")
 
             let rpcError = JSONError(code: -32600, message: "Invalid Request")
             let rpcResponse = JSONResponse(id: nil, error: rpcError)

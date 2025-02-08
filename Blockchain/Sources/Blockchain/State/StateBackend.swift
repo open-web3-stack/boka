@@ -38,6 +38,10 @@ public final class StateBackend: Sendable {
         throw StateBackendError.missingState(key: key)
     }
 
+    public func getKeys(_ prefix: Data32, _ startKey: Data32?, _ limit: UInt32?) async throws -> [(key: Data, value: Data)] {
+        try await impl.readAll(prefix: prefix.data, startKey: startKey?.data, limit: limit)
+    }
+
     public func batchRead(_ keys: [any StateKey]) async throws -> [(key: any StateKey, value: (Codable & Sendable)?)] {
         var ret = [(key: any StateKey, value: (Codable & Sendable)?)]()
         ret.reserveCapacity(keys.count)
