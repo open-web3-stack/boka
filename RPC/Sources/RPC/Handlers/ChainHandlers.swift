@@ -58,9 +58,12 @@ public enum ChainHandlers {
             self.source = source
         }
 
-        public func handle(request _: Request) async throws -> Response? {
-            // TODO: implement
-            nil
+        public func handle(request: Request) async throws -> Response? {
+            if let timeslot = request.value {
+                let blocks = try await source.getBlockHash(byTimeslot: timeslot)
+                return blocks.first?.data
+            }
+            return nil
         }
     }
 
@@ -78,8 +81,7 @@ public enum ChainHandlers {
         }
 
         public func handle(request _: Request) async throws -> Response? {
-            // TODO: implement
-            nil
+            try await source.getFinalizedHead()
         }
     }
 
@@ -97,9 +99,13 @@ public enum ChainHandlers {
             self.source = source
         }
 
-        public func handle(request _: Request) async throws -> Response? {
-            // TODO: implement
-            nil
+        public func handle(request: Request) async throws -> Response? {
+            let header = if let hash = request.value {
+                try await source.getHeader(hash: hash)?.value
+            } else {
+                try await source.getBestBlock().header
+            }
+            return try header.map { try JamEncoder.encode($0) }
         }
     }
 }

@@ -1,5 +1,18 @@
 import Utils
 
+extension ProtocolConfig {
+    private static let presetMapping: [String: ProtocolConfig] = [
+        "minimal": ProtocolConfigRef.minimal.value,
+        "dev": ProtocolConfigRef.dev.value,
+        "tiny": ProtocolConfigRef.tiny.value,
+        "mainnet": ProtocolConfigRef.mainnet.value,
+    ]
+
+    public func presetName() -> String? {
+        ProtocolConfig.presetMapping.first(where: { $0.value == self })?.key
+    }
+}
+
 extension Ref where T == ProtocolConfig {
     // TODO: pick some good numbers for dev env
     public static let minimal = Ref(ProtocolConfig(

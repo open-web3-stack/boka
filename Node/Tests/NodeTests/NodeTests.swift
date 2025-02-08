@@ -1,4 +1,5 @@
 import Blockchain
+import Database
 import Foundation
 import Testing
 import Utils
@@ -79,6 +80,10 @@ final class NodeTests {
         // Verify block was produced
         #expect(newTimeslot > initialTimeslot)
         #expect(try await validatorNode.blockchain.dataProvider.hasBlock(hash: newBestHead.hash))
+        #expect(try await validatorNode.blockchain.dataProvider.getKeys(prefix: Data32(), count: 0, startKey: nil, blockHash: nil).isEmpty)
+        await #expect(throws: StateBackendError.self) {
+            _ = try await validatorNode.blockchain.dataProvider.getStorage(key: Data32.random(), blockHash: nil)
+        }
     }
 
     @Test func sync() async throws {

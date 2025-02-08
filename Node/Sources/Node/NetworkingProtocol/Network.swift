@@ -92,6 +92,10 @@ public final class Network: Sendable {
     public var peersCount: Int {
         peer.peersCount
     }
+
+    public var networkKey: String {
+        peer.publicKey.description
+    }
 }
 
 struct HandlerDef: StreamHandler {
