@@ -1,5 +1,6 @@
 import Foundation
 
+#if !os(WASI)
 public final class ThreadSafeContainer<T>: @unchecked Sendable {
     private var storage: T
     private let lock: ReadWriteLock = .init()
@@ -35,3 +36,4 @@ public final class ThreadSafeContainer<T>: @unchecked Sendable {
         }
     }
 }
+#endif

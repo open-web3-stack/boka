@@ -2,6 +2,7 @@ import TracingUtils
 
 private let logger = Logger(label: "StoreMiddleware")
 
+#if !os(WASI)
 /// Store events in memory and wait for all handlers to be executed
 /// For testing purposes only
 public struct StoreMiddleware: MiddlewareProtocol {
@@ -39,3 +40,4 @@ public struct StoreMiddleware: MiddlewareProtocol {
         return newValue.map(\.0)
     }
 }
+#endif

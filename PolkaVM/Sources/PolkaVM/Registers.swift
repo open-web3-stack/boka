@@ -1,6 +1,10 @@
 import Foundation
 
 public struct Registers: Equatable {
+    public enum Error: Swift.Error {
+        case invalidInitDataLength
+    }
+
     public struct Index {
         public let value: UInt8
         public init(ra: UInt8) {

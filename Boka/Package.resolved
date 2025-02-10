@@ -238,10 +238,10 @@
     {
       "identity" : "swift-numerics",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-numerics",
+      "location" : "https://github.com/qiweiii/swift-numerics.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "e30276bff2ff5ed80566fbdca49f50aa160b0e83"
+        "branch" : "wasm-fix",
+        "revision" : "13c8553a4845302fc41d942c7b86af05ed550d21"
       }
     },
     {

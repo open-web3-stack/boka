@@ -1,9 +1,10 @@
 #if canImport(Glibc)
-    import Glibc
+import Glibc
 #elseif canImport(Darwin)
-    import Darwin
+import Darwin
 #endif
 
+#if !os(WASI)
 public final class ReadWriteLock: @unchecked Sendable {
     private var lock: pthread_rwlock_t = .init()
 
@@ -43,3 +44,4 @@ public final class ReadWriteLock: @unchecked Sendable {
         return try closure()
     }
 }
+#endif
