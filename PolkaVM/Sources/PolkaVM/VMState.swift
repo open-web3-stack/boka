@@ -99,6 +99,7 @@ public class VMState {
 
     public func updatePC(_ newPC: UInt32) {
         pc = newPC
+        logger.trace("pc    => \(pc)")
     }
 
     public func readRegister<T: FixedWidthInteger>(_ index: Registers.Index) -> T {
