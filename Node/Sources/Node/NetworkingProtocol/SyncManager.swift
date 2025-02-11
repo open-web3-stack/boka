@@ -27,7 +27,12 @@ public actor SyncManager {
 
     private let subscriptions: EventSubscriptions
 
-    private var status = SyncStatus.discovering
+    private var status = SyncStatus.discovering {
+        didSet {
+            logger.trace("status changed", metadata: ["status": "\(status)"])
+        }
+    }
+
     private var syncContinuation: [CheckedContinuation<Void, Never>] = []
 
     private var networkBest: HashAndSlot?
@@ -61,6 +66,15 @@ public actor SyncManager {
 
     private func on(peerUpdated info: PeerInfo, newBlockHeader: HeaderRef?) async {
         // TODO: improve this to handle the case misbehaved peers seding us the wrong best
+        logger.trace(
+            "on peer updated",
+            metadata: [
+                "peer": "\(info.id)",
+                "best": "\(String(describing: info.best))",
+                "finalized": "\(info.finalized)",
+                "newBlockHeader": "\(String(describing: newBlockHeader))",
+            ]
+        )
         if let networkBest {
             if let peerBest = info.best, peerBest.timeslot > networkBest.timeslot {
                 self.networkBest = peerBest
