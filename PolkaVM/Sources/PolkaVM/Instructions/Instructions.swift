@@ -925,7 +925,7 @@ public enum Instructions {
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let value = try context.state.readMemory(address: context.state.readRegister(rb) + offset)
+            let value = try context.state.readMemory(address: context.state.readRegister(rb) &+ offset)
             context.state.writeRegister(ra, value)
             return .continued
         }
@@ -944,7 +944,7 @@ public enum Instructions {
         }
 
         public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let value = try context.state.readMemory(address: context.state.readRegister(rb) + offset)
+            let value = try context.state.readMemory(address: context.state.readRegister(rb) &+ offset)
             context.state.writeRegister(ra, Int8(bitPattern: value))
             return .continued
         }
@@ -1816,7 +1816,7 @@ public enum Instructions {
             if rbVal == 0 {
                 context.state.writeRegister(rd, UInt64.max)
             } else {
-                context.state.writeRegister(rd, raVal / rbVal)
+                context.state.writeRegister(rd, Int32(bitPattern: raVal / rbVal))
             }
             return .continued
         }
@@ -1864,7 +1864,7 @@ public enum Instructions {
             if rbVal == 0 {
                 context.state.writeRegister(rd, Int32(bitPattern: raVal))
             } else {
-                context.state.writeRegister(rd, raVal % rbVal)
+                context.state.writeRegister(rd, Int32(bitPattern: raVal % rbVal))
             }
             return .continued
         }
