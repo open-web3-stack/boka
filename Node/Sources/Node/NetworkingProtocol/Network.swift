@@ -93,6 +93,10 @@ public final class Network: Sendable {
         peer.peersCount
     }
 
+    public var peerRole: PeerRole {
+        peer.peersRole
+    }
+
     public var networkKey: String {
         peer.publicKey.description
     }
