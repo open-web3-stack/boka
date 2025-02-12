@@ -10,25 +10,23 @@ enum MemoryTests {
 
         @Test func emptyPageMap() {
             let pageMap = PageMap(pageMap: [], config: config)
-            #expect(pageMap.isReadable(pageStart: 0, pages: 1) == false)
-            #expect(pageMap.isReadable(address: 0, length: 0) == false)
-            #expect(pageMap.isReadable(address: 0, length: 1) == false)
-            #expect(pageMap.isReadable(address: 1, length: 1) == false)
-            #expect(pageMap.isWritable(pageStart: 0, pages: 1) == false)
-            #expect(pageMap.isWritable(address: 0, length: 0) == false)
-            #expect(pageMap.isWritable(address: 0, length: 1) == false)
-            #expect(pageMap.isWritable(address: 1, length: 1) == false)
+            #expect(pageMap.isReadable(pageStart: 0, pages: 1).result == false)
+            #expect(pageMap.isReadable(address: 0, length: 1).result == false)
+            #expect(pageMap.isReadable(address: 1, length: 1).result == false)
+            #expect(pageMap.isWritable(pageStart: 0, pages: 1).result == false)
+            #expect(pageMap.isWritable(address: 0, length: 1).result == false)
+            #expect(pageMap.isWritable(address: 1, length: 1).result == false)
         }
 
         @Test func initIncompletePage() {
             let pageMap = PageMap(pageMap: [(address: 0, length: 1, access: .readOnly)], config: config)
 
-            #expect(pageMap.isReadable(pageStart: 0, pages: 1) == true)
-            #expect(pageMap.isWritable(pageStart: 0, pages: 1) == false)
+            #expect(pageMap.isReadable(pageStart: 0, pages: 1).result == true)
+            #expect(pageMap.isWritable(pageStart: 0, pages: 1).result == false)
 
-            #expect(pageMap.isReadable(address: 0, length: 1) == true)
-            #expect(pageMap.isReadable(address: UInt32(config.pvmMemoryPageSize) - 1, length: 1) == true)
-            #expect(pageMap.isReadable(address: UInt32(config.pvmMemoryPageSize), length: 1) == false)
+            #expect(pageMap.isReadable(address: 0, length: 1).result == true)
+            #expect(pageMap.isReadable(address: UInt32(config.pvmMemoryPageSize) - 1, length: 1).result == true)
+            #expect(pageMap.isReadable(address: UInt32(config.pvmMemoryPageSize), length: 1).result == false)
         }
 
         @Test func updatePageMap() {
@@ -40,36 +38,30 @@ enum MemoryTests {
                 config: config
             )
 
-            #expect(pageMap.isReadable(pageStart: 0, pages: 1) == true)
-            #expect(pageMap.isWritable(pageStart: 0, pages: 1) == false)
-            #expect(pageMap.isReadable(pageStart: 1, pages: 1) == true)
-            #expect(pageMap.isWritable(pageStart: 1, pages: 1) == false)
+            #expect(pageMap.isReadable(pageStart: 0, pages: 1).result == true)
+            #expect(pageMap.isWritable(pageStart: 0, pages: 1).result == false)
+            #expect(pageMap.isReadable(pageStart: 1, pages: 1).result == true)
+            #expect(pageMap.isWritable(pageStart: 1, pages: 1).result == false)
 
             pageMap.update(pageIndex: 1, pages: 1, access: .readWrite)
 
-            #expect(pageMap.isReadable(pageStart: 1, pages: 1) == true)
-            #expect(pageMap.isWritable(pageStart: 0, pages: 1) == false)
-            #expect(pageMap.isWritable(pageStart: 1, pages: 1) == true)
+            #expect(pageMap.isReadable(pageStart: 1, pages: 1).result == true)
+            #expect(pageMap.isWritable(pageStart: 0, pages: 1).result == false)
+            #expect(pageMap.isWritable(pageStart: 1, pages: 1).result == true)
 
-            pageMap.update(address: 0, length: config.pvmMemoryPageSize, access: .noAccess)
+            pageMap.removeAccess(address: 0, length: config.pvmMemoryPageSize)
 
-            #expect(pageMap.isReadable(pageStart: 0, pages: 1) == false)
-            #expect(pageMap.isWritable(pageStart: 0, pages: 1) == false)
-            #expect(pageMap.isReadable(pageStart: 1, pages: 1) == true)
+            #expect(pageMap.isReadable(pageStart: 0, pages: 1).result == false)
+            #expect(pageMap.isWritable(pageStart: 0, pages: 1).result == false)
+            #expect(pageMap.isReadable(pageStart: 1, pages: 1).result == true)
         }
     }
 
     @Suite struct MemoryChunkTests {
         private var config = DefaultPvmConfig()
 
-        @Test func invalidChunk() throws {
-            #expect(throws: MemoryError.invalidChunk(10)) { try MemoryChunk(startAddress: 10, endAddress: 9, data: Data([])) }
-            #expect(throws: MemoryError.invalidChunk(0)) { try MemoryChunk(startAddress: 0, endAddress: 0, data: Data([0])) }
-            #expect(throws: MemoryError.invalidChunk(0)) { try MemoryChunk(startAddress: 0, endAddress: 1, data: Data([0, 0])) }
-        }
-
         @Test func read() throws {
-            let chunk = try MemoryChunk(startAddress: 1, endAddress: 10, data: Data())
+            let chunk = try MemoryChunk(startAddress: 1, data: Data(repeating: 0, count: 9))
             #expect(try chunk.read(address: 1, length: 1) == Data([0]))
             #expect(try chunk.read(address: 2, length: 1) == Data([0]))
             #expect(try chunk.read(address: 2, length: 0) == Data())
@@ -79,36 +71,127 @@ enum MemoryTests {
         }
 
         @Test func write() throws {
-            let chunk = try MemoryChunk(startAddress: 0, endAddress: 10, data: Data())
+            let chunk = try MemoryChunk(startAddress: 0, data: Data(repeating: 0, count: 3))
             try chunk.write(address: 0, values: Data([1]))
-            #expect(chunk.data == Data([1]))
+            #expect(chunk.data == Data([1, 0, 0]))
             try chunk.write(address: 1, values: Data([2]))
-            #expect(chunk.data == Data([1, 2]))
+            #expect(chunk.data == Data([1, 2, 0]))
             try chunk.write(address: 1, values: Data([3]))
-            #expect(chunk.data == Data([1, 3]))
+            #expect(chunk.data == Data([1, 3, 0]))
 
-            #expect(throws: MemoryError.exceedChunkBoundary(11)) { try chunk.write(address: 11, values: Data([0])) }
-            #expect(throws: MemoryError.exceedChunkBoundary(9)) { try chunk.write(address: 9, values: Data([0, 0])) }
+            #expect(throws: MemoryError.exceedChunkBoundary(3)) { try chunk.write(address: 3, values: Data([0])) }
+            #expect(throws: MemoryError.exceedChunkBoundary(2)) { try chunk.write(address: 2, values: Data([0, 0])) }
         }
 
-        @Test func incrementEnd() throws {
-            let chunk = try MemoryChunk(startAddress: 0, endAddress: UInt32.max - 5, data: Data())
-            try chunk.incrementEnd(size: 5)
-            #expect(chunk.endAddress == UInt32.max)
-
-            #expect(throws: MemoryError.outOfMemory(UInt32.max)) { try chunk.incrementEnd(size: 5) }
-        }
-
-        @Test func merge() throws {
-            let chunk1 = try MemoryChunk(startAddress: 0, endAddress: 5, data: Data([1, 2, 3]))
-            let chunk2 = try MemoryChunk(startAddress: 5, endAddress: 8, data: Data([5, 6, 7]))
-            try chunk1.merge(chunk: chunk2)
+        @Test func append() throws {
+            let chunk1 = try MemoryChunk(startAddress: 0, data: Data([1, 2, 3, 0, 0]))
+            let chunk2 = try MemoryChunk(startAddress: 5, data: Data([5, 6, 7]))
+            try chunk1.append(chunk: chunk2)
             #expect(chunk1.data == Data([1, 2, 3, 0, 0, 5, 6, 7]))
             #expect(chunk2.data == Data([5, 6, 7]))
             #expect(chunk1.endAddress == 8)
 
-            let chunk3 = try MemoryChunk(startAddress: 10, endAddress: 15, data: Data([4, 5, 6]))
-            #expect(throws: MemoryError.notContiguous(10)) { try chunk1.merge(chunk: chunk3) }
+            let chunk3 = try MemoryChunk(startAddress: 10, data: Data([4, 5, 6, 0, 0]))
+            #expect(throws: MemoryError.notAdjacent(10)) { try chunk1.append(chunk: chunk3) }
+        }
+
+        @Test func zeroExtend() throws {
+            let chunk1 = try MemoryChunk(startAddress: 0, data: Data([1, 2, 3]))
+            try chunk1.zeroExtend(until: 5)
+            #expect(chunk1.data == Data([1, 2, 3, 0, 0]))
+            #expect(chunk1.endAddress == 5)
+        }
+    }
+
+    @Suite struct MemoryZoneTests {
+        private var config = DefaultPvmConfig()
+
+        @Test func invalidZone() throws {
+            #expect(throws: MemoryError.invalidZone(10)) { try MemoryZone(startAddress: 10, endAddress: 9, chunks: []) }
+            #expect(throws: MemoryError.invalidZone(0)) { try MemoryZone(
+                startAddress: 0,
+                endAddress: 0,
+                chunks: [MemoryChunk(startAddress: 0, data: Data([0]))]
+            ) }
+            #expect(throws: MemoryError.invalidZone(0)) { try MemoryZone(
+                startAddress: 0,
+                endAddress: 1,
+                chunks: [MemoryChunk(startAddress: 0, data: Data([0, 0]))]
+            ) }
+        }
+
+        @Test func incrementEnd() throws {
+            let zone = try MemoryZone(startAddress: 0, endAddress: UInt32.max - 5, chunks: [])
+            try zone.incrementEnd(size: 5)
+            #expect(zone.endAddress == UInt32.max)
+
+            #expect(throws: MemoryError.outOfMemory(UInt32.max)) { try zone.incrementEnd(size: 5) }
+        }
+
+        @Test func read() throws {
+            let zone = try MemoryZone(startAddress: 0, endAddress: 10, chunks: [
+                MemoryChunk(startAddress: 0, data: Data([0, 0])),
+                MemoryChunk(startAddress: 5, data: Data([0, 1])),
+                MemoryChunk(startAddress: 8, data: Data([2])),
+            ])
+            #expect(try zone.read(address: 0, length: 1) == Data([0]))
+            #expect(try zone.read(address: 2, length: 1) == Data([0]))
+            #expect(try zone.read(address: 0, length: 2) == Data([0, 0]))
+            #expect(try zone.read(address: 2, length: 0) == Data())
+            #expect(try zone.read(address: 2, length: 2) == Data([0, 0]))
+            #expect(try zone.read(address: 4, length: 2) == Data([0, 0]))
+            #expect(try zone.read(address: 4, length: 3) == Data([0, 0, 1]))
+            #expect(try zone.read(address: 4, length: 4) == Data([0, 0, 1, 0]))
+            #expect(try zone.read(address: 4, length: 5) == Data([0, 0, 1, 0, 2]))
+            #expect(try zone.read(address: 4, length: 6) == Data([0, 0, 1, 0, 2, 0]))
+            #expect(try zone.read(address: 5, length: 1) == Data([0]))
+            #expect(try zone.read(address: 5, length: 4) == Data([0, 1, 0, 2]))
+            #expect(try zone.read(address: 9, length: 1) == Data([0]))
+            #expect(throws: MemoryError.exceedZoneBoundary(10)) { try zone.read(address: 9, length: 2) == Data([0]) }
+        }
+
+        @Test func write() throws {
+            let zone = try MemoryZone(startAddress: 0, endAddress: 10, chunks: [
+                MemoryChunk(startAddress: 0, data: Data([0, 0])),
+                MemoryChunk(startAddress: 5, data: Data([0, 1])),
+                MemoryChunk(startAddress: 8, data: Data([2])),
+            ])
+
+            try zone.write(address: 0, values: Data([1]))
+            #expect(try zone.read(address: 0, length: 1) == Data([1]))
+
+            try zone.write(address: 0, values: Data([1, 2, 3]))
+            #expect(try zone.read(address: 0, length: 5) == Data([1, 2, 3, 0, 0]))
+
+            try zone.write(address: 3, values: Data([4, 5, 6]))
+            #expect(try zone.read(address: 0, length: 10) == Data([1, 2, 3, 4, 5, 6, 1, 0, 2, 0]))
+
+            #expect(zone.chunks.count == 3)
+            try zone.write(address: 2, values: Data([3, 4, 5, 6, 7, 8, 9]))
+            #expect(zone.chunks.count == 1)
+            #expect(try zone.read(address: 0, length: 10) == Data([1, 2, 3, 4, 5, 6, 7, 8, 9, 0]))
+        }
+
+        @Test func zero() throws {
+            let zone = try MemoryZone(startAddress: 0, endAddress: 4096, chunks: [
+                MemoryChunk(startAddress: 0, data: Data([0, 0])),
+                MemoryChunk(startAddress: 5, data: Data([0, 1])),
+                MemoryChunk(startAddress: 8, data: Data([2])),
+            ])
+
+            try zone.zero(pageIndex: 0, pages: 1)
+            #expect(try zone.read(address: 0, length: 4096) == Data(repeating: 0, count: 4096))
+        }
+
+        @Test func void() throws {
+            let zone = try MemoryZone(startAddress: 0, endAddress: 4096, chunks: [
+                MemoryChunk(startAddress: 0, data: Data([0, 0])),
+                MemoryChunk(startAddress: 5, data: Data([0, 1])),
+                MemoryChunk(startAddress: 8, data: Data([2])),
+            ])
+
+            try zone.void(pageIndex: 0, pages: 1)
+            #expect(try zone.read(address: 0, length: 4096) == Data(repeating: 0, count: 4096))
         }
     }
 
@@ -149,7 +232,7 @@ enum MemoryTests {
         @Test func read() throws {
             // readonly
             #expect(throws: MemoryError.notReadable(0)) { try memory.read(address: 0) }
-            #expect(throws: MemoryError.notReadable(readOnlyStart - 1)) { try memory.read(address: readOnlyStart - 1) }
+            #expect(throws: MemoryError.notReadable(readOnlyStart - 4096)) { try memory.read(address: readOnlyStart - 1) }
             #expect(memory.isReadable(address: 0, length: config.pvmProgramInitZoneSize) == false)
             #expect(try memory.read(address: readOnlyStart, length: 4) == Data([1, 2, 3, 0]))
             #expect(try memory.read(address: readOnlyStart, length: 4) == Data([1, 2, 3, 0]))
@@ -181,7 +264,7 @@ enum MemoryTests {
         @Test func write() throws {
             // readonly
             #expect(throws: MemoryError.notWritable(0)) { try memory.write(address: 0, value: 0) }
-            #expect(throws: MemoryError.notWritable(readOnlyStart - 1)) { try memory.write(address: readOnlyStart - 1, value: 0) }
+            #expect(throws: MemoryError.notWritable(readOnlyStart - 4096)) { try memory.write(address: readOnlyStart - 1, value: 0) }
             #expect(memory.isWritable(address: 0, length: config.pvmProgramInitZoneSize) == false)
             #expect(throws: MemoryError.notWritable(readOnlyStart)) { try memory.write(address: readOnlyStart, value: 4) }
             #expect(try memory.read(address: readOnlyStart, length: 4) == Data([1, 2, 3, 0]))
@@ -228,7 +311,7 @@ enum MemoryTests {
             memory = try GeneralMemory(
                 pageMap: [
                     (address: 0, length: UInt32(config.pvmMemoryPageSize), writable: true),
-                    (address: UInt32(config.pvmMemoryPageSize) + 2, length: UInt32(config.pvmMemoryPageSize), writable: false),
+                    (address: UInt32(config.pvmMemoryPageSize), length: UInt32(config.pvmMemoryPageSize), writable: false),
                     (address: UInt32(config.pvmMemoryPageSize) * 4, length: UInt32(config.pvmMemoryPageSize) / 2, writable: true),
                 ],
                 chunks: [
@@ -254,9 +337,9 @@ enum MemoryTests {
 
         @Test func read() throws {
             #expect(try memory.read(address: 0, length: 4) == Data([1, 2, 3, 4]))
-            #expect(throws: MemoryError.chunkNotFound(1024)) { try memory.read(address: 1024, length: 4) }
+            #expect(try memory.read(address: 1024, length: 4) == Data([0, 0, 0, 0]))
             #expect(try memory.read(address: 2048, length: 2) == Data([1, 2]))
-            #expect(throws: MemoryError.exceedChunkBoundary(2048)) { try memory.read(address: 2048, length: 10) }
+            #expect(try memory.read(address: 2048, length: 10) == Data([1, 2, 3, 0, 0, 0, 0, 0, 0, 0]))
         }
 
         @Test func write() throws {
@@ -268,11 +351,12 @@ enum MemoryTests {
         @Test func sbrk() throws {
             let oldEnd = try memory.sbrk(512)
 
-            #expect(memory.isWritable(address: oldEnd, length: 512) == true)
+            #expect(oldEnd == UInt32(config.pvmMemoryPageSize))
+            #expect(memory.isWritable(address: oldEnd, length: config.pvmMemoryPageSize) == true)
             #expect(memory.isWritable(address: 0, length: Int(oldEnd)) == true)
 
             try memory.write(address: oldEnd, values: Data([1, 2, 3]))
-            #expect(try memory.read(address: oldEnd - 1, length: 5) == Data([7, 1, 2, 3, 0]))
+            #expect(try memory.read(address: oldEnd - 1, length: 5) == Data([0, 1, 2, 3, 0]))
         }
 
         @Test func zero() throws {

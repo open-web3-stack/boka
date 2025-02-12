@@ -859,10 +859,9 @@ public class Peek: HostCall {
         var segment: Data?
         if context.pvms[regs[0]] == nil {
             segment = Data()
-        } else if state.isMemoryWritable(address: regs[1], length: Int(regs[3])), context.pvms[regs[0]]!.memory.isReadable(
-            address: UInt32(truncatingIfNeeded: regs[2]),
-            length: Int(regs[3])
-        ) {
+        } else if state.isMemoryWritable(address: regs[1], length: Int(regs[3])),
+                  context.pvms[regs[0]]!.memory.isReadable(address: UInt32(truncatingIfNeeded: regs[2]), length: Int(regs[3]))
+        {
             segment = try context.pvms[regs[0]]!.memory.read(address: UInt32(truncatingIfNeeded: regs[2]), length: Int(regs[3]))
         }
 
