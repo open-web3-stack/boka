@@ -130,6 +130,12 @@ extension Header: Codable {
     }
 }
 
+extension Header: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(hash())
+    }
+}
+
 extension Header {
     public func asRef() -> HeaderRef {
         HeaderRef(self)

@@ -6,6 +6,11 @@ public struct TicketItemAndOutput: Comparable, Sendable, Codable {
     public let ticket: ExtrinsicTickets.TicketItem
     public let output: Data32
 
+    public init(ticket: ExtrinsicTickets.TicketItem, output: Data32) {
+        self.ticket = ticket
+        self.output = output
+    }
+
     public static func < (lhs: TicketItemAndOutput, rhs: TicketItemAndOutput) -> Bool {
         lhs.output < rhs.output
     }

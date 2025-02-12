@@ -16,7 +16,7 @@ enum BroadcastTarget {
 
 public final class NetworkManager: Sendable {
     public let peerManager: PeerManager
-    public let network: Network
+    public let network: any NetworkProtocol
     public let syncManager: SyncManager
     public let blockchain: Blockchain
     private let subscriptions: EventSubscriptions
@@ -26,19 +26,13 @@ public final class NetworkManager: Sendable {
     private let devPeers: Set<Either<PeerId, NetAddr>>
 
     public init(
-        config: Network.Config,
+        buildNetwork: (NetworkProtocolHandler) throws -> any NetworkProtocol,
         blockchain: Blockchain,
         eventBus: EventBus,
         devPeers: Set<NetAddr>
     ) async throws {
         peerManager = PeerManager(eventBus: eventBus)
-
-        network = try Network(
-            config: config,
-            protocolConfig: blockchain.config,
-            genesisHeader: blockchain.dataProvider.genesisBlockHash,
-            handler: HandlerImpl(blockchain: blockchain, peerManager: peerManager)
-        )
+        network = try buildNetwork(HandlerImpl(blockchain: blockchain, peerManager: peerManager))
         syncManager = SyncManager(
             blockchain: blockchain, network: network, peerManager: peerManager, eventBus: eventBus
         )

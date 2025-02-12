@@ -3,7 +3,7 @@ import Codec
 import Foundation
 import Networking
 
-public enum CERequest: Sendable {
+public enum CERequest: Sendable, Equatable, Hashable {
     case blockRequest(BlockRequest)
     case safroleTicket1(SafroleTicketMessage)
     case safroleTicket2(SafroleTicketMessage)
