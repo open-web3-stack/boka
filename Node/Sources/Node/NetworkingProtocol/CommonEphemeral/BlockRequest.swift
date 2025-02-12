@@ -1,7 +1,7 @@
 import Utils
 
-public struct BlockRequest: Codable, Sendable {
-    public enum Direction: UInt8, Codable, Sendable {
+public struct BlockRequest: Codable, Sendable, Equatable, Hashable {
+    public enum Direction: UInt8, Codable, Sendable, Equatable, Hashable {
         case ascendingExcludsive = 0
         case descendingInclusive = 1
     }

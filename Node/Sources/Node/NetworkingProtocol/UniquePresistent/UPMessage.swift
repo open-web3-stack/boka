@@ -2,7 +2,7 @@ import Codec
 import Foundation
 import Networking
 
-public enum UPMessage: Sendable {
+public enum UPMessage: Sendable, Equatable, Hashable {
     case blockAnnouncementHandshake(BlockAnnouncementHandshake)
     case blockAnnouncement(BlockAnnouncement)
 }

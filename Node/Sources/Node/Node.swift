@@ -45,7 +45,14 @@ public class Node {
         self.keystore = keystore
 
         network = try await NetworkManager(
-            config: config.network,
+            buildNetwork: { handler in
+                try Network(
+                    config: config.network,
+                    protocolConfig: blockchain.config,
+                    genesisHeader: blockchain.dataProvider.genesisBlockHash,
+                    handler: handler
+                )
+            },
             blockchain: blockchain,
             eventBus: eventBus,
             devPeers: Set(config.peers)

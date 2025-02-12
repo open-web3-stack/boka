@@ -22,7 +22,7 @@ enum SyncStatus {
 // - re-enter to bulk sync mode if new peer with better head is discovered
 public actor SyncManager {
     private let blockchain: Blockchain
-    private let network: Network
+    private let network: NetworkProtocol
     private let peerManager: PeerManager
 
     private let subscriptions: EventSubscriptions
@@ -39,7 +39,7 @@ public actor SyncManager {
     private var networkFinalizedBest: HashAndSlot?
     private var currentRequest: (peer: PeerId, request: BlockRequest)?
 
-    public init(blockchain: Blockchain, network: Network, peerManager: PeerManager, eventBus: EventBus) {
+    public init(blockchain: Blockchain, network: NetworkProtocol, peerManager: PeerManager, eventBus: EventBus) {
         self.blockchain = blockchain
         self.network = network
         self.peerManager = peerManager

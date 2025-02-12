@@ -1,18 +1,18 @@
-import Blockchain
 import Foundation
 import Utils
 
-class BlockchainServices {
-    let config: ProtocolConfigRef
-    let timeProvider: MockTimeProvider
-    let dataProvider: BlockchainDataProvider
-    let dataStore: DataStore
-    let eventBus: EventBus
-    let scheduler: MockScheduler
-    let keystore: DevKeyStore
-    let storeMiddleware: StoreMiddleware
-    let genesisBlock: BlockRef
-    let genesisState: StateRef
+// For testing only
+public class BlockchainServices {
+    public let config: ProtocolConfigRef
+    public let timeProvider: MockTimeProvider
+    public let dataProvider: BlockchainDataProvider
+    public let dataStore: DataStore
+    public let eventBus: EventBus
+    public let scheduler: MockScheduler
+    public let keystore: DevKeyStore
+    public let storeMiddleware: StoreMiddleware
+    public let genesisBlock: BlockRef
+    public let genesisState: StateRef
 
     private var _blockchain: Blockchain?
     private weak var _blockchainRef: Blockchain?
@@ -20,7 +20,7 @@ class BlockchainServices {
     private var _blockAuthor: BlockAuthor?
     private weak var _blockAuthorRef: BlockAuthor?
 
-    init(
+    public init(
         config: ProtocolConfigRef = .dev,
         timeProvider: MockTimeProvider = MockTimeProvider(time: 988),
         keysCount: Int = 12
@@ -55,7 +55,7 @@ class BlockchainServices {
         }
     }
 
-    var blockchain: Blockchain {
+    public var blockchain: Blockchain {
         get async {
             if let _blockchain {
                 return _blockchain
@@ -71,7 +71,7 @@ class BlockchainServices {
         }
     }
 
-    var blockAuthor: BlockAuthor {
+    public var blockAuthor: BlockAuthor {
         get async {
             if let _blockAuthor {
                 return _blockAuthor
