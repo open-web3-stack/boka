@@ -5,10 +5,20 @@ public enum RuntimeEvents {
         public let block: BlockRef
         public let state: StateRef
         public let parentState: StateRef
+
+        public init(block: BlockRef, state: StateRef, parentState: StateRef) {
+            self.block = block
+            self.state = state
+            self.parentState = parentState
+        }
     }
 
     public struct BlockFinalized: Event {
         public let hash: Data32
+
+        public init(hash: Data32) {
+            self.hash = hash
+        }
     }
 
     // New safrole ticket generated from SafroleService
@@ -16,6 +26,16 @@ public enum RuntimeEvents {
         public let epochIndex: EpochIndex
         public let items: [TicketItemAndOutput]
         public let publicKey: Bandersnatch.PublicKey
+
+        public init(
+            epochIndex: EpochIndex,
+            items: [TicketItemAndOutput],
+            publicKey: Bandersnatch.PublicKey
+        ) {
+            self.epochIndex = epochIndex
+            self.items = items
+            self.publicKey = publicKey
+        }
     }
 
     // New safrole ticket received from network

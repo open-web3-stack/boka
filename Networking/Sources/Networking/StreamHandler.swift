@@ -1,6 +1,6 @@
 import Foundation
 
-public protocol StreamKindProtocol: Sendable, Hashable, RawRepresentable<UInt8>, CaseIterable {}
+public protocol StreamKindProtocol: Sendable, Hashable, Equatable, RawRepresentable<UInt8>, CaseIterable {}
 
 public protocol MessageProtocol: Sendable {
     func encode() throws -> Data
