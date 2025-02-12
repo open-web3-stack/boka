@@ -25,8 +25,6 @@ struct Topology {
     }
 
     func build(genesis: Genesis) async throws -> ([(Node, StoreMiddleware)], MockScheduler) {
-        // setupTestLogger()
-
         let timeProvider = MockTimeProvider(time: 1000)
         let scheduler = MockScheduler(timeProvider: timeProvider)
         var ret: [(Node, StoreMiddleware)] = []

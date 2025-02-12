@@ -12,8 +12,8 @@ public enum SystemHandlers {
 
     public static func getHandlers(source: SystemDataSource) -> [any RPCHandler] {
         [
-            Health(),
-            Implementation(),
+            Health(source: source),
+            Implementation(source: source),
             Version(source: source),
             Properties(source: source),
             NodeRoles(source: source),
@@ -28,8 +28,14 @@ public enum SystemHandlers {
         public static var method: String { "system_health" }
         public static var summary: String? { "Returns true if the node is healthy." }
 
+        private let source: SystemDataSource
+
+        init(source: SystemDataSource) {
+            self.source = source
+        }
+
         public func handle(request _: Request) async throws -> Response? {
-            true
+            try await source.getHealth()
         }
     }
 
@@ -40,8 +46,14 @@ public enum SystemHandlers {
         public static var method: String { "system_implementation" }
         public static var summary: String? { "Returns the implementation name of the node." }
 
+        private let source: SystemDataSource
+
+        init(source: SystemDataSource) {
+            self.source = source
+        }
+
         public func handle(request _: Request) async throws -> Response? {
-            "Boka"
+            try await source.getImplementation()
         }
     }
 
@@ -59,8 +71,7 @@ public enum SystemHandlers {
         }
 
         public func handle(request _: Request) async throws -> Response? {
-            // TODO: read it from somewhere
-            "0.0.1"
+            try await source.getVersion()
         }
     }
 
@@ -78,8 +89,7 @@ public enum SystemHandlers {
         }
 
         public func handle(request _: Request) async throws -> Response? {
-            // TODO: implement
-            JSON.array([])
+            try await source.getProperties()
         }
     }
 
@@ -97,8 +107,7 @@ public enum SystemHandlers {
         }
 
         public func handle(request _: Request) async throws -> Response? {
-            // TODO: implement
-            []
+            try await source.getNodeRoles()
         }
     }
 
@@ -116,8 +125,7 @@ public enum SystemHandlers {
         }
 
         public func handle(request _: Request) async throws -> Response? {
-            // TODO: implement
-            "dev"
+            try await source.getChainName()
         }
     }
 }

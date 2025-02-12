@@ -39,7 +39,7 @@ public struct Request1<T: FromJSON>: RequestParameter {
 public struct Request2<T1: FromJSON, T2: FromJSON>: RequestParameter {
     public static var types: [Any.Type] { [T1.self, T2.self] }
 
-    public let valuu: (T1, T2)
+    public let value: (T1, T2)
 
     public init(from json: JSON?) throws {
         guard let json else {
@@ -51,7 +51,7 @@ public struct Request2<T1: FromJSON, T2: FromJSON>: RequestParameter {
         guard arr.count <= 2 else {
             throw RequestError.unexpectedLength
         }
-        valuu = try (T1(from: arr[safe: 0]), T2(from: arr[safe: 1]))
+        value = try (T1(from: arr[safe: 0]), T2(from: arr[safe: 1]))
     }
 }
 
