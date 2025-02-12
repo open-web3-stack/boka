@@ -1,4 +1,7 @@
 import Foundation
+import TracingUtils
+
+private let logger = Logger(label: "Insts   ")
 
 extension Instructions {
     enum Constants {
@@ -60,14 +63,47 @@ extension Instructions {
         let end = start + entrySize
         let jumpTable = context.state.program.jumpTable
 
+        logger.trace("djump start (\(start)) end (\(end))")
+
         guard jumpTable.count >= (end - start), jumpTable.startIndex + end <= jumpTable.endIndex else {
             return .exit(.panic(.invalidDynamicJump))
         }
 
         var targetAlignedData = jumpTable[relative: start ..< end]
-        guard let targetAligned = targetAlignedData.decode() else {
+        logger.trace("djump target data (\(targetAlignedData.map { $0 }))")
+
+        var targetAligned: any UnsignedInteger
+
+        switch entrySize {
+        case 1:
+            let u8: UInt8? = targetAlignedData.decode(length: entrySize)
+            guard let u8 else {
+                return .exit(.panic(.invalidDynamicJump))
+            }
+            targetAligned = u8
+        case 2:
+            let u16: UInt16? = targetAlignedData.decode(length: entrySize)
+            guard let u16 else {
+                return .exit(.panic(.invalidDynamicJump))
+            }
+            targetAligned = u16
+        case 3:
+            let u32: UInt32? = targetAlignedData.decode(length: entrySize)
+            guard let u32 else {
+                return .exit(.panic(.invalidDynamicJump))
+            }
+            targetAligned = u32
+        case 4:
+            let u32: UInt32? = targetAlignedData.decode(length: entrySize)
+            guard let u32 else {
+                return .exit(.panic(.invalidDynamicJump))
+            }
+            targetAligned = u32
+        default:
             return .exit(.panic(.invalidDynamicJump))
         }
+
+        logger.trace("djump target decoded (\(targetAligned))")
 
         guard isDjumpValid(context: context, target: target, targetAligned: UInt32(truncatingIfNeeded: targetAligned)) else {
             return .exit(.panic(.invalidDynamicJump))
