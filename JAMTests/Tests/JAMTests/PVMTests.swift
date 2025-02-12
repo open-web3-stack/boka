@@ -67,23 +67,13 @@ struct PolkaVMTestcase: Codable, CustomStringConvertible {
 
 private let logger = Logger(label: "PVMTests")
 
-// TODO: pass these
-let knownFailedTestCases = [
-    "riscv_",
-]
-
 struct PVMTests {
-    init() {
-        // setupTestLogger()
-    }
+    // init() {
+    //     setupTestLogger()
+    // }
 
     static func loadTests() throws -> [Testcase] {
         try TestLoader.getTestcases(path: "pvm/programs", extension: "json")
-        let files = try TestLoader.getTestcases(path: "pvm/programs", extension: "json")
-        // return files.filter { $0.description.starts(with: "inst_") }
-        // return files.filter { $0.description.starts(with: "inst_load_imm_and_jump_indirect_") }
-        return files.filter { $0.description.starts(with: "riscv_") }
-        // return files.filter { $0.description == "riscv_rv64uzbb_zext_h.json" }
     }
 
     @Test(arguments: try loadTests())
@@ -117,20 +107,16 @@ struct PVMTests {
             status = .panic
         }
 
-        try withKnownIssue("not yet implemented", isIntermittent: true) {
-            #expect(status == testCase.expectedStatus)
-            #expect(vmState.getRegisters() == Registers(testCase.expectedRegs))
-            #expect(vmState.pc == testCase.expectedPC)
-            #expect(pageFaultAddress == testCase.expectedPageFaultAddress)
-            for chunk in testCase.expectedMemory {
-                for (offset, byte) in chunk.contents.enumerated() {
-                    let value = try vmState.getMemory().read(address: chunk.address + UInt32(offset))
-                    #expect(value == byte)
-                }
+        #expect(status == testCase.expectedStatus)
+        #expect(vmState.getRegisters() == Registers(testCase.expectedRegs))
+        #expect(vmState.pc == testCase.expectedPC)
+        #expect(pageFaultAddress == testCase.expectedPageFaultAddress)
+        for chunk in testCase.expectedMemory {
+            for (offset, byte) in chunk.contents.enumerated() {
+                let value = try vmState.getMemory().read(address: chunk.address + UInt32(offset))
+                #expect(value == byte)
             }
-            #expect(vmState.getGas() == testCase.expectedGas)
-        } when: {
-            knownFailedTestCases.contains { testCase.name.starts(with: $0) }
         }
+        #expect(vmState.getGas() == testCase.expectedGas)
     }
 }
