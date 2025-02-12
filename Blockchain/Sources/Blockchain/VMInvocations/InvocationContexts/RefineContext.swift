@@ -6,7 +6,7 @@ private let logger = Logger(label: "RefineContext")
 
 public struct InnerPvm {
     public var code: Data
-    public var memory: Memory
+    public var memory: GeneralMemory
     public var pc: UInt32
 }
 

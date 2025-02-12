@@ -108,7 +108,7 @@ struct InvokePVMTests {
                 do {
                     let (ouputAddr, len): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
                     let output = try state.readMemory(address: ouputAddr, length: Int(len))
-                    let value = output.withUnsafeBytes { $0.load(as: UInt32.self) }
+                    let value = output.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
                     let newOutput = withUnsafeBytes(of: value << 1) { Data($0) }
                     try state.writeMemory(address: ouputAddr, values: newOutput)
                     return .continued
