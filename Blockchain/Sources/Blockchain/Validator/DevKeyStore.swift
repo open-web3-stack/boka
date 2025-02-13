@@ -31,7 +31,10 @@ public final class DevKeyStore: KeyStore {
     @discardableResult
     public func addDevKeys(seed: UInt32) async throws -> KeySet {
         var seedData = Data(repeating: 0, count: 32)
-        seedData[0 ..< 4] = seed.encode()
+        let seedByte = seed.encode()
+        for i in 0 ..< 8 {
+            seedData[i * 4 ..< (i + 1) * 4] = seedByte
+        }
         let seedData32 = Data32(seedData)!
         let bandersnatch = try await add(Bandersnatch.self, seed: seedData32)
         let ed25519 = try await add(Ed25519.self, seed: seedData32)
