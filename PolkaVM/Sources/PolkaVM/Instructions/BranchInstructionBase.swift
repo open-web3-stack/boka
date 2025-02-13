@@ -1,7 +1,7 @@
 import Foundation
 import TracingUtils
 
-private let logger = Logger(label: "Branch Instruction")
+private let logger = Logger(label: "Branch  ")
 
 protocol Branch: Instruction {
     var offset: UInt32 { get }
@@ -35,14 +35,14 @@ protocol BranchInstructionBase<Compare>: Branch {
 
 extension BranchInstructionBase {
     public static func parse(data: Data) throws -> (Registers.Index, UInt64, UInt32) {
-        let register = try Registers.Index(ra: data.at(relative: 0))
+        let register = try Registers.Index(r1: data.at(relative: 0))
         let (value, offset): (UInt64, UInt32) = try Instructions.decodeImmediate2(data, divideBy: 16)
         return (register, value, offset)
     }
 
     public func condition(state: VMState) -> Bool {
         let regVal: UInt64 = state.readRegister(register)
-        logger.trace("\(Compare.self) a(\(regVal)) b(\(value)) => \(Compare.compare(a: regVal, b: value))")
+        logger.trace("🔀    \(Compare.self) a(\(regVal)) b(\(value)) => \(Compare.compare(a: regVal, b: value))")
         return Compare.compare(a: regVal, b: value)
     }
 }
@@ -59,14 +59,14 @@ protocol BranchInstructionBase2<Compare>: Branch {
 extension BranchInstructionBase2 {
     public static func parse(data: Data) throws -> (Registers.Index, Registers.Index, UInt32) {
         let offset: UInt32 = try Instructions.decodeImmediate(data.at(relative: 1...))
-        let r1 = try Registers.Index(ra: data.at(relative: 0))
-        let r2 = try Registers.Index(rb: data.at(relative: 0))
+        let r1 = try Registers.Index(r1: data.at(relative: 0))
+        let r2 = try Registers.Index(r2: data.at(relative: 0))
         return (r1, r2, offset)
     }
 
     public func condition(state: VMState) -> Bool {
         let (r1Val, r2Val): (UInt64, UInt64) = (state.readRegister(r1), state.readRegister(r2))
-        logger.trace("\(Compare.self) a(\(r1Val)) b(\(r2Val)) => \(Compare.compare(a: r1Val, b: r2Val))")
+        logger.trace("🔀    \(Compare.self) a(\(r1Val)) b(\(r2Val)) => \(Compare.compare(a: r1Val, b: r2Val))")
         return Compare.compare(a: r1Val, b: r2Val)
     }
 }

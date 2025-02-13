@@ -105,11 +105,10 @@ public class ProgramCode {
             }
             i += skip + 1
         }
-        blockGasCosts[currentBlockStart] = currentBlockGasCost
-        // trap at the end
+        // assume a trap at the end
+        blockGasCosts[currentBlockStart] = currentBlockGasCost + Instructions.Trap().gasCost()
         instCache[i] = Instructions.Trap()
         basicBlockIndices.insert(i)
-        blockGasCosts[i] = Instructions.Trap().gasCost()
     }
 
     private func parseInstruction(startIndex: Int, skip: UInt32) throws(Error) -> Instruction {

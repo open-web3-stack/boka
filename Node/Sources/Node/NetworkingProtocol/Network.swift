@@ -16,7 +16,7 @@ public protocol NetworkProtocolHandler: Sendable {
     ) async throws
 }
 
-public final class Network: Sendable {
+public final class Network: NetworkProtocol {
     public struct Config {
         public var role: PeerRole
         public var listenAddress: NetAddr
@@ -67,7 +67,7 @@ public final class Network: Sendable {
         peer = try Peer(options: option)
     }
 
-    public func connect(to: NetAddr, role: PeerRole) throws -> some ConnectionInfoProtocol {
+    public func connect(to: NetAddr, role: PeerRole) throws -> any ConnectionInfoProtocol {
         try peer.connect(to: to, role: role)
     }
 
