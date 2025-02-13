@@ -44,7 +44,10 @@ public final class DevKeyStore: KeyStore {
 
     public static func getDevKey(seed: UInt32) throws -> KeySet {
         var seedData = Data(repeating: 0, count: 32)
-        seedData[0 ..< 4] = seed.encode()
+        let seedByte = seed.encode()
+        for i in 0 ..< 8 {
+            seedData[i * 4 ..< (i + 1) * 4] = seedByte
+        }
         let seedData32 = Data32(seedData)!
         let bandersnatch = try Bandersnatch.SecretKey(from: seedData32)
         let ed25519 = try Ed25519.SecretKey(from: seedData32)
