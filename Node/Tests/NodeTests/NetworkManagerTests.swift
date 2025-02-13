@@ -56,7 +56,9 @@ struct NetworkManagerTests {
 
         // Wait for event processing
         await storeMiddleware.wait()
-
+        #expect(network.peerRole == .builder)
+        #expect(network.peersCount == 0)
+        #expect(network.networkKey == "mock_network_key")
         // Verify network calls
         #expect(
             network.contain(calls: [
