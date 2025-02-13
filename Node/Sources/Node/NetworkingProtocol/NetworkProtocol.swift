@@ -42,4 +42,6 @@ public protocol NetworkProtocol: Sendable {
 
     /// The public key of this node's network identity
     var networkKey: String { get }
+
+    var peerRole: PeerRole { get }
 }
