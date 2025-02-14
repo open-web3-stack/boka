@@ -18,7 +18,7 @@ public final class NodeDataSource: Sendable {
         self.blockchain = blockchain
         self.chainDataProvider = chainDataProvider
         self.networkManager = networkManager
-        self.name = name ?? "(no name)" // TODO: generate a random name
+        self.name = name ?? "Node-\(UUID().uuidString.prefix(8))"
     }
 }
 
@@ -33,8 +33,7 @@ extension NodeDataSource: SystemDataSource {
     }
 
     public func getNodeRoles() async throws -> [String] {
-        // TODO: Returns the roles the node is running as.
-        []
+        [networkManager.network.peerRole.rawValue]
     }
 
     public func getVersion() async throws -> String {
@@ -54,7 +53,6 @@ extension NodeDataSource: SystemDataSource {
 
 extension NodeDataSource: ChainDataSource {
     public func getKeys(prefix: Data32, count: UInt32, startKey: Data32?, blockHash: Data32?) async throws -> [String] {
-        // TODO:
         try await chainDataProvider.getKeys(prefix: prefix, count: count, startKey: startKey, blockHash: blockHash)
     }
 
