@@ -10,7 +10,7 @@ public enum StreamType: Sendable {
     case commonEphemeral
 }
 
-public enum PeerRole: Sendable, Hashable {
+public enum PeerRole: String, Codable, Sendable, Hashable {
     case validator
     case builder
     // case proxy // not yet specified
@@ -212,6 +212,10 @@ public final class Peer<Handler: StreamHandler>: Sendable {
     // there should be only one connection per peer
     public var peersCount: Int {
         impl.connections.read { $0.byId.count }
+    }
+
+    public var peersRole: PeerRole {
+        impl.role
     }
 }
 
