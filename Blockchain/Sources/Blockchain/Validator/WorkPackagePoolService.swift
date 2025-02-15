@@ -64,11 +64,19 @@ public final class WorkPackagePoolService: ServiceBase, @unchecked Sendable {
         await subscribe(RuntimeEvents.WorkPackagesGenerated.self, id: "WorkPackagePool.WorkPackagesGenerated") { [weak self] event in
             try await self?.on(workPackagesGenerated: event)
         }
+        await subscribe(RuntimeEvents.WorkPackagesReceived.self, id: "WorkPackagePool.WorkPackagesReceived") { [weak self] event in
+            try await self?.on(workPackagesReceived: event)
+        }
         // TODO: add remove subscribe
-        // TODO: add receive subscribe?
     }
 
     private func on(workPackagesGenerated event: RuntimeEvents.WorkPackagesGenerated) async throws {
+        let state = try await dataProvider.getBestState()
+        try await storage.update(state: state, config: config)
+        await storage.add(packages: event.items, config: config)
+    }
+
+    private func on(workPackagesReceived event: RuntimeEvents.WorkPackagesReceived) async throws {
         let state = try await dataProvider.getBestState()
         try await storage.update(state: state, config: config)
         await storage.add(packages: event.items, config: config)

@@ -60,6 +60,18 @@ public struct WorkPackage: Comparable, Sendable, Equatable, Codable {
     }
 }
 
+extension WorkPackage: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(authorizationToken)
+        hasher.combine(authorizationServiceIndex)
+        hasher.combine(authorizationCodeHash)
+        hasher.combine(parameterizationBlob)
+        hasher.combine(context)
+        hasher.combine(workItems.count)
+        workItems.forEach { hasher.combine($0) }
+    }
+}
+
 extension WorkPackage {
     public func hash() -> Data32 {
         try! JamEncoder.encode(self).blake2b256hash()
