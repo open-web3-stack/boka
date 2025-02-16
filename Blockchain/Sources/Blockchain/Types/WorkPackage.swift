@@ -2,6 +2,12 @@ import Codec
 import Foundation
 import Utils
 
+public enum WorkPackageError: Error {
+    case invalidWorkPackage
+    case invalidBundle
+    case segmentsRootNotFound
+}
+
 // P
 public struct WorkPackage: Comparable, Sendable, Equatable, Codable {
     // j
