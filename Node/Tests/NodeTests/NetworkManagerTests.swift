@@ -75,6 +75,38 @@ struct NetworkManagerTests {
     }
 
     @Test
+    func testWorkPackagesReceived() async throws {
+        // Create dummy work packages
+        let workPackages = [
+            WorkPackage.dummy(config: services.config),
+            WorkPackage.dummy(config: services.config),
+        ]
+
+        // Publish WorkPackagesReceived event
+        await services.eventBus.publish(RuntimeEvents.WorkPackagesReceived(items: workPackages))
+
+        // Wait for event processing
+        await storeMiddleware.wait()
+
+        // Verify network calls
+        #expect(
+            network.contain(calls: [
+                .init(function: "connect", parameters: ["address": devPeers.first!, "role": PeerRole.validator]),
+                .init(function: "sendToPeer", parameters: [
+                    "message": CERequest.workPackageSubmission(
+                        WorkPackageMessage(coreIndex: 0, workPackage: workPackages[0], extrinsics: [])
+                    ),
+                ]),
+                .init(function: "sendToPeer", parameters: [
+                    "message": CERequest.workPackageSubmission(
+                        WorkPackageMessage(coreIndex: 0, workPackage: workPackages[1], extrinsics: [])
+                    ),
+                ]),
+            ])
+        )
+    }
+
+    @Test
     func testBlockBroadcast() async throws {
         // Import a block
         let block = BlockRef.dummy(config: services.config, parent: services.genesisBlock)

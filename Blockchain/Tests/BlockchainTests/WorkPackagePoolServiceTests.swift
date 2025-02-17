@@ -40,11 +40,24 @@ struct WorkPackagePoolServiceTests {
             allWorkPackages.append(workpackage)
         }
         await services.eventBus.publish(RuntimeEvents.WorkPackagesGenerated(items: allWorkPackages))
-        let workPackages = await workPackagecPoolService.getWorkPackages()
+        var workPackages = await workPackagecPoolService.getWorkPackages()
         #expect(workPackages.array == Array(allWorkPackages).sorted())
         let workpackage = WorkPackage.dummy(config: services.config)
         try await workPackagecPoolService.addWorkPackages(packages: [workpackage])
         try await workPackagecPoolService.removeWorkPackages(packages: [workpackage])
         #expect(workPackages.array.count == services.config.value.totalNumberOfCores)
+        let event = RuntimeEvents.WorkPackagesReceived(items: [workpackage])
+        await services.eventBus.publish(event)
+        await services.eventBus.publish(event) // duplicate
+        // Wait for the event to be processed
+        await services.storeMiddleware.wait()
+        workPackages = await workPackagecPoolService.getWorkPackages()
+        #expect(workPackages.array.count > services.config.value.totalNumberOfCores)
+        await services.blockchain.publish(event: RuntimeEvents.WorkPackagesReceived(
+            items: [
+                workpackage,
+            ]
+        ))
+        await services.storeMiddleware.wait()
     }
 }
