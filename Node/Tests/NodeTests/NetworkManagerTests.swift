@@ -79,7 +79,6 @@ struct NetworkManagerTests {
         // Create dummy work packages
         let workPackages = [
             WorkPackage.dummy(config: services.config),
-            WorkPackage.dummy(config: services.config),
         ]
 
         // Publish WorkPackagesReceived event
@@ -95,11 +94,6 @@ struct NetworkManagerTests {
                 .init(function: "sendToPeer", parameters: [
                     "message": CERequest.workPackageSubmission(
                         WorkPackageMessage(coreIndex: 0, workPackage: workPackages[0], extrinsics: [])
-                    ),
-                ]),
-                .init(function: "sendToPeer", parameters: [
-                    "message": CERequest.workPackageSubmission(
-                        WorkPackageMessage(coreIndex: 0, workPackage: workPackages[1], extrinsics: [])
                     ),
                 ]),
             ])
