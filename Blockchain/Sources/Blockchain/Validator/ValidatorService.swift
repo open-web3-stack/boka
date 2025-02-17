@@ -5,7 +5,7 @@ public final class ValidatorService: Sendable {
     private let blockchain: Blockchain
     private let keystore: KeyStore
     private let safrole: SafroleService
-    private let extrinsicPool: ExtrinsicPoolService
+    private let safroleTicketPool: SafroleTicketPoolService
     private let blockAuthor: BlockAuthor
     private let dataAvailability: DataAvailability
 
@@ -26,7 +26,7 @@ public final class ValidatorService: Sendable {
             keystore: keystore
         )
 
-        extrinsicPool = await ExtrinsicPoolService(
+        safroleTicketPool = await SafroleTicketPoolService(
             config: blockchain.config,
             dataProvider: dataProvider,
             eventBus: eventBus
@@ -38,7 +38,7 @@ public final class ValidatorService: Sendable {
             eventBus: eventBus,
             keystore: keystore,
             scheduler: scheduler,
-            extrinsicPool: extrinsicPool
+            safroleTicketPool: safroleTicketPool
         )
 
         dataAvailability = await DataAvailability(
