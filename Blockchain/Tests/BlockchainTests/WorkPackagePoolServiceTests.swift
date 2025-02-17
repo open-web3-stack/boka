@@ -39,7 +39,7 @@ struct WorkPackagePoolServiceTests {
             )
             allWorkPackages.append(workpackage)
         }
-        await services.eventBus.publish(RuntimeEvents.WorkPackagesGenerated(items: allWorkPackages))
+        await services.eventBus.publish(RuntimeEvents.WorkPackagesReceived(items: allWorkPackages))
         let workPackages = await workPackagecPoolService.getWorkPackages()
         #expect(workPackages.array == Array(allWorkPackages).sorted())
         let workpackage = WorkPackage.dummy(config: services.config)

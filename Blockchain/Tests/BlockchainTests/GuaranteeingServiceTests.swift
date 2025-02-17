@@ -56,7 +56,7 @@ struct GuaranteeingServiceTests {
             )
             allWorkPackages.append(workpackage)
         }
-        await services.eventBus.publish(RuntimeEvents.WorkPackagesGenerated(items: allWorkPackages))
+        await services.eventBus.publish(RuntimeEvents.WorkPackagesReceived(items: allWorkPackages))
         await validatorService.on(genesis: genesisState)
         await storeMiddleware.wait()
         #expect(scheduler.taskCount == 1)
