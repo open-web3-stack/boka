@@ -59,5 +59,7 @@ struct WorkPackagePoolServiceTests {
             ]
         ))
         await services.storeMiddleware.wait()
+        workPackages = await workPackagecPoolService.getWorkPackages()
+        #expect(workPackages.array.count > services.config.value.totalNumberOfCores)
     }
 }
