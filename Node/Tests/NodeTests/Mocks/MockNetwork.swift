@@ -14,6 +14,7 @@ struct MockNetworkState {
     var simulatedPeersCount = 0
     var simulatedNetworkKey = "mock_network_key"
     var simulatedListenAddress = NetAddr(address: "127.0.0.1:8000")!
+    var simulatedPeerRole: PeerRole = .builder
     var simulatedResponseData = Data()
 }
 
@@ -88,6 +89,10 @@ final class MockNetwork: NetworkProtocol {
 
     var networkKey: String {
         state.read { $0.simulatedNetworkKey }
+    }
+
+    var peerRole: PeerRole {
+        state.read { $0.simulatedPeerRole }
     }
 
     func contain(calls toCheck: [MockNetwork.Call]) -> Bool {

@@ -166,8 +166,9 @@ struct PeerTests {
             let con = try peer.connect(to: centerPeer.listenAddress(), role: .builder)
             try await con.ready()
         }
-        // Simulate close connections 1~3s
-        try? await Task.sleep(for: .milliseconds(1000))
+
+        #expect(centerPeer.peersCount == 3)
+
         centerPeer.broadcast(kind: .uniqueA, message: .init(kind: .uniqueA, data: Data("connection rotation strategy".utf8)))
         try? await Task.sleep(for: .milliseconds(100))
         var receivedCount = 0
@@ -546,7 +547,7 @@ struct PeerTests {
         #expect(receivedData == messageData + Data(" response".utf8))
         try? await Task.sleep(for: .milliseconds(100))
         // Simulate abnormal shutdown of connections
-        connection.close(abort: true)
+        try connection.connection.shutdown(errorCode: 1)
         // Wait to simulate downtime & reconnected 3~5s
         try? await Task.sleep(for: .milliseconds(3000))
         peer1.broadcast(
@@ -650,7 +651,7 @@ struct PeerTests {
         #expect(receivedData == messageData + Data(" response".utf8))
         try? await Task.sleep(for: .milliseconds(100))
         // Simulate a peer failure by disconnecting one peer
-        connection.close(abort: false)
+        try connection.connection.shutdown()
         // Wait to simulate downtime
         try? await Task.sleep(for: .milliseconds(200))
         // Reconnect the failing peer

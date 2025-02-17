@@ -159,7 +159,8 @@ final class NodeTests {
 
         let (validator1, validator1StoreMiddlware) = nodes[0]
         let (validator2, validator2StoreMiddlware) = nodes[1]
-
+        #expect(validator1.network.network.peerRole == .validator)
+        #expect(validator1.network.network.networkKey != "")
         // Extract non-validator nodes and their middleware
         let nonValidatorNodes = nodes[2...].map(\.self)
 
@@ -181,6 +182,7 @@ final class NodeTests {
                 await middleware.wait()
             }
         }
+        try await Task.sleep(for: .milliseconds(nodes.count * 100))
         let validator1BestHead = await validator1.dataProvider.bestHead
         let validator2BestHead = await validator2.dataProvider.bestHead
 

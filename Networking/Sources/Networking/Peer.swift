@@ -10,7 +10,7 @@ public enum StreamType: Sendable {
     case commonEphemeral
 }
 
-public enum PeerRole: Sendable, Hashable {
+public enum PeerRole: String, Codable, Sendable, Hashable {
     case validator
     case builder
     // case proxy // not yet specified
@@ -177,14 +177,17 @@ public final class Peer<Handler: StreamHandler>: Sendable {
     public func broadcast(
         kind: Handler.PresistentHandler.StreamKind, message: Handler.PresistentHandler.Message
     ) {
-        let connections = impl.connections.read { connections in
-            connections.byId.values
-        }
         guard let messageData = try? message.encode() else {
             impl.logger.warning("Failed to encode message: \(message)")
             return
         }
+        let connections = impl.connections.read { connections in
+            connections.byId.values
+        }
         for connection in connections {
+            if connection.isClosed {
+                continue
+            }
             if let stream = try? connection.createPreistentStream(kind: kind) {
                 Task {
                     let res = await Result {
@@ -210,8 +213,13 @@ public final class Peer<Handler: StreamHandler>: Sendable {
     }
 
     // there should be only one connection per peer
+    // exlcude closed connections
     public var peersCount: Int {
-        impl.connections.read { $0.byId.count }
+        impl.connections.read { $0.byId.count { $0.value.isClosed == false } }
+    }
+
+    public var peersRole: PeerRole {
+        impl.role
     }
 }
 
