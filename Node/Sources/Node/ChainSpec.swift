@@ -72,7 +72,7 @@ public struct ChainSpec: Codable, Equatable {
         try decoder.setConfig(mergeConfig(preset: preset, config: config))
 
         block = try container.decode(Data.self, forKey: .block)
-        state = try container.decode([String: Data].self, forKey: .state)
+        state = try container.decode(Dictionary<String, Data>.self, forKey: .state)
     }
 
     public func getConfig() throws -> ProtocolConfigRef {
@@ -84,7 +84,7 @@ public struct ChainSpec: Codable, Equatable {
     }
 
     public func getState() throws -> [Data32: Data] {
-        var output = [Data32: Data]()
+        var output: [Data32: Data] = [:]
         for (key, value) in state {
             try output[Data32(fromHexString: key).unwrap()] = value
         }

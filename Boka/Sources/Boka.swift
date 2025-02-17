@@ -122,12 +122,6 @@ struct Boka: AsyncParsableCommand {
             return .rocksDB(path: path)
         } ?? .inMemory
 
-        let dataStore: DataStoreKind = basePath.map {
-            var path = URL(fileURLWithPath: $0)
-            path.append(path: "da")
-            return .filesystem(path: path)
-        } ?? .inMemory
-
         logger.info("Peers: \(peers)")
 
         if validator {
@@ -177,8 +171,7 @@ struct Boka: AsyncParsableCommand {
             peers: peers,
             local: local,
             name: name,
-            database: database,
-            dataStore: dataStore
+            database: database
         )
 
         let node: Node = if validator {

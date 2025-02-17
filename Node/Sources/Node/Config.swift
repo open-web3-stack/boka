@@ -15,7 +15,7 @@ public enum Database {
     case inMemory
     case rocksDB(path: URL)
 
-    public func open(chainspec: ChainSpec) async throws -> BlockchainDataProvider {
+    public func open(chainspec: ChainSpec) async throws -> (BlockchainDataProvider, DataStore) {
         switch self {
         case let .rocksDB(path):
             logger.debug("Using RocksDB backend at \(path.absoluteString)")
@@ -25,7 +25,10 @@ public enum Database {
                 genesisBlock: chainspec.getBlock(),
                 genesisStateData: chainspec.getState()
             )
-            return try await BlockchainDataProvider(backend)
+            let dataProvider = try await BlockchainDataProvider(backend)
+            // TODO: implement RocksDBDataStoreBackend
+            let dataStore = DataStore(InMemoryDataStoreBackend(), InMemoryDataStoreBackend())
+            return (dataProvider, dataStore)
         case .inMemory:
             logger.debug("Using in-memory backend")
             let genesisBlock = try chainspec.getBlock()
@@ -34,24 +37,12 @@ public enum Database {
             try await backend.writeRaw(Array(genesisStateData))
             let genesisState = try await State(backend: backend)
             let genesisStateRef = StateRef(genesisState)
-            return try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisStateRef, genesisBlock: genesisBlock))
-        }
-    }
-}
-
-public enum DataStoreKind {
-    case inMemory
-    case filesystem(path: URL)
-
-    func create() -> DataStore {
-        switch self {
-        case let .filesystem(path):
-            logger.info("Using filesystem data store at \(path.absoluteString)")
-            let dataStore = FilesystemDataStore()
-            return DataStore(dataStore, basePath: path)
-        case .inMemory:
-            logger.info("Using in-memory data store")
-            return DataStore(InMemoryDataStore(), basePath: URL(filePath: "/tmp/boka"))
+            let dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(
+                genesisState: genesisStateRef,
+                genesisBlock: genesisBlock
+            ))
+            let dataStore = DataStore(InMemoryDataStoreBackend(), InMemoryDataStoreBackend())
+            return (dataProvider, dataStore)
         }
     }
 }
@@ -63,7 +54,6 @@ public struct Config {
     public var local: Bool
     public var name: String?
     public var database: Database
-    public var dataStore: DataStoreKind
 
     public init(
         rpc: RPCConfig?,
@@ -71,8 +61,7 @@ public struct Config {
         peers: [NetAddr] = [],
         local: Bool = false,
         name: String? = nil,
-        database: Database = .inMemory,
-        dataStore: DataStoreKind = .inMemory
+        database: Database = .inMemory
     ) {
         self.rpc = rpc
         self.network = network
@@ -80,6 +69,5 @@ public struct Config {
         self.local = local
         self.name = name
         self.database = database
-        self.dataStore = dataStore
     }
 }

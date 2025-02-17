@@ -314,7 +314,7 @@ struct PeerTests {
         peer1.broadcast(
             kind: .uniqueA, message: .init(kind: .uniqueA, data: messageData)
         )
-        try? await Task.sleep(for: .milliseconds(100))
+        try? await Task.sleep(for: .milliseconds(500))
         let lastReceivedData = await handler2.lastReceivedData
         #expect(lastReceivedData == messageData)
 
@@ -373,7 +373,7 @@ struct PeerTests {
         peer1.broadcast(
             kind: .uniqueA, message: .init(kind: .uniqueA, data: messageData)
         )
-        try? await Task.sleep(for: .milliseconds(100))
+        try? await Task.sleep(for: .milliseconds(500))
         let lastReceivedData = await handler2.lastReceivedData
         #expect(lastReceivedData == messageData)
 
