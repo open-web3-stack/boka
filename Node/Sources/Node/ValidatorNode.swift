@@ -29,7 +29,7 @@ public class ValidatorNode: Node {
             eventBus: eventBus,
             scheduler: scheduler,
             dataProvider: dataProvider,
-            dataStore: config.dataStore.create()
+            dataStore: dataStore
         )
         self.validator = validator
 

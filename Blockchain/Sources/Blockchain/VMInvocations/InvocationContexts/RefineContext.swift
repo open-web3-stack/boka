@@ -1,6 +1,7 @@
 import Foundation
 import PolkaVM
 import TracingUtils
+import Utils
 
 private let logger = Logger(label: "RefineContext")
 
@@ -13,12 +14,12 @@ public struct InnerPvm {
 public class RefineContext: InvocationContext {
     public typealias ContextType = (
         pvms: [UInt64: InnerPvm],
-        exports: [Data]
+        exports: [Data4104]
     )
 
     public let config: ProtocolConfigRef
     public var context: ContextType
-    public let importSegments: [Data]
+    public let importSegments: [Data4104]
     public let exportSegmentOffset: UInt64
     public let service: ServiceIndex
     public let serviceAccounts: ServiceAccounts
@@ -27,7 +28,7 @@ public class RefineContext: InvocationContext {
     public init(
         config: ProtocolConfigRef,
         context: ContextType,
-        importSegments: [Data],
+        importSegments: [Data4104],
         exportSegmentOffset: UInt64,
         service: ServiceIndex,
         serviceAccounts: some ServiceAccounts,

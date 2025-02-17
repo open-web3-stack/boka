@@ -85,8 +85,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     /// WM = 2^11: The maximum number of entries in a work-package manifest.
     public var maxWorkPackageManifestEntries: Int
 
-    /// WB = 12 * 2^20: The maximum size of an encoded work-package together with its extrinsic data and import impli-
-    /// cations, in octets.
+    /// WB = 12 * 2^20: The maximum size of an encoded work-package together with its extrinsic data and import implications, in octets.
     public var maxEncodedWorkPackageSize: Int
 
     /// WG = WP*WE = 4104: The size of a segment in octets.

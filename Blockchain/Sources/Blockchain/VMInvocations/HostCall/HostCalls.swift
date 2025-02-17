@@ -743,9 +743,9 @@ public class Import: HostCall {
     public static var identifier: UInt8 { 18 }
 
     public let context: RefineContext.ContextType
-    public let importSegments: [Data]
+    public let importSegments: [Data4104]
 
-    public init(context: RefineContext.ContextType, importSegments: [Data]) {
+    public init(context: RefineContext.ContextType, importSegments: [Data4104]) {
         self.context = context
         self.importSegments = importSegments
     }
@@ -762,7 +762,7 @@ public class Import: HostCall {
         let isWritable = state.isMemoryWritable(address: startAddr, length: Int(length))
 
         if let segment, isWritable {
-            try state.writeMemory(address: startAddr, values: segment)
+            try state.writeMemory(address: startAddr, values: segment.data)
         }
 
         if !isWritable {
@@ -803,13 +803,15 @@ public class Export: HostCall {
             segment = data
         }
 
-        if segment == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
-        } else if exportSegmentOffset + UInt64(segment!.count) >= UInt64(config.value.maxWorkPackageManifestEntries) {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
+        if let segment {
+            if exportSegmentOffset + UInt64(segment.count) >= UInt64(config.value.maxWorkPackageManifestEntries) {
+                state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
+            } else {
+                state.writeRegister(Registers.Index(raw: 7), exportSegmentOffset + UInt64(segment.count))
+                context.exports.append(Data4104(segment)!)
+            }
         } else {
-            state.writeRegister(Registers.Index(raw: 7), exportSegmentOffset + UInt64(segment!.count))
-            context.exports.append(segment!)
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
         }
     }
 }

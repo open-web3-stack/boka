@@ -32,7 +32,8 @@ public class BlockchainServices {
         self.genesisBlock = genesisBlock
         self.genesisState = genesisState
         dataProvider = try! await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
-        dataStore = DataStore(InMemoryDataStore(), basePath: URL(fileURLWithPath: "/tmp/boka-test-data"))
+        let dataStoreBackend = InMemoryDataStoreBackend()
+        dataStore = DataStore(dataStoreBackend, dataStoreBackend)
 
         storeMiddleware = StoreMiddleware()
         eventBus = EventBus(eventMiddleware: .serial(Middleware(storeMiddleware), .noError), handlerMiddleware: .noError)
@@ -82,7 +83,7 @@ public class BlockchainServices {
                 eventBus: eventBus,
                 keystore: keystore,
                 scheduler: scheduler,
-                extrinsicPool: ExtrinsicPoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
+                safroleTicketPool: SafroleTicketPoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
             )
             _blockAuthorRef = _blockAuthor
             return _blockAuthor!

@@ -69,7 +69,7 @@ private actor ServiceStorage {
     }
 }
 
-public final class ExtrinsicPoolService: ServiceBase, @unchecked Sendable {
+public final class SafroleTicketPoolService: ServiceBase, @unchecked Sendable {
     private var storage: ServiceStorage
     private let dataProvider: BlockchainDataProvider
 
@@ -83,7 +83,7 @@ public final class ExtrinsicPoolService: ServiceBase, @unchecked Sendable {
         let ringContext = try! Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
         storage = ServiceStorage(ringContext: ringContext)
 
-        super.init(id: "ExtrinsicPoolService", config: config, eventBus: eventBus)
+        super.init(id: "SafroleTicketPoolService", config: config, eventBus: eventBus)
 
         await storage.setLogger(logger)
 

@@ -5,6 +5,6 @@ import Utils
 public struct WorkPackageBundle: Sendable, Equatable, Codable {
     public var workPackage: WorkPackage
     public var extrinsic: [Data]
-    public var importSegments: [[Data]]
-    public var justifications: [[Data]]
+    public var importSegments: [Data4104]
+    public var justifications: [Data]
 }
