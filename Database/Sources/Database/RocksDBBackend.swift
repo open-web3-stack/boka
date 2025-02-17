@@ -236,7 +236,7 @@ extension RocksDBBackend: StateBackendProtocol {
         let iterator = db.createIterator(column: .state, readOptions: readOptions)
         iterator.seek(to: startKey ?? prefix)
 
-        var ret = [(key: Data, value: Data)]()
+        var ret: [(key: Data, value: Data)] = []
         if let limit {
             ret.reserveCapacity(Int(limit))
         }

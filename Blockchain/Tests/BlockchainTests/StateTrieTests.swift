@@ -5,7 +5,7 @@ import Utils
 @testable import Blockchain
 
 private func merklize(_ data: some Sequence<(key: Data32, value: Data)>) -> Data32 {
-    var dict = [Data32: Data]()
+    var dict: [Data32: Data] = [:]
     for (key, value) in data {
         dict[key] = value
     }

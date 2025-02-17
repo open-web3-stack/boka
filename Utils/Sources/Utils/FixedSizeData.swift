@@ -106,11 +106,13 @@ extension FixedSizeData {
     }
 }
 
+public typealias Data12 = FixedSizeData<ConstInt12>
 public typealias Data32 = FixedSizeData<ConstInt32>
 public typealias Data48 = FixedSizeData<ConstInt48>
 public typealias Data64 = FixedSizeData<ConstInt64>
-public typealias Data96 = FixedSizeData<ConstUInt96>
-public typealias Data128 = FixedSizeData<ConstUInt128>
-public typealias Data144 = FixedSizeData<ConstUInt144>
-public typealias Data384 = FixedSizeData<ConstUInt384>
-public typealias Data784 = FixedSizeData<ConstUInt784>
+public typealias Data96 = FixedSizeData<ConstInt96>
+public typealias Data128 = FixedSizeData<ConstInt128>
+public typealias Data144 = FixedSizeData<ConstInt144>
+public typealias Data384 = FixedSizeData<ConstInt384>
+public typealias Data784 = FixedSizeData<ConstInt784>
+public typealias Data4104 = FixedSizeData<ConstInt4104>

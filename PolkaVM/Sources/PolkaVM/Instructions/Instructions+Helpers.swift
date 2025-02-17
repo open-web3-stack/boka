@@ -70,7 +70,7 @@ extension Instructions {
         }
 
         var targetAlignedData = jumpTable[relative: start ..< end]
-        logger.trace("djump target data (\(targetAlignedData.map { $0 }))")
+        logger.trace("djump target data (\(targetAlignedData.map(\.self)))")
 
         var targetAligned: any UnsignedInteger
 
