@@ -17,7 +17,7 @@ struct GuaranteeingServiceTests {
             keysCount: keysCount
         )
 
-        let extrinsicPoolService = await ExtrinsicPoolService(
+        let SafroleTicketPoolService = await SafroleTicketPoolService(
             config: config,
             dataProvider: services.dataProvider,
             eventBus: services.eventBus
@@ -32,7 +32,7 @@ struct GuaranteeingServiceTests {
             dataProvider: services.dataProvider,
             keystore: services.keystore,
             runtime: runtime,
-            extrinsicPool: extrinsicPoolService,
+            safroleTicketPool: SafroleTicketPoolService,
             dataStore: services.dataStore
         )
         return (services, guaranteeingService)

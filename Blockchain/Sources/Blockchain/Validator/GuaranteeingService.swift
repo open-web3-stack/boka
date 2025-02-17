@@ -18,7 +18,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore
     private let runtime: Runtime
-    private let extrinsicPool: ExtrinsicPoolService
+    private let safroleTicketPool: SafroleTicketPoolService
     private let workPackagePool: WorkPackagePoolService
     private let guarantees: ThreadSafeContainer<[RuntimeEvents.GuaranteeGenerated]> = .init([])
     private let authorizationFunction: GuaranteeingAuthorizationFunction
@@ -32,13 +32,13 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         dataProvider: BlockchainDataProvider,
         keystore: KeyStore,
         runtime: Runtime,
-        extrinsicPool: ExtrinsicPoolService,
+        safroleTicketPool: SafroleTicketPoolService,
         dataStore: DataStore
     ) async {
         self.dataProvider = dataProvider
         self.keystore = keystore
         self.runtime = runtime
-        self.extrinsicPool = extrinsicPool
+        self.safroleTicketPool = safroleTicketPool
         authorizationFunction = GuaranteeingAuthorizationFunction()
         refineInvocation = GuaranteeingRefineInvocation()
         workPackagePool = await WorkPackagePoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
