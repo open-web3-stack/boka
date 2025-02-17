@@ -44,7 +44,7 @@ extension Genesis {
         case let .preset(preset):
             let config = preset.config
             let (state, block) = try State.devGenesis(config: config)
-            var kv = [String: Data]()
+            var kv: [String: Data] = [:]
             for (key, value) in state.value.layer.toKV() {
                 if let value {
                     kv[key.toHexString()] = try JamEncoder.encode(value)

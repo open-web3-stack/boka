@@ -84,7 +84,7 @@ public struct ChainSpec: Codable, Equatable {
     }
 
     public func getState() throws -> [Data32: Data] {
-        var output = [Data32: Data]()
+        var output: [Data32: Data] = [:]
         for (key, value) in state {
             try output[Data32(fromHexString: key).unwrap()] = value
         }

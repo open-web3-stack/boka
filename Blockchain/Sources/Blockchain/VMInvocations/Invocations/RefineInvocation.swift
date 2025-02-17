@@ -15,10 +15,10 @@ public protocol RefineInvocation {
         refinementCtx: RefinementContext, // c
         authorizerHash: Data32,
         authorizationOutput: Data,
-        importSegments: [Data],
+        importSegments: [Data4104],
         extrinsicDataBlobs: [Data],
         exportSegmentOffset: UInt64
-    ) async throws -> (result: Result<Data, WorkResultError>, exports: [Data])
+    ) async throws -> (result: Result<Data, WorkResultError>, exports: [Data4104])
 }
 
 extension RefineInvocation {
@@ -33,10 +33,10 @@ extension RefineInvocation {
         refinementCtx: RefinementContext, // c
         authorizerHash: Data32,
         authorizationOutput: Data,
-        importSegments: [Data],
+        importSegments: [Data4104],
         extrinsicDataBlobs: [Data],
         exportSegmentOffset: UInt64
-    ) async throws -> (result: Result<Data, WorkResultError>, exports: [Data]) {
+    ) async throws -> (result: Result<Data, WorkResultError>, exports: [Data4104]) {
         let codeBlob = try await serviceAccounts.historicalLookup(
             serviceAccount: service,
             timeslot: refinementCtx.lookupAnchor.timeslot,

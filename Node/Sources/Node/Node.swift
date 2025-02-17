@@ -14,6 +14,7 @@ public class Node {
     public let rpcServer: Server?
     public let scheduler: Scheduler
     public let dataProvider: BlockchainDataProvider
+    public let dataStore: DataStore
     public let keystore: KeyStore
     public let network: NetworkManager
 
@@ -29,7 +30,7 @@ public class Node {
         let chainspec = try await genesis.load()
         let protocolConfig = try chainspec.getConfig()
 
-        dataProvider = try await config.database.open(chainspec: chainspec)
+        (dataProvider, dataStore) = try await config.database.open(chainspec: chainspec)
 
         logger.info("Genesis: \(dataProvider.genesisBlockHash)")
 
