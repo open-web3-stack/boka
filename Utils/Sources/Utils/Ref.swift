@@ -45,3 +45,19 @@ extension Ref: Dummy where T: Dummy {
         Self(T.dummy(config: config))
     }
 }
+
+open class RefWithHash<T: Hashable32 & Sendable>: Ref<T>, @unchecked Sendable {
+    private let lazyHash: Lazy<Ref<Data32>>
+
+    public required init(_ value: T) {
+        lazyHash = Lazy {
+            Ref(value.hash())
+        }
+
+        super.init(value)
+    }
+
+    public var hash: Data32 {
+        lazyHash.value.value
+    }
+}

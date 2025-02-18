@@ -27,3 +27,9 @@ extension Block: Dummy {
 }
 
 extension Block: Validate {}
+
+extension Block: Hashable32 {
+    public func hash() -> Data32 {
+        header.hash()
+    }
+}

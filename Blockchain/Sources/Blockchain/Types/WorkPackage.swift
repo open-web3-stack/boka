@@ -60,7 +60,7 @@ public struct WorkPackage: Comparable, Sendable, Equatable, Codable {
     }
 }
 
-extension WorkPackage {
+extension WorkPackage: Hashable32 {
     public func hash() -> Data32 {
         try! JamEncoder.encode(self).blake2b256hash()
     }
@@ -96,3 +96,5 @@ extension WorkPackage {
         ) ?? Data()
     }
 }
+
+public typealias WorkPackageRef = RefWithHash<WorkPackage>
