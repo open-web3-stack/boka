@@ -3,7 +3,7 @@ import Foundation
 import Utils
 
 // P
-public struct WorkPackage: Comparable, Sendable, Equatable, Codable {
+public struct WorkPackage: Comparable, Sendable, Equatable, Codable, Hashable {
     // j
     public var authorizationToken: Data
 
@@ -60,13 +60,7 @@ public struct WorkPackage: Comparable, Sendable, Equatable, Codable {
     }
 }
 
-extension WorkPackage: Hashable {
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(hash())
-    }
-}
-
-extension WorkPackage {
+extension WorkPackage: Hashable32 {
     public func hash() -> Data32 {
         try! JamEncoder.encode(self).blake2b256hash()
     }
@@ -102,3 +96,11 @@ extension WorkPackage {
         ) ?? Data()
     }
 }
+
+extension WorkPackage {
+    public func asRef() -> WorkPackageRef {
+        WorkPackageRef(self)
+    }
+}
+
+public typealias WorkPackageRef = RefWithHash<WorkPackage>
