@@ -30,12 +30,6 @@ extension Ref: Equatable where T: Equatable {
     }
 }
 
-extension Ref: Hashable where T: Hashable {
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(value)
-    }
-}
-
 extension Ref: HasConfig where T: HasConfig {
     public typealias Config = T.Config
 }
@@ -59,5 +53,11 @@ open class RefWithHash<T: Hashable32 & Sendable>: Ref<T>, @unchecked Sendable {
 
     public var hash: Data32 {
         lazyHash.value.value
+    }
+}
+
+extension RefWithHash: Hashable where T: Equatable & Sendable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(hash)
     }
 }

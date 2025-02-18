@@ -97,4 +97,10 @@ extension WorkPackage {
     }
 }
 
+extension WorkPackage {
+    public func asRef() -> WorkPackageRef {
+        WorkPackageRef(self)
+    }
+}
+
 public typealias WorkPackageRef = RefWithHash<WorkPackage>

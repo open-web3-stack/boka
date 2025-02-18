@@ -83,11 +83,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             throw GuaranteeingServiceError.invalidCoreIndex
         }
 
-        let workPackages = await workPackagePool.getWorkPackages()
-        for workPackage in workPackages.values {
+        let workPackages = await workPackagePool.getPendingPackages()
+        for workPackage in workPackages {
             if try validate(workPackage: workPackage) {
                 let workReport = try await createWorkReport(for: workPackage, coreIndex: coreIndex)
-                try await workPackagePool.removeWorkPackages(packages: [workPackage])
                 let event = RuntimeEvents.WorkReportGenerated(items: [workReport])
                 publish(event)
                 break

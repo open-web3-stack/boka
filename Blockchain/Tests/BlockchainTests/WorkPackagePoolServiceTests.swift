@@ -27,24 +27,29 @@ struct WorkPackagePoolServiceTests {
     @Test
     func testAddPendingWorkPackage() async throws {
         let (services, workPackagecPoolService) = try await setup()
-        var allWorkPackages = [WorkPackage]()
-        for _ in 0 ..< services.config.value.totalNumberOfCores {
-            let workpackage = WorkPackage(
-                authorizationToken: Data(),
-                authorizationServiceIndex: 0,
-                authorizationCodeHash: Data32.random(),
-                parameterizationBlob: Data(),
-                context: RefinementContext.dummy(config: services.config),
-                workItems: try! ConfigLimitedSizeArray(config: services.config, defaultValue: WorkItem.dummy(config: services.config))
-            )
+        var allWorkPackages = [WorkPackageRef]()
+        for i in 0 ..< 5 {
+            let workpackage = WorkPackage.dummy(config: services.config) {
+                $0.parameterizationBlob = Data([UInt8(i)])
+            }.asRef()
             allWorkPackages.append(workpackage)
         }
         await services.eventBus.publish(RuntimeEvents.WorkPackagesReceived(items: allWorkPackages))
-        let workPackages = await workPackagecPoolService.getWorkPackages()
-        #expect(workPackages.array == Array(allWorkPackages).sorted())
-        let workpackage = WorkPackage.dummy(config: services.config)
-        try await workPackagecPoolService.addWorkPackages(packages: [workpackage])
-        try await workPackagecPoolService.removeWorkPackages(packages: [workpackage])
-        #expect(workPackages.array.count == services.config.value.totalNumberOfCores)
+        let workPackages = await workPackagecPoolService.getPendingPackages()
+        #expect(Set(workPackages) == Set(allWorkPackages))
+
+        let workpackage = WorkPackage.dummy(config: services.config) {
+            $0.parameterizationBlob = Data([UInt8(5)])
+        }.asRef()
+        await services.eventBus.publish(RuntimeEvents.WorkPackagesReceived(items: [workpackage]))
+
+        #expect(await workPackagecPoolService.getPendingPackages().count == 6)
+
+        let report = WorkReport.dummy(config: services.config) {
+            $0.packageSpecification.workPackageHash = workpackage.hash
+        }
+        await services.eventBus.publish(RuntimeEvents.WorkReportGenerated(items: [report]))
+
+        #expect(await workPackagecPoolService.getPendingPackages().count == 5)
     }
 }
