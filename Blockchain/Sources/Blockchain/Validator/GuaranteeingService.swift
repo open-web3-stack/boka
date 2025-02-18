@@ -84,7 +84,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
 
         let workPackages = await workPackagePool.getWorkPackages()
-        for workPackage in workPackages.array {
+        for workPackage in workPackages.values {
             if try validate(workPackage: workPackage) {
                 let workReport = try await createWorkReport(for: workPackage, coreIndex: coreIndex)
                 try await workPackagePool.removeWorkPackages(packages: [workPackage])
@@ -98,9 +98,9 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     // workpackage -> workresult -> workreport
-    private func createWorkReport(for workPackage: WorkPackage, coreIndex: CoreIndex) async throws -> WorkReport {
+    private func createWorkReport(for workPackage: WorkPackageRef, coreIndex: CoreIndex) async throws -> WorkReport {
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
-        let packageHash = workPackage.hash()
+        let packageHash = workPackage.hash
         let corePool = state.value.coreAuthorizationPool[coreIndex]
         let authorizerHash = try corePool.array.first.unwrap(orError: GuaranteeingServiceError.noAuthorizerHash)
         var exportSegmentOffset: UInt16 = 0
@@ -116,7 +116,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
 
             var exportSegments = [Data4104]()
 
-            for item in workPackage.workItems {
+            for item in workPackage.value.workItems {
                 // TODO: make this lazy. only fetch when needed by PVM
                 let importSegments = try await dataAvailability.fetchSegment(segments: item.inputs)
 
@@ -128,12 +128,12 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                     .invoke(
                         config: config,
                         serviceAccounts: state.value,
-                        codeHash: workPackage.authorizationCodeHash,
+                        codeHash: workPackage.value.authorizationCodeHash,
                         gas: item.refineGasLimit,
                         service: item.serviceIndex,
                         workPackageHash: packageHash,
                         workPayload: item.payloadBlob,
-                        refinementCtx: workPackage.context,
+                        refinementCtx: workPackage.value.context,
                         authorizerHash: authorizerHash,
                         authorizationOutput: authorizationOutput,
                         importSegments: importSegments,
@@ -144,7 +144,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                 exportSegmentOffset += item.outputDataSegmentsCount
                 let workResult = WorkResult(
                     serviceIndex: item.serviceIndex,
-                    codeHash: workPackage.authorizationCodeHash,
+                    codeHash: workPackage.value.authorizationCodeHash,
                     payloadHash: item.payloadBlob.blake2b256hash(),
                     gas: item.refineGasLimit,
                     output: WorkOutput(refineRes.result)
@@ -159,7 +159,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             }
 
             let (erasureRoot, length) = try await dataAvailability.exportWorkpackageBundle(bundle: WorkPackageBundle(
-                workPackage: workPackage,
+                workPackage: workPackage.value,
                 extrinsic: [], // TODO: get extrinsic data
                 importSegments: [],
                 justifications: []
@@ -184,7 +184,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                 authorizerHash: authorizerHash,
                 coreIndex: coreIndex,
                 authorizationOutput: authorizationOutput,
-                refinementContext: workPackage.context,
+                refinementContext: workPackage.value.context,
                 packageSpecification: packageSpecification,
                 lookup: oldLookups,
                 results: ConfigLimitedSizeArray(config: config, array: workResults)
@@ -196,7 +196,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
     }
 
-    private func validate(workPackage _: WorkPackage) throws -> Bool {
+    private func validate(workPackage _: WorkPackageRef) throws -> Bool {
         // TODO: Add validate func
         true
     }

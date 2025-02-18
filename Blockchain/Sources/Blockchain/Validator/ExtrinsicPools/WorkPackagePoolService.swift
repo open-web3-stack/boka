@@ -3,7 +3,7 @@ import Utils
 
 private actor WorkPackageStorage {
     var logger: Logger!
-    var workPackages: SortedUniqueArray<WorkPackage> = .init()
+    var workPackages: [Data32: WorkPackageRef] = [:]
 
     let ringContext: Bandersnatch.RingContext
     var verifier: Bandersnatch.Verifier!
@@ -18,28 +18,28 @@ private actor WorkPackageStorage {
 
     func update(state _: StateRef, config _: ProtocolConfigRef) throws {}
 
-    func add(packages: [WorkPackage], config: ProtocolConfigRef) {
+    func add(packages: [WorkPackageRef], config: ProtocolConfigRef) {
         for package in packages {
             guard validatePackage(package, config: config) else {
                 logger.warning("Invalid work package: \(package)")
                 continue
             }
-            workPackages.append(contentsOf: [package])
+            workPackages[package.hash] = package
         }
     }
 
-    private func validatePackage(_: WorkPackage, config _: ProtocolConfigRef) -> Bool {
+    private func validatePackage(_: WorkPackageRef, config _: ProtocolConfigRef) -> Bool {
         // TODO: add validate logic
         true
     }
 
-    func removeWorkPackages(_ packages: [WorkPackage]) {
-        workPackages.remove { workPackage in
-            packages.contains { $0 == workPackage }
+    func removeWorkPackages(_ packages: [WorkPackageRef]) {
+        for package in packages {
+            workPackages.removeValue(forKey: package.hash)
         }
     }
 
-    func getWorkPackages() -> SortedUniqueArray<WorkPackage> {
+    func getWorkPackages() -> [Data32: WorkPackageRef] {
         workPackages
     }
 }
@@ -76,15 +76,15 @@ public final class WorkPackagePoolService: ServiceBase, @unchecked Sendable {
         try await storage.update(state: state, config: config)
     }
 
-    public func addWorkPackages(packages: [WorkPackage]) async throws {
+    public func addWorkPackages(packages: [WorkPackageRef]) async throws {
         await storage.add(packages: packages, config: config)
     }
 
-    public func removeWorkPackages(packages: [WorkPackage]) async throws {
+    public func removeWorkPackages(packages: [WorkPackageRef]) async throws {
         await storage.removeWorkPackages(packages)
     }
 
-    public func getWorkPackages() async -> SortedUniqueArray<WorkPackage> {
+    public func getWorkPackages() async -> [Data32: WorkPackageRef] {
         await storage.getWorkPackages()
     }
 }
