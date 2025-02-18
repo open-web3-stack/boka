@@ -62,13 +62,7 @@ public struct WorkPackage: Comparable, Sendable, Equatable, Codable {
 
 extension WorkPackage: Hashable {
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(authorizationToken)
-        hasher.combine(authorizationServiceIndex)
-        hasher.combine(authorizationCodeHash)
-        hasher.combine(parameterizationBlob)
-        hasher.combine(context)
-        hasher.combine(workItems.count)
-        workItems.forEach { hasher.combine($0) }
+        hasher.combine(hash())
     }
 }
 

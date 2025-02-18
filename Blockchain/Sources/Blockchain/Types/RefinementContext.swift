@@ -76,9 +76,13 @@ public struct RefinementContext: Comparable, Sendable, Equatable, Codable, Hasha
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(anchor)
-        hasher.combine(lookupAnchor)
-        hasher.combine(prerequisiteWorkPackages)
+        hasher.combine(hash())
+    }
+}
+
+extension RefinementContext {
+    public func hash() -> Data32 {
+        try! JamEncoder.encode(self).blake2b256hash()
     }
 }
 
