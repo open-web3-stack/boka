@@ -44,7 +44,7 @@ struct GuaranteeingServiceTests {
         let storeMiddleware = services.storeMiddleware
         let scheduler = services.scheduler
 
-        var allWorkPackages = [WorkPackage]()
+        var allWorkPackages = [WorkPackageRef]()
         for _ in 0 ..< services.config.value.totalNumberOfCores {
             let workpackage = WorkPackage(
                 authorizationToken: Data(),
@@ -54,9 +54,9 @@ struct GuaranteeingServiceTests {
                 context: RefinementContext.dummy(config: services.config),
                 workItems: try! ConfigLimitedSizeArray(config: services.config, defaultValue: WorkItem.dummy(config: services.config))
             )
-            allWorkPackages.append(workpackage)
+            allWorkPackages.append(workpackage.asRef())
         }
-        await services.eventBus.publish(RuntimeEvents.WorkPackagesGenerated(items: allWorkPackages))
+        await services.eventBus.publish(RuntimeEvents.WorkPackagesReceived(items: allWorkPackages))
         await validatorService.on(genesis: genesisState)
         await storeMiddleware.wait()
         #expect(scheduler.taskCount == 1)
