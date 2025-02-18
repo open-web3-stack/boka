@@ -190,6 +190,8 @@ public final class Runtime {
                 throw Error.authorizationError(error)
             }
 
+            try await updatePreimages(block: block, state: &newState, prevState: prevState)
+
             newState.activityStatistics = try prevState.value.update(
                 config: config,
                 newTimeslot: block.header.timeslot,
