@@ -26,7 +26,7 @@ struct MerklizationTests {
 
         let peaks = [Data32.random(), Data32.random(), Data32.random()]
         let mmr2 = MMR(peaks)
-        #expect(mmr2.superPeak() == Keccak.hash("node", Keccak.hash("node", peaks[0], peaks[1]), peaks[2]))
+        #expect(mmr2.superPeak() == Keccak.hash("peak", Keccak.hash("peak", peaks[0], peaks[1]), peaks[2]))
     }
 
     @Test
