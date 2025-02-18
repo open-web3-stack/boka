@@ -5,6 +5,7 @@ public enum PreimagesError: Error {
     case preimagesNotSorted
     case duplicatedPreimage
     case invalidServiceIndex
+    case preimageNotUsed
 }
 
 public struct PreimageUpdate: Sendable, Equatable {
@@ -62,6 +63,11 @@ extension Preimages {
 
             guard prevPreimageData == nil else {
                 throw PreimagesError.duplicatedPreimage
+            }
+
+            let isRequested = try? await get(serviceAccount: preimage.serviceIndex, preimageHash: hash, length: UInt32(preimage.data.count))
+            guard isRequested != nil else {
+                throw PreimagesError.preimageNotUsed
             }
 
             updates.append(PreimageUpdate(
