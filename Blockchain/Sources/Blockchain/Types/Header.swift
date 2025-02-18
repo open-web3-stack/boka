@@ -136,39 +136,14 @@ extension Header: Hashable {
     }
 }
 
-extension Header {
-    public func asRef() -> HeaderRef {
-        HeaderRef(self)
-    }
-}
-
-public final class HeaderRef: Ref<Header>, @unchecked Sendable {
-    public required init(_ value: Header) {
-        lazyHash = Lazy {
-            Ref(value.hash())
+extension Header: Hashable32 {
+    public func hash() -> Data32 {
+        do {
+            return try JamEncoder.encode(self).blake2b256hash()
+        } catch {
+            logger.error("Failed to encode header, returning empty hash", metadata: ["error": "\(error)"])
+            return Data32()
         }
-
-        super.init(value)
-    }
-
-    private let lazyHash: Lazy<Ref<Data32>>
-
-    public var hash: Data32 {
-        lazyHash.value.value
-    }
-
-    override public var description: String {
-        "Header(hash: \(hash), timeslot: \(value.timeslot))"
-    }
-}
-
-extension HeaderRef: Codable {
-    public convenience init(from decoder: Decoder) throws {
-        try self.init(.init(from: decoder))
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        try value.encode(to: encoder)
     }
 }
 
@@ -200,15 +175,6 @@ extension Header: Dummy {
 }
 
 extension Header {
-    public func hash() -> Data32 {
-        do {
-            return try JamEncoder.encode(self).blake2b256hash()
-        } catch {
-            logger.error("Failed to encode header, returning empty hash", metadata: ["error": "\(error)"])
-            return Data32()
-        }
-    }
-
     public var parentHash: Data32 { unsigned.parentHash }
     public var priorStateRoot: Data32 { unsigned.priorStateRoot }
     public var extrinsicsHash: Data32 { unsigned.extrinsicsHash }
@@ -229,5 +195,27 @@ extension Header: Validate {
         guard authorIndex < UInt32(config.value.totalNumberOfValidators) else {
             throw .invalidAuthorIndex
         }
+    }
+}
+
+extension Header {
+    public func asRef() -> HeaderRef {
+        HeaderRef(self)
+    }
+}
+
+public final class HeaderRef: RefWithHash<Header>, @unchecked Sendable {
+    override public var description: String {
+        "Header(hash: \(hash), timeslot: \(value.timeslot))"
+    }
+}
+
+extension HeaderRef: Codable {
+    public convenience init(from decoder: Decoder) throws {
+        try self.init(.init(from: decoder))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        try value.encode(to: encoder)
     }
 }
