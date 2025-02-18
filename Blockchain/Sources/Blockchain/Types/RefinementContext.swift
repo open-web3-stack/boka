@@ -3,7 +3,7 @@ import Utils
 
 // A refinement context, denoted by the set X, describes the context of the chain
 // at the point that the report’s corresponding work-package was evaluated.
-public struct RefinementContext: Comparable, Sendable, Equatable, Codable, Hashable {
+public struct RefinementContext: Comparable, Sendable, Equatable, Codable {
     public struct Anchor: Comparable, Sendable, Equatable, Codable, Hashable {
         // a
         public var headerHash: Data32
@@ -74,13 +74,9 @@ public struct RefinementContext: Comparable, Sendable, Equatable, Codable, Hasha
         }
         return lhs.lookupAnchor < rhs.lookupAnchor
     }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(hash())
-    }
 }
 
-extension RefinementContext {
+extension RefinementContext: Hashable32 {
     public func hash() -> Data32 {
         try! JamEncoder.encode(self).blake2b256hash()
     }

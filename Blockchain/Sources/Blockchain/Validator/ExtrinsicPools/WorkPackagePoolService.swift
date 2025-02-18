@@ -29,8 +29,6 @@ private actor WorkPackageStorage {
         self.logger = logger
     }
 
-    func update(state _: StateRef, config _: ProtocolConfigRef) throws {}
-
     func add(packages: [WorkPackageRef], config: ProtocolConfigRef) {
         for package in packages {
             guard validatePackage(package, config: config) else {
@@ -87,10 +85,6 @@ public final class WorkPackagePoolService: ServiceBase, @unchecked Sendable {
 
     private func on(workPackagesReceived event: RuntimeEvents.WorkPackagesReceived) async throws {
         await storage.add(packages: event.items, config: config)
-    }
-
-    public func update(state: StateRef, config: ProtocolConfigRef) async throws {
-        try await storage.update(state: state, config: config)
     }
 
     private func on(workPackagesGenerated event: RuntimeEvents.WorkReportGenerated) async throws {
