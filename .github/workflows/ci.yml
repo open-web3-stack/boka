@@ -35,13 +35,18 @@ jobs:
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
-    # - name: Cache SPM
-    #   uses: actions/cache@v4
-    #   with:
-    #     path: '**/.build'
-    #     key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
-    #     restore-keys: |
-    #       ${{ runner.os }}-spm-
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-region: us-east-2
+    - name: Cache SPM
+      uses: runs-on/cache@v4
+      with:
+        path: '**/.build'
+        key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+        restore-keys: |
+          ${{ runner.os }}-spm-
+      env:
+        RUNS_ON_S3_BUCKET_CACHE: laminar-gh-action-cache
     - name: Cache Cargo
       uses: actions/cache@v4
       with:
