@@ -88,7 +88,9 @@ struct NetworkManagerTests {
         await storeMiddleware.wait()
 
         #expect(workPackages.first?.value.hash() != nil)
+        #expect(workPackages.first?.value.context.hash() != nil)
         #expect(workPackages.first?.hashValue != nil)
+
         // Verify network calls
         #expect(
             network.contain(calls: [
