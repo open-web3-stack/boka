@@ -5,6 +5,10 @@ import Utils
 private let logger = Logger(label: "VMState ")
 
 public class VMState {
+    public enum VMError: Error {
+        case invalidInstructionMemoryAccess
+    }
+
     public let program: ProgramCode
 
     public private(set) var pc: UInt32
@@ -12,6 +16,8 @@ public class VMState {
     private var registers: Registers
     private var gas: GasInt
     private var memory: Memory
+
+    public var isExecutingInst: Bool = false
 
     public init(program: ProgramCode, pc: UInt32, registers: Registers, gas: Gas, memory: Memory) {
         self.program = program
@@ -55,13 +61,23 @@ public class VMState {
         memory.isReadable(address: UInt32(truncatingIfNeeded: address), length: length)
     }
 
+    // During the course of executing instructions
+    // When an index of ram below 2^16 is required, the machine always panics immediately
+    private func validateAddress(_ address: some FixedWidthInteger) throws {
+        if isExecutingInst, UInt32(truncatingIfNeeded: address) < (1 << 16) {
+            throw VMError.invalidInstructionMemoryAccess
+        }
+    }
+
     public func readMemory(address: some FixedWidthInteger) throws -> UInt8 {
+        try validateAddress(address)
         let res = try memory.read(address: UInt32(truncatingIfNeeded: address))
         logger.trace("read  \(address) (\(res))")
         return res
     }
 
     public func readMemory(address: some FixedWidthInteger, length: Int) throws -> Data {
+        try validateAddress(address)
         let res = try memory.read(address: UInt32(truncatingIfNeeded: address), length: length)
         logger.trace("read  \(address)..+\(length) (\(res))")
         return res
@@ -72,11 +88,13 @@ public class VMState {
     }
 
     public func writeMemory(address: some FixedWidthInteger, value: UInt8) throws {
+        try validateAddress(address)
         logger.trace("write \(address) (\(value))")
         try memory.write(address: UInt32(truncatingIfNeeded: address), value: value)
     }
 
     public func writeMemory(address: some FixedWidthInteger, values: some Sequence<UInt8>) throws {
+        try validateAddress(address)
         logger.trace("write \(address) (\(values))")
         try memory.write(address: UInt32(truncatingIfNeeded: address), values: Data(values))
     }

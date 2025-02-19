@@ -19,20 +19,22 @@ public class RefineContext: InvocationContext {
 
     public let config: ProtocolConfigRef
     public var context: ContextType
-    public let importSegments: [Data4104]
+    public let importSegments: [[Data4104]]
     public let exportSegmentOffset: UInt64
     public let service: ServiceIndex
     public let serviceAccounts: ServiceAccounts
-    public let lookupAnchorTimeslot: TimeslotIndex
+    public let workPackage: WorkPackage
+    public let authorizerOutput: Data
 
     public init(
         config: ProtocolConfigRef,
         context: ContextType,
-        importSegments: [Data4104],
+        importSegments: [[Data4104]],
         exportSegmentOffset: UInt64,
         service: ServiceIndex,
         serviceAccounts: some ServiceAccounts,
-        lookupAnchorTimeslot: TimeslotIndex
+        workPackage: WorkPackage,
+        authorizerOutput: Data
     ) {
         self.config = config
         self.context = context
@@ -40,7 +42,8 @@ public class RefineContext: InvocationContext {
         self.exportSegmentOffset = exportSegmentOffset
         self.service = service
         self.serviceAccounts = serviceAccounts
-        self.lookupAnchorTimeslot = lookupAnchorTimeslot
+        self.workPackage = workPackage
+        self.authorizerOutput = authorizerOutput
     }
 
     public func dispatch(index: UInt32, state: VMState) async -> ExecOutcome {
@@ -52,13 +55,21 @@ public class RefineContext: InvocationContext {
         case HistoricalLookup.identifier:
             return await HistoricalLookup(
                 context: context,
-                service: service,
+                serviceIndex: service,
                 serviceAccounts: serviceAccounts,
-                lookupAnchorTimeslot: lookupAnchorTimeslot
+                lookupAnchorTimeslot: workPackage.context.lookupAnchor.timeslot
             )
             .call(config: config, state: state)
-        case Import.identifier:
-            return await Import(context: context, importSegments: importSegments).call(config: config, state: state)
+        case Fetch.identifier:
+            return await Fetch(
+                context: context,
+                serviceAccounts: serviceAccounts,
+                serviceIndex: service,
+                workPackage: workPackage,
+                authorizerOutput: authorizerOutput,
+                importSegments: importSegments
+            )
+            .call(config: config, state: state)
         case Export.identifier:
             return await Export(context: &context, exportSegmentOffset: exportSegmentOffset).call(config: config, state: state)
         case Machine.identifier:

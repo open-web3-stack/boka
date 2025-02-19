@@ -190,7 +190,7 @@ public final class Runtime {
                 throw Error.authorizationError(error)
             }
 
-            try await updatePreimages(block: block, state: &newState, prevState: prevState)
+            try await updatePreimages(block: block, state: &newState)
 
             newState.activityStatistics = try prevState.value.update(
                 config: config,
@@ -342,8 +342,8 @@ public final class Runtime {
         return availableReports
     }
 
-    public func updatePreimages(block: BlockRef, state newState: inout State, prevState: StateRef) async throws {
-        let res = try await prevState.value.updatePreimages(
+    public func updatePreimages(block: BlockRef, state newState: inout State) async throws {
+        let res = try await newState.updatePreimages(
             config: config, timeslot: newState.timeslot, preimages: block.extrinsic.preimages
         )
         newState.mergeWith(postState: res)
