@@ -57,7 +57,7 @@ struct ReportsState: Guaranteeing {
     }
 
     var accumulationQueue: ConfigFixedSizeArray<[AccumulationQueueItem], ProtocolConfig.EpochLength>
-    var accumulationHistory: ConfigFixedSizeArray<Set<Data32>, ProtocolConfig.EpochLength>
+    var accumulationHistory: ConfigFixedSizeArray<SortedUniqueArray<Data32>, ProtocolConfig.EpochLength>
 }
 
 struct ReportsTestcase: Codable {
@@ -92,7 +92,7 @@ struct ReportsTests {
             coreAuthorizationPool: testcase.preState.coreAuthorizationPool,
             services: testcase.preState.services,
             accumulationQueue: try! ConfigFixedSizeArray(config: config, defaultValue: []),
-            accumulationHistory: try! ConfigFixedSizeArray(config: config, defaultValue: [])
+            accumulationHistory: try! ConfigFixedSizeArray(config: config, defaultValue: .init())
         )
         let result = Result {
             try testcase.input.reports.validate(config: config)

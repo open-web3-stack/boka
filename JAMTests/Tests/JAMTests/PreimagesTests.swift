@@ -6,7 +6,7 @@ import Utils
 
 @testable import JAMTests
 
-struct PreimageInfo: Codable, Equatable, Hashable, Comparable {
+private struct PreimageInfo: Codable, Equatable, Hashable, Comparable {
     var hash: Data32
     var blob: Data
 
@@ -15,18 +15,18 @@ struct PreimageInfo: Codable, Equatable, Hashable, Comparable {
     }
 }
 
-struct HistoryEntry: Codable, Equatable {
+private struct HistoryEntry: Codable, Equatable {
     var key: HashAndLength
     var value: [TimeslotIndex]
 }
 
-struct AccountsMapEntry: Codable, Equatable {
+private struct AccountsMapEntry: Codable, Equatable {
     var index: ServiceIndex
     @CodingAs<SortedSet<PreimageInfo>> var preimages: Set<PreimageInfo>
     @CodingAs<SortedKeyValues<HashAndLength, [TimeslotIndex]>> var history: [HashAndLength: [TimeslotIndex]]
 }
 
-struct PreimagesState: Equatable, Codable, Preimages {
+private struct PreimagesState: Equatable, Codable, Preimages {
     var accounts: [AccountsMapEntry] = []
 
     func get(serviceAccount index: ServiceIndex, preimageHash hash: Data32) async throws -> Data? {
@@ -64,12 +64,12 @@ struct PreimagesState: Equatable, Codable, Preimages {
     }
 }
 
-struct PreimagesInput: Codable {
+private struct PreimagesInput: Codable {
     var preimages: ExtrinsicPreimages
     var slot: TimeslotIndex
 }
 
-struct PreimagesTestcase: Codable {
+private struct PreimagesTestcase: Codable {
     var input: PreimagesInput
     var preState: PreimagesState
     var output: UInt8?
