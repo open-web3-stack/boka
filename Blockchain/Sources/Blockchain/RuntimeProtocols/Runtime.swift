@@ -190,7 +190,7 @@ public final class Runtime {
                 throw Error.authorizationError(error)
             }
 
-            try await updatePreimages(block: block, state: &newState, prevState: prevState)
+            try await updatePreimages(block: block, state: &newState, prevState: StateRef(newState))
 
             newState.activityStatistics = try prevState.value.update(
                 config: config,

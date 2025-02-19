@@ -3,7 +3,7 @@ public enum HostCallResultCode: UInt64 {
     case NONE = 0xFFFF_FFFF_FFFF_FFFF
     /// WHAT = 2^64 − 2: Name unknown.
     case WHAT = 0xFFFF_FFFF_FFFF_FFFE
-    /// OOB = 2^64 − 3: The return value for when a memory index is provided for reading/writing which is not accessible.
+    /// OOB = 2^64 − 3: The inner pvm memory index provided for reading/writing is not accessible.
     case OOB = 0xFFFF_FFFF_FFFF_FFFD
     /// WHO = 2^64 − 4: Index unknown.
     case WHO = 0xFFFF_FFFF_FFFF_FFFC
