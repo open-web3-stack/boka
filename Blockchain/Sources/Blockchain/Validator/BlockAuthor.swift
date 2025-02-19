@@ -7,7 +7,7 @@ import Utils
 public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
     private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore
-    private let extrinsicPool: ExtrinsicPoolService
+    private let safroleTicketPool: SafroleTicketPoolService
 
     private let tickets: ThreadSafeContainer<[RuntimeEvents.SafroleTicketsGenerated]> = .init([])
 
@@ -17,11 +17,11 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         eventBus: EventBus,
         keystore: KeyStore,
         scheduler: Scheduler,
-        extrinsicPool: ExtrinsicPoolService
+        safroleTicketPool: SafroleTicketPoolService
     ) async {
         self.dataProvider = dataProvider
         self.keystore = keystore
-        self.extrinsicPool = extrinsicPool
+        self.safroleTicketPool = safroleTicketPool
 
         super.init(id: "BlockAuthor", config: config, eventBus: eventBus, scheduler: scheduler)
 
@@ -57,7 +57,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         let stateRoot = await state.value.stateRoot
         let epoch = timeslot.timeslotToEpochIndex(config: config)
 
-        let pendingTickets = await extrinsicPool.getPendingTickets(epoch: epoch)
+        let pendingTickets = await safroleTicketPool.getPendingTickets(epoch: epoch)
         let existingTickets = SortedArray(sortedUnchecked: state.value.safroleState.ticketsAccumulator.array.map(\.id))
         let tickets = pendingTickets.array
             .lazy

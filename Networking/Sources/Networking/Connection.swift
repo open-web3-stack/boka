@@ -28,6 +28,7 @@ enum ConnectionState {
     case connecting(continuations: [CheckedContinuation<Void, Error>])
     case connected(publicKey: Data)
     case closed
+    case closing
     case reconnect(publicKey: Data)
 }
 
@@ -51,7 +52,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                 nil
             case let .connected(publicKey):
                 publicKey
-            case .closed:
+            case .closed, .closing:
                 nil
             case let .reconnect(publicKey):
                 publicKey
@@ -99,9 +100,19 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                 for continuation in continuations {
                     continuation.resume(throwing: ConnectionError.closed)
                 }
-                state = .closed
             }
             state = .closed
+        }
+    }
+
+    func closing() {
+        state.write { state in
+            if case let .connecting(continuations) = state {
+                for continuation in continuations {
+                    continuation.resume(throwing: ConnectionError.closed)
+                }
+            }
+            state = .closing
         }
     }
 
@@ -111,7 +122,6 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                 for continuation in continuations {
                     continuation.resume(throwing: ConnectionError.reconnect)
                 }
-                state = .reconnect(publicKey: publicKey)
             }
             state = .reconnect(publicKey: publicKey)
         }
@@ -119,10 +129,12 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
 
     public var isClosed: Bool {
         state.read {
-            if case .closed = $0 {
-                return true
+            switch $0 {
+            case .closed, .closing:
+                true
+            case .connected, .reconnect, .connecting:
+                false
             }
-            return false
         }
     }
 
@@ -140,11 +152,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
             switch $0 {
             case .connecting:
                 false
-            case .connected:
-                true
-            case .closed:
-                true
-            case .reconnect:
+            case .connected, .closed, .closing, .reconnect:
                 true
             }
         }
@@ -165,6 +173,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
     }
 
     public func close(abort: Bool = false) {
+        closing()
         try? connection.shutdown(errorCode: abort ? 1 : 0) // TODO: define some error code
     }
 

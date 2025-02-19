@@ -30,7 +30,7 @@ public struct MMR: Sendable, Equatable, Codable {
             } else if peaks.count == 1 {
                 peaks[0]
             } else {
-                Keccak.hash("node", helper(peaks[0 ..< peaks.count - 1]), peaks.last!)
+                Keccak.hash("peak", helper(peaks[0 ..< peaks.count - 1]), peaks.last!)
             }
         }
 

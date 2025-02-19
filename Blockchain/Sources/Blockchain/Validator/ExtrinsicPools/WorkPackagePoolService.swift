@@ -2,9 +2,22 @@ import Foundation
 import TracingUtils
 import Utils
 
+enum WorkPackageStatus {
+    case pending
+    // work report is generated and waiting for assursor to make it available
+    case refined
+    // work report is available and waiting for the work report to be accurmulated
+    case assured
+}
+
+private struct WorkPackageInfo {
+    let workPackage: WorkPackageRef
+    var status: WorkPackageStatus
+}
+
 private actor WorkPackageStorage {
     var logger: Logger!
-    var workPackages: SortedUniqueArray<WorkPackage> = .init()
+    var workPackages: [Data32: WorkPackageInfo] = [:]
 
     let ringContext: Bandersnatch.RingContext
     var verifier: Bandersnatch.Verifier!
@@ -17,31 +30,29 @@ private actor WorkPackageStorage {
         self.logger = logger
     }
 
-    func update(state _: StateRef, config _: ProtocolConfigRef) throws {}
-
-    func add(packages: [WorkPackage], config: ProtocolConfigRef) {
+    func add(packages: [WorkPackageRef], config: ProtocolConfigRef) {
         for package in packages {
             guard validatePackage(package, config: config) else {
                 logger.warning("Invalid work package: \(package)")
                 continue
             }
-            workPackages.append(contentsOf: [package])
+            workPackages[package.hash] = WorkPackageInfo(workPackage: package, status: .pending)
         }
     }
 
-    private func validatePackage(_: WorkPackage, config _: ProtocolConfigRef) -> Bool {
+    private func validatePackage(_: WorkPackageRef, config _: ProtocolConfigRef) -> Bool {
         // TODO: add validate logic
         true
     }
 
-    func removeWorkPackages(_ packages: [WorkPackage]) {
-        workPackages.remove { workPackage in
-            packages.contains { $0 == workPackage }
+    func packageRefined(packageHashes: [Data32]) {
+        for hash in packageHashes {
+            workPackages[hash]?.status = .refined
         }
     }
 
-    func getWorkPackages() -> SortedUniqueArray<WorkPackage> {
-        workPackages
+    func getPendingPackages() -> [WorkPackageRef] {
+        workPackages.values.filter { $0.status == .pending }.map(\.workPackage)
     }
 }
 
@@ -141,37 +152,27 @@ public final class WorkPackagePoolService: ServiceBase, @unchecked Sendable {
         super.init(id: "WorkPackagePoolService", config: config, eventBus: eventBus)
         await storage.setLogger(logger)
 
-        await subscribe(RuntimeEvents.WorkPackagesGenerated.self, id: "WorkPackagePool.WorkPackagesGenerated") { [weak self] event in
-            try await self?.on(workPackagesGenerated: event)
-        }
         await subscribe(RuntimeEvents.WorkPackagesReceived.self, id: "WorkPackagePool.WorkPackagesReceived") { [weak self] event in
             try await self?.on(workPackagesReceived: event)
         }
+
+        await subscribe(RuntimeEvents.WorkReportGenerated.self, id: "WorkPackagePool.WorkReportGenerated") { [weak self] event in
+            try await self?.on(workPackagesGenerated: event)
+        }
+
         // TODO: add remove subscribe
     }
 
-    private func on(workPackagesGenerated event: RuntimeEvents.WorkPackagesGenerated) async throws {
-        let state = try await dataProvider.getBestState()
-        try await storage.update(state: state, config: config)
-        await storage.add(packages: event.items, config: config)
-    }
-
     private func on(workPackagesReceived event: RuntimeEvents.WorkPackagesReceived) async throws {
-        let state = try await dataProvider.getBestState()
-        try await storage.update(state: state, config: config)
         await storage.add(packages: event.items, config: config)
     }
 
-    public func update(state: StateRef, config: ProtocolConfigRef) async throws {
-        try await storage.update(state: state, config: config)
+    private func on(workPackagesGenerated event: RuntimeEvents.WorkReportGenerated) async throws {
+        await storage.packageRefined(packageHashes: event.items.map(\.packageSpecification.workPackageHash))
     }
 
-    public func addWorkPackages(packages: [WorkPackage]) async throws {
+    public func addWorkPackages(packages: [WorkPackageRef]) async throws {
         await storage.add(packages: packages, config: config)
-    }
-
-    public func removeWorkPackages(packages: [WorkPackage]) async throws {
-        await storage.removeWorkPackages(packages)
     }
 
     public func createWorkPackageBundle(_ workPackage: WorkPackage) async throws -> WorkPackageBundle {
@@ -246,7 +247,7 @@ public final class WorkPackagePoolService: ServiceBase, @unchecked Sendable {
                 bundle: bundle
             )
 
-            // 5. Publish the work report hash and signature
+            // 6. Publish the work report hash and signature
 //            let event = RuntimeEvents.WorkReportGenerated(hash: workReportHash, signature: signature)
 //            publish(event)
         }
@@ -289,13 +290,13 @@ public final class WorkPackagePoolService: ServiceBase, @unchecked Sendable {
         [] // Placeholder
     }
 
-    private func retrieveImportSegments(for _: WorkPackage) async throws -> [[Data]] {
+    private func retrieveImportSegments(for _: WorkPackage) async throws -> [Data4104] {
         // Implement logic to retrieve imported data segments
         // For example, fetch from the data availability layer
         [] // Placeholder
     }
 
-    private func retrieveJustifications(for _: WorkPackage) async throws -> [[Data]] {
+    private func retrieveJustifications(for _: WorkPackage) async throws -> [Data] {
         // Implement logic to retrieve justifications for the imported segments
         // For example, fetch proofs from the data availability layer
         [] // Placeholder
@@ -306,7 +307,7 @@ public final class WorkPackagePoolService: ServiceBase, @unchecked Sendable {
         true
     }
 
-    public func getWorkPackages() async -> SortedUniqueArray<WorkPackage> {
-        await storage.getWorkPackages()
+    public func getPendingPackages() async -> [WorkPackageRef] {
+        await storage.getPendingPackages()
     }
 }

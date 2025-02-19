@@ -1,3 +1,4 @@
+import Codec
 import Foundation
 import TracingUtils
 import Utils
@@ -39,16 +40,28 @@ public final class DataAvailability: ServiceBase2, @unchecked Sendable {
         // of 28 days (672 complete epochs) following the reporting of the work-report.
     }
 
-    public func fetchSegment(root _: Data32, index _: UInt16) async throws -> Data? {
-        // TODO: fetch segment
-        nil
+    public func fetchSegment(segments: [WorkItem.ImportedDataSegment]) async throws -> [Data4104] {
+        try await dataStore.fetchSegment(segments: segments)
     }
 
-    public func exportSegments(data _: [Data]) async throws {
-        // TODO: export segments
+    public func exportSegments(data: [Data4104], erasureRoot: Data32) async throws -> Data32 {
+        let segmentRoot = Merklization.constantDepthMerklize(data.map(\.data))
+
+        for (index, data) in data.enumerated() {
+            try await dataStore.set(data: data, erasureRoot: erasureRoot, index: UInt16(index))
+        }
+
+        return segmentRoot
     }
 
-    public func distributeWorkpackageBundle(bundle _: WorkPackageBundle) async throws {
+    public func exportWorkpackageBundle(bundle: WorkPackageBundle) async throws -> (erasureRoot: Data32, length: DataLength) {
         // TODO: distribute workpackage bundle to audits DA
+        // and correctly generate the erasure root
+
+        // This is just a mock implementation
+        let data = try JamEncoder.encode(bundle)
+        let erasureRoot = data.blake2b256hash()
+
+        return (erasureRoot, DataLength(data.count))
     }
 }

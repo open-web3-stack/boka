@@ -6,6 +6,9 @@ import Utils
 public enum GuaranteeingServiceError: Error {
     case invalidValidatorIndex
     case customValidatorNotFound
+    case noAuthorizerHash
+    case invalidCoreIndex
+    case invalidExports
 }
 
 struct GuaranteeingAuthorizationFunction: IsAuthorizedFunction {}
@@ -15,7 +18,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore
     private let runtime: Runtime
-    private let extrinsicPool: ExtrinsicPoolService
+    private let safroleTicketPool: SafroleTicketPoolService
     private let workPackagePool: WorkPackagePoolService
     private let guarantees: ThreadSafeContainer<[RuntimeEvents.GuaranteeGenerated]> = .init([])
     private let authorizationFunction: GuaranteeingAuthorizationFunction
@@ -29,13 +32,13 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         dataProvider: BlockchainDataProvider,
         keystore: KeyStore,
         runtime: Runtime,
-        extrinsicPool: ExtrinsicPoolService,
+        safroleTicketPool: SafroleTicketPoolService,
         dataStore: DataStore
     ) async {
         self.dataProvider = dataProvider
         self.keystore = keystore
         self.runtime = runtime
-        self.extrinsicPool = extrinsicPool
+        self.safroleTicketPool = safroleTicketPool
         authorizationFunction = GuaranteeingAuthorizationFunction()
         refineInvocation = GuaranteeingRefineInvocation()
         workPackagePool = await WorkPackagePoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
@@ -75,12 +78,15 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             logger.error("AuthorIndex not found")
             throw GuaranteeingServiceError.invalidValidatorIndex
         }
-        let coreIndex = CoreIndex(currentCoreAssignment[Int(authorIndex)])
-        let workPackages = await workPackagePool.getWorkPackages()
-        for workPackage in workPackages.array {
+        let coreIndex = currentCoreAssignment[Int(authorIndex)]
+        guard coreIndex < CoreIndex(config.value.totalNumberOfCores) else {
+            throw GuaranteeingServiceError.invalidCoreIndex
+        }
+
+        let workPackages = await workPackagePool.getPendingPackages()
+        for workPackage in workPackages {
             if try validate(workPackage: workPackage) {
                 let workReport = try await createWorkReport(for: workPackage, coreIndex: coreIndex)
-                try await workPackagePool.removeWorkPackages(packages: [workPackage])
                 let event = RuntimeEvents.WorkReportGenerated(items: [workReport])
                 publish(event)
                 break
@@ -91,13 +97,12 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     // workpackage -> workresult -> workreport
-    private func createWorkReport(for workPackage: WorkPackage, coreIndex: CoreIndex) async throws -> WorkReport {
+    private func createWorkReport(for workPackage: WorkPackageRef, coreIndex: CoreIndex) async throws -> WorkReport {
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
-        let packageHash = workPackage.hash()
-        let corePool = state.value.coreAuthorizationPool[UInt16(coreIndex)]
-        // TODO: fix empty data
-        let authorizerHash = corePool.array.first ?? Data32()
-        var exportSegmentOffset: UInt64 = 0
+        let packageHash = workPackage.hash
+        let corePool = state.value.coreAuthorizationPool[coreIndex]
+        let authorizerHash = try corePool.array.first.unwrap(orError: GuaranteeingServiceError.noAuthorizerHash)
+        var exportSegmentOffset: UInt16 = 0
         // B.2. the authorization output, the result of the Is-Authorized function
         // TODO: waiting for authorizationFunction done  Mock a result
         // let res = try await authorizationFunction.invoke(config: config, serviceAccounts: state.value, package: workPackage, coreIndex:
@@ -107,56 +112,67 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         // authorizationFunction -> authorizationOutput
         case let .success(authorizationOutput):
             var workResults = [WorkResult]()
-            for item in workPackage.workItems {
-                var importSegments = [Data]()
-                for importSegment in item.inputs {
-                    switch importSegment.root {
-                    case let .segmentRoot(data):
-                        importSegments.append(data.data)
-                    case let .workPackageHash(data):
-                        importSegments.append(data.data)
-                    }
-                }
 
-                // TODO: generally by the work-package builder.
+            var exportSegments = [Data4104]()
+
+            for item in workPackage.value.workItems {
+                // TODO: make this lazy. only fetch when needed by PVM
+                let importSegments = try await dataAvailability.fetchSegment(segments: item.inputs)
+
+                // TODO: generated by the work-package builder.
                 let extrinsicDataBlobs = [Data]()
-                // TODO: fix exportSegments func
-                try await dataAvailability.exportSegments(data: importSegments)
+
                 // RefineInvocation invoke up data to workresult
                 let refineRes = try await refineInvocation
                     .invoke(
                         config: config,
                         serviceAccounts: state.value,
-                        codeHash: workPackage.authorizationCodeHash,
+                        codeHash: workPackage.value.authorizationCodeHash,
                         gas: item.refineGasLimit,
                         service: item.serviceIndex,
                         workPackageHash: packageHash,
                         workPayload: item.payloadBlob,
-                        refinementCtx: workPackage.context,
+                        refinementCtx: workPackage.value.context,
                         authorizerHash: authorizerHash,
                         authorizationOutput: authorizationOutput,
                         importSegments: importSegments,
                         extrinsicDataBlobs: extrinsicDataBlobs,
-                        exportSegmentOffset: exportSegmentOffset
+                        exportSegmentOffset: UInt64(exportSegmentOffset)
                     )
                 // Export -> DA or exportSegmentOffset + outputDataSegmentsCount ？
-                exportSegmentOffset += UInt64(item.outputDataSegmentsCount)
+                exportSegmentOffset += item.outputDataSegmentsCount
                 let workResult = WorkResult(
                     serviceIndex: item.serviceIndex,
-                    codeHash: workPackage.authorizationCodeHash,
+                    codeHash: workPackage.value.authorizationCodeHash,
                     payloadHash: item.payloadBlob.blake2b256hash(),
                     gas: item.refineGasLimit,
                     output: WorkOutput(refineRes.result)
                 )
                 workResults.append(workResult)
+
+                guard item.outputDataSegmentsCount == refineRes.exports.count else {
+                    throw GuaranteeingServiceError.invalidExports
+                }
+
+                exportSegments.append(contentsOf: refineRes.exports)
             }
+
+            let (erasureRoot, length) = try await dataAvailability.exportWorkpackageBundle(bundle: WorkPackageBundle(
+                workPackage: workPackage.value,
+                extrinsic: [], // TODO: get extrinsic data
+                importSegments: [],
+                justifications: []
+            ))
+
+            let segmentRoot = try await dataAvailability.exportSegments(data: exportSegments, erasureRoot: erasureRoot)
+
             // TODO: generate or find AvailabilitySpecifications  14.4.1 work-package bundle
             let packageSpecification = AvailabilitySpecifications(
                 workPackageHash: packageHash,
-                length: 0,
-                erasureRoot: Data32(),
-                segmentRoot: Data32(),
-                segmentCount: UInt16(exportSegmentOffset)
+                length: length,
+                erasureRoot: erasureRoot,
+                segmentRoot: segmentRoot,
+                segmentCount: exportSegmentOffset
             )
             // The historical lookup function, Λ, is defined in equation 9.7.
             var oldLookups = [Data32: Data32]()
@@ -167,7 +183,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                 authorizerHash: authorizerHash,
                 coreIndex: coreIndex,
                 authorizationOutput: authorizationOutput,
-                refinementContext: workPackage.context,
+                refinementContext: workPackage.value.context,
                 packageSpecification: packageSpecification,
                 lookup: oldLookups,
                 results: ConfigLimitedSizeArray(config: config, array: workResults)
@@ -179,7 +195,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
     }
 
-    private func validate(workPackage _: WorkPackage) throws -> Bool {
+    private func validate(workPackage _: WorkPackageRef) throws -> Bool {
         // TODO: Add validate func
         true
     }

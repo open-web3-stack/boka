@@ -5,14 +5,14 @@ import Utils
 
 @testable import Blockchain
 
-struct ExtrinsicPoolServiceTests {
+struct SafroleTicketPoolServiceTests {
     let config: ProtocolConfigRef
     let timeProvider: MockTimeProvider
     let dataProvider: BlockchainDataProvider
     let eventBus: EventBus
     let keystore: KeyStore
     let storeMiddleware: StoreMiddleware
-    let extrinsicPoolService: ExtrinsicPoolService
+    let poolService: SafroleTicketPoolService
     let ringContext: Bandersnatch.RingContext
 
     init() async throws {
@@ -29,7 +29,7 @@ struct ExtrinsicPoolServiceTests {
 
         keystore = try await DevKeyStore(devKeysCount: config.value.totalNumberOfValidators)
 
-        extrinsicPoolService = await ExtrinsicPoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
+        poolService = await SafroleTicketPoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
 
         ringContext = try Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
 
@@ -66,7 +66,7 @@ struct ExtrinsicPoolServiceTests {
             // Wait for the event to be processed
             await storeMiddleware.wait()
 
-            let pendingTickets = await extrinsicPoolService
+            let pendingTickets = await poolService
                 .getPendingTickets(epoch: state.value.timeslot.timeslotToEpochIndex(config: config))
             #expect(pendingTickets == allTickets)
         }
@@ -110,7 +110,7 @@ struct ExtrinsicPoolServiceTests {
         // Wait for the event to be processed
         await storeMiddleware.wait()
 
-        let pendingTickets = await extrinsicPoolService.getPendingTickets(epoch: state.value.timeslot.timeslotToEpochIndex(config: config))
+        let pendingTickets = await poolService.getPendingTickets(epoch: state.value.timeslot.timeslotToEpochIndex(config: config))
         #expect(pendingTickets == allTickets)
     }
 
@@ -164,7 +164,7 @@ struct ExtrinsicPoolServiceTests {
         await storeMiddleware.wait()
 
         // Check that the tickets in the block have been removed from the pool
-        let pendingTickets = await extrinsicPoolService.getPendingTickets(epoch: state.value.timeslot.timeslotToEpochIndex(config: config))
+        let pendingTickets = await poolService.getPendingTickets(epoch: state.value.timeslot.timeslotToEpochIndex(config: config))
         #expect(pendingTickets.array == Array(tickets[2 ..< 4]).sorted())
     }
 
@@ -194,8 +194,8 @@ struct ExtrinsicPoolServiceTests {
 
         let epoch = state.value.timeslot.timeslotToEpochIndex(config: config)
 
-        #expect(await extrinsicPoolService.getPendingTickets(epoch: epoch).count == 4)
-        #expect(await extrinsicPoolService.getPendingTickets(epoch: epoch + 1).count == 0)
+        #expect(await poolService.getPendingTickets(epoch: epoch).count == 4)
+        #expect(await poolService.getPendingTickets(epoch: epoch + 1).count == 0)
 
         // Simulate an epoch change with new entropy
         let nextTimeslot = state.value.timeslot + TimeslotIndex(config.value.epochLength)
@@ -215,7 +215,7 @@ struct ExtrinsicPoolServiceTests {
                 headerHash: newBlock.hash,
                 mmr: MMR([]),
                 stateRoot: Data32(),
-                lookup: [Data32: Data32]()
+                lookup: .init()
             ))
         }
 
@@ -240,10 +240,10 @@ struct ExtrinsicPoolServiceTests {
         await eventBus.publish(newAddEvent)
         await storeMiddleware.wait()
 
-        let finalPendingTickets = await extrinsicPoolService.getPendingTickets(epoch: epoch + 1)
+        let finalPendingTickets = await poolService.getPendingTickets(epoch: epoch + 1)
         #expect(finalPendingTickets.array == newTickets.sorted())
 
-        #expect(await extrinsicPoolService.getPendingTickets(epoch: epoch).count == 0)
-        #expect(await extrinsicPoolService.getPendingTickets(epoch: epoch + 2).count == 0)
+        #expect(await poolService.getPendingTickets(epoch: epoch).count == 0)
+        #expect(await poolService.getPendingTickets(epoch: epoch + 2).count == 0)
     }
 }

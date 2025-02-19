@@ -31,9 +31,9 @@ public enum ConstInt3: ConstInt {
     }
 }
 
-public enum ConstIntMax: ConstInt {
+public enum ConstInt12: ConstInt {
     public static var value: Int {
-        Int.max
+        12
     }
 }
 
@@ -55,32 +55,44 @@ public enum ConstInt64: ConstInt {
     }
 }
 
-public enum ConstUInt96: ConstInt {
+public enum ConstInt96: ConstInt {
     public static var value: Int {
         96
     }
 }
 
-public enum ConstUInt128: ConstInt {
+public enum ConstInt128: ConstInt {
     public static var value: Int {
         128
     }
 }
 
-public enum ConstUInt144: ConstInt {
+public enum ConstInt144: ConstInt {
     public static var value: Int {
         144
     }
 }
 
-public enum ConstUInt384: ConstInt {
+public enum ConstInt384: ConstInt {
     public static var value: Int {
         384
     }
 }
 
-public enum ConstUInt784: ConstInt {
+public enum ConstInt784: ConstInt {
     public static var value: Int {
         784
+    }
+}
+
+public enum ConstInt4104: ConstInt {
+    public static var value: Int {
+        4104
+    }
+}
+
+public enum ConstIntMax: ConstInt {
+    public static var value: Int {
+        Int.max
     }
 }
