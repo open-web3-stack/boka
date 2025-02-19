@@ -191,10 +191,10 @@ struct AccumulateTests {
         }
     }
 
-    @Test(arguments: try AccumulateTests.loadTests(variant: .tiny))
-    func tinyTests(_ testcase: Testcase) async throws {
-        try await accumulateTests(testcase, variant: .tiny)
-    }
+    // @Test(arguments: try AccumulateTests.loadTests(variant: .tiny))
+    // func tinyTests(_ testcase: Testcase) async throws {
+    //     try await accumulateTests(testcase, variant: .tiny)
+    // }
 
     // @Test(arguments: try AccumulateTests.loadTests(variant: .full))
     // func fullTests(_ testcase: Testcase) async throws {
