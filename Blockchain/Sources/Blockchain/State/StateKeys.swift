@@ -241,7 +241,7 @@ public enum StateKeys {
 
     public struct AccumulationHistoryKey: StateKey {
         public typealias Value = ConfigFixedSizeArray<
-            Set<Data32>,
+            SortedUniqueArray<Data32>,
             ProtocolConfig.EpochLength
         >
 

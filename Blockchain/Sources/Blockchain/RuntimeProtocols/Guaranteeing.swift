@@ -45,7 +45,7 @@ public protocol Guaranteeing {
         ProtocolConfig.EpochLength
     > { get }
     var accumulationHistory: ConfigFixedSizeArray<
-        Set<Data32>,
+        SortedUniqueArray<Data32>,
         ProtocolConfig.EpochLength
     > { get }
 
@@ -185,7 +185,7 @@ extension Guaranteeing {
         }
 
         let recentWorkPackageHashes: Set<Data32> = Set(recentHistory.items.flatMap(\.lookup.keys))
-        let accumulateHistoryReports = Set(accumulationHistory.array.flatMap(\.self))
+        let accumulateHistoryReports = Set(accumulationHistory.array.flatMap(\.array))
         let accumulateQueueReports = Set(accumulationQueue.array.flatMap(\.self)
             .flatMap(\.workReport.refinementContext.prerequisiteWorkPackages))
         let pendingWorkReportHashes = Set(reports.array.flatMap { $0?.workReport.refinementContext.prerequisiteWorkPackages ?? [] })

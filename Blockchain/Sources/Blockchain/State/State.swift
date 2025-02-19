@@ -296,7 +296,7 @@ extension State: Dummy {
         )
         let accumulationHistory: StateKeys.AccumulationHistoryKey.Value = try! ConfigFixedSizeArray(
             config: config,
-            defaultValue: Set<Data32>()
+            defaultValue: .init()
         )
 
         let kv: [(any StateKey, Codable & Sendable)] = [
@@ -481,8 +481,10 @@ extension State: Preimages {
     }
 }
 
-struct DummyFunction: AccumulateFunction, OnTransferFunction {
-    func invoke(
+public struct DummyFunction: AccumulateFunction, OnTransferFunction {
+    public init() {}
+
+    public func invoke(
         config _: ProtocolConfigRef,
         accounts _: inout some ServiceAccounts,
         state _: AccumulateState,
@@ -495,7 +497,7 @@ struct DummyFunction: AccumulateFunction, OnTransferFunction {
         fatalError("not implemented")
     }
 
-    func invoke(
+    public func invoke(
         config _: ProtocolConfigRef,
         service _: ServiceIndex,
         serviceAccounts _: inout some ServiceAccounts,

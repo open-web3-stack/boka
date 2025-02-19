@@ -54,6 +54,12 @@ public struct SortedUniqueArray<T: Comparable>: SortedContainer {
     }
 }
 
+extension SortedUniqueArray where T: Hashable {
+    public init(_ set: Set<T>) {
+        array = set.sorted()
+    }
+}
+
 extension SortedUniqueArray: Encodable where T: Encodable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
