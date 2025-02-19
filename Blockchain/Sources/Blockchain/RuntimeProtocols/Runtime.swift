@@ -232,7 +232,12 @@ public final class Runtime {
         )
 
         // accumulate and transfers
-        let (numAccumulated, accumulateState, _) = try await state.update(config: config, block: block, workReports: accumulatableReports)
+        let (numAccumulated, accumulateState, _) = try await state.update(
+            config: config,
+            workReports: accumulatableReports,
+            entropy: state.entropyPool.t0,
+            timeslot: block.header.timeslot
+        )
 
         state.authorizationQueue = accumulateState.authorizationQueue
         state.validatorQueue = accumulateState.validatorQueue
@@ -255,7 +260,7 @@ public final class Runtime {
         let newHistoryItem = Set(accumulated.map(\.packageSpecification.workPackageHash))
         for i in 0 ..< config.value.epochLength {
             if i == config.value.epochLength - 1 {
-                state.accumulationHistory[i] = newHistoryItem
+                state.accumulationHistory[i] = .init(newHistoryItem)
             } else {
                 state.accumulationHistory[i] = state.accumulationHistory[i + 1]
             }
