@@ -17,48 +17,26 @@ struct GuaranteeingServiceTests {
             keysCount: keysCount
         )
 
-        let SafroleTicketPoolService = await SafroleTicketPoolService(
-            config: config,
-            dataProvider: services.dataProvider,
-            eventBus: services.eventBus
-        )
-
-        let runtime = Runtime(config: config)
-
         let guaranteeingService = await GuaranteeingService(
             config: config,
             eventBus: services.eventBus,
             scheduler: services.scheduler,
             dataProvider: services.dataProvider,
             keystore: services.keystore,
-            runtime: runtime,
-            safroleTicketPool: SafroleTicketPoolService,
             dataStore: services.dataStore
         )
         return (services, guaranteeingService)
     }
 
     @Test func onGenesis() async throws {
-        let (services, validatorService) = try await setup()
-        let genesisState = services.genesisState
-        let storeMiddleware = services.storeMiddleware
-        let scheduler = services.scheduler
+        let (_, guaranteeingService) = try await setup(keysCount: 1)
 
-        var allWorkPackages = [WorkPackageRef]()
-        for _ in 0 ..< services.config.value.totalNumberOfCores {
-            let workpackage = WorkPackage(
-                authorizationToken: Data(),
-                authorizationServiceIndex: 0,
-                authorizationCodeHash: Data32.random(),
-                parameterizationBlob: Data(),
-                context: RefinementContext.dummy(config: services.config),
-                workItems: try! ConfigLimitedSizeArray(config: services.config, defaultValue: WorkItem.dummy(config: services.config))
-            )
-            allWorkPackages.append(workpackage.asRef())
-        }
-        await services.eventBus.publish(RuntimeEvents.WorkPackagesReceived(items: allWorkPackages))
-        await validatorService.on(genesis: genesisState)
-        await storeMiddleware.wait()
-        #expect(scheduler.taskCount == 1)
+        await guaranteeingService.onSyncCompleted()
+
+        let publicKey = try DevKeyStore.getDevKey(seed: 0).ed25519
+        let signingKey = guaranteeingService.signingKey.value!
+
+        #expect(signingKey.0 == 0)
+        #expect(signingKey.1.publicKey == publicKey)
     }
 }

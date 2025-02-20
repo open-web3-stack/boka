@@ -5,6 +5,7 @@ public protocol KeyStore: Sendable {
     func add<K: KeyType>(_ type: K.Type, seed: Data32) async throws -> K.SecretKey
     func contains<PK: PublicKeyProtocol>(publicKey: PK) async -> Bool
     func get<K: KeyType>(_ type: K.Type, publicKey: K.SecretKey.PublicKey) async -> K.SecretKey?
+    func getAll<K: KeyType>(_ type: K.Type) async -> [K.SecretKey]
 }
 
 struct HashableKey: Hashable {
@@ -43,5 +44,11 @@ public actor InMemoryKeyStore: KeyStore {
     public func get<K: KeyType>(_: K.Type, publicKey: K.SecretKey.PublicKey) async -> K.SecretKey? {
         let hashableKey = HashableKey(value: publicKey)
         return keys[hashableKey] as? K.SecretKey
+    }
+
+    public func getAll<K: KeyType>(_: K.Type) async -> [K.SecretKey] {
+        keys.compactMap { _, value in
+            value as? K.SecretKey
+        }
     }
 }
