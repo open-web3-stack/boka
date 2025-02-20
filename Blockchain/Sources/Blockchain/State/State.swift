@@ -481,15 +481,7 @@ extension State: Preimages {
     }
 }
 
-extension State: Accumulation {
-    public var accumulateFunction: AccumulateFunction {
-        VMFunctions.shared
-    }
-
-    public var onTransferFunction: OnTransferFunction {
-        VMFunctions.shared
-    }
-}
+extension State: Accumulation {}
 
 public class StateRef: Ref<State>, @unchecked Sendable {
     public static func dummy(config: ProtocolConfigRef, block: BlockRef?) -> StateRef {

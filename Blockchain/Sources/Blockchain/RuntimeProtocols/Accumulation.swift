@@ -69,8 +69,6 @@ public protocol Accumulation: ServiceAccounts {
         >,
         ProtocolConfig.TotalNumberOfCores
     > { get }
-    var accumulateFunction: AccumulateFunction { get }
-    var onTransferFunction: OnTransferFunction { get }
     var accumulationQueue: StateKeys.AccumulationQueueKey.Value { get }
     var accumulationHistory: StateKeys.AccumulationHistoryKey.Value { get }
 }
@@ -105,7 +103,7 @@ extension Accumulation {
             }
         }
 
-        let (newState, transfers, commitment, gasUsed) = try await accumulateFunction.invoke(
+        let (newState, transfers, commitment, gasUsed) = try await accumulate(
             config: config,
             accounts: &self,
             state: state,
@@ -363,7 +361,7 @@ extension Accumulation {
         }
 
         for (service, transfers) in transferGroups {
-            try await onTransferFunction.invoke(
+            try await onTransfer(
                 config: config,
                 service: service,
                 serviceAccounts: &self,
