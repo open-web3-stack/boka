@@ -77,19 +77,14 @@ struct NetworkManagerTests {
     @Test
     func testWorkPackagesReceived() async throws {
         // Create dummy work packages
-        let workPackages = [
-            WorkPackage.dummy(config: services.config).asRef(),
-        ]
+        let workPackage = WorkPackage.dummy(config: services.config).asRef()
 
         // Publish WorkPackagesReceived event
-        await services.eventBus.publish(RuntimeEvents.WorkPackagesReceived(items: workPackages))
+        await services.blockchain
+            .publish(event: RuntimeEvents.WorkPackagesReceived(coreIndex: 0, workPackageRef: workPackage, extrinsics: []))
 
         // Wait for event processing
         await storeMiddleware.wait()
-
-        #expect(workPackages.first?.value.hash() != nil)
-        #expect(workPackages.first?.value.context.hash() != nil)
-        #expect(workPackages.first?.hashValue != nil)
 
         // Verify network calls
         #expect(
@@ -97,7 +92,7 @@ struct NetworkManagerTests {
                 .init(function: "connect", parameters: ["address": devPeers.first!, "role": PeerRole.validator]),
                 .init(function: "sendToPeer", parameters: [
                     "message": CERequest.workPackageSubmission(
-                        WorkPackageMessage(coreIndex: 0, workPackage: workPackages[0].value, extrinsics: [])
+                        WorkPackageMessage(coreIndex: 0, workPackage: workPackage.value, extrinsics: [])
                     ),
                 ]),
             ])

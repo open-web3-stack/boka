@@ -227,7 +227,15 @@ struct HandlerImpl: NetworkProtocolHandler {
             ))
             return []
         case let .workPackageSubmission(message):
-            blockchain.publish(event: RuntimeEvents.WorkPackagesReceived(items: [message.workPackage.asRef()]))
+            blockchain
+                .publish(
+                    event: RuntimeEvents
+                        .WorkPackagesReceived(
+                            coreIndex: message.coreIndex,
+                            workPackageRef: message.workPackage.asRef(),
+                            extrinsics: message.extrinsics
+                        )
+                )
             return []
         }
     }

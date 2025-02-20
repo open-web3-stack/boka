@@ -28,6 +28,10 @@ public final class DevKeyStore: KeyStore {
         await keystore.get(type, publicKey: publicKey)
     }
 
+    public func getAll<K: KeyType>(_ type: K.Type) async -> [K.SecretKey] {
+        await keystore.getAll(type)
+    }
+
     @discardableResult
     public func addDevKeys(seed: UInt32) async throws -> KeySet {
         var seedData = Data(repeating: 0, count: 32)
