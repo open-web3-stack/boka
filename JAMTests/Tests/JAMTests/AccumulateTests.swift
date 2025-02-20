@@ -85,7 +85,7 @@ private struct FullAccumulateState: Accumulation {
         ConfigFixedSizeArray<Data32, ProtocolConfig.MaxAuthorizationsQueueItems>,
         ProtocolConfig.TotalNumberOfCores
     >
-    var accumlateFunction: any AccumulateFunction
+    var accumulateFunction: any AccumulateFunction
     var onTransferFunction: any OnTransferFunction
     var accumulationQueue: StateKeys.AccumulationQueueKey.Value
     var accumulationHistory: StateKeys.AccumulationHistoryKey.Value
@@ -155,8 +155,8 @@ struct AccumulateTests {
             privilegedServices: preState.privilegedServices,
             validatorQueue: .init(config: config, defaultValue: .dummy(config: config)),
             authorizationQueue: .init(config: config, defaultValue: .init(config: config, defaultValue: Data32())),
-            accumlateFunction: DummyFunction(),
-            onTransferFunction: DummyFunction(),
+            accumulateFunction: VMFunctions.shared,
+            onTransferFunction: VMFunctions.shared,
             accumulationQueue: preState.accumulationQueue,
             accumulationHistory: preState.accumulationHistory
         )

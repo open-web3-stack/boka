@@ -481,40 +481,13 @@ extension State: Preimages {
     }
 }
 
-public struct DummyFunction: AccumulateFunction, OnTransferFunction {
-    public init() {}
-
-    public func invoke(
-        config _: ProtocolConfigRef,
-        accounts _: inout some ServiceAccounts,
-        state _: AccumulateState,
-        serviceIndex _: ServiceIndex,
-        gas _: Gas,
-        arguments _: [AccumulateArguments],
-        initialIndex _: ServiceIndex,
-        timeslot _: TimeslotIndex
-    ) async throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
-        fatalError("not implemented")
-    }
-
-    public func invoke(
-        config _: ProtocolConfigRef,
-        service _: ServiceIndex,
-        serviceAccounts _: inout some ServiceAccounts,
-        timeslot _: TimeslotIndex,
-        transfers _: [DeferredTransfers]
-    ) async throws {
-        fatalError("not implemented")
-    }
-}
-
 extension State: Accumulation {
-    public var accumlateFunction: AccumulateFunction {
-        DummyFunction()
+    public var accumulateFunction: AccumulateFunction {
+        VMFunctions.shared
     }
 
     public var onTransferFunction: OnTransferFunction {
-        DummyFunction()
+        VMFunctions.shared
     }
 }
 

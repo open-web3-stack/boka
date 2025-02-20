@@ -3,7 +3,7 @@ import Foundation
 import PolkaVM
 import Utils
 
-public protocol RefineInvocation {
+public protocol RefineFunction {
     func invoke(
         config: ProtocolConfigRef,
         serviceAccounts: some ServiceAccounts,
@@ -20,7 +20,7 @@ public protocol RefineInvocation {
     ) async throws -> (result: Result<Data, WorkResultError>, exports: [Data4104])
 }
 
-extension RefineInvocation {
+extension RefineFunction {
     public func invoke(
         config: ProtocolConfigRef,
         serviceAccounts: some ServiceAccounts,

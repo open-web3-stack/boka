@@ -8,16 +8,13 @@ public enum GuaranteeingServiceError: Error {
     case invalidExports
 }
 
-struct GuaranteeingAuthorizationFunction: IsAuthorizedFunction {}
-struct GuaranteeingRefineInvocation: RefineInvocation {}
-
 public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore
     private let dataAvailability: DataAvailability
 
     private let authorizationFunction: IsAuthorizedFunction
-    private let refineInvocation: RefineInvocation
+    private let refineFunction: RefineFunction
 
     let signingKey: ThreadSafeContainer<(ValidatorIndex, Ed25519.SecretKey)?> = .init(nil)
 
@@ -39,8 +36,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             dataStore: dataStore
         )
 
-        authorizationFunction = GuaranteeingAuthorizationFunction()
-        refineInvocation = GuaranteeingRefineInvocation()
+        authorizationFunction = VMFunctions.shared
+        refineFunction = VMFunctions.shared
 
         super.init(id: "GuaranteeingService", config: config, eventBus: eventBus, scheduler: scheduler)
 
@@ -142,8 +139,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             }
 
             for (i, item) in workPackage.value.workItems.enumerated() {
-                // RefineInvocation invoke up data to workresult
-                let refineRes = try await refineInvocation
+                // RefineFunction invoke up data to workresult
+                let refineRes = try await refineFunction
                     .invoke(
                         config: config,
                         serviceAccounts: state.value,
