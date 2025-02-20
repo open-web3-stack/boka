@@ -111,24 +111,24 @@ public struct Guarantor: Codable, Identifiable {
         _: SegmentsRootMapping,
         for _: WorkPackage
     ) throws -> Bool {
-        // Implement logic to validate the segments-root mapping
+        // TODO: Implement logic to validate the segments-root mapping
         true // Placeholder
     }
 
     private func validateAuthorization(_: WorkPackage) throws -> Bool {
-        // Implement logic to validate the work package authorization
+        // TODO: Implement logic to validate the work package authorization
         true // Placeholder
     }
 
     private func refineWorkPackageBundle(_: WorkPackageBundle) async throws -> Data32 {
-        // Implement refine logic here
+        // TODO: Implement refine logic here
         // For example, execute the work items and generate a work report
 //        let workReportHash = try await refineLogic.execute(bundle)
         Data32()
     }
 
     private func signData(_: Data32) async throws -> Data {
-        // Implement signing logic here
+        // TODO: Implement signing logic here
         // For example, use the guarantor's private key to sign the data
 //        let signature = try await keystore.sign(data: data, with: privateKey)
         Data()
@@ -285,18 +285,21 @@ public final class WorkPackagePoolService: ServiceBase, @unchecked Sendable {
     }
 
     private func retrieveExtrinsicData(for _: WorkPackage) async throws -> [Data] {
+        // TODO: Implement retrieveExtrinsicData
         // Implement logic to retrieve extrinsic data associated with the work package
         // For example, fetch from the blockchain or local storage
         [] // Placeholder
     }
 
     private func retrieveImportSegments(for _: WorkPackage) async throws -> [Data4104] {
+        // TODO: Implement retrieveImportSegments
         // Implement logic to retrieve imported data segments
         // For example, fetch from the data availability layer
         [] // Placeholder
     }
 
     private func retrieveJustifications(for _: WorkPackage) async throws -> [Data] {
+        // TODO: Implement retrieveJustifications
         // Implement logic to retrieve justifications for the imported segments
         // For example, fetch proofs from the data availability layer
         [] // Placeholder
