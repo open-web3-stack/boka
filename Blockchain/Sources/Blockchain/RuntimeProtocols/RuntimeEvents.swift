@@ -60,6 +60,9 @@ public enum RuntimeEvents {
     // When a work package is recived via CE133
     public struct WorkPackagesReceived: Event {
         public let item: WorkPackageRef
+        public init(item: WorkPackageRef) {
+            self.item = item
+        }
     }
 
     // When a work package bundle is ready to shared via CE134
