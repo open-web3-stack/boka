@@ -19,7 +19,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     private let authorizationFunction: IsAuthorizedFunction
     private let refineInvocation: RefineInvocation
 
-    private let signingKey: ThreadSafeContainer<(ValidatorIndex, Ed25519.SecretKey)?> = .init(nil)
+    let signingKey: ThreadSafeContainer<(ValidatorIndex, Ed25519.SecretKey)?> = .init(nil)
 
     public init(
         config: ProtocolConfigRef,
@@ -50,16 +50,13 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     public func onSyncCompleted() async {
+        let nowTimeslot = timeProvider.getTime().timeToTimeslot(config: config)
+        let epoch = nowTimeslot.timeslotToEpochIndex(config: config)
+        await onBeforeEpoch(epoch: epoch)
+
         scheduleForNextEpoch("GuaranteeingService.scheduleForNextEpoch") { [weak self] epoch in
             await self?.onBeforeEpoch(epoch: epoch)
         }
-    }
-
-    public func on(genesis _: StateRef) async {
-        let nowTimeslot = timeProvider.getTime().timeToTimeslot(config: config)
-        // schedule for current epoch
-        let epoch = nowTimeslot.timeslotToEpochIndex(config: config)
-        await onBeforeEpoch(epoch: epoch)
     }
 
     private func onBeforeEpoch(epoch: EpochIndex) async {
