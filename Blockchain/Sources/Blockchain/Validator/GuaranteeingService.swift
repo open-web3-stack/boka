@@ -4,10 +4,7 @@ import TracingUtils
 import Utils
 
 public enum GuaranteeingServiceError: Error {
-    case invalidValidatorIndex
-    case customValidatorNotFound
     case noAuthorizerHash
-    case invalidCoreIndex
     case invalidExports
 }
 
@@ -17,13 +14,12 @@ struct GuaranteeingRefineInvocation: RefineInvocation {}
 public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore
-    private let runtime: Runtime
-    private let safroleTicketPool: SafroleTicketPoolService
-    private let workPackagePool: WorkPackagePoolService
-    private let guarantees: ThreadSafeContainer<[RuntimeEvents.GuaranteeGenerated]> = .init([])
-    private let authorizationFunction: GuaranteeingAuthorizationFunction
     private let dataAvailability: DataAvailability
-    private let refineInvocation: GuaranteeingRefineInvocation
+
+    private let authorizationFunction: IsAuthorizedFunction
+    private let refineInvocation: RefineInvocation
+
+    let signingKey: ThreadSafeContainer<(ValidatorIndex, Ed25519.SecretKey)?> = .init(nil)
 
     public init(
         config: ProtocolConfigRef,
@@ -31,17 +27,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         scheduler: Scheduler,
         dataProvider: BlockchainDataProvider,
         keystore: KeyStore,
-        runtime: Runtime,
-        safroleTicketPool: SafroleTicketPoolService,
         dataStore: DataStore
     ) async {
         self.dataProvider = dataProvider
         self.keystore = keystore
-        self.runtime = runtime
-        self.safroleTicketPool = safroleTicketPool
-        authorizationFunction = GuaranteeingAuthorizationFunction()
-        refineInvocation = GuaranteeingRefineInvocation()
-        workPackagePool = await WorkPackagePoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
         dataAvailability = await DataAvailability(
             config: config,
             eventBus: eventBus,
@@ -49,51 +38,82 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             dataProvider: dataProvider,
             dataStore: dataStore
         )
+
+        authorizationFunction = GuaranteeingAuthorizationFunction()
+        refineInvocation = GuaranteeingRefineInvocation()
+
         super.init(id: "GuaranteeingService", config: config, eventBus: eventBus, scheduler: scheduler)
 
-        await subscribe(RuntimeEvents.GuaranteeGenerated.self, id: "GuaranteeingService.GuaranteeGenerated") { [weak self] event in
-            try await self?.onGuaranteeGenerated(event: event)
+        await subscribe(RuntimeEvents.WorkPackagesReceived.self, id: "GuaranteeingService.WorkPackagesReceived") { [weak self] event in
+            try await self?.on(workPackagesReceived: event)
         }
     }
 
-    public func on(genesis _: StateRef) async {
-        await onGuaranteeing()
+    public func onSyncCompleted() async {
+        let nowTimeslot = timeProvider.getTime().timeToTimeslot(config: config)
+        let epoch = nowTimeslot.timeslotToEpochIndex(config: config)
+        await onBeforeEpoch(epoch: epoch)
+
+        scheduleForNextEpoch("GuaranteeingService.scheduleForNextEpoch") { [weak self] epoch in
+            await self?.onBeforeEpoch(epoch: epoch)
+        }
     }
 
-    public func scheduleGuaranteeTasks() async throws {
+    private func onBeforeEpoch(epoch: EpochIndex) async {
+        await withSpan("GuaranteeingService.onBeforeEpoch", logger: logger) { _ in
+            let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
+            let timeslot = epoch.epochToTimeslotIndex(config: config)
+            // simulate next block to determine the correct current validators
+            // this is more accurate than just using nextValidators from current state
+            let res = try state.value.updateSafrole(
+                config: config,
+                slot: timeslot,
+                entropy: Data32(),
+                offenders: [],
+                extrinsics: .dummy(config: config)
+            )
+            let validators = res.state.currentValidators
+
+            let keys = await keystore.getAll(Ed25519.self)
+            var result: (ValidatorIndex, Ed25519.SecretKey)?
+            for key in keys {
+                if let idx = validators.array.firstIndex(where: { $0.ed25519 == key.publicKey.data }) {
+                    result = (ValidatorIndex(idx), key)
+                    break
+                }
+            }
+
+            signingKey.value = result
+        }
+    }
+
+    private func on(workPackagesReceived event: RuntimeEvents.WorkPackagesReceived) async throws {
+        try await refine(package: event.item)
+    }
+
+    private func refine(package: WorkPackageRef) async throws {
+        guard let (validatorIndex, signingKey) = signingKey.value else {
+            logger.debug("not in current validator set, skipping refine")
+            return
+        }
+
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
-        let header = try await dataProvider.getHeader(hash: dataProvider.bestHead.hash)
-        let authorIndex = header.value.authorIndex
-        let authorKey = try Ed25519.PublicKey(from: state.value.currentValidators[Int(authorIndex)].ed25519)
-        let key = await keystore.get(Ed25519.self, publicKey: authorKey)
-        if key == nil {
-            throw GuaranteeingServiceError.customValidatorNotFound
-        }
+
+        // TODO: check for edge cases such as epoch end
         let currentCoreAssignment = state.value.getCoreAssignment(
             config: config,
             randomness: state.value.entropyPool.t2,
-            timeslot: state.value.timeslot
+            timeslot: state.value.timeslot + 1
         )
-        guard authorIndex < ValidatorIndex(currentCoreAssignment.count) else {
-            logger.error("AuthorIndex not found")
-            throw GuaranteeingServiceError.invalidValidatorIndex
-        }
-        let coreIndex = currentCoreAssignment[Int(authorIndex)]
-        guard coreIndex < CoreIndex(config.value.totalNumberOfCores) else {
-            throw GuaranteeingServiceError.invalidCoreIndex
+        guard let coreIndex = currentCoreAssignment[safe: Int(validatorIndex)] else {
+            try throwUnreachable("invalid validator index/core assignment")
         }
 
-        let workPackages = await workPackagePool.getPendingPackages()
-        for workPackage in workPackages {
-            if try validate(workPackage: workPackage) {
-                let workReport = try await createWorkReport(for: workPackage, coreIndex: coreIndex)
-                let event = RuntimeEvents.WorkReportGenerated(items: [workReport])
-                publish(event)
-                break
-            } else {
-                logger.error("WorkPackage validation failed")
-            }
-        }
+        let workReport = try await createWorkReport(for: package, coreIndex: coreIndex)
+        let payload = SigningContext.guarantee + workReport.hash().data
+        let signature = try signingKey.sign(message: payload)
+        let event = RuntimeEvents.WorkReportGenerated(item: workReport, signature: signature)
+        publish(event)
     }
 
     // workpackage -> workresult -> workreport
@@ -122,9 +142,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             }
 
             for (i, item) in workPackage.value.workItems.enumerated() {
-                // TODO: generated by the work-package builder.
-                let extrinsicDataBlobs = [Data]()
-
                 // RefineInvocation invoke up data to workresult
                 let refineRes = try await refineInvocation
                     .invoke(
@@ -190,20 +207,5 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             logger.error("Authorization failed with error: \(error)")
             throw error
         }
-    }
-
-    private func validate(workPackage _: WorkPackageRef) throws -> Bool {
-        // TODO: Add validate func
-        true
-    }
-
-    private func onGuaranteeing() async {
-        await withSpan("GuaranteeingService.onGuaranteeing", logger: logger) { _ in
-            try await scheduleGuaranteeTasks()
-        }
-    }
-
-    private func onGuaranteeGenerated(event: RuntimeEvents.GuaranteeGenerated) async throws {
-        guarantees.write { $0.append(event) }
     }
 }
