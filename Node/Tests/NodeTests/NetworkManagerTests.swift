@@ -80,14 +80,11 @@ struct NetworkManagerTests {
         let workPackage = WorkPackage.dummy(config: services.config).asRef()
 
         // Publish WorkPackagesReceived event
-        await services.blockchain.publish(event: RuntimeEvents.WorkPackagesReceived(item: workPackage))
+        await services.blockchain
+            .publish(event: RuntimeEvents.WorkPackagesReceived(coreIndex: 0, workPackageRef: workPackage, extrinsics: []))
 
         // Wait for event processing
         await storeMiddleware.wait()
-
-        #expect(workPackage.value.hash() != nil)
-        #expect(workPackage.value.context.hash() != nil)
-        #expect(workPackage.hashValue != nil)
 
         // Verify network calls
         #expect(
