@@ -88,7 +88,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     private func on(workPackagesReceived event: RuntimeEvents.WorkPackagesReceived) async throws {
-        try await refine(package: event.item)
+        try await refine(package: event.workPackageRef)
     }
 
     private func refine(package: WorkPackageRef) async throws {
