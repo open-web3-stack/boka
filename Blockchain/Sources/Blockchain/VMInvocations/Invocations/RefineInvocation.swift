@@ -7,40 +7,36 @@ public protocol RefineInvocation {
     func invoke(
         config: ProtocolConfigRef,
         serviceAccounts: some ServiceAccounts,
-        codeHash: Data32,
-        gas: Gas,
-        service: ServiceIndex,
-        workPackageHash: Data32,
-        workPayload: Data, // y
-        refinementCtx: RefinementContext, // c
-        authorizerHash: Data32,
-        authorizationOutput: Data,
-        importSegments: [Data4104],
-        extrinsicDataBlobs: [Data],
+        /// Index of the work item to be refined
+        workItemIndex: Int,
+        /// The work package
+        workPackage: WorkPackage,
+        /// The output of the authorizer
+        authorizerOutput: Data,
+        /// all work items's import segments
+        importSegments: [[Data4104]],
+        /// Export segment offset
         exportSegmentOffset: UInt64
     ) async throws -> (result: Result<Data, WorkResultError>, exports: [Data4104])
 }
 
 extension RefineInvocation {
-    func invoke(
+    public func invoke(
         config: ProtocolConfigRef,
         serviceAccounts: some ServiceAccounts,
-        codeHash: Data32,
-        gas: Gas,
-        service: ServiceIndex,
-        workPackageHash: Data32,
-        workPayload: Data, // y
-        refinementCtx: RefinementContext, // c
-        authorizerHash: Data32,
-        authorizationOutput: Data,
-        importSegments: [Data4104],
-        extrinsicDataBlobs: [Data],
+        workItemIndex: Int,
+        workPackage: WorkPackage,
+        authorizerOutput: Data,
+        importSegments: [[Data4104]],
         exportSegmentOffset: UInt64
     ) async throws -> (result: Result<Data, WorkResultError>, exports: [Data4104]) {
+        let workItem = workPackage.workItems[workItemIndex]
+        let service = workItem.serviceIndex
+
         let codeBlob = try await serviceAccounts.historicalLookup(
             serviceAccount: service,
-            timeslot: refinementCtx.lookupAnchor.timeslot,
-            preimageHash: codeHash
+            timeslot: workPackage.context.lookupAnchor.timeslot,
+            preimageHash: workItem.codeHash
         )
 
         guard let codeBlob, try await serviceAccounts.get(serviceAccount: service) != nil else {
@@ -51,15 +47,14 @@ extension RefineInvocation {
             return (.failure(.codeTooLarge), [])
         }
 
-        let argumentData = try JamEncoder.encode(
+        let argumentData = try await JamEncoder.encode(
             service,
-            workPayload,
-            workPackageHash,
-            refinementCtx,
-            authorizerHash,
-            authorizationOutput,
-            extrinsicDataBlobs
+            workItem.payloadBlob,
+            workPackage.hash(),
+            workPackage.context,
+            workPackage.authorizer(serviceAccounts: serviceAccounts)
         )
+
         let ctx = RefineContext(
             config: config,
             context: (pvms: [:], exports: []),
@@ -67,14 +62,15 @@ extension RefineInvocation {
             exportSegmentOffset: exportSegmentOffset,
             service: service,
             serviceAccounts: serviceAccounts,
-            lookupAnchorTimeslot: refinementCtx.lookupAnchor.timeslot
+            workPackage: workPackage,
+            authorizerOutput: authorizerOutput
         )
 
         let (exitReason, _, output) = await invokePVM(
             config: config,
             blob: codeBlob,
             pc: 0,
-            gas: gas,
+            gas: workItem.refineGasLimit,
             argumentData: argumentData,
             ctx: ctx
         )
