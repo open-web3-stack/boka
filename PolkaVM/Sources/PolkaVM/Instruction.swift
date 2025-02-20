@@ -29,17 +29,21 @@ public class ExecutionContext {
 extension Instruction {
     public func execute(context: ExecutionContext, skip: UInt32) -> ExecOutcome {
         do {
-            let execRes = try _executeImpl(context: context)
-            if case .exit = execRes {
-                return execRes
+            context.state.isExecutingInst = true
+            let out1 = try _executeImpl(context: context)
+            context.state.isExecutingInst = false
+            if case .exit = out1 {
+                return out1
             }
             return updatePC(context: context, skip: skip)
         } catch let e as MemoryError {
             logger.debug("memory error: \(e)")
+            context.state.isExecutingInst = false
             return .exit(.pageFault(e.address))
         } catch let e {
             // other unknown errors
             logger.error("execution failed!", metadata: ["error": "\(e)"])
+            context.state.isExecutingInst = false
             return .exit(.panic(.trap))
         }
     }

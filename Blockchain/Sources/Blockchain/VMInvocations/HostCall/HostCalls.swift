@@ -30,38 +30,42 @@ public class Lookup: HostCall {
     }
 
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
-        var service: ServiceIndex
-        let reg: UInt64 = state.readRegister(Registers.Index(raw: 7))
-        if reg == serviceIndex || reg == Int64.max {
-            service = serviceIndex
+        let reg7: UInt64 = state.readRegister(Registers.Index(raw: 7))
+        let service: ServiceIndex? = if reg7 == serviceIndex || reg7 == Int64.max {
+            serviceIndex
+        } else if try await serviceAccounts.get(serviceAccount: ServiceIndex(truncatingIfNeeded: reg7)) != nil {
+            ServiceIndex(truncatingIfNeeded: reg7)
         } else {
-            service = ServiceIndex(truncatingIfNeeded: reg)
+            nil
         }
 
-        let regs: [UInt32] = state.readRegisters(in: 8 ..< 11)
+        let regs: [UInt32] = state.readRegisters(in: 8 ..< 10)
+
+        if !state.isMemoryReadable(address: regs[0], length: 32) {
+            throw VMInvocationsError.panic
+        }
 
         let preimageHash = try? Blake2b256.hash(state.readMemory(address: regs[0], length: 32))
 
-        let value: Data? = if let preimageHash {
+        let value: Data? = if let service, let preimageHash {
             try await serviceAccounts.get(serviceAccount: service, preimageHash: preimageHash)
         } else {
             nil
         }
 
-        let isWritable = state.isMemoryWritable(address: regs[1], length: Int(regs[2]))
-        if let value, isWritable {
-            let maxLen = min(regs[2], UInt32(value.count))
-            try state.writeMemory(address: regs[1], values: value[0 ..< Int(maxLen)])
-        }
+        let reg10: UInt64 = state.readRegister(Registers.Index(raw: 10))
+        let reg11: UInt64 = state.readRegister(Registers.Index(raw: 11))
 
-        if preimageHash != nil, isWritable {
-            if let value {
-                state.writeRegister(Registers.Index(raw: 7), UInt32(value.count))
-            } else {
-                state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
-            }
+        let first = min(Int(reg10), value?.count ?? 0)
+        let len = min(Int(reg11), (value?.count ?? 0) - first)
+
+        if !state.isMemoryWritable(address: regs[1], length: len) {
+            throw VMInvocationsError.panic
+        } else if value == nil {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
         } else {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+            state.writeRegister(Registers.Index(raw: 7), value!.count)
+            try state.writeMemory(address: regs[1], values: value![relative: first ..< (first + len)])
         }
     }
 }
@@ -79,38 +83,44 @@ public class Read: HostCall {
     }
 
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
-        var service: ServiceIndex
-        let reg: UInt64 = state.readRegister(Registers.Index(raw: 7))
-        if reg == serviceIndex || reg == Int64.max {
-            service = serviceIndex
+        let reg7: UInt64 = state.readRegister(Registers.Index(raw: 7))
+        let serviceX = reg7 == Int64.max ? serviceIndex : ServiceIndex(truncatingIfNeeded: reg7)
+
+        let service: ServiceIndex? = if serviceX == serviceIndex {
+            serviceIndex
+        } else if try await serviceAccounts.get(serviceAccount: serviceX) != nil {
+            serviceX
         } else {
-            service = ServiceIndex(truncatingIfNeeded: reg)
+            nil
         }
 
-        let regs: [UInt32] = state.readRegisters(in: 8 ..< 12)
+        let regs: [UInt32] = state.readRegisters(in: 8 ..< 11)
 
-        let key = try? Blake2b256.hash(serviceIndex.encode(), state.readMemory(address: regs[0], length: Int(regs[1])))
+        if !state.isMemoryReadable(address: regs[0], length: Int(regs[1])) {
+            throw VMInvocationsError.panic
+        }
 
-        let value: Data? = if let key {
+        let key = try? Blake2b256.hash(serviceX.encode(), state.readMemory(address: regs[0], length: Int(regs[1])))
+
+        let value: Data? = if let service, let key {
             try await serviceAccounts.get(serviceAccount: service, storageKey: key)
         } else {
             nil
         }
 
-        let isWritable = state.isMemoryWritable(address: regs[2], length: Int(regs[3]))
-        if let value, isWritable {
-            let maxLen = min(regs[3], UInt32(value.count))
-            try state.writeMemory(address: regs[2], values: value[0 ..< Int(maxLen)])
-        }
+        let reg11: UInt64 = state.readRegister(Registers.Index(raw: 11))
+        let reg12: UInt64 = state.readRegister(Registers.Index(raw: 12))
 
-        if key != nil, isWritable {
-            if let value {
-                state.writeRegister(Registers.Index(raw: 7), UInt32(value.count))
-            } else {
-                state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
-            }
+        let first = min(Int(reg11), value?.count ?? 0)
+        let len = min(Int(reg12), (value?.count ?? 0) - first)
+
+        if !state.isMemoryWritable(address: regs[2], length: len) {
+            throw VMInvocationsError.panic
+        } else if value == nil {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
         } else {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+            state.writeRegister(Registers.Index(raw: 7), value!.count)
+            try state.writeMemory(address: regs[2], values: value![relative: first ..< (first + len)])
         }
     }
 }
@@ -132,34 +142,30 @@ public class Write: HostCall {
 
         let key = try? Blake2b256.hash(serviceIndex.encode(), state.readMemory(address: regs[0], length: Int(regs[1])))
 
-        let service: ServiceIndex? = if key != nil, state.isMemoryReadable(address: regs[2], length: Int(regs[3])) {
-            serviceIndex
-        } else {
-            nil
+        if key == nil || (regs[3] != 0 && !state.isMemoryReadable(address: regs[2], length: Int(regs[3]))) {
+            throw VMInvocationsError.panic
         }
 
-        let len = if let key, let value = try await serviceAccounts.get(serviceAccount: service!, storageKey: key) {
+        let len = if let key, let value = try await serviceAccounts.get(serviceAccount: serviceIndex, storageKey: key) {
             UInt64(value.count)
         } else {
             HostCallResultCode.NONE.rawValue
         }
 
-        let acc: ServiceAccountDetails? = (service != nil) ? try await serviceAccounts.get(serviceAccount: service!) : nil
-        if key != nil, let service, let acc, acc.thresholdBalance(config: config) <= acc.balance {
+        let accountDetails = try await serviceAccounts.get(serviceAccount: serviceIndex)
+        if let accountDetails, accountDetails.thresholdBalance(config: config) > accountDetails.balance {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
+        } else {
             state.writeRegister(Registers.Index(raw: 7), len)
             if regs[3] == 0 {
-                serviceAccounts.set(serviceAccount: service, storageKey: key!, value: nil)
+                serviceAccounts.set(serviceAccount: serviceIndex, storageKey: key!, value: nil)
             } else {
                 try serviceAccounts.set(
-                    serviceAccount: service,
+                    serviceAccount: serviceIndex,
                     storageKey: key!,
                     value: state.readMemory(address: regs[2], length: Int(regs[3]))
                 )
             }
-        } else if let acc, acc.thresholdBalance(config: config) > acc.balance {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
-        } else {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
         }
     }
 }
@@ -208,10 +214,14 @@ public class Info: HostCall {
         if let m, state.isMemoryWritable(address: o, length: Int(m.count)) {
             try state.writeMemory(address: o, values: m)
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
+        }
+
+        if !state.isMemoryWritable(address: o, length: Int(m!.count)) {
+            throw VMInvocationsError.panic
         } else if m == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
         } else {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         }
     }
 }
@@ -231,27 +241,28 @@ public class Bless: HostCall {
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         let regs: [UInt32] = state.readRegisters(in: 7 ..< 12)
 
-        var basicGas: [ServiceIndex: Gas] = [:]
+        var basicGas: [ServiceIndex: Gas]?
         let length = 12 * Int(regs[4])
         if state.isMemoryReadable(address: regs[3], length: length) {
+            basicGas = [:]
             let data = try state.readMemory(address: regs[3], length: length)
             for i in stride(from: 0, to: length, by: 12) {
                 let serviceIndex = ServiceIndex(data[i ..< i + 4].decode(UInt32.self))
                 let gas = Gas(data[i + 4 ..< i + 12].decode(UInt64.self))
-                basicGas[serviceIndex] = gas
+                basicGas![serviceIndex] = gas
             }
         }
 
-        if basicGas.count == 0 {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
-        } else if !regs[0 ..< 4].allSatisfy({ $0 >= 0 && $0 <= Int(UInt32.max) }) {
+        if basicGas == nil {
+            throw VMInvocationsError.panic
+        } else if !regs[0 ..< 3].allSatisfy({ $0 >= 0 && $0 <= Int(UInt32.max) }) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
             x.accumulateState.privilegedServices.blessed = regs[0]
             x.accumulateState.privilegedServices.assign = regs[1]
             x.accumulateState.privilegedServices.designate = regs[2]
-            x.accumulateState.privilegedServices.basicGas = basicGas
+            x.accumulateState.privilegedServices.basicGas = basicGas!
         }
     }
 }
@@ -269,21 +280,22 @@ public class Assign: HostCall {
     public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
         let (targetCoreIndex, startAddr): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
 
-        var authorizationQueue: [Data32] = []
+        var authorizationQueue: [Data32]?
         let length = 32 * config.value.maxAuthorizationsQueueItems
         if state.isMemoryReadable(address: startAddr, length: length) {
+            authorizationQueue = [Data32]()
             let data = try state.readMemory(address: startAddr, length: length)
             for i in stride(from: 0, to: length, by: 32) {
-                authorizationQueue.append(Data32(data[i ..< i + 32])!)
+                authorizationQueue!.append(Data32(data[i ..< i + 32])!)
             }
         }
 
-        if authorizationQueue.isEmpty {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+        if authorizationQueue == nil {
+            throw VMInvocationsError.panic
         } else if targetCoreIndex > config.value.totalNumberOfCores {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.CORE.rawValue)
         } else {
-            x.accumulateState.authorizationQueue[targetCoreIndex] = try ConfigFixedSizeArray(config: config, array: authorizationQueue)
+            x.accumulateState.authorizationQueue[targetCoreIndex] = try ConfigFixedSizeArray(config: config, array: authorizationQueue!)
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         }
     }
@@ -302,19 +314,20 @@ public class Designate: HostCall {
     public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
         let startAddr: UInt32 = state.readRegister(Registers.Index(raw: 7))
 
-        var validatorQueue: [ValidatorKey] = []
+        var validatorQueue: [ValidatorKey]?
         let length = 336 * config.value.totalNumberOfValidators
         if state.isMemoryReadable(address: startAddr, length: length) {
+            validatorQueue = [ValidatorKey]()
             let data = try state.readMemory(address: startAddr, length: length)
             for i in stride(from: 0, to: length, by: 336) {
-                try validatorQueue.append(ValidatorKey(data: Data(data[i ..< i + 336])))
+                try validatorQueue!.append(ValidatorKey(data: Data(data[i ..< i + 336])))
             }
         }
 
-        if validatorQueue.isEmpty {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+        if validatorQueue == nil {
+            throw VMInvocationsError.panic
         } else {
-            x.accumulateState.validatorQueue = try ConfigFixedSizeArray(config: config, array: validatorQueue)
+            x.accumulateState.validatorQueue = try ConfigFixedSizeArray(config: config, array: validatorQueue!)
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         }
     }
@@ -374,23 +387,25 @@ public class New: HostCall {
             newAccount!.balance = newAccount!.thresholdBalance(config: config)
         }
 
-        if let newAccount,
-           var acc = try await x.serviceAccounts.get(serviceAccount: x.serviceIndex),
-           acc.balance >= acc.thresholdBalance(config: config)
+        if codeHash == nil {
+            throw VMInvocationsError.panic
+        } else if let newAccount, let account = try await x.serviceAccounts.get(serviceAccount: x.serviceIndex),
+                  account.balance - newAccount.thresholdBalance(config: config) < account.thresholdBalance(config: config)
         {
-            acc.balance -= newAccount.balance
-            x.serviceAccounts.set(serviceAccount: x.serviceIndex, account: acc)
-
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.CASH.rawValue)
+        } else {
+            guard let newAccount, var account = try await x.serviceAccounts.get(serviceAccount: x.serviceIndex) else {
+                throw VMInvocationsError.panic
+            }
             state.writeRegister(Registers.Index(raw: 7), x.nextAccountIndex)
-            x.accumulateState.newServiceAccounts.merge([x.nextAccountIndex: newAccount]) { _, new in new }
             x.nextAccountIndex = AccumulateContext.check(
                 i: bump(i: x.nextAccountIndex),
                 serviceAccounts: x.accumulateState.newServiceAccounts
             )
-        } else if codeHash == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
-        } else {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.CASH.rawValue)
+
+            account.balance -= newAccount.thresholdBalance(config: config)
+            x.serviceAccounts.set(serviceAccount: x.serviceIndex, account: account)
+            x.accumulateState.newServiceAccounts.merge([x.nextAccountIndex: newAccount]) { _, new in new }
         }
     }
 }
@@ -417,7 +432,7 @@ public class Upgrade: HostCall {
             x.serviceAccounts.set(serviceAccount: x.serviceIndex, account: acc)
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         } else {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+            throw VMInvocationsError.panic
         }
     }
 }
@@ -455,7 +470,7 @@ public class Transfer: HostCall {
         }
 
         if memo == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+            throw VMInvocationsError.panic
         } else if destAcc == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
         } else if gasLimit < destAcc!.minOnTransferGas {
@@ -505,7 +520,7 @@ public class Eject: HostCall {
         let minHoldPeriod = TimeslotIndex(config.value.preimagePurgePeriod)
 
         if preimageHash == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+            throw VMInvocationsError.panic
         } else if ejectAccount == nil || ejectAccount?.codeHash.data != Data(x.serviceIndex.encode(method: .fixedWidth(32))) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
         }
@@ -544,8 +559,7 @@ public class Query: HostCall {
         let (startAddr, length): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
         let preimageHash = try? state.readMemory(address: startAddr, length: 32)
         if preimageHash == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
-            return
+            throw VMInvocationsError.panic
         }
 
         let preimageInfo = try await x.serviceAccounts.get(
@@ -599,7 +613,7 @@ public class Solicit: HostCall {
         let acc = try await x.serviceAccounts.get(serviceAccount: x.serviceIndex)
 
         if hash == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+            throw VMInvocationsError.panic
         } else if !canSolicit {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
         } else if let acc, acc.balance < acc.thresholdBalance(config: config) {
@@ -641,7 +655,7 @@ public class Forget: HostCall {
         let canForget = canExpunge || isAvailable1 || isAvailable3
 
         if hash == nil {
-            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.OOB.rawValue)
+            throw VMInvocationsError.panic
         } else if !canForget {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.HUH.rawValue)
         } else {
@@ -673,7 +687,7 @@ public class Yield: HostCall {
         let startAddr: UInt32 = state.readRegister(Registers.Index(raw: 7))
         let hash = try? state.readMemory(address: startAddr, length: 32)
         if hash == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+            throw VMInvocationsError.panic
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
             x.yield = Data32(hash!)!
@@ -681,96 +695,155 @@ public class Yield: HostCall {
     }
 }
 
+// MARK: - Refine
+
 /// Historical lookup
 public class HistoricalLookup: HostCall {
     public static var identifier: UInt8 { 17 }
 
     public let context: RefineContext.ContextType
-    public let service: ServiceIndex
+    public let serviceIndex: ServiceIndex
     public let serviceAccounts: ServiceAccounts
     public let lookupAnchorTimeslot: TimeslotIndex
 
     public init(
         context: RefineContext.ContextType,
-        service: ServiceIndex,
+        serviceIndex: ServiceIndex,
         serviceAccounts: ServiceAccounts,
         lookupAnchorTimeslot: TimeslotIndex
     ) {
         self.context = context
         self.lookupAnchorTimeslot = lookupAnchorTimeslot
-        self.service = service
+        self.serviceIndex = serviceIndex
         self.serviceAccounts = serviceAccounts
     }
 
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
-        var serviceIndex: ServiceIndex?
         let reg7: UInt64 = state.readRegister(Registers.Index(raw: 7))
-        if reg7 == Int64.max, try await serviceAccounts.get(serviceAccount: service) != nil {
-            serviceIndex = service
+        let service: ServiceIndex? = if reg7 == Int64.max, try await serviceAccounts.get(serviceAccount: serviceIndex) != nil {
+            serviceIndex
         } else if try await serviceAccounts.get(serviceAccount: UInt32(truncatingIfNeeded: reg7)) != nil {
-            serviceIndex = UInt32(truncatingIfNeeded: reg7)
+            UInt32(truncatingIfNeeded: reg7)
+        } else {
+            nil
         }
 
-        let regs: [UInt32] = state.readRegisters(in: 8 ..< 11)
-
-        let isReadable = state.isMemoryReadable(address: regs[0], length: 32)
-        let preimageHash = isReadable ? try? Blake2b256.hash(state.readMemory(address: regs[0], length: 32)) : nil
-        let isWritable = state.isMemoryWritable(address: regs[1], length: Int(regs[2]))
-
-        var preimage: Data?
-        if let preimageHash, let serviceIndex, isWritable {
-            preimage = try await serviceAccounts.historicalLookup(
-                serviceAccount: serviceIndex,
-                timeslot: lookupAnchorTimeslot,
-                preimageHash: preimageHash
-            )
-
-            try state.writeMemory(address: regs[1], values: preimage ?? Data())
+        guard let service else {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
+            return
         }
 
-        if preimageHash == nil || !isWritable {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+        let regs: [UInt32] = state.readRegisters(in: 8 ..< 10)
+
+        guard state.isMemoryReadable(address: regs[0], length: 32) else {
+            throw VMInvocationsError.panic
+        }
+
+        let preimage = try await serviceAccounts.historicalLookup(
+            serviceAccount: service,
+            timeslot: lookupAnchorTimeslot,
+            preimageHash: Data32(state.readMemory(address: regs[0], length: 32))!
+        )
+
+        let reg10: UInt64 = state.readRegister(Registers.Index(raw: 10))
+        let reg11: UInt64 = state.readRegister(Registers.Index(raw: 11))
+        let first = min(Int(reg10), preimage?.count ?? 0)
+        let len = min(Int(reg11), (preimage?.count ?? 0) - first)
+
+        let isWritable = state.isMemoryWritable(address: regs[1], length: len)
+
+        if !isWritable {
+            throw VMInvocationsError.panic
         } else if preimage == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), preimage!.count)
+            try state.writeMemory(address: regs[1], values: preimage![relative: first ..< (first + len)])
         }
     }
 }
 
-/// Import a segment to memory
-public class Import: HostCall {
+/// Fetch a segment to memory
+public class Fetch: HostCall {
     public static var identifier: UInt8 { 18 }
 
     public let context: RefineContext.ContextType
-    public let importSegments: [Data4104]
+    public let serviceAccounts: ServiceAccounts
+    public let serviceIndex: ServiceIndex
+    public let workPackage: WorkPackage
+    public let authorizerOutput: Data
+    public let importSegments: [[Data4104]]
 
-    public init(context: RefineContext.ContextType, importSegments: [Data4104]) {
+    public init(
+        context: RefineContext.ContextType,
+        serviceAccounts: ServiceAccounts,
+        serviceIndex: ServiceIndex,
+        workPackage: WorkPackage,
+        authorizerOutput: Data,
+        importSegments: [[Data4104]]
+    ) {
         self.context = context
+        self.serviceAccounts = serviceAccounts
+        self.serviceIndex = serviceIndex
+        self.workPackage = workPackage
+        self.authorizerOutput = authorizerOutput
         self.importSegments = importSegments
     }
 
-    public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
-        let reg7: UInt64 = state.readRegister(Registers.Index(raw: 7))
-        let segment = reg7 < UInt64(importSegments.count) ? importSegments[Int(reg7)] : nil
+    public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
+        let reg10: UInt64 = state.readRegister(Registers.Index(raw: 10))
+        let reg11: UInt64 = state.readRegister(Registers.Index(raw: 11))
+        let reg12: UInt64 = state.readRegister(Registers.Index(raw: 12))
 
-        let startAddr: UInt32 = state.readRegister(Registers.Index(raw: 8))
-        let length = min(
-            state.readRegister(Registers.Index(raw: 9)),
-            UInt64(config.value.segmentSize)
-        )
-        let isWritable = state.isMemoryWritable(address: startAddr, length: Int(length))
-
-        if let segment, isWritable {
-            try state.writeMemory(address: startAddr, values: segment.data)
+        var value: Data?
+        switch reg10 {
+        case 0:
+            value = try JamEncoder.encode(workPackage)
+        case 1:
+            value = authorizerOutput
+        case 2:
+            if reg11 < workPackage.workItems.count {
+                value = workPackage.workItems[Int(reg11)].payloadBlob
+            }
+        case 3:
+            if reg11 < workPackage.workItems.count, reg12 < workPackage.workItems[Int(reg11)].outputs.count {
+                let hash = workPackage.workItems[Int(reg11)].outputs[Int(reg12)].hash
+                value = try await serviceAccounts.get(serviceAccount: serviceIndex, preimageHash: hash)
+            }
+        case 4:
+            if reg11 < workPackage.workItems[Int(serviceIndex)].outputs.count {
+                let hash = workPackage.workItems[Int(serviceIndex)].outputs[Int(reg11)].hash
+                value = try await serviceAccounts.get(serviceAccount: serviceIndex, preimageHash: hash)
+            }
+        case 5:
+            if reg11 < importSegments.count, reg12 < importSegments[Int(reg11)].count {
+                value = importSegments[Int(reg11)][Int(reg12)].data
+            }
+        case 6:
+            if reg11 < importSegments[Int(serviceIndex)].count {
+                value = importSegments[Int(serviceIndex)][Int(reg11)].data
+            }
+        default:
+            value = nil
         }
 
+        let writeAddr: UInt32 = state.readRegister(Registers.Index(raw: 7))
+
+        let reg8: UInt64 = state.readRegister(Registers.Index(raw: 8))
+        let reg9: UInt64 = state.readRegister(Registers.Index(raw: 9))
+
+        let first = min(Int(reg8), value?.count ?? 0)
+        let len = min(Int(reg9), (value?.count ?? 0) - first)
+
+        let isWritable = state.isMemoryWritable(address: writeAddr, length: len)
+
         if !isWritable {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
-        } else if segment == nil {
+            throw VMInvocationsError.panic
+        } else if value == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
         } else {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
+            state.writeRegister(Registers.Index(raw: 7), value!.count)
+            try state.writeMemory(address: writeAddr, values: value![relative: first ..< (first + len)])
         }
     }
 }
@@ -793,25 +866,22 @@ public class Export: HostCall {
         let length = min(state.readRegister(Registers.Index(raw: 8)), segmentSize)
         let isReadable = state.isMemoryReadable(address: startAddr, length: Int(length))
 
-        var segment: Data?
-        if isReadable {
-            var data = try state.readMemory(address: startAddr, length: Int(length))
-            let remainder = data.count % Int(segmentSize)
-            if remainder != 0 {
-                data.append(Data(repeating: 0, count: Int(segmentSize) - remainder))
-            }
-            segment = data
+        guard isReadable else {
+            throw VMInvocationsError.panic
         }
 
-        if let segment {
-            if exportSegmentOffset + UInt64(segment.count) >= UInt64(config.value.maxWorkPackageManifestEntries) {
-                state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
-            } else {
-                state.writeRegister(Registers.Index(raw: 7), exportSegmentOffset + UInt64(segment.count))
-                context.exports.append(Data4104(segment)!)
-            }
+        var data = try state.readMemory(address: startAddr, length: Int(length))
+        let remainder = data.count % Int(segmentSize)
+        if remainder != 0 {
+            data.append(Data(repeating: 0, count: Int(segmentSize) - remainder))
+        }
+        let segment = Data4104(data)!
+
+        if exportSegmentOffset + UInt64(context.exports.count) >= UInt64(config.value.maxWorkPackageManifestEntries) {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
         } else {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+            state.writeRegister(Registers.Index(raw: 7), exportSegmentOffset + UInt64(context.exports.count))
+            context.exports.append(segment)
         }
     }
 }
@@ -831,16 +901,26 @@ public class Machine: HostCall {
 
         let isReadable = state.isMemoryReadable(address: regs[0], length: Int(regs[1]))
 
-        let innerVmIndex = UInt64(context.pvms.count)
+        let max = context.pvms.keys.max() ?? 0
+        var innerVmIndex: UInt64 = max + 1
+        for i in 0 ..< max where context.pvms[i] == nil {
+            innerVmIndex = i
+            break
+        }
+
         let code = isReadable ? try state.readMemory(address: regs[0], length: Int(regs[1])) : nil
         let pc = UInt32(truncatingIfNeeded: regs[2])
         let mem = try GeneralMemory(pageMap: [], chunks: [])
 
-        if code == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+        guard let code else {
+            throw VMInvocationsError.panic
+        }
+
+        if (try? ProgramCode(code)) == nil {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), innerVmIndex)
-            context.pvms[innerVmIndex] = InnerPvm(code: code!, memory: mem, pc: pc)
+            context.pvms[innerVmIndex] = InnerPvm(code: code, memory: mem, pc: pc)
         }
     }
 }
@@ -858,22 +938,18 @@ public class Peek: HostCall {
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         let regs: [UInt64] = state.readRegisters(in: 7 ..< 11)
 
-        var segment: Data?
-        if context.pvms[regs[0]] == nil {
-            segment = Data()
-        } else if state.isMemoryWritable(address: regs[1], length: Int(regs[3])),
-                  context.pvms[regs[0]]!.memory.isReadable(address: UInt32(truncatingIfNeeded: regs[2]), length: Int(regs[3]))
-        {
-            segment = try context.pvms[regs[0]]!.memory.read(address: UInt32(truncatingIfNeeded: regs[2]), length: Int(regs[3]))
+        guard state.isMemoryWritable(address: regs[1], length: Int(regs[3])) else {
+            throw VMInvocationsError.panic
         }
 
-        if segment == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
-        } else if segment!.count == 0 {
+        if context.pvms[regs[0]] == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
+        } else if !context.pvms[regs[0]]!.memory.isReadable(address: UInt32(truncatingIfNeeded: regs[2]), length: Int(regs[3])) {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
-            try state.writeMemory(address: regs[1], values: segment!)
+            let data = try context.pvms[regs[0]]!.memory.read(address: UInt32(truncatingIfNeeded: regs[2]), length: Int(regs[3]))
+            try state.writeMemory(address: regs[1], values: data)
         }
     }
 }
@@ -891,23 +967,18 @@ public class Poke: HostCall {
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         let regs: [UInt64] = state.readRegisters(in: 7 ..< 11)
 
-        var segment: Data?
-        if context.pvms[regs[0]] == nil {
-            segment = Data()
-        } else if state.isMemoryReadable(address: regs[1], length: Int(regs[3])), context.pvms[regs[0]]!.memory.isWritable(
-            address: UInt32(truncatingIfNeeded: regs[2]),
-            length: Int(regs[3])
-        ) {
-            segment = try state.readMemory(address: regs[1], length: Int(regs[3]))
+        guard state.isMemoryReadable(address: regs[1], length: Int(regs[3])) else {
+            throw VMInvocationsError.panic
         }
 
-        if segment == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
-        } else if segment!.count == 0 {
+        if context.pvms[regs[0]] == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
+        } else if !context.pvms[regs[0]]!.memory.isWritable(address: UInt32(truncatingIfNeeded: regs[2]), length: Int(regs[3])) {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
-            try context.pvms[regs[0]]!.memory.write(address: UInt32(truncatingIfNeeded: regs[2]), values: segment!)
+            let data = try state.readMemory(address: regs[1], length: Int(regs[3]))
+            try context.pvms[regs[0]]!.memory.write(address: UInt32(truncatingIfNeeded: regs[2]), values: data)
         }
     }
 }
@@ -931,7 +1002,7 @@ public class Zero: HostCall {
         }
 
         if regs[1] < 16 || (regs[1] + regs[2]) >= (1 << 20) {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
             try context.pvms[regs[0]]!.memory.zero(pageIndex: UInt32(truncatingIfNeeded: regs[1]), pages: Int(regs[2]))
@@ -949,18 +1020,16 @@ public class VoidFn: HostCall {
         self.context = context
     }
 
-    public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
+    public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
         let regs: [UInt64] = state.readRegisters(in: 7 ..< 10)
 
         if context.pvms[regs[0]] == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
-            return
-        }
-
-        if (regs[1] + regs[2]) >= (1 << 32) ||
+        } else if regs[1] < 16 ||
+            (regs[1] + regs[2]) >= ((1 << 32) / UInt32(config.value.pvmMemoryPageSize)) ||
             !context.pvms[regs[0]]!.memory.isReadable(pageStart: UInt32(truncatingIfNeeded: regs[1]), pages: Int(regs[2]))
         {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
             try context.pvms[regs[0]]!.memory.void(pageIndex: UInt32(truncatingIfNeeded: regs[1]), pages: Int(regs[2]))
@@ -992,8 +1061,7 @@ public class Invoke: HostCall {
         }
 
         guard let gas else {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
-            return
+            throw VMInvocationsError.panic
         }
 
         guard let innerPvm = context.pvms[pvmIndex] else {
@@ -1046,9 +1114,11 @@ public class Expunge: HostCall {
         }
 
         state.writeRegister(Registers.Index(raw: 7), context.pvms[reg7]!.pc)
-        context.pvms[reg7] = nil
+        context.pvms.removeValue(forKey: reg7)
     }
 }
+
+// MARK: - Debug
 
 /// A host call for passing a debugging message from the service/authorizer to the hosting environment for logging to the node operator.
 public class Log: HostCall {

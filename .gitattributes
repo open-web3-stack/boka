@@ -1,1 +1,3 @@
 Package.resolved linguist-generated=true
+Utils/Sources/SHA3IUF/** linguist-vendored=true
+Networking/Sources/include/** linguist-vendored=true

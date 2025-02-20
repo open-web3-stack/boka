@@ -1,3 +1,4 @@
+import Codec
 import Utils
 
 public enum AccumulationError: Error {
@@ -7,7 +8,7 @@ public enum AccumulationError: Error {
 
 public struct AccumulationQueueItem: Sendable, Equatable, Codable {
     public var workReport: WorkReport
-    public var dependencies: Set<Data32>
+    @CodingAs<SortedSet<Data32>> public var dependencies: Set<Data32>
 
     public init(workReport: WorkReport, dependencies: Set<Data32>) {
         self.workReport = workReport
@@ -68,7 +69,6 @@ public protocol Accumulation: ServiceAccounts {
         >,
         ProtocolConfig.TotalNumberOfCores
     > { get }
-    var entropyPool: EntropyPool { get }
     var accumlateFunction: AccumulateFunction { get }
     var onTransferFunction: OnTransferFunction { get }
     var accumulationQueue: StateKeys.AccumulationQueueKey.Value { get }
@@ -82,8 +82,9 @@ extension Accumulation {
         state: AccumulateState,
         workReports: [WorkReport],
         service: ServiceIndex,
-        block: BlockRef,
-        privilegedGas: [ServiceIndex: Gas]
+        privilegedGas: [ServiceIndex: Gas],
+        entropy: Data32,
+        timeslot: TimeslotIndex
     ) async throws -> SingleAccumulationOutput {
         var gas = Gas(0)
         var arguments: [AccumulateArguments] = []
@@ -111,9 +112,8 @@ extension Accumulation {
             serviceIndex: service,
             gas: gas,
             arguments: arguments,
-            initialIndex: Blake2b256.hash(service.encode(), entropyPool.t0.data, block.header.timeslot.encode())
-                .data.decode(UInt32.self),
-            timeslot: block.header.timeslot
+            initialIndex: Blake2b256.hash(service.encode(), entropy.data, timeslot.encode()).data.decode(UInt32.self),
+            timeslot: timeslot
         )
 
         return SingleAccumulationOutput(
@@ -127,10 +127,11 @@ extension Accumulation {
     /// parallelized accumulate function ∆*
     private mutating func parallelizedAccumulate(
         config: ProtocolConfigRef,
-        block: BlockRef,
         state: AccumulateState,
         workReports: [WorkReport],
-        privilegedGas: [ServiceIndex: Gas]
+        privilegedGas: [ServiceIndex: Gas],
+        entropy: Data32,
+        timeslot: TimeslotIndex
     ) async throws -> ParallelAccumulationOutput {
         var services = Set<ServiceIndex>()
         var gasUsed = Gas(0)
@@ -165,8 +166,9 @@ extension Accumulation {
                 state: state,
                 workReports: workReports,
                 service: service,
-                block: block,
-                privilegedGas: privilegedGas
+                privilegedGas: privilegedGas,
+                entropy: entropy,
+                timeslot: timeslot
             )
             gasUsed += singleOutput.gasUsed
 
@@ -214,11 +216,12 @@ extension Accumulation {
     /// outer accumulate function ∆+
     private mutating func outerAccumulate(
         config: ProtocolConfigRef,
-        block: BlockRef,
         state: AccumulateState,
         workReports: [WorkReport],
         privilegedGas: [ServiceIndex: Gas],
-        gasLimit: Gas
+        gasLimit: Gas,
+        entropy: Data32,
+        timeslot: TimeslotIndex
     ) async throws -> AccumulationOutput {
         var i = 0
         var sumGasRequired = Gas(0)
@@ -242,18 +245,20 @@ extension Accumulation {
         } else {
             let parallelOutput = try await parallelizedAccumulate(
                 config: config,
-                block: block,
                 state: state,
                 workReports: Array(workReports[0 ..< i]),
-                privilegedGas: privilegedGas
+                privilegedGas: privilegedGas,
+                entropy: entropy,
+                timeslot: timeslot
             )
             let outerOutput = try await outerAccumulate(
                 config: config,
-                block: block,
                 state: parallelOutput.state,
                 workReports: Array(workReports[i ..< workReports.count]),
                 privilegedGas: [:],
-                gasLimit: gasLimit - parallelOutput.gasUsed
+                gasLimit: gasLimit - parallelOutput.gasUsed,
+                entropy: entropy,
+                timeslot: timeslot
             )
             return AccumulationOutput(
                 numAccumulated: i + outerOutput.numAccumulated,
@@ -305,7 +310,7 @@ extension Accumulation {
 
         editAccumulatedItems(
             items: &newQueueItems,
-            accumulatedPackages: Set(history.array.reduce(into: Set<Data32>()) { $0.formUnion($1) })
+            accumulatedPackages: Set(history.array.reduce(into: Set<Data32>()) { $0.formUnion($1.array) })
         )
 
         return (zeroPrereqReports, newQueueItems)
@@ -328,8 +333,9 @@ extension Accumulation {
 
     public mutating func update(
         config: ProtocolConfigRef,
-        block: BlockRef,
-        workReports: [WorkReport]
+        workReports: [WorkReport],
+        entropy: Data32,
+        timeslot: TimeslotIndex
     ) async throws -> (numAccumulated: Int, state: AccumulateState, commitments: Set<Commitment>) {
         let sumPrevilegedGas = privilegedServices.basicGas.values.reduce(Gas(0)) { $0 + $1.value }
         let minTotalGas = config.value.workReportAccumulationGas * Gas(config.value.totalNumberOfCores) + sumPrevilegedGas
@@ -337,7 +343,6 @@ extension Accumulation {
 
         let res = try await outerAccumulate(
             config: config,
-            block: block,
             state: AccumulateState(
                 newServiceAccounts: [:],
                 validatorQueue: validatorQueue,
@@ -346,7 +351,9 @@ extension Accumulation {
             ),
             workReports: workReports,
             privilegedGas: privilegedServices.basicGas,
-            gasLimit: gasLimit
+            gasLimit: gasLimit,
+            entropy: entropy,
+            timeslot: timeslot
         )
 
         var transferGroups = [ServiceIndex: [DeferredTransfers]]()
