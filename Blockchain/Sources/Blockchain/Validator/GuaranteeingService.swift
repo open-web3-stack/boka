@@ -167,10 +167,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     private func on(workPackagesReceived event: RuntimeEvents.WorkPackagesReceived) async throws {
-        try await refine(package: event.workPackageRef)
+        try await refine(coreIndex: event.coreIndex, package: event.workPackageRef, extrinsics: event.extrinsics)
     }
 
-    private func refine(package: WorkPackageRef) async throws {
+    private func refine(coreIndex _: CoreIndex, package: WorkPackageRef, extrinsics _: [Data]) async throws {
         guard let (validatorIndex, signingKey) = signingKey.value else {
             logger.debug("not in current validator set, skipping refine")
             return
