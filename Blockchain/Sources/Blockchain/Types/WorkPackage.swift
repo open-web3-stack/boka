@@ -3,7 +3,7 @@ import Foundation
 import Utils
 
 // P
-public struct WorkPackage: Comparable, Sendable, Equatable, Codable {
+public struct WorkPackage: Comparable, Sendable, Equatable, Codable, Hashable {
     // j
     public var authorizationToken: Data
 

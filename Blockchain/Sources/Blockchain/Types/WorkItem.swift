@@ -2,9 +2,9 @@ import Foundation
 import Utils
 
 // I
-public struct WorkItem: Sendable, Equatable, Codable {
-    public struct ImportedDataSegment: Sendable, Equatable, Codable {
-        public enum DataSegmentRootKind: Sendable, Equatable {
+public struct WorkItem: Sendable, Equatable, Codable, Hashable {
+    public struct ImportedDataSegment: Sendable, Equatable, Codable, Hashable {
+        public enum DataSegmentRootKind: Sendable, Equatable, Hashable {
             case segmentRoot(Data32)
             case workPackageHash(Data32)
         }

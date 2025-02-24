@@ -54,7 +54,15 @@ public enum RuntimeEvents {
 
     // When a work package is recived via CE133
     public struct WorkPackagesReceived: Event {
-        public let item: WorkPackageRef
+        public let coreIndex: CoreIndex
+        public let workPackageRef: WorkPackageRef
+        public let extrinsics: [Data]
+
+        public init(coreIndex: CoreIndex, workPackageRef: WorkPackageRef, extrinsics: [Data]) {
+            self.coreIndex = coreIndex
+            self.workPackageRef = workPackageRef
+            self.extrinsics = extrinsics
+        }
     }
 
     // When a work package bundle is ready to shared via CE134

@@ -4,7 +4,7 @@ import Utils
 // A refinement context, denoted by the set X, describes the context of the chain
 // at the point that the report’s corresponding work-package was evaluated.
 public struct RefinementContext: Comparable, Sendable, Equatable, Codable {
-    public struct Anchor: Comparable, Sendable, Equatable, Codable {
+    public struct Anchor: Comparable, Sendable, Equatable, Codable, Hashable {
         // a
         public var headerHash: Data32
         // s

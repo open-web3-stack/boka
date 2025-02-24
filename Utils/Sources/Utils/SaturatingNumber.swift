@@ -1,7 +1,7 @@
 import Codec
 import Numerics
 
-public struct SaturatingNumber<T: FixedWidthInteger & Sendable>: Sendable {
+public struct SaturatingNumber<T: FixedWidthInteger & Sendable>: Sendable, Hashable {
     public private(set) var value: T
 
     public static var max: SaturatingNumber {
