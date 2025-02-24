@@ -1,7 +1,10 @@
 import Codec
 import Foundation
 import PolkaVM
+import TracingUtils
 import Utils
+
+private let logger = Logger(label: "AccumulateInvocation")
 
 public func accumulate(
     config: ProtocolConfigRef,
@@ -13,6 +16,8 @@ public func accumulate(
     initialIndex: ServiceIndex,
     timeslot: TimeslotIndex
 ) async throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
+    logger.debug("accumulating service index: \(serviceIndex)")
+
     guard let accumulatingAccountDetails = try await accounts.get(serviceAccount: serviceIndex),
           let codeBlob = try await accounts.get(serviceAccount: serviceIndex, preimageHash: accumulatingAccountDetails.codeHash)
     else {
@@ -45,6 +50,8 @@ public func accumulate(
         argumentData: argument,
         ctx: ctx
     )
+
+    logger.debug("accumulate exit reason: \(exitReason)")
 
     return try collapse(exitReason: exitReason, output: output, context: ctx.context, gas: gas)
 }

@@ -267,11 +267,12 @@ extension Accumulation {
         }
     }
 
-    // E: edit the accumulation queue
+    // E: edit the accumulation queue items when some work reports are accumulated
     private func editQueue(items: inout [AccumulationQueueItem], accumulatedPackages: Set<Data32>) {
         items = items.filter { !accumulatedPackages.contains($0.workReport.packageSpecification.workPackageHash) }
-        for var item in items {
-            item.dependencies.subtract(accumulatedPackages)
+
+        for i in items.indices {
+            items[i].dependencies.subtract(accumulatedPackages)
         }
     }
 
@@ -288,8 +289,7 @@ extension Accumulation {
 
     // newly available work-reports, W, are partitioned into two sequences based on the condition of having zero prerequisite work-reports
     private func partitionWorkReports(
-        availableReports: [WorkReport],
-        history: StateKeys.AccumulationHistoryKey.Value
+        availableReports: [WorkReport]
     ) -> (zeroPrereqReports: [WorkReport], newQueueItems: [AccumulationQueueItem]) {
         let zeroPrereqReports = availableReports.filter { report in
             report.refinementContext.prerequisiteWorkPackages.isEmpty && report.lookup.isEmpty
@@ -307,17 +307,18 @@ extension Accumulation {
 
         editQueue(
             items: &newQueueItems,
-            accumulatedPackages: Set(history.array.reduce(into: Set<Data32>()) { $0.formUnion($1.array) })
+            accumulatedPackages: Set(accumulationHistory.array.reduce(into: Set<Data32>()) { $0.formUnion($1.array) })
         )
 
         return (zeroPrereqReports, newQueueItems)
     }
 
-    private func getAccumulatableReports(
-        index: Int, availableReports: [WorkReport],
-        history: StateKeys.AccumulationHistoryKey.Value
+    // get all the work reports that can be accumulated in this block
+    private func getAllAccumulatableReports(
+        availableReports: [WorkReport],
+        index: Int
     ) -> (accumulatableReports: [WorkReport], newQueueItems: [AccumulationQueueItem]) {
-        let (zeroPrereqReports, newQueueItems) = partitionWorkReports(availableReports: availableReports, history: history)
+        let (zeroPrereqReports, newQueueItems) = partitionWorkReports(availableReports: availableReports)
 
         let rightQueueItems = accumulationQueue.array[index...]
         let leftQueueItems = accumulationQueue.array[0 ..< index]
@@ -365,11 +366,11 @@ extension Accumulation {
         prevTimeslot: TimeslotIndex,
         entropy: Data32
     ) async throws -> Data32 {
-        let curIndex = Int(timeslot) % config.value.epochLength
-        var (accumulatableReports, newQueueItems) = getAccumulatableReports(
-            index: curIndex,
+        let index = Int(timeslot) %% config.value.epochLength
+
+        var (accumulatableReports, newQueueItems) = getAllAccumulatableReports(
             availableReports: availableReports,
-            history: accumulationHistory
+            index: index
         )
 
         let accumulateOutput = try await execution(
@@ -425,7 +426,7 @@ extension Accumulation {
 
         // update accumulation queue
         for i in 0 ..< config.value.epochLength {
-            let queueIdx = (curIndex - i) %% config.value.epochLength
+            let queueIdx = (index - i) %% config.value.epochLength
             if i == 0 {
                 editQueue(items: &newQueueItems, accumulatedPackages: newHistoryItem)
                 accumulationQueue[queueIdx] = newQueueItems
