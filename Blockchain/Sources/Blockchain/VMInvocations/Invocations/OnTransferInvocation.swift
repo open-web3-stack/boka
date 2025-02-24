@@ -5,29 +5,28 @@ import Utils
 
 public func onTransfer(
     config: ProtocolConfigRef,
-    service: ServiceIndex,
+    serviceIndex: ServiceIndex,
     serviceAccounts: inout some ServiceAccounts,
     timeslot: TimeslotIndex,
     transfers: [DeferredTransfers]
 ) async throws {
-    guard var account = try await serviceAccounts.get(serviceAccount: service) else {
-        throw VMInvocationsError.serviceAccountNotFound
+    guard var account = try await serviceAccounts.get(serviceAccount: serviceIndex),
+          let codeBlob = try await serviceAccounts.get(serviceAccount: serviceIndex, preimageHash: account.codeHash),
+          !transfers.isEmpty
+    else {
+        return
     }
 
     account.balance += transfers.reduce(Balance(0)) { $0 + $1.amount }
 
-    if account.codeHash.data.isEmpty || transfers.isEmpty {
-        return
-    }
-
-    var contextContent = OnTransferContext.ContextType(service, serviceAccounts)
+    var contextContent = OnTransferContext.ContextType(serviceIndex, serviceAccounts)
     let ctx = OnTransferContext(context: &contextContent, config: config)
     let gasLimitSum = transfers.reduce(Balance(0)) { $0 + $1.gasLimit }
-    let argument = try JamEncoder.encode(timeslot, service, transfers)
+    let argument = try JamEncoder.encode(timeslot, serviceIndex, transfers)
 
     _ = await invokePVM(
         config: config,
-        blob: account.codeHash.data,
+        blob: codeBlob,
         pc: 10,
         gas: gasLimitSum,
         argumentData: argument,

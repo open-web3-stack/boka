@@ -405,7 +405,7 @@ extension Accumulation {
         for (service, transfers) in transferGroups {
             try await onTransfer(
                 config: config,
-                service: service,
+                serviceIndex: service,
                 serviceAccounts: &self,
                 timeslot: timeslot,
                 transfers: transfers

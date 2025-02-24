@@ -13,7 +13,9 @@ public func accumulate(
     initialIndex: ServiceIndex,
     timeslot: TimeslotIndex
 ) async throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
-    guard let accumulatingAccountDetails = try await accounts.get(serviceAccount: serviceIndex) else {
+    guard let accumulatingAccountDetails = try await accounts.get(serviceAccount: serviceIndex),
+          let codeBlob = try await accounts.get(serviceAccount: serviceIndex, preimageHash: accumulatingAccountDetails.codeHash)
+    else {
         return (state, [], nil, Gas(0))
     }
 
@@ -37,7 +39,7 @@ public func accumulate(
 
     let (exitReason, gas, output) = await invokePVM(
         config: config,
-        blob: accumulatingAccountDetails.codeHash.data,
+        blob: codeBlob,
         pc: 5,
         gas: gas,
         argumentData: argument,
