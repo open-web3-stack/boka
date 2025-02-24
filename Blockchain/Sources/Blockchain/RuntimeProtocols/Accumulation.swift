@@ -58,19 +58,19 @@ public struct SingleAccumulationOutput {
 
 public protocol Accumulation: ServiceAccounts {
     var timeslot: TimeslotIndex { get }
-    var privilegedServices: PrivilegedServices { get }
+    var privilegedServices: PrivilegedServices { get set }
     var validatorQueue: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
-    > { get }
+    > { get set }
     var authorizationQueue: ConfigFixedSizeArray<
         ConfigFixedSizeArray<
             Data32,
             ProtocolConfig.MaxAuthorizationsQueueItems
         >,
         ProtocolConfig.TotalNumberOfCores
-    > { get }
-    var accumulationQueue: StateKeys.AccumulationQueueKey.Value { get }
-    var accumulationHistory: StateKeys.AccumulationHistoryKey.Value { get }
+    > { get set }
+    var accumulationQueue: StateKeys.AccumulationQueueKey.Value { get set }
+    var accumulationHistory: StateKeys.AccumulationHistoryKey.Value { get set }
 }
 
 extension Accumulation {
@@ -267,28 +267,27 @@ extension Accumulation {
         }
     }
 
-    // E: edit the accumulation queue, remove the dependencies of the items that are already accumulated
-    public func editAccumulatedItems(items: inout [AccumulationQueueItem], accumulatedPackages: Set<Data32>) {
-        for index in items.indices
-            where !accumulatedPackages.contains(items[index].workReport.packageSpecification.workPackageHash)
-        {
-            items[index].dependencies.subtract(accumulatedPackages)
+    // E: edit the accumulation queue
+    private func editQueue(items: inout [AccumulationQueueItem], accumulatedPackages: Set<Data32>) {
+        items = items.filter { !accumulatedPackages.contains($0.workReport.packageSpecification.workPackageHash) }
+        for var item in items {
+            item.dependencies.subtract(accumulatedPackages)
         }
     }
 
-    // Q: find the reports that have no dependencies
-    private func findNoDepsReports(items: inout [AccumulationQueueItem]) -> [WorkReport] {
+    // Q: provides the sequence of work-reports which are accumulatable given a set of not-yet-accumulated work-reports and their dependencies
+    private func getAccumulatables(items: inout [AccumulationQueueItem]) -> [WorkReport] {
         let noDepsReports = items.filter(\.dependencies.isEmpty).map(\.workReport)
         if noDepsReports.isEmpty {
             return []
         } else {
-            editAccumulatedItems(items: &items, accumulatedPackages: Set(noDepsReports.map(\.packageSpecification.workPackageHash)))
-            return noDepsReports + findNoDepsReports(items: &items)
+            editQueue(items: &items, accumulatedPackages: Set(noDepsReports.map(\.packageSpecification.workPackageHash)))
+            return noDepsReports + getAccumulatables(items: &items)
         }
     }
 
     // newly available work-reports, W, are partitioned into two sequences based on the condition of having zero prerequisite work-reports
-    public func partitionWorkReports(
+    private func partitionWorkReports(
         availableReports: [WorkReport],
         history: StateKeys.AccumulationHistoryKey.Value
     ) -> (zeroPrereqReports: [WorkReport], newQueueItems: [AccumulationQueueItem]) {
@@ -306,7 +305,7 @@ extension Accumulation {
             ))
         }
 
-        editAccumulatedItems(
+        editQueue(
             items: &newQueueItems,
             accumulatedPackages: Set(history.array.reduce(into: Set<Data32>()) { $0.formUnion($1.array) })
         )
@@ -314,7 +313,7 @@ extension Accumulation {
         return (zeroPrereqReports, newQueueItems)
     }
 
-    public func getAccumulatableReports(
+    private func getAccumulatableReports(
         index: Int, availableReports: [WorkReport],
         history: StateKeys.AccumulationHistoryKey.Value
     ) -> (accumulatableReports: [WorkReport], newQueueItems: [AccumulationQueueItem]) {
@@ -324,22 +323,23 @@ extension Accumulation {
         let leftQueueItems = accumulationQueue.array[0 ..< index]
         var allQueueItems = rightQueueItems.flatMap(\.self) + leftQueueItems.flatMap(\.self) + newQueueItems
 
-        editAccumulatedItems(items: &allQueueItems, accumulatedPackages: Set(zeroPrereqReports.map(\.packageSpecification.workPackageHash)))
+        editQueue(items: &allQueueItems, accumulatedPackages: Set(zeroPrereqReports.map(\.packageSpecification.workPackageHash)))
 
-        return (zeroPrereqReports + findNoDepsReports(items: &allQueueItems), newQueueItems)
+        return (zeroPrereqReports + getAccumulatables(items: &allQueueItems), newQueueItems)
     }
 
-    public mutating func update(
+    // accumulate execution
+    private mutating func execution(
         config: ProtocolConfigRef,
         workReports: [WorkReport],
         entropy: Data32,
         timeslot: TimeslotIndex
-    ) async throws -> (numAccumulated: Int, state: AccumulateState, commitments: Set<Commitment>) {
+    ) async throws -> AccumulationOutput {
         let sumPrevilegedGas = privilegedServices.basicGas.values.reduce(Gas(0)) { $0 + $1.value }
         let minTotalGas = config.value.workReportAccumulationGas * Gas(config.value.totalNumberOfCores) + sumPrevilegedGas
         let gasLimit = max(config.value.totalAccumulationGas, minTotalGas)
 
-        let res = try await outerAccumulate(
+        return try await outerAccumulate(
             config: config,
             state: AccumulateState(
                 newServiceAccounts: [:],
@@ -353,13 +353,55 @@ extension Accumulation {
             entropy: entropy,
             timeslot: timeslot
         )
+    }
 
-        var transferGroups = [ServiceIndex: [DeferredTransfers]]()
+    /// Accumulate execution, state integration and deferred transfers
+    ///
+    /// Return accumulation-result merkle tree root
+    public mutating func update(
+        config: ProtocolConfigRef,
+        availableReports: [WorkReport],
+        timeslot: TimeslotIndex,
+        prevTimeslot: TimeslotIndex,
+        entropy: Data32
+    ) async throws -> Data32 {
+        let curIndex = Int(timeslot) % config.value.epochLength
+        var (accumulatableReports, newQueueItems) = getAccumulatableReports(
+            index: curIndex,
+            availableReports: availableReports,
+            history: accumulationHistory
+        )
 
-        for transfer in res.transfers {
-            transferGroups[transfer.destination, default: []].append(transfer)
+        let accumulateOutput = try await execution(
+            config: config,
+            workReports: accumulatableReports,
+            entropy: entropy,
+            timeslot: timeslot
+        )
+
+        authorizationQueue = accumulateOutput.state.authorizationQueue
+        validatorQueue = accumulateOutput.state.validatorQueue
+        privilegedServices = accumulateOutput.state.privilegedServices
+
+        // add new service accounts
+        for (service, account) in accumulateOutput.state.newServiceAccounts {
+            set(serviceAccount: service, account: account.toDetails())
+            for (hash, value) in account.storage {
+                set(serviceAccount: service, storageKey: hash, value: value)
+            }
+            for (hash, value) in account.preimages {
+                set(serviceAccount: service, preimageHash: hash, value: value)
+            }
+            for (hashLength, value) in account.preimageInfos {
+                set(serviceAccount: service, preimageHash: hashLength.hash, length: hashLength.length, value: value)
+            }
         }
 
+        // transfers
+        var transferGroups = [ServiceIndex: [DeferredTransfers]]()
+        for transfer in accumulateOutput.transfers {
+            transferGroups[transfer.destination, default: []].append(transfer)
+        }
         for (service, transfers) in transferGroups {
             try await onTransfer(
                 config: config,
@@ -370,6 +412,34 @@ extension Accumulation {
             )
         }
 
-        return (res.numAccumulated, res.state, res.commitments)
+        // update accumulation history
+        let accumulated = accumulatableReports[0 ..< accumulateOutput.numAccumulated]
+        let newHistoryItem = Set(accumulated.map(\.packageSpecification.workPackageHash))
+        for i in 0 ..< config.value.epochLength {
+            if i == config.value.epochLength - 1 {
+                accumulationHistory[i] = .init(newHistoryItem)
+            } else {
+                accumulationHistory[i] = accumulationHistory[i + 1]
+            }
+        }
+
+        // update accumulation queue
+        for i in 0 ..< config.value.epochLength {
+            let queueIdx = (curIndex - i) %% config.value.epochLength
+            if i == 0 {
+                editQueue(items: &newQueueItems, accumulatedPackages: newHistoryItem)
+                accumulationQueue[queueIdx] = newQueueItems
+            } else if i >= 1, i < timeslot - prevTimeslot {
+                accumulationQueue[queueIdx] = []
+            } else {
+                editQueue(items: &accumulationQueue[queueIdx], accumulatedPackages: newHistoryItem)
+            }
+        }
+
+        // accumulate root
+        let nodes = try accumulateOutput.commitments.map { try JamEncoder.encode($0.serviceIndex) + JamEncoder.encode($0.hash) }
+        let root = Merklization.binaryMerklize(nodes, hasher: Keccak.self)
+
+        return root
     }
 }
