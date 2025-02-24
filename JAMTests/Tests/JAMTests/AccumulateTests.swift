@@ -2,6 +2,7 @@ import Blockchain
 import Codec
 import Foundation
 import Testing
+import TracingUtils
 import Utils
 
 @testable import JAMTests
@@ -85,8 +86,6 @@ private struct FullAccumulateState: Accumulation {
         ConfigFixedSizeArray<Data32, ProtocolConfig.MaxAuthorizationsQueueItems>,
         ProtocolConfig.TotalNumberOfCores
     >
-    var accumlateFunction: any AccumulateFunction
-    var onTransferFunction: any OnTransferFunction
     var accumulationQueue: StateKeys.AccumulationQueueKey.Value
     var accumulationHistory: StateKeys.AccumulationHistoryKey.Value
 
@@ -140,6 +139,10 @@ private struct FullAccumulateState: Accumulation {
 }
 
 struct AccumulateTests {
+    // init() {
+    //     setupTestLogger()
+    // }
+
     static func loadTests(variant: TestVariants) throws -> [Testcase] {
         try TestLoader.getTestcases(path: "accumulate/\(variant)", extension: "bin")
     }
@@ -155,28 +158,45 @@ struct AccumulateTests {
             privilegedServices: preState.privilegedServices,
             validatorQueue: .init(config: config, defaultValue: .dummy(config: config)),
             authorizationQueue: .init(config: config, defaultValue: .init(config: config, defaultValue: Data32())),
-            accumlateFunction: DummyFunction(),
-            onTransferFunction: DummyFunction(),
             accumulationQueue: preState.accumulationQueue,
             accumulationHistory: preState.accumulationHistory
         )
 
+        for entry in testcase.preState.accounts {
+            fullState.accounts[entry.index] = entry.data.service
+            for preimage in entry.data.preimages {
+                fullState.preimages[entry.index, default: [:]][preimage.hash] = preimage.blob
+            }
+        }
+
         let result = await Result {
             try await fullState.update(
                 config: config,
-                workReports: testcase.input.reports,
-                entropy: preState.entropy,
-                timeslot: testcase.input.timeslot
+                availableReports: testcase.input.reports,
+                timeslot: testcase.input.timeslot,
+                prevTimeslot: preState.timeslot,
+                entropy: preState.entropy
             )
         }
 
         switch result {
-        case let .success((newAccumulated, postState, commitments)):
+        case let .success(root):
             switch testcase.output {
-            case let .ok(root):
-                print(root)
-                print(newAccumulated, postState, commitments)
-            // TODO: compare
+            case let .ok(expectedRoot):
+                // NOTE: timeslot and entropy are not changed by accumulate
+                #expect(root == expectedRoot, "root mismatch")
+                #expect(fullState.accumulationQueue == testcase.postState.accumulationQueue, "AccumulationQueue mismatch")
+                #expect(fullState.accumulationHistory == testcase.postState.accumulationHistory, "AccumulationHistory mismatch")
+                #expect(fullState.privilegedServices == testcase.postState.privilegedServices, "PrivilegedServices mismatch")
+
+                #expect(fullState.accounts.count == testcase.postState.accounts.count, "Accounts count mismatch")
+                for entry in testcase.postState.accounts {
+                    let account = fullState.accounts[entry.index]!
+                    #expect(account == entry.data.service, "ServiceAccountDetail mismatch")
+                    for preimage in entry.data.preimages {
+                        #expect(fullState.preimages[entry.index]?[preimage.hash] == preimage.blob, "Preimage mismatch")
+                    }
+                }
             case .err:
                 Issue.record("Expected error, got \(result)")
             }
@@ -191,13 +211,13 @@ struct AccumulateTests {
         }
     }
 
-    // @Test(arguments: try AccumulateTests.loadTests(variant: .tiny))
-    // func tinyTests(_ testcase: Testcase) async throws {
-    //     try await accumulateTests(testcase, variant: .tiny)
-    // }
+    @Test(arguments: try AccumulateTests.loadTests(variant: .tiny))
+    func tinyTests(_ testcase: Testcase) async throws {
+        try await accumulateTests(testcase, variant: .tiny)
+    }
 
-    // @Test(arguments: try AccumulateTests.loadTests(variant: .full))
-    // func fullTests(_ testcase: Testcase) async throws {
-    //     try await accumulateTests(testcase, variant: .full)
-    // }
+    @Test(arguments: try AccumulateTests.loadTests(variant: .full))
+    func fullTests(_ testcase: Testcase) async throws {
+        try await accumulateTests(testcase, variant: .full)
+    }
 }
