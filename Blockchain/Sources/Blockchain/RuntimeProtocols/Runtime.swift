@@ -170,13 +170,13 @@ public final class Runtime {
             // depends on Safrole and Disputes
             let availableReports = try updateReports(block: block, state: &newState)
 
-            // accumulation
-            try await accumulate(
+            // accumulate
+            let accumulateRoot = try await newState.update(
                 config: config,
-                block: block,
                 availableReports: availableReports,
-                state: &newState,
-                prevTimeslot: prevState.value.timeslot
+                timeslot: block.header.timeslot,
+                prevTimeslot: prevState.value.timeslot,
+                entropy: newState.entropyPool.t0
             )
 
             do {
@@ -200,7 +200,7 @@ public final class Runtime {
             )
 
             // after reports as it need old recent history
-            try updateRecentHistory(block: block, state: &newState)
+            try updateRecentHistory(block: block, state: &newState, accumulateRoot: accumulateRoot)
 
             try await newState.save()
         } catch let error as Error {
@@ -216,71 +216,7 @@ public final class Runtime {
         return StateRef(newState)
     }
 
-    // accumulation related state updates
-    public func accumulate(
-        config: ProtocolConfigRef,
-        block: BlockRef,
-        availableReports: [WorkReport],
-        state: inout State,
-        prevTimeslot: TimeslotIndex
-    ) async throws {
-        let curIndex = Int(block.header.timeslot) % config.value.epochLength
-        var (accumulatableReports, newQueueItems) = state.getAccumulatableReports(
-            index: curIndex,
-            availableReports: availableReports,
-            history: state.accumulationHistory
-        )
-
-        // accumulate and transfers
-        let (numAccumulated, accumulateState, _) = try await state.update(
-            config: config,
-            workReports: accumulatableReports,
-            entropy: state.entropyPool.t0,
-            timeslot: block.header.timeslot
-        )
-
-        state.authorizationQueue = accumulateState.authorizationQueue
-        state.validatorQueue = accumulateState.validatorQueue
-        state.privilegedServices = accumulateState.privilegedServices
-        for (service, account) in accumulateState.newServiceAccounts {
-            state[serviceAccount: service] = account.toDetails()
-            for (hash, value) in account.storage {
-                state[serviceAccount: service, storageKey: hash] = value
-            }
-            for (hash, value) in account.preimages {
-                state[serviceAccount: service, preimageHash: hash] = value
-            }
-            for (hashLength, value) in account.preimageInfos {
-                state[serviceAccount: service, preimageHash: hashLength.hash, length: hashLength.length] = value
-            }
-        }
-
-        // update accumulation history
-        let accumulated = accumulatableReports[0 ..< numAccumulated]
-        let newHistoryItem = Set(accumulated.map(\.packageSpecification.workPackageHash))
-        for i in 0 ..< config.value.epochLength {
-            if i == config.value.epochLength - 1 {
-                state.accumulationHistory[i] = .init(newHistoryItem)
-            } else {
-                state.accumulationHistory[i] = state.accumulationHistory[i + 1]
-            }
-        }
-
-        // update accumulation queue
-        for i in 0 ..< config.value.epochLength {
-            let queueIdx = (curIndex - i) %% config.value.epochLength
-            if i == 0 {
-                state.editAccumulatedItems(items: &newQueueItems, accumulatedPackages: newHistoryItem)
-                state.accumulationQueue[queueIdx] = newQueueItems
-            } else if i >= 1, i < state.timeslot - prevTimeslot {
-                state.accumulationQueue[queueIdx] = []
-            } else {
-                state.editAccumulatedItems(items: &state.accumulationQueue[queueIdx], accumulatedPackages: newHistoryItem)
-            }
-        }
-    }
-
-    public func updateRecentHistory(block: BlockRef, state newState: inout State) throws {
+    public func updateRecentHistory(block: BlockRef, state newState: inout State, accumulateRoot: Data32) throws {
         let lookup: [Data32: Data32] = Dictionary(uniqueKeysWithValues: block.extrinsic.reports.guarantees.map { (
             $0.workReport.packageSpecification.workPackageHash,
             $0.workReport.packageSpecification.segmentRoot
@@ -288,7 +224,7 @@ public final class Runtime {
         newState.recentHistory.update(
             headerHash: block.hash,
             parentStateRoot: block.header.priorStateRoot,
-            accumulateRoot: Data32(), // TODO: calculate accumulation result
+            accumulateRoot: accumulateRoot,
             lookup: lookup
         )
     }

@@ -8,16 +8,10 @@ public enum GuaranteeingServiceError: Error {
     case invalidExports
 }
 
-struct GuaranteeingAuthorizationFunction: IsAuthorizedFunction {}
-struct GuaranteeingRefineInvocation: RefineInvocation {}
-
 public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore
     private let dataAvailability: DataAvailability
-
-    private let authorizationFunction: IsAuthorizedFunction
-    private let refineInvocation: RefineInvocation
 
     let signingKey: ThreadSafeContainer<(ValidatorIndex, Ed25519.SecretKey)?> = .init(nil)
 
@@ -38,9 +32,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             dataProvider: dataProvider,
             dataStore: dataStore
         )
-
-        authorizationFunction = GuaranteeingAuthorizationFunction()
-        refineInvocation = GuaranteeingRefineInvocation()
 
         super.init(id: "GuaranteeingService", config: config, eventBus: eventBus, scheduler: scheduler)
 
@@ -88,10 +79,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     private func on(workPackagesReceived event: RuntimeEvents.WorkPackagesReceived) async throws {
-        try await refine(package: event.workPackageRef)
+        try await refinePkg(package: event.workPackageRef)
     }
 
-    private func refine(package: WorkPackageRef) async throws {
+    private func refinePkg(package: WorkPackageRef) async throws {
         guard let (validatorIndex, signingKey) = signingKey.value else {
             logger.debug("not in current validator set, skipping refine")
             return
@@ -142,17 +133,16 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             }
 
             for (i, item) in workPackage.value.workItems.enumerated() {
-                // RefineInvocation invoke up data to workresult
-                let refineRes = try await refineInvocation
-                    .invoke(
-                        config: config,
-                        serviceAccounts: state.value,
-                        workItemIndex: i,
-                        workPackage: workPackage.value,
-                        authorizerOutput: authorizationOutput,
-                        importSegments: importSegments,
-                        exportSegmentOffset: UInt64(exportSegmentOffset)
-                    )
+                // refine data to workresult
+                let refineRes = try await refine(
+                    config: config,
+                    serviceAccounts: state.value,
+                    workItemIndex: i,
+                    workPackage: workPackage.value,
+                    authorizerOutput: authorizationOutput,
+                    importSegments: importSegments,
+                    exportSegmentOffset: UInt64(exportSegmentOffset)
+                )
                 // Export -> DA or exportSegmentOffset + outputDataSegmentsCount ？
                 exportSegmentOffset += item.outputDataSegmentsCount
                 let workResult = WorkResult(
