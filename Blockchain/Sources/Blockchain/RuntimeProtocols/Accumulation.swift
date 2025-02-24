@@ -276,7 +276,7 @@ extension Accumulation {
         }
     }
 
-    // Q: provides the sequence of work-reports which are accumulatable given a set of not-yet-accumulated work-reports and their dependencies
+    // Q: provides the sequence of work-reports which are accumulatable given queue items
     private func getAccumulatables(items: inout [AccumulationQueueItem]) -> [WorkReport] {
         let noDepsReports = items.filter(\.dependencies.isEmpty).map(\.workReport)
         if noDepsReports.isEmpty {
