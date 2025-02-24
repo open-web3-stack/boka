@@ -170,23 +170,12 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         try await refine(coreIndex: event.coreIndex, package: event.workPackageRef, extrinsics: event.extrinsics)
     }
 
-    private func refine(coreIndex _: CoreIndex, package: WorkPackageRef, extrinsics _: [Data]) async throws {
+    private func refine(coreIndex: CoreIndex, package: WorkPackageRef, extrinsics: [Data]) async throws {
         guard let (validatorIndex, signingKey) = signingKey.value else {
             logger.debug("not in current validator set, skipping refine")
             return
         }
-
-        let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
-
-        // TODO: check for edge cases such as epoch end
-        let currentCoreAssignment = state.value.getCoreAssignment(
-            config: config,
-            randomness: state.value.entropyPool.t2,
-            timeslot: state.value.timeslot + 1
-        )
-        guard let coreIndex = currentCoreAssignment[safe: Int(validatorIndex)] else {
-            try throwUnreachable("invalid validator index/core assignment")
-        }
+        try await shareWorkPackage(coreIndex: coreIndex, workPackage: package.value, extrinsics: extrinsics)
 
         let workReport = try await createWorkReport(for: package, coreIndex: coreIndex)
         let payload = SigningContext.guarantee + workReport.hash().data
@@ -195,16 +184,15 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         publish(event)
     }
 
-    public func createWorkPackageBundle(_ workPackage: WorkPackage) async throws -> WorkPackageBundle {
+    public func createWorkPackageBundle(_ workPackage: WorkPackage, extrinsics: [Data]) async throws -> WorkPackageBundle {
         // 1. Retrieve the necessary data for the bundle
-        let extrinsicData = try await retrieveExtrinsicData(for: workPackage)
         let importSegments = try await retrieveImportSegments(for: workPackage)
         let justifications = try await retrieveJustifications(for: workPackage)
 
         // 2. Construct the work package bundle
         return WorkPackageBundle(
             workPackage: workPackage,
-            extrinsic: extrinsicData,
+            extrinsic: extrinsics,
             importSegments: importSegments,
             justifications: justifications
         )
@@ -244,8 +232,9 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         return segmentsRoot
     }
 
-    public func shareWorkPackage(_ workPackage: WorkPackage, coreIndex: CoreIndex) async throws {
-        // 1. Get other guarantors assigned to the same core
+    // Work Package Sharing (Send Side)
+    public func shareWorkPackage(coreIndex: CoreIndex, workPackage: WorkPackage, extrinsics: [Data]) async throws {
+        // 1. Get other guarantors assigned to the same core, how to
         let guarantors = try await getGuarantors(for: coreIndex)
 
         // 2. Validate the work package
@@ -255,9 +244,9 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
         // 3. Create WorkPackageBundle
 
-        let bundle = try await createWorkPackageBundle(workPackage)
+        let bundle = try await createWorkPackageBundle(workPackage, extrinsics: extrinsics)
 
-        // 4. Send the bundle to other guarantors
+        // 4. TODO: Send the bundle to other guarantors
         // 5. Map work-package hashes to segments-roots
         var mappings: SegmentsRootMappings = []
         for guarantor in guarantors {
