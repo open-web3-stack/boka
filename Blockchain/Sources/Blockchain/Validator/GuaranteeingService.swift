@@ -171,27 +171,17 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     private func refine(coreIndex: CoreIndex, package: WorkPackageRef, extrinsics: [Data]) async throws {
-        guard let (validatorIndex, signingKey) = signingKey.value else {
-            logger.debug("not in current validator set, skipping refine")
-            return
-        }
-        try await shareWorkPackage(coreIndex: coreIndex, workPackage: package.value, extrinsics: extrinsics)
-
-        let workReport = try await createWorkReport(for: package, coreIndex: coreIndex)
-        let payload = SigningContext.guarantee + workReport.hash().data
-        let signature = try signingKey.sign(message: payload)
-        let event = RuntimeEvents.WorkReportGenerated(item: workReport, signature: signature)
-        publish(event)
+        try await shareWorkPackage(coreIndex: coreIndex, workPackage: package, extrinsics: extrinsics)
     }
 
-    public func createWorkPackageBundle(_ workPackage: WorkPackage, extrinsics: [Data]) async throws -> WorkPackageBundle {
+    public func createWorkPackageBundle(_ workPackage: WorkPackageRef, extrinsics: [Data]) async throws -> WorkPackageBundle {
         // 1. Retrieve the necessary data for the bundle
-        let importSegments = try await retrieveImportSegments(for: workPackage)
-        let justifications = try await retrieveJustifications(for: workPackage)
+        let importSegments = try await retrieveImportSegments(for: workPackage.value)
+        let justifications = try await retrieveJustifications(for: workPackage.value)
 
         // 2. Construct the work package bundle
         return WorkPackageBundle(
-            workPackage: workPackage,
+            workPackage: workPackage.value,
             extrinsic: extrinsics,
             importSegments: importSegments,
             justifications: justifications
@@ -233,21 +223,31 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     // Work Package Sharing (Send Side)
-    public func shareWorkPackage(coreIndex: CoreIndex, workPackage: WorkPackage, extrinsics: [Data]) async throws {
-        // 1. Get other guarantors assigned to the same core, how to
+    public func shareWorkPackage(coreIndex: CoreIndex, workPackage: WorkPackageRef, extrinsics: [Data]) async throws {
+        guard let (validatorIndex, signingKey) = signingKey.value else {
+            logger.debug("not in current validator set, skipping refine")
+            return
+        }
+        // TODO: validatorIndex -> coreIndex
+        // 1. TODO: Get other guarantors assigned to the same core
         let guarantors = try await getGuarantors(for: coreIndex)
 
         // 2. Validate the work package
-        guard try validate(workPackage: workPackage) else {
+        guard try validate(workPackage: workPackage.value) else {
             logger.error("Invalid work package: \(workPackage)")
             throw WorkPackageError.invalidWorkPackage
         }
-        // 3. Create WorkPackageBundle
 
+        // 3. Create WorkPackageBundle
         let bundle = try await createWorkPackageBundle(workPackage, extrinsics: extrinsics)
 
-        // 4. TODO: Send the bundle to other guarantors
-        // 5. Map work-package hashes to segments-roots
+        // 4. Retrieve segments-root mappings
+        let segmentsRootMappings = try await retrieveSegmentsRootMappings(for: workPackage.value)
+
+        // 5. create work report
+        let workReport = try await createWorkReport(for: workPackage, coreIndex: coreIndex)
+        // 6. TODO: Send the bundle to other guarantors
+        // 7. Map work-package hashes to segments-roots
         var mappings: SegmentsRootMappings = []
         for guarantor in guarantors {
             let (workReportHash, signature) = try await guarantor.receiveWorkPackageBundle(
@@ -255,11 +255,12 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                 segmentsRootMappings: mappings,
                 bundle: bundle
             )
-
-            // 6. Publish the work report hash and signature
-            // let event = RuntimeEvents.WorkReportGenerated(hash: workReportHash, signature: signature)
-            // publish(event)
         }
+        // 8. push
+        let payload = SigningContext.guarantee + workReport.hash().data
+        let signature = try signingKey.sign(message: payload)
+        let event = RuntimeEvents.WorkReportGenerated(item: workReport, signature: signature)
+        publish(event)
     }
 
     public func getGuarantors(for coreIndex: CoreIndex) async throws -> [Guarantor] {
