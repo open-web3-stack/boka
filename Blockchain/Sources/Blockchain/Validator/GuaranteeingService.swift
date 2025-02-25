@@ -201,9 +201,9 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
         var guarantors = [Guarantor]()
         // TODO: Mock
-        for (_, v) in state.value.currentValidators.enumerated() {
+        for validator in state.value.currentValidators {
             guarantors.append(Guarantor(
-                id: v.ed25519.blake2b256hash(), // Use the validator's public key hash as the ID
+                id: validator.ed25519.blake2b256hash(), // 使用验证者的公钥哈希作为 ID
                 coreIndex: coreIndex
             ))
         }
