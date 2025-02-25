@@ -149,6 +149,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             logger.debug("not in current validator set, skipping refine")
             return
         }
+        logger.info("validatorIndex = \(validatorIndex)")
         // TODO: validatorIndex -> coreIndex
         // 1. TODO: Get other guarantors assigned to the same core
         let guarantors = try await getGuarantors(for: coreIndex)
