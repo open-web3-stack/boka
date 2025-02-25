@@ -140,16 +140,28 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     // Work Package Sharing (Send Side)
-    public func shareWorkPackage(coreIndex: CoreIndex, workPackage: WorkPackageRef, extrinsics: [Data]) async throws {
-        try await refinePkg(coreIndex: coreIndex, workPackage: workPackage, extrinsics: extrinsics)
+    public func shareWorkPackage(coreIndex _: CoreIndex, workPackage: WorkPackageRef, extrinsics: [Data]) async throws {
+        try await refinePkg(workPackage: workPackage, extrinsics: extrinsics)
     }
 
-    private func refinePkg(coreIndex: CoreIndex, workPackage: WorkPackageRef, extrinsics: [Data]) async throws {
+    private func refinePkg(workPackage: WorkPackageRef, extrinsics: [Data]) async throws {
         guard let (validatorIndex, signingKey) = signingKey.value else {
             logger.debug("not in current validator set, skipping refine")
             return
         }
-        logger.info("validatorIndex = \(validatorIndex)")
+
+        let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
+
+        // TODO: check for edge cases such as epoch end
+        let currentCoreAssignment = state.value.getCoreAssignment(
+            config: config,
+            randomness: state.value.entropyPool.t2,
+            timeslot: state.value.timeslot + 1
+        )
+        // TODO: coreIndex equal with shareWorkPackage coreIndex?
+        guard let coreIndex = currentCoreAssignment[safe: Int(validatorIndex)] else {
+            try throwUnreachable("invalid validator index/core assignment")
+        }
         // TODO: validatorIndex -> coreIndex
         // 1. TODO: Get other guarantors assigned to the same core
         let guarantors = try await getGuarantors(for: coreIndex)
@@ -187,31 +199,15 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     public func getGuarantors(for coreIndex: CoreIndex) async throws -> [Guarantor] {
         // 1. Get the current blockchain state
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
-
-        // 2. Get the core assignment for the current timeslot
-        let coreAssignment: [CoreIndex] = state.value.getCoreAssignment(
-            config: config,
-            randomness: state.value.entropyPool.t2,
-            timeslot: state.value.timeslot
-        )
-
-        // 3. Ensure the core index is valid
-        guard coreIndex < coreAssignment.count else {
-            logger.error("Invalid core index: \(coreIndex)")
-            try throwUnreachable("invalid validator index/core assignment")
+        var guarantors = [Guarantor]()
+        // TODO: Mock
+        for (_, v) in state.value.currentValidators.enumerated() {
+            guarantors.append(Guarantor(
+                id: v.ed25519.blake2b256hash(), // Use the validator's public key hash as the ID
+                coreIndex: coreIndex
+            ))
         }
-
-        // 4. Get the validator index assigned to the core
-        let validatorIndex = coreAssignment[Int(coreIndex)]
-
-        let validator = state.value.currentValidators[Int(validatorIndex)]
-        // 5. Create a Guarantor object for the validator
-        let guarantor = Guarantor(
-            id: validator.ed25519.blake2b256hash(), // Use the validator's public key hash as the ID
-            coreIndex: coreIndex
-        )
-
-        return [guarantor]
+        return guarantors
     }
 
     private func validate(workPackage _: WorkPackage) throws -> Bool {
