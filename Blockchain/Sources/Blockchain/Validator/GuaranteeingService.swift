@@ -28,19 +28,11 @@ public struct Guarantor: Codable, Identifiable {
         coreIndex _: CoreIndex,
         segmentsRootMappings: SegmentsRootMappings,
         bundle: WorkPackageBundle
-    ) async throws -> (Data32, Data) {
+    ) async throws {
         // 1. Perform basic verification
         guard try validateWorkPackageBundle(bundle, segmentsRootMappings: segmentsRootMappings) else {
             throw WorkPackageError.invalidBundle
         }
-
-        // 2. Execute refine logic
-        let workReportHash = try await refineWorkPackageBundle(bundle)
-
-        // 3. Sign the work report hash
-        let signature = try await signData(workReportHash)
-
-        return (workReportHash, signature)
     }
 
     private func validateWorkPackageBundle(
@@ -73,20 +65,6 @@ public struct Guarantor: Codable, Identifiable {
     private func validateAuthorization(_: WorkPackage) throws -> Bool {
         // TODO: Implement logic to validate the work package authorization
         true // Placeholder
-    }
-
-    private func refineWorkPackageBundle(_: WorkPackageBundle) async throws -> Data32 {
-        // TODO: Implement refine logic here
-        // For example, execute the work items and generate a work report
-        // let workReportHash = try await refineLogic.execute(bundle)
-        Data32()
-    }
-
-    private func signData(_: Data32) async throws -> Data {
-        // TODO: Implement signing logic here
-        // For example, use the guarantor's private key to sign the data
-        // let signature = try await keystore.sign(data: data, with: privateKey)
-        Data()
     }
 }
 
@@ -174,20 +152,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         try await shareWorkPackage(coreIndex: coreIndex, workPackage: package, extrinsics: extrinsics)
     }
 
-    public func createWorkPackageBundle(_ workPackage: WorkPackageRef, extrinsics: [Data]) async throws -> WorkPackageBundle {
-        // 1. Retrieve the necessary data for the bundle
-        let importSegments = try await retrieveImportSegments(for: workPackage.value)
-        let justifications = try await retrieveJustifications(for: workPackage.value)
-
-        // 2. Construct the work package bundle
-        return WorkPackageBundle(
-            workPackage: workPackage.value,
-            extrinsic: extrinsics,
-            importSegments: importSegments,
-            justifications: justifications
-        )
-    }
-
     public func retrieveSegmentsRootMappings(for workPackage: WorkPackage) async throws -> SegmentsRootMappings {
         // 1. Get the import segments from the work package
         let importSegments = try await retrieveImportSegments(for: workPackage)
@@ -238,31 +202,33 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             throw WorkPackageError.invalidWorkPackage
         }
 
-        // 3. Create WorkPackageBundle
-        let bundle = try await createWorkPackageBundle(workPackage, extrinsics: extrinsics)
-
-        // 4. Retrieve segments-root mappings
+        // 3. Retrieve segments-root mappings
         let segmentsRootMappings = try await retrieveSegmentsRootMappings(for: workPackage.value)
 
-        // 5. create work report
-        let workReport = try await createWorkReport(for: workPackage, coreIndex: coreIndex)
-        // 6. TODO: Send the bundle to other guarantors
-        // 7. Map work-package hashes to segments-roots
-        var mappings: SegmentsRootMappings = []
+        // 4. Create work report & WorkPackageBundle
+        let (bundle, mappings, workReport) = try await createWorkReport(
+            coreIndex: coreIndex,
+            workPackage: workPackage,
+            extrinsics: extrinsics
+        )
+        // 5. TODO: Send the bundle to other guarantors
         for guarantor in guarantors {
-            let (workReportHash, signature) = try await guarantor.receiveWorkPackageBundle(
+            // 6. TODO: Something needs to do, when receive workpackage bundle
+            try await guarantor.receiveWorkPackageBundle(
                 coreIndex: coreIndex,
                 segmentsRootMappings: mappings,
                 bundle: bundle
             )
         }
-        // 8. push
+        // 7. Sign the work report hash
         let payload = SigningContext.guarantee + workReport.hash().data
         let signature = try signingKey.sign(message: payload)
         let event = RuntimeEvents.WorkReportGenerated(item: workReport, signature: signature)
+        // 8. Push
         publish(event)
     }
 
+    // TODO: Get other guarantors assigned to the same core
     public func getGuarantors(for coreIndex: CoreIndex) async throws -> [Guarantor] {
         // 1. Get the current blockchain state
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
@@ -298,13 +264,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         true
     }
 
-    private func retrieveExtrinsicData(for _: WorkPackage) async throws -> [Data] {
-        // TODO: Implement retrieveExtrinsicData
-        // Implement logic to retrieve extrinsic data associated with the work package
-        // For example, fetch from the blockchain or local storage
-        [] // Placeholder
-    }
-
     private func retrieveImportSegments(for _: WorkPackage) async throws -> [Data4104] {
         // TODO: Implement retrieveImportSegments
         // Implement logic to retrieve imported data segments
@@ -320,12 +279,15 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     // workpackage -> workresult -> workreport
-    private func createWorkReport(for workPackage: WorkPackageRef, coreIndex: CoreIndex) async throws -> WorkReport {
+    private func createWorkReport(coreIndex: CoreIndex, workPackage: WorkPackageRef,
+                                  extrinsics: [Data]) async throws -> (WorkPackageBundle, SegmentsRootMappings, WorkReport)
+    {
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
         let packageHash = workPackage.hash
         let corePool = state.value.coreAuthorizationPool[coreIndex]
         let authorizerHash = try corePool.array.first.unwrap(orError: GuaranteeingServiceError.noAuthorizerHash)
         var exportSegmentOffset: UInt16 = 0
+        var mappings: SegmentsRootMappings = []
         // B.2. the authorization output, the result of the Is-Authorized function
         // TODO: waiting for authorizationFunction done  Mock a result
         // let res = try await authorizationFunction.invoke(config: config, serviceAccounts: state.value, package: workPackage, coreIndex:
@@ -373,16 +335,16 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
 
                 exportSegments.append(contentsOf: refineRes.exports)
             }
-
-            let (erasureRoot, length) = try await dataAvailability.exportWorkpackageBundle(bundle: WorkPackageBundle(
+            let bundle = try await WorkPackageBundle(
                 workPackage: workPackage.value,
-                extrinsic: [], // TODO: get extrinsic data
-                importSegments: [],
-                justifications: []
-            ))
+                extrinsic: extrinsics,
+                importSegments: retrieveImportSegments(for: workPackage.value),
+                justifications: retrieveJustifications(for: workPackage.value)
+            )
+            let (erasureRoot, length) = try await dataAvailability.exportWorkpackageBundle(bundle: bundle)
 
             let segmentRoot = try await dataAvailability.exportSegments(data: exportSegments, erasureRoot: erasureRoot)
-
+            mappings.append(SegmentsRootMapping(workPackageHash: packageHash, segmentsRoot: segmentRoot))
             // TODO: generate or find AvailabilitySpecifications  14.4.1 work-package bundle
             let packageSpecification = AvailabilitySpecifications(
                 workPackageHash: packageHash,
@@ -396,7 +358,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             for item in state.value.recentHistory.items {
                 oldLookups.merge(item.lookup, uniquingKeysWith: { _, new in new })
             }
-            return try WorkReport(
+            return try (bundle, mappings, WorkReport(
                 authorizerHash: authorizerHash,
                 coreIndex: coreIndex,
                 authorizationOutput: authorizationOutput,
@@ -404,7 +366,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                 packageSpecification: packageSpecification,
                 lookup: oldLookups,
                 results: ConfigLimitedSizeArray(config: config, array: workResults)
-            )
+            ))
 
         case let .failure(error):
             logger.error("Authorization failed with error: \(error)")
