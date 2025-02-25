@@ -155,17 +155,17 @@ public class InstructionTable {
     }()
 
     public static func parse(_ data: Data) -> (any Instruction)? {
-        logger.debug("parsing \(data)")
+        logger.trace("parsing \(data)")
         guard data.count >= 1 else {
             return nil
         }
         let opcode = data[data.startIndex]
-        logger.debug("parsed opcode: \(opcode)")
+        logger.trace("parsed opcode: \(opcode)")
         guard let instType = table[Int(opcode)] else {
             return nil
         }
 
-        logger.debug("initializing \(instType)")
+        logger.trace("initializing \(instType)")
         return try? instType.init(data: data[relative: 1...])
     }
 }

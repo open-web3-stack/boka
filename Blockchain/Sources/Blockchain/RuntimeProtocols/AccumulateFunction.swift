@@ -76,21 +76,3 @@ public struct AccumlateResultContext {
     /// y
     public var yield: Data32?
 }
-
-public protocol AccumulateFunction {
-    func invoke(
-        config: ProtocolConfigRef,
-        // prior accounts
-        accounts: inout some ServiceAccounts,
-        // u
-        state: AccumulateState,
-        // s
-        serviceIndex: ServiceIndex,
-        // g
-        gas: Gas,
-        // o
-        arguments: [AccumulateArguments],
-        initialIndex: ServiceIndex,
-        timeslot: TimeslotIndex
-    ) async throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas)
-}

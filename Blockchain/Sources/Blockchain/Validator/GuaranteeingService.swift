@@ -8,9 +8,6 @@ public enum GuaranteeingServiceError: Error {
     case invalidExports
 }
 
-struct GuaranteeingAuthorizationFunction: IsAuthorizedFunction {}
-struct GuaranteeingRefineInvocation: RefineInvocation {}
-
 public struct SegmentsRootMapping: Codable {
     public let workPackageHash: Data32
     public let segmentsRoot: SegmentsRoot
@@ -73,9 +70,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     private let keystore: KeyStore
     private let dataAvailability: DataAvailability
 
-    private let authorizationFunction: IsAuthorizedFunction
-    private let refineInvocation: RefineInvocation
-
     let signingKey: ThreadSafeContainer<(ValidatorIndex, Ed25519.SecretKey)?> = .init(nil)
 
     public init(
@@ -95,9 +89,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             dataProvider: dataProvider,
             dataStore: dataStore
         )
-
-        authorizationFunction = GuaranteeingAuthorizationFunction()
-        refineInvocation = GuaranteeingRefineInvocation()
 
         super.init(id: "GuaranteeingService", config: config, eventBus: eventBus, scheduler: scheduler)
 
@@ -145,49 +136,15 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     private func on(workPackagesReceived event: RuntimeEvents.WorkPackagesReceived) async throws {
-        try await refine(coreIndex: event.coreIndex, package: event.workPackageRef, extrinsics: event.extrinsics)
-    }
-
-    private func refine(coreIndex: CoreIndex, package: WorkPackageRef, extrinsics: [Data]) async throws {
-        try await shareWorkPackage(coreIndex: coreIndex, workPackage: package, extrinsics: extrinsics)
-    }
-
-    public func retrieveSegmentsRootMappings(for workPackage: WorkPackage) async throws -> SegmentsRootMappings {
-        // 1. Get the import segments from the work package
-        let importSegments = try await retrieveImportSegments(for: workPackage)
-
-        // 2. Map work-package hashes to segments-roots
-        var mappings: SegmentsRootMappings = []
-        for segment in importSegments {
-            // 2.1. Get the work-package hash from the segment ??
-            let workPackageHash = workPackage.hash()
-
-            // 2.2. Retrieve the segments-root from the blockchain or data availability layer
-            let segmentsRoot = try await retrieveSegmentsRoot(for: workPackageHash)
-
-            // 2.3. Create a mapping and add it to the array
-            let mapping = SegmentsRootMapping(workPackageHash: workPackageHash, segmentsRoot: segmentsRoot)
-            mappings.append(mapping)
-        }
-
-        return mappings
-    }
-
-    private func retrieveSegmentsRoot(for _: Data32) async throws -> SegmentsRoot {
-        // 1. Query the blockchain or data availability layer to get the segments-root
-        // For example, use a blockchain data provider to fetch the segments-root
-        // let segmentsRoot = try await dataProvider.getSegmentsRoot(for: workPackageHash)
-        let segmentsRoot = SegmentsRoot()
-        // 2. If the segments-root is not found, throw an error
-        // guard let segmentsRoot = segmentsRoot else {
-        //    throw WorkPackageError.segmentsRootNotFound
-        // }
-
-        return segmentsRoot
+        try await shareWorkPackage(coreIndex: event.coreIndex, workPackage: event.workPackageRef, extrinsics: event.extrinsics)
     }
 
     // Work Package Sharing (Send Side)
     public func shareWorkPackage(coreIndex: CoreIndex, workPackage: WorkPackageRef, extrinsics: [Data]) async throws {
+        try await refinePkg(coreIndex: coreIndex, workPackage: workPackage, extrinsics: extrinsics)
+    }
+
+    private func refinePkg(coreIndex: CoreIndex, workPackage: WorkPackageRef, extrinsics: [Data]) async throws {
         guard let (validatorIndex, signingKey) = signingKey.value else {
             logger.debug("not in current validator set, skipping refine")
             return
@@ -202,29 +159,26 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             throw WorkPackageError.invalidWorkPackage
         }
 
-        // 3. Retrieve segments-root mappings
-        let segmentsRootMappings = try await retrieveSegmentsRootMappings(for: workPackage.value)
-
-        // 4. Create work report & WorkPackageBundle
+        // 3. Create work report & WorkPackageBundle
         let (bundle, mappings, workReport) = try await createWorkReport(
             coreIndex: coreIndex,
             workPackage: workPackage,
             extrinsics: extrinsics
         )
-        // 5. TODO: Send the bundle to other guarantors
+        // 4. TODO: Send the bundle to other guarantors
         for guarantor in guarantors {
-            // 6. TODO: Something needs to do, when receive workpackage bundle
+            // 5. TODO: Something needs to do, when receive workpackage bundle
             try await guarantor.receiveWorkPackageBundle(
                 coreIndex: coreIndex,
                 segmentsRootMappings: mappings,
                 bundle: bundle
             )
         }
-        // 7. Sign the work report hash
+        // 6. Sign the work report hash
         let payload = SigningContext.guarantee + workReport.hash().data
         let signature = try signingKey.sign(message: payload)
         let event = RuntimeEvents.WorkReportGenerated(item: workReport, signature: signature)
-        // 8. Push
+        // 7. Push
         publish(event)
     }
 
@@ -307,17 +261,16 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             }
 
             for (i, item) in workPackage.value.workItems.enumerated() {
-                // RefineInvocation invoke up data to workresult
-                let refineRes = try await refineInvocation
-                    .invoke(
-                        config: config,
-                        serviceAccounts: state.value,
-                        workItemIndex: i,
-                        workPackage: workPackage.value,
-                        authorizerOutput: authorizationOutput,
-                        importSegments: importSegments,
-                        exportSegmentOffset: UInt64(exportSegmentOffset)
-                    )
+                // refine data to workresult
+                let refineRes = try await refine(
+                    config: config,
+                    serviceAccounts: state.value,
+                    workItemIndex: i,
+                    workPackage: workPackage.value,
+                    authorizerOutput: authorizationOutput,
+                    importSegments: importSegments,
+                    exportSegmentOffset: UInt64(exportSegmentOffset)
+                )
                 // Export -> DA or exportSegmentOffset + outputDataSegmentsCount ？
                 exportSegmentOffset += item.outputDataSegmentsCount
                 let workResult = WorkResult(
