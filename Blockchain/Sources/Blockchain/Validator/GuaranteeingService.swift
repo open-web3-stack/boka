@@ -155,14 +155,18 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             logger.debug("not in current validator set, skipping refine")
             return
         }
-        // Share work package
 
-        // Reine
+        // Share work package
+        let shareWorkPackageEvent = RuntimeEvents.ShareWorkPackage(coreIndex: coreIndex, workPackage: workPackage, extrinsics: extrinsics)
+        publish(shareWorkPackageEvent)
+
+        // check & refine
         let (bundle, mappings, workReport) = try await refinePkg(
             validatorIndex: validatorIndex,
             workPackage: workPackage,
             extrinsics: extrinsics
         )
+
         // Share work bundle
         let shareWorkBundleEvent = RuntimeEvents.WorkPackageBundleReady(
             coreIndex: coreIndex,
@@ -216,6 +220,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
 
     private func validate(workPackage _: WorkPackage) throws -> Bool {
         // TODO: Add validate func
+        // 1. Check if it is possible to generate a work-report
+        // 2. Check all import segments have been retrieved
         true
     }
 
