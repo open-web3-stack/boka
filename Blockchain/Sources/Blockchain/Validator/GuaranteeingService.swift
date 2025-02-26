@@ -6,63 +6,9 @@ import Utils
 public enum GuaranteeingServiceError: Error {
     case noAuthorizerHash
     case invalidExports
-}
-
-public struct SegmentsRootMapping: Codable {
-    public let workPackageHash: Data32
-    public let segmentsRoot: SegmentsRoot
-}
-
-public typealias SegmentsRoot = Data32
-public typealias SegmentsRootMappings = [SegmentsRootMapping]
-
-public struct Guarantor: Codable, Identifiable {
-    public let id: Data32 // Unique identifier for the guarantor (e.g., public key hash)
-    public let coreIndex: CoreIndex // The core index to which the guarantor is assigned
-
-    // Method to receive a work package bundle
-    public func receiveWorkPackageBundle(
-        coreIndex _: CoreIndex,
-        segmentsRootMappings: SegmentsRootMappings,
-        bundle: WorkPackageBundle
-    ) async throws {
-        // 1. Perform basic verification
-        guard try validateWorkPackageBundle(bundle, segmentsRootMappings: segmentsRootMappings) else {
-            throw WorkPackageError.invalidBundle
-        }
-    }
-
-    private func validateWorkPackageBundle(
-        _ bundle: WorkPackageBundle,
-        segmentsRootMappings: SegmentsRootMappings
-    ) throws -> Bool {
-        // 1. Validate the work package authorization
-        guard try validateAuthorization(bundle.workPackage) else {
-            return false
-        }
-
-        // 2. Validate the segments-root mappings
-        for mapping in segmentsRootMappings {
-            guard try validateSegmentsRootMapping(mapping, for: bundle.workPackage) else {
-                return false
-            }
-        }
-
-        return true
-    }
-
-    private func validateSegmentsRootMapping(
-        _: SegmentsRootMapping,
-        for _: WorkPackage
-    ) throws -> Bool {
-        // TODO: Implement logic to validate the segments-root mapping
-        true // Placeholder
-    }
-
-    private func validateAuthorization(_: WorkPackage) throws -> Bool {
-        // TODO: Implement logic to validate the work package authorization
-        true // Placeholder
-    }
+    case invalidWorkPackage
+    case invalidBundle
+    case segmentsRootNotFound
 }
 
 public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
@@ -94,6 +40,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
 
         await subscribe(RuntimeEvents.WorkPackagesReceived.self, id: "GuaranteeingService.WorkPackagesReceived") { [weak self] event in
             try await self?.on(workPackagesReceived: event)
+        }
+
+        await subscribe(RuntimeEvents.WorkPackageBundleReady.self, id: "GuaranteeingService.WorkPackageBundleReady") { [weak self] event in
+            try await self?.on(workPackageBundleReady: event)
         }
     }
 
@@ -135,21 +85,88 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
     }
 
+    private func on(workPackageBundleReady event: RuntimeEvents.WorkPackageBundleReady) async throws {
+        try await receiveWorkPackageBundleReady(
+            coreIndex: event.coreIndex,
+            segmentsRootMappings: event.segmentsRootMappings,
+            bundle: event.bundle
+        )
+    }
+
+    private func on(workPackageBundleReceived _: RuntimeEvents.WorkPackageBundleRecived) async throws {
+        // TODO: check somethings
+    }
+
+    // Method to receive a work package bundle ready
+    private func receiveWorkPackageBundleReady(
+        coreIndex _: CoreIndex,
+        segmentsRootMappings: SegmentsRootMappings,
+        bundle: WorkPackageBundle
+    ) async throws {
+        // 1. Perform basic verification
+        guard try validateWorkPackageBundle(bundle, segmentsRootMappings: segmentsRootMappings) else {
+            throw GuaranteeingServiceError.invalidBundle
+        }
+    }
+
+    private func validateWorkPackageBundle(
+        _ bundle: WorkPackageBundle,
+        segmentsRootMappings: SegmentsRootMappings
+    ) throws -> Bool {
+        // 1. Validate the work package authorization
+        guard try validateAuthorization(bundle.workPackage) else {
+            return false
+        }
+
+        // 2. Validate the segments-root mappings
+        for mapping in segmentsRootMappings {
+            guard try validateSegmentsRootMapping(mapping, for: bundle.workPackage) else {
+                return false
+            }
+        }
+
+        return true
+    }
+
     private func on(workPackagesReceived event: RuntimeEvents.WorkPackagesReceived) async throws {
-        try await shareWorkPackage(coreIndex: event.coreIndex, workPackage: event.workPackageRef, extrinsics: event.extrinsics)
+        try await handleWorkPackage(coreIndex: event.coreIndex, workPackage: event.workPackageRef, extrinsics: event.extrinsics)
     }
 
-    // Work Package Sharing (Send Side)
-    public func shareWorkPackage(coreIndex _: CoreIndex, workPackage: WorkPackageRef, extrinsics: [Data]) async throws {
-        try await refinePkg(workPackage: workPackage, extrinsics: extrinsics)
-    }
-
-    private func refinePkg(workPackage: WorkPackageRef, extrinsics: [Data]) async throws {
+    // handle Work Package
+    public func handleWorkPackage(coreIndex: CoreIndex, workPackage: WorkPackageRef, extrinsics: [Data]) async throws {
+        // 1. Validate the work package
+        guard try validate(workPackage: workPackage.value) else {
+            logger.error("Invalid work package: \(workPackage)")
+            throw GuaranteeingServiceError.invalidWorkPackage
+        }
         guard let (validatorIndex, signingKey) = signingKey.value else {
             logger.debug("not in current validator set, skipping refine")
             return
         }
+        // 2. share work package
+        // 3. reine
+        let (bundle, mappings, workReport) = try await refine(
+            validatorIndex: validatorIndex,
+            workPackage: workPackage,
+            extrinsics: extrinsics
+        )
+        // 4. share work bundle
+        let shareWorkBundleEvent = RuntimeEvents.WorkPackageBundleReady(
+            coreIndex: coreIndex,
+            bundle: bundle,
+            segmentsRootMappings: mappings
+        )
+        publish(shareWorkBundleEvent)
+        // 5. sign work report & work-report distribution
+        let payload = SigningContext.guarantee + workReport.hash().data
+        let signature = try signingKey.sign(message: payload)
+        let workReportEvent = RuntimeEvents.WorkReportGenerated(item: workReport, signature: signature)
+        publish(workReportEvent)
+    }
 
+    private func refine(validatorIndex: ValidatorIndex, workPackage: WorkPackageRef,
+                        extrinsics: [Data]) async throws -> (WorkPackageBundle, SegmentsRootMappings, WorkReport)
+    {
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
 
         // TODO: check for edge cases such as epoch end
@@ -162,52 +179,26 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         guard let coreIndex = currentCoreAssignment[safe: Int(validatorIndex)] else {
             try throwUnreachable("invalid validator index/core assignment")
         }
-        // TODO: validatorIndex -> coreIndex
-        // 1. TODO: Get other guarantors assigned to the same core
-        let guarantors = try await getGuarantors(for: coreIndex)
 
-        // 2. Validate the work package
-        guard try validate(workPackage: workPackage.value) else {
-            logger.error("Invalid work package: \(workPackage)")
-            throw WorkPackageError.invalidWorkPackage
-        }
-
-        // 3. Create work report & WorkPackageBundle
-        let (bundle, mappings, workReport) = try await createWorkReport(
+        // Create work report & WorkPackageBundle
+        return try await createWorkReport(
             coreIndex: coreIndex,
             workPackage: workPackage,
             extrinsics: extrinsics
         )
-        // 4. TODO: Send the bundle to other guarantors
-        for guarantor in guarantors {
-            // 5. TODO: Something needs to do, when receive workpackage bundle
-            try await guarantor.receiveWorkPackageBundle(
-                coreIndex: coreIndex,
-                segmentsRootMappings: mappings,
-                bundle: bundle
-            )
-        }
-        // 6. Sign the work report hash
-        let payload = SigningContext.guarantee + workReport.hash().data
-        let signature = try signingKey.sign(message: payload)
-        let event = RuntimeEvents.WorkReportGenerated(item: workReport, signature: signature)
-        // 7. Push
-        publish(event)
     }
 
-    // TODO: Get other guarantors assigned to the same core
-    public func getGuarantors(for coreIndex: CoreIndex) async throws -> [Guarantor] {
-        // 1. Get the current blockchain state
-        let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
-        var guarantors = [Guarantor]()
-        // TODO: Mock
-        for validator in state.value.currentValidators {
-            guarantors.append(Guarantor(
-                id: validator.ed25519.blake2b256hash(), // 使用验证者的公钥哈希作为 ID
-                coreIndex: coreIndex
-            ))
-        }
-        return guarantors
+    private func validateSegmentsRootMapping(
+        _: SegmentsRootMapping,
+        for _: WorkPackage
+    ) throws -> Bool {
+        // TODO: Implement logic to validate the segments-root mapping
+        true // Placeholder
+    }
+
+    private func validateAuthorization(_: WorkPackage) throws -> Bool {
+        // TODO: Implement logic to validate the work package authorization
+        true // Placeholder
     }
 
     private func validate(workPackage _: WorkPackage) throws -> Bool {

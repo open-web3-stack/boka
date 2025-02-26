@@ -76,12 +76,6 @@ public struct RefinementContext: Comparable, Sendable, Equatable, Codable {
     }
 }
 
-extension RefinementContext: Hashable32 {
-    public func hash() -> Data32 {
-        try! JamEncoder.encode(self).blake2b256hash()
-    }
-}
-
 extension RefinementContext: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config _: Config) -> RefinementContext {
