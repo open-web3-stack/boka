@@ -38,6 +38,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
 
         super.init(id: "GuaranteeingService", config: config, eventBus: eventBus, scheduler: scheduler)
 
+        await subscribe(RuntimeEvents.ShareWorkPackage.self, id: "GuaranteeingService.ShareWorkPackage") { [weak self] event in
+            try await self?.on(shareWorkPackage: event)
+        }
+
         await subscribe(RuntimeEvents.WorkPackagesReceived.self, id: "GuaranteeingService.WorkPackagesReceived") { [weak self] event in
             try await self?.on(workPackagesReceived: event)
         }
@@ -85,6 +89,14 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
     }
 
+    private func on(shareWorkPackage event: RuntimeEvents.ShareWorkPackage) async throws {
+        guard try validate(workPackage: event.workPackage.value) else {
+            logger.error("Invalid work package: \(event.workPackage)")
+            throw GuaranteeingServiceError.invalidWorkPackage
+        }
+        // TODO: sometings need to do
+    }
+
     private func on(workPackageBundleReady event: RuntimeEvents.WorkPackageBundleReady) async throws {
         try await receiveWorkPackageBundleReady(
             coreIndex: event.coreIndex,
@@ -103,7 +115,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         segmentsRootMappings: SegmentsRootMappings,
         bundle: WorkPackageBundle
     ) async throws {
-        // 1. Perform basic verification
+        // Perform basic verification
         guard try validateWorkPackageBundle(bundle, segmentsRootMappings: segmentsRootMappings) else {
             throw GuaranteeingServiceError.invalidBundle
         }
@@ -113,12 +125,12 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         _ bundle: WorkPackageBundle,
         segmentsRootMappings: SegmentsRootMappings
     ) throws -> Bool {
-        // 1. Validate the work package authorization
+        // Validate the work package authorization
         guard try validateAuthorization(bundle.workPackage) else {
             return false
         }
 
-        // 2. Validate the segments-root mappings
+        // Validate the segments-root mappings
         for mapping in segmentsRootMappings {
             guard try validateSegmentsRootMapping(mapping, for: bundle.workPackage) else {
                 return false
@@ -134,7 +146,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
 
     // handle Work Package
     public func handleWorkPackage(coreIndex: CoreIndex, workPackage: WorkPackageRef, extrinsics: [Data]) async throws {
-        // 1. Validate the work package
+        // Validate the work package
         guard try validate(workPackage: workPackage.value) else {
             logger.error("Invalid work package: \(workPackage)")
             throw GuaranteeingServiceError.invalidWorkPackage
@@ -143,29 +155,30 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             logger.debug("not in current validator set, skipping refine")
             return
         }
-        // 2. share work package
-        // 3. reine
-        let (bundle, mappings, workReport) = try await refine(
+        // Share work package
+
+        // Reine
+        let (bundle, mappings, workReport) = try await refinePkg(
             validatorIndex: validatorIndex,
             workPackage: workPackage,
             extrinsics: extrinsics
         )
-        // 4. share work bundle
+        // Share work bundle
         let shareWorkBundleEvent = RuntimeEvents.WorkPackageBundleReady(
             coreIndex: coreIndex,
             bundle: bundle,
             segmentsRootMappings: mappings
         )
         publish(shareWorkBundleEvent)
-        // 5. sign work report & work-report distribution
+        // Sign work report & work-report distribution via CE 135
         let payload = SigningContext.guarantee + workReport.hash().data
         let signature = try signingKey.sign(message: payload)
         let workReportEvent = RuntimeEvents.WorkReportGenerated(item: workReport, signature: signature)
         publish(workReportEvent)
     }
 
-    private func refine(validatorIndex: ValidatorIndex, workPackage: WorkPackageRef,
-                        extrinsics: [Data]) async throws -> (WorkPackageBundle, SegmentsRootMappings, WorkReport)
+    private func refinePkg(validatorIndex: ValidatorIndex, workPackage: WorkPackageRef,
+                           extrinsics: [Data]) async throws -> (WorkPackageBundle, SegmentsRootMappings, WorkReport)
     {
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
 
