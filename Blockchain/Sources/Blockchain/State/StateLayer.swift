@@ -39,6 +39,12 @@ public struct StateLayer: Sendable {
         }
     }
 
+    public init(rawKV: [Data32: Data]) {
+        for (key, value) in rawKV {
+            changes[key] = .value(value)
+        }
+    }
+
     // α: The core αuthorizations pool.
     public var coreAuthorizationPool: StateKeys.CoreAuthorizationPoolKey.Value {
         get {
