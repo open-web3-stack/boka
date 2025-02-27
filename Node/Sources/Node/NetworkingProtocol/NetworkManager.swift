@@ -232,7 +232,18 @@ struct HandlerImpl: NetworkProtocolHandler {
                     event: RuntimeEvents
                         .WorkPackagesReceived(
                             coreIndex: message.coreIndex,
-                            workPackageRef: message.workPackage.asRef(),
+                            workPackage: message.workPackage.asRef(),
+                            extrinsics: message.extrinsics
+                        )
+                )
+            return []
+        case let .workPackageSharing(message):
+            blockchain
+                .publish(
+                    event: RuntimeEvents
+                        .WorkPackageShare(
+                            coreIndex: message.coreIndex,
+                            workPackage: message.workPackage.asRef(),
                             extrinsics: message.extrinsics
                         )
                 )

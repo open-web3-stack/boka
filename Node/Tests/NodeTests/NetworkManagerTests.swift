@@ -81,7 +81,32 @@ struct NetworkManagerTests {
 
         // Publish WorkPackagesReceived event
         await services.blockchain
-            .publish(event: RuntimeEvents.WorkPackagesReceived(coreIndex: 0, workPackageRef: workPackage, extrinsics: []))
+            .publish(event: RuntimeEvents.WorkPackagesReceived(coreIndex: 0, workPackage: workPackage, extrinsics: []))
+
+        // Wait for event processing
+        await storeMiddleware.wait()
+
+        // Verify network calls
+        #expect(
+            network.contain(calls: [
+                .init(function: "connect", parameters: ["address": devPeers.first!, "role": PeerRole.validator]),
+                .init(function: "sendToPeer", parameters: [
+                    "message": CERequest.workPackageSubmission(
+                        WorkPackageMessage(coreIndex: 0, workPackage: workPackage.value, extrinsics: [])
+                    ),
+                ]),
+            ])
+        )
+    }
+
+    @Test
+    func testWorkPackagesShare() async throws {
+        // Create dummy work packages
+        let workPackage = WorkPackage.dummy(config: services.config).asRef()
+
+        // Publish WorkPackagesShare event
+        await services.blockchain
+            .publish(event: RuntimeEvents.WorkPackageShare(coreIndex: 0, workPackage: workPackage, extrinsics: []))
 
         // Wait for event processing
         await storeMiddleware.wait()

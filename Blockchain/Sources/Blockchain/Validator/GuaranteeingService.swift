@@ -38,8 +38,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
 
         super.init(id: "GuaranteeingService", config: config, eventBus: eventBus, scheduler: scheduler)
 
-        await subscribe(RuntimeEvents.ShareWorkPackage.self, id: "GuaranteeingService.ShareWorkPackage") { [weak self] event in
-            try await self?.on(shareWorkPackage: event)
+        await subscribe(RuntimeEvents.WorkPackageShare.self, id: "GuaranteeingService.ShareWorkPackage") { [weak self] event in
+            try await self?.on(workPackagSharee: event)
         }
 
         await subscribe(RuntimeEvents.WorkPackagesReceived.self, id: "GuaranteeingService.WorkPackagesReceived") { [weak self] event in
@@ -89,7 +89,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
     }
 
-    private func on(shareWorkPackage event: RuntimeEvents.ShareWorkPackage) async throws {
+    private func on(workPackagSharee event: RuntimeEvents.WorkPackageShare) async throws {
         guard try validate(workPackage: event.workPackage.value) else {
             logger.error("Invalid work package: \(event.workPackage)")
             throw GuaranteeingServiceError.invalidWorkPackage
@@ -141,7 +141,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     private func on(workPackagesReceived event: RuntimeEvents.WorkPackagesReceived) async throws {
-        try await handleWorkPackage(coreIndex: event.coreIndex, workPackage: event.workPackageRef, extrinsics: event.extrinsics)
+        try await handleWorkPackage(coreIndex: event.coreIndex, workPackage: event.workPackage, extrinsics: event.extrinsics)
     }
 
     // handle Work Package
@@ -157,7 +157,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
 
         // Share work package
-        let shareWorkPackageEvent = RuntimeEvents.ShareWorkPackage(coreIndex: coreIndex, workPackage: workPackage, extrinsics: extrinsics)
+        let shareWorkPackageEvent = RuntimeEvents.WorkPackageShare(coreIndex: coreIndex, workPackage: workPackage, extrinsics: extrinsics)
         publish(shareWorkPackageEvent)
 
         // check & refine
@@ -218,8 +218,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         true // Placeholder
     }
 
+    // TODO: Add validate func
     private func validate(workPackage _: WorkPackage) throws -> Bool {
-        // TODO: Add validate func
         // 1. Check if it is possible to generate a work-report
         // 2. Check all import segments have been retrieved
         true

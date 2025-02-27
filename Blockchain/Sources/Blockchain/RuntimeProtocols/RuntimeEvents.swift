@@ -55,12 +55,12 @@ public enum RuntimeEvents {
     // When a work package is recived via CE133
     public struct WorkPackagesReceived: Event {
         public let coreIndex: CoreIndex
-        public let workPackageRef: WorkPackageRef
+        public let workPackage: WorkPackageRef
         public let extrinsics: [Data]
 
-        public init(coreIndex: CoreIndex, workPackageRef: WorkPackageRef, extrinsics: [Data]) {
+        public init(coreIndex: CoreIndex, workPackage: WorkPackageRef, extrinsics: [Data]) {
             self.coreIndex = coreIndex
-            self.workPackageRef = workPackageRef
+            self.workPackage = workPackage
             self.extrinsics = extrinsics
         }
     }
@@ -83,7 +83,7 @@ public enum RuntimeEvents {
     }
 
     // When a work package will be shared via CE134
-    public struct ShareWorkPackage: Event {
+    public struct WorkPackageShare: Event {
         public let coreIndex: CoreIndex
         public let workPackage: WorkPackageRef
         public let extrinsics: [Data]

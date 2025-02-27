@@ -47,6 +47,6 @@ struct GuaranteeingServiceTests {
 //
 //        let workpackage = WorkPackage.dummy(config: services.config)
 //        await services.eventBus
-//            .publish(RuntimeEvents.WorkPackagesReceived(coreIndex: 0, workPackageRef: workpackage.asRef(), extrinsics: []))
+//            .publish(RuntimeEvents.WorkPackagesReceived(coreIndex: 0, workPackage: workpackage.asRef(), extrinsics: []))
 //    }
 }
