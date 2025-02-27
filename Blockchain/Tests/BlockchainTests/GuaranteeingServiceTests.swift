@@ -40,13 +40,13 @@ struct GuaranteeingServiceTests {
         #expect(signingKey.1.publicKey == publicKey)
     }
 
-//    @Test func workPackagesReceived() async throws {
-//        let (services, guaranteeingService) = try await setup(keysCount: 1)
-//
-//        await guaranteeingService.onSyncCompleted()
-//
-//        let workpackage = WorkPackage.dummy(config: services.config)
-//        await services.eventBus
-//            .publish(RuntimeEvents.WorkPackagesReceived(coreIndex: 0, workPackage: workpackage.asRef(), extrinsics: []))
-//    }
+    @Test func workPackagesReceived() async throws {
+        let (services, guaranteeingService) = try await setup(keysCount: 0)
+
+        await guaranteeingService.onSyncCompleted()
+
+        let workpackage = WorkPackage.dummy(config: services.config)
+        await services.eventBus
+            .publish(RuntimeEvents.WorkPackagesReceived(coreIndex: 0, workPackage: workpackage.asRef(), extrinsics: []))
+    }
 }
