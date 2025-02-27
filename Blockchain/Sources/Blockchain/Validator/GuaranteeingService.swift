@@ -39,7 +39,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         super.init(id: "GuaranteeingService", config: config, eventBus: eventBus, scheduler: scheduler)
 
         await subscribe(RuntimeEvents.WorkPackageShare.self, id: "GuaranteeingService.ShareWorkPackage") { [weak self] event in
-            try await self?.on(workPackagSharee: event)
+            try await self?.on(workPackagShare: event)
         }
 
         await subscribe(RuntimeEvents.WorkPackagesReceived.self, id: "GuaranteeingService.WorkPackagesReceived") { [weak self] event in
@@ -47,7 +47,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
 
         await subscribe(RuntimeEvents.WorkPackageBundleReady.self, id: "GuaranteeingService.WorkPackageBundleReady") { [weak self] event in
-            try await self?.on(workPackageBundleReady: event)
+            try await self?.on(workPackageBundle: event)
         }
     }
 
@@ -89,7 +89,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
     }
 
-    private func on(workPackagSharee event: RuntimeEvents.WorkPackageShare) async throws {
+    private func on(workPackagShare event: RuntimeEvents.WorkPackageShare) async throws {
         guard try validate(workPackage: event.workPackage.value) else {
             logger.error("Invalid work package: \(event.workPackage)")
             throw GuaranteeingServiceError.invalidWorkPackage
@@ -97,8 +97,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         // TODO: sometings need to do
     }
 
-    private func on(workPackageBundleReady event: RuntimeEvents.WorkPackageBundleReady) async throws {
-        try await receiveWorkPackageBundleReady(
+    private func on(workPackageBundle event: RuntimeEvents.WorkPackageBundleReady) async throws {
+        try await receiveWorkPackageBundle(
             coreIndex: event.coreIndex,
             segmentsRootMappings: event.segmentsRootMappings,
             bundle: event.bundle
@@ -109,8 +109,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         // TODO: check somethings
     }
 
-    // Method to receive a work package bundle ready
-    private func receiveWorkPackageBundleReady(
+    // Method to receive a work package bundle
+    private func receiveWorkPackageBundle(
         coreIndex _: CoreIndex,
         segmentsRootMappings: SegmentsRootMappings,
         bundle: WorkPackageBundle
