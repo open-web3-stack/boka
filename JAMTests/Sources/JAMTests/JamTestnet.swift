@@ -7,8 +7,6 @@ struct JamTestnetTestcase: Codable {
     var preState: TestState
     var block: Block
     var postState: TestState
-    // NOTE: jamduna has a field for accumulate root, others don't have this
-    // var r: Data32
 }
 
 extension ProtocolConfig {
@@ -152,6 +150,7 @@ enum JamTestnet {
     }
 
     static func decodeTestcase(_ input: Testcase, config: ProtocolConfigRef = TestVariants.tiny.config) throws -> JamTestnetTestcase {
+        // NOTE: some tests have trailing bytes
         try JamDecoder.decode(JamTestnetTestcase.self, from: input.data, withConfig: config, allowTrailingBytes: true)
     }
 
