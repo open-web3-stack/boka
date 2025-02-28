@@ -21,7 +21,6 @@ private enum StateLayerValue: Sendable {
     }
 }
 
-// @unchecked because AnyHashable is not Sendable
 public struct StateLayer: Sendable {
     private var changes: [Data32: StateLayerValue] = [:]
 

@@ -23,9 +23,16 @@ enum TestVariants: String, CaseIterable {
     }
 }
 
+enum TestsSource: String {
+    case w3f = "jamtestvectors"
+    case jamduna
+    case javajam
+    case jamixir
+}
+
 enum TestLoader {
-    static func getTestcases(path: String, extension ext: String) throws -> [Testcase] {
-        let prefix = Bundle.module.resourcePath! + "/jamtestvectors/\(path)"
+    static func getTestcases(path: String, extension ext: String, src: TestsSource = .w3f) throws -> [Testcase] {
+        let prefix = Bundle.module.resourcePath! + "/\(src.rawValue)/\(path)"
         let files = try FileManager.default.contentsOfDirectory(atPath: prefix)
         var filtered = files.filter { $0.hasSuffix(".\(ext)") }
         filtered.sort()
@@ -35,8 +42,8 @@ enum TestLoader {
         }
     }
 
-    static func getFile(path: String, extension ext: String) throws -> Data {
-        let path = Bundle.module.resourcePath! + "/jamtestvectors/\(path).\(ext)"
+    static func getFile(path: String, extension ext: String, src: TestsSource = .w3f) throws -> Data {
+        let path = Bundle.module.resourcePath! + "/\(src.rawValue)/\(path).\(ext)"
         return try Data(contentsOf: URL(fileURLWithPath: path))
     }
 }

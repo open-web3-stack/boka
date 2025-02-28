@@ -31,7 +31,12 @@ let package = Package(
             dependencies: [
                 "Blockchain",
             ],
-            resources: [.copy("../../jamtestvectors")]
+            resources: [
+                .copy("../../jamtestvectors"),
+                .copy("../../jamduna"),
+                .copy("../../javajam"),
+                .copy("../../jamixir"),
+            ]
         ),
         .testTarget(
             name: "JAMTestsTests",

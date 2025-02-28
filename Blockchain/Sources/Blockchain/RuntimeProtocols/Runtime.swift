@@ -75,7 +75,7 @@ public final class Runtime {
         // offendersMarkers is validated at apply time by Disputes
     }
 
-    public func validateHeaderSeal(block: BlockRef, state: inout State, prevState: StateRef) throws(Error) {
+    public func validateHeaderSeal(block: BlockRef, state: State, prevState: StateRef) throws(Error) {
         let vrfOutput: Data32
         let blockAuthorKey = try Result {
             try Bandersnatch.PublicKey(data: state.currentValidators[Int(block.header.authorIndex)].bandersnatch)
@@ -144,13 +144,13 @@ public final class Runtime {
             .mapError(Error.validateError)
             .get()
 
-        return try await apply(block: validatedBlock, state: prevState, context: context)
+        try validate(block: validatedBlock, state: prevState, context: context)
+
+        return try await apply(block: validatedBlock, state: prevState)
     }
 
-    public func apply(block: Validated<BlockRef>, state prevState: StateRef, context: ApplyContext) async throws(Error) -> StateRef {
-        try validate(block: block, state: prevState, context: context)
+    public func apply(block: Validated<BlockRef>, state prevState: StateRef) async throws(Error) -> StateRef {
         let block = block.value
-
         var newState = prevState.value
 
         do {
@@ -163,7 +163,7 @@ public final class Runtime {
                 ])
             }
 
-            try validateHeaderSeal(block: block, state: &newState, prevState: prevState)
+            try validateHeaderSeal(block: block, state: newState, prevState: prevState)
 
             try updateDisputes(block: block, state: &newState)
 

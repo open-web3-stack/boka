@@ -17,7 +17,7 @@ public func stateMerklize(kv: [Data32: Data], i: Int = 0) throws(MerklizeError) 
     func embeddedLeaf(key: Data32, value: Data, size: UInt8) -> Data64 {
         var data = Data(capacity: 64)
         data.append(0b1000_0000 | size)
-        data += key.data[..<31]
+        data += key.data[relative: ..<31]
         data += value
         data.append(contentsOf: repeatElement(0, count: 32 - Int(size)))
         return Data64(data)!
@@ -26,7 +26,7 @@ public func stateMerklize(kv: [Data32: Data], i: Int = 0) throws(MerklizeError) 
     func regularLeaf(key: Data32, value: Data) -> Data64 {
         var data = Data(capacity: 64)
         data.append(0b1100_0000)
-        data += key.data[..<31]
+        data += key.data[relative: ..<31]
         data += value.blake2b256hash().data
         return Data64(data)!
     }
@@ -41,9 +41,10 @@ public func stateMerklize(kv: [Data32: Data], i: Int = 0) throws(MerklizeError) 
 
     /// bit at i, returns true if it is 1
     func bit(_ data: Data, _ i: Int) throws(MerklizeError) -> Bool {
-        guard let byte = data[safe: i / 8] else {
+        guard data.indices.contains(data.startIndex + (i / 8)) else {
             throw MerklizeError.invalidIndex
         }
+        let byte = data[relative: i / 8]
         return (byte & (1 << (7 - (i % 8)))) != 0
     }
 
