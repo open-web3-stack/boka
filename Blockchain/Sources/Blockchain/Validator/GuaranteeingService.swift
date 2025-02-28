@@ -6,6 +6,9 @@ import Utils
 public enum GuaranteeingServiceError: Error {
     case noAuthorizerHash
     case invalidExports
+    case invalidWorkPackage
+    case invalidBundle
+    case segmentsRootNotFound
 }
 
 public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
@@ -37,6 +40,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
 
         await subscribe(RuntimeEvents.WorkPackagesReceived.self, id: "GuaranteeingService.WorkPackagesReceived") { [weak self] event in
             try await self?.on(workPackagesReceived: event)
+        }
+
+        await subscribe(RuntimeEvents.WorkPackageBundleShare.self, id: "GuaranteeingService.WorkPackageBundleShare") { [weak self] event in
+            try await self?.on(workPackageBundle: event)
         }
     }
 
@@ -78,16 +85,89 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
     }
 
-    private func on(workPackagesReceived event: RuntimeEvents.WorkPackagesReceived) async throws {
-        try await refinePkg(package: event.workPackageRef)
+    private func on(workPackageBundle event: RuntimeEvents.WorkPackageBundleShare) async throws {
+        try await receiveWorkPackageBundle(
+            coreIndex: event.coreIndex,
+            segmentsRootMappings: event.segmentsRootMappings,
+            bundle: event.bundle
+        )
     }
 
-    private func refinePkg(package: WorkPackageRef) async throws {
+    private func on(workPackageBundleReceived _: RuntimeEvents.WorkPackageBundleRecived) async throws {
+        // TODO: check somethings
+    }
+
+    // Method to receive a work package bundle
+    private func receiveWorkPackageBundle(
+        coreIndex _: CoreIndex,
+        segmentsRootMappings: SegmentsRootMappings,
+        bundle: WorkPackageBundle
+    ) async throws {
+        // Perform basic verification
+        guard try validateWorkPackageBundle(bundle, segmentsRootMappings: segmentsRootMappings) else {
+            throw GuaranteeingServiceError.invalidBundle
+        }
+    }
+
+    private func validateWorkPackageBundle(
+        _ bundle: WorkPackageBundle,
+        segmentsRootMappings: SegmentsRootMappings
+    ) throws -> Bool {
+        // Validate the work package authorization
+        guard try validateAuthorization(bundle.workPackage) else {
+            return false
+        }
+
+        // Validate the segments-root mappings
+        for mapping in segmentsRootMappings {
+            guard try validateSegmentsRootMapping(mapping, for: bundle.workPackage) else {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    private func on(workPackagesReceived event: RuntimeEvents.WorkPackagesReceived) async throws {
+        try await handleWorkPackage(coreIndex: event.coreIndex, workPackage: event.workPackage, extrinsics: event.extrinsics)
+    }
+
+    // handle Work Package
+    public func handleWorkPackage(coreIndex: CoreIndex, workPackage: WorkPackageRef, extrinsics: [Data]) async throws {
+        // Validate the work package
+        guard try validate(workPackage: workPackage.value) else {
+            logger.error("Invalid work package: \(workPackage)")
+            throw GuaranteeingServiceError.invalidWorkPackage
+        }
         guard let (validatorIndex, signingKey) = signingKey.value else {
             logger.debug("not in current validator set, skipping refine")
             return
         }
 
+        // check & refine
+        let (bundle, mappings, workReport) = try await refinePkg(
+            validatorIndex: validatorIndex,
+            workPackage: workPackage,
+            extrinsics: extrinsics
+        )
+
+        // Share work package bundle
+        let shareWorkBundleEvent = RuntimeEvents.WorkPackageBundleShare(
+            coreIndex: coreIndex,
+            bundle: bundle,
+            segmentsRootMappings: mappings
+        )
+        publish(shareWorkBundleEvent)
+        // Sign work report & work-report distribution via CE 135
+        let payload = SigningContext.guarantee + workReport.hash().data
+        let signature = try signingKey.sign(message: payload)
+        let workReportEvent = RuntimeEvents.WorkReportGenerated(item: workReport, signature: signature)
+        publish(workReportEvent)
+    }
+
+    private func refinePkg(validatorIndex: ValidatorIndex, workPackage: WorkPackageRef,
+                           extrinsics: [Data]) async throws -> (WorkPackageBundle, SegmentsRootMappings, WorkReport)
+    {
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
 
         // TODO: check for edge cases such as epoch end
@@ -96,24 +176,63 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             randomness: state.value.entropyPool.t2,
             timeslot: state.value.timeslot + 1
         )
+        // TODO: coreIndex equal with shareWorkPackage coreIndex?
         guard let coreIndex = currentCoreAssignment[safe: Int(validatorIndex)] else {
             try throwUnreachable("invalid validator index/core assignment")
         }
 
-        let workReport = try await createWorkReport(for: package, coreIndex: coreIndex)
-        let payload = SigningContext.guarantee + workReport.hash().data
-        let signature = try signingKey.sign(message: payload)
-        let event = RuntimeEvents.WorkReportGenerated(item: workReport, signature: signature)
-        publish(event)
+        // Create work report & WorkPackageBundle
+        return try await createWorkReport(
+            coreIndex: coreIndex,
+            workPackage: workPackage,
+            extrinsics: extrinsics
+        )
+    }
+
+    private func validateSegmentsRootMapping(
+        _: SegmentsRootMapping,
+        for _: WorkPackage
+    ) throws -> Bool {
+        // TODO: Implement logic to validate the segments-root mapping
+        true // Placeholder
+    }
+
+    private func validateAuthorization(_: WorkPackage) throws -> Bool {
+        // TODO: Implement logic to validate the work package authorization
+        true // Placeholder
+    }
+
+    // TODO: Add validate func
+    private func validate(workPackage _: WorkPackage) throws -> Bool {
+        // 1. Check if it is possible to generate a work-report
+        // 2. Check all import segments have been retrieved
+        true
+    }
+
+    private func retrieveImportSegments(for _: WorkPackage) async throws -> [Data4104] {
+        // TODO: Implement retrieveImportSegments
+        // Implement logic to retrieve imported data segments
+        // For example, fetch from the data availability layer
+        [] // Placeholder
+    }
+
+    private func retrieveJustifications(for _: WorkPackage) async throws -> [Data] {
+        // TODO: Implement retrieveJustifications
+        // Implement logic to retrieve justifications for the imported segments
+        // For example, fetch proofs from the data availability layer
+        [] // Placeholder
     }
 
     // workpackage -> workresult -> workreport
-    private func createWorkReport(for workPackage: WorkPackageRef, coreIndex: CoreIndex) async throws -> WorkReport {
+    private func createWorkReport(coreIndex: CoreIndex, workPackage: WorkPackageRef,
+                                  extrinsics: [Data]) async throws -> (WorkPackageBundle, SegmentsRootMappings, WorkReport)
+    {
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
         let packageHash = workPackage.hash
         let corePool = state.value.coreAuthorizationPool[coreIndex]
         let authorizerHash = try corePool.array.first.unwrap(orError: GuaranteeingServiceError.noAuthorizerHash)
         var exportSegmentOffset: UInt16 = 0
+        var mappings: SegmentsRootMappings = []
         // B.2. the authorization output, the result of the Is-Authorized function
         // TODO: waiting for authorizationFunction done  Mock a result
         // let res = try await authorizationFunction.invoke(config: config, serviceAccounts: state.value, package: workPackage, coreIndex:
@@ -160,16 +279,16 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
 
                 exportSegments.append(contentsOf: refineRes.exports)
             }
-
-            let (erasureRoot, length) = try await dataAvailability.exportWorkpackageBundle(bundle: WorkPackageBundle(
+            let bundle = try await WorkPackageBundle(
                 workPackage: workPackage.value,
-                extrinsic: [], // TODO: get extrinsic data
-                importSegments: [],
-                justifications: []
-            ))
+                extrinsic: extrinsics,
+                importSegments: retrieveImportSegments(for: workPackage.value),
+                justifications: retrieveJustifications(for: workPackage.value)
+            )
+            let (erasureRoot, length) = try await dataAvailability.exportWorkpackageBundle(bundle: bundle)
 
             let segmentRoot = try await dataAvailability.exportSegments(data: exportSegments, erasureRoot: erasureRoot)
-
+            mappings.append(SegmentsRootMapping(workPackageHash: packageHash, segmentsRoot: segmentRoot))
             // TODO: generate or find AvailabilitySpecifications  14.4.1 work-package bundle
             let packageSpecification = AvailabilitySpecifications(
                 workPackageHash: packageHash,
@@ -183,7 +302,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             for item in state.value.recentHistory.items {
                 oldLookups.merge(item.lookup, uniquingKeysWith: { _, new in new })
             }
-            return try WorkReport(
+            return try (bundle, mappings, WorkReport(
                 authorizerHash: authorizerHash,
                 coreIndex: coreIndex,
                 authorizationOutput: authorizationOutput,
@@ -191,7 +310,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
                 packageSpecification: packageSpecification,
                 lookup: oldLookups,
                 results: ConfigLimitedSizeArray(config: config, array: workResults)
-            )
+            ))
 
         case let .failure(error):
             logger.error("Authorization failed with error: \(error)")
