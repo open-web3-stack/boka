@@ -25,12 +25,14 @@ public class JamDecoder {
     ) throws -> T {
         let decoder = JamDecoder(data: data, config: config)
         let val = try decoder.decode(type)
-        try decoder.finalize(allowTrailingBytes: allowTrailingBytes)
+        if !allowTrailingBytes {
+            try decoder.finalize()
+        }
         return val
     }
 
-    public func finalize(allowTrailingBytes: Bool) throws {
-        if !allowTrailingBytes, !input.isEmpty {
+    public func finalize() throws {
+        guard input.isEmpty else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: [],
