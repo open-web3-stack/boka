@@ -8,7 +8,7 @@ public enum CERequest: Sendable, Equatable, Hashable {
     case safroleTicket1(SafroleTicketMessage)
     case safroleTicket2(SafroleTicketMessage)
     case workPackageSubmission(WorkPackageMessage)
-    case workPackageSharing(WorkPackageMessage)
+    case workPackageSharing(WorkPackageShareMessage)
 }
 
 extension CERequest: RequestProtocol {
@@ -55,7 +55,7 @@ extension CERequest: RequestProtocol {
         case .workPackageSubmission:
             WorkPackageMessage.self
         case .workPackageSharing:
-            WorkPackageMessage.self
+            WorkPackageShareMessage.self
         default:
             fatalError("unimplemented")
         }
@@ -82,7 +82,7 @@ extension CERequest: RequestProtocol {
             guard let message = data as? WorkPackageMessage else { return nil }
             return .workPackageSubmission(message)
         case .workPackageSharing:
-            guard let message = data as? WorkPackageMessage else { return nil }
+            guard let message = data as? WorkPackageShareMessage else { return nil }
             return .workPackageSharing(message)
         default:
             fatalError("unimplemented")

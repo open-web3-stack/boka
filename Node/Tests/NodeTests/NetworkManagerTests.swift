@@ -103,10 +103,15 @@ struct NetworkManagerTests {
     func testWorkPackagesShare() async throws {
         // Create dummy work packages
         let workPackage = WorkPackage.dummy(config: services.config).asRef()
-
+        let bundle = WorkPackageBundle(
+            workPackage: workPackage.value,
+            extrinsic: [],
+            importSegments: [],
+            justifications: []
+        )
         // Publish WorkPackagesShare event
         await services.blockchain
-            .publish(event: RuntimeEvents.WorkPackageShare(coreIndex: 0, workPackage: workPackage, extrinsics: []))
+            .publish(event: RuntimeEvents.WorkPackageBundleShare(coreIndex: 0, bundle: bundle, segmentsRootMappings: []))
 
         // Wait for event processing
         await storeMiddleware.wait()
@@ -116,8 +121,8 @@ struct NetworkManagerTests {
             network.contain(calls: [
                 .init(function: "connect", parameters: ["address": devPeers.first!, "role": PeerRole.validator]),
                 .init(function: "sendToPeer", parameters: [
-                    "message": CERequest.workPackageSubmission(
-                        WorkPackageMessage(coreIndex: 0, workPackage: workPackage.value, extrinsics: [])
+                    "message": CERequest.workPackageSharing(
+                        WorkPackageShareMessage(coreIndex: 0, bundle: bundle, segmentsRootMappings: [])
                     ),
                 ]),
             ])

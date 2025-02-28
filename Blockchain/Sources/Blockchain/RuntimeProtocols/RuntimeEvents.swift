@@ -66,7 +66,7 @@ public enum RuntimeEvents {
     }
 
     // When a work package bundle is ready to shared via CE134
-    public struct WorkPackageBundleReady: Event {
+    public struct WorkPackageBundleShare: Event {
         public let coreIndex: CoreIndex
         public let bundle: WorkPackageBundle
         public let segmentsRootMappings: SegmentsRootMappings
@@ -79,19 +79,6 @@ public enum RuntimeEvents {
             self.coreIndex = coreIndex
             self.bundle = bundle
             self.segmentsRootMappings = segmentsRootMappings
-        }
-    }
-
-    // When a work package will be shared via CE134
-    public struct WorkPackageShare: Event {
-        public let coreIndex: CoreIndex
-        public let workPackage: WorkPackageRef
-        public let extrinsics: [Data]
-
-        public init(coreIndex: CoreIndex, workPackage: WorkPackageRef, extrinsics: [Data]) {
-            self.coreIndex = coreIndex
-            self.workPackage = workPackage
-            self.extrinsics = extrinsics
         }
     }
 

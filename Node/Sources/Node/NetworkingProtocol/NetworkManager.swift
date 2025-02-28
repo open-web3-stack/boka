@@ -241,10 +241,10 @@ struct HandlerImpl: NetworkProtocolHandler {
             blockchain
                 .publish(
                     event: RuntimeEvents
-                        .WorkPackageShare(
+                        .WorkPackageBundleShare(
                             coreIndex: message.coreIndex,
-                            workPackage: message.workPackage.asRef(),
-                            extrinsics: message.extrinsics
+                            bundle: message.bundle,
+                            segmentsRootMappings: message.segmentsRootMappings
                         )
                 )
             return []

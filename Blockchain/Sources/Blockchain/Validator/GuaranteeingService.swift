@@ -38,15 +38,11 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
 
         super.init(id: "GuaranteeingService", config: config, eventBus: eventBus, scheduler: scheduler)
 
-        await subscribe(RuntimeEvents.WorkPackageShare.self, id: "GuaranteeingService.ShareWorkPackage") { [weak self] event in
-            try await self?.on(workPackagShare: event)
-        }
-
         await subscribe(RuntimeEvents.WorkPackagesReceived.self, id: "GuaranteeingService.WorkPackagesReceived") { [weak self] event in
             try await self?.on(workPackagesReceived: event)
         }
 
-        await subscribe(RuntimeEvents.WorkPackageBundleReady.self, id: "GuaranteeingService.WorkPackageBundleReady") { [weak self] event in
+        await subscribe(RuntimeEvents.WorkPackageBundleShare.self, id: "GuaranteeingService.WorkPackageBundleShare") { [weak self] event in
             try await self?.on(workPackageBundle: event)
         }
     }
@@ -89,15 +85,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
     }
 
-    private func on(workPackagShare event: RuntimeEvents.WorkPackageShare) async throws {
-        guard try validate(workPackage: event.workPackage.value) else {
-            logger.error("Invalid work package: \(event.workPackage)")
-            throw GuaranteeingServiceError.invalidWorkPackage
-        }
-        // TODO: sometings need to do
-    }
-
-    private func on(workPackageBundle event: RuntimeEvents.WorkPackageBundleReady) async throws {
+    private func on(workPackageBundle event: RuntimeEvents.WorkPackageBundleShare) async throws {
         try await receiveWorkPackageBundle(
             coreIndex: event.coreIndex,
             segmentsRootMappings: event.segmentsRootMappings,
@@ -156,10 +144,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             return
         }
 
-        // Share work package
-        let shareWorkPackageEvent = RuntimeEvents.WorkPackageShare(coreIndex: coreIndex, workPackage: workPackage, extrinsics: extrinsics)
-        publish(shareWorkPackageEvent)
-
         // check & refine
         let (bundle, mappings, workReport) = try await refinePkg(
             validatorIndex: validatorIndex,
@@ -167,8 +151,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             extrinsics: extrinsics
         )
 
-        // Share work bundle
-        let shareWorkBundleEvent = RuntimeEvents.WorkPackageBundleReady(
+        // Share work package bundle
+        let shareWorkBundleEvent = RuntimeEvents.WorkPackageBundleShare(
             coreIndex: coreIndex,
             bundle: bundle,
             segmentsRootMappings: mappings
