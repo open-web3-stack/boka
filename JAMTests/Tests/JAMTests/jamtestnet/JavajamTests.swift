@@ -9,7 +9,6 @@ struct JavajamTests {
         if input.description != "785461.bin" {
             return
         }
-
         try await CommonTests.test(input)
     }
 }

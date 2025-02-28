@@ -7,10 +7,9 @@ enum CommonTests {
     static func test(_ input: Testcase) async throws {
         let testcase = try JamTestnet.decodeTestcase(input)
 
-        // test state merklize function
-        let preKv = testcase.preState.toKV()
-        let postKv = testcase.postState.toKV()
-        // TODO: fix state merkle fail
+        // test state merklize
+        let preKv = testcase.preState.toDict()
+        let postKv = testcase.postState.toDict()
         #expect(try stateMerklize(kv: preKv) == testcase.preState.root, "pre_state root mismatch")
         #expect(try stateMerklize(kv: postKv) == testcase.postState.root, "post_state root mismatch")
 
@@ -18,11 +17,9 @@ enum CommonTests {
         let result = try await JamTestnet.runSTF(testcase)
         switch result {
         case let .success(stateRef):
-            await #expect(stateRef.value.stateRoot == testcase.postState.root)
+            // TODO: compare details
 
-        // TODO: compare details if root does not match
-        // TODO: how to compare accounts stuff
-        // #expect(stateRef.value == testcase.postState.toState(config: config))
+            await #expect(stateRef.value.stateRoot == testcase.postState.root)
         case .failure:
             Issue.record("Expected success, got \(result)")
         }

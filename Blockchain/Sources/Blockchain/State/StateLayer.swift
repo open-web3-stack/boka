@@ -21,7 +21,6 @@ private enum StateLayerValue: Sendable {
     }
 }
 
-// @unchecked because AnyHashable is not Sendable
 public struct StateLayer: Sendable {
     private var changes: [Data32: StateLayerValue] = [:]
 
@@ -36,12 +35,6 @@ public struct StateLayer: Sendable {
     public init(changes: [(key: any StateKey, value: Codable & Sendable)]) {
         for (key, value) in changes {
             self.changes[key.encode()] = .value(value)
-        }
-    }
-
-    public init(rawKV: [Data32: Data]) {
-        for (key, value) in rawKV {
-            changes[key] = .value(value)
         }
     }
 
