@@ -44,21 +44,21 @@ struct TestState: Codable {
         return result
     }
 
-    func toState(config: ProtocolConfigRef) throws -> State {
+    func toState(config: ProtocolConfigRef = TestVariants.tiny.config) throws -> State {
         var changes: [(key: any StateKey, value: Codable & Sendable)] = []
 
         for arr in keyvals {
             let key: any StateKey
             let value: Codable & Sendable
 
-            guard let str = String(data: arr[2], encoding: .utf8) else {
+            guard let desc = String(data: arr[2], encoding: .utf8) else {
                 fatalError("invalid description")
             }
             guard let detail = String(data: arr[3], encoding: .utf8) else {
                 fatalError("invalid detail")
             }
 
-            switch str {
+            switch desc {
             case "c1":
                 key = StateKeys.CoreAuthorizationPoolKey()
                 value = try JamDecoder.decode(StateKeys.CoreAuthorizationPoolKey.Value.self, from: arr[1], withConfig: config)

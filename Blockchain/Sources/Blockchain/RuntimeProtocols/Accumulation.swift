@@ -244,7 +244,7 @@ extension Accumulation {
             let parallelOutput = try await parallelizedAccumulate(
                 config: config,
                 state: state,
-                workReports: Array(workReports[0 ..< i]),
+                workReports: Array(workReports[0 ..< min(i, workReports.count)]),
                 privilegedGas: privilegedGas,
                 entropy: entropy,
                 timeslot: timeslot

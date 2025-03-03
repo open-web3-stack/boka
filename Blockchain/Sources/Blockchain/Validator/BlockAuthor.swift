@@ -100,11 +100,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
             vrfOutput = try secretKey.getOutput(vrfInputData: inputData)
         }
 
-        let vrfSignature = if ticket != nil {
-            try secretKey.ietfVRFSign(vrfInputData: SigningContext.entropyInputData(entropy: vrfOutput))
-        } else {
-            try secretKey.ietfVRFSign(vrfInputData: SigningContext.fallbackSealInputData(entropy: state.value.entropyPool.t3))
-        }
+        let vrfSignature = try secretKey.ietfVRFSign(vrfInputData: SigningContext.entropyInputData(entropy: vrfOutput))
 
         let authorIndex = state.value.currentValidators.firstIndex { publicKey.data == $0.bandersnatch }
         guard let authorIndex else {
@@ -114,7 +110,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         let safroleResult = try state.value.updateSafrole(
             config: config,
             slot: timeslot,
-            entropy: state.value.entropyPool.t0,
+            entropy: Bandersnatch.getIetfSignatureOutput(signature: vrfSignature),
             offenders: state.value.judgements.punishSet,
             extrinsics: extrinsic.tickets
         )
