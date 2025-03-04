@@ -10,7 +10,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 // of the Bandersnatch VRFs specification
 #[derive(CanonicalSerialize, CanonicalDeserialize)]
 pub struct IetfVrfSignature {
-    output: Output,
+    pub output: Output,
     proof: IetfProof,
 }
 

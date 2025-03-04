@@ -56,6 +56,8 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         let state = try await dataProvider.getState(hash: parentHash)
         let stateRoot = await state.value.stateRoot
         let epoch = timeslot.timeslotToEpochIndex(config: config)
+        let parentEpoch = state.value.timeslot.timeslotToEpochIndex(config: config)
+        let isEpochChange = epoch > parentEpoch
 
         let pendingTickets = await safroleTicketPool.getPendingTickets(epoch: epoch)
         let existingTickets = SortedArray(sortedUnchecked: state.value.safroleState.ticketsAccumulator.array.map(\.id))
@@ -92,19 +94,17 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
             try throwUnreachable("no secret key for public key")
         }
 
+        let sealEntropy = isEpochChange ? state.value.entropyPool.t2 : state.value.entropyPool.t3
+
         let vrfOutput: Data32
         if let ticket {
             vrfOutput = ticket.output
         } else {
-            let inputData = SigningContext.fallbackSealInputData(entropy: state.value.entropyPool.t3)
+            let inputData = SigningContext.fallbackSealInputData(entropy: sealEntropy)
             vrfOutput = try secretKey.getOutput(vrfInputData: inputData)
         }
 
-        let vrfSignature = if ticket != nil {
-            try secretKey.ietfVRFSign(vrfInputData: SigningContext.entropyInputData(entropy: vrfOutput))
-        } else {
-            try secretKey.ietfVRFSign(vrfInputData: SigningContext.fallbackSealInputData(entropy: state.value.entropyPool.t3))
-        }
+        let vrfSignature = try secretKey.ietfVRFSign(vrfInputData: SigningContext.entropyInputData(entropy: vrfOutput))
 
         let authorIndex = state.value.currentValidators.firstIndex { publicKey.data == $0.bandersnatch }
         guard let authorIndex else {
@@ -114,7 +114,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         let safroleResult = try state.value.updateSafrole(
             config: config,
             slot: timeslot,
-            entropy: state.value.entropyPool.t0,
+            entropy: Bandersnatch.getIetfSignatureOutput(signature: vrfSignature),
             offenders: state.value.judgements.punishSet,
             extrinsics: extrinsic.tickets
         )
@@ -136,14 +136,14 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         let seal = if let ticket {
             try secretKey.ietfVRFSign(
                 vrfInputData: SigningContext.safroleTicketInputData(
-                    entropy: state.value.entropyPool.t3,
+                    entropy: sealEntropy,
                     attempt: ticket.ticket.attempt
                 ),
                 auxData: encodedHeader
             )
         } else {
             try secretKey.ietfVRFSign(
-                vrfInputData: SigningContext.fallbackSealInputData(entropy: state.value.entropyPool.t3),
+                vrfInputData: SigningContext.fallbackSealInputData(entropy: sealEntropy),
                 auxData: encodedHeader
             )
         }

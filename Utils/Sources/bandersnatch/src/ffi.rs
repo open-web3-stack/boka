@@ -4,7 +4,7 @@ use bandersnatch::{Public, RingContext, Secret};
 
 use crate::bandersnatch_vrfs::{
     ietf_vrf_sign, ietf_vrf_verify, ring_context, ring_vrf_sign, ring_vrf_verify, vrf_input_point,
-    RingCommitment,
+    IetfVrfSignature, RingCommitment,
 };
 
 // MARK: Secret
@@ -399,4 +399,37 @@ pub extern "C" fn verifier_ietf_vrf_verify(
         Ok(_) => 0,
         Err(_) => 3,
     }
+}
+
+// MARK: Output
+
+/// out is 32 bytes
+#[no_mangle]
+pub extern "C" fn get_ietf_signature_output(
+    input: *const u8,
+    input_len: usize,
+    out: *mut u8,
+    out_len: usize,
+) -> isize {
+    if input.is_null() || out.is_null() {
+        return 1;
+    }
+    if input_len < 96 {
+        return 2;
+    }
+    if out_len < 32 {
+        return 3;
+    }
+
+    let input_slice = unsafe { std::slice::from_raw_parts(input, input_len) };
+    let signature = match IetfVrfSignature::deserialize_compressed(input_slice) {
+        Ok(signature) => Box::new(signature),
+        Err(_) => return 4,
+    };
+
+    let output = signature.output;
+
+    let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
+    out_slice.copy_from_slice(&output.hash()[..32]);
+    0
 }

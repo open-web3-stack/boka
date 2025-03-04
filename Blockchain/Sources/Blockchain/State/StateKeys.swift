@@ -297,7 +297,7 @@ public enum StateKeys {
         }
 
         public func encode() -> Data32 {
-            constructKey(index, UInt32.max - 1, hash.data[1...])
+            constructKey(index, UInt32.max - 1, hash.data[relative: 1...])
         }
     }
 
