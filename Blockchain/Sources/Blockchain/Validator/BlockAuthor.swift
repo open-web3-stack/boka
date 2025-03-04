@@ -56,6 +56,8 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         let state = try await dataProvider.getState(hash: parentHash)
         let stateRoot = await state.value.stateRoot
         let epoch = timeslot.timeslotToEpochIndex(config: config)
+        let parentEpoch = state.value.timeslot.timeslotToEpochIndex(config: config)
+        let isEpochChange = epoch > parentEpoch
 
         let pendingTickets = await safroleTicketPool.getPendingTickets(epoch: epoch)
         let existingTickets = SortedArray(sortedUnchecked: state.value.safroleState.ticketsAccumulator.array.map(\.id))
@@ -92,11 +94,13 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
             try throwUnreachable("no secret key for public key")
         }
 
+        let sealEntropy = isEpochChange ? state.value.entropyPool.t2 : state.value.entropyPool.t3
+
         let vrfOutput: Data32
         if let ticket {
             vrfOutput = ticket.output
         } else {
-            let inputData = SigningContext.fallbackSealInputData(entropy: state.value.entropyPool.t3)
+            let inputData = SigningContext.fallbackSealInputData(entropy: sealEntropy)
             vrfOutput = try secretKey.getOutput(vrfInputData: inputData)
         }
 
@@ -132,14 +136,14 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         let seal = if let ticket {
             try secretKey.ietfVRFSign(
                 vrfInputData: SigningContext.safroleTicketInputData(
-                    entropy: state.value.entropyPool.t3,
+                    entropy: sealEntropy,
                     attempt: ticket.ticket.attempt
                 ),
                 auxData: encodedHeader
             )
         } else {
             try secretKey.ietfVRFSign(
-                vrfInputData: SigningContext.fallbackSealInputData(entropy: state.value.entropyPool.t3),
+                vrfInputData: SigningContext.fallbackSealInputData(entropy: sealEntropy),
                 auxData: encodedHeader
             )
         }
