@@ -1,3 +1,12 @@
 [submodule "JAMTests/jamtestvectors"]
 	path = JAMTests/jamtestvectors
 	url = https://github.com/open-web3-stack/jamtestvectors.git
+[submodule "JAMTests/jamixir"]
+	path = JAMTests/jamixir
+	url = https://github.com/jamixir/jamtestnet.git
+[submodule "JAMTests/javajam"]
+	path = JAMTests/javajam
+	url = https://github.com/javajamio/javajam-trace.git
+[submodule "JAMTests/jamduna"]
+	path = JAMTests/jamduna
+	url = https://github.com/jam-duna/jamtestnet.git
