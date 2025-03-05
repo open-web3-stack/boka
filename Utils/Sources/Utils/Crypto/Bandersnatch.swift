@@ -314,4 +314,20 @@ public enum Bandersnatch: KeyType {
             return Data32(output)!
         }
     }
+
+    public static func getIetfSignatureOutput(signature input: Data96) throws -> Data32 {
+        var output = Data(repeating: 0, count: 32)
+
+        try FFIUtils.call(input.data, out: &output) { ptrs, out_buf in
+            get_ietf_signature_output(
+                ptrs[0].ptr,
+                ptrs[0].count,
+                out_buf.ptr,
+                out_buf.count
+            )
+        } onErr: { err throws(Error) in
+            throw .getOutputFailed(err)
+        }
+        return Data32(output)!
+    }
 }

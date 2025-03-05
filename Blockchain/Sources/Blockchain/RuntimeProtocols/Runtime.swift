@@ -75,18 +75,20 @@ public final class Runtime {
         // offendersMarkers is validated at apply time by Disputes
     }
 
-    public func validateHeaderSeal(block: BlockRef, state: inout State, prevState: StateRef) throws(Error) {
+    public func validateHeaderSeal(block: BlockRef, state: State) throws(Error) {
         let vrfOutput: Data32
+        // H_a
         let blockAuthorKey = try Result {
             try Bandersnatch.PublicKey(data: state.currentValidators[Int(block.header.authorIndex)].bandersnatch)
         }.mapError(Error.invalidBlockSeal).get()
+
         let index = block.header.timeslot % UInt32(config.value.epochLength)
         let encodedHeader = try Result { try JamEncoder.encode(block.header.unsigned) }.mapError(Error.invalidBlockSeal).get()
         let entropyVRFInputData: Data
         switch state.safroleState.ticketsOrKeys {
         case let .left(tickets):
             let ticket = tickets[Int(index)]
-            let vrfInputData = SigningContext.safroleTicketInputData(entropy: prevState.value.entropyPool.t3, attempt: ticket.attempt)
+            let vrfInputData = SigningContext.safroleTicketInputData(entropy: state.entropyPool.t3, attempt: ticket.attempt)
             vrfOutput = try Result {
                 try blockAuthorKey.ietfVRFVerify(
                     vrfInputData: vrfInputData,
@@ -106,7 +108,7 @@ public final class Runtime {
                 logger.debug("expected key: \(key.toHexString()), got key: \(blockAuthorKey.data.toHexString())")
                 throw Error.invalidAuthorKey
             }
-            let vrfInputData = SigningContext.fallbackSealInputData(entropy: prevState.value.entropyPool.t3)
+            let vrfInputData = SigningContext.fallbackSealInputData(entropy: state.entropyPool.t3)
             vrfOutput = try Result {
                 logger.trace("verifying ticket", metadata: ["key": "\(blockAuthorKey.data.toHexString())"])
                 return try blockAuthorKey.ietfVRFVerify(
@@ -116,7 +118,7 @@ public final class Runtime {
                 )
             }.mapError(Error.invalidBlockSeal).get()
 
-            entropyVRFInputData = SigningContext.fallbackSealInputData(entropy: prevState.value.entropyPool.t3)
+            entropyVRFInputData = SigningContext.entropyInputData(entropy: vrfOutput)
         }
 
         _ = try Result {
@@ -144,13 +146,13 @@ public final class Runtime {
             .mapError(Error.validateError)
             .get()
 
-        return try await apply(block: validatedBlock, state: prevState, context: context)
+        try validate(block: validatedBlock, state: prevState, context: context)
+
+        return try await apply(block: validatedBlock, state: prevState)
     }
 
-    public func apply(block: Validated<BlockRef>, state prevState: StateRef, context: ApplyContext) async throws(Error) -> StateRef {
-        try validate(block: block, state: prevState, context: context)
+    public func apply(block: Validated<BlockRef>, state prevState: StateRef) async throws(Error) -> StateRef {
         let block = block.value
-
         var newState = prevState.value
 
         do {
@@ -163,7 +165,7 @@ public final class Runtime {
                 ])
             }
 
-            try validateHeaderSeal(block: block, state: &newState, prevState: prevState)
+            try validateHeaderSeal(block: block, state: newState)
 
             try updateDisputes(block: block, state: &newState)
 
@@ -233,7 +235,7 @@ public final class Runtime {
         let safroleResult = try newState.updateSafrole(
             config: config,
             slot: block.header.timeslot,
-            entropy: newState.entropyPool.t0,
+            entropy: Bandersnatch.getIetfSignatureOutput(signature: block.header.vrfSignature),
             offenders: newState.judgements.punishSet,
             extrinsics: block.extrinsic.tickets
         )

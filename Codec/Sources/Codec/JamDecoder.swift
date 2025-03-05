@@ -17,10 +17,17 @@ public class JamDecoder {
         return res
     }
 
-    public static func decode<T: Decodable>(_ type: T.Type, from data: DataInput, withConfig config: Any? = nil) throws -> T {
+    public static func decode<T: Decodable>(
+        _ type: T.Type,
+        from data: DataInput,
+        withConfig config: Any? = nil,
+        allowTrailingBytes: Bool = false
+    ) throws -> T {
         let decoder = JamDecoder(data: data, config: config)
         let val = try decoder.decode(type)
-        try decoder.finalize()
+        if !allowTrailingBytes {
+            try decoder.finalize()
+        }
         return val
     }
 

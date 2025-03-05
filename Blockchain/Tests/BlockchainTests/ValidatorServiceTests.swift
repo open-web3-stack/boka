@@ -109,7 +109,7 @@ struct ValidatorServiceTests {
 
         await storeMiddleware.wait()
 
-        for _ in 0 ..< 25 {
+        for _ in 0 ..< 50 {
             await scheduler.advance(by: TimeInterval(config.value.slotPeriodSeconds))
             await storeMiddleware.wait() // let events to be processed
         }
@@ -118,7 +118,7 @@ struct ValidatorServiceTests {
 
         let blockAuthoredEvents = events.filter { $0 is RuntimeEvents.BlockAuthored }
 
-        #expect(blockAuthoredEvents.count == 25)
+        #expect(blockAuthoredEvents.count == 50)
     }
 
     @Test

@@ -103,3 +103,11 @@ intptr_t verifier_ietf_vrf_verify(const Public *public_,
                                   uintptr_t signature_len,
                                   uint8_t *out,
                                   uintptr_t out_len);
+
+/**
+ * out is 32 bytes
+ */
+intptr_t get_ietf_signature_output(const uint8_t *input,
+                                   uintptr_t input_len,
+                                   uint8_t *out,
+                                   uintptr_t out_len);
