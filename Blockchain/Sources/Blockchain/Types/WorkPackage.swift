@@ -80,6 +80,18 @@ extension WorkPackage: Dummy {
     }
 }
 
+import Foundation
+
+extension WorkPackage {
+    public func encode() throws -> Data {
+        try JamEncoder.encode(self)
+    }
+
+    public static func decode(data: Data, withConfig: ProtocolConfigRef) throws -> WorkPackage {
+        try JamDecoder.decode(WorkPackage.self, from: data, withConfig: withConfig)
+    }
+}
+
 extension WorkPackage {
     /// a: work-package’s implied authorizer, the hash of the concatenation of the authorization code
     /// and the parameterization
