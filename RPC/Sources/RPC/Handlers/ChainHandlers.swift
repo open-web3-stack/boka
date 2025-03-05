@@ -9,6 +9,7 @@ public enum ChainHandlers {
         GetBlockHash.self,
         GetFinalizedHead.self,
         GetHeader.self,
+        SubmitWorkPackage.self,
     ]
 
     public static func getHandlers(source: ChainDataSource) -> [any RPCHandler] {
@@ -17,6 +18,7 @@ public enum ChainHandlers {
             GetBlockHash(source: source),
             GetFinalizedHead(source: source),
             GetHeader(source: source),
+            SubmitWorkPackage(source: source),
         ]
     }
 
@@ -64,6 +66,28 @@ public enum ChainHandlers {
                 return blocks.first?.data
             }
             return nil
+        }
+    }
+
+    public struct SubmitWorkPackage: RPCHandler {
+        public typealias Request = Request1<Data?>
+        public typealias Response = Bool
+
+        public static var method: String { "builder_submitWorkPackage" }
+        public static var requestNames: [String] { ["workPackage"] }
+        public static var summary: String? { "Send the work package to other connected nodes" }
+
+        private let source: ChainDataSource
+
+        init(source: ChainDataSource) {
+            self.source = source
+        }
+
+        public func handle(request: Request) async throws -> Response? {
+            if let workPackage = request.value {
+                return try await source.submitWorkPackage(data: workPackage)
+            }
+            return false
         }
     }
 

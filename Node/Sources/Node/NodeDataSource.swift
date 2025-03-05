@@ -52,6 +52,18 @@ extension NodeDataSource: SystemDataSource {
 }
 
 extension NodeDataSource: ChainDataSource {
+    public func submitWorkPackage(data: Data) async throws -> Bool {
+        let workPackage = try WorkPackage.decode(data: data, withConfig: blockchain.config)
+        // TODO: get guarantor from state etc.
+        blockchain.publish(event: RuntimeEvents
+            .WorkPackagesReceived(
+                coreIndex: 0,
+                workPackage: workPackage.asRef(),
+                extrinsics: []
+            ))
+        return true
+    }
+
     public func getKeys(prefix: Data32, count: UInt32, startKey: Data32?, blockHash: Data32?) async throws -> [String] {
         try await chainDataProvider.getKeys(prefix: prefix, count: count, startKey: startKey, blockHash: blockHash)
     }

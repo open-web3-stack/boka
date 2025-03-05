@@ -22,6 +22,10 @@ extension DummyNodeDataSource: ChainDataSource {
         ["key1", "key2", "key3"]
     }
 
+    public func submitWorkPackage(data _: Data) async throws -> Bool {
+        true
+    }
+
     public func getStorage(key _: Data32, blockHash _: Data32?) async throws -> [String] {
         ["value1", "value2"]
     }
@@ -63,6 +67,21 @@ final class ChainRPCControllerTests {
         let rpcController = JSONRPCController(handlers: ChainHandlers
             .getHandlers(source: DummyNodeDataSource(chainDataProvider: dataProvider)))
         try app.register(collection: rpcController)
+    }
+
+    @Test func submitWorkPackage() async throws {
+        try await setUp()
+        let hashHex = await dataProvider.bestHead.hash.toHexString()
+        let params = JSON.array([.string(hashHex)])
+        let req = JSONRequest(jsonrpc: "2.0", method: "builder_submitWorkPackage", params: params, id: 0)
+        var buffer = ByteBuffer()
+        try buffer.writeJSONEncodable(req)
+        try await app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
+            #expect(res.status == .ok)
+            let resp = try! res.content.decode(JSONResponse.self, using: JSONDecoder())
+            #expect((resp.result!.value as! Utils.JSON).bool == true)
+        }
+        try await app.asyncShutdown()
     }
 
     @Test func getBlock() async throws {
