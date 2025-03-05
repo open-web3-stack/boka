@@ -80,8 +80,6 @@ extension WorkPackage: Dummy {
     }
 }
 
-import Foundation
-
 extension WorkPackage {
     public func encode() throws -> Data {
         try JamEncoder.encode(self)
