@@ -9,7 +9,6 @@ struct NodeDataSourceTests {
     var dataSource: NodeDataSource!
     var networkManager: NetworkManagerTests!
     init() async throws {
-        let (genesisState, genesisBlock) = try! State.devGenesis(config: .minimal)
         networkManager = try! await NetworkManagerTests()
         dataSource = await NodeDataSource(
             blockchain: networkManager.services.blockchain,
