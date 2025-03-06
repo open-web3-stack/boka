@@ -20,6 +20,9 @@ public protocol ChainDataSource: Sendable {
     func getFinalizedHead() async throws -> Data32?
     func getKeys(prefix: Data32, count: UInt32, startKey: Data32?, blockHash: Data32?) async throws -> [String]
     func getStorage(key: Data32, blockHash: Data32?) async throws -> [String]
+}
+
+public protocol BuilderDataSource: Sendable {
     func submitWorkPackage(data: Data) async throws -> Bool
 }
 
@@ -29,4 +32,4 @@ public protocol TelemetryDataSource: Sendable {
     func getNetworkKey() async throws -> String
 }
 
-public typealias DataSource = ChainDataSource & SystemDataSource & TelemetryDataSource
+public typealias DataSource = BuilderDataSource & ChainDataSource & SystemDataSource & TelemetryDataSource
