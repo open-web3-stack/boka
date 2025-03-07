@@ -211,11 +211,6 @@ public class Info: HostCall {
             m = nil
         }
 
-        if let m, state.isMemoryWritable(address: o, length: Int(m.count)) {
-            try state.writeMemory(address: o, values: m)
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
-        }
-
         if !state.isMemoryWritable(address: o, length: Int(m!.count)) {
             throw VMInvocationsError.panic
         } else if m == nil {
@@ -296,6 +291,8 @@ public class Assign: HostCall {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.CORE.rawValue)
         } else {
             x.accumulateState.authorizationQueue[targetCoreIndex] = try ConfigFixedSizeArray(config: config, array: authorizationQueue!)
+            // logger.debug("targetCoreIndex: \(targetCoreIndex)")
+            // logger.debug("authorizationQueue': \(x.accumulateState.authorizationQueue)")
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         }
     }
@@ -456,7 +453,7 @@ public class Transfer: HostCall {
         let regs: [UInt64] = state.readRegisters(in: 7 ..< 11)
         let amount = Balance(regs[1])
         let gasLimit = Gas(regs[2])
-        let memo = try? state.readMemory(address: regs[5], length: config.value.transferMemoSize)
+        let memo = try? state.readMemory(address: regs[3], length: config.value.transferMemoSize)
         let dest = UInt32(truncatingIfNeeded: regs[0])
 
         let acc = try await x.serviceAccounts.get(serviceAccount: x.serviceIndex)
@@ -523,6 +520,7 @@ public class Eject: HostCall {
             throw VMInvocationsError.panic
         } else if ejectAccount == nil || ejectAccount?.codeHash.data != Data(x.serviceIndex.encode(method: .fixedWidth(32))) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
+            return
         }
 
         let preimageInfo = try await x.serviceAccounts.get(
@@ -531,9 +529,11 @@ public class Eject: HostCall {
             length: max(81, UInt32(ejectAccount!.totalByteLength)) - 81
         )
 
+        let minHoldSlot = max(0, Int(timeslot) - Int(minHoldPeriod))
+
         if ejectAccount!.itemsCount != 2 || preimageInfo == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
-        } else if preimageInfo!.count == 2, preimageInfo![1] < timeslot - minHoldPeriod {
+        } else if preimageInfo!.count == 2, preimageInfo![1] < minHoldSlot {
             var destAccount = try await x.serviceAccounts.get(serviceAccount: x.serviceIndex)
             destAccount?.balance += ejectAccount!.balance
             x.serviceAccounts.set(serviceAccount: ejectIndex, account: nil)
@@ -649,9 +649,11 @@ public class Forget: HostCall {
         let preimageInfo = try await x.serviceAccounts.get(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length)
         let historyCount = preimageInfo?.count
 
-        let canExpunge = historyCount == 0 || (historyCount == 2 && preimageInfo![1] < timeslot - minHoldPeriod)
+        let minHoldSlot = max(0, Int(timeslot) - Int(minHoldPeriod))
+
+        let canExpunge = historyCount == 0 || (historyCount == 2 && preimageInfo![1] < minHoldSlot)
         let isAvailable1 = historyCount == 1
-        let isAvailable3 = historyCount == 3 && (preimageInfo![1] < timeslot - minHoldPeriod)
+        let isAvailable3 = historyCount == 3 && (preimageInfo![1] < minHoldSlot)
         let canForget = canExpunge || isAvailable1 || isAvailable3
 
         if hash == nil {

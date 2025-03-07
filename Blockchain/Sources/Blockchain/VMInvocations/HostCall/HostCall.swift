@@ -12,6 +12,7 @@ public protocol HostCall {
 
 extension HostCall {
     public func call(config: ProtocolConfigRef, state: VMState) async -> ExecOutcome {
+        logger.debug("call: \(Self.self)")
         guard hasEnoughGas(state: state) else {
             logger.debug("not enough gas")
             return .exit(.outOfGas)
@@ -21,6 +22,7 @@ extension HostCall {
 
         do {
             try await _callImpl(config: config, state: state)
+            logger.debug("w7: \(String(describing: HostCallResultCode(rawValue: state.readRegister(Registers.Index(raw: 7)))))")
             return .continued
         } catch let e as MemoryError {
             logger.error("memory error: \(e)")

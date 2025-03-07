@@ -1,8 +1,5 @@
 import Foundation
 import PolkaVM
-import TracingUtils
-
-private let logger = Logger(label: "AccumulateContext")
 
 public class AccumulateContext: InvocationContext {
     public typealias ContextType = (
@@ -21,8 +18,6 @@ public class AccumulateContext: InvocationContext {
     }
 
     public func dispatch(index: UInt32, state: VMState) async -> ExecOutcome {
-        logger.debug("dispatching host-call: \(index)")
-
         switch UInt8(index) {
         case Read.identifier:
             return await Read(serviceIndex: context.x.serviceIndex, accounts: context.x.serviceAccounts)
