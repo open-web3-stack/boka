@@ -53,13 +53,13 @@ extension NodeDataSource: SystemDataSource {
 
 extension NodeDataSource: BuilderDataSource {
     public func submitWorkPackage(data: Data) async throws -> Bool {
-        let workPackage = try WorkPackage.decode(data: data, withConfig: blockchain.config)
+        let workPackageMessage = try WorkPackageMessage.decode(data: data, withConfig: blockchain.config)
         // TODO: get guarantor from state etc.
         blockchain.publish(event: RuntimeEvents
             .WorkPackagesReceived(
-                coreIndex: 0,
-                workPackage: workPackage.asRef(),
-                extrinsics: []
+                coreIndex: workPackageMessage.coreIndex,
+                workPackage: workPackageMessage.workPackage.asRef(),
+                extrinsics: workPackageMessage.extrinsics
             ))
         return true
     }

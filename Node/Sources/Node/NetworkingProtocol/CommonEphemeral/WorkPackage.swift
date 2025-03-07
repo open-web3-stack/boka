@@ -18,3 +18,13 @@ public struct WorkPackageMessage: Codable, Sendable, Equatable, Hashable {
         self.extrinsics = extrinsics
     }
 }
+
+extension WorkPackageMessage {
+    public func encode() throws -> Data {
+        try JamEncoder.encode(self)
+    }
+
+    public static func decode(data: Data, withConfig: ProtocolConfigRef) throws -> WorkPackageMessage {
+        try JamDecoder.decode(WorkPackageMessage.self, from: data, withConfig: withConfig)
+    }
+}

@@ -20,6 +20,7 @@ struct NodeDataSourceTests {
 
     @Test func submitWorkPackage() async throws {
         let workPackage = WorkPackage.dummy(config: networkManager.services.config)
-        #expect(try await dataSource.submitWorkPackage(data: workPackage.encode()) == true)
+        let workPackageMessage = WorkPackageMessage(coreIndex: 0, workPackage: workPackage, extrinsics: [])
+        #expect(try await dataSource.submitWorkPackage(data: workPackageMessage.encode()) == true)
     }
 }
