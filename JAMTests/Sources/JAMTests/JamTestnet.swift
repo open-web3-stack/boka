@@ -114,7 +114,7 @@ struct TestState: Codable {
                     index: UInt32(details["s"]!)!,
                     key: Data32(fromHexString: String(details["k"]!.suffix(64)))!
                 )
-                value = try JamDecoder.decode(StateKeys.ServiceAccountStorageKey.Value.self, from: arr[1], withConfig: config)
+                value = arr[1]
             case "account_preimage":
                 let details = extractDetails(from: detail)
                 key = StateKeys.ServiceAccountPreimagesKey(

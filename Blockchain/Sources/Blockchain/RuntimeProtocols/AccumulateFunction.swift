@@ -3,7 +3,7 @@ import Utils
 
 public struct AccumulateArguments: Codable {
     /// o
-    public var result: WorkResult
+    public var output: WorkOutput
     /// l
     public var paylaodHash: Data32
     /// k
@@ -11,8 +11,8 @@ public struct AccumulateArguments: Codable {
     /// a
     public var authorizationOutput: Data
 
-    public init(result: WorkResult, paylaodHash: Data32, packageHash: Data32, authorizationOutput: Data) {
-        self.result = result
+    public init(output: WorkOutput, paylaodHash: Data32, packageHash: Data32, authorizationOutput: Data) {
+        self.output = output
         self.paylaodHash = paylaodHash
         self.packageHash = packageHash
         self.authorizationOutput = authorizationOutput

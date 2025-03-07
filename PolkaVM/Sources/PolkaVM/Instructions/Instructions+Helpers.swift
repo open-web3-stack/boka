@@ -45,21 +45,19 @@ extension Instructions {
         context.state.program.basicBlockIndices.contains(context.state.pc &+ offset)
     }
 
-    static func isDjumpValid(context: ExecutionContext, target a: UInt32, targetAligned: UInt32) -> Bool {
-        let za = context.config.pvmDynamicAddressAlignmentFactor
-        return !(a == 0 ||
-            a > context.state.program.jumpTable.count * za ||
-            Int(a) % za != 0 ||
-            !context.state.program.basicBlockIndices.contains(targetAligned))
-    }
-
     static func djump(context: ExecutionContext, target: UInt32) -> ExecOutcome {
         if target == Constants.djumpHaltAddress {
             return .exit(.halt)
         }
 
+        let za = context.config.pvmDynamicAddressAlignmentFactor
+
+        if target == 0 || target > context.state.program.jumpTable.count * za || Int(target) % za != 0 {
+            return .exit(.panic(.invalidDynamicJump))
+        }
+
         let entrySize = Int(context.state.program.jumpTableEntrySize)
-        let start = ((Int(target) / context.config.pvmDynamicAddressAlignmentFactor) - 1) * entrySize
+        let start = ((Int(target) / za) - 1) * entrySize
         let end = start + entrySize
         let jumpTable = context.state.program.jumpTable
 
@@ -105,7 +103,7 @@ extension Instructions {
 
         logger.trace("djump target decoded (\(targetAligned))")
 
-        guard isDjumpValid(context: context, target: target, targetAligned: UInt32(truncatingIfNeeded: targetAligned)) else {
+        guard context.state.program.basicBlockIndices.contains(UInt32(targetAligned)) else {
             return .exit(.panic(.invalidDynamicJump))
         }
 

@@ -1,5 +1,8 @@
 import Codec
+import TracingUtils
 import Utils
+
+private let logger = Logger(label: "Accumulation")
 
 public enum AccumulationError: Error {
     case invalidServiceIndex
@@ -95,13 +98,15 @@ extension Accumulation {
             for result in report.results where result.serviceIndex == service {
                 gas += result.gasRatio
                 arguments.append(AccumulateArguments(
-                    result: result,
+                    output: result.output,
                     paylaodHash: result.payloadHash,
                     packageHash: report.packageSpecification.workPackageHash,
                     authorizationOutput: report.authorizationOutput
                 ))
             }
         }
+
+        logger.debug("[single] accumulate arguments: \(arguments)")
 
         let (newState, transfers, commitment, gasUsed) = try await accumulate(
             config: config,
@@ -113,6 +118,8 @@ extension Accumulation {
             initialIndex: Blake2b256.hash(service.encode(), entropy.data, timeslot.encode()).data.decode(UInt32.self),
             timeslot: timeslot
         )
+
+        logger.debug("[single] accumulate result: gasUsed=\(gasUsed), commitment=\(String(describing: commitment))")
 
         return SingleAccumulationOutput(
             state: newState,
@@ -131,7 +138,7 @@ extension Accumulation {
         entropy: Data32,
         timeslot: TimeslotIndex
     ) async throws -> ParallelAccumulationOutput {
-        var services = Set<ServiceIndex>()
+        var services = [ServiceIndex]()
         var gasUsed = Gas(0)
         var transfers: [DeferredTransfers] = []
         var commitments = Set<Commitment>()
@@ -150,13 +157,15 @@ extension Accumulation {
 
         for report in workReports {
             for result in report.results {
-                services.insert(result.serviceIndex)
+                services.append(result.serviceIndex)
             }
         }
 
         for service in privilegedGas.keys {
-            services.insert(service)
+            services.append(service)
         }
+
+        logger.debug("[parallel] services to accumulate: \(services)")
 
         for service in services {
             let singleOutput = try await singleAccumulate(
@@ -223,14 +232,17 @@ extension Accumulation {
     ) async throws -> AccumulationOutput {
         var i = 0
         var sumGasRequired = Gas(0)
+
         for report in workReports {
+            var canAccumulate = true
             for result in report.results {
                 if result.gasRatio + sumGasRequired > gasLimit {
+                    canAccumulate = false
                     break
                 }
                 sumGasRequired += result.gasRatio
-                i += 1
             }
+            i += canAccumulate ? 1 : 0
         }
 
         if i == 0 {
@@ -241,10 +253,12 @@ extension Accumulation {
                 commitments: Set()
             )
         } else {
+            logger.debug("[outer] can accumulate until index: \(i)")
+
             let parallelOutput = try await parallelizedAccumulate(
                 config: config,
                 state: state,
-                workReports: Array(workReports[0 ..< min(i, workReports.count)]),
+                workReports: Array(workReports[0 ..< i]),
                 privilegedGas: privilegedGas,
                 entropy: entropy,
                 timeslot: timeslot
@@ -368,10 +382,14 @@ extension Accumulation {
     ) async throws -> Data32 {
         let index = Int(timeslot) %% config.value.epochLength
 
+        logger.debug("available reports (\(availableReports.count)): \(availableReports.map(\.packageSpecification.workPackageHash))")
+
         var (accumulatableReports, newQueueItems) = getAllAccumulatableReports(
             availableReports: availableReports,
             index: index
         )
+
+        logger.debug("accumulatable reports: \(accumulatableReports.map(\.packageSpecification.workPackageHash))")
 
         let accumulateOutput = try await execution(
             config: config,
@@ -440,6 +458,8 @@ extension Accumulation {
         // accumulate root
         let nodes = try accumulateOutput.commitments.map { try JamEncoder.encode($0.serviceIndex) + JamEncoder.encode($0.hash) }
         let root = Merklization.binaryMerklize(nodes, hasher: Keccak.self)
+
+        logger.debug("accumulation root: \(root.toHexString())")
 
         return root
     }
