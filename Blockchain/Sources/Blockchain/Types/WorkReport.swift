@@ -2,7 +2,7 @@ import Codec
 import Foundation
 import Utils
 
-public struct WorkReport: Sendable, Equatable, Codable {
+public struct WorkReport: Sendable, Equatable, Codable, Hashable {
     // s: package specification
     public var packageSpecification: AvailabilitySpecifications
 
