@@ -14,17 +14,13 @@ struct JamdunaTests {
         try await CommonTests.test(input)
     }
 
+    @Test(arguments: try JamTestnet.loadTests(path: "data/assurances/state_transitions", src: .jamduna))
+    func assurancesTests(_ input: Testcase) async throws {
+        _ = try await CommonTests.test(input)
+    }
+
     // @Test(arguments: try JamTestnet.loadTests(path: "data/orderedaccumulation/state_transitions", src: .jamduna))
     // func orderedaccumulationTests(_ input: Testcase) async throws {
-    //     await withKnownIssue("todo") {
-    //         try await CommonTests.test(input)
-    //     }
-    // }
-
-    // @Test(arguments: try JamTestnet.loadTests(path: "data/assurances/state_transitions", src: .jamduna))
-    // func assurancesTests(_ input: Testcase) async throws {
-    //     await withKnownIssue("todo") {
-    //         try await CommonTests.test(input)
-    //     }
+    //     try await CommonTests.test(input)
     // }
 }

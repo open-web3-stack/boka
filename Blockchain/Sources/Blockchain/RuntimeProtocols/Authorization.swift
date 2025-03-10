@@ -1,4 +1,7 @@
+import TracingUtils
 import Utils
+
+private let logger = Logger(label: "Authorization")
 
 public enum AuthorizationError: Error {
     case invalidReportAuthorizer
@@ -81,6 +84,8 @@ extension Authorization {
                     }
                 }
             }
+
+            logger.debug("core index: \(coreIndex), newItem add to pool: \(newItem)")
 
             // Add new item from queue
             corePool.safeAppend(newItem)
