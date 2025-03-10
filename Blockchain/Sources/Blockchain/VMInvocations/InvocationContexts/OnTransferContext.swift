@@ -5,15 +5,22 @@ import TracingUtils
 private let logger = Logger(label: "OnTransferContext")
 
 public class OnTransferContext: InvocationContext {
-    public typealias ContextType = (
-        index: ServiceIndex,
-        accounts: ServiceAccounts
-    )
+    public class OnTransferContextType {
+        var index: ServiceIndex
+        var accounts: ServiceAccountsMutRef
+
+        init(serviceIndex: ServiceIndex, accounts: ServiceAccountsMutRef) {
+            index = serviceIndex
+            self.accounts = accounts
+        }
+    }
+
+    public typealias ContextType = OnTransferContextType
 
     public let config: ProtocolConfigRef
     public var context: ContextType
 
-    public init(context: inout ContextType, config: ProtocolConfigRef) {
+    public init(context: ContextType, config: ProtocolConfigRef) {
         self.config = config
         self.context = context
     }
@@ -22,18 +29,18 @@ public class OnTransferContext: InvocationContext {
         logger.debug("dispatching host-call: \(index)")
         switch UInt8(index) {
         case Lookup.identifier:
-            return await Lookup(serviceIndex: context.index, accounts: context.accounts)
+            return await Lookup(serviceIndex: context.index, accounts: context.accounts.toRef())
                 .call(config: config, state: state)
         case Read.identifier:
-            return await Read(serviceIndex: context.index, accounts: context.accounts)
+            return await Read(serviceIndex: context.index, accounts: context.accounts.toRef())
                 .call(config: config, state: state)
         case Write.identifier:
-            return await Write(serviceIndex: context.index, accounts: &context.accounts)
+            return await Write(serviceIndex: context.index, accounts: context.accounts)
                 .call(config: config, state: state)
         case GasFn.identifier:
             return await GasFn().call(config: config, state: state)
         case Info.identifier:
-            return await Info(serviceIndex: context.index, accounts: context.accounts)
+            return await Info(serviceIndex: context.index, accounts: context.accounts.toRef())
                 .call(config: config, state: state)
         case Log.identifier:
             return await Log(service: index).call(config: config, state: state)
