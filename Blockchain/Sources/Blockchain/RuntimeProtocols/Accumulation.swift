@@ -108,16 +108,18 @@ extension Accumulation {
 
         logger.debug("[single] accumulate arguments: \(arguments)")
 
+        let accountsMutRef = ServiceAccountsMutRef(self)
         let (newState, transfers, commitment, gasUsed) = try await accumulate(
             config: config,
-            accounts: &self,
-            state: state,
+            serviceAccounts: accountsMutRef,
+            accumulateState: state,
             serviceIndex: service,
             gas: gas,
             arguments: arguments,
             initialIndex: Blake2b256.hash(service.encode(), entropy.data, timeslot.encode()).data.decode(UInt32.self),
             timeslot: timeslot
         )
+        self = accountsMutRef.value as! Self
 
         logger.debug("[single] accumulate result: gasUsed=\(gasUsed), commitment=\(String(describing: commitment))")
 
@@ -422,13 +424,15 @@ extension Accumulation {
             transferGroups[transfer.destination, default: []].append(transfer)
         }
         for (service, transfers) in transferGroups {
+            let accountsMutRef = ServiceAccountsMutRef(self)
             try await onTransfer(
                 config: config,
                 serviceIndex: service,
-                serviceAccounts: &self,
+                serviceAccounts: accountsMutRef,
                 timeslot: timeslot,
                 transfers: transfers
             )
+            self = accountsMutRef.value as! Self
         }
 
         // update accumulation history
@@ -459,7 +463,7 @@ extension Accumulation {
         let nodes = try accumulateOutput.commitments.map { try JamEncoder.encode($0.serviceIndex) + JamEncoder.encode($0.hash) }
         let root = Merklization.binaryMerklize(nodes, hasher: Keccak.self)
 
-        logger.debug("accumulation root: \(root.toHexString())")
+        logger.debug("accumulation root: \(root)")
 
         return root
     }

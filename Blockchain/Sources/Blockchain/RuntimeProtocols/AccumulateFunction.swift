@@ -62,9 +62,9 @@ public struct AccumulateState {
 }
 
 /// X
-public struct AccumlateResultContext {
+public class AccumlateResultContext {
     /// d: all existing service accounts
-    public var serviceAccounts: ServiceAccounts
+    public var serviceAccounts: ServiceAccountsMutRef
     /// s: the accumulating service account index
     public var serviceIndex: ServiceIndex
     /// u
@@ -75,4 +75,20 @@ public struct AccumlateResultContext {
     public var transfers: [DeferredTransfers]
     /// y
     public var yield: Data32?
+
+    public init(
+        serviceAccounts: ServiceAccountsMutRef,
+        serviceIndex: ServiceIndex,
+        accumulateState: AccumulateState,
+        nextAccountIndex: ServiceIndex,
+        transfers: [DeferredTransfers],
+        yield: Data32?
+    ) {
+        self.serviceAccounts = serviceAccounts
+        self.serviceIndex = serviceIndex
+        self.accumulateState = accumulateState
+        self.nextAccountIndex = nextAccountIndex
+        self.transfers = transfers
+        self.yield = yield
+    }
 }

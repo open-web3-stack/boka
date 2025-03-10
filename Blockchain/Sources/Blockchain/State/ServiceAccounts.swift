@@ -1,7 +1,7 @@
 import Foundation
 import Utils
 
-public protocol ServiceAccounts {
+public protocol ServiceAccounts: Sendable {
     func get(serviceAccount index: ServiceIndex) async throws -> ServiceAccountDetails?
     func get(serviceAccount index: ServiceIndex, storageKey key: Data32) async throws -> Data?
     func get(serviceAccount index: ServiceIndex, preimageHash hash: Data32) async throws -> Data?
@@ -20,4 +20,14 @@ public protocol ServiceAccounts {
         length: UInt32,
         value: StateKeys.ServiceAccountPreimageInfoKey.Value?
     )
+}
+
+public class ServiceAccountsRef: Ref<ServiceAccounts>, @unchecked Sendable {}
+
+public typealias ServiceAccountsMutRef = RefMut<ServiceAccounts>
+
+extension ServiceAccountsMutRef {
+    public func toRef() -> ServiceAccountsRef {
+        ServiceAccountsRef(value)
+    }
 }

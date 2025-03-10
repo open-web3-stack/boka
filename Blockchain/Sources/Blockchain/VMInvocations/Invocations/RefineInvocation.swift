@@ -44,7 +44,7 @@ public func refine(
 
     let ctx = RefineContext(
         config: config,
-        context: (pvms: [:], exports: []),
+        context: RefineContext.ContextType(pvms: [:], exports: []),
         importSegments: importSegments,
         exportSegmentOffset: exportSegmentOffset,
         service: service,
