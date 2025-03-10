@@ -130,6 +130,26 @@ struct NetworkManagerTests {
     }
 
     @Test
+    func testWorkReportDistribution() async throws {
+        let workReport = WorkReport.dummy(config: services.config)
+        // Publish GuranteedWorkReport event
+        await services.blockchain
+            .publish(event: RuntimeEvents.GuranteedWorkReport(workReport: workReport, slot: 0, signatures: []))
+        await storeMiddleware.wait()
+        // Verify network calls
+        #expect(
+            network.contain(calls: [
+                .init(function: "connect", parameters: ["address": devPeers.first!, "role": PeerRole.validator]),
+                .init(function: "sendToPeer", parameters: [
+                    "message": CERequest.workReportDistrubution(
+                        GuaranteedWorkReportMessage(workReport: workReport, slot: 0, signatures: [])
+                    ),
+                ]),
+            ])
+        )
+    }
+
+    @Test
     func testBlockBroadcast() async throws {
         // Import a block
         let block = BlockRef.dummy(config: services.config, parent: services.genesisBlock)

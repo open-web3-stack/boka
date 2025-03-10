@@ -248,6 +248,17 @@ struct HandlerImpl: NetworkProtocolHandler {
                         )
                 )
             return []
+        case let .workReportDistrubution(message):
+            blockchain
+                .publish(
+                    event: RuntimeEvents
+                        .GuranteedWorkReport(
+                            workReport: message.workReport,
+                            slot: message.slot,
+                            signatures: message.signatures
+                        )
+                )
+            return []
         }
     }
 

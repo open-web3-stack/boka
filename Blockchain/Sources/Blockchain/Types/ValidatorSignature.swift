@@ -1,7 +1,7 @@
 import Foundation
 
 /// A validator's signature over a work-report hash.
-public struct ValidatorSignature: Codable, Equatable {
+public struct ValidatorSignature: Codable, Sendable, Equatable, Hashable {
     /// The index of the validator in the current validator set.
     public let validatorIndex: ValidatorIndex
 

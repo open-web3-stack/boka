@@ -161,8 +161,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         // Sign work report & work-report distribution via CE 135
         let payload = SigningContext.guarantee + workReport.hash().data
         let signature = try signingKey.sign(message: payload)
-        let workReportEvent = RuntimeEvents.WorkReportGenerated(item: workReport, signature: signature)
-        publish(workReportEvent)
+//        let workReportEvent = RuntimeEvents.WorkReportGenerated(item: workReport, signature: signature)
+//        publish(workReportEvent)
     }
 
     private func refinePkg(validatorIndex: ValidatorIndex, workPackage: WorkPackageRef,
