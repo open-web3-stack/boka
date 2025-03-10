@@ -22,9 +22,9 @@ public class Lookup: HostCall {
     public static var identifier: UInt8 { 1 }
 
     public let serviceIndex: ServiceIndex
-    public let serviceAccounts: ServiceAccounts
+    public let serviceAccounts: ServiceAccountsRef
 
-    public init(serviceIndex: ServiceIndex, accounts: some ServiceAccounts) {
+    public init(serviceIndex: ServiceIndex, accounts: ServiceAccountsRef) {
         self.serviceIndex = serviceIndex
         serviceAccounts = accounts
     }
@@ -33,7 +33,7 @@ public class Lookup: HostCall {
         let reg7: UInt64 = state.readRegister(Registers.Index(raw: 7))
         let service: ServiceIndex? = if reg7 == serviceIndex || reg7 == Int64.max {
             serviceIndex
-        } else if try await serviceAccounts.get(serviceAccount: ServiceIndex(truncatingIfNeeded: reg7)) != nil {
+        } else if try await serviceAccounts.value.get(serviceAccount: ServiceIndex(truncatingIfNeeded: reg7)) != nil {
             ServiceIndex(truncatingIfNeeded: reg7)
         } else {
             nil
@@ -48,7 +48,7 @@ public class Lookup: HostCall {
         let preimageHash = try? Blake2b256.hash(state.readMemory(address: regs[0], length: 32))
 
         let value: Data? = if let service, let preimageHash {
-            try await serviceAccounts.get(serviceAccount: service, preimageHash: preimageHash)
+            try await serviceAccounts.value.get(serviceAccount: service, preimageHash: preimageHash)
         } else {
             nil
         }
@@ -75,9 +75,9 @@ public class Read: HostCall {
     public static var identifier: UInt8 { 2 }
 
     public let serviceIndex: ServiceIndex
-    public let serviceAccounts: ServiceAccounts
+    public let serviceAccounts: ServiceAccountsRef
 
-    public init(serviceIndex: ServiceIndex, accounts: ServiceAccounts) {
+    public init(serviceIndex: ServiceIndex, accounts: ServiceAccountsRef) {
         self.serviceIndex = serviceIndex
         serviceAccounts = accounts
     }
@@ -88,7 +88,7 @@ public class Read: HostCall {
 
         let service: ServiceIndex? = if serviceX == serviceIndex {
             serviceIndex
-        } else if try await serviceAccounts.get(serviceAccount: serviceX) != nil {
+        } else if try await serviceAccounts.value.get(serviceAccount: serviceX) != nil {
             serviceX
         } else {
             nil
@@ -103,7 +103,7 @@ public class Read: HostCall {
         let key = try? Blake2b256.hash(serviceX.encode(), state.readMemory(address: regs[0], length: Int(regs[1])))
 
         let value: Data? = if let service, let key {
-            try await serviceAccounts.get(serviceAccount: service, storageKey: key)
+            try await serviceAccounts.value.get(serviceAccount: service, storageKey: key)
         } else {
             nil
         }
@@ -130,9 +130,9 @@ public class Write: HostCall {
     public static var identifier: UInt8 { 3 }
 
     public let serviceIndex: ServiceIndex
-    public var serviceAccounts: ServiceAccounts
+    public let serviceAccounts: ServiceAccountsMutRef
 
-    public init(serviceIndex: ServiceIndex, accounts: inout ServiceAccounts) {
+    public init(serviceIndex: ServiceIndex, accounts: ServiceAccountsMutRef) {
         self.serviceIndex = serviceIndex
         serviceAccounts = accounts
     }
@@ -146,21 +146,21 @@ public class Write: HostCall {
             throw VMInvocationsError.panic
         }
 
-        let len = if let key, let value = try await serviceAccounts.get(serviceAccount: serviceIndex, storageKey: key) {
+        let len = if let key, let value = try await serviceAccounts.value.get(serviceAccount: serviceIndex, storageKey: key) {
             UInt64(value.count)
         } else {
             HostCallResultCode.NONE.rawValue
         }
 
-        let accountDetails = try await serviceAccounts.get(serviceAccount: serviceIndex)
+        let accountDetails = try await serviceAccounts.value.get(serviceAccount: serviceIndex)
         if let accountDetails, accountDetails.thresholdBalance(config: config) > accountDetails.balance {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), len)
             if regs[3] == 0 {
-                serviceAccounts.set(serviceAccount: serviceIndex, storageKey: key!, value: nil)
+                serviceAccounts.value.set(serviceAccount: serviceIndex, storageKey: key!, value: nil)
             } else {
-                try serviceAccounts.set(
+                try serviceAccounts.value.set(
                     serviceAccount: serviceIndex,
                     storageKey: key!,
                     value: state.readMemory(address: regs[2], length: Int(regs[3]))
@@ -175,9 +175,9 @@ public class Info: HostCall {
     public static var identifier: UInt8 { 4 }
 
     public let serviceIndex: ServiceIndex
-    public let serviceAccounts: ServiceAccounts
+    public let serviceAccounts: ServiceAccountsRef
 
-    public init(serviceIndex: ServiceIndex, accounts: ServiceAccounts) {
+    public init(serviceIndex: ServiceIndex, accounts: ServiceAccountsRef) {
         self.serviceIndex = serviceIndex
         serviceAccounts = accounts
     }
@@ -194,7 +194,7 @@ public class Info: HostCall {
         let o: UInt32 = state.readRegister(Registers.Index(raw: 8))
 
         let m: Data?
-        let account = try await serviceAccounts.get(serviceAccount: service)
+        let account = try await serviceAccounts.value.get(serviceAccount: service)
         if let account {
             // codeHash, balance, thresholdBalance, minAccumlateGas, minOnTransferGas, totalByteLength, itemsCount
             let capacity = 32 + 8 * 5 + 4
@@ -209,11 +209,6 @@ public class Info: HostCall {
             m = encoder.data
         } else {
             m = nil
-        }
-
-        if let m, state.isMemoryWritable(address: o, length: Int(m.count)) {
-            try state.writeMemory(address: o, values: m)
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         }
 
         if !state.isMemoryWritable(address: o, length: Int(m!.count)) {
@@ -232,9 +227,9 @@ public class Info: HostCall {
 public class Bless: HostCall {
     public static var identifier: UInt8 { 5 }
 
-    public var x: AccumlateResultContext
+    public let x: AccumlateResultContext
 
-    public init(x: inout AccumlateResultContext) {
+    public init(x: AccumlateResultContext) {
         self.x = x
     }
 
@@ -271,9 +266,9 @@ public class Bless: HostCall {
 public class Assign: HostCall {
     public static var identifier: UInt8 { 6 }
 
-    public var x: AccumlateResultContext
+    public let x: AccumlateResultContext
 
-    public init(x: inout AccumlateResultContext) {
+    public init(x: AccumlateResultContext) {
         self.x = x
     }
 
@@ -295,7 +290,9 @@ public class Assign: HostCall {
         } else if targetCoreIndex > config.value.totalNumberOfCores {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.CORE.rawValue)
         } else {
-            x.accumulateState.authorizationQueue[targetCoreIndex] = try ConfigFixedSizeArray(config: config, array: authorizationQueue!)
+            var newAuthorizationQueue = x.accumulateState.authorizationQueue
+            newAuthorizationQueue[targetCoreIndex] = try ConfigFixedSizeArray(config: config, array: authorizationQueue!)
+            x.accumulateState.authorizationQueue = newAuthorizationQueue
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         }
     }
@@ -305,9 +302,9 @@ public class Assign: HostCall {
 public class Designate: HostCall {
     public static var identifier: UInt8 { 7 }
 
-    public var x: AccumlateResultContext
+    public let x: AccumlateResultContext
 
-    public init(x: inout AccumlateResultContext) {
+    public init(x: AccumlateResultContext) {
         self.x = x
     }
 
@@ -338,9 +335,9 @@ public class Checkpoint: HostCall {
     public static var identifier: UInt8 { 8 }
 
     public let x: AccumlateResultContext
-    public var y: AccumlateResultContext
+    public let y: AccumlateResultContext
 
-    public init(x: AccumlateResultContext, y: inout AccumlateResultContext) {
+    public init(x: AccumlateResultContext, y: AccumlateResultContext) {
         self.x = x
         self.y = y
     }
@@ -348,7 +345,12 @@ public class Checkpoint: HostCall {
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         state.writeRegister(Registers.Index(raw: 7), UInt64(bitPattern: state.getGas().value))
 
-        y = x
+        y.serviceAccounts = x.serviceAccounts
+        y.serviceIndex = x.serviceIndex
+        y.accumulateState = x.accumulateState
+        y.nextAccountIndex = x.nextAccountIndex
+        y.transfers = x.transfers
+        y.yield = x.yield
     }
 }
 
@@ -356,9 +358,9 @@ public class Checkpoint: HostCall {
 public class New: HostCall {
     public static var identifier: UInt8 { 9 }
 
-    public var x: AccumlateResultContext
+    public let x: AccumlateResultContext
 
-    public init(x: inout AccumlateResultContext) {
+    public init(x: AccumlateResultContext) {
         self.x = x
     }
 
@@ -389,12 +391,12 @@ public class New: HostCall {
 
         if codeHash == nil {
             throw VMInvocationsError.panic
-        } else if let newAccount, let account = try await x.serviceAccounts.get(serviceAccount: x.serviceIndex),
+        } else if let newAccount, let account = try await x.serviceAccounts.value.get(serviceAccount: x.serviceIndex),
                   account.balance - newAccount.thresholdBalance(config: config) < account.thresholdBalance(config: config)
         {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.CASH.rawValue)
         } else {
-            guard let newAccount, var account = try await x.serviceAccounts.get(serviceAccount: x.serviceIndex) else {
+            guard let newAccount, var account = try await x.serviceAccounts.value.get(serviceAccount: x.serviceIndex) else {
                 throw VMInvocationsError.panic
             }
             state.writeRegister(Registers.Index(raw: 7), x.nextAccountIndex)
@@ -404,7 +406,7 @@ public class New: HostCall {
             )
 
             account.balance -= newAccount.thresholdBalance(config: config)
-            x.serviceAccounts.set(serviceAccount: x.serviceIndex, account: account)
+            x.serviceAccounts.value.set(serviceAccount: x.serviceIndex, account: account)
             x.accumulateState.newServiceAccounts.merge([x.nextAccountIndex: newAccount]) { _, new in new }
         }
     }
@@ -414,9 +416,9 @@ public class New: HostCall {
 public class Upgrade: HostCall {
     public static var identifier: UInt8 { 10 }
 
-    public var x: AccumlateResultContext
+    public let x: AccumlateResultContext
 
-    public init(x: inout AccumlateResultContext) {
+    public init(x: AccumlateResultContext) {
         self.x = x
     }
 
@@ -425,11 +427,11 @@ public class Upgrade: HostCall {
 
         let codeHash: Data32? = try? Data32(state.readMemory(address: regs[0], length: 32))
 
-        if let codeHash, var acc = try await x.serviceAccounts.get(serviceAccount: x.serviceIndex) {
+        if let codeHash, var acc = try await x.serviceAccounts.value.get(serviceAccount: x.serviceIndex) {
             acc.codeHash = codeHash
             acc.minAccumlateGas = Gas(regs[1])
             acc.minOnTransferGas = Gas(regs[2])
-            x.serviceAccounts.set(serviceAccount: x.serviceIndex, account: acc)
+            x.serviceAccounts.value.set(serviceAccount: x.serviceIndex, account: acc)
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         } else {
             throw VMInvocationsError.panic
@@ -441,9 +443,9 @@ public class Upgrade: HostCall {
 public class Transfer: HostCall {
     public static var identifier: UInt8 { 11 }
 
-    public var x: AccumlateResultContext
+    public let x: AccumlateResultContext
 
-    public init(x: inout AccumlateResultContext) {
+    public init(x: AccumlateResultContext) {
         self.x = x
     }
 
@@ -456,13 +458,13 @@ public class Transfer: HostCall {
         let regs: [UInt64] = state.readRegisters(in: 7 ..< 11)
         let amount = Balance(regs[1])
         let gasLimit = Gas(regs[2])
-        let memo = try? state.readMemory(address: regs[5], length: config.value.transferMemoSize)
+        let memo = try? state.readMemory(address: regs[3], length: config.value.transferMemoSize)
         let dest = UInt32(truncatingIfNeeded: regs[0])
 
-        let acc = try await x.serviceAccounts.get(serviceAccount: x.serviceIndex)
+        let acc = try await x.serviceAccounts.value.get(serviceAccount: x.serviceIndex)
 
-        let destAcc: ServiceAccountDetails? = if try await x.serviceAccounts.get(serviceAccount: dest) != nil {
-            try await x.serviceAccounts.get(serviceAccount: dest)
+        let destAcc: ServiceAccountDetails? = if try await x.serviceAccounts.value.get(serviceAccount: dest) != nil {
+            try await x.serviceAccounts.value.get(serviceAccount: dest)
         } else if x.accumulateState.newServiceAccounts[dest] != nil {
             x.accumulateState.newServiceAccounts[dest]?.toDetails()
         } else {
@@ -487,7 +489,7 @@ public class Transfer: HostCall {
                 gasLimit: gasLimit
             ))
             acc.balance -= amount
-            x.serviceAccounts.set(serviceAccount: x.serviceIndex, account: acc)
+            x.serviceAccounts.value.set(serviceAccount: x.serviceIndex, account: acc)
         }
     }
 }
@@ -496,10 +498,10 @@ public class Transfer: HostCall {
 public class Eject: HostCall {
     public static var identifier: UInt8 { 12 }
 
-    public var x: AccumlateResultContext
+    public let x: AccumlateResultContext
     public let timeslot: TimeslotIndex
 
-    public init(x: inout AccumlateResultContext, timeslot: TimeslotIndex) {
+    public init(x: AccumlateResultContext, timeslot: TimeslotIndex) {
         self.x = x
         self.timeslot = timeslot
     }
@@ -510,8 +512,8 @@ public class Eject: HostCall {
         let preimageHash = try? state.readMemory(address: reg8, length: 32)
         let ejectAccount: ServiceAccountDetails? = if ejectIndex == x.serviceIndex {
             nil
-        } else if try await x.serviceAccounts.get(serviceAccount: ejectIndex) != nil {
-            try await x.serviceAccounts.get(serviceAccount: ejectIndex)
+        } else if try await x.serviceAccounts.value.get(serviceAccount: ejectIndex) != nil {
+            try await x.serviceAccounts.value.get(serviceAccount: ejectIndex)
         } else if x.accumulateState.newServiceAccounts[ejectIndex] != nil {
             x.accumulateState.newServiceAccounts[ejectIndex]?.toDetails()
         } else {
@@ -523,21 +525,24 @@ public class Eject: HostCall {
             throw VMInvocationsError.panic
         } else if ejectAccount == nil || ejectAccount?.codeHash.data != Data(x.serviceIndex.encode(method: .fixedWidth(32))) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
+            return
         }
 
-        let preimageInfo = try await x.serviceAccounts.get(
+        let preimageInfo = try await x.serviceAccounts.value.get(
             serviceAccount: ejectIndex,
             preimageHash: Data32(preimageHash!)!,
             length: max(81, UInt32(ejectAccount!.totalByteLength)) - 81
         )
 
+        let minHoldSlot = max(0, Int(timeslot) - Int(minHoldPeriod))
+
         if ejectAccount!.itemsCount != 2 || preimageInfo == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
-        } else if preimageInfo!.count == 2, preimageInfo![1] < timeslot - minHoldPeriod {
-            var destAccount = try await x.serviceAccounts.get(serviceAccount: x.serviceIndex)
+        } else if preimageInfo!.count == 2, preimageInfo![1] < minHoldSlot {
+            var destAccount = try await x.serviceAccounts.value.get(serviceAccount: x.serviceIndex)
             destAccount?.balance += ejectAccount!.balance
-            x.serviceAccounts.set(serviceAccount: ejectIndex, account: nil)
-            x.serviceAccounts.set(serviceAccount: x.serviceIndex, account: destAccount)
+            x.serviceAccounts.value.set(serviceAccount: ejectIndex, account: nil)
+            x.serviceAccounts.value.set(serviceAccount: x.serviceIndex, account: destAccount)
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
@@ -549,9 +554,9 @@ public class Eject: HostCall {
 public class Query: HostCall {
     public static var identifier: UInt8 { 13 }
 
-    public var x: AccumlateResultContext
+    public let x: AccumlateResultContext
 
-    public init(x: inout AccumlateResultContext) {
+    public init(x: AccumlateResultContext) {
         self.x = x
     }
 
@@ -562,7 +567,7 @@ public class Query: HostCall {
             throw VMInvocationsError.panic
         }
 
-        let preimageInfo = try await x.serviceAccounts.get(
+        let preimageInfo = try await x.serviceAccounts.value.get(
             serviceAccount: x.serviceIndex,
             preimageHash: Data32(preimageHash!)!,
             length: length
@@ -593,10 +598,10 @@ public class Query: HostCall {
 public class Solicit: HostCall {
     public static var identifier: UInt8 { 14 }
 
-    public var x: AccumlateResultContext
+    public let x: AccumlateResultContext
     public let timeslot: TimeslotIndex
 
-    public init(x: inout AccumlateResultContext, timeslot: TimeslotIndex) {
+    public init(x: AccumlateResultContext, timeslot: TimeslotIndex) {
         self.x = x
         self.timeslot = timeslot
     }
@@ -605,12 +610,16 @@ public class Solicit: HostCall {
         let (startAddr, length): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
         let hash = try? state.readMemory(address: startAddr, length: 32)
 
-        let preimageInfo = try await x.serviceAccounts.get(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length)
+        let preimageInfo = try await x.serviceAccounts.value.get(
+            serviceAccount: x.serviceIndex,
+            preimageHash: Data32(hash!)!,
+            length: length
+        )
         let notRequestedYet = preimageInfo == nil
         let isPreviouslyAvailable = preimageInfo?.count == 2
         let canSolicit = notRequestedYet || isPreviouslyAvailable
 
-        let acc = try await x.serviceAccounts.get(serviceAccount: x.serviceIndex)
+        let acc = try await x.serviceAccounts.value.get(serviceAccount: x.serviceIndex)
 
         if hash == nil {
             throw VMInvocationsError.panic
@@ -620,10 +629,15 @@ public class Solicit: HostCall {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
         } else {
             if notRequestedYet {
-                x.serviceAccounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: [])
+                x.serviceAccounts.value.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: [])
             } else if isPreviouslyAvailable, var preimageInfo {
                 try preimageInfo.append(timeslot)
-                x.serviceAccounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: preimageInfo)
+                x.serviceAccounts.value.set(
+                    serviceAccount: x.serviceIndex,
+                    preimageHash: Data32(hash!)!,
+                    length: length,
+                    value: preimageInfo
+                )
             }
         }
     }
@@ -633,10 +647,10 @@ public class Solicit: HostCall {
 public class Forget: HostCall {
     public static var identifier: UInt8 { 15 }
 
-    public var x: AccumlateResultContext
+    public let x: AccumlateResultContext
     public let timeslot: TimeslotIndex
 
-    public init(x: inout AccumlateResultContext, timeslot: TimeslotIndex) {
+    public init(x: AccumlateResultContext, timeslot: TimeslotIndex) {
         self.x = x
         self.timeslot = timeslot
     }
@@ -646,12 +660,18 @@ public class Forget: HostCall {
         let hash = try? state.readMemory(address: startAddr, length: 32)
         let minHoldPeriod = TimeslotIndex(config.value.preimagePurgePeriod)
 
-        let preimageInfo = try await x.serviceAccounts.get(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length)
+        let preimageInfo = try await x.serviceAccounts.value.get(
+            serviceAccount: x.serviceIndex,
+            preimageHash: Data32(hash!)!,
+            length: length
+        )
         let historyCount = preimageInfo?.count
 
-        let canExpunge = historyCount == 0 || (historyCount == 2 && preimageInfo![1] < timeslot - minHoldPeriod)
+        let minHoldSlot = max(0, Int(timeslot) - Int(minHoldPeriod))
+
+        let canExpunge = historyCount == 0 || (historyCount == 2 && preimageInfo![1] < minHoldSlot)
         let isAvailable1 = historyCount == 1
-        let isAvailable3 = historyCount == 3 && (preimageInfo![1] < timeslot - minHoldPeriod)
+        let isAvailable3 = historyCount == 3 && (preimageInfo![1] < minHoldSlot)
         let canForget = canExpunge || isAvailable1 || isAvailable3
 
         if hash == nil {
@@ -660,14 +680,24 @@ public class Forget: HostCall {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.HUH.rawValue)
         } else {
             if canExpunge {
-                x.serviceAccounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: nil)
-                x.serviceAccounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, value: nil)
+                x.serviceAccounts.value.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: nil)
+                x.serviceAccounts.value.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, value: nil)
             } else if isAvailable1, var preimageInfo {
                 try preimageInfo.append(timeslot)
-                x.serviceAccounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: preimageInfo)
+                x.serviceAccounts.value.set(
+                    serviceAccount: x.serviceIndex,
+                    preimageHash: Data32(hash!)!,
+                    length: length,
+                    value: preimageInfo
+                )
             } else if isAvailable3, var preimageInfo {
                 preimageInfo = [preimageInfo[2], timeslot]
-                x.serviceAccounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: preimageInfo)
+                x.serviceAccounts.value.set(
+                    serviceAccount: x.serviceIndex,
+                    preimageHash: Data32(hash!)!,
+                    length: length,
+                    value: preimageInfo
+                )
             }
         }
     }
@@ -677,9 +707,9 @@ public class Forget: HostCall {
 public class Yield: HostCall {
     public static var identifier: UInt8 { 16 }
 
-    public var x: AccumlateResultContext
+    public let x: AccumlateResultContext
 
-    public init(x: inout AccumlateResultContext) {
+    public init(x: AccumlateResultContext) {
         self.x = x
     }
 
@@ -703,13 +733,13 @@ public class HistoricalLookup: HostCall {
 
     public let context: RefineContext.ContextType
     public let serviceIndex: ServiceIndex
-    public let serviceAccounts: ServiceAccounts
+    public let serviceAccounts: ServiceAccountsRef
     public let lookupAnchorTimeslot: TimeslotIndex
 
     public init(
         context: RefineContext.ContextType,
         serviceIndex: ServiceIndex,
-        serviceAccounts: ServiceAccounts,
+        serviceAccounts: ServiceAccountsRef,
         lookupAnchorTimeslot: TimeslotIndex
     ) {
         self.context = context
@@ -720,9 +750,9 @@ public class HistoricalLookup: HostCall {
 
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         let reg7: UInt64 = state.readRegister(Registers.Index(raw: 7))
-        let service: ServiceIndex? = if reg7 == Int64.max, try await serviceAccounts.get(serviceAccount: serviceIndex) != nil {
+        let service: ServiceIndex? = if reg7 == Int64.max, try await serviceAccounts.value.get(serviceAccount: serviceIndex) != nil {
             serviceIndex
-        } else if try await serviceAccounts.get(serviceAccount: UInt32(truncatingIfNeeded: reg7)) != nil {
+        } else if try await serviceAccounts.value.get(serviceAccount: UInt32(truncatingIfNeeded: reg7)) != nil {
             UInt32(truncatingIfNeeded: reg7)
         } else {
             nil
@@ -739,7 +769,7 @@ public class HistoricalLookup: HostCall {
             throw VMInvocationsError.panic
         }
 
-        let preimage = try await serviceAccounts.historicalLookup(
+        let preimage = try await serviceAccounts.value.historicalLookup(
             serviceAccount: service,
             timeslot: lookupAnchorTimeslot,
             preimageHash: Data32(state.readMemory(address: regs[0], length: 32))!
@@ -768,7 +798,7 @@ public class Fetch: HostCall {
     public static var identifier: UInt8 { 18 }
 
     public let context: RefineContext.ContextType
-    public let serviceAccounts: ServiceAccounts
+    public let serviceAccounts: ServiceAccountsRef
     public let serviceIndex: ServiceIndex
     public let workPackage: WorkPackage
     public let authorizerOutput: Data
@@ -776,7 +806,7 @@ public class Fetch: HostCall {
 
     public init(
         context: RefineContext.ContextType,
-        serviceAccounts: ServiceAccounts,
+        serviceAccounts: ServiceAccountsRef,
         serviceIndex: ServiceIndex,
         workPackage: WorkPackage,
         authorizerOutput: Data,
@@ -808,12 +838,12 @@ public class Fetch: HostCall {
         case 3:
             if reg11 < workPackage.workItems.count, reg12 < workPackage.workItems[Int(reg11)].outputs.count {
                 let hash = workPackage.workItems[Int(reg11)].outputs[Int(reg12)].hash
-                value = try await serviceAccounts.get(serviceAccount: serviceIndex, preimageHash: hash)
+                value = try await serviceAccounts.value.get(serviceAccount: serviceIndex, preimageHash: hash)
             }
         case 4:
             if reg11 < workPackage.workItems[Int(serviceIndex)].outputs.count {
                 let hash = workPackage.workItems[Int(serviceIndex)].outputs[Int(reg11)].hash
-                value = try await serviceAccounts.get(serviceAccount: serviceIndex, preimageHash: hash)
+                value = try await serviceAccounts.value.get(serviceAccount: serviceIndex, preimageHash: hash)
             }
         case 5:
             if reg11 < importSegments.count, reg12 < importSegments[Int(reg11)].count {
@@ -852,10 +882,10 @@ public class Fetch: HostCall {
 public class Export: HostCall {
     public static var identifier: UInt8 { 19 }
 
-    public var context: RefineContext.ContextType
+    public let context: RefineContext.ContextType
     public let exportSegmentOffset: UInt64
 
-    public init(context: inout RefineContext.ContextType, exportSegmentOffset: UInt64) {
+    public init(context: RefineContext.ContextType, exportSegmentOffset: UInt64) {
         self.context = context
         self.exportSegmentOffset = exportSegmentOffset
     }
@@ -890,9 +920,9 @@ public class Export: HostCall {
 public class Machine: HostCall {
     public static var identifier: UInt8 { 20 }
 
-    public var context: RefineContext.ContextType
+    public let context: RefineContext.ContextType
 
-    public init(context: inout RefineContext.ContextType) {
+    public init(context: RefineContext.ContextType) {
         self.context = context
     }
 
@@ -958,9 +988,9 @@ public class Peek: HostCall {
 public class Poke: HostCall {
     public static var identifier: UInt8 { 22 }
 
-    public var context: RefineContext.ContextType
+    public let context: RefineContext.ContextType
 
-    public init(context: inout RefineContext.ContextType) {
+    public init(context: RefineContext.ContextType) {
         self.context = context
     }
 
@@ -987,9 +1017,9 @@ public class Poke: HostCall {
 public class Zero: HostCall {
     public static var identifier: UInt8 { 23 }
 
-    public var context: RefineContext.ContextType
+    public let context: RefineContext.ContextType
 
-    public init(context: inout RefineContext.ContextType) {
+    public init(context: RefineContext.ContextType) {
         self.context = context
     }
 
@@ -1014,9 +1044,9 @@ public class Zero: HostCall {
 public class VoidFn: HostCall {
     public static var identifier: UInt8 { 24 }
 
-    public var context: RefineContext.ContextType
+    public let context: RefineContext.ContextType
 
-    public init(context: inout RefineContext.ContextType) {
+    public init(context: RefineContext.ContextType) {
         self.context = context
     }
 
@@ -1041,9 +1071,9 @@ public class VoidFn: HostCall {
 public class Invoke: HostCall {
     public static var identifier: UInt8 { 25 }
 
-    public var context: RefineContext.ContextType
+    public let context: RefineContext.ContextType
 
-    public init(context: inout RefineContext.ContextType) {
+    public init(context: RefineContext.ContextType) {
         self.context = context
     }
 
@@ -1099,9 +1129,9 @@ public class Invoke: HostCall {
 public class Expunge: HostCall {
     public static var identifier: UInt8 { 26 }
 
-    public var context: RefineContext.ContextType
+    public let context: RefineContext.ContextType
 
-    public init(context: inout RefineContext.ContextType) {
+    public init(context: RefineContext.ContextType) {
         self.context = context
     }
 
@@ -1178,8 +1208,8 @@ public class Log: HostCall {
         }
     }
 
-    public var core: CoreIndex?
-    public var service: ServiceIndex?
+    public let core: CoreIndex?
+    public let service: ServiceIndex?
 
     public init(core: CoreIndex? = nil, service: ServiceIndex? = nil) {
         self.core = core

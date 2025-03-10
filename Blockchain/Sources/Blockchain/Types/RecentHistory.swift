@@ -1,5 +1,8 @@
 import Codec
+import TracingUtils
 import Utils
+
+private let logger = Logger(label: "RecentHistory")
 
 // β
 public struct RecentHistory: Sendable, Equatable, Codable {
@@ -61,6 +64,8 @@ extension RecentHistory {
 
         var mmr = items.last?.mmr ?? .init([])
         mmr.append(accumulateRoot, hasher: Keccak.self)
+
+        logger.trace("recent history new item mmr: \(mmr)")
 
         let newItem = RecentHistory.HistoryItem(
             headerHash: headerHash,

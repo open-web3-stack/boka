@@ -25,7 +25,7 @@ enum CommonTests {
             // compare details
             #expect(stateRef.value.coreAuthorizationPool == expectedState.coreAuthorizationPool)
             #expect(stateRef.value.authorizationQueue == expectedState.authorizationQueue)
-            #expect(stateRef.value.recentHistory == expectedState.recentHistory)
+            #expect(stateRef.value.recentHistory.items == expectedState.recentHistory.items)
             #expect(stateRef.value.safroleState == expectedState.safroleState)
             #expect(stateRef.value.judgements == expectedState.judgements)
             #expect(stateRef.value.entropyPool == expectedState.entropyPool)

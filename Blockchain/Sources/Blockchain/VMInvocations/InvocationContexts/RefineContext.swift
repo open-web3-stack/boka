@@ -12,10 +12,17 @@ public struct InnerPvm {
 }
 
 public class RefineContext: InvocationContext {
-    public typealias ContextType = (
-        pvms: [UInt64: InnerPvm],
-        exports: [Data4104]
-    )
+    public class RefineContextType {
+        var pvms: [UInt64: InnerPvm]
+        var exports: [Data4104]
+
+        init(pvms: [UInt64: InnerPvm], exports: [Data4104]) {
+            self.pvms = pvms
+            self.exports = exports
+        }
+    }
+
+    public typealias ContextType = RefineContextType
 
     public let config: ProtocolConfigRef
     public var context: ContextType
@@ -56,14 +63,14 @@ public class RefineContext: InvocationContext {
             return await HistoricalLookup(
                 context: context,
                 serviceIndex: service,
-                serviceAccounts: serviceAccounts,
+                serviceAccounts: ServiceAccountsRef(serviceAccounts),
                 lookupAnchorTimeslot: workPackage.context.lookupAnchor.timeslot
             )
             .call(config: config, state: state)
         case Fetch.identifier:
             return await Fetch(
                 context: context,
-                serviceAccounts: serviceAccounts,
+                serviceAccounts: ServiceAccountsRef(serviceAccounts),
                 serviceIndex: service,
                 workPackage: workPackage,
                 authorizerOutput: authorizerOutput,
@@ -71,21 +78,21 @@ public class RefineContext: InvocationContext {
             )
             .call(config: config, state: state)
         case Export.identifier:
-            return await Export(context: &context, exportSegmentOffset: exportSegmentOffset).call(config: config, state: state)
+            return await Export(context: context, exportSegmentOffset: exportSegmentOffset).call(config: config, state: state)
         case Machine.identifier:
-            return await Machine(context: &context).call(config: config, state: state)
+            return await Machine(context: context).call(config: config, state: state)
         case Peek.identifier:
             return await Peek(context: context).call(config: config, state: state)
         case Zero.identifier:
-            return await Zero(context: &context).call(config: config, state: state)
+            return await Zero(context: context).call(config: config, state: state)
         case Poke.identifier:
-            return await Poke(context: &context).call(config: config, state: state)
+            return await Poke(context: context).call(config: config, state: state)
         case VoidFn.identifier:
-            return await VoidFn(context: &context).call(config: config, state: state)
+            return await VoidFn(context: context).call(config: config, state: state)
         case Invoke.identifier:
-            return await Invoke(context: &context).call(config: config, state: state)
+            return await Invoke(context: context).call(config: config, state: state)
         case Expunge.identifier:
-            return await Expunge(context: &context).call(config: config, state: state)
+            return await Expunge(context: context).call(config: config, state: state)
         case Log.identifier:
             return await Log(service: service).call(config: config, state: state)
         default:
