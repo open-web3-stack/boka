@@ -96,7 +96,7 @@ public enum RuntimeEvents {
     public struct GuranteedWorkReport: Event {
         public let workReport: WorkReport
         public let slot: UInt32
-        public let signatures: [ValidatorSignature]
+        public var signatures: [ValidatorSignature]
 
         public init(
             workReport: WorkReport,
