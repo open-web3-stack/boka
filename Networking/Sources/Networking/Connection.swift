@@ -181,12 +181,22 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         guard !isClosed else {
             throw ConnectionError.closed
         }
-        logger.trace("sending request", metadata: ["kind": "\(request.kind)"])
-        let data = try request.encode()
+        logger.debug("sending request", metadata: ["kind": "\(request.kind)"])
+        var data = try request.encode()
+        logger.trace(
+            "sending request",
+            metadata: ["request": "\(request)", "dataChunks": "\(data.count)", "totalSize": "\(data.reduce(0) { $0 + $1.count })"]
+        )
         let kind = request.kind
         let stream = try createStream(kind: kind)
-        for chunk in data {
-            try await stream.send(message: chunk)
+        if data.isEmpty {
+            try await stream.send(message: Data(), finish: true)
+        } else {
+            let last = data.removeLast()
+            for chunk in data {
+                try await stream.send(message: chunk)
+            }
+            try await stream.send(message: last, finish: true)
         }
 
         var resp = [Data]()

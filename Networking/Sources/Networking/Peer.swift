@@ -135,6 +135,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
     }
 
     // TODO: see if we can remove the role parameter
+    @discardableResult
     public func connect(to address: NetAddr, role: PeerRole) throws -> Connection<Handler> {
         let conn = impl.connections.read { connections in
             connections.byAddr[address]
@@ -522,7 +523,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             var needReconnect = false
             if let conn = connections.byId[connection.id] {
                 needReconnect = conn.needReconnect
-                if let publicKey = conn.publicKey {
+                if let publicKey = conn.publicKey, let existingConn = connections.byPublicKey[publicKey], existingConn === conn {
                     connections.byPublicKey.removeValue(forKey: publicKey)
                 }
                 connections.byId.removeValue(forKey: connection.id)

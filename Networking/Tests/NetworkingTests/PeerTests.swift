@@ -125,6 +125,10 @@ struct PeerTests {
         typealias EphemeralHandler = MockEphemeralStreamHandler
     }
 
+    init() {
+        setupTestLogger()
+    }
+
     @Test
     func connectionRotationStrategy() async throws {
         var peers: [Peer<MockStreamHandler>] = []
@@ -422,13 +426,18 @@ struct PeerTests {
             )
         )
 
-        let connection1 = try peer1.connect(to: peer2.listenAddress(), role: .validator)
-        let connection2 = try peer2.connect(to: peer1.listenAddress(), role: .validator)
-        try? await Task.sleep(for: .milliseconds(1000))
+        try peer1.connect(to: peer2.listenAddress(), role: .validator)
+        try peer2.connect(to: peer1.listenAddress(), role: .validator)
+        try? await Task.sleep(for: .milliseconds(500))
+        #expect(peer1.peersCount == 1)
+        #expect(peer2.peersCount == 1)
+
+        let connection1 = peer1.getConnection(publicKey: peer2.publicKey)
+        let connection2 = peer2.getConnection(publicKey: peer1.publicKey)
         let connections = [connection1, connection2]
-        for connection in connections where !connection.isClosed {
+        for connection in connections {
+            let connection = try #require(connection)
             let data = try await connection.request(MockRequest(kind: .typeA, data: [Data("hello world".utf8)]))
-            try? await Task.sleep(for: .milliseconds(500))
             #expect(data == [Data("hello world response".utf8)])
         }
     }

@@ -102,9 +102,9 @@ public final class QuicStream: Sendable {
             logger.debug("\(storage.connection.id) \(id) sending \(data.count) bytes data \(data.toHexString())")
             let messageLength = data.count
 
-            if messageLength == 0 {
+            if messageLength == 0, !start, !finish {
                 logger.debug("No data to send.")
-                throw SendError.emptyData // Throw a specific error or return
+                throw SendError.emptyData
             }
 
             let sendBufferRaw = UnsafeMutableRawPointer.allocate( // !! allocate
