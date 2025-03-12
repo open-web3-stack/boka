@@ -88,8 +88,6 @@ final class NodeTests {
     }
 
     @Test func sync() async throws {
-        setupTestLogger()
-
         // Create validator and full node
         let (nodes, scheduler) = try await Topology(
             nodes: [

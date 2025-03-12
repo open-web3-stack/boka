@@ -184,14 +184,13 @@ struct HandlerImpl: NetworkProtocolHandler {
     let blockchain: Blockchain
     let peerManager: PeerManager
 
-    func handle(ceRequest: CERequest) async throws -> [any Encodable] {
+    func handle(ceRequest: CERequest) async throws -> [Data] {
         logger.trace("handling request", metadata: ["request": "\(ceRequest)"])
         switch ceRequest {
         case let .blockRequest(message):
             let dataProvider = blockchain.dataProvider
             let count = min(MAX_BLOCKS_PER_REQUEST, message.maxBlocks)
-            var resp = [BlockRef]()
-            resp.reserveCapacity(Int(count))
+            let encoder = JamEncoder()
             switch message.direction {
             case .ascendingExcludsive:
                 let number = try await dataProvider.getBlockNumber(hash: message.hash)
@@ -202,7 +201,7 @@ struct HandlerImpl: NetworkProtocolHandler {
                     for hash in hashes {
                         let block = try await dataProvider.getBlock(hash: hash)
                         if block.header.parentHash == currentHash {
-                            resp.append(block)
+                            try encoder.encode(block)
                             found = true
                             currentHash = hash
                             break
@@ -216,14 +215,14 @@ struct HandlerImpl: NetworkProtocolHandler {
                 var hash = message.hash
                 for _ in 0 ..< count {
                     let block = try await dataProvider.getBlock(hash: hash)
-                    resp.append(block)
+                    try encoder.encode(block)
                     if hash == dataProvider.genesisBlockHash {
                         break
                     }
                     hash = block.header.parentHash
                 }
             }
-            return resp
+            return [encoder.data]
         case let .safroleTicket1(message):
             blockchain.publish(event: RuntimeEvents.SafroleTicketsReceived(
                 items: [

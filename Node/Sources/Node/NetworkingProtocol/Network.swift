@@ -6,7 +6,7 @@ import TracingUtils
 import Utils
 
 public protocol NetworkProtocolHandler: Sendable {
-    func handle(ceRequest: CERequest) async throws -> [any Encodable]
+    func handle(ceRequest: CERequest) async throws -> [Data]
     func handle(connection: some ConnectionInfoProtocol, upMessage: UPMessage) async throws
 
     func handle(
@@ -155,7 +155,6 @@ struct EphemeralStreamHandlerImpl: EphemeralStreamHandler {
 
     func handle(connection: any ConnectionInfoProtocol, request: Request) async throws -> [Data] {
         impl.logger.trace("handling request: \(request) from \(connection.id)")
-        let resp = try await impl.handler.handle(ceRequest: request)
-        return try resp.map { try JamEncoder.encode($0) }
+        return try await impl.handler.handle(ceRequest: request)
     }
 }

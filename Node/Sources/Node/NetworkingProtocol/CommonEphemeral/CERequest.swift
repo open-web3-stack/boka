@@ -108,7 +108,7 @@ extension CERequest: RequestProtocol {
         guard data.count == 1, let data = data.first else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
-                debugDescription: "unexpected data"
+                debugDescription: "unexpected data \(data)"
             ))
         }
         let decoder = JamDecoder(data: data, config: config)
