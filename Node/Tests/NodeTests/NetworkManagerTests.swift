@@ -92,7 +92,7 @@ struct NetworkManagerTests {
                 .init(function: "connect", parameters: ["address": devPeers.first!, "role": PeerRole.validator]),
                 .init(function: "sendToPeer", parameters: [
                     "message": CERequest.workPackageSubmission(
-                        WorkPackageMessage(coreIndex: 0, workPackage: workPackage.value, extrinsics: [])
+                        WorkPackageSubmissionMessage(coreIndex: 0, workPackage: workPackage.value, extrinsics: [])
                     ),
                 ]),
             ])
@@ -111,7 +111,7 @@ struct NetworkManagerTests {
         )
         // Publish WorkPackagesShare event
         await services.blockchain
-            .publish(event: RuntimeEvents.WorkPackageBundleShare(coreIndex: 0, bundle: bundle, segmentsRootMappings: []))
+            .publish(event: RuntimeEvents.WorkPackageBundleReady(coreIndex: 0, bundle: bundle, segmentsRootMappings: []))
 
         // Wait for event processing
         await storeMiddleware.wait()
@@ -122,7 +122,7 @@ struct NetworkManagerTests {
                 .init(function: "connect", parameters: ["address": devPeers.first!, "role": PeerRole.validator]),
                 .init(function: "sendToPeer", parameters: [
                     "message": CERequest.workPackageSharing(
-                        WorkPackageShareMessage(coreIndex: 0, bundle: bundle, segmentsRootMappings: [])
+                        WorkPackageSharingMessage(coreIndex: 0, bundle: bundle, segmentsRootMappings: [])
                     ),
                 ]),
             ])
@@ -132,9 +132,9 @@ struct NetworkManagerTests {
     @Test
     func testWorkReportDistribution() async throws {
         let workReport = WorkReport.dummy(config: services.config)
-        // Publish GuranteedWorkReport event
+        // Publish WorkReportGenerated event
         await services.blockchain
-            .publish(event: RuntimeEvents.GuranteedWorkReport(workReport: workReport, slot: 0, signatures: []))
+            .publish(event: RuntimeEvents.WorkReportGenerated(workReport: workReport, slot: 0, signatures: []))
         await storeMiddleware.wait()
         // Verify network calls
         #expect(
@@ -142,7 +142,7 @@ struct NetworkManagerTests {
                 .init(function: "connect", parameters: ["address": devPeers.first!, "role": PeerRole.validator]),
                 .init(function: "sendToPeer", parameters: [
                     "message": CERequest.workReportDistrubution(
-                        GuaranteedWorkReportMessage(workReport: workReport, slot: 0, signatures: [])
+                        WorkReportDistributionMessage(workReport: workReport, slot: 0, signatures: [])
                     ),
                 ]),
             ])

@@ -86,3 +86,17 @@ extension FixedSizeData: FromJSON {
         }
     }
 }
+
+extension Array: FromJSON where Element: FromJSON {
+    public init(from json: JSON?) throws {
+        guard let json else {
+            throw FromJSONError.null
+        }
+        switch json {
+        case let .array(arr):
+            self = try arr.map { try Element(from: $0) }
+        default:
+            throw FromJSONError.unexpectedJSON
+        }
+    }
+}

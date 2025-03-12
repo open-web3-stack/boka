@@ -71,12 +71,12 @@ public final class Network: NetworkProtocol {
         try peer.connect(to: to, role: role)
     }
 
-    public func send(to: PeerId, message: CERequest) async throws -> Data {
+    public func send(to: PeerId, message: CERequest) async throws -> [Data] {
         let conn = try peer.getConnection(publicKey: to.publicKey) ?? peer.connect(to: to.address, role: .builder)
         return try await conn.request(message)
     }
 
-    public func send(to: NetAddr, message: CERequest) async throws -> Data {
+    public func send(to: NetAddr, message: CERequest) async throws -> [Data] {
         let conn = try peer.connect(to: to, role: .builder)
         return try await conn.request(message)
     }
@@ -125,7 +125,7 @@ struct PresistentStreamHandlerImpl: PresistentStreamHandler {
 
     fileprivate let impl: NetworkImpl
 
-    func createDecoder(kind: StreamKind) -> any MessageDecoder<Message> {
+    func createDecoder(kind: StreamKind) -> any PresistentStreamMessageDecoder<Message> {
         switch kind {
         case .blockAnnouncement:
             BlockAnnouncementDecoder(config: impl.config, kind: kind)
@@ -149,17 +149,13 @@ struct EphemeralStreamHandlerImpl: EphemeralStreamHandler {
 
     fileprivate let impl: NetworkImpl
 
-    func createDecoder(kind: StreamKind) -> any MessageDecoder<Request> {
+    func createDecoder(kind: StreamKind) -> any EphemeralStreamMessageDecoder<Request> {
         CEMessageDecoder(config: impl.config, kind: kind)
     }
 
-    func handle(connection: any ConnectionInfoProtocol, request: Request) async throws -> Data {
+    func handle(connection: any ConnectionInfoProtocol, request: Request) async throws -> [Data] {
         impl.logger.trace("handling request: \(request) from \(connection.id)")
-        let encoder = JamEncoder()
         let resp = try await impl.handler.handle(ceRequest: request)
-        for r in resp {
-            try encoder.encode(r)
-        }
-        return encoder.data
+        return try resp.map { try JamEncoder.encode($0) }
     }
 }

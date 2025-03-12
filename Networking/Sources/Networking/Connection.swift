@@ -177,7 +177,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         try? connection.shutdown(errorCode: abort ? 1 : 0) // TODO: define some error code
     }
 
-    public func request(_ request: Handler.EphemeralHandler.Request) async throws -> Data {
+    public func request(_ request: Handler.EphemeralHandler.Request) async throws -> [Data] {
         guard !isClosed else {
             throw ConnectionError.closed
         }
@@ -185,9 +185,15 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         let data = try request.encode()
         let kind = request.kind
         let stream = try createStream(kind: kind)
-        try await stream.send(message: data)
+        for chunk in data {
+            try await stream.send(message: chunk)
+        }
 
-        return try await receiveData(stream: stream)
+        var resp = [Data]()
+        while let data = try await receiveMaybeData(stream: stream) {
+            resp.append(data)
+        }
+        return resp
     }
 
     @discardableResult
@@ -284,10 +290,22 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                 var decoder = impl.ephemeralStreamHandler.createDecoder(kind: ceKind)
 
                 do {
-                    let data = try await receiveData(stream: stream)
-                    let request = try decoder.decode(data: data)
-                    let resp = try await impl.ephemeralStreamHandler.handle(connection: self, request: request)
-                    try await stream.send(message: resp, finish: true)
+                    // receive all the data until no more
+                    var allData = [Data]()
+                    while let data = try await receiveMaybeData(stream: stream) {
+                        allData.append(data)
+                    }
+                    let request = try decoder.decode(data: allData)
+                    var resp = try await impl.ephemeralStreamHandler.handle(connection: self, request: request)
+                    if resp.isEmpty {
+                        stream.close()
+                    } else {
+                        let last = resp.removeLast()
+                        for r in resp {
+                            try await stream.send(message: r)
+                        }
+                        try await stream.send(message: last, finish: true)
+                    }
                 } catch {
                     logger.error("Failed to handle request", metadata: ["error": "\(error)"])
                     stream.close(abort: true)

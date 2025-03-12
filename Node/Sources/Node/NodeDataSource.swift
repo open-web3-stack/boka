@@ -1,4 +1,5 @@
 import Blockchain
+import Codec
 import Foundation
 import RPC
 import Utils
@@ -52,16 +53,14 @@ extension NodeDataSource: SystemDataSource {
 }
 
 extension NodeDataSource: BuilderDataSource {
-    public func submitWorkPackage(data: Data) async throws -> Bool {
-        let workPackageMessage = try WorkPackageMessage.decode(data: data, withConfig: blockchain.config)
-        // TODO: get guarantor from state etc.
+    public func submitWorkPackage(coreIndex: CoreIndex, workPackage: Data, extrinsics: [Data]) async throws {
+        let decoded = try JamDecoder.decode(WorkPackage.self, from: workPackage, withConfig: blockchain.config)
         blockchain.publish(event: RuntimeEvents
-            .WorkPackagesReceived(
-                coreIndex: workPackageMessage.coreIndex,
-                workPackage: workPackageMessage.workPackage.asRef(),
-                extrinsics: workPackageMessage.extrinsics
+            .WorkPackagesSubmitted(
+                coreIndex: coreIndex,
+                workPackage: decoded.asRef(),
+                extrinsics: extrinsics
             ))
-        return true
     }
 }
 

@@ -170,11 +170,7 @@ public actor SyncManager {
                         direction: .descendingInclusive,
                         maxBlocks: max(1, newHeader.value.timeslot - currentTimeslot)
                     )))
-                    let decoder = JamDecoder(data: resp, config: blockchain.config)
-                    var blocks = [BlockRef]()
-                    while !decoder.isAtEnd {
-                        try blocks.append(decoder.decode(BlockRef.self))
-                    }
+                    let blocks = try CERequest.decodeResponseForBlockRequest(data: resp, config: blockchain.config)
                     // reverse to import old block first
                     for block in blocks.reversed() {
                         logger.debug("blocks reversed", metadata: ["hash": "\(String(describing: block.hash))"])

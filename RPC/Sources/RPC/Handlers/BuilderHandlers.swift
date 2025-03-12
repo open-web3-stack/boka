@@ -15,12 +15,12 @@ public enum BuilderHandlers {
     }
 
     public struct SubmitWorkPackage: RPCHandler {
-        public typealias Request = Request1<Data>
+        public typealias Request = Request3<CoreIndex, Data, [Data]>
         public typealias Response = Bool
 
         public static var method: String { "builder_submitWorkPackage" }
-        public static var requestNames: [String] { ["workPackage"] }
-        public static var summary: String? { "Send the work package to other connected nodes" }
+        public static var requestNames: [String] { ["coreIndex", "workPackage", "extrinsics"] }
+        public static var summary: String? { "Submit a new work package for inclusion in the blockchain." }
 
         private let source: BuilderDataSource
 
@@ -29,7 +29,9 @@ public enum BuilderHandlers {
         }
 
         public func handle(request: Request) async throws -> Response? {
-            try await source.submitWorkPackage(data: request.value)
+            let (coreIndex, workPackage, extrinsics) = request.value
+            try await source.submitWorkPackage(coreIndex: coreIndex, workPackage: workPackage, extrinsics: extrinsics)
+            return true
         }
     }
 }

@@ -55,7 +55,14 @@ actor StreamSender {
         try stream.send(data: message, finish: finish)
 
         if finish {
-            status = .receiveOnly
+            switch status {
+            case .open:
+                status = .receiveOnly
+            case .sendOnly:
+                status = .closed
+            default:
+                unreachable("invalid status: \(status)")
+            }
         }
     }
 }
@@ -97,7 +104,10 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
     }
 
     public func send(message: Handler.PresistentHandler.Message) async throws {
-        try await send(message: message.encode(), finish: false)
+        let data = try message.encode()
+        for chunk in data {
+            try await send(message: chunk, finish: false)
+        }
     }
 
     /// send raw data

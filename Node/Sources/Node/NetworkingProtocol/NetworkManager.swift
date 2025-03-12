@@ -72,6 +72,13 @@ public final class NetworkManager: Sendable {
             ) { [weak self] event in
                 await self?.on(blockImported: event)
             }
+
+            await subscriptions.subscribe(
+                RuntimeEvents.WorkPackagesSubmitted.self,
+                id: "NetworkManager.WorkPackagesSubmitted"
+            ) { [weak self] event in
+                await self?.on(workPackagesSubmitted: event)
+            }
         }
     }
 
@@ -87,14 +94,14 @@ public final class NetworkManager: Sendable {
         }
     }
 
-    private func send(to: PeerId, message: CERequest) async throws -> Data {
+    private func send(to: PeerId, message: CERequest) async throws -> [Data] {
         try await network.send(to: to, message: message)
     }
 
     private func broadcast(
         to: BroadcastTarget,
         message: CERequest,
-        responseHandler: @Sendable @escaping (Result<Data, Error>) async -> Void
+        responseHandler: @Sendable @escaping (Result<[Data], Error>) async -> Void
     ) async {
         let targets = getAddresses(target: to)
         for target in targets {
@@ -128,6 +135,18 @@ public final class NetworkManager: Sendable {
                 }
             }
         }
+    }
+
+    private func on(workPackagesSubmitted event: RuntimeEvents.WorkPackagesSubmitted) async {
+        logger.trace("sending work package", metadata: ["coreIndex": "\(event.coreIndex)"])
+        await broadcast(
+            to: .currentValidators,
+            message: .workPackageSubmission(.init(
+                coreIndex: event.coreIndex,
+                workPackage: event.workPackage.value,
+                extrinsics: event.extrinsics
+            ))
+        )
     }
 
     private func on(safroleTicketsGenerated event: RuntimeEvents.SafroleTicketsGenerated) async {
@@ -241,7 +260,7 @@ struct HandlerImpl: NetworkProtocolHandler {
             blockchain
                 .publish(
                     event: RuntimeEvents
-                        .WorkPackageBundleShare(
+                        .WorkPackageBundleReady(
                             coreIndex: message.coreIndex,
                             bundle: message.bundle,
                             segmentsRootMappings: message.segmentsRootMappings
@@ -252,7 +271,7 @@ struct HandlerImpl: NetworkProtocolHandler {
             blockchain
                 .publish(
                     event: RuntimeEvents
-                        .GuranteedWorkReport(
+                        .WorkReportGenerated(
                             workReport: message.workReport,
                             slot: message.slot,
                             signatures: message.signatures

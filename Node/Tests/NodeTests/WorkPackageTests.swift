@@ -8,10 +8,10 @@ struct WorkPackageTests {
     @Test
     func workPackageEncodeAndDecode() throws {
         let workPackage = WorkPackage.dummy(config: .minimal)
-        let workPackageMessage = WorkPackageMessage(coreIndex: 0, workPackage: workPackage, extrinsics: [])
-        let data = try workPackageMessage.encode()
+        let WorkPackageSubmissionMessage = WorkPackageSubmissionMessage(coreIndex: 0, workPackage: workPackage, extrinsics: [])
+        let data = try WorkPackageSubmissionMessage.encode()
         #expect(data.count > 0)
-        let message = try WorkPackageMessage.decode(data: data, withConfig: ProtocolConfigRef.minimal)
-        #expect(workPackageMessage == message)
+        let message = try WorkPackageSubmissionMessage.decode(data: data, withConfig: ProtocolConfigRef.minimal)
+        #expect(WorkPackageSubmissionMessage == message)
     }
 }

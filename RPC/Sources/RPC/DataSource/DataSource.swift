@@ -23,7 +23,7 @@ public protocol ChainDataSource: Sendable {
 }
 
 public protocol BuilderDataSource: Sendable {
-    func submitWorkPackage(data: Data) async throws -> Bool
+    func submitWorkPackage(coreIndex: CoreIndex, workPackage: Data, extrinsics: [Data]) async throws
 }
 
 public protocol TelemetryDataSource: Sendable {

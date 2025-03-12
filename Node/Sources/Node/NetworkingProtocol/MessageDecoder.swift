@@ -6,7 +6,7 @@ import Networking
 import Synchronization
 import TracingUtils
 
-class BlockAnnouncementDecoder: MessageDecoder {
+class BlockAnnouncementDecoder: PresistentStreamMessageDecoder {
     typealias Message = UPMessage
 
     private let config: ProtocolConfigRef
@@ -32,7 +32,7 @@ class BlockAnnouncementDecoder: MessageDecoder {
     }
 }
 
-class CEMessageDecoder: MessageDecoder {
+class CEMessageDecoder: EphemeralStreamMessageDecoder {
     typealias Message = CERequest
 
     private let config: ProtocolConfigRef
@@ -43,9 +43,9 @@ class CEMessageDecoder: MessageDecoder {
         self.kind = kind
     }
 
-    func decode(data: Data) throws -> Message {
+    func decode(data: [Data]) throws -> Message {
         let type = CERequest.getType(kind: kind)
-        let payload = try JamDecoder.decode(type, from: data, withConfig: config)
+        let payload = try type.decode(data: data, withConfig: config)
         guard let message = CERequest.from(kind: kind, data: payload) else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],

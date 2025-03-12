@@ -191,7 +191,9 @@ public final class Peer<Handler: StreamHandler>: Sendable {
             if let stream = try? connection.createPreistentStream(kind: kind) {
                 Task {
                     let res = await Result {
-                        try await stream.send(message: messageData)
+                        for chunk in messageData {
+                            try await stream.send(message: chunk)
+                        }
                     }
                     switch res {
                     case .success:
