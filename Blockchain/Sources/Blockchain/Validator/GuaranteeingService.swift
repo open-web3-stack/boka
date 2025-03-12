@@ -161,8 +161,37 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         // Sign work report & work-report distribution via CE 135
         let payload = SigningContext.guarantee + workReport.hash().data
         let signature = try signingKey.sign(message: payload)
-        let workReportEvent = RuntimeEvents.WorkReportGenerated(item: workReport, signature: signature)
-        publish(workReportEvent)
+
+        let timeslot = timeProvider.getTime().timeToTimeslot(config: config)
+        try await distributeWorkReport(
+            workReport,
+            slot: timeslot,
+            signature: ValidatorSignature(validatorIndex: validatorIndex, signature: signature)
+        )
+    }
+
+    // Sign work report & work-report distribution via CE135
+    private func distributeWorkReport(_ workReport: WorkReport, slot: UInt32, signature: ValidatorSignature) async throws {
+        // Construct the guaranteed work-report
+        var guaranteedWorkReport = RuntimeEvents.GuranteedWorkReport(
+            workReport: workReport,
+            slot: slot,
+            signatures: [signature]
+        )
+
+        // Fetch additional signatures (if any) from other guarantors
+        let additionalSignatures = await fetchAdditionalSignatures(for: workReport)
+        guaranteedWorkReport.signatures.append(contentsOf: additionalSignatures)
+
+        // Distribute the guaranteed work-report to all current validators
+        publish(guaranteedWorkReport)
+    }
+
+    // Fetch additional signatures from other guarantors
+    private func fetchAdditionalSignatures(for _: WorkReport) async -> [ValidatorSignature] {
+        // TODO: Implement logic to fetch additional signatures from other guarantors
+        // This could involve querying a shared data structure or waiting for events
+        [] // Placeholder
     }
 
     private func refinePkg(validatorIndex: ValidatorIndex, workPackage: WorkPackageRef,

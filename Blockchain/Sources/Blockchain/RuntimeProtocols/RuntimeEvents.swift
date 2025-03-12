@@ -92,9 +92,20 @@ public enum RuntimeEvents {
         }
     }
 
-    // When a work report is generated and ready to be distrubuted via CE135
-    public struct WorkReportGenerated: Event {
-        public let item: WorkReport
-        public let signature: Ed25519Signature
+    // A guaranteed work-report ready for distribution via CE135.
+    public struct GuranteedWorkReport: Event {
+        public let workReport: WorkReport
+        public let slot: UInt32
+        public var signatures: [ValidatorSignature]
+
+        public init(
+            workReport: WorkReport,
+            slot: UInt32,
+            signatures: [ValidatorSignature]
+        ) {
+            self.workReport = workReport
+            self.slot = slot
+            self.signatures = signatures
+        }
     }
 }
