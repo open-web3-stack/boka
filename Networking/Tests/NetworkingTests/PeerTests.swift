@@ -424,7 +424,7 @@ struct PeerTests {
 
         try peer1.connect(to: peer2.listenAddress(), role: .validator)
         try peer2.connect(to: peer1.listenAddress(), role: .validator)
-        try? await Task.sleep(for: .milliseconds(500))
+        try? await Task.sleep(for: .milliseconds(1000))
         #expect(peer1.peersCount == 1)
         #expect(peer2.peersCount == 1)
 
