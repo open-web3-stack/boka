@@ -14,9 +14,11 @@ public enum Bandersnatch: KeyType {
         case ringVRFVerifyFailed(Int)
         case ietfVRFVerifyFailed(Int)
         case getOutputFailed(Int)
+        case invalidSecretKey
     }
 
-    public final class SecretKey: SecretKeyProtocol, Sendable {
+    // TODO: fix SecretKeyProtocol, Codable
+    public final class SecretKey: SecretKeyProtocol, Codable, Sendable {
         fileprivate let ptr: SafePointer
         public let publicKey: PublicKey
 
@@ -72,6 +74,35 @@ public enum Bandersnatch: KeyType {
             }
 
             return Data32(output)!
+        }
+
+        public func encode() throws -> Data {
+            // TODO: encode bls to bytes
+            Data()
+        }
+
+        public static func decode(from data: Data) throws -> Self {
+            guard let seed = Data32(data) else {
+                throw Error.invalidSecretKey
+            }
+
+            return try Self(from: seed)
+        }
+
+        // MARK: - Codable
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(encode())
+        }
+
+        public convenience init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            let data = try container.decode(Data.self)
+            guard let seed = Data32(data) else {
+                throw Error.invalidSecretKey
+            }
+            try self.init(from: seed)
         }
     }
 

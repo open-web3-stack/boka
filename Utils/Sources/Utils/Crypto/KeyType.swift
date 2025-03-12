@@ -1,3 +1,5 @@
+import Foundation
+
 public protocol PublicKeyProtocol: Codable, Hashable, CustomStringConvertible, Sendable {}
 
 public protocol SecretKeyProtocol: Sendable {
@@ -5,6 +7,9 @@ public protocol SecretKeyProtocol: Sendable {
     init(from seed: Data32) throws
 
     var publicKey: PublicKey { get }
+
+    func encode() throws -> Data
+    static func decode(from data: Data) throws -> Self
 }
 
 public protocol KeyType {

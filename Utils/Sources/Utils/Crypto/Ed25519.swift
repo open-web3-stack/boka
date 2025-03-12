@@ -2,7 +2,11 @@ import Crypto
 import Foundation
 
 public enum Ed25519: KeyType {
-    public final class SecretKey: SecretKeyProtocol, @unchecked Sendable {
+    public enum Error: Swift.Error {
+        case invalidSecretKey
+    }
+
+    public final class SecretKey: SecretKeyProtocol, Codable, @unchecked Sendable {
         private let secretKey: Curve25519.Signing.PrivateKey
         public let publicKey: PublicKey
 
@@ -18,6 +22,35 @@ public enum Ed25519: KeyType {
 
         public var rawRepresentation: Data {
             secretKey.rawRepresentation
+        }
+
+        // MARK: - SecretKeyProtocol Methods
+
+        public func encode() throws -> Data {
+            secretKey.rawRepresentation
+        }
+
+        public static func decode(from data: Data) throws -> Self {
+            guard let seed = Data32(data) else {
+                throw Error.invalidSecretKey
+            }
+            return try Self(from: seed)
+        }
+
+        // MARK: - Codable Implementation
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(secretKey.rawRepresentation)
+        }
+
+        public convenience init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            let data = try container.decode(Data.self)
+            guard let seed = Data32(data) else {
+                throw Error.invalidSecretKey
+            }
+            try self.init(from: seed)
         }
     }
 

@@ -14,15 +14,16 @@ public enum BLS: KeyType {
         case signatureVerifyFailed(Int)
         case aggregateSigsFailed(Int)
         case aggregatedVerifyFailed(Int)
+        case invalidSecretKey
     }
 
-    public final class SecretKey: SecretKeyProtocol, Sendable {
+    // TODO: fix SecretKeyProtocol, Codable
+    public final class SecretKey: SecretKeyProtocol, Codable, Sendable {
         fileprivate let keyPairPtr: SafePointer
         public let publicKey: PublicKey
 
         public init(from seed: Data32) throws(Error) {
             var ptr: OpaquePointer!
-
             try FFIUtils.call(seed.data) { ptrs in
                 keypair_new(ptrs[0].ptr, ptrs[0].count, &ptr)
             } onErr: { err throws(Error) in
@@ -50,6 +51,35 @@ public enum BLS: KeyType {
             }
 
             return output
+        }
+
+        public func encode() throws -> Data {
+            // TODO: encode bls to bytes
+            Data()
+        }
+
+        public static func decode(from data: Data) throws -> Self {
+            guard let seed = Data32(data) else {
+                throw Error.invalidSecretKey
+            }
+
+            return try Self(from: seed)
+        }
+
+        // MARK: - Codable
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(encode())
+        }
+
+        public convenience init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            let data = try container.decode(Data.self)
+            guard let seed = Data32(data) else {
+                throw Error.invalidSecretKey
+            }
+            try self.init(from: seed)
         }
     }
 
