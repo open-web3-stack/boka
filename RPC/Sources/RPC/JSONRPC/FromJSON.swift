@@ -66,6 +66,8 @@ extension Data: FromJSON {
         }
         switch json {
         case let .string(str):
+            // if str starts with 0x, remove it
+            let str = str.hasPrefix("0x") ? String(str.dropFirst(2)) : str
             self = try Data(fromHexString: str).unwrap()
         default:
             throw FromJSONError.unexpectedJSON
