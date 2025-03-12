@@ -2,6 +2,7 @@ import Blockchain
 import Database
 import Foundation
 import Testing
+import TracingUtils
 import Utils
 
 @testable import Node
@@ -87,6 +88,8 @@ final class NodeTests {
     }
 
     @Test func sync() async throws {
+        setupTestLogger()
+
         // Create validator and full node
         let (nodes, scheduler) = try await Topology(
             nodes: [
