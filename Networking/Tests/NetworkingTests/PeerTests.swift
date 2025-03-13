@@ -866,7 +866,6 @@ struct PeerTests {
                     to: otherPeer.listenAddress(),
                     role: .validator
                 ).request(MockRequest(kind: type, data: messageData))
-                try? await Task.sleep(for: .milliseconds(100))
                 #expect(response == [messageData[0] + Data(" response".utf8)], "Peer \(i) should receive correct response")
             })
         }
@@ -926,7 +925,6 @@ struct PeerTests {
                     )
                     .unwrap()
                     .request(MockRequest(kind: type, data: messageData))
-                    try? await Task.sleep(for: .milliseconds(50))
                     #expect(response == [messageData[0] + Data(" response".utf8)], "Peer should receive correct response")
                 }
             }
