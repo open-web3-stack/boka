@@ -141,7 +141,7 @@ private final class ListenerHandle: Sendable {
             return listener.handler.newConnection(listener, connection: connection, info: info)
 
         case QUIC_LISTENER_EVENT_STOP_COMPLETE:
-            logger.debug("Stop complete")
+            logger.trace("Stop complete")
 
             api.call { api in
                 api.pointee.ListenerClose(ptr.value)

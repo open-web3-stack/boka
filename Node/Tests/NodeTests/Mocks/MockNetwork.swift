@@ -15,7 +15,7 @@ struct MockNetworkState {
     var simulatedNetworkKey = "mock_network_key"
     var simulatedListenAddress = NetAddr(address: "127.0.0.1:8000")!
     var simulatedPeerRole: PeerRole = .builder
-    var simulatedResponseData = Data()
+    var simulatedResponseData = [Data()]
 }
 
 final class MockNetwork: NetworkProtocol {
@@ -50,7 +50,7 @@ final class MockNetwork: NetworkProtocol {
         return MockConnectionInfo(role: role, remoteAddress: address, publicKey: Data(repeating: 0, count: 32))
     }
 
-    func send(to peerId: PeerId, message: CERequest) async throws -> Data {
+    func send(to peerId: PeerId, message: CERequest) async throws -> [Data] {
         let (shouldFailNextSend, simulatedResponseData) = state.write {
             $0.calls.append(Call(function: "sendToPeer", parameters: ["peerId": peerId, "message": message]))
             return ($0.shouldFailNextSend, $0.simulatedResponseData)
@@ -59,7 +59,7 @@ final class MockNetwork: NetworkProtocol {
         return simulatedResponseData
     }
 
-    func send(to address: NetAddr, message: CERequest) async throws -> Data {
+    func send(to address: NetAddr, message: CERequest) async throws -> [Data] {
         let (shouldFailNextSend, simulatedResponseData) = state.write {
             $0.calls.append(Call(function: "sendToAddress", parameters: ["address": address, "message": message]))
             return ($0.shouldFailNextSend, $0.simulatedResponseData)

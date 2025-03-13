@@ -52,7 +52,20 @@ public enum RuntimeEvents {
         public let block: BlockRef
     }
 
-    // When a work package is recived via CE133
+    // Received new work package submission via RPC
+    public struct WorkPackagesSubmitted: Event {
+        public let coreIndex: CoreIndex
+        public let workPackage: WorkPackageRef
+        public let extrinsics: [Data]
+
+        public init(coreIndex: CoreIndex, workPackage: WorkPackageRef, extrinsics: [Data]) {
+            self.coreIndex = coreIndex
+            self.workPackage = workPackage
+            self.extrinsics = extrinsics
+        }
+    }
+
+    // When a work package is received via CE133
     public struct WorkPackagesReceived: Event {
         public let coreIndex: CoreIndex
         public let workPackage: WorkPackageRef
@@ -66,7 +79,7 @@ public enum RuntimeEvents {
     }
 
     // When a work package bundle is ready to shared via CE134
-    public struct WorkPackageBundleShare: Event {
+    public struct WorkPackageBundleReady: Event {
         public let coreIndex: CoreIndex
         public let bundle: WorkPackageBundle
         public let segmentsRootMappings: SegmentsRootMappings
@@ -93,7 +106,7 @@ public enum RuntimeEvents {
     }
 
     // A guaranteed work-report ready for distribution via CE135.
-    public struct GuranteedWorkReport: Event {
+    public struct WorkReportGenerated: Event {
         public let workReport: WorkReport
         public let slot: UInt32
         public var signatures: [ValidatorSignature]

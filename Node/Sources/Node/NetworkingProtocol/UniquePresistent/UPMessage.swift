@@ -8,12 +8,12 @@ public enum UPMessage: Sendable, Equatable, Hashable {
 }
 
 extension UPMessage: MessageProtocol {
-    public func encode() throws -> Data {
+    public func encode() throws -> [Data] {
         switch self {
         case let .blockAnnouncementHandshake(message):
-            try JamEncoder.encode(message)
+            try [JamEncoder.encode(message)]
         case let .blockAnnouncement(message):
-            try JamEncoder.encode(message)
+            try [JamEncoder.encode(message)]
         }
     }
 
