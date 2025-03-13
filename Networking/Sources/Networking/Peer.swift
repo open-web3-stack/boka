@@ -591,7 +591,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             return try impl.connections.write { connections in
                 if let existingConnection = connections.byPublicKey[publicKey] {
                     // Deterministically decide based on public key comparison
-                    if !publicKey.lexicographicallyPrecedes(impl.publicKey) {
+                    if !publicKey.lexicographicallyPrecedes(impl.publicKey) != conn.initiatedByLocal {
                         // We win the lexicographical comparison, we keep this connection
                         logger.debug(
                             "Replacing existing connection by lexicographical rule",
