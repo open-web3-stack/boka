@@ -26,8 +26,8 @@ public func repeatUntil<T>(
 
 public func repeatUntil<T>(
     _ repeatFn: () async -> T?,
-    timeout: TimeInterval = 10,
-    sleep: TimeInterval = 0.01
+    timeout: TimeInterval = 5,
+    sleep: TimeInterval = 0.05
 ) async throws -> T {
     let start = Date()
     while true {
