@@ -397,8 +397,6 @@ struct PeerTests {
 
     @Test
     func concurrentPeerConnection() async throws {
-        setupTestLogger()
-
         let peer1 = try Peer(
             options: PeerOptions<MockStreamHandler>(
                 role: .validator,
