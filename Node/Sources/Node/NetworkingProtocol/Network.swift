@@ -6,7 +6,7 @@ import TracingUtils
 import Utils
 
 public protocol NetworkProtocolHandler: Sendable {
-    func handle(ceRequest: CERequest) async throws -> [any Encodable]
+    func handle(ceRequest: CERequest) async throws -> [Data]
     func handle(connection: some ConnectionInfoProtocol, upMessage: UPMessage) async throws
 
     func handle(
@@ -58,7 +58,7 @@ public final class Network: NetworkProtocol {
             listenAddress: config.listenAddress,
             genesisHeader: genesisHeader,
             secretKey: config.key,
-            presistentStreamHandler: PresistentStreamHandlerImpl(impl: impl),
+            persistentStreamHandler: PresistentStreamHandlerImpl(impl: impl),
             ephemeralStreamHandler: EphemeralStreamHandlerImpl(impl: impl),
             serverSettings: .defaultSettings,
             clientSettings: .defaultSettings
@@ -71,12 +71,12 @@ public final class Network: NetworkProtocol {
         try peer.connect(to: to, role: role)
     }
 
-    public func send(to: PeerId, message: CERequest) async throws -> Data {
+    public func send(to: PeerId, message: CERequest) async throws -> [Data] {
         let conn = try peer.getConnection(publicKey: to.publicKey) ?? peer.connect(to: to.address, role: .builder)
         return try await conn.request(message)
     }
 
-    public func send(to: NetAddr, message: CERequest) async throws -> Data {
+    public func send(to: NetAddr, message: CERequest) async throws -> [Data] {
         let conn = try peer.connect(to: to, role: .builder)
         return try await conn.request(message)
     }
@@ -125,7 +125,7 @@ struct PresistentStreamHandlerImpl: PresistentStreamHandler {
 
     fileprivate let impl: NetworkImpl
 
-    func createDecoder(kind: StreamKind) -> any MessageDecoder<Message> {
+    func createDecoder(kind: StreamKind) -> any PresistentStreamMessageDecoder<Message> {
         switch kind {
         case .blockAnnouncement:
             BlockAnnouncementDecoder(config: impl.config, kind: kind)
@@ -149,17 +149,12 @@ struct EphemeralStreamHandlerImpl: EphemeralStreamHandler {
 
     fileprivate let impl: NetworkImpl
 
-    func createDecoder(kind: StreamKind) -> any MessageDecoder<Request> {
+    func createDecoder(kind: StreamKind) -> any EphemeralStreamMessageDecoder<Request> {
         CEMessageDecoder(config: impl.config, kind: kind)
     }
 
-    func handle(connection: any ConnectionInfoProtocol, request: Request) async throws -> Data {
+    func handle(connection: any ConnectionInfoProtocol, request: Request) async throws -> [Data] {
         impl.logger.trace("handling request: \(request) from \(connection.id)")
-        let encoder = JamEncoder()
-        let resp = try await impl.handler.handle(ceRequest: request)
-        for r in resp {
-            try encoder.encode(r)
-        }
-        return encoder.data
+        return try await impl.handler.handle(ceRequest: request)
     }
 }

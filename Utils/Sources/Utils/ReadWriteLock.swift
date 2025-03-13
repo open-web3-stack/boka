@@ -18,17 +18,17 @@ public final class ReadWriteLock: @unchecked Sendable {
 
     private func readLock() {
         let result = pthread_rwlock_rdlock(&lock)
-        precondition(result == 0, "Failed to acquire read lock")
+        precondition(result == 0, "Failed to acquire read lock \(result)")
     }
 
     private func writeLock() {
         let result = pthread_rwlock_wrlock(&lock)
-        precondition(result == 0, "Failed to acquire write lock")
+        precondition(result == 0, "Failed to acquire write lock \(result)")
     }
 
     private func unlock() {
         let result = pthread_rwlock_unlock(&lock)
-        precondition(result == 0, "Failed to release lock")
+        precondition(result == 0, "Failed to release lock \(result)")
     }
 
     public func withReadLock<T>(_ closure: () throws -> T) rethrows -> T {

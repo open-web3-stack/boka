@@ -66,6 +66,8 @@ extension Data: FromJSON {
         }
         switch json {
         case let .string(str):
+            // if str starts with 0x, remove it
+            let str = str.hasPrefix("0x") ? String(str.dropFirst(2)) : str
             self = try Data(fromHexString: str).unwrap()
         default:
             throw FromJSONError.unexpectedJSON
@@ -81,6 +83,20 @@ extension FixedSizeData: FromJSON {
         switch json {
         case let .string(str):
             self = try FixedSizeData(fromHexString: str).unwrap()
+        default:
+            throw FromJSONError.unexpectedJSON
+        }
+    }
+}
+
+extension Array: FromJSON where Element: FromJSON {
+    public init(from json: JSON?) throws {
+        guard let json else {
+            throw FromJSONError.null
+        }
+        switch json {
+        case let .array(arr):
+            self = try arr.map { try Element(from: $0) }
         default:
             throw FromJSONError.unexpectedJSON
         }

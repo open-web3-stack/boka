@@ -2,6 +2,7 @@ import Blockchain
 import Database
 import Foundation
 import Testing
+import TracingUtils
 import Utils
 
 @testable import Node

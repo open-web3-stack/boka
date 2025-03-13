@@ -18,14 +18,14 @@ public protocol NetworkProtocol: Sendable {
     ///   - to: The peer ID to send to
     ///   - message: The message to send
     /// - Returns: Response data
-    func send(to: PeerId, message: CERequest) async throws -> Data
+    func send(to: PeerId, message: CERequest) async throws -> [Data]
 
     /// Sends a message to a specific network address
     /// - Parameters:
     ///   - to: The network address to send to
     ///   - message: The message to send
     /// - Returns: Response data
-    func send(to: NetAddr, message: CERequest) async throws -> Data
+    func send(to: NetAddr, message: CERequest) async throws -> [Data]
 
     /// Broadcasts a message to all connected peers
     /// - Parameters:
