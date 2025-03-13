@@ -2,7 +2,7 @@ import Blockchain
 import Codec
 import Foundation
 
-public struct WorkPackageSubmissionMessage: Codable, Sendable, Equatable, Hashable {
+public struct WorkPackageSubmissionMessage: Sendable, Equatable, Hashable {
     /// The core index associated with the work-package.
     public var coreIndex: CoreIndex
 
@@ -21,16 +21,36 @@ public struct WorkPackageSubmissionMessage: Codable, Sendable, Equatable, Hashab
 
 extension WorkPackageSubmissionMessage: CEMessage {
     public func encode() throws -> [Data] {
-        try [JamEncoder.encode(self)]
+        // --> Core Index ++ Work-Package
+        // --> [Extrinsic] (Message size should equal sum of extrinsic data lengths)
+        let encoder = JamEncoder()
+        try encoder.encode(coreIndex)
+        try encoder.encode(workPackage)
+        let extrinsicsEncoder = JamEncoder(capacity: extrinsics.reduce(0) { $0 + $1.count + 2 })
+        for extrinsic in extrinsics {
+            try extrinsicsEncoder.encode(extrinsic)
+        }
+        return [
+            encoder.data,
+            extrinsicsEncoder.data,
+        ]
     }
 
-    public static func decode(data: [Data], withConfig: ProtocolConfigRef) throws -> WorkPackageSubmissionMessage {
-        guard data.count == 1, let data = data.first else {
+    public static func decode(data: [Data], config: ProtocolConfigRef) throws -> WorkPackageSubmissionMessage {
+        guard data.count == 2 else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
                 debugDescription: "unexpected data"
             ))
         }
-        return try JamDecoder.decode(WorkPackageSubmissionMessage.self, from: data, withConfig: withConfig)
+        let decoder = JamDecoder(data: data[0], config: config)
+        let coreIndex = try decoder.decode(CoreIndex.self)
+        let workPackage = try decoder.decode(WorkPackage.self)
+        let extrinsicsDecoder = JamDecoder(data: data[1], config: config)
+        var extrinsics: [Data] = []
+        while !extrinsicsDecoder.isAtEnd {
+            try extrinsics.append(extrinsicsDecoder.decode(Data.self))
+        }
+        return .init(coreIndex: coreIndex, workPackage: workPackage, extrinsics: extrinsics)
     }
 }

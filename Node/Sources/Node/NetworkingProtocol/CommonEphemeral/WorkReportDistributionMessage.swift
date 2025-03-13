@@ -23,13 +23,13 @@ extension WorkReportDistributionMessage: CEMessage {
         try [JamEncoder.encode(self)]
     }
 
-    public static func decode(data: [Data], withConfig: ProtocolConfigRef) throws -> WorkReportDistributionMessage {
+    public static func decode(data: [Data], config: ProtocolConfigRef) throws -> WorkReportDistributionMessage {
         guard data.count == 1, let data = data.first else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
                 debugDescription: "unexpected data"
             ))
         }
-        return try JamDecoder.decode(WorkReportDistributionMessage.self, from: data, withConfig: withConfig)
+        return try JamDecoder.decode(WorkReportDistributionMessage.self, from: data, withConfig: config)
     }
 }

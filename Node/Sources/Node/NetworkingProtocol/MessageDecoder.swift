@@ -45,7 +45,7 @@ class CEMessageDecoder: EphemeralStreamMessageDecoder {
 
     func decode(data: [Data]) throws -> Message {
         let type = CERequest.getType(kind: kind)
-        let payload = try type.decode(data: data, withConfig: config)
+        let payload = try type.decode(data: data, config: config)
         guard let message = CERequest.from(kind: kind, data: payload) else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],

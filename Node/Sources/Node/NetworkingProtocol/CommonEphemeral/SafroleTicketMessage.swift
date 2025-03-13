@@ -13,13 +13,13 @@ extension SafroleTicketMessage: CEMessage {
         try [JamEncoder.encode(self)]
     }
 
-    public static func decode(data: [Data], withConfig: ProtocolConfigRef) throws -> SafroleTicketMessage {
+    public static func decode(data: [Data], config: ProtocolConfigRef) throws -> SafroleTicketMessage {
         guard data.count == 1, let data = data.first else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
                 debugDescription: "unexpected data"
             ))
         }
-        return try JamDecoder.decode(SafroleTicketMessage.self, from: data, withConfig: withConfig)
+        return try JamDecoder.decode(SafroleTicketMessage.self, from: data, withConfig: config)
     }
 }

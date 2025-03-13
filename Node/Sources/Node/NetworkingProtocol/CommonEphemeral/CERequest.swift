@@ -5,7 +5,7 @@ import Networking
 
 protocol CEMessage {
     func encode() throws -> [Data]
-    static func decode(data: [Data], withConfig: ProtocolConfigRef) throws -> Self
+    static func decode(data: [Data], config: ProtocolConfigRef) throws -> Self
 }
 
 public enum CERequest: Sendable, Equatable, Hashable {

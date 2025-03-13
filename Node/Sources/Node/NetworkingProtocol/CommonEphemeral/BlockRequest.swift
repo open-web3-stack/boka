@@ -19,13 +19,13 @@ extension BlockRequest: CEMessage {
         try [JamEncoder.encode(self)]
     }
 
-    public static func decode(data: [Data], withConfig: ProtocolConfigRef) throws -> BlockRequest {
+    public static func decode(data: [Data], config: ProtocolConfigRef) throws -> BlockRequest {
         guard data.count == 1, let data = data.first else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
                 debugDescription: "unexpected data \(data)"
             ))
         }
-        return try JamDecoder.decode(BlockRequest.self, from: data, withConfig: withConfig)
+        return try JamDecoder.decode(BlockRequest.self, from: data, withConfig: config)
     }
 }
