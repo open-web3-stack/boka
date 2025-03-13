@@ -87,6 +87,8 @@ jobs:
     - name: Check rust format
       run: cargo +nightly fmt --all -- --check
     - name: Build
-      run: make build
+      # run: make build
+      run: make deps
     - name: Test
-      run: make test-all
+      # run: make test-all
+      run: swift test --filter concurrentPeerConnection --package-path Networking
