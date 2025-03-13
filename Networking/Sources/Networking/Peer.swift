@@ -396,6 +396,17 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
     }
 
     func reopenUpStream(connection: Connection<Handler>, kind: Handler.PresistentHandler.StreamKind) {
+        if connection.isClosed {
+            logger.debug(
+                "Connection is closed, skipping reopen",
+                metadata: [
+                    "connectionId": "\(connection.id)",
+                    "streamKind": "\(kind)",
+                ]
+            )
+            return
+        }
+
         var state = reopenStates.read { states in
             states[connection.id] ?? .init()
         }
@@ -646,6 +657,13 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
         }
 
         if conn.initiatedByLocal {
+            logger.debug(
+                "Connection initiated by local, creating persistent streams",
+                metadata: [
+                    "connectionId": "\(connection.id)",
+                    "remoteAddress": "\(conn.remoteAddress)",
+                ]
+            )
             for kind in Handler.PresistentHandler.StreamKind.allCases {
                 do {
                     try conn.createPreistentStream(kind: kind)

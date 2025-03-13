@@ -99,7 +99,7 @@ public final class QuicStream: Sendable {
                 throw QuicError.alreadyClosed
             }
 
-            logger.debug("\(storage.connection.id) \(id) sending \(data.count) bytes data \(data.toHexString())")
+            logger.debug("\(storage.connection.id) \(id) sending \(data.count) bytes data \(data.toDebugHexString())")
             let messageLength = data.count
 
             if messageLength == 0, !start, !finish {
@@ -172,7 +172,7 @@ private class StreamHandle {
     fileprivate func callbackHandler(event: UnsafePointer<QUIC_STREAM_EVENT>) -> QuicStatus {
         switch event.pointee.Type {
         case QUIC_STREAM_EVENT_SEND_COMPLETE:
-            logger.debug("Stream send completed")
+            logger.trace("Stream send completed")
             if let clientContext = event.pointee.SEND_COMPLETE.ClientContext {
                 clientContext.deallocate() // !! deallocate
             }

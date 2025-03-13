@@ -164,6 +164,7 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
             logger.warning("Trying to close stream \(id) in status \(status)")
             return
         }
+        logger.debug("Closing stream \(id) in status \(status)")
         status = abort ? .aborted : .closed
         channel.close()
         try? stream.shutdown(errorCode: abort ? 1 : 0) // TODO: define some error code
