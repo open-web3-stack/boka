@@ -2,10 +2,20 @@ import Foundation
 import Utils
 
 public final class DevKeyStore: KeyStore {
-    private let keystore: InMemoryKeyStore
+    private let keystore: KeyStore
 
-    public init(devKeysCount: Int = 12) async throws {
-        keystore = InMemoryKeyStore()
+    public enum KeyStoreType {
+        case inMemory
+        case file(path: URL)
+    }
+
+    public init(devKeysCount: Int = 12, _ type: KeyStoreType = .inMemory) async throws {
+        switch type {
+        case .inMemory:
+            keystore = InMemoryKeyStore()
+        case let .file(path):
+            keystore = try FilesystemKeyStore(storageDirectory: path)
+        }
 
         for i in 0 ..< devKeysCount {
             _ = try await addDevKeys(seed: UInt32(i))
