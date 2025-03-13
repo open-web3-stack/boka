@@ -424,15 +424,17 @@ struct PeerTests {
 
         try peer1.connect(to: peer2.listenAddress(), role: .validator)
         try peer2.connect(to: peer1.listenAddress(), role: .validator)
-        try? await Task.sleep(for: .milliseconds(1000))
+
+        try? await Task.sleep(for: .milliseconds(100))
+
+        let connection1 = try await repeatUntil { peer1.getConnection(publicKey: peer2.publicKey) }
+        let connection2 = try await repeatUntil { peer2.getConnection(publicKey: peer1.publicKey) }
+
         #expect(peer1.peersCount == 1)
         #expect(peer2.peersCount == 1)
 
-        let connection1 = peer1.getConnection(publicKey: peer2.publicKey)
-        let connection2 = peer2.getConnection(publicKey: peer1.publicKey)
         let connections = [connection1, connection2]
         for connection in connections {
-            let connection = try #require(connection)
             let data = try await connection.request(MockRequest(kind: .typeA, data: [Data("hello world".utf8)]))
             #expect(data == [Data("hello world response".utf8)])
         }
@@ -941,14 +943,14 @@ struct PeerTests {
         var handles: [MockPresistentStreamHandler] = []
 
         // Create 50 peers with unique addresses
-        for _ in 0 ..< 50 {
+        for i in 0 ..< 50 {
             let handle = MockPresistentStreamHandler()
             let peer = try Peer(
                 options: PeerOptions<MockStreamHandler>(
                     role: .validator,
                     listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                     genesisHeader: Data32(),
-                    secretKey: Ed25519.SecretKey(from: Data32.random()),
+                    secretKey: Ed25519.SecretKey(from: Data32(repeating: UInt8(i))),
                     presistentStreamHandler: handle,
                     ephemeralStreamHandler: MockEphemeralStreamHandler(),
                     serverSettings: .defaultSettings,
@@ -977,12 +979,9 @@ struct PeerTests {
         let messagedata = [Data("Sync message".utf8)]
         centralPeer.broadcast(kind: .uniqueA, message: MockRequest(kind: .uniqueA, data: messagedata))
 
-        // Wait for message to propagate
-        try? await Task.sleep(for: .seconds(1))
-
         // Check that each peer received the broadcast
         for i in 1 ..< handles.count {
-            let receivedData = await handles[i].lastReceivedData
+            let receivedData = try await repeatUntil { await handles[i].lastReceivedData }
             #expect(receivedData == messagedata, "Handle should have received the broadcast message")
         }
     }
