@@ -54,16 +54,17 @@ public actor InMemoryKeyStore: KeyStore {
 }
 
 public actor FilesystemKeyStore: KeyStore {
+    public enum Error: Swift.Error {
+        case invalidSecretKey
+    }
+
     private let storageDirectory: URL
 
     public init(storageDirectory: URL) throws {
         self.storageDirectory = storageDirectory
-    }
-
-    private func createStorageDirectoryIfNeeded() throws {
         if !FileManager.default.fileExists(atPath: storageDirectory.path) {
             try FileManager.default.createDirectory(
-                at: storageDirectory,
+                at: self.storageDirectory,
                 withIntermediateDirectories: true,
                 attributes: nil
             )
@@ -76,10 +77,9 @@ public actor FilesystemKeyStore: KeyStore {
         return storageDirectory.appendingPathComponent(fileName)
     }
 
-    private func saveKey(_ key: some SecretKeyProtocol) throws {
+    private func saveKey(_ key: some SecretKeyProtocol, seed: Data32) throws {
         let fileURL = filePath(for: key.publicKey)
-        let data = try key.encode()
-        try data.write(to: fileURL, options: .atomic)
+        try seed.data.write(to: fileURL, options: .atomic)
     }
 
     private func loadKey<K: KeyType>(_: K.Type, publicKey: K.SecretKey.PublicKey) throws -> K.SecretKey? {
@@ -87,15 +87,10 @@ public actor FilesystemKeyStore: KeyStore {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             return nil
         }
-        let data = try Data(contentsOf: fileURL)
-        return try K.SecretKey.decode(from: data)
-    }
-
-    private func deleteKey(for publicKey: some PublicKeyProtocol) throws {
-        let fileURL = filePath(for: publicKey)
-        if FileManager.default.fileExists(atPath: fileURL.path) {
-            try FileManager.default.removeItem(at: fileURL)
+        guard let seed = try Data32(Data(contentsOf: fileURL)) else {
+            throw Error.invalidSecretKey
         }
+        return try K.SecretKey(from: seed)
     }
 
     public func generate<K: KeyType>(_ type: K.Type) async throws -> K.SecretKey {
@@ -104,7 +99,7 @@ public actor FilesystemKeyStore: KeyStore {
 
     public func add<K: KeyType>(_ type: K.Type, seed: Data32) async throws -> K.SecretKey {
         let secretKey = try type.SecretKey(from: seed)
-        try saveKey(secretKey)
+        try saveKey(secretKey, seed: seed)
         return secretKey
     }
 
@@ -122,8 +117,10 @@ public actor FilesystemKeyStore: KeyStore {
             return []
         }
         return files.compactMap { fileURL in
-            guard let data = try? Data(contentsOf: fileURL) else { return nil }
-            return try? K.SecretKey.decode(from: data)
+            guard let seed = try? Data32(Data(contentsOf: fileURL)) else {
+                return nil
+            }
+            return try? K.SecretKey(from: seed)
         }
     }
 }

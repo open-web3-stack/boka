@@ -7,9 +7,6 @@ public protocol SecretKeyProtocol: Sendable {
     init(from seed: Data32) throws
 
     var publicKey: PublicKey { get }
-
-    func encode() throws -> Data
-    static func decode(from data: Data) throws -> Self
 }
 
 public protocol KeyType {

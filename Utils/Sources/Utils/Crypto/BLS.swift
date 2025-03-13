@@ -17,8 +17,7 @@ public enum BLS: KeyType {
         case invalidSecretKey
     }
 
-    // TODO: fix SecretKeyProtocol, Codable
-    public final class SecretKey: SecretKeyProtocol, Codable, Sendable {
+    public final class SecretKey: SecretKeyProtocol, Sendable {
         fileprivate let keyPairPtr: SafePointer
         public let publicKey: PublicKey
 
@@ -51,35 +50,6 @@ public enum BLS: KeyType {
             }
 
             return output
-        }
-
-        public func encode() throws -> Data {
-            // TODO: encode bls to bytes
-            Data()
-        }
-
-        public static func decode(from data: Data) throws -> Self {
-            guard let seed = Data32(data) else {
-                throw Error.invalidSecretKey
-            }
-
-            return try Self(from: seed)
-        }
-
-        // MARK: - Codable
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.singleValueContainer()
-            try container.encode(encode())
-        }
-
-        public convenience init(from decoder: Decoder) throws {
-            let container = try decoder.singleValueContainer()
-            let data = try container.decode(Data.self)
-            guard let seed = Data32(data) else {
-                throw Error.invalidSecretKey
-            }
-            try self.init(from: seed)
         }
     }
 
