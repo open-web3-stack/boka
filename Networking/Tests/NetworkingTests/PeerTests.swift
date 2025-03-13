@@ -134,7 +134,7 @@ struct PeerTests {
                 role: .validator,
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
-                secretKey: Ed25519.SecretKey(from: Data32.random()),
+                secretKey: Ed25519.SecretKey(from: Data32(repeating: 255)),
                 presistentStreamHandler: MockPresistentStreamHandler(),
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
@@ -143,7 +143,7 @@ struct PeerTests {
             )
         )
         // Create 5 peer nodes
-        for _ in 0 ..< 5 {
+        for i in 0 ..< 5 {
             let handler = MockPresistentStreamHandler()
             handlers.append(handler)
             let peer = try Peer(
@@ -151,7 +151,7 @@ struct PeerTests {
                     role: .builder,
                     listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                     genesisHeader: Data32(),
-                    secretKey: Ed25519.SecretKey(from: Data32.random()),
+                    secretKey: Ed25519.SecretKey(from: Data32(repeating: UInt8(i))),
                     presistentStreamHandler: handler,
                     ephemeralStreamHandler: MockEphemeralStreamHandler(),
                     serverSettings: .defaultSettings,
@@ -397,7 +397,7 @@ struct PeerTests {
 
     @Test
     func concurrentPeerConnection() async throws {
-        setupTestLogger()
+        // setupTestLogger()
 
         let peer1 = try Peer(
             options: PeerOptions<MockStreamHandler>(
@@ -838,13 +838,13 @@ struct PeerTests {
         var peers: [Peer<MockStreamHandler>] = []
 
         // Create 100 peer nodes
-        for _ in 0 ..< 100 {
+        for i in 0 ..< 100 {
             let peer = try Peer(
                 options: PeerOptions<MockStreamHandler>(
                     role: .builder,
                     listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                     genesisHeader: Data32(),
-                    secretKey: Ed25519.SecretKey(from: Data32.random()),
+                    secretKey: Ed25519.SecretKey(from: Data32(repeating: UInt8(i))),
                     presistentStreamHandler: MockPresistentStreamHandler(),
                     ephemeralStreamHandler: MockEphemeralStreamHandler(),
                     serverSettings: .defaultSettings,
@@ -883,13 +883,13 @@ struct PeerTests {
         var peers: [Peer<MockStreamHandler>] = []
         let peersCount = 50
         // Create peers
-        for _ in 0 ..< peersCount {
+        for i in 0 ..< peersCount {
             let peer = try Peer(
                 options: PeerOptions<MockStreamHandler>(
                     role: .validator,
                     listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                     genesisHeader: Data32(),
-                    secretKey: Ed25519.SecretKey(from: Data32.random()),
+                    secretKey: Ed25519.SecretKey(from: Data32(repeating: UInt8(i))),
                     presistentStreamHandler: MockPresistentStreamHandler(),
                     ephemeralStreamHandler: MockEphemeralStreamHandler(),
                     serverSettings: .defaultSettings,
