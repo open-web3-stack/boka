@@ -122,7 +122,7 @@ struct NetworkManagerTests {
                 .init(function: "connect", parameters: ["address": devPeers.first!, "role": PeerRole.validator]),
                 .init(function: "sendToPeer", parameters: [
                     "message": CERequest.workPackageSharing(
-                        WorkPackageSharingMessage(coreIndex: 0, bundle: bundle, segmentsRootMappings: [])
+                        WorkPackageSharingMessage(coreIndex: 0, segmentsRootMappings: [], bundle: bundle)
                     ),
                 ]),
             ])
