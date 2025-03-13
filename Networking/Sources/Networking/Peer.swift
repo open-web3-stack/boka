@@ -593,6 +593,15 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                     // Deterministically decide based on public key comparison
                     if !publicKey.lexicographicallyPrecedes(impl.publicKey) {
                         // We win the lexicographical comparison, we keep this connection
+                        logger.debug(
+                            "Replacing existing connection by lexicographical rule",
+                            metadata: [
+                                "connectionId": "\(connection.id)",
+                                "publicKey": "\(publicKey.toHexString())",
+                                "remoteAddress": "\(conn.remoteAddress)",
+                                "existingConnectionId": "\(existingConnection.id)",
+                            ]
+                        )
                         connections.byPublicKey[publicKey] = conn
                         existingConnection.close()
                         try conn.opened(publicKey: publicKey)
@@ -638,6 +647,18 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 "Connection established but missing in registry",
                 metadata: [
                     "connectionId": "\(connection.id)",
+                ]
+            )
+            return
+        }
+
+        if conn.isClosed {
+            logger.warning(
+                "Connection established but already closed",
+                metadata: [
+                    "connectionId": "\(connection.id)",
+                    "remoteAddress": "\(conn.remoteAddress)",
+                    "initiatedByLocal": "\(conn.initiatedByLocal)",
                 ]
             )
             return
