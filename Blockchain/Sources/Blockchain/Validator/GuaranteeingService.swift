@@ -38,12 +38,21 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
 
         super.init(id: "GuaranteeingService", config: config, eventBus: eventBus, scheduler: scheduler)
 
+        // received via p2p
         await subscribe(RuntimeEvents.WorkPackagesReceived.self, id: "GuaranteeingService.WorkPackagesReceived") { [weak self] event in
             try await self?.on(workPackagesReceived: event)
         }
 
-        await subscribe(RuntimeEvents.WorkPackageBundleReady.self, id: "GuaranteeingService.WorkPackageBundleReady") { [weak self] event in
-            try await self?.on(workPackageBundle: event)
+        // received via RPC
+        await subscribe(RuntimeEvents.WorkPackagesSubmitted.self, id: "GuaranteeingService.WorkPackagesSubmitted") { [weak self] event in
+            try await self?.on(workPackagesSubmitted: event)
+        }
+
+        await subscribe(
+            RuntimeEvents.WorkPackageBundleRecived.self,
+            id: "GuaranteeingService.WorkPackageBundleRecived"
+        ) { [weak self] event in
+            try await self?.on(workPackageBundleReceived: event)
         }
     }
 
@@ -85,16 +94,20 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
     }
 
-    private func on(workPackageBundle event: RuntimeEvents.WorkPackageBundleReady) async throws {
+    private func on(workPackagesReceived event: RuntimeEvents.WorkPackagesReceived) async throws {
+        try await handleWorkPackage(coreIndex: event.coreIndex, workPackage: event.workPackage, extrinsics: event.extrinsics)
+    }
+
+    private func on(workPackagesSubmitted event: RuntimeEvents.WorkPackagesSubmitted) async throws {
+        try await handleWorkPackage(coreIndex: event.coreIndex, workPackage: event.workPackage, extrinsics: event.extrinsics)
+    }
+
+    private func on(workPackageBundleReceived event: RuntimeEvents.WorkPackageBundleRecived) async throws {
         try await receiveWorkPackageBundle(
             coreIndex: event.coreIndex,
             segmentsRootMappings: event.segmentsRootMappings,
             bundle: event.bundle
         )
-    }
-
-    private func on(workPackageBundleReceived _: RuntimeEvents.WorkPackageBundleRecived) async throws {
-        // TODO: check somethings
     }
 
     // Method to receive a work package bundle
@@ -126,10 +139,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
 
         return true
-    }
-
-    private func on(workPackagesReceived event: RuntimeEvents.WorkPackagesReceived) async throws {
-        try await handleWorkPackage(coreIndex: event.coreIndex, workPackage: event.workPackage, extrinsics: event.extrinsics)
     }
 
     // handle Work Package

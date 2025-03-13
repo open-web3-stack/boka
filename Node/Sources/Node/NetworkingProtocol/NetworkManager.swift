@@ -259,7 +259,7 @@ struct HandlerImpl: NetworkProtocolHandler {
             blockchain
                 .publish(
                     event: RuntimeEvents
-                        .WorkPackageBundleReady(
+                        .WorkPackageBundleRecived(
                             coreIndex: message.coreIndex,
                             bundle: message.bundle,
                             segmentsRootMappings: message.segmentsRootMappings
@@ -270,7 +270,7 @@ struct HandlerImpl: NetworkProtocolHandler {
             blockchain
                 .publish(
                     event: RuntimeEvents
-                        .WorkReportGenerated(
+                        .WorkReportReceived(
                             workReport: message.workReport,
                             slot: message.slot,
                             signatures: message.signatures
