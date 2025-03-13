@@ -39,7 +39,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
     public let role: PeerRole
     public let remoteAddress: NetAddr
     private let lastActive: Atomic<TimeInterval> = Atomic(0)
-    let presistentStreams: ThreadSafeContainer<
+    let persistentStreams: ThreadSafeContainer<
         [Handler.PresistentHandler.StreamKind: Stream<Handler>]
     > = .init([:])
     let initiatedByLocal: Bool
@@ -208,18 +208,18 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
 
     @discardableResult
     func createPreistentStream(kind: Handler.PresistentHandler.StreamKind) throws -> Stream<Handler>? {
-        let stream = presistentStreams.read { presistentStreams in
-            presistentStreams[kind]
+        let stream = persistentStreams.read { persistentStreams in
+            persistentStreams[kind]
         }
         if let stream {
             return stream
         }
-        let newStream = try presistentStreams.write { presistentStreams in
-            if let stream = presistentStreams[kind] {
+        let newStream = try persistentStreams.write { persistentStreams in
+            if let stream = persistentStreams[kind] {
                 return stream
             }
             let stream = try self.createStream(kind: kind)
-            presistentStreams[kind] = stream
+            persistentStreams[kind] = stream
             return stream
         }
         runPresistentStreamLoop(stream: newStream, kind: kind)
@@ -230,28 +230,28 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         stream: Stream<Handler>,
         kind: Handler.PresistentHandler.StreamKind
     ) {
-        presistentStreamRunLoop(
+        persistentStreamRunLoop(
             kind: kind,
             logger: logger,
-            handler: impl.presistentStreamHandler,
+            handler: impl.persistentStreamHandler,
             connection: self,
             stream: stream
         )
     }
 
-    func createStream(kind: UInt8, presistentKind: Handler.PresistentHandler.StreamKind?) throws -> Stream<Handler> {
-        let stream = try Stream(connection.createStream(), connectionId: id, impl: impl, kind: presistentKind)
+    func createStream(kind: UInt8, persistentKind: Handler.PresistentHandler.StreamKind?) throws -> Stream<Handler> {
+        let stream = try Stream(connection.createStream(), connectionId: id, impl: impl, kind: persistentKind)
         impl.addStream(stream)
         try stream.send(data: Data([kind]))
         return stream
     }
 
     func createStream(kind: Handler.PresistentHandler.StreamKind) throws -> Stream<Handler> {
-        try createStream(kind: kind.rawValue, presistentKind: kind)
+        try createStream(kind: kind.rawValue, persistentKind: kind)
     }
 
     func createStream(kind: Handler.EphemeralHandler.StreamKind) throws -> Stream<Handler> {
-        try createStream(kind: kind.rawValue, presistentKind: nil)
+        try createStream(kind: kind.rawValue, persistentKind: nil)
     }
 
     func streamStarted(stream: QuicStream) {
@@ -264,8 +264,8 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
             }
             if let upKind = Handler.PresistentHandler.StreamKind(rawValue: byte) {
                 // Check for duplicate UP streams
-                let existingStream = presistentStreams.read { presistentStreams in
-                    presistentStreams[upKind]
+                let existingStream = persistentStreams.read { persistentStreams in
+                    persistentStreams[upKind]
                 }
                 if let existingStream {
                     if existingStream.stream.id < stream.stream.id {
@@ -287,8 +287,8 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                 }
 
                 // Write the new stream as the active one for this UP kind
-                presistentStreams.write { presistentStreams in
-                    presistentStreams[upKind] = stream
+                persistentStreams.write { persistentStreams in
+                    persistentStreams[upKind] = stream
                 }
                 runPresistentStreamLoop(stream: stream, kind: upKind)
                 return
@@ -327,8 +327,8 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
     func streamClosed(stream: Stream<Handler>, abort: Bool) {
         stream.closed(abort: abort)
         if let kind = stream.kind {
-            presistentStreams.write { presistentStreams in
-                presistentStreams[kind] = nil
+            persistentStreams.write { persistentStreams in
+                persistentStreams[kind] = nil
             }
         }
     }
@@ -362,7 +362,7 @@ private func receiveMaybeData(stream: Stream<some StreamHandler>) async throws -
     return await stream.receive(count: Int(length))
 }
 
-func presistentStreamRunLoop<Handler: StreamHandler>(
+func persistentStreamRunLoop<Handler: StreamHandler>(
     kind: Handler.PresistentHandler.StreamKind,
     logger: Logger,
     handler: Handler.PresistentHandler,
@@ -374,19 +374,23 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
             try await handler.streamOpened(connection: connection, stream: stream, kind: kind)
         } catch {
             logger.error(
-                "Failed to setup presistent stream",
+                "Failed to setup persistent stream",
                 metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "error": "\(error)"]
             )
         }
         logger.debug(
-            "Starting presistent stream run loop",
+            "Starting persistent stream run loop",
             metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)"]
         )
         var decoder = handler.createDecoder(kind: kind)
         do {
             while let data = try await receiveMaybeData(stream: stream) {
-                let msg = try decoder.decode(data: data)
-                try await handler.handle(connection: connection, message: msg)
+                do {
+                    let msg = try decoder.decode(data: data)
+                    try await handler.handle(connection: connection, message: msg)
+                } catch {
+                    logger.error("Failed to decode and handle message \(error) \(connection.id) \(stream.id)")
+                }
             }
         } catch {
             logger.error("UP stream run loop failed: \(error) \(connection.id) \(stream.id)")
@@ -394,7 +398,7 @@ func presistentStreamRunLoop<Handler: StreamHandler>(
         }
 
         logger.debug(
-            "Ending presistent stream run loop",
+            "Ending persistent stream run loop",
             metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)"]
         )
     }

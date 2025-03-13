@@ -135,7 +135,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 255)),
-                presistentStreamHandler: MockPresistentStreamHandler(),
+                persistentStreamHandler: MockPresistentStreamHandler(),
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings,
@@ -152,7 +152,7 @@ struct PeerTests {
                     listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                     genesisHeader: Data32(),
                     secretKey: Ed25519.SecretKey(from: Data32(repeating: UInt8(i))),
-                    presistentStreamHandler: handler,
+                    persistentStreamHandler: handler,
                     ephemeralStreamHandler: MockEphemeralStreamHandler(),
                     serverSettings: .defaultSettings,
                     clientSettings: .defaultSettings
@@ -214,7 +214,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 1)),
-                presistentStreamHandler: MockPresistentStreamHandler(),
+                persistentStreamHandler: MockPresistentStreamHandler(),
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -265,7 +265,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 1)),
-                presistentStreamHandler: MockPresistentStreamHandler(),
+                persistentStreamHandler: MockPresistentStreamHandler(),
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -287,7 +287,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 1)),
-                presistentStreamHandler: MockPresistentStreamHandler(),
+                persistentStreamHandler: MockPresistentStreamHandler(),
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -299,7 +299,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 2)),
-                presistentStreamHandler: handler2,
+                persistentStreamHandler: handler2,
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -321,8 +321,8 @@ struct PeerTests {
 
         try? await Task.sleep(for: .milliseconds(100))
         // Simulate abnormal close stream
-        let stream = connection.presistentStreams.read { presistentStreams in
-            presistentStreams[.uniqueA]
+        let stream = connection.persistentStreams.read { persistentStreams in
+            persistentStreams[.uniqueA]
         }
         stream!.close(abort: true)
         // Wait to simulate downtime & reopen up stream 8s
@@ -346,7 +346,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 1)),
-                presistentStreamHandler: MockPresistentStreamHandler(),
+                persistentStreamHandler: MockPresistentStreamHandler(),
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -358,7 +358,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 2)),
-                presistentStreamHandler: handler2,
+                persistentStreamHandler: handler2,
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -380,8 +380,8 @@ struct PeerTests {
 
         try? await Task.sleep(for: .milliseconds(100))
         // Simulate regular close stream
-        let stream = connection.presistentStreams.read { presistentStreams in
-            presistentStreams[.uniqueA]
+        let stream = connection.persistentStreams.read { persistentStreams in
+            persistentStreams[.uniqueA]
         }
         stream!.close(abort: false)
         // Wait to simulate downtime
@@ -405,7 +405,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 1)),
-                presistentStreamHandler: MockPresistentStreamHandler(),
+                persistentStreamHandler: MockPresistentStreamHandler(),
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -417,7 +417,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 2)),
-                presistentStreamHandler: MockPresistentStreamHandler(),
+                persistentStreamHandler: MockPresistentStreamHandler(),
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -461,7 +461,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 1)),
-                presistentStreamHandler: handler1,
+                persistentStreamHandler: handler1,
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -474,7 +474,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 2)),
-                presistentStreamHandler: handler2,
+                persistentStreamHandler: handler2,
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -525,7 +525,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 1)),
-                presistentStreamHandler: MockPresistentStreamHandler(),
+                persistentStreamHandler: MockPresistentStreamHandler(),
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -537,7 +537,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 2)),
-                presistentStreamHandler: handler2,
+                persistentStreamHandler: handler2,
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -579,7 +579,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 1)),
-                presistentStreamHandler: MockPresistentStreamHandler(),
+                persistentStreamHandler: MockPresistentStreamHandler(),
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -592,7 +592,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 2)),
-                presistentStreamHandler: handler2,
+                persistentStreamHandler: handler2,
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -627,7 +627,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 1)),
-                presistentStreamHandler: MockPresistentStreamHandler(),
+                persistentStreamHandler: MockPresistentStreamHandler(),
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -640,7 +640,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 2)),
-                presistentStreamHandler: handler2,
+                persistentStreamHandler: handler2,
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -693,7 +693,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 1)),
-                presistentStreamHandler: handler1,
+                persistentStreamHandler: handler1,
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -705,7 +705,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 2)),
-                presistentStreamHandler: handler2,
+                persistentStreamHandler: handler2,
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -739,7 +739,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 1)),
-                presistentStreamHandler: MockPresistentStreamHandler(),
+                persistentStreamHandler: MockPresistentStreamHandler(),
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -751,7 +751,7 @@ struct PeerTests {
                 listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                 genesisHeader: Data32(),
                 secretKey: Ed25519.SecretKey(from: Data32(repeating: 2)),
-                presistentStreamHandler: MockPresistentStreamHandler(),
+                persistentStreamHandler: MockPresistentStreamHandler(),
                 ephemeralStreamHandler: MockEphemeralStreamHandler(),
                 serverSettings: .defaultSettings,
                 clientSettings: .defaultSettings
@@ -783,7 +783,7 @@ struct PeerTests {
                     listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                     genesisHeader: Data32(),
                     secretKey: Ed25519.SecretKey(from: Data32(repeating: UInt8(i))),
-                    presistentStreamHandler: handler,
+                    persistentStreamHandler: handler,
                     ephemeralStreamHandler: MockEphemeralStreamHandler(),
                     serverSettings: .defaultSettings,
                     clientSettings: .defaultSettings
@@ -845,7 +845,7 @@ struct PeerTests {
                     listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                     genesisHeader: Data32(),
                     secretKey: Ed25519.SecretKey(from: Data32(repeating: UInt8(i))),
-                    presistentStreamHandler: MockPresistentStreamHandler(),
+                    persistentStreamHandler: MockPresistentStreamHandler(),
                     ephemeralStreamHandler: MockEphemeralStreamHandler(),
                     serverSettings: .defaultSettings,
                     clientSettings: .defaultSettings
@@ -890,7 +890,7 @@ struct PeerTests {
                     listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                     genesisHeader: Data32(),
                     secretKey: Ed25519.SecretKey(from: Data32(repeating: UInt8(i))),
-                    presistentStreamHandler: MockPresistentStreamHandler(),
+                    persistentStreamHandler: MockPresistentStreamHandler(),
                     ephemeralStreamHandler: MockEphemeralStreamHandler(),
                     serverSettings: .defaultSettings,
                     clientSettings: .defaultSettings
@@ -953,7 +953,7 @@ struct PeerTests {
                     listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
                     genesisHeader: Data32(),
                     secretKey: Ed25519.SecretKey(from: Data32(repeating: UInt8(i))),
-                    presistentStreamHandler: handle,
+                    persistentStreamHandler: handle,
                     ephemeralStreamHandler: MockEphemeralStreamHandler(),
                     serverSettings: .defaultSettings,
                     clientSettings: .defaultSettings

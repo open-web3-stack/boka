@@ -36,7 +36,7 @@ public struct PeerOptions<Handler: StreamHandler>: Sendable {
     public var listenAddress: NetAddr
     public var genesisHeader: Data32
     public var secretKey: Ed25519.SecretKey
-    public var presistentStreamHandler: Handler.PresistentHandler
+    public var persistentStreamHandler: Handler.PresistentHandler
     public var ephemeralStreamHandler: Handler.EphemeralHandler
     public var serverSettings: QuicSettings
     public var clientSettings: QuicSettings
@@ -47,7 +47,7 @@ public struct PeerOptions<Handler: StreamHandler>: Sendable {
         listenAddress: NetAddr,
         genesisHeader: Data32,
         secretKey: Ed25519.SecretKey,
-        presistentStreamHandler: Handler.PresistentHandler,
+        persistentStreamHandler: Handler.PresistentHandler,
         ephemeralStreamHandler: Handler.EphemeralHandler,
         serverSettings: QuicSettings = .defaultSettings,
         clientSettings: QuicSettings = .defaultSettings,
@@ -57,7 +57,7 @@ public struct PeerOptions<Handler: StreamHandler>: Sendable {
         self.listenAddress = listenAddress
         self.genesisHeader = genesisHeader
         self.secretKey = secretKey
-        self.presistentStreamHandler = presistentStreamHandler
+        self.persistentStreamHandler = persistentStreamHandler
         self.ephemeralStreamHandler = ephemeralStreamHandler
         self.serverSettings = serverSettings
         self.clientSettings = clientSettings
@@ -108,7 +108,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
             alpns: alpns,
             publicKey: publicKey,
             clientConfiguration: clientConfiguration,
-            presistentStreamHandler: options.presistentStreamHandler,
+            persistentStreamHandler: options.persistentStreamHandler,
             ephemeralStreamHandler: options.ephemeralStreamHandler
         )
 
@@ -263,7 +263,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
     fileprivate let reopenStates: ThreadSafeContainer<[UniqueId: BackoffState]> = .init([:])
 
     let maxRetryAttempts = 5
-    let presistentStreamHandler: Handler.PresistentHandler
+    let persistentStreamHandler: Handler.PresistentHandler
     let ephemeralStreamHandler: Handler.EphemeralHandler
 
     fileprivate init(
@@ -273,7 +273,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
         alpns: [PeerRole: Data],
         publicKey: Data,
         clientConfiguration: QuicConfiguration,
-        presistentStreamHandler: Handler.PresistentHandler,
+        persistentStreamHandler: Handler.PresistentHandler,
         ephemeralStreamHandler: Handler.EphemeralHandler
     ) {
         self.logger = logger
@@ -282,7 +282,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
         self.alpns = alpns
         self.publicKey = publicKey
         self.clientConfiguration = clientConfiguration
-        self.presistentStreamHandler = presistentStreamHandler
+        self.persistentStreamHandler = persistentStreamHandler
         self.ephemeralStreamHandler = ephemeralStreamHandler
 
         var alpnLookup = [Data: PeerRole]()
@@ -791,8 +791,8 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
     }
 
     func closed(_ quicStream: QuicStream, status: QuicStatus, code _: QuicErrorCode) {
-        let stream = impl.streams.read { streams in
-            streams[quicStream.id]
+        let stream = impl.streams.write { streams in
+            streams.removeValue(forKey: quicStream.id)
         }
 
         if let stream {

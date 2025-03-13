@@ -58,7 +58,7 @@ public final class Network: NetworkProtocol {
             listenAddress: config.listenAddress,
             genesisHeader: genesisHeader,
             secretKey: config.key,
-            presistentStreamHandler: PresistentStreamHandlerImpl(impl: impl),
+            persistentStreamHandler: PresistentStreamHandlerImpl(impl: impl),
             ephemeralStreamHandler: EphemeralStreamHandlerImpl(impl: impl),
             serverSettings: .defaultSettings,
             clientSettings: .defaultSettings
