@@ -20,14 +20,16 @@ struct ContinuationTests {
     }
 
     @Test func throwsOnTimeout() async throws {
+        let now = Date()
         // Test that timeout error is thrown when operation takes too long
         await #expect(throws: ContinuationError.timeout) {
             try await withCheckedContinuationTimeout(seconds: 0.1) { continuation in
                 Task {
-                    try? await Task.sleep(for: .seconds(0.5))
+                    try? await Task.sleep(for: .seconds(10))
                     continuation.resume()
                 }
             }
         }
+        #expect(Date().timeIntervalSince(now) < 5)
     }
 }
