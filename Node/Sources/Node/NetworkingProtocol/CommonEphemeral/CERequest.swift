@@ -3,32 +3,37 @@ import Codec
 import Foundation
 import Networking
 
+protocol CEMessage {
+    func encode() throws -> [Data]
+    static func decode(data: [Data], config: ProtocolConfigRef) throws -> Self
+}
+
 public enum CERequest: Sendable, Equatable, Hashable {
     case blockRequest(BlockRequest)
     case safroleTicket1(SafroleTicketMessage)
     case safroleTicket2(SafroleTicketMessage)
-    case workPackageSubmission(WorkPackageMessage)
-    case workPackageSharing(WorkPackageShareMessage)
-    case workReportDistrubution(GuaranteedWorkReportMessage)
+    case workPackageSubmission(WorkPackageSubmissionMessage)
+    case workPackageSharing(WorkPackageSharingMessage)
+    case workReportDistrubution(WorkReportDistributionMessage)
 }
 
 extension CERequest: RequestProtocol {
     public typealias StreamKind = CommonEphemeralStreamKind
 
-    public func encode() throws -> Data {
+    public func encode() throws -> [Data] {
         switch self {
         case let .blockRequest(message):
-            try JamEncoder.encode(message)
+            try message.encode()
         case let .safroleTicket1(message):
-            try JamEncoder.encode(message)
+            try message.encode()
         case let .safroleTicket2(message):
-            try JamEncoder.encode(message)
+            try message.encode()
         case let .workPackageSubmission(message):
-            try JamEncoder.encode(message)
+            try message.encode()
         case let .workPackageSharing(message):
-            try JamEncoder.encode(message)
+            try message.encode()
         case let .workReportDistrubution(message):
-            try JamEncoder.encode(message)
+            try message.encode()
         }
     }
 
@@ -49,7 +54,7 @@ extension CERequest: RequestProtocol {
         }
     }
 
-    static func getType(kind: CommonEphemeralStreamKind) -> Decodable.Type {
+    static func getType(kind: CommonEphemeralStreamKind) -> CEMessage.Type {
         switch kind {
         case .blockRequest:
             BlockRequest.self
@@ -58,17 +63,17 @@ extension CERequest: RequestProtocol {
         case .safroleTicket2:
             SafroleTicketMessage.self
         case .workPackageSubmission:
-            WorkPackageMessage.self
+            WorkPackageSubmissionMessage.self
         case .workPackageSharing:
-            WorkPackageShareMessage.self
+            WorkPackageSharingMessage.self
         case .workReportDistrubution:
-            GuaranteedWorkReportMessage.self
+            WorkReportDistributionMessage.self
         default:
             fatalError("unimplemented")
         }
     }
 
-    static func from(kind: CommonEphemeralStreamKind, data: any Decodable) -> CERequest? {
+    static func from(kind: CommonEphemeralStreamKind, data: any CEMessage) -> CERequest? {
         switch kind {
         case .blockRequest:
             guard let message = data as? BlockRequest else {
@@ -86,20 +91,26 @@ extension CERequest: RequestProtocol {
             }
             return .safroleTicket2(message)
         case .workPackageSubmission:
-            guard let message = data as? WorkPackageMessage else { return nil }
+            guard let message = data as? WorkPackageSubmissionMessage else { return nil }
             return .workPackageSubmission(message)
         case .workPackageSharing:
-            guard let message = data as? WorkPackageShareMessage else { return nil }
+            guard let message = data as? WorkPackageSharingMessage else { return nil }
             return .workPackageSharing(message)
         case .workReportDistrubution:
-            guard let message = data as? GuaranteedWorkReportMessage else { return nil }
+            guard let message = data as? WorkReportDistributionMessage else { return nil }
             return .workReportDistrubution(message)
         default:
             fatalError("unimplemented")
         }
     }
 
-    static func decodeResponseForBlockRequest(data: Data, config: ProtocolConfigRef) throws -> [BlockRef] {
+    static func decodeResponseForBlockRequest(data: [Data], config: ProtocolConfigRef) throws -> [BlockRef] {
+        guard data.count == 1, let data = data.first else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(
+                codingPath: [],
+                debugDescription: "unexpected data \(data)"
+            ))
+        }
         let decoder = JamDecoder(data: data, config: config)
         var resp = [BlockRef]()
         while !decoder.isAtEnd {

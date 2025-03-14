@@ -42,7 +42,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             try await self?.on(workPackagesReceived: event)
         }
 
-        await subscribe(RuntimeEvents.WorkPackageBundleShare.self, id: "GuaranteeingService.WorkPackageBundleShare") { [weak self] event in
+        await subscribe(RuntimeEvents.WorkPackageBundleReady.self, id: "GuaranteeingService.WorkPackageBundleReady") { [weak self] event in
             try await self?.on(workPackageBundle: event)
         }
     }
@@ -85,7 +85,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
     }
 
-    private func on(workPackageBundle event: RuntimeEvents.WorkPackageBundleShare) async throws {
+    private func on(workPackageBundle event: RuntimeEvents.WorkPackageBundleReady) async throws {
         try await receiveWorkPackageBundle(
             coreIndex: event.coreIndex,
             segmentsRootMappings: event.segmentsRootMappings,
@@ -152,7 +152,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         )
 
         // Share work package bundle
-        let shareWorkBundleEvent = RuntimeEvents.WorkPackageBundleShare(
+        let shareWorkBundleEvent = RuntimeEvents.WorkPackageBundleReady(
             coreIndex: coreIndex,
             bundle: bundle,
             segmentsRootMappings: mappings
@@ -173,7 +173,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     // Sign work report & work-report distribution via CE135
     private func distributeWorkReport(_ workReport: WorkReport, slot: UInt32, signature: ValidatorSignature) async throws {
         // Construct the guaranteed work-report
-        var guaranteedWorkReport = RuntimeEvents.GuranteedWorkReport(
+        var guaranteedWorkReport = RuntimeEvents.WorkReportGenerated(
             workReport: workReport,
             slot: slot,
             signatures: [signature]

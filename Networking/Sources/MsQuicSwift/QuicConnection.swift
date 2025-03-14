@@ -146,9 +146,9 @@ public final class QuicConnection: Sendable {
                     errorCode.code
                 )
             }
-            self.handler.shutdownInitiated(self, reason: .byLocal(code: errorCode))
             storage = nil
         }
+        handler.shutdownInitiated(self, reason: .byLocal(code: errorCode))
     }
 
     public func createStream() throws -> QuicStream {
