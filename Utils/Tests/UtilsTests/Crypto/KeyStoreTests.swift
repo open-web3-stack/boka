@@ -17,7 +17,6 @@ import Testing
         let keyStoreDir = tempDir.appendingPathComponent("KeyStoreTests")
         try? FileManager.default.removeItem(at: keyStoreDir)
         let keyStore = try FilesystemKeyStore(storageDirectory: keyStoreDir)
-
         let secretKey = try await keyStore.generate(Bandersnatch.self)
         let retrievedKey = await keyStore.get(Bandersnatch.self, publicKey: secretKey.publicKey)
         #expect(retrievedKey != nil)
@@ -35,6 +34,10 @@ import Testing
         let retrievedKey = await keyStore.get(Bandersnatch.self, publicKey: secretKey.publicKey)
         #expect(retrievedKey != nil)
         #expect(retrievedKey!.publicKey == secretKey.publicKey)
+        let path = await keyStore.filePath(for: secretKey.publicKey)
+        try Data(repeating: 0, count: 20).write(to: path, options: .atomic)
+        let emptyKey = await keyStore.get(Bandersnatch.self, publicKey: secretKey.publicKey)
+        #expect(emptyKey == nil)
     }
 
     @Test func containsKey() async throws {

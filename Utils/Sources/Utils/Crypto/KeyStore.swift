@@ -55,7 +55,7 @@ public actor InMemoryKeyStore: KeyStore {
 
 public actor FilesystemKeyStore: KeyStore {
     public enum Error: Swift.Error {
-        case invalidSecretKey
+        case invalidSeed
     }
 
     private let storageDirectory: URL
@@ -71,7 +71,7 @@ public actor FilesystemKeyStore: KeyStore {
         }
     }
 
-    private func filePath(for publicKey: some PublicKeyProtocol) -> URL {
+    func filePath(for publicKey: some PublicKeyProtocol) -> URL {
         let hashableKey = HashableKey(value: publicKey)
         let fileName = "\(hashableKey).json"
         return storageDirectory.appendingPathComponent(fileName)
@@ -88,7 +88,7 @@ public actor FilesystemKeyStore: KeyStore {
             return nil
         }
         guard let seed = try Data32(Data(contentsOf: fileURL)) else {
-            throw Error.invalidSecretKey
+            throw Error.invalidSeed
         }
         return try K.SecretKey(from: seed)
     }
