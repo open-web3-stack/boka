@@ -1,22 +1,16 @@
 import Foundation
 import Utils
 
+public enum KeyStoreType {
+    case inMemory
+    case file(path: URL)
+}
+
 public final class DevKeyStore: KeyStore {
-    private let keystore: KeyStore
+    private let keystore: InMemoryKeyStore
 
-    public enum KeyStoreType {
-        case inMemory
-        case file(path: URL)
-    }
-
-    public init(devKeysCount: Int = 12, _ type: KeyStoreType = .inMemory) async throws {
-        switch type {
-        case .inMemory:
-            keystore = InMemoryKeyStore()
-        case let .file(path):
-            keystore = try FilesystemKeyStore(storageDirectory: path)
-        }
-
+    public init(devKeysCount: Int = 12) async throws {
+        keystore = InMemoryKeyStore()
         for i in 0 ..< devKeysCount {
             _ = try await addDevKeys(seed: UInt32(i))
         }
@@ -42,6 +36,21 @@ public final class DevKeyStore: KeyStore {
         await keystore.getAll(type)
     }
 
+    public static func getDevKey(seed: UInt32) throws -> KeySet {
+        var seedData = Data(repeating: 0, count: 32)
+        let seedByte = seed.encode()
+        for i in 0 ..< 8 {
+            seedData[i * 4 ..< (i + 1) * 4] = seedByte
+        }
+        let seedData32 = Data32(seedData)!
+        let bandersnatch = try Bandersnatch.SecretKey(from: seedData32)
+        let ed25519 = try Ed25519.SecretKey(from: seedData32)
+        let bls = try BLS.SecretKey(from: seedData32)
+        return KeySet(bandersnatch: bandersnatch.publicKey, ed25519: ed25519.publicKey, bls: bls.publicKey)
+    }
+}
+
+extension KeyStore {
     @discardableResult
     public func addDevKeys(seed: UInt32) async throws -> KeySet {
         var seedData = Data(repeating: 0, count: 32)
@@ -53,19 +62,6 @@ public final class DevKeyStore: KeyStore {
         let bandersnatch = try await add(Bandersnatch.self, seed: seedData32)
         let ed25519 = try await add(Ed25519.self, seed: seedData32)
         let bls = try await add(BLS.self, seed: seedData32)
-        return KeySet(bandersnatch: bandersnatch.publicKey, ed25519: ed25519.publicKey, bls: bls.publicKey)
-    }
-
-    public static func getDevKey(seed: UInt32) throws -> KeySet {
-        var seedData = Data(repeating: 0, count: 32)
-        let seedByte = seed.encode()
-        for i in 0 ..< 8 {
-            seedData[i * 4 ..< (i + 1) * 4] = seedByte
-        }
-        let seedData32 = Data32(seedData)!
-        let bandersnatch = try Bandersnatch.SecretKey(from: seedData32)
-        let ed25519 = try Ed25519.SecretKey(from: seedData32)
-        let bls = try BLS.SecretKey(from: seedData32)
         return KeySet(bandersnatch: bandersnatch.publicKey, ed25519: ed25519.publicKey, bls: bls.publicKey)
     }
 }

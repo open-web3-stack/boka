@@ -25,10 +25,7 @@ struct SafroleServiceTests {
 
         storeMiddleware = StoreMiddleware()
         eventBus = EventBus(eventMiddleware: .serial(Middleware(storeMiddleware), .noError), handlerMiddleware: .noError)
-        let tempDir = FileManager.default.temporaryDirectory
-        let keyStoreDir = tempDir.appendingPathComponent("KeyStoreTests")
-        try? FileManager.default.removeItem(at: keyStoreDir)
-        keystore = try await DevKeyStore(devKeysCount: 2, .file(path: keyStoreDir))
+        keystore = try await DevKeyStore(devKeysCount: 2)
 
         safroleService = await SafroleService(config: config, eventBus: eventBus, keystore: keystore)
 
