@@ -1,3 +1,5 @@
+import Foundation
+
 public protocol PublicKeyProtocol: Codable, Hashable, CustomStringConvertible, Sendable {}
 
 public protocol SecretKeyProtocol: Sendable {
