@@ -14,7 +14,6 @@ public enum BLS: KeyType {
         case signatureVerifyFailed(Int)
         case aggregateSigsFailed(Int)
         case aggregatedVerifyFailed(Int)
-        case invalidSecretKey
     }
 
     public final class SecretKey: SecretKeyProtocol, Sendable {

@@ -2,10 +2,6 @@ import Crypto
 import Foundation
 
 public enum Ed25519: KeyType {
-    public enum Error: Swift.Error {
-        case invalidSecretKey
-    }
-
     public final class SecretKey: SecretKeyProtocol, @unchecked Sendable {
         private let secretKey: Curve25519.Signing.PrivateKey
         public let publicKey: PublicKey

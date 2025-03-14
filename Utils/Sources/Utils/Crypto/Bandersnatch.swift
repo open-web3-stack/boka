@@ -14,7 +14,6 @@ public enum Bandersnatch: KeyType {
         case ringVRFVerifyFailed(Int)
         case ietfVRFVerifyFailed(Int)
         case getOutputFailed(Int)
-        case invalidSecretKey
     }
 
     public final class SecretKey: SecretKeyProtocol, Sendable {
