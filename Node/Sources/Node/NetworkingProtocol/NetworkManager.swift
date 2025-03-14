@@ -256,6 +256,7 @@ struct HandlerImpl: NetworkProtocolHandler {
                 )
             return []
         case let .workPackageSharing(message):
+            let hash = message.bundle.hash()
             blockchain
                 .publish(
                     event: RuntimeEvents
@@ -265,7 +266,11 @@ struct HandlerImpl: NetworkProtocolHandler {
                             segmentsRootMappings: message.segmentsRootMappings
                         )
                 )
-            return []
+            let resp = try await blockchain.waitFor(RuntimeEvents.WorkPackageBundleRecivedResponse.self) { event in
+                hash == event.workBundleHash
+            }
+            let (workReportHash, signature) = try resp.result.get()
+            return try [JamEncoder.encode(workReportHash, signature)]
         case let .workReportDistrubution(message):
             blockchain
                 .publish(

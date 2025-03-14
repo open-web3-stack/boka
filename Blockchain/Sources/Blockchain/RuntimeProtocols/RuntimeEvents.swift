@@ -112,6 +112,22 @@ public enum RuntimeEvents {
         }
     }
 
+    // response to CE134
+    public struct WorkPackageBundleRecivedResponse: Event {
+        public let workBundleHash: Data32
+        public let result: Result<(workReportHash: Data32, signature: Ed25519Signature), Error>
+
+        public init(workBundleHash: Data32, workReportHash: Data32, signature: Ed25519Signature) {
+            self.workBundleHash = workBundleHash
+            result = .success((workReportHash, signature))
+        }
+
+        public init(workBundleHash: Data32, error: Error) {
+            self.workBundleHash = workBundleHash
+            result = .failure(error)
+        }
+    }
+
     // A guaranteed work-report ready for distribution via CE135.
     public struct WorkReportGenerated: Event {
         public let workReport: WorkReport
