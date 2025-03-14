@@ -1,3 +1,4 @@
+import Foundation
 import TracingUtils
 import Utils
 
@@ -27,5 +28,13 @@ public class ServiceBase {
 
     func publish(_ event: some Event) {
         subscriptions.publish(event)
+    }
+
+    func waitFor<T: Event>(
+        eventType: T.Type,
+        check: @escaping @Sendable (T) -> Bool = { _ in true },
+        timeout: TimeInterval = 10
+    ) async throws -> T {
+        try await subscriptions.waitFor(eventType, check: check, timeout: timeout)
     }
 }

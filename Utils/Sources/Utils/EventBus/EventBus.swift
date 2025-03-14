@@ -176,7 +176,7 @@ public actor EventBus: Subscribable {
     }
 
     public func waitFor<T: Event>(
-        eventType: T.Type,
+        _ eventType: T.Type,
         check: @escaping @Sendable (T) -> Bool = { _ in true },
         timeout: TimeInterval = 10
     ) async throws -> T {
