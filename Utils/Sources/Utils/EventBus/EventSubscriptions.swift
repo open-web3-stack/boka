@@ -1,3 +1,4 @@
+import Foundation
 import Synchronization
 
 public struct EventSubscriptions: ~Copyable, Sendable {
@@ -38,5 +39,13 @@ public struct EventSubscriptions: ~Copyable, Sendable {
 
     public func publish(_ event: some Event) {
         eventBus.publish(event)
+    }
+
+    public func waitFor<T: Event>(
+        _ eventType: T.Type,
+        check: @escaping @Sendable (T) -> Bool = { _ in true },
+        timeout: TimeInterval = 10
+    ) async throws -> T {
+        try await eventBus.waitFor(eventType, check: check, timeout: timeout)
     }
 }

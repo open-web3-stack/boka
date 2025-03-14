@@ -272,8 +272,8 @@ private class ConnectionHandle {
         case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
             logger.debug("Peer stream started")
             let streamPtr = event.pointee.PEER_STREAM_STARTED.Stream
-            if let connection, let streamPtr, connection.api != nil {
-                let stream = QuicStream(connection: connection, stream: streamPtr, handler: connection.handler)
+            if let connection, let streamPtr, let api = connection.api {
+                let stream = QuicStream(api: api, connection: connection, stream: streamPtr, handler: connection.handler)
                 connection.handler.streamStarted(connection, stream: stream)
             } else {
                 logger.warning("Stream started but connection is gone?")

@@ -1,3 +1,4 @@
+import Codec
 import Foundation
 import Utils
 
@@ -12,5 +13,9 @@ public struct WorkPackageBundle: Sendable, Equatable, Codable, Hashable {
         self.extrinsic = extrinsic
         self.importSegments = importSegments
         self.justifications = justifications
+    }
+
+    public func hash() -> Data32 {
+        try! JamEncoder.encode(self).blake2b256hash()
     }
 }
