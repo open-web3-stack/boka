@@ -140,17 +140,23 @@ public class Write: HostCall {
     public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
         let regs: [UInt32] = state.readRegisters(in: 7 ..< 11)
 
+        logger.debug("regs: \(regs)")
+
         let key = try? Blake2b256.hash(serviceIndex.encode(), state.readMemory(address: regs[0], length: Int(regs[1])))
 
         if key == nil || (regs[3] != 0 && !state.isMemoryReadable(address: regs[2], length: Int(regs[3]))) {
             throw VMInvocationsError.panic
         }
 
+        logger.debug("key: \(key?.debugDescription ?? "nil")")
+
         let len = if let key, let value = try await serviceAccounts.value.get(serviceAccount: serviceIndex, storageKey: key) {
             UInt64(value.count)
         } else {
             HostCallResultCode.NONE.rawValue
         }
+
+        logger.debug("len: \(len)")
 
         let accountDetails = try await serviceAccounts.value.get(serviceAccount: serviceIndex)
         if let accountDetails, accountDetails.thresholdBalance(config: config) > accountDetails.balance {
@@ -160,10 +166,12 @@ public class Write: HostCall {
             if regs[3] == 0 {
                 serviceAccounts.value.set(serviceAccount: serviceIndex, storageKey: key!, value: nil)
             } else {
-                try serviceAccounts.value.set(
+                let value = try state.readMemory(address: regs[2], length: Int(regs[3]))
+                logger.debug("set value: \(value.toDebugHexString())")
+                serviceAccounts.value.set(
                     serviceAccount: serviceIndex,
                     storageKey: key!,
-                    value: state.readMemory(address: regs[2], length: Int(regs[3]))
+                    value: value
                 )
             }
         }
@@ -254,10 +262,10 @@ public class Bless: HostCall {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
-            x.accumulateState.privilegedServices.blessed = regs[0]
-            x.accumulateState.privilegedServices.assign = regs[1]
-            x.accumulateState.privilegedServices.designate = regs[2]
-            x.accumulateState.privilegedServices.basicGas = basicGas!
+            x.state.privilegedServices.blessed = regs[0]
+            x.state.privilegedServices.assign = regs[1]
+            x.state.privilegedServices.designate = regs[2]
+            x.state.privilegedServices.basicGas = basicGas!
         }
     }
 }
@@ -290,9 +298,9 @@ public class Assign: HostCall {
         } else if targetCoreIndex > config.value.totalNumberOfCores {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.CORE.rawValue)
         } else {
-            var newAuthorizationQueue = x.accumulateState.authorizationQueue
+            var newAuthorizationQueue = x.state.authorizationQueue
             newAuthorizationQueue[targetCoreIndex] = try ConfigFixedSizeArray(config: config, array: authorizationQueue!)
-            x.accumulateState.authorizationQueue = newAuthorizationQueue
+            x.state.authorizationQueue = newAuthorizationQueue
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         }
     }
@@ -324,7 +332,7 @@ public class Designate: HostCall {
         if validatorQueue == nil {
             throw VMInvocationsError.panic
         } else {
-            x.accumulateState.validatorQueue = try ConfigFixedSizeArray(config: config, array: validatorQueue!)
+            x.state.validatorQueue = try ConfigFixedSizeArray(config: config, array: validatorQueue!)
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         }
     }
@@ -345,9 +353,8 @@ public class Checkpoint: HostCall {
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         state.writeRegister(Registers.Index(raw: 7), UInt64(bitPattern: state.getGas().value))
 
-        y.serviceAccounts = x.serviceAccounts
         y.serviceIndex = x.serviceIndex
-        y.accumulateState = x.accumulateState
+        y.state = x.state
         y.nextAccountIndex = x.nextAccountIndex
         y.transfers = x.transfers
         y.yield = x.yield
@@ -372,6 +379,9 @@ public class New: HostCall {
         let regs: [UInt64] = state.readRegisters(in: 7 ..< 11)
 
         let codeHash: Data32? = try? Data32(state.readMemory(address: regs[0], length: 32))
+        logger.debug("codeHash: \(codeHash?.description ?? "nil")")
+        logger.debug("new service index: \(x.nextAccountIndex)")
+
         let minAccumlateGas = Gas(regs[2])
         let minOnTransferGas = Gas(regs[3])
 
@@ -380,7 +390,7 @@ public class New: HostCall {
             newAccount = ServiceAccount(
                 storage: [:],
                 preimages: [:],
-                preimageInfos: [HashAndLength(hash: codeHash, length: UInt32(truncatingIfNeeded: regs[1])): []],
+                preimageInfos: [:],
                 codeHash: codeHash,
                 balance: Balance(0),
                 minAccumlateGas: minAccumlateGas,
@@ -391,23 +401,30 @@ public class New: HostCall {
 
         if codeHash == nil {
             throw VMInvocationsError.panic
-        } else if let newAccount, let account = try await x.serviceAccounts.value.get(serviceAccount: x.serviceIndex),
+        } else if let newAccount,
+                  let account = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex),
                   account.balance - newAccount.thresholdBalance(config: config) < account.thresholdBalance(config: config)
         {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.CASH.rawValue)
         } else {
-            guard let newAccount, var account = try await x.serviceAccounts.value.get(serviceAccount: x.serviceIndex) else {
+            guard let newAccount, var account = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex) else {
                 throw VMInvocationsError.panic
             }
             state.writeRegister(Registers.Index(raw: 7), x.nextAccountIndex)
-            x.nextAccountIndex = AccumulateContext.check(
-                i: bump(i: x.nextAccountIndex),
-                serviceAccounts: x.accumulateState.newServiceAccounts
-            )
 
             account.balance -= newAccount.thresholdBalance(config: config)
-            x.serviceAccounts.value.set(serviceAccount: x.serviceIndex, account: account)
-            x.accumulateState.newServiceAccounts.merge([x.nextAccountIndex: newAccount]) { _, new in new }
+            x.state.accounts.value.set(serviceAccount: x.serviceIndex, account: account)
+            x.state.accounts.value.set(serviceAccount: x.nextAccountIndex, account: newAccount.toDetails())
+            x.state.accounts.value.set(
+                serviceAccount: x.nextAccountIndex,
+                preimageHash: codeHash!,
+                length: UInt32(truncatingIfNeeded: regs[1]), value: []
+            )
+
+            x.nextAccountIndex = try await AccumulateContext.check(
+                i: bump(i: x.nextAccountIndex),
+                accounts: x.state.accounts.toRef()
+            )
         }
     }
 }
@@ -427,11 +444,11 @@ public class Upgrade: HostCall {
 
         let codeHash: Data32? = try? Data32(state.readMemory(address: regs[0], length: 32))
 
-        if let codeHash, var acc = try await x.serviceAccounts.value.get(serviceAccount: x.serviceIndex) {
+        if let codeHash, var acc = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex) {
             acc.codeHash = codeHash
             acc.minAccumlateGas = Gas(regs[1])
             acc.minOnTransferGas = Gas(regs[2])
-            x.serviceAccounts.value.set(serviceAccount: x.serviceIndex, account: acc)
+            x.state.accounts.value.set(serviceAccount: x.serviceIndex, account: acc)
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         } else {
             throw VMInvocationsError.panic
@@ -461,25 +478,22 @@ public class Transfer: HostCall {
         let memo = try? state.readMemory(address: regs[3], length: config.value.transferMemoSize)
         let dest = UInt32(truncatingIfNeeded: regs[0])
 
-        let acc = try await x.serviceAccounts.value.get(serviceAccount: x.serviceIndex)
+        let srcAccount = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex)
 
-        let destAcc: ServiceAccountDetails? = if try await x.serviceAccounts.value.get(serviceAccount: dest) != nil {
-            try await x.serviceAccounts.value.get(serviceAccount: dest)
-        } else if x.accumulateState.newServiceAccounts[dest] != nil {
-            x.accumulateState.newServiceAccounts[dest]?.toDetails()
-        } else {
-            nil
-        }
+        let destAccount = try await x.state.accounts.value.get(serviceAccount: dest)
+
+        logger.debug("src: \(x.serviceIndex), dest: \(dest), amount: \(amount), gasLimit: \(gasLimit)")
+        logger.debug("dest is found: \(destAccount != nil)")
 
         if memo == nil {
             throw VMInvocationsError.panic
-        } else if destAcc == nil {
+        } else if destAccount == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
-        } else if gasLimit < destAcc!.minOnTransferGas {
+        } else if gasLimit < destAccount!.minOnTransferGas {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.LOW.rawValue)
-        } else if let acc, acc.balance - amount < acc.thresholdBalance(config: config) {
+        } else if let srcAccount, srcAccount.balance - amount < srcAccount.thresholdBalance(config: config) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.CASH.rawValue)
-        } else if var acc {
+        } else if var srcAccount {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
             x.transfers.append(DeferredTransfers(
                 sender: x.serviceIndex,
@@ -488,8 +502,8 @@ public class Transfer: HostCall {
                 memo: Data128(memo!)!,
                 gasLimit: gasLimit
             ))
-            acc.balance -= amount
-            x.serviceAccounts.value.set(serviceAccount: x.serviceIndex, account: acc)
+            srcAccount.balance -= amount
+            x.state.accounts.value.set(serviceAccount: x.serviceIndex, account: srcAccount)
         }
     }
 }
@@ -512,12 +526,8 @@ public class Eject: HostCall {
         let preimageHash = try? state.readMemory(address: reg8, length: 32)
         let ejectAccount: ServiceAccountDetails? = if ejectIndex == x.serviceIndex {
             nil
-        } else if try await x.serviceAccounts.value.get(serviceAccount: ejectIndex) != nil {
-            try await x.serviceAccounts.value.get(serviceAccount: ejectIndex)
-        } else if x.accumulateState.newServiceAccounts[ejectIndex] != nil {
-            x.accumulateState.newServiceAccounts[ejectIndex]?.toDetails()
         } else {
-            nil
+            try await x.state.accounts.value.get(serviceAccount: ejectIndex)
         }
         let minHoldPeriod = TimeslotIndex(config.value.preimagePurgePeriod)
 
@@ -528,7 +538,7 @@ public class Eject: HostCall {
             return
         }
 
-        let preimageInfo = try await x.serviceAccounts.value.get(
+        let preimageInfo = try await x.state.accounts.value.get(
             serviceAccount: ejectIndex,
             preimageHash: Data32(preimageHash!)!,
             length: max(81, UInt32(ejectAccount!.totalByteLength)) - 81
@@ -539,10 +549,10 @@ public class Eject: HostCall {
         if ejectAccount!.itemsCount != 2 || preimageInfo == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
         } else if preimageInfo!.count == 2, preimageInfo![1] < minHoldSlot {
-            var destAccount = try await x.serviceAccounts.value.get(serviceAccount: x.serviceIndex)
+            var destAccount = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex)
             destAccount?.balance += ejectAccount!.balance
-            x.serviceAccounts.value.set(serviceAccount: ejectIndex, account: nil)
-            x.serviceAccounts.value.set(serviceAccount: x.serviceIndex, account: destAccount)
+            x.state.accounts.value.set(serviceAccount: ejectIndex, account: nil)
+            x.state.accounts.value.set(serviceAccount: x.serviceIndex, account: destAccount)
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
@@ -567,7 +577,7 @@ public class Query: HostCall {
             throw VMInvocationsError.panic
         }
 
-        let preimageInfo = try await x.serviceAccounts.value.get(
+        let preimageInfo = try await x.state.accounts.value.get(
             serviceAccount: x.serviceIndex,
             preimageHash: Data32(preimageHash!)!,
             length: length
@@ -610,7 +620,7 @@ public class Solicit: HostCall {
         let (startAddr, length): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
         let hash = try? state.readMemory(address: startAddr, length: 32)
 
-        let preimageInfo = try await x.serviceAccounts.value.get(
+        let preimageInfo = try await x.state.accounts.value.get(
             serviceAccount: x.serviceIndex,
             preimageHash: Data32(hash!)!,
             length: length
@@ -619,7 +629,7 @@ public class Solicit: HostCall {
         let isPreviouslyAvailable = preimageInfo?.count == 2
         let canSolicit = notRequestedYet || isPreviouslyAvailable
 
-        let acc = try await x.serviceAccounts.value.get(serviceAccount: x.serviceIndex)
+        let acc = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex)
 
         if hash == nil {
             throw VMInvocationsError.panic
@@ -629,10 +639,10 @@ public class Solicit: HostCall {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
         } else {
             if notRequestedYet {
-                x.serviceAccounts.value.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: [])
+                x.state.accounts.value.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: [])
             } else if isPreviouslyAvailable, var preimageInfo {
                 try preimageInfo.append(timeslot)
-                x.serviceAccounts.value.set(
+                x.state.accounts.value.set(
                     serviceAccount: x.serviceIndex,
                     preimageHash: Data32(hash!)!,
                     length: length,
@@ -660,7 +670,7 @@ public class Forget: HostCall {
         let hash = try? state.readMemory(address: startAddr, length: 32)
         let minHoldPeriod = TimeslotIndex(config.value.preimagePurgePeriod)
 
-        let preimageInfo = try await x.serviceAccounts.value.get(
+        let preimageInfo = try await x.state.accounts.value.get(
             serviceAccount: x.serviceIndex,
             preimageHash: Data32(hash!)!,
             length: length
@@ -680,11 +690,11 @@ public class Forget: HostCall {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.HUH.rawValue)
         } else {
             if canExpunge {
-                x.serviceAccounts.value.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: nil)
-                x.serviceAccounts.value.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, value: nil)
+                x.state.accounts.value.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: nil)
+                x.state.accounts.value.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, value: nil)
             } else if isAvailable1, var preimageInfo {
                 try preimageInfo.append(timeslot)
-                x.serviceAccounts.value.set(
+                x.state.accounts.value.set(
                     serviceAccount: x.serviceIndex,
                     preimageHash: Data32(hash!)!,
                     length: length,
@@ -692,7 +702,7 @@ public class Forget: HostCall {
                 )
             } else if isAvailable3, var preimageInfo {
                 preimageInfo = [preimageInfo[2], timeslot]
-                x.serviceAccounts.value.set(
+                x.state.accounts.value.set(
                     serviceAccount: x.serviceIndex,
                     preimageHash: Data32(hash!)!,
                     length: length,

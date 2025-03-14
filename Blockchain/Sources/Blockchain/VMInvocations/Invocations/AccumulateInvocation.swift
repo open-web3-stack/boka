@@ -8,8 +8,7 @@ private let logger = Logger(label: "accumulate")
 
 public func accumulate(
     config: ProtocolConfigRef,
-    serviceAccounts: ServiceAccountsMutRef,
-    accumulateState: AccumulateState,
+    state: AccumulateState,
     serviceIndex: ServiceIndex,
     gas: Gas,
     arguments: [AccumulateArguments],
@@ -18,34 +17,32 @@ public func accumulate(
 ) async throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
     logger.debug("accumulating service index: \(serviceIndex)")
 
-    guard let accumulatingAccountDetails = try await serviceAccounts.value.get(serviceAccount: serviceIndex),
-          let codeBlob = try await serviceAccounts.value.get(
+    guard let accumulatingAccountDetails = try await state.accounts.value.get(serviceAccount: serviceIndex),
+          let codeBlob = try await state.accounts.value.get(
               serviceAccount: serviceIndex,
               preimageHash: accumulatingAccountDetails.codeHash
           )
     else {
-        return (accumulateState, [], nil, Gas(0))
+        return (state, [], nil, Gas(0))
     }
 
-    let contextContent = AccumulateContext.ContextType(
+    let contextContent = try await AccumulateContext.ContextType(
         x: AccumlateResultContext(
-            serviceAccounts: serviceAccounts,
             serviceIndex: serviceIndex,
-            accumulateState: accumulateState,
+            state: state,
             nextAccountIndex: AccumulateContext.check(
-                i: initialIndex & (serviceIndexModValue - 1) + 256,
-                serviceAccounts: [:]
+                i: initialIndex % serviceIndexModValue + 256,
+                accounts: state.accounts.toRef()
             ),
             transfers: [],
             yield: nil
         ),
         y: AccumlateResultContext(
-            serviceAccounts: serviceAccounts,
             serviceIndex: serviceIndex,
-            accumulateState: accumulateState,
+            state: state,
             nextAccountIndex: AccumulateContext.check(
-                i: initialIndex & (serviceIndexModValue - 1) + 256,
-                serviceAccounts: [:]
+                i: initialIndex % serviceIndexModValue + 256,
+                accounts: state.accounts.toRef()
             ),
             transfers: [],
             yield: nil
@@ -64,9 +61,8 @@ public func accumulate(
     )
 
     logger.debug("accumulate exit reason: \(exitReason)")
-
-    // logger.debug("x accumulateState: \(ctx.context.x.accumulateState)")
-    // logger.debug("y accumulateState: \(ctx.context.y.accumulateState)")
+    logger.debug("accumulate output: \(output?.toDebugHexString() ?? "nil")")
+    logger.debug("accumulate x.yield: \(ctx.context.x.yield?.toHexString() ?? "nil")")
 
     return try collapse(exitReason: exitReason, output: output, context: ctx.context, gas: gas)
 }
@@ -78,12 +74,12 @@ private func collapse(
 ) throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
     switch exitReason {
     case .panic, .outOfGas:
-        (context.y.accumulateState, context.y.transfers, context.y.yield, gas)
+        (context.y.state, context.y.transfers, context.y.yield, gas)
     default:
         if let output, let o = Data32(output) {
-            (context.x.accumulateState, context.x.transfers, o, gas)
+            (context.x.state, context.x.transfers, o, gas)
         } else {
-            (context.x.accumulateState, context.x.transfers, context.x.yield, gas)
+            (context.x.state, context.x.transfers, context.x.yield, gas)
         }
     }
 }

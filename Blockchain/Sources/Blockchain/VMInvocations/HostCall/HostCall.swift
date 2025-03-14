@@ -1,7 +1,7 @@
 import PolkaVM
 import TracingUtils
 
-private let logger = Logger(label: "HostCall")
+private let logger = Logger(label: "HostCall ")
 
 public protocol HostCall {
     static var identifier: UInt8 { get }
@@ -12,17 +12,17 @@ public protocol HostCall {
 
 extension HostCall {
     public func call(config: ProtocolConfigRef, state: VMState) async -> ExecOutcome {
-        logger.debug("call: \(Self.self)")
+        logger.debug("===== host call: \(Self.self) =====")
         guard hasEnoughGas(state: state) else {
             logger.debug("not enough gas")
             return .exit(.outOfGas)
         }
         state.consumeGas(gasCost(state: state))
-        logger.debug("consumed \(gasCost(state: state)) gas")
+        logger.debug("consumed \(gasCost(state: state)) gas, \(state.getGas()) left")
 
         do {
             try await _callImpl(config: config, state: state)
-            logger.debug("w7: \(String(describing: HostCallResultCode(rawValue: state.readRegister(Registers.Index(raw: 7)))))")
+            logger.debug("w7: \(HostCallResultCode(rawValue: state.readRegister(Registers.Index(raw: 7))) ?? .OK)")
             return .continued
         } catch let e as MemoryError {
             logger.error("memory error: \(e)")

@@ -30,18 +30,18 @@ public class AccumulateContext: InvocationContext {
     public func dispatch(index: UInt32, state: VMState) async -> ExecOutcome {
         switch UInt8(index) {
         case Read.identifier:
-            return await Read(serviceIndex: context.x.serviceIndex, accounts: context.x.serviceAccounts.toRef())
+            return await Read(serviceIndex: context.x.serviceIndex, accounts: context.x.state.accounts.toRef())
                 .call(config: config, state: state)
         case Write.identifier:
-            return await Write(serviceIndex: context.x.serviceIndex, accounts: context.x.serviceAccounts)
+            return await Write(serviceIndex: context.x.serviceIndex, accounts: context.x.state.accounts)
                 .call(config: config, state: state)
         case Lookup.identifier:
-            return await Lookup(serviceIndex: context.x.serviceIndex, accounts: context.x.serviceAccounts.toRef())
+            return await Lookup(serviceIndex: context.x.serviceIndex, accounts: context.x.state.accounts.toRef())
                 .call(config: config, state: state)
         case GasFn.identifier:
             return await GasFn().call(config: config, state: state)
         case Info.identifier:
-            return await Info(serviceIndex: context.x.serviceIndex, accounts: context.x.serviceAccounts.toRef())
+            return await Info(serviceIndex: context.x.serviceIndex, accounts: context.x.state.accounts.toRef())
                 .call(config: config, state: state)
         case Bless.identifier:
             return await Bless(x: context.x).call(config: config, state: state)
@@ -78,11 +78,14 @@ public class AccumulateContext: InvocationContext {
     }
 
     // a check function to find the first such index in this sequence which does not already represent a service
-    public static func check(i: ServiceIndex, serviceAccounts: [ServiceIndex: ServiceAccount]) -> ServiceIndex {
-        if serviceAccounts[i] == nil {
+    public static func check(
+        i: ServiceIndex,
+        accounts: ServiceAccountsRef
+    ) async throws -> ServiceIndex {
+        if try await accounts.value.get(serviceAccount: i) == nil {
             return i
         }
 
-        return check(i: (i - 255) & (serviceIndexModValue - 1) + 256, serviceAccounts: serviceAccounts)
+        return try await check(i: (i - 255) % serviceIndexModValue + 256, accounts: accounts)
     }
 }

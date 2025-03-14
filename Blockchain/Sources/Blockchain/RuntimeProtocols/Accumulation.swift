@@ -108,18 +108,15 @@ extension Accumulation {
 
         logger.debug("[single] accumulate arguments: \(arguments)")
 
-        let accountsMutRef = ServiceAccountsMutRef(self)
         let (newState, transfers, commitment, gasUsed) = try await accumulate(
             config: config,
-            serviceAccounts: accountsMutRef,
-            accumulateState: state,
+            state: state,
             serviceIndex: service,
             gas: gas,
             arguments: arguments,
-            initialIndex: Blake2b256.hash(service.encode(), entropy.data, timeslot.encode()).data.decode(UInt32.self),
+            initialIndex: Blake2b256.hash(JamEncoder.encode(service, entropy, timeslot)).data.decode(UInt32.self),
             timeslot: timeslot
         )
-        self = accountsMutRef.value as! Self
 
         logger.debug("[single] accumulate result: gasUsed=\(gasUsed), commitment=\(String(describing: commitment))")
 
@@ -144,7 +141,6 @@ extension Accumulation {
         var gasUsed = Gas(0)
         var transfers: [DeferredTransfers] = []
         var commitments = Set<Commitment>()
-        var newServiceAccounts = [ServiceIndex: ServiceAccount]()
         var newPrivilegedServices: PrivilegedServices?
         var newValidatorQueue: ConfigFixedSizeArray<
             ValidatorKey, ProtocolConfig.TotalNumberOfValidators
@@ -189,14 +185,6 @@ extension Accumulation {
                 transfers.append(transfer)
             }
 
-            // new service accounts
-            for (service, account) in singleOutput.state.newServiceAccounts {
-                guard newServiceAccounts[service] == nil, try await get(serviceAccount: service) == nil else {
-                    throw AccumulationError.duplicatedServiceIndex
-                }
-                newServiceAccounts[service] = account
-            }
-
             switch service {
             case privilegedServices.blessed:
                 newPrivilegedServices = singleOutput.state.privilegedServices
@@ -212,7 +200,7 @@ extension Accumulation {
         return ParallelAccumulationOutput(
             gasUsed: gasUsed,
             state: AccumulateState(
-                newServiceAccounts: newServiceAccounts,
+                accounts: state.accounts,
                 validatorQueue: newValidatorQueue ?? validatorQueue,
                 authorizationQueue: newAuthorizationQueue ?? authorizationQueue,
                 privilegedServices: newPrivilegedServices ?? privilegedServices
@@ -349,6 +337,7 @@ extension Accumulation {
     private mutating func execution(
         config: ProtocolConfigRef,
         workReports: [WorkReport],
+        state: AccumulateState,
         entropy: Data32,
         timeslot: TimeslotIndex
     ) async throws -> AccumulationOutput {
@@ -358,12 +347,7 @@ extension Accumulation {
 
         return try await outerAccumulate(
             config: config,
-            state: AccumulateState(
-                newServiceAccounts: [:],
-                validatorQueue: validatorQueue,
-                authorizationQueue: authorizationQueue,
-                privilegedServices: privilegedServices
-            ),
+            state: state,
             workReports: workReports,
             privilegedGas: privilegedServices.basicGas,
             gasLimit: gasLimit,
@@ -393,9 +377,19 @@ extension Accumulation {
 
         logger.debug("accumulatable reports: \(accumulatableReports.map(\.packageSpecification.workPackageHash))")
 
+        let accountsMutRef = ServiceAccountsMutRef(self)
+
+        let initialAccState = AccumulateState(
+            accounts: accountsMutRef,
+            validatorQueue: validatorQueue,
+            authorizationQueue: authorizationQueue,
+            privilegedServices: privilegedServices
+        )
+
         let accumulateOutput = try await execution(
             config: config,
             workReports: accumulatableReports,
+            state: initialAccState,
             entropy: entropy,
             timeslot: timeslot
         )
@@ -404,27 +398,12 @@ extension Accumulation {
         validatorQueue = accumulateOutput.state.validatorQueue
         privilegedServices = accumulateOutput.state.privilegedServices
 
-        // add new service accounts
-        for (service, account) in accumulateOutput.state.newServiceAccounts {
-            set(serviceAccount: service, account: account.toDetails())
-            for (hash, value) in account.storage {
-                set(serviceAccount: service, storageKey: hash, value: value)
-            }
-            for (hash, value) in account.preimages {
-                set(serviceAccount: service, preimageHash: hash, value: value)
-            }
-            for (hashLength, value) in account.preimageInfos {
-                set(serviceAccount: service, preimageHash: hashLength.hash, length: hashLength.length, value: value)
-            }
-        }
-
         // transfers
         var transferGroups = [ServiceIndex: [DeferredTransfers]]()
         for transfer in accumulateOutput.transfers {
             transferGroups[transfer.destination, default: []].append(transfer)
         }
         for (service, transfers) in transferGroups {
-            let accountsMutRef = ServiceAccountsMutRef(self)
             try await onTransfer(
                 config: config,
                 serviceIndex: service,
@@ -432,8 +411,9 @@ extension Accumulation {
                 timeslot: timeslot,
                 transfers: transfers
             )
-            self = accountsMutRef.value as! Self
         }
+
+        self = accountsMutRef.value as! Self
 
         // update accumulation history
         let accumulated = accumulatableReports[0 ..< accumulateOutput.numAccumulated]
@@ -459,8 +439,14 @@ extension Accumulation {
             }
         }
 
+        let commitmentsSorted = accumulateOutput.commitments.sorted { $0.serviceIndex < $1.serviceIndex }
+        logger.debug("accumulation commitments sorted: \(commitmentsSorted)")
+
         // accumulate root
-        let nodes = try accumulateOutput.commitments.map { try JamEncoder.encode($0.serviceIndex) + JamEncoder.encode($0.hash) }
+        let nodes = try commitmentsSorted.map { try JamEncoder.encode($0.serviceIndex) + JamEncoder.encode($0.hash) }
+
+        logger.debug("accumulation commitments encoded: \(nodes.map { $0.toHexString() })")
+
         let root = Merklization.binaryMerklize(nodes, hasher: Keccak.self)
 
         logger.debug("accumulation root: \(root)")
