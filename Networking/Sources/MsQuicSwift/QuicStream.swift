@@ -56,6 +56,7 @@ public final class QuicStream: Sendable {
 
     // wrapping a remote stream initiated by peer
     init(
+        api: QuicAPI,
         connection: QuicConnection,
         stream: HQUIC,
         handler: QuicEventHandler
@@ -64,7 +65,7 @@ public final class QuicStream: Sendable {
         logger = Logger(label: id)
         self.handler = handler
 
-        let handle = StreamHandle(logger: logger, ptr: stream, api: connection.api!)
+        let handle = StreamHandle(logger: logger, ptr: stream, api: api)
 
         storage = .init(.init(
             handle: handle,
