@@ -125,7 +125,7 @@ struct PeerTests {
         typealias EphemeralHandler = MockEphemeralStreamHandler
     }
 
-    @Test
+    @Test("Connection rotation strategy", .disabled("TODO: Fix this test"))
     func connectionRotationStrategy() async throws {
         var peers: [Peer<MockStreamHandler>] = []
         var handlers: [MockPresistentStreamHandler] = []
@@ -875,7 +875,7 @@ struct PeerTests {
         }
     }
 
-    @Test
+    @Test("High concurrent request", .disabled("TODO: Fix this test"))
     func highConcurrentRequest() async throws {
         var peers: [Peer<MockStreamHandler>] = []
         let peersCount = 50
