@@ -23,7 +23,7 @@ struct EventBusTests {
 
         // Start waiting for the event in a separate task
         let waitTask = Task {
-            try await eventBus.waitFor(eventType: TestEvent.self)
+            try await eventBus.waitFor(TestEvent.self)
         }
 
         // Give a small delay to ensure the wait is set up
@@ -41,7 +41,7 @@ struct EventBusTests {
     @Test func testWaitForWithCustomCheck() async throws {
         // Start waiting for an event with id = 2
         let waitTask = Task {
-            try await eventBus.waitFor(eventType: TestEvent.self) { event in
+            try await eventBus.waitFor(TestEvent.self) { event in
                 event.id == 2
             }
         }
@@ -68,7 +68,7 @@ struct EventBusTests {
     @Test func testWaitForTimeout() async throws {
         await #expect(throws: ContinuationError.timeout) {
             // Wait for an event with a short timeout
-            _ = try await eventBus.waitFor(eventType: TestEvent.self, timeout: 0.1)
+            _ = try await eventBus.waitFor(TestEvent.self, timeout: 0.1)
             Issue.record()
         }
     }
@@ -76,11 +76,11 @@ struct EventBusTests {
     @Test func testMultipleConcurrentWaits() async throws {
         // Start waiting for two different event types
         let waitTask1 = Task {
-            try await eventBus.waitFor(eventType: TestEvent.self)
+            try await eventBus.waitFor(TestEvent.self)
         }
 
         let waitTask2 = Task {
-            try await eventBus.waitFor(eventType: AnotherTestEvent.self)
+            try await eventBus.waitFor(AnotherTestEvent.self)
         }
 
         // Give a small delay to ensure the waits are set up
@@ -105,13 +105,13 @@ struct EventBusTests {
     @Test func testMultipleWaitsForSameEventType() async throws {
         // Start multiple waits with different check conditions
         let waitTask1 = Task {
-            try await eventBus.waitFor(eventType: TestEvent.self) { event in
+            try await eventBus.waitFor(TestEvent.self) { event in
                 event.id == 1
             }
         }
 
         let waitTask2 = Task {
-            try await eventBus.waitFor(eventType: TestEvent.self) { event in
+            try await eventBus.waitFor(TestEvent.self) { event in
                 event.id == 2
             }
         }
@@ -141,7 +141,7 @@ struct EventBusTests {
 
         // Start waiting for event
         let waitTask = Task {
-            try await eventBus.waitFor(eventType: TestEvent.self)
+            try await eventBus.waitFor(TestEvent.self)
         }
 
         // Give a small delay to ensure the wait is set up
