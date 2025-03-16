@@ -9,6 +9,7 @@ public enum GuaranteeingServiceError: Error {
     case invalidWorkPackage
     case invalidBundle
     case segmentsRootNotFound
+    case notValidator
 }
 
 public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
@@ -103,9 +104,35 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     private func on(workPackageBundleReceived event: RuntimeEvents.WorkPackageBundleRecived) async throws {
-        try await refineWorkPackage(
-            coreIndex: event.coreIndex, workPackage: event.bundle.workPackage.asRef(), extrinsics: event.bundle.extrinsic
-        )
+        let workBundleHash = event.bundle.hash()
+        guard let (_, signingKey) = signingKey.value else {
+            publish(RuntimeEvents.WorkPackageBundleRecivedResponse(
+                workBundleHash: workBundleHash,
+                error: GuaranteeingServiceError.notValidator
+            ))
+            return
+        }
+
+        do {
+            let report = try await processWorkPackageBundle(
+                coreIndex: event.coreIndex,
+                segmentsRootMappings: event.segmentsRootMappings,
+                bundle: event.bundle
+            )
+
+            let payload = SigningContext.guarantee + report.hash().data
+            let signature = try signingKey.sign(message: payload)
+            publish(RuntimeEvents.WorkPackageBundleRecivedResponse(
+                workBundleHash: workBundleHash,
+                workReportHash: report.hash(),
+                signature: signature
+            ))
+        } catch {
+            publish(RuntimeEvents.WorkPackageBundleRecivedResponse(
+                workBundleHash: workBundleHash,
+                error: error
+            ))
+        }
     }
 
     private func validateWorkPackageBundle(
@@ -127,7 +154,19 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         return true
     }
 
-    public func refineWorkPackage(coreIndex: CoreIndex, workPackage: WorkPackageRef, extrinsics: [Data]) async throws {
+    public func processWorkPackageBundle(
+        coreIndex _: CoreIndex,
+        segmentsRootMappings _: SegmentsRootMappings,
+        bundle _: WorkPackageBundle
+    ) async throws -> WorkReport {
+        fatalError("unimplemented")
+    }
+
+    public func refineWorkPackage(
+        coreIndex: CoreIndex,
+        workPackage: WorkPackageRef,
+        extrinsics: [Data]
+    ) async throws {
         // Validate the work package
         guard try validate(workPackage: workPackage.value) else {
             logger.error("Invalid work package: \(workPackage)")
@@ -188,9 +227,11 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         [] // Placeholder
     }
 
-    private func refinePkg(validatorIndex: ValidatorIndex, workPackage: WorkPackageRef,
-                           extrinsics: [Data]) async throws -> (WorkPackageBundle, SegmentsRootMappings, WorkReport)
-    {
+    private func refinePkg(
+        validatorIndex: ValidatorIndex,
+        workPackage: WorkPackageRef,
+        extrinsics: [Data]
+    ) async throws -> (WorkPackageBundle, SegmentsRootMappings, WorkReport) {
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
 
         // TODO: check for edge cases such as epoch end
