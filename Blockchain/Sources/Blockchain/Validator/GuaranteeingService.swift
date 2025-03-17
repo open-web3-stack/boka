@@ -10,6 +10,8 @@ public enum GuaranteeingServiceError: Error {
     case invalidBundle
     case segmentsRootNotFound
     case notValidator
+    case invalidCore
+    case unableToGetSignatures
 }
 
 public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
@@ -18,6 +20,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     private let dataAvailability: DataAvailability
 
     let signingKey: ThreadSafeContainer<(ValidatorIndex, Ed25519.SecretKey)?> = .init(nil)
+    let coreAssignments: ThreadSafeContainer<([CoreIndex], TimeslotIndex)> = .init(([], 0))
 
     public init(
         config: ProtocolConfigRef,
@@ -154,7 +157,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         return true
     }
 
-    public func processWorkPackageBundle(
+    private func processWorkPackageBundle(
         coreIndex _: CoreIndex,
         segmentsRootMappings _: SegmentsRootMappings,
         bundle _: WorkPackageBundle
@@ -162,19 +165,30 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         fatalError("unimplemented")
     }
 
-    public func refineWorkPackage(
+    private func refineWorkPackage(
         coreIndex: CoreIndex,
         workPackage: WorkPackageRef,
         extrinsics: [Data]
     ) async throws {
+        guard let (validatorIndex, signingKey) = signingKey.value else {
+            throw GuaranteeingServiceError.notValidator
+        }
+
+        let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
+
+        let coreAssignment = getCoreAssignment(state: state)
+
+        guard let currentCoreIndex = coreAssignment[safe: Int(validatorIndex)] else {
+            try throwUnreachable("invalid validator index/core assignment")
+        }
+        guard currentCoreIndex == coreIndex else {
+            throw GuaranteeingServiceError.invalidCore
+        }
+
         // Validate the work package
         guard try validate(workPackage: workPackage.value) else {
             logger.error("Invalid work package: \(workPackage)")
             throw GuaranteeingServiceError.invalidWorkPackage
-        }
-        guard let (validatorIndex, signingKey) = signingKey.value else {
-            logger.debug("not in current validator set, skipping refine")
-            return
         }
 
         // check & refine
@@ -184,47 +198,102 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
             extrinsics: extrinsics
         )
 
-        // Share work package bundle
-        let shareWorkBundleEvent = RuntimeEvents.WorkPackageBundleReady(
-            coreIndex: coreIndex,
-            bundle: bundle,
-            segmentsRootMappings: mappings
-        )
-        publish(shareWorkBundleEvent)
+        let workReportHash = workReport.hash()
+
+        var otherValidators = [(ValidatorIndex, Ed25519PublicKey)]()
+        // TODO: handle the edge case and we may need to use nextValidators on epoch boundary
+        let currentValidators = state.value.currentValidators
+        for (idx, core) in coreAssignment.enumerated() {
+            if core == coreIndex, idx != Int(validatorIndex) {
+                otherValidators.append((ValidatorIndex(idx), currentValidators.array[idx].ed25519))
+            }
+        }
+
+        // announce work package bundle ready via CE134 to other validators in the same core group and wait for signatures
+        var sigs: [ValidatorSignature] = await withTaskGroup(of: Optional<ValidatorSignature>.self) { group in
+            for (idx, validatorKey) in otherValidators {
+                publish(RuntimeEvents.WorkPackageBundleReady(
+                    target: validatorKey,
+                    coreIndex: coreIndex,
+                    bundle: bundle,
+                    segmentsRootMappings: mappings
+                ))
+                group.addTask {
+                    do {
+                        let resp = try await self.waitFor(
+                            eventType: RuntimeEvents.WorkPackageBundleRecivedReply.self,
+                            check: { event in
+                                event.source == validatorKey && event.workReportHash == workReportHash
+                            },
+                            timeout: 2 // TODO: make configurable? and determine the best value
+                        )
+                        return ValidatorSignature(validatorIndex: idx, signature: resp.signature)
+                    } catch ContinuationError.timeout {
+                        self.logger.debug("no reply from \(validatorKey) in time")
+                        return nil
+                    } catch {
+                        self.logger.error("error waiting for reply from \(validatorKey)", metadata: ["error": "\(error)"])
+                        return nil
+                    }
+                }
+            }
+
+            var results: [ValidatorSignature] = []
+            for await sig in group {
+                if let sig {
+                    results.append(sig)
+                }
+            }
+            return results
+        }
+
+        guard sigs.count >= 1 else {
+            throw GuaranteeingServiceError.unableToGetSignatures
+        }
+
         // Sign work report & work-report distribution via CE 135
         let payload = SigningContext.guarantee + workReport.hash().data
         let signature = try signingKey.sign(message: payload)
 
-        let timeslot = timeProvider.getTime().timeToTimeslot(config: config)
-        try await distributeWorkReport(
-            workReport,
-            slot: timeslot,
-            signature: ValidatorSignature(validatorIndex: validatorIndex, signature: signature)
-        )
-    }
+        sigs.append(ValidatorSignature(validatorIndex: validatorIndex, signature: signature))
 
-    // Sign work report & work-report distribution via CE135
-    private func distributeWorkReport(_ workReport: WorkReport, slot: UInt32, signature: ValidatorSignature) async throws {
-        // Construct the guaranteed work-report
-        var guaranteedWorkReport = RuntimeEvents.WorkReportGenerated(
-            workReport: workReport,
-            slot: slot,
-            signatures: [signature]
-        )
-
-        // Fetch additional signatures (if any) from other guarantors
-        let additionalSignatures = await fetchAdditionalSignatures(for: workReport)
-        guaranteedWorkReport.signatures.append(contentsOf: additionalSignatures)
+        let timeslot = timeProvider.getTime().timeToTimeslot(config: config) + 1
 
         // Distribute the guaranteed work-report to all current validators
-        publish(guaranteedWorkReport)
+        publish(RuntimeEvents.WorkReportGenerated(
+            workReport: workReport,
+            slot: timeslot,
+            signatures: sigs
+        ))
     }
 
-    // Fetch additional signatures from other guarantors
-    private func fetchAdditionalSignatures(for _: WorkReport) async -> [ValidatorSignature] {
-        // TODO: Implement logic to fetch additional signatures from other guarantors
-        // This could involve querying a shared data structure or waiting for events
-        [] // Placeholder
+    private func getCoreAssignment(state: StateRef) -> [CoreIndex] {
+        // TODO: this is wrong
+        // instead of using timeslot from last block, we need to calculate the current timeslot and use it
+        // so we can handle block gaps
+
+        let timeslot = state.value.timeslot + 1
+
+        let res = coreAssignments.read { c, t -> [CoreIndex]? in
+            if t == timeslot {
+                return c
+            }
+            return nil
+        }
+
+        if let res {
+            return res
+        }
+
+        let newCoreAssignment = state.value.getCoreAssignment(
+            config: config,
+            randomness: state.value.entropyPool.t2,
+            timeslot: timeslot
+        )
+
+        coreAssignments.value = (newCoreAssignment, timeslot)
+
+        return newCoreAssignment
     }
 
     private func refinePkg(

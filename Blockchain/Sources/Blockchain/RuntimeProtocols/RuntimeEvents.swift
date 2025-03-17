@@ -52,7 +52,7 @@ public enum RuntimeEvents {
         public let block: BlockRef
     }
 
-    // Received new work package submission via RPC
+    // RPC -> NetworkManager & GuaranteeingService: Received new work package submission via RPC
     public struct WorkPackagesSubmitted: Event {
         public let coreIndex: CoreIndex
         public let workPackage: WorkPackageRef
@@ -65,7 +65,7 @@ public enum RuntimeEvents {
         }
     }
 
-    // When a work package is received via CE133
+    // NetworkManager -> GuaranteeingService: When a work package is received via CE133
     public struct WorkPackagesReceived: Event {
         public let coreIndex: CoreIndex
         public let workPackage: WorkPackageRef
@@ -78,24 +78,27 @@ public enum RuntimeEvents {
         }
     }
 
-    // When a work package bundle is ready to shared via CE134
+    // GuaranteeingService -> NetworkManager: When a work package bundle is ready to shared via CE134
     public struct WorkPackageBundleReady: Event {
+        public let target: Ed25519PublicKey
         public let coreIndex: CoreIndex
         public let bundle: WorkPackageBundle
         public let segmentsRootMappings: SegmentsRootMappings
 
         public init(
+            target: Ed25519PublicKey,
             coreIndex: CoreIndex,
             bundle: WorkPackageBundle,
             segmentsRootMappings: SegmentsRootMappings
         ) {
+            self.target = target
             self.coreIndex = coreIndex
             self.bundle = bundle
             self.segmentsRootMappings = segmentsRootMappings
         }
     }
 
-    // When a work package bundle is recived via CE134
+    // NetworkManager -> GuaranteeingService: When a work package bundle is recived via CE134 request
     public struct WorkPackageBundleRecived: Event {
         public let coreIndex: CoreIndex
         public let segmentsRootMappings: SegmentsRootMappings
@@ -112,19 +115,43 @@ public enum RuntimeEvents {
         }
     }
 
-    // response to CE134
+    // GuaranteeingService -> NetworkManager: Response to CE134 request
     public struct WorkPackageBundleRecivedResponse: Event {
         public let workBundleHash: Data32
         public let result: Result<(workReportHash: Data32, signature: Ed25519Signature), Error>
 
-        public init(workBundleHash: Data32, workReportHash: Data32, signature: Ed25519Signature) {
+        public init(
+            workBundleHash: Data32,
+            workReportHash: Data32,
+            signature: Ed25519Signature
+        ) {
             self.workBundleHash = workBundleHash
             result = .success((workReportHash, signature))
         }
 
-        public init(workBundleHash: Data32, error: Error) {
+        public init(
+            workBundleHash: Data32,
+            error: Error
+        ) {
             self.workBundleHash = workBundleHash
             result = .failure(error)
+        }
+    }
+
+    // NetworkManager -> GuaranteeingService: When a work package bundle response is recived via CE134 reply
+    public struct WorkPackageBundleRecivedReply: Event {
+        public let source: Ed25519PublicKey
+        public let workReportHash: Data32
+        public let signature: Ed25519Signature
+
+        public init(
+            source: Ed25519PublicKey,
+            workReportHash: Data32,
+            signature: Ed25519Signature
+        ) {
+            self.source = source
+            self.workReportHash = workReportHash
+            self.signature = signature
         }
     }
 

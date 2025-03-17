@@ -79,6 +79,13 @@ public final class NetworkManager: Sendable {
             ) { [weak self] event in
                 await self?.on(workPackagesSubmitted: event)
             }
+
+            await subscriptions.subscribe(
+                RuntimeEvents.WorkPackageBundleReady.self,
+                id: "NetworkManager.WorkPackageBundleReady"
+            ) { [weak self] event in
+                await self?.on(workPackageBundleReady: event)
+            }
         }
     }
 
@@ -137,18 +144,6 @@ public final class NetworkManager: Sendable {
         }
     }
 
-    private func on(workPackagesSubmitted event: RuntimeEvents.WorkPackagesSubmitted) async {
-        logger.trace("sending work package", metadata: ["coreIndex": "\(event.coreIndex)"])
-        await broadcast(
-            to: .currentValidators,
-            message: .workPackageSubmission(.init(
-                coreIndex: event.coreIndex,
-                workPackage: event.workPackage.value,
-                extrinsics: event.extrinsics
-            ))
-        )
-    }
-
     private func on(safroleTicketsGenerated event: RuntimeEvents.SafroleTicketsGenerated) async {
         logger.trace("sending tickets", metadata: ["epochIndex": "\(event.epochIndex)"])
         for ticket in event.items {
@@ -173,6 +168,22 @@ public final class NetworkManager: Sendable {
                 finalized: HashAndSlot(hash: finalized.hash, timeslot: finalized.timeslot)
             ))
         )
+    }
+
+    private func on(workPackagesSubmitted event: RuntimeEvents.WorkPackagesSubmitted) async {
+        logger.trace("sending work package", metadata: ["coreIndex": "\(event.coreIndex)"])
+        await broadcast(
+            to: .currentValidators,
+            message: .workPackageSubmission(.init(
+                coreIndex: event.coreIndex,
+                workPackage: event.workPackage.value,
+                extrinsics: event.extrinsics
+            ))
+        )
+    }
+
+    private func on(workPackageBundleReady event: RuntimeEvents.WorkPackageBundleReady) async {
+        logger.trace("sending work package bundle", metadata: ["coreIndex": "\(event.coreIndex)"])
     }
 
     public var peersCount: Int {
