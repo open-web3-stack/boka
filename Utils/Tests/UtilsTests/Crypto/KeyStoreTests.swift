@@ -7,9 +7,9 @@ import Testing
     @Test func keyStoreInitialization() throws {
         let tempDir = FileManager.default.temporaryDirectory
         let keyStoreDir = tempDir.appendingPathComponent("KeyStoreTests")
-        try? FileManager.default.removeItem(at: keyStoreDir)
         _ = try FilesystemKeyStore(storageDirectory: keyStoreDir)
         #expect(FileManager.default.fileExists(atPath: keyStoreDir.path))
+        try? FileManager.default.removeItem(at: keyStoreDir)
     }
 
     @Test func generateAndRetrieveKey() async throws {
@@ -34,6 +34,11 @@ import Testing
         let retrievedKey = await keyStore.get(Bandersnatch.self, publicKey: secretKey.publicKey)
         #expect(retrievedKey != nil)
         #expect(retrievedKey!.publicKey == secretKey.publicKey)
+
+        let randomSecretKey = try await InMemoryKeyStore().add(Bandersnatch.self, seed: Data32.random())
+        let retrievedRandomKey = await keyStore.get(Bandersnatch.self, publicKey: randomSecretKey.publicKey)
+        #expect(retrievedRandomKey == nil)
+
         let path = await keyStore.filePath(for: secretKey.publicKey)
         try Data(repeating: 0, count: 20).write(to: path, options: .atomic)
         let emptyKey = await keyStore.get(Bandersnatch.self, publicKey: secretKey.publicKey)
@@ -54,6 +59,8 @@ import Testing
         let tempDir = FileManager.default.temporaryDirectory
         let keyStoreDir = tempDir.appendingPathComponent("KeyStoreTests-\(UUID().uuidString)")
         let keyStore = try FilesystemKeyStore(storageDirectory: keyStoreDir)
+        let allKeysCount = await keyStore.getAll(Bandersnatch.self).count
+        #expect(allKeysCount == 0)
 
         let secretKey1 = try await keyStore.generate(Bandersnatch.self)
         let secretKey2 = try await keyStore.generate(Bandersnatch.self)
@@ -61,5 +68,6 @@ import Testing
         #expect(allKeys.count == 2)
         #expect(allKeys.contains { $0.publicKey == secretKey1.publicKey })
         #expect(allKeys.contains { $0.publicKey == secretKey2.publicKey })
+        try? FileManager.default.removeItem(at: keyStoreDir)
     }
 }

@@ -11,6 +11,20 @@ public typealias NetworkConfig = Network.Config
 
 private let logger = Logger(label: "config")
 
+public enum KeyStoreType {
+    case inMemory
+    case file(path: URL)
+
+    public func getStore() throws -> KeyStore {
+        switch self {
+        case let .file(path):
+            try FilesystemKeyStore(storageDirectory: path)
+        case .inMemory:
+            InMemoryKeyStore()
+        }
+    }
+}
+
 public enum Database {
     case inMemory
     case rocksDB(path: URL)
@@ -54,6 +68,7 @@ public struct Config {
     public var local: Bool
     public var name: String?
     public var database: Database
+    public var keystoreType: KeyStoreType
 
     public init(
         rpc: RPCConfig?,
@@ -61,7 +76,8 @@ public struct Config {
         peers: [NetAddr] = [],
         local: Bool = false,
         name: String? = nil,
-        database: Database = .inMemory
+        database: Database = .inMemory,
+        keystoreType: KeyStoreType = .inMemory
     ) {
         self.rpc = rpc
         self.network = network
@@ -69,5 +85,6 @@ public struct Config {
         self.local = local
         self.name = name
         self.database = database
+        self.keystoreType = keystoreType
     }
 }

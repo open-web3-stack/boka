@@ -56,6 +56,12 @@ public actor InMemoryKeyStore: KeyStore {
 public actor FilesystemKeyStore: KeyStore {
     public enum Error: Swift.Error {
         case invalidSeed
+        case invalidPublicKey
+    }
+
+    struct KeyData: Codable {
+        let publicKey: String
+        let seed: String
     }
 
     private let storageDirectory: URL
@@ -79,7 +85,12 @@ public actor FilesystemKeyStore: KeyStore {
 
     private func saveKey(_ key: some SecretKeyProtocol, seed: Data32) throws {
         let fileURL = filePath(for: key.publicKey)
-        try seed.data.write(to: fileURL, options: .atomic)
+        let keyData = KeyData(
+            publicKey: key.publicKey.toHexString(),
+            seed: seed.data.toHexString()
+        )
+        let jsonData = try JSONEncoder().encode(keyData)
+        try jsonData.write(to: fileURL, options: .atomic)
     }
 
     private func loadKey<K: KeyType>(_: K.Type, publicKey: K.SecretKey.PublicKey) throws -> K.SecretKey? {
@@ -87,7 +98,12 @@ public actor FilesystemKeyStore: KeyStore {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             return nil
         }
-        guard let seed = try Data32(Data(contentsOf: fileURL)) else {
+        let jsonData = try Data(contentsOf: fileURL)
+        let keyData = try JSONDecoder().decode(KeyData.self, from: jsonData)
+        if publicKey.toHexString() != keyData.publicKey {
+            throw Error.invalidPublicKey
+        }
+        guard let seed = Data32(fromHexString: keyData.seed) else {
             throw Error.invalidSeed
         }
         return try K.SecretKey(from: seed)
@@ -117,7 +133,10 @@ public actor FilesystemKeyStore: KeyStore {
             return []
         }
         return files.compactMap { fileURL in
-            guard let seed = try? Data32(Data(contentsOf: fileURL)) else {
+            guard let jsonData = try? Data(contentsOf: fileURL),
+                  let keyData = try? JSONDecoder().decode(KeyData.self, from: jsonData),
+                  let seed = Data32(fromHexString: keyData.seed)
+            else {
                 return nil
             }
             return try? K.SecretKey(from: seed)

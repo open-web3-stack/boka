@@ -1,11 +1,6 @@
 import Foundation
 import Utils
 
-public enum KeyStoreType {
-    case inMemory
-    case file(path: URL)
-}
-
 public final class DevKeyStore: KeyStore {
     private let keystore: InMemoryKeyStore
 

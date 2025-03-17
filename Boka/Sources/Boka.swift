@@ -79,9 +79,6 @@ struct Boka: AsyncParsableCommand {
     @Option(name: .long, help: "For development only. Seed for validator keys.")
     var devSeed: UInt32?
 
-    @Option(name: .long, help: "Path to the directory for keystore. If not provided, an in-memory keystore will be used.")
-    var keystorePath: String?
-
     @Option(name: .long, help: "Node name. For telemetry only.")
     var name: String?
 
@@ -142,15 +139,12 @@ struct Boka: AsyncParsableCommand {
             return RPCConfig(listenAddress: address, port: Int(port))
         }
 
-        let keystore: any KeyStore
-        if let keystorePath {
-            let storageDirectory = URL(fileURLWithPath: keystorePath)
-            keystore = try FilesystemKeyStore(storageDirectory: storageDirectory)
-            logger.info("Using filesystem keystore at \(keystorePath).")
-        } else {
-            keystore = InMemoryKeyStore()
-            logger.info("Using in-memory keystore.")
-        }
+        let keysotreType: KeyStoreType = basePath.map {
+            var path = URL(fileURLWithPath: $0)
+            return .file(path: path)
+        } ?? .inMemory
+
+        let keystore: KeyStore = try keysotreType.getStore()
 
         let networkKey: Ed25519.SecretKey = try await {
             if let devSeed {
@@ -182,7 +176,8 @@ struct Boka: AsyncParsableCommand {
             peers: peers,
             local: local,
             name: name,
-            database: database
+            database: database,
+            keystoreType: keysotreType
         )
 
         let node: Node = if validator {

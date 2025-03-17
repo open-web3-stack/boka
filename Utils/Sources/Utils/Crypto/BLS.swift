@@ -84,6 +84,10 @@ public enum BLS: KeyType {
             self.data = Data144(data)!
         }
 
+        public func toHexString() -> String {
+            data.toHexString()
+        }
+
         deinit {
             bls_public_free(ptr.value)
         }
