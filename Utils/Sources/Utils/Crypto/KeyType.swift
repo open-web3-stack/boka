@@ -1,4 +1,8 @@
-public protocol PublicKeyProtocol: Codable, Hashable, CustomStringConvertible, Sendable {}
+import Foundation
+
+public protocol PublicKeyProtocol: Codable, Hashable, CustomStringConvertible, Sendable {
+    func toHexString() -> String
+}
 
 public protocol SecretKeyProtocol: Sendable {
     associatedtype PublicKey: PublicKeyProtocol

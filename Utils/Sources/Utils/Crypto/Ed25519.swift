@@ -35,6 +35,10 @@ public enum Ed25519: KeyType {
             self.data = data
         }
 
+        public func toHexString() -> String {
+            data.toHexString()
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.singleValueContainer()
             try container.encode(data)
