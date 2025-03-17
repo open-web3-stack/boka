@@ -14,7 +14,10 @@ public final class DataStore: Sendable {
         self.network = network
     }
 
-    public func fetchSegment(segments: [WorkItem.ImportedDataSegment]) async throws -> [Data4104] {
+    public func fetchSegment(
+        segments: [WorkItem.ImportedDataSegment],
+        segmentsRootMappings: SegmentsRootMappings?
+    ) async throws -> [Data4104] {
         var result: [Data4104] = []
 
         for segment in segments {
@@ -22,7 +25,14 @@ public final class DataStore: Sendable {
             case let .segmentRoot(root):
                 root
             case let .workPackageHash(hash):
-                try await impl.getSegmentRoot(forWorkPackageHash: hash).unwrap(orError: DataStoreError.invalidPackageHash(hash))
+                if let segmentsRootMappings {
+                    try segmentsRootMappings
+                        .first(where: { $0.workPackageHash == hash })
+                        .unwrap(orError: DataStoreError.invalidPackageHash(hash))
+                        .segmentsRoot
+                } else {
+                    try await impl.getSegmentRoot(forWorkPackageHash: hash).unwrap(orError: DataStoreError.invalidPackageHash(hash))
+                }
             }
             let erasureRoot = try await impl.getEasureRoot(forSegmentRoot: segmentRoot)
                 .unwrap(orError: DataStoreError.invalidSegmentRoot(segmentRoot))

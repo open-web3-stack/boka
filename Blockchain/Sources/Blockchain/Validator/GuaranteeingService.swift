@@ -12,6 +12,7 @@ public enum GuaranteeingServiceError: Error {
     case notValidator
     case invalidCore
     case unableToGetSignatures
+    case authorizationError(WorkResultError)
 }
 
 public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
@@ -117,6 +118,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
 
         do {
+            // TODO: we may already done the work. need to cache the result
             let report = try await processWorkPackageBundle(
                 coreIndex: event.coreIndex,
                 segmentsRootMappings: event.segmentsRootMappings,
@@ -158,11 +160,43 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     private func processWorkPackageBundle(
-        coreIndex _: CoreIndex,
-        segmentsRootMappings _: SegmentsRootMappings,
-        bundle _: WorkPackageBundle
+        coreIndex: CoreIndex,
+        segmentsRootMappings: SegmentsRootMappings,
+        bundle: WorkPackageBundle
     ) async throws -> WorkReport {
-        fatalError("unimplemented")
+        guard let (validatorIndex, _) = signingKey.value else {
+            throw GuaranteeingServiceError.notValidator
+        }
+
+        let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
+
+        let coreAssignment = getCoreAssignment(state: state)
+
+        guard let currentCoreIndex = coreAssignment[safe: Int(validatorIndex)] else {
+            try throwUnreachable("invalid validator index/core assignment")
+        }
+        guard currentCoreIndex == coreIndex else {
+            throw GuaranteeingServiceError.invalidCore
+        }
+
+        let workPackage = bundle.workPackage.asRef()
+
+        // Validate the work package
+        guard try validate(workPackage: workPackage.value) else {
+            logger.error("Invalid work package: \(workPackage)")
+            throw GuaranteeingServiceError.invalidWorkPackage
+        }
+
+        // check & refine
+        let (_, _, workReport) = try await createWorkReport(
+            state: state,
+            coreIndex: coreIndex,
+            workPackage: workPackage,
+            extrinsics: bundle.extrinsics,
+            segmentsRootMappings: segmentsRootMappings
+        )
+
+        return workReport
     }
 
     private func refineWorkPackage(
@@ -192,10 +226,12 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
 
         // check & refine
-        let (bundle, mappings, workReport) = try await refinePkg(
-            validatorIndex: validatorIndex,
+        let (bundle, mappings, workReport) = try await createWorkReport(
+            state: state,
+            coreIndex: coreIndex,
             workPackage: workPackage,
-            extrinsics: extrinsics
+            extrinsics: extrinsics,
+            segmentsRootMappings: nil
         )
 
         let workReportHash = workReport.hash()
@@ -296,32 +332,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         return newCoreAssignment
     }
 
-    private func refinePkg(
-        validatorIndex: ValidatorIndex,
-        workPackage: WorkPackageRef,
-        extrinsics: [Data]
-    ) async throws -> (WorkPackageBundle, SegmentsRootMappings, WorkReport) {
-        let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
-
-        // TODO: check for edge cases such as epoch end
-        let currentCoreAssignment = state.value.getCoreAssignment(
-            config: config,
-            randomness: state.value.entropyPool.t2,
-            timeslot: state.value.timeslot + 1
-        )
-        // TODO: coreIndex equal with shareWorkPackage coreIndex?
-        guard let coreIndex = currentCoreAssignment[safe: Int(validatorIndex)] else {
-            try throwUnreachable("invalid validator index/core assignment")
-        }
-
-        // Create work report & WorkPackageBundle
-        return try await createWorkReport(
-            coreIndex: coreIndex,
-            workPackage: workPackage,
-            extrinsics: extrinsics
-        )
-    }
-
     private func validateSegmentsRootMapping(
         _: SegmentsRootMapping,
         for _: WorkPackage
@@ -357,97 +367,92 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     // workpackage -> workresult -> workreport
-    private func createWorkReport(coreIndex: CoreIndex, workPackage: WorkPackageRef,
-                                  extrinsics: [Data]) async throws -> (WorkPackageBundle, SegmentsRootMappings, WorkReport)
-    {
-        let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
+    private func createWorkReport(
+        state: StateRef,
+        coreIndex: CoreIndex,
+        workPackage: WorkPackageRef,
+        extrinsics: [Data],
+        segmentsRootMappings: SegmentsRootMappings?
+    ) async throws -> (WorkPackageBundle, SegmentsRootMappings, WorkReport) {
         let packageHash = workPackage.hash
         let corePool = state.value.coreAuthorizationPool[coreIndex]
         let authorizerHash = try corePool.array.first.unwrap(orError: GuaranteeingServiceError.noAuthorizerHash)
         var exportSegmentOffset: UInt16 = 0
         var mappings: SegmentsRootMappings = []
-        // B.2. the authorization output, the result of the Is-Authorized function
-        // TODO: waiting for authorizationFunction done  Mock a result
-        // let res = try await authorizationFunction.invoke(config: config, serviceAccounts: state.value, package: workPackage, coreIndex:
-        // coreIndex)
-        let res = Result<Data, WorkResultError>.success(Data())
-        switch res {
-        // authorizationFunction -> authorizationOutput
-        case let .success(authorizationOutput):
-            var workResults = [WorkResult]()
 
-            var exportSegments = [Data4104]()
+        let res = try await isAuthorized(config: config, serviceAccounts: state.value, package: workPackage.value, coreIndex: coreIndex)
+        let authorizationOutput = try res.mapError(GuaranteeingServiceError.authorizationError).get()
 
-            // TODO: make this lazy, only fetch when needed by PVM
-            var importSegments = [[Data4104]]()
-            for item in workPackage.value.workItems {
-                try await importSegments.append(dataAvailability.fetchSegment(segments: item.inputs))
-            }
+        var workResults = [WorkResult]()
 
-            for (i, item) in workPackage.value.workItems.enumerated() {
-                // refine data to workresult
-                let refineRes = try await refine(
-                    config: config,
-                    serviceAccounts: state.value,
-                    workItemIndex: i,
-                    workPackage: workPackage.value,
-                    authorizerOutput: authorizationOutput,
-                    importSegments: importSegments,
-                    exportSegmentOffset: UInt64(exportSegmentOffset)
-                )
-                // Export -> DA or exportSegmentOffset + outputDataSegmentsCount ？
-                exportSegmentOffset += item.outputDataSegmentsCount
-                let workResult = WorkResult(
-                    serviceIndex: item.serviceIndex,
-                    codeHash: workPackage.value.authorizationCodeHash,
-                    payloadHash: item.payloadBlob.blake2b256hash(),
-                    gas: item.refineGasLimit,
-                    output: WorkOutput(refineRes.result)
-                )
-                workResults.append(workResult)
+        var exportSegments = [Data4104]()
 
-                guard item.outputDataSegmentsCount == refineRes.exports.count else {
-                    throw GuaranteeingServiceError.invalidExports
-                }
-
-                exportSegments.append(contentsOf: refineRes.exports)
-            }
-            let bundle = try await WorkPackageBundle(
-                workPackage: workPackage.value,
-                extrinsic: extrinsics,
-                importSegments: retrieveImportSegments(for: workPackage.value),
-                justifications: retrieveJustifications(for: workPackage.value)
-            )
-            let (erasureRoot, length) = try await dataAvailability.exportWorkpackageBundle(bundle: bundle)
-
-            let segmentRoot = try await dataAvailability.exportSegments(data: exportSegments, erasureRoot: erasureRoot)
-            mappings.append(SegmentsRootMapping(workPackageHash: packageHash, segmentsRoot: segmentRoot))
-            // TODO: generate or find AvailabilitySpecifications  14.4.1 work-package bundle
-            let packageSpecification = AvailabilitySpecifications(
-                workPackageHash: packageHash,
-                length: length,
-                erasureRoot: erasureRoot,
-                segmentRoot: segmentRoot,
-                segmentCount: exportSegmentOffset
-            )
-            // The historical lookup function, Λ, is defined in equation 9.7.
-            var oldLookups = [Data32: Data32]()
-            for item in state.value.recentHistory.items {
-                oldLookups.merge(item.lookup, uniquingKeysWith: { _, new in new })
-            }
-            return try (bundle, mappings, WorkReport(
-                authorizerHash: authorizerHash,
-                coreIndex: coreIndex,
-                authorizationOutput: authorizationOutput,
-                refinementContext: workPackage.value.context,
-                packageSpecification: packageSpecification,
-                lookup: oldLookups,
-                results: ConfigLimitedSizeArray(config: config, array: workResults)
-            ))
-
-        case let .failure(error):
-            logger.error("Authorization failed with error: \(error)")
-            throw error
+        // TODO: make this lazy, only fetch when needed by PVM
+        var importSegments = [[Data4104]]()
+        for item in workPackage.value.workItems {
+            let segment = try await dataAvailability.fetchSegment(segments: item.inputs, segmentsRootMappings: segmentsRootMappings)
+            importSegments.append(segment)
         }
+
+        for (i, item) in workPackage.value.workItems.enumerated() {
+            // refine data to workresult
+            let refineRes = try await refine(
+                config: config,
+                serviceAccounts: state.value,
+                workItemIndex: i,
+                workPackage: workPackage.value,
+                authorizerOutput: authorizationOutput,
+                importSegments: importSegments,
+                exportSegmentOffset: UInt64(exportSegmentOffset)
+            )
+            // Export -> DA or exportSegmentOffset + outputDataSegmentsCount ？
+            exportSegmentOffset += item.outputDataSegmentsCount
+            let workResult = WorkResult(
+                serviceIndex: item.serviceIndex,
+                codeHash: workPackage.value.authorizationCodeHash,
+                payloadHash: item.payloadBlob.blake2b256hash(),
+                gas: item.refineGasLimit,
+                output: WorkOutput(refineRes.result)
+            )
+            workResults.append(workResult)
+
+            guard item.outputDataSegmentsCount == refineRes.exports.count else {
+                throw GuaranteeingServiceError.invalidExports
+            }
+
+            exportSegments.append(contentsOf: refineRes.exports)
+        }
+        let bundle = try await WorkPackageBundle(
+            workPackage: workPackage.value,
+            extrinsics: extrinsics,
+            importSegments: retrieveImportSegments(for: workPackage.value),
+            justifications: retrieveJustifications(for: workPackage.value)
+        )
+        let (erasureRoot, length) = try await dataAvailability.exportWorkpackageBundle(bundle: bundle)
+
+        let segmentRoot = try await dataAvailability.exportSegments(data: exportSegments, erasureRoot: erasureRoot)
+        mappings.append(SegmentsRootMapping(workPackageHash: packageHash, segmentsRoot: segmentRoot))
+        // TODO: generate or find AvailabilitySpecifications  14.4.1 work-package bundle
+        let packageSpecification = AvailabilitySpecifications(
+            workPackageHash: packageHash,
+            length: length,
+            erasureRoot: erasureRoot,
+            segmentRoot: segmentRoot,
+            segmentCount: exportSegmentOffset
+        )
+        // The historical lookup function, Λ, is defined in equation 9.7.
+        var oldLookups = [Data32: Data32]()
+        for item in state.value.recentHistory.items {
+            oldLookups.merge(item.lookup, uniquingKeysWith: { _, new in new })
+        }
+        return try (bundle, mappings, WorkReport(
+            authorizerHash: authorizerHash,
+            coreIndex: coreIndex,
+            authorizationOutput: authorizationOutput,
+            refinementContext: workPackage.value.context,
+            packageSpecification: packageSpecification,
+            lookup: oldLookups,
+            results: ConfigLimitedSizeArray(config: config, array: workResults)
+        ))
     }
 }
