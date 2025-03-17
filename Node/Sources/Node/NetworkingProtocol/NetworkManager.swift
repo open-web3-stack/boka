@@ -14,6 +14,22 @@ enum BroadcastTarget {
     case currentValidators
 }
 
+enum NetworkManagerError: Error {
+    case peerNotFound
+}
+
+private actor NetworkManagerStorage {
+    var peerIdByPublicKey: [Data32: PeerId] = [:]
+
+    func getPeerId(publicKey: Data32) -> PeerId? {
+        peerIdByPublicKey[publicKey]
+    }
+
+    func set(_ dict: [Data32: PeerId]) {
+        peerIdByPublicKey = dict
+    }
+}
+
 public final class NetworkManager: Sendable {
     public let peerManager: PeerManager
     public let network: any NetworkProtocol
@@ -24,6 +40,8 @@ public final class NetworkManager: Sendable {
     // This is for development only
     // Those peers will receive all the messages regardless the target
     private let devPeers: Set<Either<PeerId, NetAddr>>
+
+    private let storage = NetworkManagerStorage()
 
     public init(
         buildNetwork: (NetworkProtocolHandler) throws -> any NetworkProtocol,
@@ -99,6 +117,44 @@ public final class NetworkManager: Sendable {
             // TODO: read onchain state for validators
             devPeers
         }
+    }
+
+    private func onBeforeEpoch(epoch: EpochIndex) async {
+        await withSpan("NetworkManager.onBeforeEpoch", logger: logger) { _ in
+            let state = try await blockchain.dataProvider.getState(hash: blockchain.dataProvider.bestHead.hash)
+            let timeslot = epoch.epochToTimeslotIndex(config: blockchain.config)
+            // simulate next block to determine the correct current validators
+            // this is more accurate than just using nextValidators from current state
+            let res = try state.value.updateSafrole(
+                config: blockchain.config,
+                slot: timeslot,
+                entropy: Data32(),
+                offenders: [],
+                extrinsics: .dummy(config: blockchain.config)
+            )
+            let currentValidators = res.state.currentValidators
+            let nextValidators = res.state.nextValidators
+            let allValidators = Set([currentValidators.array, nextValidators.array].joined())
+
+            var peerIdByPublicKey: [Data32: PeerId] = [:]
+            for validator in allValidators {
+                if let addr = NetAddr(address: validator.metadataString) {
+                    peerIdByPublicKey[validator.ed25519] = PeerId(
+                        publicKey: validator.ed25519.data,
+                        address: addr
+                    )
+                }
+            }
+
+            await storage.set(peerIdByPublicKey)
+        }
+    }
+
+    private func send(to: Ed25519PublicKey, message: CERequest) async throws -> [Data] {
+        guard let peerId = await storage.getPeerId(publicKey: to) else {
+            throw NetworkManagerError.peerNotFound
+        }
+        return try await network.send(to: peerId, message: message)
     }
 
     private func send(to: PeerId, message: CERequest) async throws -> [Data] {
@@ -183,7 +239,29 @@ public final class NetworkManager: Sendable {
     }
 
     private func on(workPackageBundleReady event: RuntimeEvents.WorkPackageBundleReady) async {
-        logger.trace("sending work package bundle", metadata: ["coreIndex": "\(event.coreIndex)"])
+        await withSpan("NetworkManager.on(workPackageBundleReady)", logger: logger) { _ in
+            let target = event.target
+            let resp = try await send(to: target, message: .workPackageSharing(.init(
+                coreIndex: event.coreIndex,
+                segmentsRootMappings: event.segmentsRootMappings,
+                bundle: event.bundle
+            )))
+
+            guard resp.count == 1, let data = resp.first else {
+                logger.warning("WorkPackageSharing response is invalid", metadata: ["resp": "\(resp)", "target": "\(target)"])
+                return
+            }
+
+            let decoder = JamDecoder(data: data, config: blockchain.config)
+            let workReportHash = try decoder.decode(Data32.self)
+            let signature = try decoder.decode(Ed25519Signature.self)
+
+            blockchain.publish(event: RuntimeEvents.WorkPackageBundleRecivedReply(
+                source: target,
+                workReportHash: workReportHash,
+                signature: signature
+            ))
+        }
     }
 
     public var peersCount: Int {

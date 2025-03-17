@@ -105,7 +105,7 @@ struct NetworkManagerTests {
         let workPackage = WorkPackage.dummy(config: services.config).asRef()
         let bundle = WorkPackageBundle(
             workPackage: workPackage.value,
-            extrinsic: [],
+            extrinsics: [],
             importSegments: [],
             justifications: []
         )

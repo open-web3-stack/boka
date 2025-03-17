@@ -1,7 +1,7 @@
 import Foundation
 import Utils
 
-public struct ValidatorKey: Sendable, Equatable, Codable {
+public struct ValidatorKey: Sendable, Equatable, Codable, Hashable {
     public enum Error: Swift.Error {
         case invalidDataLength
     }
@@ -38,6 +38,13 @@ public struct ValidatorKey: Sendable, Equatable, Codable {
         ed25519 = Ed25519PublicKey()
         bls = BLSKey()
         metadata = Data128()
+    }
+
+    public var metadataString: String {
+        // we want this behaviour rather than fail on invalid utf8
+        // swiftlint:disable optional_data_string_conversion
+        String(decoding: metadata.data, as: UTF8.self)
+        // swiftlint:enable optional_data_string_conversion
     }
 }
 
