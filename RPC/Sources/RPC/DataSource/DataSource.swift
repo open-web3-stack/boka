@@ -32,4 +32,10 @@ public protocol TelemetryDataSource: Sendable {
     func getNetworkKey() async throws -> String
 }
 
-public typealias DataSource = BuilderDataSource & ChainDataSource & SystemDataSource & TelemetryDataSource
+public protocol KeystoreDataSource: Sendable {
+    func createKey(keyType: CreateKeyType) async throws -> String
+    func listKeys() async throws -> [String]
+    func hasKey(publicKey: Data) async throws -> Bool
+}
+
+public typealias DataSource = BuilderDataSource & ChainDataSource & KeystoreDataSource & SystemDataSource & TelemetryDataSource
