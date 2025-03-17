@@ -9,6 +9,7 @@ public enum GuaranteeingServiceError: Error {
     case invalidWorkPackage
     case invalidBundle
     case segmentsRootNotFound
+    case notValidator
 }
 
 public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
@@ -38,12 +39,21 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
 
         super.init(id: "GuaranteeingService", config: config, eventBus: eventBus, scheduler: scheduler)
 
+        // received via p2p
         await subscribe(RuntimeEvents.WorkPackagesReceived.self, id: "GuaranteeingService.WorkPackagesReceived") { [weak self] event in
             try await self?.on(workPackagesReceived: event)
         }
 
-        await subscribe(RuntimeEvents.WorkPackageBundleReady.self, id: "GuaranteeingService.WorkPackageBundleReady") { [weak self] event in
-            try await self?.on(workPackageBundle: event)
+        // received via RPC
+        await subscribe(RuntimeEvents.WorkPackagesSubmitted.self, id: "GuaranteeingService.WorkPackagesSubmitted") { [weak self] event in
+            try await self?.on(workPackagesSubmitted: event)
+        }
+
+        await subscribe(
+            RuntimeEvents.WorkPackageBundleRecived.self,
+            id: "GuaranteeingService.WorkPackageBundleRecived"
+        ) { [weak self] event in
+            try await self?.on(workPackageBundleReceived: event)
         }
     }
 
@@ -85,27 +95,43 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
     }
 
-    private func on(workPackageBundle event: RuntimeEvents.WorkPackageBundleReady) async throws {
-        try await receiveWorkPackageBundle(
-            coreIndex: event.coreIndex,
-            segmentsRootMappings: event.segmentsRootMappings,
-            bundle: event.bundle
-        )
+    private func on(workPackagesReceived event: RuntimeEvents.WorkPackagesReceived) async throws {
+        try await refineWorkPackage(coreIndex: event.coreIndex, workPackage: event.workPackage, extrinsics: event.extrinsics)
     }
 
-    private func on(workPackageBundleReceived _: RuntimeEvents.WorkPackageBundleRecived) async throws {
-        // TODO: check somethings
+    private func on(workPackagesSubmitted event: RuntimeEvents.WorkPackagesSubmitted) async throws {
+        try await refineWorkPackage(coreIndex: event.coreIndex, workPackage: event.workPackage, extrinsics: event.extrinsics)
     }
 
-    // Method to receive a work package bundle
-    private func receiveWorkPackageBundle(
-        coreIndex _: CoreIndex,
-        segmentsRootMappings: SegmentsRootMappings,
-        bundle: WorkPackageBundle
-    ) async throws {
-        // Perform basic verification
-        guard try validateWorkPackageBundle(bundle, segmentsRootMappings: segmentsRootMappings) else {
-            throw GuaranteeingServiceError.invalidBundle
+    private func on(workPackageBundleReceived event: RuntimeEvents.WorkPackageBundleRecived) async throws {
+        let workBundleHash = event.bundle.hash()
+        guard let (_, signingKey) = signingKey.value else {
+            publish(RuntimeEvents.WorkPackageBundleRecivedResponse(
+                workBundleHash: workBundleHash,
+                error: GuaranteeingServiceError.notValidator
+            ))
+            return
+        }
+
+        do {
+            let report = try await processWorkPackageBundle(
+                coreIndex: event.coreIndex,
+                segmentsRootMappings: event.segmentsRootMappings,
+                bundle: event.bundle
+            )
+
+            let payload = SigningContext.guarantee + report.hash().data
+            let signature = try signingKey.sign(message: payload)
+            publish(RuntimeEvents.WorkPackageBundleRecivedResponse(
+                workBundleHash: workBundleHash,
+                workReportHash: report.hash(),
+                signature: signature
+            ))
+        } catch {
+            publish(RuntimeEvents.WorkPackageBundleRecivedResponse(
+                workBundleHash: workBundleHash,
+                error: error
+            ))
         }
     }
 
@@ -128,12 +154,19 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         return true
     }
 
-    private func on(workPackagesReceived event: RuntimeEvents.WorkPackagesReceived) async throws {
-        try await handleWorkPackage(coreIndex: event.coreIndex, workPackage: event.workPackage, extrinsics: event.extrinsics)
+    public func processWorkPackageBundle(
+        coreIndex _: CoreIndex,
+        segmentsRootMappings _: SegmentsRootMappings,
+        bundle _: WorkPackageBundle
+    ) async throws -> WorkReport {
+        fatalError("unimplemented")
     }
 
-    // handle Work Package
-    public func handleWorkPackage(coreIndex: CoreIndex, workPackage: WorkPackageRef, extrinsics: [Data]) async throws {
+    public func refineWorkPackage(
+        coreIndex: CoreIndex,
+        workPackage: WorkPackageRef,
+        extrinsics: [Data]
+    ) async throws {
         // Validate the work package
         guard try validate(workPackage: workPackage.value) else {
             logger.error("Invalid work package: \(workPackage)")
@@ -194,9 +227,11 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         [] // Placeholder
     }
 
-    private func refinePkg(validatorIndex: ValidatorIndex, workPackage: WorkPackageRef,
-                           extrinsics: [Data]) async throws -> (WorkPackageBundle, SegmentsRootMappings, WorkReport)
-    {
+    private func refinePkg(
+        validatorIndex: ValidatorIndex,
+        workPackage: WorkPackageRef,
+        extrinsics: [Data]
+    ) async throws -> (WorkPackageBundle, SegmentsRootMappings, WorkReport) {
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
 
         // TODO: check for edge cases such as epoch end

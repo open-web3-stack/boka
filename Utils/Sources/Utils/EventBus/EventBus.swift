@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import TracingUtils
 
 private let logger = Logger(label: "EventBus")
@@ -43,9 +44,9 @@ public actor EventBus: Subscribable {
 
     private struct AnyEventHandler: Sendable {
         let token: SubscriptionToken
-        private let _handle: @Sendable (Any) async throws -> Void
+        private let _handle: @Sendable (Event) async throws -> Void
 
-        init<T>(_ token: SubscriptionToken, _ handler: @escaping @Sendable (T) async throws -> Void) {
+        init<T: Event>(_ token: SubscriptionToken, _ handler: @escaping @Sendable (T) async throws -> Void) {
             self.token = token
             _handle = { event in
                 guard let event = event as? T else { return }
@@ -53,14 +54,32 @@ public actor EventBus: Subscribable {
             }
         }
 
-        func handle(_ event: Any) async throws {
+        func handle(_ event: Event) async throws {
             try await _handle(event)
+        }
+    }
+
+    private struct ContinuationHandler {
+        let id = UniqueId()
+        let eventType: Event.Type
+        let continuation: CheckedContinuation<Event, Error>
+        let handler: @Sendable (Event) -> Bool
+
+        init<T: Event>(_ eventType: T.Type, _ continuation: CheckedContinuation<Event, Error>, _ handler: @escaping @Sendable (T) -> Bool) {
+            self.eventType = eventType
+            self.continuation = continuation
+            self.handler = { event in
+                guard let event = event as? T else { return false }
+                return handler(event)
+            }
         }
     }
 
     private var handlers: [ObjectIdentifier: [AnyEventHandler]] = [:]
     private let eventMiddleware: Middleware
     private let handlerMiddleware: Middleware
+
+    private var waitContinuations: [ObjectIdentifier: [ContinuationHandler]] = [:]
 
     public init(eventMiddleware: Middleware = .noop, handlerMiddleware: Middleware = .noop) {
         self.eventMiddleware = eventMiddleware
@@ -102,6 +121,29 @@ public actor EventBus: Subscribable {
         let eventHandlers = handlers[key]
         let eventMiddleware = eventMiddleware
         let handlerMiddleware = handlerMiddleware
+
+        // Process wait continuations
+        if let continuations = waitContinuations[key] {
+            var remainingContinuations: [ContinuationHandler] = []
+
+            for handler in continuations {
+                if handler.handler(event) {
+                    // Found a match, resume the continuation with this event
+                    handler.continuation.resume(returning: event)
+                    // Don't keep this continuation
+                } else {
+                    // No match, keep waiting
+                    remainingContinuations.append(handler)
+                }
+            }
+
+            if remainingContinuations.isEmpty {
+                waitContinuations.removeValue(forKey: key)
+            } else {
+                waitContinuations[key] = remainingContinuations
+            }
+        }
+
         do {
             try await eventMiddleware.handle(event) { event in
                 guard let eventHandlers else {
@@ -119,6 +161,51 @@ public actor EventBus: Subscribable {
             }
         } catch {
             logger.warning("Unhandled error for event: \(event) with error: \(error)")
+        }
+    }
+
+    private func addWaitContinuation<T: Event>(
+        _ eventType: T.Type,
+        check: @escaping @Sendable (T) -> Bool,
+        continuation: CheckedContinuation<Event, Error>
+    ) -> UniqueId {
+        let key = ObjectIdentifier(eventType)
+        let handler = ContinuationHandler(eventType, continuation, check)
+        waitContinuations[key, default: []].append(handler)
+        return handler.id
+    }
+
+    public func waitFor<T: Event>(
+        _ eventType: T.Type,
+        check: @escaping @Sendable (T) -> Bool = { _ in true },
+        timeout: TimeInterval = 10
+    ) async throws -> T {
+        let contId: Mutex<UniqueId?> = .init(nil)
+
+        do {
+            let res = try await withCheckedContinuationTimeout(seconds: timeout) { [weak self] continuation in
+                guard let self else { return }
+
+                Task {
+                    // Add the continuation with the event type filtering already applied
+                    let id = await self.addWaitContinuation(eventType, check: check, continuation: continuation)
+                    contId.withLock { contId in
+                        contId = id
+                    }
+                }
+            }
+            if let result = res as? T {
+                return result
+            }
+            try throwUnreachable("Unexpected result type \(res) \(eventType)")
+        } catch ContinuationError.timeout {
+            // Timeout occurred, remove the continuation
+            if let id = contId.withLock({ $0 }) {
+                let key = ObjectIdentifier(eventType)
+                waitContinuations[key, default: []].removeAll { $0.id == id }
+            }
+
+            throw ContinuationError.timeout
         }
     }
 }

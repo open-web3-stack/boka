@@ -97,16 +97,56 @@ public enum RuntimeEvents {
 
     // When a work package bundle is recived via CE134
     public struct WorkPackageBundleRecived: Event {
-        public let workPackageHash: Data32
-        public let edd25519Signature: Data64
-        public init(workPackageHash: Data32, edd25519Signature: Data64) {
-            self.workPackageHash = workPackageHash
-            self.edd25519Signature = edd25519Signature
+        public let coreIndex: CoreIndex
+        public let segmentsRootMappings: SegmentsRootMappings
+        public let bundle: WorkPackageBundle
+
+        public init(
+            coreIndex: CoreIndex,
+            bundle: WorkPackageBundle,
+            segmentsRootMappings: SegmentsRootMappings
+        ) {
+            self.coreIndex = coreIndex
+            self.bundle = bundle
+            self.segmentsRootMappings = segmentsRootMappings
+        }
+    }
+
+    // response to CE134
+    public struct WorkPackageBundleRecivedResponse: Event {
+        public let workBundleHash: Data32
+        public let result: Result<(workReportHash: Data32, signature: Ed25519Signature), Error>
+
+        public init(workBundleHash: Data32, workReportHash: Data32, signature: Ed25519Signature) {
+            self.workBundleHash = workBundleHash
+            result = .success((workReportHash, signature))
+        }
+
+        public init(workBundleHash: Data32, error: Error) {
+            self.workBundleHash = workBundleHash
+            result = .failure(error)
         }
     }
 
     // A guaranteed work-report ready for distribution via CE135.
     public struct WorkReportGenerated: Event {
+        public let workReport: WorkReport
+        public let slot: UInt32
+        public var signatures: [ValidatorSignature]
+
+        public init(
+            workReport: WorkReport,
+            slot: UInt32,
+            signatures: [ValidatorSignature]
+        ) {
+            self.workReport = workReport
+            self.slot = slot
+            self.signatures = signatures
+        }
+    }
+
+    // When a work report is received via CE135
+    public struct WorkReportReceived: Event {
         public let workReport: WorkReport
         public let slot: UInt32
         public var signatures: [ValidatorSignature]
