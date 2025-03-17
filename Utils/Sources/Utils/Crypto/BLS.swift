@@ -22,7 +22,6 @@ public enum BLS: KeyType {
 
         public init(from seed: Data32) throws(Error) {
             var ptr: OpaquePointer!
-
             try FFIUtils.call(seed.data) { ptrs in
                 keypair_new(ptrs[0].ptr, ptrs[0].count, &ptr)
             } onErr: { err throws(Error) in
@@ -83,6 +82,10 @@ public enum BLS: KeyType {
 
             self.ptr = ptr.asSendable
             self.data = Data144(data)!
+        }
+
+        public func toHexString() -> String {
+            data.toHexString()
         }
 
         deinit {

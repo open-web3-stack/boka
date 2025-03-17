@@ -107,6 +107,10 @@ public enum Bandersnatch: KeyType {
             self.data = Data32(data)!
         }
 
+        public func toHexString() -> String {
+            data.toHexString()
+        }
+
         deinit {
             public_free(ptr.value)
         }
