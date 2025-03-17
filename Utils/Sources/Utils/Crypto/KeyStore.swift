@@ -89,17 +89,17 @@ public actor FilesystemKeyStore: KeyStore {
 
     private func loadKey<K: KeyType>(_: K.Type, publicKey: K.SecretKey.PublicKey) throws -> K.SecretKey? {
         let fileURL = filePath(for: publicKey)
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
-
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            return nil
+        }
         let jsonData = try Data(contentsOf: fileURL)
         let keyData = try JSONDecoder().decode(KeyData.self, from: jsonData)
-
-        guard publicKey.toHexString() == keyData.publicKey,
-              let seed = Data32(fromHexString: keyData.seed)
-        else {
-            throw publicKey.toHexString() == keyData.publicKey ? Error.invalidSeed : Error.invalidPublicKey
+        if publicKey.toHexString() != keyData.publicKey {
+            throw Error.invalidPublicKey
         }
-
+        guard let seed = Data32(fromHexString: keyData.seed) else {
+            throw Error.invalidSeed
+        }
         return try K.SecretKey(from: seed)
     }
 
