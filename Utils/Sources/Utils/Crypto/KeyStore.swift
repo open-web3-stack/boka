@@ -78,34 +78,28 @@ public actor FilesystemKeyStore: KeyStore {
     }
 
     func filePath(for publicKey: some PublicKeyProtocol) -> URL {
-        let hashableKey = HashableKey(value: publicKey)
-        let fileName = "\(hashableKey).json"
-        return storageDirectory.appendingPathComponent(fileName)
+        storageDirectory.appendingPathComponent("\(publicKey.toHexString()).json")
     }
 
     private func saveKey(_ key: some SecretKeyProtocol, seed: Data32) throws {
         let fileURL = filePath(for: key.publicKey)
-        let keyData = KeyData(
-            publicKey: key.publicKey.toHexString(),
-            seed: seed.data.toHexString()
-        )
-        let jsonData = try JSONEncoder().encode(keyData)
-        try jsonData.write(to: fileURL, options: .atomic)
+        let keyData = KeyData(publicKey: key.publicKey.toHexString(), seed: seed.data.toHexString())
+        try JSONEncoder().encode(keyData).write(to: fileURL, options: .atomic)
     }
 
     private func loadKey<K: KeyType>(_: K.Type, publicKey: K.SecretKey.PublicKey) throws -> K.SecretKey? {
         let fileURL = filePath(for: publicKey)
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            return nil
-        }
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
+
         let jsonData = try Data(contentsOf: fileURL)
         let keyData = try JSONDecoder().decode(KeyData.self, from: jsonData)
-        if publicKey.toHexString() != keyData.publicKey {
-            throw Error.invalidPublicKey
+
+        guard publicKey.toHexString() == keyData.publicKey,
+              let seed = Data32(fromHexString: keyData.seed)
+        else {
+            throw publicKey.toHexString() == keyData.publicKey ? Error.invalidSeed : Error.invalidPublicKey
         }
-        guard let seed = Data32(fromHexString: keyData.seed) else {
-            throw Error.invalidSeed
-        }
+
         return try K.SecretKey(from: seed)
     }
 
@@ -132,14 +126,17 @@ public actor FilesystemKeyStore: KeyStore {
         guard let files = try? FileManager.default.contentsOfDirectory(at: storageDirectory, includingPropertiesForKeys: nil) else {
             return []
         }
+
         return files.compactMap { fileURL in
             guard let jsonData = try? Data(contentsOf: fileURL),
                   let keyData = try? JSONDecoder().decode(KeyData.self, from: jsonData),
-                  let seed = Data32(fromHexString: keyData.seed)
+                  let seed = Data32(fromHexString: keyData.seed),
+                  let secretKey = try? K.SecretKey(from: seed),
+                  secretKey.publicKey.toHexString() == keyData.publicKey
             else {
                 return nil
             }
-            return try? K.SecretKey(from: seed)
+            return secretKey
         }
     }
 }
