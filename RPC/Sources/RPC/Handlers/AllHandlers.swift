@@ -6,7 +6,7 @@ public enum AllHandlers {
         TelemetryHandlers.handlers +
         RPCHandlers.handlers +
         BuilderHandlers.handlers +
-        KeystoreHandlers.handlers // Add KeystoreHandlers
+        KeystoreHandlers.handlers
 
     public static func getHandlers(source: ChainDataSource & SystemDataSource & TelemetryDataSource & BuilderDataSource &
         KeystoreDataSource)
