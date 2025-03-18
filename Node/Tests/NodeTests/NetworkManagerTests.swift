@@ -151,4 +151,121 @@ struct NetworkManagerTests {
             ])
         )
     }
+
+    @Test
+    func testPeersCount() async throws {
+        // Configure simulated peers count
+        let expectedPeersCount = 5
+        network.state.write { $0.simulatedPeersCount = expectedPeersCount }
+
+        // Verify peersCount property forwards to network implementation
+        #expect(networkManager.peersCount == expectedPeersCount)
+    }
+
+    @Test
+    func testHandleCERequest() async throws {
+        // Setup mock data
+        let blockRequest = BlockRequest(
+            hash: services.genesisBlock.hash,
+            direction: .descendingInclusive,
+            maxBlocks: 10
+        )
+
+        // Test handling block request
+        let response = try await network.handler.handle(ceRequest: .blockRequest(blockRequest))
+
+        // Verify response
+        let data = try #require(response.first)
+
+        let decoder = JamDecoder(data: data, config: services.config)
+        let block = try decoder.decode(BlockRef.self)
+
+        // Verify decoded block matches genesis block
+        #expect(block.hash == services.genesisBlock.hash)
+    }
+
+    @Test
+    func testWorkPackagesSubmitted() async throws {
+        // Create work package and extrinsics
+        let workPackage = WorkPackageRef.dummy(config: services.config)
+        let extrinsics = [Data(repeating: 5, count: 32)]
+        let coreIndex: CoreIndex = 1
+
+        // Publish WorkPackagesSubmitted event
+        await services.eventBus.publish(RuntimeEvents.WorkPackagesSubmitted(
+            coreIndex: coreIndex,
+            workPackage: workPackage,
+            extrinsics: extrinsics
+        ))
+
+        // Wait for event processing
+        await storeMiddleware.wait()
+
+        #expect(network.contain(calls: [
+            .init(function: "sendToPeer", parameters: [
+                "message": CERequest.workPackageSubmission(.init(
+                    coreIndex: coreIndex,
+                    workPackage: workPackage.value,
+                    extrinsics: extrinsics
+                )),
+            ]),
+        ]))
+    }
+
+    @Test
+    func testProcessingBlockRequest() async throws {
+        // Setup mock data
+        let blockRequest = BlockRequest(
+            hash: services.genesisBlock.hash,
+            direction: .descendingInclusive,
+            maxBlocks: 10
+        )
+
+        // Test handling block request
+        let response = try await network.handler.handle(ceRequest: .blockRequest(blockRequest))
+
+        // Verify response
+        let data = try #require(response.first)
+
+        let decoder = JamDecoder(data: data, config: services.config)
+        let block = try decoder.decode(BlockRef.self)
+
+        // Verify decoded block matches genesis block
+        #expect(block.hash == services.genesisBlock.hash)
+    }
+
+    @Test
+    func testHandleWorkPackageSubmission() async throws {
+        // Create work package and extrinsics
+        let workPackage = WorkPackageRef.dummy(config: services.config)
+        let extrinsics = [Data(repeating: 5, count: 32)]
+        let coreIndex: CoreIndex = 3
+
+        // Handle WorkPackageSubmission message
+        let submissionMessage = CERequest.workPackageSubmission(.init(
+            coreIndex: coreIndex,
+            workPackage: workPackage.value,
+            extrinsics: extrinsics
+        ))
+
+        // Process the request
+        _ = try await network.handler.handle(ceRequest: submissionMessage)
+
+        // Wait for event processing and collect events
+        let events = await storeMiddleware.wait()
+
+        // Find the WorkPackagesReceived event
+        let receivedEvent = events.first {
+            if let event = $0 as? RuntimeEvents.WorkPackagesReceived {
+                return event.coreIndex == coreIndex
+            }
+            return false
+        } as? RuntimeEvents.WorkPackagesReceived
+
+        // Verify the event was published with correct data
+        let event = try #require(receivedEvent)
+        #expect(event.coreIndex == coreIndex)
+        #expect(event.workPackage.hash == workPackage.hash)
+        #expect(event.extrinsics == extrinsics)
+    }
 }
