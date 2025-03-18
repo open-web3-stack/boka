@@ -1,7 +1,7 @@
 import Foundation
 import Utils
 
-public struct ValidatorKey: Sendable, Equatable, Codable {
+public struct ValidatorKey: Sendable, Equatable, Codable, Hashable {
     public enum Error: Swift.Error {
         case invalidDataLength
     }
@@ -38,6 +38,12 @@ public struct ValidatorKey: Sendable, Equatable, Codable {
         ed25519 = Ed25519PublicKey()
         bls = BLSKey()
         metadata = Data128()
+    }
+
+    public var metadataString: String {
+        // get bytes from metadata.data that ends with the first nul
+        let bytes = metadata.data.prefix(while: { $0 != 0 })
+        return String(bytes: bytes, encoding: .utf8) ?? ""
     }
 }
 

@@ -6,19 +6,19 @@ import Utils
 @testable import Blockchain
 
 struct BlockAuthorTests {
-    func setup() async -> (BlockchainServices, BlockAuthor, Runtime) {
+    func setup() async throws -> (BlockchainServices, BlockAuthor, Runtime) {
         // setupTestLogger()
 
         let services = await BlockchainServices()
         let blockAuthor = await services.blockAuthor
         let runtime = Runtime(config: services.config)
-        await blockAuthor.onSyncCompleted()
+
         return (services, blockAuthor, runtime)
     }
 
     @Test
     func createNewBlockWithFallbackKey() async throws {
-        let (services, blockAuthor, runtime) = await setup()
+        let (services, blockAuthor, runtime) = try await setup()
         let config = services.config
         let timeProvider = services.timeProvider
         let genesisState = services.genesisState
@@ -39,6 +39,8 @@ struct BlockAuthorTests {
         let key = res.state.ticketsOrKeys.right!.array[Int(idx)]
         let pubkey = try! Bandersnatch.PublicKey(data: key)
 
+        await blockAuthor.onBeforeEpoch(epoch: timeslot.timeslotToEpochIndex(config: config), safroleState: res.state)
+
         // Create a new block
         let block = try await blockAuthor.createNewBlock(timeslot: timeslot, claim: .right(pubkey))
 
@@ -51,7 +53,7 @@ struct BlockAuthorTests {
 
     @Test
     func createNewBlockWithTicket() async throws {
-        let (services, blockAuthor, runtime) = await setup()
+        let (services, blockAuthor, runtime) = try await setup()
         let config = services.config
         let timeProvider = services.timeProvider
         let genesisState = services.genesisState
@@ -107,20 +109,18 @@ struct BlockAuthorTests {
 
     @Test
     func firstBlock() async throws {
-        let (services, blockAuthor, runtime) = await setup()
+        let (services, _, runtime) = try await setup()
         let config = services.config
         let timeProvider = services.timeProvider
         let genesisState = services.genesisState
         let scheduler = services.scheduler
         let storeMiddleware = services.storeMiddleware
 
-        await blockAuthor.on(genesis: genesisState)
-
         #expect(scheduler.taskCount > 0)
 
         await scheduler.advance(by: TimeInterval(2))
 
-        let events = await storeMiddleware.wait()
+        let events = await storeMiddleware.wait().filter { !($0 is RuntimeEvents.BeforeEpochChange) }
         #expect(events.count == 1)
         #expect(events.first is RuntimeEvents.BlockAuthored)
 

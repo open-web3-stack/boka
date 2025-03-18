@@ -4,7 +4,7 @@ import Synchronization
 import TracingUtils
 import Utils
 
-public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
+public final class BlockAuthor: ServiceBase2, @unchecked Sendable, OnBeforeEpoch {
     private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore
     private let safroleTicketPool: SafroleTicketPoolService
@@ -28,19 +28,6 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         await subscribe(RuntimeEvents.SafroleTicketsGenerated.self, id: "BlockAuthor.SafroleTicketsGenerated") { [weak self] event in
             try await self?.on(safroleTicketsGenerated: event)
         }
-    }
-
-    public func onSyncCompleted() async {
-        scheduleForNextEpoch("BlockAuthor.scheduleForNextEpoch") { [weak self] epoch in
-            await self?.onBeforeEpoch(epoch: epoch)
-        }
-    }
-
-    public func on(genesis _: StateRef) async {
-        let nowTimeslot = timeProvider.getTime().timeToTimeslot(config: config)
-        // schedule for current epoch
-        let epoch = nowTimeslot.timeslotToEpochIndex(config: config)
-        await onBeforeEpoch(epoch: epoch)
     }
 
     public func createNewBlock(
@@ -172,7 +159,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
         tickets.write { $0.append(event) }
     }
 
-    private func onBeforeEpoch(epoch: EpochIndex) async {
+    public func onBeforeEpoch(epoch: EpochIndex, safroleState: SafrolePostState) async {
         logger.debug("scheduling new blocks for epoch \(epoch)")
         await withSpan("BlockAuthor.onBeforeEpoch", logger: logger) { _ in
             tickets.value = []
@@ -188,22 +175,11 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable {
                 logger.error("trying to do onBeforeEpoch for epoch \(epoch) but best head epoch is \(bestHeadEpoch)")
             }
 
-            let state = try await dataProvider.getState(hash: bestHead.hash)
-
-            // simulate next block to determine the block authors for next epoch
-            let res = try state.value.updateSafrole(
-                config: config,
-                slot: timeslot,
-                entropy: Data32(),
-                offenders: [],
-                extrinsics: .dummy(config: config)
-            )
-
             logger.trace("expected safrole tickets", metadata: [
-                "tickets": "\(res.state.ticketsOrKeys)", "epoch": "\(epoch)", "parentTimeslot": "\(bestHead.timeslot)",
+                "tickets": "\(safroleState.ticketsOrKeys)", "epoch": "\(epoch)", "parentTimeslot": "\(bestHead.timeslot)",
             ])
 
-            await scheduleNewBlocks(ticketsOrKeys: res.state.ticketsOrKeys, timeslot: timeslot)
+            await scheduleNewBlocks(ticketsOrKeys: safroleState.ticketsOrKeys, timeslot: timeslot)
         }
     }
 

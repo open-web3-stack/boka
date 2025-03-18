@@ -26,7 +26,7 @@ struct ContinuationTests {
             try await withCheckedContinuationTimeout(seconds: 0.1) { continuation in
                 Task {
                     try? await Task.sleep(for: .seconds(10))
-                    continuation.resume()
+                    continuation.resume(returning: "success")
                 }
             }
         }

@@ -31,6 +31,8 @@ struct SafroleServiceTests {
 
         ringContext = try Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
 
+        await safroleService.onSyncCompleted()
+
         // setupTestLogger()
     }
 

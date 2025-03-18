@@ -8,27 +8,47 @@ import Utils
 
 struct NodeDataSourceTests {
     let dataSource: NodeDataSource
-    let networkManager: NetworkManagerTests
+    let networkManager: NetworkManager
+    let network: MockNetwork
+    let services: BlockchainServices
+    let storeMiddleware: StoreMiddleware
+
     init() async throws {
-        networkManager = try! await NetworkManagerTests()
+        let services = await BlockchainServices()
+        var network: MockNetwork!
+
+        let networkManager = try await NetworkManager(
+            buildNetwork: { handler in
+                network = MockNetwork(handler: handler)
+                return network
+            },
+            blockchain: services.blockchain,
+            eventBus: services.eventBus,
+            devPeers: []
+        )
+
+        self.networkManager = networkManager
+        self.network = network
+        self.services = services
+        storeMiddleware = services.storeMiddleware
+
         dataSource = await NodeDataSource(
-            blockchain: networkManager.services.blockchain,
-            chainDataProvider: networkManager.services.dataProvider,
-            networkManager: networkManager.networkManager,
-            name: "submitWorkPackage"
+            blockchain: services.blockchain,
+            chainDataProvider: services.dataProvider,
+            networkManager: networkManager,
+            name: "NodeDataSourceTests"
         )
     }
 
     @Test func submitWorkPackage() async throws {
-        let workPackage = WorkPackage.dummy(config: networkManager.services.config)
+        let workPackage = WorkPackage.dummy(config: services.config)
         let extrinsic = [Data([0, 1, 2]), Data([3, 4, 5])]
         try await dataSource.submitWorkPackage(coreIndex: 0, workPackage: JamEncoder.encode(workPackage), extrinsics: extrinsic)
-        let events = await networkManager.storeMiddleware.wait()
+        let events = await storeMiddleware.wait()
 
         #expect(events.count == 1)
-        #expect(events[0] is RuntimeEvents.WorkPackagesSubmitted)
 
-        let workPackageEvent = events[0] as! RuntimeEvents.WorkPackagesSubmitted
+        let workPackageEvent = try #require(events[0] as? RuntimeEvents.WorkPackagesSubmitted)
         #expect(workPackageEvent.coreIndex == 0)
         #expect(workPackageEvent.workPackage.value == workPackage)
         #expect(workPackageEvent.extrinsics == extrinsic)

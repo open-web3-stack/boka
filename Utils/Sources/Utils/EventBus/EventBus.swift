@@ -62,10 +62,10 @@ public actor EventBus: Subscribable {
     private struct ContinuationHandler {
         let id = UniqueId()
         let eventType: Event.Type
-        let continuation: CheckedContinuation<Event, Error>
+        let continuation: SafeContinuation<Event>
         let handler: @Sendable (Event) -> Bool
 
-        init<T: Event>(_ eventType: T.Type, _ continuation: CheckedContinuation<Event, Error>, _ handler: @escaping @Sendable (T) -> Bool) {
+        init<T: Event>(_ eventType: T.Type, _ continuation: SafeContinuation<Event>, _ handler: @escaping @Sendable (T) -> Bool) {
             self.eventType = eventType
             self.continuation = continuation
             self.handler = { event in
@@ -167,7 +167,7 @@ public actor EventBus: Subscribable {
     private func addWaitContinuation<T: Event>(
         _ eventType: T.Type,
         check: @escaping @Sendable (T) -> Bool,
-        continuation: CheckedContinuation<Event, Error>
+        continuation: SafeContinuation<Event>
     ) -> UniqueId {
         let key = ObjectIdentifier(eventType)
         let handler = ContinuationHandler(eventType, continuation, check)
