@@ -1,4 +1,5 @@
 import Blockchain
+import Codec
 import Foundation
 @testable import Node
 import Testing
@@ -29,6 +30,9 @@ struct NetworkManagerTests {
         self.network = network
         self.services = services
         storeMiddleware = services.storeMiddleware
+
+        await services.publishOnBeforeEpochEvent()
+        await storeMiddleware.wait() // ensure all events are processed including onBeforeEpoch
     }
 
     @Test
@@ -75,78 +79,46 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testWorkPackagesReceived() async throws {
-        // Create dummy work packages
-        let workPackage = WorkPackage.dummy(config: services.config).asRef()
+    func testWorkPackageBundleReady() async throws {
+        let bundle = WorkPackageBundle.dummy(config: services.config)
+        let key = try DevKeyStore.getDevKey(seed: 0)
+        let segmentsRootMappings = [SegmentsRootMapping(workPackageHash: Data32(repeating: 1), segmentsRoot: Data32(repeating: 2))]
+        let workReportHash = Data32(repeating: 2)
+        let signature = Ed25519Signature(repeating: 3)
+        let expectedResp = try JamEncoder.encode(workReportHash, signature)
+        network.state.write { $0.simulatedResponseData = [expectedResp] }
 
         // Publish WorkPackagesReceived event
         await services.blockchain
-            .publish(event: RuntimeEvents.WorkPackagesReceived(coreIndex: 0, workPackage: workPackage, extrinsics: []))
+            .publish(event: RuntimeEvents.WorkPackageBundleReady(
+                target: key.ed25519.data,
+                coreIndex: 1,
+                bundle: bundle,
+                segmentsRootMappings: segmentsRootMappings
+            ))
 
         // Wait for event processing
-        await storeMiddleware.wait()
+        let events = await storeMiddleware.wait()
 
         // Verify network calls
         #expect(
             network.contain(calls: [
                 .init(function: "connect", parameters: ["address": devPeers.first!, "role": PeerRole.validator]),
                 .init(function: "sendToPeer", parameters: [
-                    "message": CERequest.workPackageSubmission(
-                        WorkPackageSubmissionMessage(coreIndex: 0, workPackage: workPackage.value, extrinsics: [])
-                    ),
+                    "peerId": PeerId(publicKey: key.ed25519.data.data, address: NetAddr(address: "127.0.0.1:5000")!),
+                    "message": CERequest.workPackageSharing(.init(
+                        coreIndex: 1,
+                        segmentsRootMappings: segmentsRootMappings,
+                        bundle: bundle
+                    )),
                 ]),
             ])
         )
-    }
 
-    @Test
-    func testWorkPackagesShare() async throws {
-        // Create dummy work packages
-        let workPackage = WorkPackage.dummy(config: services.config).asRef()
-        let bundle = WorkPackageBundle(
-            workPackage: workPackage.value,
-            extrinsics: [],
-            importSegments: [],
-            justifications: []
-        )
-        // Publish WorkPackagesShare event
-        await services.blockchain
-            .publish(event: RuntimeEvents.WorkPackageBundleReady(coreIndex: 0, bundle: bundle, segmentsRootMappings: []))
-
-        // Wait for event processing
-        await storeMiddleware.wait()
-
-        // Verify network calls
-        #expect(
-            network.contain(calls: [
-                .init(function: "connect", parameters: ["address": devPeers.first!, "role": PeerRole.validator]),
-                .init(function: "sendToPeer", parameters: [
-                    "message": CERequest.workPackageSharing(
-                        WorkPackageSharingMessage(coreIndex: 0, segmentsRootMappings: [], bundle: bundle)
-                    ),
-                ]),
-            ])
-        )
-    }
-
-    @Test
-    func testWorkReportDistribution() async throws {
-        let workReport = WorkReport.dummy(config: services.config)
-        // Publish WorkReportGenerated event
-        await services.blockchain
-            .publish(event: RuntimeEvents.WorkReportGenerated(workReport: workReport, slot: 0, signatures: []))
-        await storeMiddleware.wait()
-        // Verify network calls
-        #expect(
-            network.contain(calls: [
-                .init(function: "connect", parameters: ["address": devPeers.first!, "role": PeerRole.validator]),
-                .init(function: "sendToPeer", parameters: [
-                    "message": CERequest.workReportDistrubution(
-                        WorkReportDistributionMessage(workReport: workReport, slot: 0, signatures: [])
-                    ),
-                ]),
-            ])
-        )
+        let event = events.first { $0 is RuntimeEvents.WorkPackageBundleRecivedReply } as! RuntimeEvents.WorkPackageBundleRecivedReply
+        #expect(event.source == key.ed25519.data)
+        #expect(event.workReportHash == workReportHash)
+        #expect(event.signature == signature)
     }
 
     @Test
@@ -169,12 +141,11 @@ struct NetworkManagerTests {
         // Verify network broadcast
         #expect(
             network.contain(calls: [
-                .init(function: "connect", parameters: ["address": devPeers.first!, "role": PeerRole.validator]),
                 .init(function: "broadcast", parameters: [
                     "kind": UniquePresistentStreamKind.blockAnnouncement,
-                    "message": UPMessage.blockAnnouncementHandshake(BlockAnnouncementHandshake(
-                        finalized: HashAndSlot(hash: block.header.parentHash, timeslot: 0),
-                        heads: [HashAndSlot(hash: block.hash, timeslot: block.header.timeslot)]
+                    "message": UPMessage.blockAnnouncement(.init(
+                        header: block.header.asRef(),
+                        finalized: HashAndSlot(hash: block.header.parentHash, timeslot: 0)
                     )),
                 ]),
             ])

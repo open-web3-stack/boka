@@ -15,7 +15,7 @@ struct MockNetworkState {
     var simulatedNetworkKey = "mock_network_key"
     var simulatedListenAddress = NetAddr(address: "127.0.0.1:8000")!
     var simulatedPeerRole: PeerRole = .builder
-    var simulatedResponseData = [Data()]
+    var simulatedResponseData: [Data] = []
 }
 
 final class MockNetwork: NetworkProtocol {
@@ -95,29 +95,39 @@ final class MockNetwork: NetworkProtocol {
         state.read { $0.simulatedPeerRole }
     }
 
+    var calls: [Call] {
+        state.read { $0.calls }
+    }
+
     func contain(calls toCheck: [MockNetwork.Call]) -> Bool {
         let calls = state.read { $0.calls }
 
         var idx = 0
-        outer:
-            for expectedCall in toCheck
-        {
-            if idx >= calls.count {
-                return false
+
+        for call in calls {
+            if idx >= toCheck.count {
+                return true
             }
-            let current = calls[idx]
-            idx += 1
-            guard current.function == expectedCall.function else {
+            let expected = toCheck[idx]
+
+            if call.function != expected.function {
                 continue
             }
-            // it is not easy to compare two `any Equatable` values
-            // so we compare the hash values instead. should be good enough for unit tests
-            for (key, value) in expectedCall.parameters where current.parameters[key]?.hashValue != value.hashValue {
-                continue outer
+
+            let match = expected.parameters.allSatisfy { key, value in
+                // it is not easy to compare two `any Equatable` values
+                // so we compare the hash values instead. should be good enough for unit tests
+                call.parameters[key]?.hashValue == value.hashValue
             }
+
+            if !match {
+                continue
+            }
+
+            idx += 1
         }
 
-        return true
+        return idx == toCheck.count
     }
 }
 

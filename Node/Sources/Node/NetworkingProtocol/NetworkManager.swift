@@ -30,6 +30,7 @@ private actor NetworkManagerStorage {
     }
 }
 
+// TODO: move validator only code to a separate class
 public final class NetworkManager: Sendable {
     public let peerManager: PeerManager
     public let network: any NetworkProtocol
@@ -104,6 +105,13 @@ public final class NetworkManager: Sendable {
             ) { [weak self] event in
                 await self?.on(workPackageBundleReady: event)
             }
+
+            await subscriptions.subscribe(
+                RuntimeEvents.BeforeEpochChange.self,
+                id: "NetworkManager.BeforeEpochChange"
+            ) { [weak self] event in
+                await self?.on(beforeEpochChange: event)
+            }
         }
     }
 
@@ -116,37 +124,6 @@ public final class NetworkManager: Sendable {
         case .currentValidators:
             // TODO: read onchain state for validators
             devPeers
-        }
-    }
-
-    private func onBeforeEpoch(epoch: EpochIndex) async {
-        await withSpan("NetworkManager.onBeforeEpoch", logger: logger) { _ in
-            let state = try await blockchain.dataProvider.getState(hash: blockchain.dataProvider.bestHead.hash)
-            let timeslot = epoch.epochToTimeslotIndex(config: blockchain.config)
-            // simulate next block to determine the correct current validators
-            // this is more accurate than just using nextValidators from current state
-            let res = try state.value.updateSafrole(
-                config: blockchain.config,
-                slot: timeslot,
-                entropy: Data32(),
-                offenders: [],
-                extrinsics: .dummy(config: blockchain.config)
-            )
-            let currentValidators = res.state.currentValidators
-            let nextValidators = res.state.nextValidators
-            let allValidators = Set([currentValidators.array, nextValidators.array].joined())
-
-            var peerIdByPublicKey: [Data32: PeerId] = [:]
-            for validator in allValidators {
-                if let addr = NetAddr(address: validator.metadataString) {
-                    peerIdByPublicKey[validator.ed25519] = PeerId(
-                        publicKey: validator.ed25519.data,
-                        address: addr
-                    )
-                }
-            }
-
-            await storage.set(peerIdByPublicKey)
         }
     }
 
@@ -247,6 +224,7 @@ public final class NetworkManager: Sendable {
                 bundle: event.bundle
             )))
 
+            // <-- Work-Report Hash ++ Ed25519 Signature
             guard resp.count == 1, let data = resp.first else {
                 logger.warning("WorkPackageSharing response is invalid", metadata: ["resp": "\(resp)", "target": "\(target)"])
                 return
@@ -261,6 +239,27 @@ public final class NetworkManager: Sendable {
                 workReportHash: workReportHash,
                 signature: signature
             ))
+        }
+    }
+
+    // Note: This is only called when under as validator mode
+    private func on(beforeEpochChange event: RuntimeEvents.BeforeEpochChange) async {
+        await withSpan("NetworkManager.onBeforeEpoch", logger: logger) { _ in
+            let currentValidators = event.state.currentValidators
+            let nextValidators = event.state.nextValidators
+            let allValidators = Set([currentValidators.array, nextValidators.array].joined())
+
+            var peerIdByPublicKey: [Data32: PeerId] = [:]
+            for validator in allValidators {
+                if let addr = NetAddr(address: validator.metadataString) {
+                    peerIdByPublicKey[validator.ed25519] = PeerId(
+                        publicKey: validator.ed25519.data,
+                        address: addr
+                    )
+                }
+            }
+
+            await storage.set(peerIdByPublicKey)
         }
     }
 
