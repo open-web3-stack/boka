@@ -81,15 +81,9 @@ extension NodeDataSource: KeystoreDataSource {
     }
 
     public func listKeys() async throws -> [String] {
-        let (blsResult, ed25519Result, bandersnatchResult) = await (
-            keystore.getAll(BLS.self),
-            keystore.getAll(Ed25519.self),
-            keystore.getAll(Bandersnatch.self)
-        )
-        let blsPublicKeys = blsResult.map { $0.publicKey.toHexString() }
-        let ed25519PublicKeys = ed25519Result.map { $0.publicKey.toHexString() }
-        let bandersnatchPublicKeys = bandersnatchResult.map { $0.publicKey.toHexString() }
-
+        let blsPublicKeys = await keystore.getAll(BLS.self).map { $0.publicKey.toHexString() }
+        let ed25519PublicKeys = await keystore.getAll(Ed25519.self).map { $0.publicKey.toHexString() }
+        let bandersnatchPublicKeys = await keystore.getAll(Bandersnatch.self).map { $0.publicKey.toHexString() }
         return blsPublicKeys + ed25519PublicKeys + bandersnatchPublicKeys
     }
 
@@ -102,10 +96,8 @@ extension NodeDataSource: KeystoreDataSource {
                 {
                     return true
                 }
-                if let ed25519PublicKey = try? Ed25519.PublicKey(from: publicKeyData),
-                   await keystore.contains(publicKey: ed25519PublicKey)
-                {
-                    return true
+                if let ed25519PublicKey = try? Ed25519.PublicKey(from: publicKeyData) {
+                    return await keystore.contains(publicKey: ed25519PublicKey)
                 }
             }
             return false
