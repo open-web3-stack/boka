@@ -2,7 +2,7 @@ import Foundation
 import TracingUtils
 import Utils
 
-public class ServiceBase {
+public class ServiceBase: @unchecked Sendable {
     public let id: UniqueId
     let logger: Logger
     public let config: ProtocolConfigRef

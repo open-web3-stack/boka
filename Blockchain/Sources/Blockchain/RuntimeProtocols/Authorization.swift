@@ -85,7 +85,7 @@ extension Authorization {
                 }
             }
 
-            logger.debug("core index: \(coreIndex), newItem add to pool: \(newItem)")
+            logger.trace("core index: \(coreIndex), newItem add to pool: \(newItem)")
 
             // Add new item from queue
             corePool.safeAppend(newItem)

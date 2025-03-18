@@ -483,6 +483,12 @@ extension State: Preimages {
 
 extension State: Accumulation {}
 
+extension State: CustomStringConvertible {
+    public var description: String {
+        "State()" // TODO: maybe cache state root hash so it can be accessed here?
+    }
+}
+
 public class StateRef: Ref<State>, @unchecked Sendable {
     public static func dummy(config: ProtocolConfigRef, block: BlockRef?) -> StateRef {
         StateRef(State.dummy(config: config, block: block))

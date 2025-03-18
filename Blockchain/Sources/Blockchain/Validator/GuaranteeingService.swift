@@ -15,7 +15,7 @@ public enum GuaranteeingServiceError: Error {
     case authorizationError(WorkResultError)
 }
 
-public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
+public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBeforeEpoch, OnSyncCompleted {
     private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore
     private let dataAvailability: DataAvailability
@@ -42,7 +42,9 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         )
 
         super.init(id: "GuaranteeingService", config: config, eventBus: eventBus, scheduler: scheduler)
+    }
 
+    public func onSyncCompleted() async {
         // received via p2p
         await subscribe(RuntimeEvents.WorkPackagesReceived.self, id: "GuaranteeingService.WorkPackagesReceived") { [weak self] event in
             try await self?.on(workPackagesReceived: event)
@@ -61,30 +63,9 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
     }
 
-    public func onSyncCompleted() async {
-        let nowTimeslot = timeProvider.getTime().timeToTimeslot(config: config)
-        let epoch = nowTimeslot.timeslotToEpochIndex(config: config)
-        await onBeforeEpoch(epoch: epoch)
-
-        scheduleForNextEpoch("GuaranteeingService.scheduleForNextEpoch") { [weak self] epoch in
-            await self?.onBeforeEpoch(epoch: epoch)
-        }
-    }
-
-    private func onBeforeEpoch(epoch: EpochIndex) async {
+    public func onBeforeEpoch(epoch _: EpochIndex, safroleState: SafrolePostState) async {
         await withSpan("GuaranteeingService.onBeforeEpoch", logger: logger) { _ in
-            let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
-            let timeslot = epoch.epochToTimeslotIndex(config: config)
-            // simulate next block to determine the correct current validators
-            // this is more accurate than just using nextValidators from current state
-            let res = try state.value.updateSafrole(
-                config: config,
-                slot: timeslot,
-                entropy: Data32(),
-                offenders: [],
-                extrinsics: .dummy(config: config)
-            )
-            let validators = res.state.currentValidators
+            let validators = safroleState.currentValidators
 
             let keys = await keystore.getAll(Ed25519.self)
             var result: (ValidatorIndex, Ed25519.SecretKey)?
