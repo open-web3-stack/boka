@@ -139,7 +139,12 @@ struct Boka: AsyncParsableCommand {
             return RPCConfig(listenAddress: address, port: Int(port))
         }
 
-        let keystore = try await DevKeyStore(devKeysCount: devSeed == nil ? 12 : 0)
+        let keysotreType: KeyStoreType = basePath.map {
+            var path = URL(fileURLWithPath: $0)
+            return .file(path: path)
+        } ?? .inMemory
+
+        let keystore: KeyStore = try keysotreType.getStore()
 
         let networkKey: Ed25519.SecretKey = try await {
             if let devSeed {
@@ -171,7 +176,8 @@ struct Boka: AsyncParsableCommand {
             peers: peers,
             local: local,
             name: name,
-            database: database
+            database: database,
+            keystoreType: keysotreType
         )
 
         let node: Node = if validator {
