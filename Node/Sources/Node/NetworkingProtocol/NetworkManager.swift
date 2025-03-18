@@ -14,6 +14,23 @@ enum BroadcastTarget {
     case currentValidators
 }
 
+enum NetworkManagerError: Error {
+    case peerNotFound
+}
+
+private actor NetworkManagerStorage {
+    var peerIdByPublicKey: [Data32: PeerId] = [:]
+
+    func getPeerId(publicKey: Data32) -> PeerId? {
+        peerIdByPublicKey[publicKey]
+    }
+
+    func set(_ dict: [Data32: PeerId]) {
+        peerIdByPublicKey = dict
+    }
+}
+
+// TODO: move validator only code to a separate class
 public final class NetworkManager: Sendable {
     public let peerManager: PeerManager
     public let network: any NetworkProtocol
@@ -24,6 +41,8 @@ public final class NetworkManager: Sendable {
     // This is for development only
     // Those peers will receive all the messages regardless the target
     private let devPeers: Set<Either<PeerId, NetAddr>>
+
+    private let storage = NetworkManagerStorage()
 
     public init(
         buildNetwork: (NetworkProtocolHandler) throws -> any NetworkProtocol,
@@ -79,6 +98,20 @@ public final class NetworkManager: Sendable {
             ) { [weak self] event in
                 await self?.on(workPackagesSubmitted: event)
             }
+
+            await subscriptions.subscribe(
+                RuntimeEvents.WorkPackageBundleReady.self,
+                id: "NetworkManager.WorkPackageBundleReady"
+            ) { [weak self] event in
+                await self?.on(workPackageBundleReady: event)
+            }
+
+            await subscriptions.subscribe(
+                RuntimeEvents.BeforeEpochChange.self,
+                id: "NetworkManager.BeforeEpochChange"
+            ) { [weak self] event in
+                await self?.on(beforeEpochChange: event)
+            }
         }
     }
 
@@ -92,6 +125,13 @@ public final class NetworkManager: Sendable {
             // TODO: read onchain state for validators
             devPeers
         }
+    }
+
+    private func send(to: Ed25519PublicKey, message: CERequest) async throws -> [Data] {
+        guard let peerId = await storage.getPeerId(publicKey: to) else {
+            throw NetworkManagerError.peerNotFound
+        }
+        return try await network.send(to: peerId, message: message)
     }
 
     private func send(to: PeerId, message: CERequest) async throws -> [Data] {
@@ -137,18 +177,6 @@ public final class NetworkManager: Sendable {
         }
     }
 
-    private func on(workPackagesSubmitted event: RuntimeEvents.WorkPackagesSubmitted) async {
-        logger.trace("sending work package", metadata: ["coreIndex": "\(event.coreIndex)"])
-        await broadcast(
-            to: .currentValidators,
-            message: .workPackageSubmission(.init(
-                coreIndex: event.coreIndex,
-                workPackage: event.workPackage.value,
-                extrinsics: event.extrinsics
-            ))
-        )
-    }
-
     private func on(safroleTicketsGenerated event: RuntimeEvents.SafroleTicketsGenerated) async {
         logger.trace("sending tickets", metadata: ["epochIndex": "\(event.epochIndex)"])
         for ticket in event.items {
@@ -173,6 +201,66 @@ public final class NetworkManager: Sendable {
                 finalized: HashAndSlot(hash: finalized.hash, timeslot: finalized.timeslot)
             ))
         )
+    }
+
+    private func on(workPackagesSubmitted event: RuntimeEvents.WorkPackagesSubmitted) async {
+        logger.trace("sending work package", metadata: ["coreIndex": "\(event.coreIndex)"])
+        await broadcast(
+            to: .currentValidators,
+            message: .workPackageSubmission(.init(
+                coreIndex: event.coreIndex,
+                workPackage: event.workPackage.value,
+                extrinsics: event.extrinsics
+            ))
+        )
+    }
+
+    private func on(workPackageBundleReady event: RuntimeEvents.WorkPackageBundleReady) async {
+        await withSpan("NetworkManager.on(workPackageBundleReady)", logger: logger) { _ in
+            let target = event.target
+            let resp = try await send(to: target, message: .workPackageSharing(.init(
+                coreIndex: event.coreIndex,
+                segmentsRootMappings: event.segmentsRootMappings,
+                bundle: event.bundle
+            )))
+
+            // <-- Work-Report Hash ++ Ed25519 Signature
+            guard resp.count == 1, let data = resp.first else {
+                logger.warning("WorkPackageSharing response is invalid", metadata: ["resp": "\(resp)", "target": "\(target)"])
+                return
+            }
+
+            let decoder = JamDecoder(data: data, config: blockchain.config)
+            let workReportHash = try decoder.decode(Data32.self)
+            let signature = try decoder.decode(Ed25519Signature.self)
+
+            blockchain.publish(event: RuntimeEvents.WorkPackageBundleRecivedReply(
+                source: target,
+                workReportHash: workReportHash,
+                signature: signature
+            ))
+        }
+    }
+
+    // Note: This is only called when under as validator mode
+    private func on(beforeEpochChange event: RuntimeEvents.BeforeEpochChange) async {
+        await withSpan("NetworkManager.onBeforeEpoch", logger: logger) { _ in
+            let currentValidators = event.state.currentValidators
+            let nextValidators = event.state.nextValidators
+            let allValidators = Set([currentValidators.array, nextValidators.array].joined())
+
+            var peerIdByPublicKey: [Data32: PeerId] = [:]
+            for validator in allValidators {
+                if let addr = NetAddr(address: validator.metadataString) {
+                    peerIdByPublicKey[validator.ed25519] = PeerId(
+                        publicKey: validator.ed25519.data,
+                        address: addr
+                    )
+                }
+            }
+
+            await storage.set(peerIdByPublicKey)
+        }
     }
 
     public var peersCount: Int {

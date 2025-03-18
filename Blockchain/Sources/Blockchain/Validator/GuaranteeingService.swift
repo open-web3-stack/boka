@@ -10,14 +10,18 @@ public enum GuaranteeingServiceError: Error {
     case invalidBundle
     case segmentsRootNotFound
     case notValidator
+    case invalidCore
+    case unableToGetSignatures
+    case authorizationError(WorkResultError)
 }
 
-public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
+public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBeforeEpoch, OnSyncCompleted {
     private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore
     private let dataAvailability: DataAvailability
 
     let signingKey: ThreadSafeContainer<(ValidatorIndex, Ed25519.SecretKey)?> = .init(nil)
+    let coreAssignments: ThreadSafeContainer<([CoreIndex], TimeslotIndex)> = .init(([], 0))
 
     public init(
         config: ProtocolConfigRef,
@@ -38,7 +42,9 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         )
 
         super.init(id: "GuaranteeingService", config: config, eventBus: eventBus, scheduler: scheduler)
+    }
 
+    public func onSyncCompleted() async {
         // received via p2p
         await subscribe(RuntimeEvents.WorkPackagesReceived.self, id: "GuaranteeingService.WorkPackagesReceived") { [weak self] event in
             try await self?.on(workPackagesReceived: event)
@@ -57,30 +63,9 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
     }
 
-    public func onSyncCompleted() async {
-        let nowTimeslot = timeProvider.getTime().timeToTimeslot(config: config)
-        let epoch = nowTimeslot.timeslotToEpochIndex(config: config)
-        await onBeforeEpoch(epoch: epoch)
-
-        scheduleForNextEpoch("GuaranteeingService.scheduleForNextEpoch") { [weak self] epoch in
-            await self?.onBeforeEpoch(epoch: epoch)
-        }
-    }
-
-    private func onBeforeEpoch(epoch: EpochIndex) async {
+    public func onBeforeEpoch(epoch _: EpochIndex, safroleState: SafrolePostState) async {
         await withSpan("GuaranteeingService.onBeforeEpoch", logger: logger) { _ in
-            let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
-            let timeslot = epoch.epochToTimeslotIndex(config: config)
-            // simulate next block to determine the correct current validators
-            // this is more accurate than just using nextValidators from current state
-            let res = try state.value.updateSafrole(
-                config: config,
-                slot: timeslot,
-                entropy: Data32(),
-                offenders: [],
-                extrinsics: .dummy(config: config)
-            )
-            let validators = res.state.currentValidators
+            let validators = safroleState.currentValidators
 
             let keys = await keystore.getAll(Ed25519.self)
             var result: (ValidatorIndex, Ed25519.SecretKey)?
@@ -114,6 +99,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         }
 
         do {
+            // TODO: we may already done the work. need to cache the result
             let report = try await processWorkPackageBundle(
                 coreIndex: event.coreIndex,
                 segmentsRootMappings: event.segmentsRootMappings,
@@ -154,103 +140,177 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
         return true
     }
 
-    public func processWorkPackageBundle(
-        coreIndex _: CoreIndex,
-        segmentsRootMappings _: SegmentsRootMappings,
-        bundle _: WorkPackageBundle
-    ) async throws -> WorkReport {
-        fatalError("unimplemented")
-    }
-
-    public func refineWorkPackage(
+    private func processWorkPackageBundle(
         coreIndex: CoreIndex,
-        workPackage: WorkPackageRef,
-        extrinsics: [Data]
-    ) async throws {
+        segmentsRootMappings: SegmentsRootMappings,
+        bundle: WorkPackageBundle
+    ) async throws -> WorkReport {
+        guard let (validatorIndex, _) = signingKey.value else {
+            throw GuaranteeingServiceError.notValidator
+        }
+
+        let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
+
+        let coreAssignment = getCoreAssignment(state: state)
+
+        guard let currentCoreIndex = coreAssignment[safe: Int(validatorIndex)] else {
+            try throwUnreachable("invalid validator index/core assignment")
+        }
+        guard currentCoreIndex == coreIndex else {
+            throw GuaranteeingServiceError.invalidCore
+        }
+
+        let workPackage = bundle.workPackage.asRef()
+
         // Validate the work package
         guard try validate(workPackage: workPackage.value) else {
             logger.error("Invalid work package: \(workPackage)")
             throw GuaranteeingServiceError.invalidWorkPackage
         }
+
+        // check & refine
+        let (_, _, workReport) = try await createWorkReport(
+            state: state,
+            coreIndex: coreIndex,
+            workPackage: workPackage,
+            extrinsics: bundle.extrinsics,
+            segmentsRootMappings: segmentsRootMappings
+        )
+
+        return workReport
+    }
+
+    private func refineWorkPackage(
+        coreIndex: CoreIndex,
+        workPackage: WorkPackageRef,
+        extrinsics: [Data]
+    ) async throws {
         guard let (validatorIndex, signingKey) = signingKey.value else {
-            logger.debug("not in current validator set, skipping refine")
-            return
+            throw GuaranteeingServiceError.notValidator
+        }
+
+        let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
+
+        let coreAssignment = getCoreAssignment(state: state)
+
+        guard let currentCoreIndex = coreAssignment[safe: Int(validatorIndex)] else {
+            try throwUnreachable("invalid validator index/core assignment")
+        }
+        guard currentCoreIndex == coreIndex else {
+            throw GuaranteeingServiceError.invalidCore
+        }
+
+        // Validate the work package
+        guard try validate(workPackage: workPackage.value) else {
+            logger.error("Invalid work package: \(workPackage)")
+            throw GuaranteeingServiceError.invalidWorkPackage
         }
 
         // check & refine
-        let (bundle, mappings, workReport) = try await refinePkg(
-            validatorIndex: validatorIndex,
+        let (bundle, mappings, workReport) = try await createWorkReport(
+            state: state,
+            coreIndex: coreIndex,
             workPackage: workPackage,
-            extrinsics: extrinsics
+            extrinsics: extrinsics,
+            segmentsRootMappings: nil
         )
 
-        // Share work package bundle
-        let shareWorkBundleEvent = RuntimeEvents.WorkPackageBundleReady(
-            coreIndex: coreIndex,
-            bundle: bundle,
-            segmentsRootMappings: mappings
-        )
-        publish(shareWorkBundleEvent)
+        let workReportHash = workReport.hash()
+
+        var otherValidators = [(ValidatorIndex, Ed25519PublicKey)]()
+        // TODO: handle the edge case and we may need to use nextValidators on epoch boundary
+        let currentValidators = state.value.currentValidators
+        for (idx, core) in coreAssignment.enumerated() {
+            if core == coreIndex, idx != Int(validatorIndex) {
+                otherValidators.append((ValidatorIndex(idx), currentValidators.array[idx].ed25519))
+            }
+        }
+
+        // announce work package bundle ready via CE134 to other validators in the same core group and wait for signatures
+        var sigs: [ValidatorSignature] = await withTaskGroup(of: Optional<ValidatorSignature>.self) { group in
+            for (idx, validatorKey) in otherValidators {
+                publish(RuntimeEvents.WorkPackageBundleReady(
+                    target: validatorKey,
+                    coreIndex: coreIndex,
+                    bundle: bundle,
+                    segmentsRootMappings: mappings
+                ))
+                group.addTask {
+                    do {
+                        let resp = try await self.waitFor(
+                            eventType: RuntimeEvents.WorkPackageBundleRecivedReply.self,
+                            check: { event in
+                                event.source == validatorKey && event.workReportHash == workReportHash
+                            },
+                            timeout: 2 // TODO: make configurable? and determine the best value
+                        )
+                        return ValidatorSignature(validatorIndex: idx, signature: resp.signature)
+                    } catch ContinuationError.timeout {
+                        self.logger.debug("no reply from \(validatorKey) in time")
+                        return nil
+                    } catch {
+                        self.logger.error("error waiting for reply from \(validatorKey)", metadata: ["error": "\(error)"])
+                        return nil
+                    }
+                }
+            }
+
+            var results: [ValidatorSignature] = []
+            for await sig in group {
+                if let sig {
+                    results.append(sig)
+                }
+            }
+            return results
+        }
+
+        guard sigs.count >= 1 else {
+            throw GuaranteeingServiceError.unableToGetSignatures
+        }
+
         // Sign work report & work-report distribution via CE 135
         let payload = SigningContext.guarantee + workReport.hash().data
         let signature = try signingKey.sign(message: payload)
 
-        let timeslot = timeProvider.getTime().timeToTimeslot(config: config)
-        try await distributeWorkReport(
-            workReport,
-            slot: timeslot,
-            signature: ValidatorSignature(validatorIndex: validatorIndex, signature: signature)
-        )
-    }
+        sigs.append(ValidatorSignature(validatorIndex: validatorIndex, signature: signature))
 
-    // Sign work report & work-report distribution via CE135
-    private func distributeWorkReport(_ workReport: WorkReport, slot: UInt32, signature: ValidatorSignature) async throws {
-        // Construct the guaranteed work-report
-        var guaranteedWorkReport = RuntimeEvents.WorkReportGenerated(
-            workReport: workReport,
-            slot: slot,
-            signatures: [signature]
-        )
-
-        // Fetch additional signatures (if any) from other guarantors
-        let additionalSignatures = await fetchAdditionalSignatures(for: workReport)
-        guaranteedWorkReport.signatures.append(contentsOf: additionalSignatures)
+        let timeslot = timeProvider.getTime().timeToTimeslot(config: config) + 1
 
         // Distribute the guaranteed work-report to all current validators
-        publish(guaranteedWorkReport)
+        publish(RuntimeEvents.WorkReportGenerated(
+            workReport: workReport,
+            slot: timeslot,
+            signatures: sigs
+        ))
     }
 
-    // Fetch additional signatures from other guarantors
-    private func fetchAdditionalSignatures(for _: WorkReport) async -> [ValidatorSignature] {
-        // TODO: Implement logic to fetch additional signatures from other guarantors
-        // This could involve querying a shared data structure or waiting for events
-        [] // Placeholder
-    }
+    private func getCoreAssignment(state: StateRef) -> [CoreIndex] {
+        // TODO: this is wrong
+        // instead of using timeslot from last block, we need to calculate the current timeslot and use it
+        // so we can handle block gaps
 
-    private func refinePkg(
-        validatorIndex: ValidatorIndex,
-        workPackage: WorkPackageRef,
-        extrinsics: [Data]
-    ) async throws -> (WorkPackageBundle, SegmentsRootMappings, WorkReport) {
-        let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
+        let timeslot = state.value.timeslot + 1
 
-        // TODO: check for edge cases such as epoch end
-        let currentCoreAssignment = state.value.getCoreAssignment(
-            config: config,
-            randomness: state.value.entropyPool.t2,
-            timeslot: state.value.timeslot + 1
-        )
-        // TODO: coreIndex equal with shareWorkPackage coreIndex?
-        guard let coreIndex = currentCoreAssignment[safe: Int(validatorIndex)] else {
-            try throwUnreachable("invalid validator index/core assignment")
+        let res = coreAssignments.read { c, t -> [CoreIndex]? in
+            if t == timeslot {
+                return c
+            }
+            return nil
         }
 
-        // Create work report & WorkPackageBundle
-        return try await createWorkReport(
-            coreIndex: coreIndex,
-            workPackage: workPackage,
-            extrinsics: extrinsics
+        if let res {
+            return res
+        }
+
+        let newCoreAssignment = state.value.getCoreAssignment(
+            config: config,
+            randomness: state.value.entropyPool.t2,
+            timeslot: timeslot
         )
+
+        coreAssignments.value = (newCoreAssignment, timeslot)
+
+        return newCoreAssignment
     }
 
     private func validateSegmentsRootMapping(
@@ -288,97 +348,92 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable {
     }
 
     // workpackage -> workresult -> workreport
-    private func createWorkReport(coreIndex: CoreIndex, workPackage: WorkPackageRef,
-                                  extrinsics: [Data]) async throws -> (WorkPackageBundle, SegmentsRootMappings, WorkReport)
-    {
-        let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
+    private func createWorkReport(
+        state: StateRef,
+        coreIndex: CoreIndex,
+        workPackage: WorkPackageRef,
+        extrinsics: [Data],
+        segmentsRootMappings: SegmentsRootMappings?
+    ) async throws -> (WorkPackageBundle, SegmentsRootMappings, WorkReport) {
         let packageHash = workPackage.hash
         let corePool = state.value.coreAuthorizationPool[coreIndex]
         let authorizerHash = try corePool.array.first.unwrap(orError: GuaranteeingServiceError.noAuthorizerHash)
         var exportSegmentOffset: UInt16 = 0
         var mappings: SegmentsRootMappings = []
-        // B.2. the authorization output, the result of the Is-Authorized function
-        // TODO: waiting for authorizationFunction done  Mock a result
-        // let res = try await authorizationFunction.invoke(config: config, serviceAccounts: state.value, package: workPackage, coreIndex:
-        // coreIndex)
-        let res = Result<Data, WorkResultError>.success(Data())
-        switch res {
-        // authorizationFunction -> authorizationOutput
-        case let .success(authorizationOutput):
-            var workResults = [WorkResult]()
 
-            var exportSegments = [Data4104]()
+        let res = try await isAuthorized(config: config, serviceAccounts: state.value, package: workPackage.value, coreIndex: coreIndex)
+        let authorizationOutput = try res.mapError(GuaranteeingServiceError.authorizationError).get()
 
-            // TODO: make this lazy, only fetch when needed by PVM
-            var importSegments = [[Data4104]]()
-            for item in workPackage.value.workItems {
-                try await importSegments.append(dataAvailability.fetchSegment(segments: item.inputs))
-            }
+        var workResults = [WorkResult]()
 
-            for (i, item) in workPackage.value.workItems.enumerated() {
-                // refine data to workresult
-                let refineRes = try await refine(
-                    config: config,
-                    serviceAccounts: state.value,
-                    workItemIndex: i,
-                    workPackage: workPackage.value,
-                    authorizerOutput: authorizationOutput,
-                    importSegments: importSegments,
-                    exportSegmentOffset: UInt64(exportSegmentOffset)
-                )
-                // Export -> DA or exportSegmentOffset + outputDataSegmentsCount ？
-                exportSegmentOffset += item.outputDataSegmentsCount
-                let workResult = WorkResult(
-                    serviceIndex: item.serviceIndex,
-                    codeHash: workPackage.value.authorizationCodeHash,
-                    payloadHash: item.payloadBlob.blake2b256hash(),
-                    gas: item.refineGasLimit,
-                    output: WorkOutput(refineRes.result)
-                )
-                workResults.append(workResult)
+        var exportSegments = [Data4104]()
 
-                guard item.outputDataSegmentsCount == refineRes.exports.count else {
-                    throw GuaranteeingServiceError.invalidExports
-                }
-
-                exportSegments.append(contentsOf: refineRes.exports)
-            }
-            let bundle = try await WorkPackageBundle(
-                workPackage: workPackage.value,
-                extrinsic: extrinsics,
-                importSegments: retrieveImportSegments(for: workPackage.value),
-                justifications: retrieveJustifications(for: workPackage.value)
-            )
-            let (erasureRoot, length) = try await dataAvailability.exportWorkpackageBundle(bundle: bundle)
-
-            let segmentRoot = try await dataAvailability.exportSegments(data: exportSegments, erasureRoot: erasureRoot)
-            mappings.append(SegmentsRootMapping(workPackageHash: packageHash, segmentsRoot: segmentRoot))
-            // TODO: generate or find AvailabilitySpecifications  14.4.1 work-package bundle
-            let packageSpecification = AvailabilitySpecifications(
-                workPackageHash: packageHash,
-                length: length,
-                erasureRoot: erasureRoot,
-                segmentRoot: segmentRoot,
-                segmentCount: exportSegmentOffset
-            )
-            // The historical lookup function, Λ, is defined in equation 9.7.
-            var oldLookups = [Data32: Data32]()
-            for item in state.value.recentHistory.items {
-                oldLookups.merge(item.lookup, uniquingKeysWith: { _, new in new })
-            }
-            return try (bundle, mappings, WorkReport(
-                authorizerHash: authorizerHash,
-                coreIndex: coreIndex,
-                authorizationOutput: authorizationOutput,
-                refinementContext: workPackage.value.context,
-                packageSpecification: packageSpecification,
-                lookup: oldLookups,
-                results: ConfigLimitedSizeArray(config: config, array: workResults)
-            ))
-
-        case let .failure(error):
-            logger.error("Authorization failed with error: \(error)")
-            throw error
+        // TODO: make this lazy, only fetch when needed by PVM
+        var importSegments = [[Data4104]]()
+        for item in workPackage.value.workItems {
+            let segment = try await dataAvailability.fetchSegment(segments: item.inputs, segmentsRootMappings: segmentsRootMappings)
+            importSegments.append(segment)
         }
+
+        for (i, item) in workPackage.value.workItems.enumerated() {
+            // refine data to workresult
+            let refineRes = try await refine(
+                config: config,
+                serviceAccounts: state.value,
+                workItemIndex: i,
+                workPackage: workPackage.value,
+                authorizerOutput: authorizationOutput,
+                importSegments: importSegments,
+                exportSegmentOffset: UInt64(exportSegmentOffset)
+            )
+            // Export -> DA or exportSegmentOffset + outputDataSegmentsCount ？
+            exportSegmentOffset += item.outputDataSegmentsCount
+            let workResult = WorkResult(
+                serviceIndex: item.serviceIndex,
+                codeHash: workPackage.value.authorizationCodeHash,
+                payloadHash: item.payloadBlob.blake2b256hash(),
+                gas: item.refineGasLimit,
+                output: WorkOutput(refineRes.result)
+            )
+            workResults.append(workResult)
+
+            guard item.outputDataSegmentsCount == refineRes.exports.count else {
+                throw GuaranteeingServiceError.invalidExports
+            }
+
+            exportSegments.append(contentsOf: refineRes.exports)
+        }
+        let bundle = try await WorkPackageBundle(
+            workPackage: workPackage.value,
+            extrinsics: extrinsics,
+            importSegments: retrieveImportSegments(for: workPackage.value),
+            justifications: retrieveJustifications(for: workPackage.value)
+        )
+        let (erasureRoot, length) = try await dataAvailability.exportWorkpackageBundle(bundle: bundle)
+
+        let segmentRoot = try await dataAvailability.exportSegments(data: exportSegments, erasureRoot: erasureRoot)
+        mappings.append(SegmentsRootMapping(workPackageHash: packageHash, segmentsRoot: segmentRoot))
+        // TODO: generate or find AvailabilitySpecifications  14.4.1 work-package bundle
+        let packageSpecification = AvailabilitySpecifications(
+            workPackageHash: packageHash,
+            length: length,
+            erasureRoot: erasureRoot,
+            segmentRoot: segmentRoot,
+            segmentCount: exportSegmentOffset
+        )
+        // The historical lookup function, Λ, is defined in equation 9.7.
+        var oldLookups = [Data32: Data32]()
+        for item in state.value.recentHistory.items {
+            oldLookups.merge(item.lookup, uniquingKeysWith: { _, new in new })
+        }
+        return try (bundle, mappings, WorkReport(
+            authorizerHash: authorizerHash,
+            coreIndex: coreIndex,
+            authorizationOutput: authorizationOutput,
+            refinementContext: workPackage.value.context,
+            packageSpecification: packageSpecification,
+            lookup: oldLookups,
+            results: ConfigLimitedSizeArray(config: config, array: workResults)
+        ))
     }
 }

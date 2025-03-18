@@ -40,8 +40,11 @@ public final class DataAvailability: ServiceBase2, @unchecked Sendable {
         // of 28 days (672 complete epochs) following the reporting of the work-report.
     }
 
-    public func fetchSegment(segments: [WorkItem.ImportedDataSegment]) async throws -> [Data4104] {
-        try await dataStore.fetchSegment(segments: segments)
+    public func fetchSegment(
+        segments: [WorkItem.ImportedDataSegment],
+        segmentsRootMappings: SegmentsRootMappings? = nil
+    ) async throws -> [Data4104] {
+        try await dataStore.fetchSegment(segments: segments, segmentsRootMappings: segmentsRootMappings)
     }
 
     public func exportSegments(data: [Data4104], erasureRoot: Data32) async throws -> Data32 {

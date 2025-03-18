@@ -27,7 +27,7 @@ struct EventBusTests {
         }
 
         // Give a small delay to ensure the wait is set up
-        try await Task.sleep(for: .seconds(0.01))
+        try await Task.sleep(for: .seconds(0.1))
 
         // Publish the event
         await eventBus.publish(testEvent)
@@ -47,13 +47,10 @@ struct EventBusTests {
         }
 
         // Give a small delay to ensure the wait is set up
-        try await Task.sleep(for: .seconds(0.01))
+        try await Task.sleep(for: .seconds(0.1))
 
         // Publish an event that doesn't match the check
         await eventBus.publish(TestEvent(id: 1, value: "wrong event"))
-
-        // Small delay to ensure the first event is processed
-        try await Task.sleep(for: .seconds(0.01))
 
         // Publish an event that matches the check
         let correctEvent = TestEvent(id: 2, value: "correct event")
@@ -84,7 +81,7 @@ struct EventBusTests {
         }
 
         // Give a small delay to ensure the waits are set up
-        try await Task.sleep(for: .seconds(0.01))
+        try await Task.sleep(for: .seconds(0.1))
 
         // Publish events
         let testEvent = TestEvent(id: 5, value: "test value")
@@ -117,7 +114,7 @@ struct EventBusTests {
         }
 
         // Give a small delay to ensure the waits are set up
-        try await Task.sleep(for: .seconds(0.01))
+        try await Task.sleep(for: .seconds(0.1))
 
         // Publish events
         await eventBus.publish(TestEvent(id: 1, value: "first"))
@@ -145,7 +142,7 @@ struct EventBusTests {
         }
 
         // Give a small delay to ensure the wait is set up
-        try await Task.sleep(for: .seconds(0.01))
+        try await Task.sleep(for: .seconds(0.1))
 
         // Unsubscribe
         await eventBus.unsubscribe(token: token)
