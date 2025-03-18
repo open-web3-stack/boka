@@ -19,3 +19,16 @@ public struct WorkPackageBundle: Sendable, Equatable, Codable, Hashable {
         try! JamEncoder.encode(self).blake2b256hash()
     }
 }
+
+extension WorkPackageBundle: Dummy {
+    public typealias Config = ProtocolConfigRef
+
+    public static func dummy(config: Config) -> WorkPackageBundle {
+        WorkPackageBundle(
+            workPackage: WorkPackage.dummy(config: config),
+            extrinsics: [],
+            importSegments: [],
+            justifications: []
+        )
+    }
+}

@@ -162,6 +162,8 @@ public class BlockchainServices: @unchecked Sendable {
             for service in targets {
                 await service.onBeforeEpoch(epoch: epoch, safroleState: res.state)
             }
+
+            await eventBus.publish(RuntimeEvents.BeforeEpochChange(epoch: epoch, state: res.state))
         } catch {
             fatalError("onBeforeEpoch failed: \(error)")
         }
@@ -177,5 +179,27 @@ public class BlockchainServices: @unchecked Sendable {
         }
 
         await callOnBeforeEpoch(epoch: epoch, targets: targets)
+    }
+
+    public nonisolated func publishOnBeforeEpochEvent() async {
+        do {
+            let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
+
+            let timeslot = timeProvider.getTime().timeToTimeslot(config: config)
+            let epoch = timeslot.timeslotToEpochIndex(config: config)
+
+            // simulate next block to determine the block authors for next epoch
+            let res = try state.value.updateSafrole(
+                config: config,
+                slot: timeslot,
+                entropy: Data32(),
+                offenders: [],
+                extrinsics: .dummy(config: config)
+            )
+
+            await eventBus.publish(RuntimeEvents.BeforeEpochChange(epoch: epoch, state: res.state))
+        } catch {
+            fatalError("onBeforeEpoch failed: \(error)")
+        }
     }
 }

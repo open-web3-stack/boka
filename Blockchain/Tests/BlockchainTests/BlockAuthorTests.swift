@@ -120,7 +120,7 @@ struct BlockAuthorTests {
 
         await scheduler.advance(by: TimeInterval(2))
 
-        let events = await storeMiddleware.wait()
+        let events = await storeMiddleware.wait().filter { !($0 is RuntimeEvents.BeforeEpochChange) }
         #expect(events.count == 1)
         #expect(events.first is RuntimeEvents.BlockAuthored)
 

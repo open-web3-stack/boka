@@ -21,6 +21,18 @@ public enum RuntimeEvents {
         }
     }
 
+    // Called before an epoch change is expected on next timeslot
+    // Note: This is only called when under as validator mode
+    public struct BeforeEpochChange: Event {
+        public let epoch: EpochIndex
+        public let state: SafrolePostState
+
+        public init(epoch: EpochIndex, state: SafrolePostState) {
+            self.epoch = epoch
+            self.state = state
+        }
+    }
+
     // New safrole ticket generated from SafroleService
     public struct SafroleTicketsGenerated: Event {
         public let epochIndex: EpochIndex

@@ -41,10 +41,9 @@ public struct ValidatorKey: Sendable, Equatable, Codable, Hashable {
     }
 
     public var metadataString: String {
-        // we want this behaviour rather than fail on invalid utf8
-        // swiftlint:disable optional_data_string_conversion
-        String(decoding: metadata.data, as: UTF8.self)
-        // swiftlint:enable optional_data_string_conversion
+        // get bytes from metadata.data that ends with the first nul
+        let bytes = metadata.data.prefix(while: { $0 != 0 })
+        return String(bytes: bytes, encoding: .utf8) ?? ""
     }
 }
 

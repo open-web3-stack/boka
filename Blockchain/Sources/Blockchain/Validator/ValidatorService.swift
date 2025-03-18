@@ -12,7 +12,7 @@ public final class ValidatorService: Sendable {
     private let blockAuthor: BlockAuthor
     private let dataAvailability: DataAvailability
 
-    private let allServices: [ServiceBase]
+    private let allServices: [Sendable]
 
     public init(
         blockchain: Blockchain,
@@ -118,6 +118,8 @@ public final class ValidatorService: Sendable {
                     await service.onBeforeEpoch(epoch: epoch, safroleState: res.state)
                 }
             }
+
+            blockchain.publish(event: RuntimeEvents.BeforeEpochChange(epoch: epoch, state: res.state))
         }
     }
 }
