@@ -84,7 +84,7 @@ struct EventBusTests {
         }
 
         // Give a small delay to ensure the waits are set up
-        try await Task.sleep(for: .seconds(0.01))
+        try await Task.sleep(for: .seconds(0.1))
 
         // Publish events
         let testEvent = TestEvent(id: 5, value: "test value")
