@@ -6,7 +6,9 @@ private let logger = Logger(label: "Accumulation")
 
 public enum AccumulationError: Error {
     case invalidServiceIndex
-    case duplicatedServiceIndex
+    case duplicatedNewService
+    case duplicatedContributionToService
+    case duplicatedRemovedService
 }
 
 public struct AccumulationQueueItem: Sendable, Equatable, Codable {
@@ -48,7 +50,9 @@ public struct ParallelAccumulationOutput {
 }
 
 /// single-service accumulation function ∆1 output
-public struct SingleAccumulationOutput {
+public typealias SingleAccumulationOutput = AccumulationResult
+
+public struct AccumulationResult {
     // o
     public var state: AccumulateState
     // t
@@ -57,6 +61,58 @@ public struct SingleAccumulationOutput {
     public var commitment: Data32?
     // u
     public var gasUsed: Gas
+}
+
+public struct AccountChanges {
+    public var newAccounts: [ServiceIndex: ServiceAccount]
+    public var altered: Set<ServiceIndex>
+    public var alterations: [(ServiceAccountsMutRef) -> Void]
+    public var removed: Set<ServiceIndex>
+
+    public init() {
+        newAccounts = [:]
+        alterations = []
+        altered = []
+        removed = []
+    }
+
+    public mutating func addAlteration(index: ServiceIndex, _ alteration: @escaping (ServiceAccountsMutRef) -> Void) {
+        alterations.append(alteration)
+        altered.insert(index)
+    }
+
+    public func apply(to accounts: ServiceAccountsMutRef) {
+        for (index, account) in newAccounts {
+            accounts.addNew(serviceAccount: index, account: account)
+        }
+        for index in removed {
+            accounts.remove(serviceAccount: index)
+        }
+        for alteration in alterations {
+            alteration(accounts)
+        }
+    }
+
+    public mutating func checkAndMerge(with other: AccountChanges) throws(AccumulationError) {
+        guard Set(newAccounts.keys).isDisjoint(with: other.newAccounts.keys) else {
+            logger.debug("new accounts have duplicates, self: \(newAccounts.keys), other: \(other.newAccounts.keys)")
+            throw .duplicatedNewService
+        }
+        guard altered.isDisjoint(with: other.altered) else {
+            logger.debug("altered accounts have duplicates, self: \(altered), other: \(other.altered)")
+            throw .duplicatedContributionToService
+        }
+        guard removed.isDisjoint(with: other.removed) else {
+            logger.debug("removed accounts have duplicates, self: \(removed), other: \(other.removed)")
+            throw .duplicatedRemovedService
+        }
+
+        for (index, account) in other.newAccounts {
+            newAccounts[index] = account
+        }
+        altered.formUnion(other.altered)
+        removed.formUnion(other.removed)
+    }
 }
 
 public protocol Accumulation: ServiceAccounts {
@@ -108,27 +164,19 @@ extension Accumulation {
 
         logger.debug("[single] accumulate arguments: \(arguments)")
 
-        let accountsMutRef = ServiceAccountsMutRef(self)
-        let (newState, transfers, commitment, gasUsed) = try await accumulate(
+        let result = try await accumulate(
             config: config,
-            serviceAccounts: accountsMutRef,
-            accumulateState: state,
+            state: state,
             serviceIndex: service,
             gas: gas,
             arguments: arguments,
-            initialIndex: Blake2b256.hash(service.encode(), entropy.data, timeslot.encode()).data.decode(UInt32.self),
+            initialIndex: Blake2b256.hash(JamEncoder.encode(service, entropy, timeslot)).data.decode(UInt32.self),
             timeslot: timeslot
         )
-        self = accountsMutRef.value as! Self
 
-        logger.debug("[single] accumulate result: gasUsed=\(gasUsed), commitment=\(String(describing: commitment))")
+        logger.debug("[single] accumulate result: gasUsed=\(result.gasUsed), commitment=\(String(describing: result.commitment))")
 
-        return SingleAccumulationOutput(
-            state: newState,
-            transfers: transfers,
-            commitment: commitment,
-            gasUsed: gasUsed
-        )
+        return result
     }
 
     /// parallelized accumulate function ∆*
@@ -144,7 +192,6 @@ extension Accumulation {
         var gasUsed = Gas(0)
         var transfers: [DeferredTransfers] = []
         var commitments = Set<Commitment>()
-        var newServiceAccounts = [ServiceIndex: ServiceAccount]()
         var newPrivilegedServices: PrivilegedServices?
         var newValidatorQueue: ConfigFixedSizeArray<
             ValidatorKey, ProtocolConfig.TotalNumberOfValidators
@@ -156,6 +203,7 @@ extension Accumulation {
             >,
             ProtocolConfig.TotalNumberOfCores
         >?
+        var overallAccountChanges = AccountChanges()
 
         for report in workReports {
             for result in report.results {
@@ -169,10 +217,17 @@ extension Accumulation {
 
         logger.debug("[parallel] services to accumulate: \(services)")
 
+        var accountsRef = ServiceAccountsMutRef(state.accounts.value)
+
         for service in services {
             let singleOutput = try await singleAccumulate(
                 config: config,
-                state: state,
+                state: AccumulateState(
+                    accounts: accountsRef,
+                    validatorQueue: state.validatorQueue,
+                    authorizationQueue: state.authorizationQueue,
+                    privilegedServices: state.privilegedServices
+                ),
                 workReports: workReports,
                 service: service,
                 privilegedGas: privilegedGas,
@@ -189,14 +244,6 @@ extension Accumulation {
                 transfers.append(transfer)
             }
 
-            // new service accounts
-            for (service, account) in singleOutput.state.newServiceAccounts {
-                guard newServiceAccounts[service] == nil, try await get(serviceAccount: service) == nil else {
-                    throw AccumulationError.duplicatedServiceIndex
-                }
-                newServiceAccounts[service] = account
-            }
-
             switch service {
             case privilegedServices.blessed:
                 newPrivilegedServices = singleOutput.state.privilegedServices
@@ -207,12 +254,16 @@ extension Accumulation {
             default:
                 break
             }
+
+            accountsRef = singleOutput.state.accounts
+            try overallAccountChanges.checkAndMerge(with: accountsRef.changes)
+            accountsRef.clearRecordedChanges()
         }
 
         return ParallelAccumulationOutput(
             gasUsed: gasUsed,
             state: AccumulateState(
-                newServiceAccounts: newServiceAccounts,
+                accounts: state.accounts,
                 validatorQueue: newValidatorQueue ?? validatorQueue,
                 authorizationQueue: newAuthorizationQueue ?? authorizationQueue,
                 privilegedServices: newPrivilegedServices ?? privilegedServices
@@ -349,6 +400,7 @@ extension Accumulation {
     private mutating func execution(
         config: ProtocolConfigRef,
         workReports: [WorkReport],
+        state: AccumulateState,
         entropy: Data32,
         timeslot: TimeslotIndex
     ) async throws -> AccumulationOutput {
@@ -358,12 +410,7 @@ extension Accumulation {
 
         return try await outerAccumulate(
             config: config,
-            state: AccumulateState(
-                newServiceAccounts: [:],
-                validatorQueue: validatorQueue,
-                authorizationQueue: authorizationQueue,
-                privilegedServices: privilegedServices
-            ),
+            state: state,
             workReports: workReports,
             privilegedGas: privilegedServices.basicGas,
             gasLimit: gasLimit,
@@ -393,9 +440,19 @@ extension Accumulation {
 
         logger.debug("accumulatable reports: \(accumulatableReports.map(\.packageSpecification.workPackageHash))")
 
+        let accountsMutRef = ServiceAccountsMutRef(self)
+
+        let initialAccState = AccumulateState(
+            accounts: accountsMutRef,
+            validatorQueue: validatorQueue,
+            authorizationQueue: authorizationQueue,
+            privilegedServices: privilegedServices
+        )
+
         let accumulateOutput = try await execution(
             config: config,
             workReports: accumulatableReports,
+            state: initialAccState,
             entropy: entropy,
             timeslot: timeslot
         )
@@ -404,27 +461,12 @@ extension Accumulation {
         validatorQueue = accumulateOutput.state.validatorQueue
         privilegedServices = accumulateOutput.state.privilegedServices
 
-        // add new service accounts
-        for (service, account) in accumulateOutput.state.newServiceAccounts {
-            set(serviceAccount: service, account: account.toDetails())
-            for (hash, value) in account.storage {
-                set(serviceAccount: service, storageKey: hash, value: value)
-            }
-            for (hash, value) in account.preimages {
-                set(serviceAccount: service, preimageHash: hash, value: value)
-            }
-            for (hashLength, value) in account.preimageInfos {
-                set(serviceAccount: service, preimageHash: hashLength.hash, length: hashLength.length, value: value)
-            }
-        }
-
         // transfers
         var transferGroups = [ServiceIndex: [DeferredTransfers]]()
         for transfer in accumulateOutput.transfers {
             transferGroups[transfer.destination, default: []].append(transfer)
         }
         for (service, transfers) in transferGroups {
-            let accountsMutRef = ServiceAccountsMutRef(self)
             try await onTransfer(
                 config: config,
                 serviceIndex: service,
@@ -432,8 +474,9 @@ extension Accumulation {
                 timeslot: timeslot,
                 transfers: transfers
             )
-            self = accountsMutRef.value as! Self
         }
+
+        self = accountsMutRef.value as! Self
 
         // update accumulation history
         let accumulated = accumulatableReports[0 ..< accumulateOutput.numAccumulated]
@@ -459,8 +502,14 @@ extension Accumulation {
             }
         }
 
+        let commitmentsSorted = accumulateOutput.commitments.sorted { $0.serviceIndex < $1.serviceIndex }
+        logger.debug("accumulation commitments sorted: \(commitmentsSorted)")
+
         // accumulate root
-        let nodes = try accumulateOutput.commitments.map { try JamEncoder.encode($0.serviceIndex) + JamEncoder.encode($0.hash) }
+        let nodes = try commitmentsSorted.map { try JamEncoder.encode($0.serviceIndex) + JamEncoder.encode($0.hash) }
+
+        logger.debug("accumulation commitments encoded: \(nodes.map { $0.toHexString() })")
+
         let root = Merklization.binaryMerklize(nodes, hasher: Keccak.self)
 
         logger.debug("accumulation root: \(root)")
