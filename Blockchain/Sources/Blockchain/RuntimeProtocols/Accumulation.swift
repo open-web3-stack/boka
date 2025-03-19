@@ -94,15 +94,15 @@ public struct AccountChanges {
     }
 
     public mutating func checkAndMerge(with other: AccountChanges) throws(AccumulationError) {
-        guard Set(newAccounts.keys).intersection(other.newAccounts.keys).isEmpty else {
+        guard Set(newAccounts.keys).isDisjoint(with: other.newAccounts.keys) else {
             logger.debug("new accounts have duplicates, self: \(newAccounts.keys), other: \(other.newAccounts.keys)")
             throw .duplicatedNewService
         }
-        guard altered.intersection(other.altered).isEmpty else {
+        guard altered.isDisjoint(with: other.altered) else {
             logger.debug("altered accounts have duplicates, self: \(altered), other: \(other.altered)")
             throw .duplicatedContributionToService
         }
-        guard removed.intersection(other.removed).isEmpty else {
+        guard removed.isDisjoint(with: other.removed) else {
             logger.debug("removed accounts have duplicates, self: \(removed), other: \(other.removed)")
             throw .duplicatedRemovedService
         }
