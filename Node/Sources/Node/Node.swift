@@ -63,6 +63,7 @@ public class Node {
             blockchain: blockchain,
             chainDataProvider: dataProvider,
             networkManager: network,
+            keystore: keystore,
             name: config.name
         )
 
