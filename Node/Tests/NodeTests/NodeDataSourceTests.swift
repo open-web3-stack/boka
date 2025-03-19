@@ -63,6 +63,7 @@ struct NodeDataSourceTests {
         #expect(blsKey.key.count > 0)
         #expect(ed25519Key.key.count > 0)
         #expect(bandersnatchKey.key.count > 0)
+        await storeMiddleware.wait()
     }
 
     @Test func listKeys() async throws {
@@ -80,6 +81,7 @@ struct NodeDataSourceTests {
         #expect(keys.contains { item in
             item.key == bandersnatchKey.key
         })
+        await storeMiddleware.wait()
     }
 
     @Test func hasKey() async throws {
@@ -103,5 +105,6 @@ struct NodeDataSourceTests {
         let randomData = Data32.random().data
         let hasRandomKey = try await dataSource.has(keyType: .Bandersnatch, with: randomData)
         #expect(hasRandomKey == false)
+        await storeMiddleware.wait()
     }
 }
