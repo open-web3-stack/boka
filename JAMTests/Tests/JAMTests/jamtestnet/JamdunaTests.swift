@@ -19,8 +19,10 @@ struct JamdunaTests {
         _ = try await CommonTests.test(input)
     }
 
-    // @Test(arguments: try JamTestnet.loadTests(path: "data/orderedaccumulation/state_transitions", src: .jamduna))
-    // func orderedaccumulationTests(_ input: Testcase) async throws {
-    //     try await CommonTests.test(input)
-    // }
+    @Test(arguments: try JamTestnet.loadTests(path: "data/orderedaccumulation/state_transitions", src: .jamduna))
+    func orderedaccumulationTests(_ input: Testcase) async throws {
+        await withKnownIssue("https://github.com/jam-duna/jamtestnet/issues/150", isIntermittent: true) {
+            try await CommonTests.test(input)
+        }
+    }
 }
