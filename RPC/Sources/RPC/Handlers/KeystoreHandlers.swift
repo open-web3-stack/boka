@@ -87,11 +87,11 @@ public enum KeystoreHandlers {
     }
 
     public struct HasKey: RPCHandler {
-        public typealias Request = Request1<Data>
+        public typealias Request = Request2<String, Data>
         public typealias Response = Bool
 
         public static var method: String { "keys_hasKey" }
-        public static var requestNames: [String] { ["publicKey"] }
+        public static var requestNames: [String] { ["keyType", "publicKey"] }
         public static var summary: String? { "Check if a public key exists in the keystore." }
 
         private let source: KeystoreDataSource
