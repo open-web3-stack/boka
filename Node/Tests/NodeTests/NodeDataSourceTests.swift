@@ -55,53 +55,36 @@ struct NodeDataSourceTests {
         #expect(workPackageEvent.extrinsics == extrinsic)
     }
 
-//    @Test func createKey() async throws {
-//        let blsKey = try await dataSource.create(keyType: .BLS)
-//        let ed25519Key = try await dataSource.create(keyType: .Ed25519)
-//        let bandersnatchKey = try await dataSource.create(keyType: .Bandersnatch)
-//
-//        #expect(blsKey.key.count > 0)
-//        #expect(ed25519Key.key.count > 0)
-//        #expect(bandersnatchKey.key.count > 0)
-//    }
-//
-//    @Test func listKeys() async throws {
-//        let blsKey = try await dataSource.create(keyType: .BLS)
-//        let ed25519Key = try await dataSource.create(keyType: .Ed25519)
-//        let bandersnatchKey = try await dataSource.create(keyType: .Bandersnatch)
-//
-//        let keys = try await dataSource.listKeys()
-//        #expect(keys.contains { item in
-//            item.key == blsKey.key
-//        })
-//        #expect(keys.contains { item in
-//            item.key == ed25519Key.key
-//        })
-//        #expect(keys.contains { item in
-//            item.key == bandersnatchKey.key
-//        })
-//    }
-//
-//    @Test func hasKey() async throws {
-//        let blsKey = try await dataSource.create(keyType: .BLS)
-//        let ed25519Key = try await dataSource.create(keyType: .Ed25519)
-//        let bandersnatchKey = try await dataSource.create(keyType: .Bandersnatch)
-//
-//        let blsKeyData = Data(fromHexString: blsKey.key)!
-//        let ed25519KeyData = Data(fromHexString: ed25519Key.key)!
-//        let bandersnatchKeyData = Data(fromHexString: bandersnatchKey.key)!
-//
-//        let hasBLSKey = try await dataSource.has(keyType: .BLS, with: blsKeyData)
-//
-//        let hasEd25519Key = try await dataSource.has(keyType: .Ed25519, with: ed25519KeyData)
-//        let hasBandersnatchKey = try await dataSource.has(keyType: .Bandersnatch, with: bandersnatchKeyData)
-//
-//        #expect(hasBLSKey == true)
-//        #expect(hasEd25519Key == true)
-//        #expect(hasBandersnatchKey == true)
-//
-//        let randomData = Data32.random().data
-//        let hasRandomKey = try await dataSource.has(keyType: .Bandersnatch, with: randomData)
-//        #expect(hasRandomKey == false)
-//    }
+    @Test func testKeyStore() async throws {
+        let blsKey = try await dataSource.create(keyType: .BLS)
+        let ed25519Key = try await dataSource.create(keyType: .Ed25519)
+        let bandersnatchKey = try await dataSource.create(keyType: .Bandersnatch)
+
+        let keys = try await dataSource.listKeys()
+        #expect(keys.contains { item in
+            item.key == blsKey.key
+        })
+        #expect(keys.contains { item in
+            item.key == ed25519Key.key
+        })
+        #expect(keys.contains { item in
+            item.key == bandersnatchKey.key
+        })
+
+        let blsKeyData = Data(fromHexString: blsKey.key)!
+        let ed25519KeyData = Data(fromHexString: ed25519Key.key)!
+        let bandersnatchKeyData = Data(fromHexString: bandersnatchKey.key)!
+
+        let hasBLSKey = try await dataSource.has(keyType: .BLS, with: blsKeyData)
+        let hasEd25519Key = try await dataSource.has(keyType: .Ed25519, with: ed25519KeyData)
+        let hasBandersnatchKey = try await dataSource.has(keyType: .Bandersnatch, with: bandersnatchKeyData)
+
+        #expect(hasBLSKey == true)
+        #expect(hasEd25519Key == true)
+        #expect(hasBandersnatchKey == true)
+
+        let randomData = Data32.random().data
+        let hasRandomKey = try await dataSource.has(keyType: .Bandersnatch, with: randomData)
+        #expect(hasRandomKey == false)
+    }
 }
