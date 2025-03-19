@@ -14,7 +14,7 @@ public func accumulate(
     arguments: [AccumulateArguments],
     initialIndex: ServiceIndex,
     timeslot: TimeslotIndex
-) async throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
+) async throws -> AccumulationResult {
     logger.debug("accumulating service index: \(serviceIndex)")
 
     guard let accumulatingAccountDetails = try await state.accounts.value.get(serviceAccount: serviceIndex),
@@ -23,7 +23,7 @@ public func accumulate(
               preimageHash: accumulatingAccountDetails.codeHash
           )
     else {
-        return (state, [], nil, Gas(0))
+        return .init(state: state, transfers: [], commitment: nil, gasUsed: Gas(0))
     }
 
     let contextContent = try await AccumulateContext.ContextType(
@@ -33,19 +33,15 @@ public func accumulate(
             nextAccountIndex: AccumulateContext.check(
                 i: initialIndex % serviceIndexModValue + 256,
                 accounts: state.accounts.toRef()
-            ),
-            transfers: [],
-            yield: nil
+            )
         ),
         y: AccumlateResultContext(
             serviceIndex: serviceIndex,
-            state: state,
+            state: state.copy(),
             nextAccountIndex: AccumulateContext.check(
                 i: initialIndex % serviceIndexModValue + 256,
                 accounts: state.accounts.toRef()
-            ),
-            transfers: [],
-            yield: nil
+            )
         )
     )
     let ctx = AccumulateContext(context: contextContent, config: config, timeslot: timeslot)
@@ -62,7 +58,6 @@ public func accumulate(
 
     logger.debug("accumulate exit reason: \(exitReason)")
     logger.debug("accumulate output: \(output?.toDebugHexString() ?? "nil")")
-    logger.debug("accumulate x.yield: \(ctx.context.x.yield?.toHexString() ?? "nil")")
 
     return try collapse(exitReason: exitReason, output: output, context: ctx.context, gas: gas)
 }
@@ -71,15 +66,16 @@ public func accumulate(
 // machine’s halt was regular or exceptional
 private func collapse(
     exitReason: ExitReason, output: Data?, context: AccumulateContext.ContextType, gas: Gas
-) throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
+) throws -> AccumulationResult {
     switch exitReason {
     case .panic, .outOfGas:
-        (context.y.state, context.y.transfers, context.y.yield, gas)
+        .init(state: context.y.state, transfers: context.y.transfers, commitment: context.y.yield, gasUsed: gas)
     default:
         if let output, let o = Data32(output) {
-            (context.x.state, context.x.transfers, o, gas)
+            .init(state: context.x.state, transfers: context.x.transfers, commitment: o, gasUsed: gas)
+
         } else {
-            (context.x.state, context.x.transfers, context.x.yield, gas)
+            .init(state: context.x.state, transfers: context.x.transfers, commitment: context.x.yield, gasUsed: gas)
         }
     }
 }

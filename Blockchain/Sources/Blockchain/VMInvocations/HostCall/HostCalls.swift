@@ -94,6 +94,8 @@ public class Read: HostCall {
             nil
         }
 
+        logger.debug("service: \(service?.description ?? "nil")")
+
         let regs: [UInt32] = state.readRegisters(in: 8 ..< 11)
 
         if !state.isMemoryReadable(address: regs[0], length: Int(regs[1])) {
@@ -102,11 +104,15 @@ public class Read: HostCall {
 
         let key = try? Blake2b256.hash(serviceX.encode(), state.readMemory(address: regs[0], length: Int(regs[1])))
 
+        logger.debug("key: \(key?.toHexString() ?? "nil")")
+
         let value: Data? = if let service, let key {
             try await serviceAccounts.value.get(serviceAccount: service, storageKey: key)
         } else {
             nil
         }
+
+        logger.debug("raw val: \(value?.toDebugHexString() ?? "nil")")
 
         let reg11: UInt64 = state.readRegister(Registers.Index(raw: 11))
         let reg12: UInt64 = state.readRegister(Registers.Index(raw: 12))
@@ -120,6 +126,7 @@ public class Read: HostCall {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), value!.count)
+            logger.debug("val: \(value![relative: first ..< (first + len)].toDebugHexString())")
             try state.writeMemory(address: regs[2], values: value![relative: first ..< (first + len)])
         }
     }
@@ -156,19 +163,17 @@ public class Write: HostCall {
             HostCallResultCode.NONE.rawValue
         }
 
-        logger.debug("len: \(len)")
-
         let accountDetails = try await serviceAccounts.value.get(serviceAccount: serviceIndex)
         if let accountDetails, accountDetails.thresholdBalance(config: config) > accountDetails.balance {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), len)
             if regs[3] == 0 {
-                serviceAccounts.value.set(serviceAccount: serviceIndex, storageKey: key!, value: nil)
+                serviceAccounts.set(serviceAccount: serviceIndex, storageKey: key!, value: nil)
             } else {
                 let value = try state.readMemory(address: regs[2], length: Int(regs[3]))
-                logger.debug("set value: \(value.toDebugHexString())")
-                serviceAccounts.value.set(
+                logger.debug("val: \(value.toDebugHexString()), len: \(value.count)")
+                serviceAccounts.set(
                     serviceAccount: serviceIndex,
                     storageKey: key!,
                     value: value
@@ -390,7 +395,7 @@ public class New: HostCall {
             newAccount = ServiceAccount(
                 storage: [:],
                 preimages: [:],
-                preimageInfos: [:],
+                preimageInfos: [HashAndLength(hash: codeHash, length: UInt32(truncatingIfNeeded: regs[1])): []],
                 codeHash: codeHash,
                 balance: Balance(0),
                 minAccumlateGas: minAccumlateGas,
@@ -413,14 +418,14 @@ public class New: HostCall {
             state.writeRegister(Registers.Index(raw: 7), x.nextAccountIndex)
 
             account.balance -= newAccount.thresholdBalance(config: config)
-            x.state.accounts.value.set(serviceAccount: x.serviceIndex, account: account)
-            x.state.accounts.value.set(serviceAccount: x.nextAccountIndex, account: newAccount.toDetails())
-            x.state.accounts.value.set(
-                serviceAccount: x.nextAccountIndex,
-                preimageHash: codeHash!,
-                length: UInt32(truncatingIfNeeded: regs[1]), value: []
-            )
 
+            // update accumulating account details
+            x.state.accounts.set(serviceAccount: x.serviceIndex, account: account)
+
+            // add the new account
+            x.state.accounts.addNew(serviceAccount: x.nextAccountIndex, account: newAccount)
+
+            // update nextAccountIndex
             x.nextAccountIndex = try await AccumulateContext.check(
                 i: bump(i: x.nextAccountIndex),
                 accounts: x.state.accounts.toRef()
@@ -448,7 +453,7 @@ public class Upgrade: HostCall {
             acc.codeHash = codeHash
             acc.minAccumlateGas = Gas(regs[1])
             acc.minOnTransferGas = Gas(regs[2])
-            x.state.accounts.value.set(serviceAccount: x.serviceIndex, account: acc)
+            x.state.accounts.set(serviceAccount: x.serviceIndex, account: acc)
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         } else {
             throw VMInvocationsError.panic
@@ -503,7 +508,7 @@ public class Transfer: HostCall {
                 gasLimit: gasLimit
             ))
             srcAccount.balance -= amount
-            x.state.accounts.value.set(serviceAccount: x.serviceIndex, account: srcAccount)
+            x.state.accounts.set(serviceAccount: x.serviceIndex, account: srcAccount)
         }
     }
 }
@@ -549,10 +554,11 @@ public class Eject: HostCall {
         if ejectAccount!.itemsCount != 2 || preimageInfo == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
         } else if preimageInfo!.count == 2, preimageInfo![1] < minHoldSlot {
-            var destAccount = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex)
-            destAccount?.balance += ejectAccount!.balance
-            x.state.accounts.value.set(serviceAccount: ejectIndex, account: nil)
-            x.state.accounts.value.set(serviceAccount: x.serviceIndex, account: destAccount)
+            // accumulating service definitely exist
+            var destAccount = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex)!
+            destAccount.balance += ejectAccount!.balance
+            x.state.accounts.remove(serviceAccount: ejectIndex)
+            x.state.accounts.set(serviceAccount: x.serviceIndex, account: destAccount)
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
@@ -639,10 +645,10 @@ public class Solicit: HostCall {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
         } else {
             if notRequestedYet {
-                x.state.accounts.value.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: [])
+                x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: [])
             } else if isPreviouslyAvailable, var preimageInfo {
                 try preimageInfo.append(timeslot)
-                x.state.accounts.value.set(
+                x.state.accounts.set(
                     serviceAccount: x.serviceIndex,
                     preimageHash: Data32(hash!)!,
                     length: length,
@@ -690,11 +696,11 @@ public class Forget: HostCall {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.HUH.rawValue)
         } else {
             if canExpunge {
-                x.state.accounts.value.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: nil)
-                x.state.accounts.value.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, value: nil)
+                x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: nil)
+                x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, value: nil)
             } else if isAvailable1, var preimageInfo {
                 try preimageInfo.append(timeslot)
-                x.state.accounts.value.set(
+                x.state.accounts.set(
                     serviceAccount: x.serviceIndex,
                     preimageHash: Data32(hash!)!,
                     length: length,
@@ -702,7 +708,7 @@ public class Forget: HostCall {
                 )
             } else if isAvailable3, var preimageInfo {
                 preimageInfo = [preimageInfo[2], timeslot]
-                x.state.accounts.value.set(
+                x.state.accounts.set(
                     serviceAccount: x.serviceIndex,
                     preimageHash: Data32(hash!)!,
                     length: length,
