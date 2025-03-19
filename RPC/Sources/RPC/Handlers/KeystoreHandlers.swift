@@ -40,7 +40,7 @@ public enum KeystoreHandlers {
 
     public struct CreateKey: RPCHandler {
         public typealias Request = Request1<String>
-        public typealias Response = String
+        public typealias Response = PubKeyItem
 
         public static var method: String { "keys_create" }
         public static var requestNames: [String] { ["keyType"] }

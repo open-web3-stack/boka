@@ -68,7 +68,7 @@ extension NodeDataSource: BuilderDataSource {
 }
 
 extension NodeDataSource: KeystoreDataSource {
-    public func create(keyType: KeyGenType) async throws -> String {
+    public func create(keyType: KeyGenType) async throws -> PubKeyItem {
         let secretKey: any SecretKeyProtocol = switch keyType {
         case .BLS:
             try await keystore.generate(BLS.self)
@@ -77,7 +77,7 @@ extension NodeDataSource: KeystoreDataSource {
         case .Ed25519:
             try await keystore.generate(Ed25519.self)
         }
-        return secretKey.publicKey.toHexString()
+        return PubKeyItem(key: secretKey.publicKey.toHexString(), type: keyType.rawValue)
     }
 
     public func listKeys() async throws -> [PubKeyItem] {

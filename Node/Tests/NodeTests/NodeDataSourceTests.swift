@@ -60,9 +60,9 @@ struct NodeDataSourceTests {
         let ed25519Key = try await dataSource.create(keyType: .Ed25519)
         let bandersnatchKey = try await dataSource.create(keyType: .Bandersnatch)
 
-        #expect(blsKey.count > 0)
-        #expect(ed25519Key.count > 0)
-        #expect(bandersnatchKey.count > 0)
+        #expect(blsKey.key.count > 0)
+        #expect(ed25519Key.key.count > 0)
+        #expect(bandersnatchKey.key.count > 0)
     }
 
     @Test func listKeys() async throws {
@@ -72,24 +72,24 @@ struct NodeDataSourceTests {
 
         let keys = try await dataSource.listKeys()
         #expect(keys.contains { item in
-            item.key == blsKey
+            item.key == blsKey.key
         })
         #expect(keys.contains { item in
-            item.key == ed25519Key
+            item.key == ed25519Key.key
         })
         #expect(keys.contains { item in
-            item.key == bandersnatchKey
+            item.key == bandersnatchKey.key
         })
     }
 
     @Test func hasKey() async throws {
-        let blsKeyHex = try await dataSource.create(keyType: .BLS)
-        let ed25519KeyHex = try await dataSource.create(keyType: .Ed25519)
-        let bandersnatchKeyHex = try await dataSource.create(keyType: .Bandersnatch)
+        let blsKey = try await dataSource.create(keyType: .BLS)
+        let ed25519Key = try await dataSource.create(keyType: .Ed25519)
+        let bandersnatchKey = try await dataSource.create(keyType: .Bandersnatch)
 
-        let blsKeyData = Data(fromHexString: blsKeyHex)!
-        let ed25519KeyData = Data(fromHexString: ed25519KeyHex)!
-        let bandersnatchKeyData = Data(fromHexString: bandersnatchKeyHex)!
+        let blsKeyData = Data(fromHexString: blsKey.key)!
+        let ed25519KeyData = Data(fromHexString: ed25519Key.key)!
+        let bandersnatchKeyData = Data(fromHexString: bandersnatchKey.key)!
 
         let hasBLSKey = try await dataSource.has(keyType: .BLS, with: blsKeyData)
 
