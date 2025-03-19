@@ -48,6 +48,20 @@ extension BinaryInteger where Self: FromJSON {
     }
 }
 
+extension String: FromJSON {
+    public init(from json: JSON?) throws {
+        guard let json else {
+            throw FromJSONError.null
+        }
+        switch json {
+        case let .string(str):
+            self = str
+        default:
+            throw FromJSONError.unexpectedJSON
+        }
+    }
+}
+
 extension Int8: FromJSON {}
 extension Int16: FromJSON {}
 extension Int32: FromJSON {}
