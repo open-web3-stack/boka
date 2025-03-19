@@ -16,6 +16,7 @@ public indirect enum JSON: Codable, Equatable, Sendable {
     case dictionary([String: JSON])
     case array([JSON])
     case string(String)
+//    case string(String)
     case number(Double)
     case boolean(Bool)
     case null

@@ -55,7 +55,17 @@ struct NodeDataSourceTests {
         #expect(workPackageEvent.extrinsics == extrinsic)
     }
 
-    @Test func testKeyStore() async throws {
+    @Test func createKey() async throws {
+        let blsKey = try await dataSource.create(keyType: .BLS)
+        let ed25519Key = try await dataSource.create(keyType: .Ed25519)
+        let bandersnatchKey = try await dataSource.create(keyType: .Bandersnatch)
+
+        #expect(blsKey.key.count > 0)
+        #expect(ed25519Key.key.count > 0)
+        #expect(bandersnatchKey.key.count > 0)
+    }
+
+    @Test func listKeys() async throws {
         let blsKey = try await dataSource.create(keyType: .BLS)
         let ed25519Key = try await dataSource.create(keyType: .Ed25519)
         let bandersnatchKey = try await dataSource.create(keyType: .Bandersnatch)
@@ -70,12 +80,19 @@ struct NodeDataSourceTests {
         #expect(keys.contains { item in
             item.key == bandersnatchKey.key
         })
+    }
+
+    @Test func hasKey() async throws {
+        let blsKey = try await dataSource.create(keyType: .BLS)
+        let ed25519Key = try await dataSource.create(keyType: .Ed25519)
+        let bandersnatchKey = try await dataSource.create(keyType: .Bandersnatch)
 
         let blsKeyData = Data(fromHexString: blsKey.key)!
         let ed25519KeyData = Data(fromHexString: ed25519Key.key)!
         let bandersnatchKeyData = Data(fromHexString: bandersnatchKey.key)!
 
         let hasBLSKey = try await dataSource.has(keyType: .BLS, with: blsKeyData)
+
         let hasEd25519Key = try await dataSource.has(keyType: .Ed25519, with: ed25519KeyData)
         let hasBandersnatchKey = try await dataSource.has(keyType: .Bandersnatch, with: bandersnatchKeyData)
 
