@@ -43,8 +43,8 @@ public struct DeferredTransfers: Codable {
 /// U: a characterization (i.e. values capable of representing) of state components
 ///    which are both needed and mutable by the accumulation process.
 public struct AccumulateState {
-    /// d
-    public var newServiceAccounts: [ServiceIndex: ServiceAccount]
+    /// d (all service accounts)
+    public var accounts: ServiceAccountsMutRef
     /// i
     public var validatorQueue: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators
@@ -59,36 +59,41 @@ public struct AccumulateState {
     >
     /// x
     public var privilegedServices: PrivilegedServices
+
+    public func copy() -> AccumulateState {
+        AccumulateState(
+            accounts: ServiceAccountsMutRef(accounts.value),
+            validatorQueue: validatorQueue,
+            authorizationQueue: authorizationQueue,
+            privilegedServices: privilegedServices
+        )
+    }
 }
 
 /// X
 public class AccumlateResultContext {
-    /// d: all existing service accounts
-    public var serviceAccounts: ServiceAccountsMutRef
     /// s: the accumulating service account index
     public var serviceIndex: ServiceIndex
     /// u
-    public var accumulateState: AccumulateState
+    public var state: AccumulateState
     /// i
     public var nextAccountIndex: ServiceIndex
     /// t: deferred transfers
     public var transfers: [DeferredTransfers]
     /// y
     public var yield: Data32?
+    public var accountChanges: AccountChanges
 
     public init(
-        serviceAccounts: ServiceAccountsMutRef,
         serviceIndex: ServiceIndex,
-        accumulateState: AccumulateState,
-        nextAccountIndex: ServiceIndex,
-        transfers: [DeferredTransfers],
-        yield: Data32?
+        state: AccumulateState,
+        nextAccountIndex: ServiceIndex
     ) {
-        self.serviceAccounts = serviceAccounts
         self.serviceIndex = serviceIndex
-        self.accumulateState = accumulateState
+        self.state = state
         self.nextAccountIndex = nextAccountIndex
-        self.transfers = transfers
-        self.yield = yield
+        transfers = []
+        yield = nil
+        accountChanges = AccountChanges()
     }
 }

@@ -22,7 +22,11 @@ public enum Merklization {
             let l = nodes[nodes.startIndex ..< midIndex]
             let r = nodes[midIndex ..< nodes.endIndex]
 
-            return .init(right: hasher.hash("node", binaryMerklizeHelper(l).value, binaryMerklizeHelper(r).value))
+            return .init(right: hasher.hash(
+                "node",
+                binaryMerklizeHelper(l, hasher: hasher).value,
+                binaryMerklizeHelper(r, hasher: hasher).value
+            ))
         }
     }
 

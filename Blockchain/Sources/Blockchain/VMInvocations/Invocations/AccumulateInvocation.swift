@@ -8,47 +8,40 @@ private let logger = Logger(label: "accumulate")
 
 public func accumulate(
     config: ProtocolConfigRef,
-    serviceAccounts: ServiceAccountsMutRef,
-    accumulateState: AccumulateState,
+    state: AccumulateState,
     serviceIndex: ServiceIndex,
     gas: Gas,
     arguments: [AccumulateArguments],
     initialIndex: ServiceIndex,
     timeslot: TimeslotIndex
-) async throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
+) async throws -> AccumulationResult {
     logger.debug("accumulating service index: \(serviceIndex)")
 
-    guard let accumulatingAccountDetails = try await serviceAccounts.value.get(serviceAccount: serviceIndex),
-          let codeBlob = try await serviceAccounts.value.get(
+    guard let accumulatingAccountDetails = try await state.accounts.value.get(serviceAccount: serviceIndex),
+          let codeBlob = try await state.accounts.value.get(
               serviceAccount: serviceIndex,
               preimageHash: accumulatingAccountDetails.codeHash
           )
     else {
-        return (accumulateState, [], nil, Gas(0))
+        return .init(state: state, transfers: [], commitment: nil, gasUsed: Gas(0))
     }
 
-    let contextContent = AccumulateContext.ContextType(
+    let contextContent = try await AccumulateContext.ContextType(
         x: AccumlateResultContext(
-            serviceAccounts: serviceAccounts,
             serviceIndex: serviceIndex,
-            accumulateState: accumulateState,
+            state: state,
             nextAccountIndex: AccumulateContext.check(
-                i: initialIndex & (serviceIndexModValue - 1) + 256,
-                serviceAccounts: [:]
-            ),
-            transfers: [],
-            yield: nil
+                i: initialIndex % serviceIndexModValue + 256,
+                accounts: state.accounts.toRef()
+            )
         ),
         y: AccumlateResultContext(
-            serviceAccounts: serviceAccounts,
             serviceIndex: serviceIndex,
-            accumulateState: accumulateState,
+            state: state.copy(),
             nextAccountIndex: AccumulateContext.check(
-                i: initialIndex & (serviceIndexModValue - 1) + 256,
-                serviceAccounts: [:]
-            ),
-            transfers: [],
-            yield: nil
+                i: initialIndex % serviceIndexModValue + 256,
+                accounts: state.accounts.toRef()
+            )
         )
     )
     let ctx = AccumulateContext(context: contextContent, config: config, timeslot: timeslot)
@@ -64,9 +57,7 @@ public func accumulate(
     )
 
     logger.debug("accumulate exit reason: \(exitReason)")
-
-    // logger.debug("x accumulateState: \(ctx.context.x.accumulateState)")
-    // logger.debug("y accumulateState: \(ctx.context.y.accumulateState)")
+    logger.debug("accumulate output: \(output?.toDebugHexString() ?? "nil")")
 
     return try collapse(exitReason: exitReason, output: output, context: ctx.context, gas: gas)
 }
@@ -75,15 +66,16 @@ public func accumulate(
 // machine’s halt was regular or exceptional
 private func collapse(
     exitReason: ExitReason, output: Data?, context: AccumulateContext.ContextType, gas: Gas
-) throws -> (state: AccumulateState, transfers: [DeferredTransfers], result: Data32?, gas: Gas) {
+) throws -> AccumulationResult {
     switch exitReason {
     case .panic, .outOfGas:
-        (context.y.accumulateState, context.y.transfers, context.y.yield, gas)
+        .init(state: context.y.state, transfers: context.y.transfers, commitment: context.y.yield, gasUsed: gas)
     default:
         if let output, let o = Data32(output) {
-            (context.x.accumulateState, context.x.transfers, o, gas)
+            .init(state: context.x.state, transfers: context.x.transfers, commitment: o, gasUsed: gas)
+
         } else {
-            (context.x.accumulateState, context.x.transfers, context.x.yield, gas)
+            .init(state: context.x.state, transfers: context.x.transfers, commitment: context.x.yield, gasUsed: gas)
         }
     }
 }
