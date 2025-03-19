@@ -20,7 +20,7 @@ public struct TicketItemAndOutput: Comparable, Sendable, Codable {
     }
 }
 
-public final class SafroleService: ServiceBase, @unchecked Sendable {
+public final class SafroleService: ServiceBase, @unchecked Sendable, OnGenesis, OnSyncCompleted {
     private let keystore: KeyStore
     private let ringContext: Bandersnatch.RingContext
 
@@ -33,15 +33,17 @@ public final class SafroleService: ServiceBase, @unchecked Sendable {
         ringContext = try! Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
 
         super.init(id: "SafroleService", config: config, eventBus: eventBus)
-
-        await subscribe(RuntimeEvents.BlockImported.self, id: "SafroleService.BlockImported") { [weak self] event in
-            try await self?.on(blockImported: event)
-        }
     }
 
     public func on(genesis: StateRef) async {
         await withSpan("on(genesis)", logger: logger) { _ in
             try await generateAndSubmitTickets(state: genesis)
+        }
+    }
+
+    public func onSyncCompleted() async {
+        await subscribe(RuntimeEvents.BlockImported.self, id: "SafroleService.BlockImported") { [weak self] event in
+            try await self?.on(blockImported: event)
         }
     }
 

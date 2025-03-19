@@ -8,11 +8,14 @@ extension State {
 
         for i in 0 ..< config.value.totalNumberOfValidators {
             let keySet = try DevKeyStore.getDevKey(seed: UInt32(i))
+            let addr = "127.0.0.1:\(UInt16(i + 5000))"
+            var addrData = Data(addr.utf8)
+            addrData.append(contentsOf: Data(repeating: 0, count: 128 - addrData.count))
             devKeys.append(ValidatorKey(
                 bandersnatch: keySet.bandersnatch.data,
                 ed25519: keySet.ed25519.data,
                 bls: keySet.bls.data,
-                metadata: Data128()
+                metadata: Data128(addrData)!
             ))
         }
         state.safroleState.nextValidators = try ConfigFixedSizeArray(config: config, array: devKeys)
