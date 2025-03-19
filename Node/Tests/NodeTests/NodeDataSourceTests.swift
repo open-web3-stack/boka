@@ -91,16 +91,17 @@ struct NodeDataSourceTests {
         let ed25519KeyData = Data(fromHexString: ed25519KeyHex)!
         let bandersnatchKeyData = Data(fromHexString: bandersnatchKeyHex)!
 
-        let hasBLSKey = try await dataSource.hasKey(publicKey: blsKeyData)
-        let hasEd25519Key = try await dataSource.hasKey(publicKey: ed25519KeyData)
-        let hasBandersnatchKey = try await dataSource.hasKey(publicKey: bandersnatchKeyData)
+        let hasBLSKey = try await dataSource.has(keyType: .BLS, with: blsKeyData)
+
+        let hasEd25519Key = try await dataSource.has(keyType: .Ed25519, with: ed25519KeyData)
+        let hasBandersnatchKey = try await dataSource.has(keyType: .Bandersnatch, with: bandersnatchKeyData)
 
         #expect(hasBLSKey == true)
         #expect(hasEd25519Key == true)
         #expect(hasBandersnatchKey == true)
 
         let randomData = Data32.random().data
-        let hasRandomKey = try await dataSource.hasKey(publicKey: randomData)
+        let hasRandomKey = try await dataSource.has(keyType: .Bandersnatch, with: randomData)
         #expect(hasRandomKey == false)
     }
 }

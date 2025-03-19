@@ -3,17 +3,10 @@ import Codec
 import Foundation
 import Utils
 
-public enum CreateKeyType: String, CaseIterable, Sendable {
+public enum KeyGenType: String, CaseIterable, Sendable {
     case BLS = "bls"
     case Bandersnatch = "bandersnatch"
     case Ed25519 = "ed25519"
-
-    static func from(data: Data) -> CreateKeyType? {
-        if let string = String(data: data, encoding: .utf8) {
-            return CreateKeyType(rawValue: string)
-        }
-        return nil
-    }
 }
 
 public struct PubKeyItem: Sendable, Codable {
@@ -60,10 +53,9 @@ public enum KeystoreHandlers {
         }
 
         public func handle(request: Request) async throws -> Response? {
-            guard let keyType = CreateKeyType.from(data: request.value) else {
+            guard let keyType = KeyGenType(rawValue: request.value) else {
                 throw Error.invalidKeyType
             }
-
             return try await source.create(keyType: keyType)
         }
     }
@@ -101,8 +93,10 @@ public enum KeystoreHandlers {
         }
 
         public func handle(request: Request) async throws -> Response? {
-            let publicKey = request.value
-            return try await source.hasKey(publicKey: publicKey)
+            guard let keyType = KeyGenType(rawValue: request.value.0) else {
+                throw Error.invalidKeyType
+            }
+            return try await source.has(keyType: keyType, with: request.value.1)
         }
     }
 }

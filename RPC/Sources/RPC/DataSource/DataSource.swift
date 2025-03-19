@@ -33,9 +33,9 @@ public protocol TelemetryDataSource: Sendable {
 }
 
 public protocol KeystoreDataSource: Sendable {
-    func create(keyType: CreateKeyType) async throws -> String
+    func create(keyType: KeyGenType) async throws -> String
     func listKeys() async throws -> [PubKeyItem]
-    func hasKey(publicKey: Data) async throws -> Bool
+    func has(keyType: KeyGenType, with publicKey: Data) async throws -> Bool
 }
 
 public typealias DataSource = BuilderDataSource & ChainDataSource & KeystoreDataSource & SystemDataSource & TelemetryDataSource

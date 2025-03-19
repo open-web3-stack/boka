@@ -68,7 +68,7 @@ extension NodeDataSource: BuilderDataSource {
 }
 
 extension NodeDataSource: KeystoreDataSource {
-    public func create(keyType: CreateKeyType) async throws -> String {
+    public func create(keyType: KeyGenType) async throws -> String {
         let secretKey: any SecretKeyProtocol = switch keyType {
         case .BLS:
             try await keystore.generate(BLS.self)
@@ -82,40 +82,39 @@ extension NodeDataSource: KeystoreDataSource {
 
     public func listKeys() async throws -> [PubKeyItem] {
         let blsPublicKeys = await keystore.getAll(BLS.self).map {
-            PubKeyItem(key: $0.publicKey.toHexString(), type: CreateKeyType.BLS.rawValue)
+            PubKeyItem(key: $0.publicKey.toHexString(), type: KeyGenType.BLS.rawValue)
         }
         let ed25519PublicKeys = await keystore.getAll(Ed25519.self).map {
-            PubKeyItem(key: $0.publicKey.toHexString(), type: CreateKeyType.Ed25519.rawValue)
+            PubKeyItem(key: $0.publicKey.toHexString(), type: KeyGenType.Ed25519.rawValue)
         }
         let bandersnatchPublicKeys = await keystore.getAll(Bandersnatch.self).map {
-            PubKeyItem(key: $0.publicKey.toHexString(), type: CreateKeyType.Bandersnatch.rawValue)
+            PubKeyItem(key: $0.publicKey.toHexString(), type: KeyGenType.Bandersnatch.rawValue)
         }
         return blsPublicKeys + ed25519PublicKeys + bandersnatchPublicKeys
     }
 
-    public func hasKey(publicKey: Data) async throws -> Bool {
-        switch publicKey.count {
-        case 32:
-            if let publicKeyData = Data32(publicKey) {
-                if let bandersnatchPublicKey = try? Bandersnatch.PublicKey(data: publicKeyData),
-                   await keystore.contains(publicKey: bandersnatchPublicKey)
-                {
-                    return true
-                }
-                if let ed25519PublicKey = try? Ed25519.PublicKey(from: publicKeyData) {
-                    return await keystore.contains(publicKey: ed25519PublicKey)
-                }
-            }
-            return false
-        case 144:
+    public func has(keyType: KeyGenType, with publicKey: Data) async throws -> Bool {
+        switch keyType {
+        case .BLS:
             if let publicKeyData = Data144(publicKey) {
-                let publicKey = try BLS.PublicKey(data: publicKeyData)
-                return await keystore.contains(publicKey: publicKey)
+                if let publicKey = try? BLS.PublicKey(data: publicKeyData) {
+                    return await keystore.contains(publicKey: publicKey)
+                }
             }
-            return false
-        default:
-            return false
+        case .Ed25519:
+            if let publicKeyData = Data32(publicKey) {
+                if let publicKey = try? Ed25519.PublicKey(from: publicKeyData) {
+                    return await keystore.contains(publicKey: publicKey)
+                }
+            }
+        case .Bandersnatch:
+            if let publicKeyData = Data32(publicKey) {
+                if let publicKey = try? Bandersnatch.PublicKey(data: publicKeyData) {
+                    return await keystore.contains(publicKey: publicKey)
+                }
+            }
         }
+        return false
     }
 }
 
