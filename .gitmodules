@@ -7,6 +7,3 @@
 [submodule "JAMTests/javajam"]
 	path = JAMTests/javajam
 	url = https://github.com/javajamio/javajam-trace.git
-[submodule "JAMTests/jamduna"]
-	path = JAMTests/jamduna
-	url = https://github.com/jam-duna/jamtestnet.git
