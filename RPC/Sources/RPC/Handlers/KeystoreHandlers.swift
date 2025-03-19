@@ -3,10 +3,27 @@ import Codec
 import Foundation
 import Utils
 
-public enum CreateKeyType: Int32, CaseIterable, Sendable {
-    case BLS = 0
-    case Bandersnatch = 1
-    case Ed25519 = 2
+public enum CreateKeyType: String, CaseIterable, Sendable {
+    case BLS = "bls"
+    case Bandersnatch = "bandersnatch"
+    case Ed25519 = "ed25519"
+
+    static func from(data: Data) -> CreateKeyType? {
+        if let string = String(data: data, encoding: .utf8) {
+            return CreateKeyType(rawValue: string)
+        }
+        return nil
+    }
+}
+
+public struct PubKeyItem: Sendable, Codable {
+    public let key: String
+    public let type: String
+
+    public init(key: String, type: String) {
+        self.key = key
+        self.type = type
+    }
 }
 
 public enum KeystoreHandlers {
@@ -29,7 +46,7 @@ public enum KeystoreHandlers {
     }
 
     public struct CreateKey: RPCHandler {
-        public typealias Request = Request1<Int32>
+        public typealias Request = Request1<Data>
         public typealias Response = String
 
         public static var method: String { "keys_create" }
@@ -43,19 +60,17 @@ public enum KeystoreHandlers {
         }
 
         public func handle(request: Request) async throws -> Response? {
-            let keyTypeInt = request.value
-
-            guard let keyType = CreateKeyType(rawValue: keyTypeInt) else {
+            guard let keyType = CreateKeyType.from(data: request.value) else {
                 throw Error.invalidKeyType
             }
 
-            return try await source.createKey(keyType: keyType)
+            return try await source.create(keyType: keyType)
         }
     }
 
     public struct ListKeys: RPCHandler {
         public typealias Request = VoidRequest
-        public typealias Response = [String]
+        public typealias Response = [PubKeyItem]
 
         public static var method: String { "keys_list" }
         public static var summary: String? { "List all public keys in the keystore." }

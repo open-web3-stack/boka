@@ -68,8 +68,8 @@ extension NodeDataSource: BuilderDataSource {
 }
 
 extension NodeDataSource: KeystoreDataSource {
-    public func createKey(keyType: CreateKeyType) async throws -> String {
-        var secretKey: any SecretKeyProtocol = switch keyType {
+    public func create(keyType: CreateKeyType) async throws -> String {
+        let secretKey: any SecretKeyProtocol = switch keyType {
         case .BLS:
             try await keystore.generate(BLS.self)
         case .Bandersnatch:
@@ -80,10 +80,16 @@ extension NodeDataSource: KeystoreDataSource {
         return secretKey.publicKey.toHexString()
     }
 
-    public func listKeys() async throws -> [String] {
-        let blsPublicKeys = await keystore.getAll(BLS.self).map { $0.publicKey.toHexString() }
-        let ed25519PublicKeys = await keystore.getAll(Ed25519.self).map { $0.publicKey.toHexString() }
-        let bandersnatchPublicKeys = await keystore.getAll(Bandersnatch.self).map { $0.publicKey.toHexString() }
+    public func listKeys() async throws -> [PubKeyItem] {
+        let blsPublicKeys = await keystore.getAll(BLS.self).map {
+            PubKeyItem(key: $0.publicKey.toHexString(), type: CreateKeyType.BLS.rawValue)
+        }
+        let ed25519PublicKeys = await keystore.getAll(Ed25519.self).map {
+            PubKeyItem(key: $0.publicKey.toHexString(), type: CreateKeyType.Ed25519.rawValue)
+        }
+        let bandersnatchPublicKeys = await keystore.getAll(Bandersnatch.self).map {
+            PubKeyItem(key: $0.publicKey.toHexString(), type: CreateKeyType.Bandersnatch.rawValue)
+        }
         return blsPublicKeys + ed25519PublicKeys + bandersnatchPublicKeys
     }
 

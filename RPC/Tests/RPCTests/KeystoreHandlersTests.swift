@@ -8,25 +8,28 @@ import Vapor
 import XCTVapor
 
 actor DummyKeystoreDataSource {
-    var keys: [String] = []
-    func addKey(_ key: String) {
+    var keys: [PubKeyItem] = []
+    func addKey(_ key: PubKeyItem) {
         keys.append(key)
     }
 }
 
 extension DummyKeystoreDataSource: KeystoreDataSource {
-    public func createKey(keyType: CreateKeyType) async throws -> String {
+    func create(keyType: CreateKeyType) async throws -> String {
         let publicKey = "\(keyType.rawValue)_PublicKey_\(UUID().uuidString)"
-        keys.append(publicKey)
+        let item = PubKeyItem(key: publicKey, type: keyType.rawValue)
+        keys.append(item)
         return publicKey
     }
 
-    public func listKeys() async throws -> [String] {
+    public func listKeys() async throws -> [PubKeyItem] {
         keys
     }
 
     public func hasKey(publicKey: Data) async throws -> Bool {
-        keys.contains(publicKey.toHexString())
+        keys.contains { item in
+            Data(item.key.utf8) == publicKey
+        }
     }
 }
 
@@ -43,7 +46,7 @@ final class KeyStoreRPCControllerTests {
     @Test
     func createKey() async throws {
         let keyType = CreateKeyType.BLS.rawValue
-        let params = JSON.array([.init(integerLiteral: keyType)])
+        let params = JSON.array([.string(Data(keyType.utf8).toHexString())])
 
         let req = JSONRequest(jsonrpc: "2.0", method: "keys_create", params: params, id: 0)
         var buffer = ByteBuffer()
@@ -54,7 +57,9 @@ final class KeyStoreRPCControllerTests {
             #expect(resp?.result?.value != nil)
             if let publicKey = resp?.result?.value as? String {
                 let keys = await self.dummyKeystoreDataSource.keys
-                #expect(keys.contains(publicKey))
+                #expect(keys.contains { item in
+                    item.key == publicKey
+                })
             }
         }
 
@@ -65,8 +70,11 @@ final class KeyStoreRPCControllerTests {
 
     @Test
     func listKeys() async throws {
-        await dummyKeystoreDataSource.addKey("BLS_PublicKey_1")
-        await dummyKeystoreDataSource.addKey("Ed25519_PublicKey_2")
+        let item1 = PubKeyItem(key: "PublicKey_1", type: CreateKeyType.BLS.rawValue)
+        let item2 = PubKeyItem(key: "PublicKey_2", type: CreateKeyType.Ed25519.rawValue)
+
+        await dummyKeystoreDataSource.addKey(item1)
+        await dummyKeystoreDataSource.addKey(item2)
 
         let req = JSONRequest(jsonrpc: "2.0", method: "keys_list", params: JSON.array([]), id: 0)
         var buffer = ByteBuffer()
@@ -74,10 +82,14 @@ final class KeyStoreRPCControllerTests {
         try await app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
             let resp = try? res.content.decode(JSONResponse.self, using: JSONDecoder())
-            if let keys = resp?.result?.value as? [String] {
+            if let keys = resp?.result?.value as? [PubKeyItem] {
                 #expect(keys.count == 2)
-                #expect(keys.contains("BLS_PublicKey_1"))
-                #expect(keys.contains("Ed25519_PublicKey_2"))
+                #expect(keys.contains { item in
+                    item.key == item1.key
+                })
+                #expect(keys.contains { item in
+                    item.key == item2.key
+                })
             }
         }
         try await app.asyncShutdown()
@@ -85,10 +97,11 @@ final class KeyStoreRPCControllerTests {
 
     @Test
     func hasKey() async throws {
-        let publicKey = "BLS_PublicKey_1"
-        let publicKeyString = Data(publicKey.utf8).toHexString()
+        let item1 = PubKeyItem(key: "PublicKey_1", type: CreateKeyType.BLS.rawValue)
 
-        await dummyKeystoreDataSource.addKey(publicKeyString)
+        let publicKeyString = Data(item1.key.utf8).toHexString()
+
+        await dummyKeystoreDataSource.addKey(item1)
 
         let params = JSON.array([.string(publicKeyString)])
 
