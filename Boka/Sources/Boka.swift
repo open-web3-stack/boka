@@ -140,7 +140,7 @@ struct Boka: AsyncParsableCommand {
         }
 
         let keysotreType: KeyStoreType = basePath.map {
-            var path = URL(fileURLWithPath: $0)
+            let path = URL(fileURLWithPath: $0)
             return .file(path: path)
         } ?? .inMemory
 
