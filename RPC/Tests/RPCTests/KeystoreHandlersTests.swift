@@ -48,7 +48,7 @@ final class KeystoreHandlersTests {
         try await app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
             let resp = try? res.content.decode(JSONResponse.self, using: JSONDecoder())
-            #expect(resp?.result!.value as? JSON != nil)
+            #expect(resp?.result?.value is JSON)
         }
         let createdKeys = await dummyKeystoreDataSource.createdKeys
         #expect(createdKeys.count == 1)
