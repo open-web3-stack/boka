@@ -46,7 +46,7 @@ public enum KeystoreHandlers {
     }
 
     public struct CreateKey: RPCHandler {
-        public typealias Request = Request1<Data>
+        public typealias Request = Request1<String>
         public typealias Response = String
 
         public static var method: String { "keys_create" }
