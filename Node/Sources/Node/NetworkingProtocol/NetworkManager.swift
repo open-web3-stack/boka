@@ -112,6 +112,41 @@ public final class NetworkManager: Sendable {
             ) { [weak self] event in
                 await self?.on(beforeEpochChange: event)
             }
+
+//            await subscriptions.subscribe(
+//                RuntimeEvents.WorkReportReceived.self,
+//                id: "NetworkManager.WorkReportReceived"
+//            ) { [weak self] event in
+//                await self?.on(workReportDistrubution: event)
+//            }
+//
+//            await subscriptions.subscribe(
+//                RuntimeEvents.SafroleTicketsReceived.self,
+//                id: "NetworkManager.SafroleTicket1"
+//            ) { [weak self] event in
+//                await self?.on(safroleTicket1: event)
+//            }
+//
+//            await subscriptions.subscribe(
+//                RuntimeEvents.SafroleTicketsReceived.self,
+//                id: "NetworkManager.SafroleTicket2"
+//            ) { [weak self] event in
+//                await self?.on(safroleTicket2: event)
+//            }
+//
+//            await subscriptions.subscribe(
+//                RuntimeEvents.WorkPackagesReceived.self,
+//                id: "NetworkManager.WorkPackageSubmission"
+//            ) { [weak self] event in
+//                await self?.on(workPackageSubmission: event)
+//            }
+//
+//            await subscriptions.subscribe(
+//                RuntimeEvents.WorkPackageBundleRecived.self,
+//                id: "NetworkManager.WorkPackageSharing"
+//            ) { [weak self] event in
+//                await self?.on(workPackageSharing: event)
+//            }
         }
     }
 
@@ -176,6 +211,71 @@ public final class NetworkManager: Sendable {
             }
         }
     }
+
+//    private func on(workReportDistrubution event: RuntimeEvents.WorkReportReceived) async {
+//        logger.trace("sending work report distribution", metadata: ["slot": "\(event.slot)"])
+//        await broadcast(
+//            to: .currentValidators,
+//            message: .workReportDistrubution(.init(
+//                workReport: event.workReport,
+//                slot: event.slot,
+//                signatures: event.signatures
+//            ))
+//        )
+//    }
+//
+//
+//    private func on(safroleTicket1 event: RuntimeEvents.SafroleTicketsReceived) async {
+//        logger.trace("sending safrole ticket 1", metadata: ["attempt": "\(event.items.first?.attempt ?? 0)"])
+//        for ticket in event.items {
+//            await broadcast(
+//                to: .safroleStep1Validator,
+//                message: .safroleTicket1(.init(
+//                    epochIndex: 0,
+//                    attempt: ticket.attempt,
+//                    proof: ticket.signature
+//                ))
+//            )
+//        }
+//    }
+//
+//    private func on(safroleTicket2 event: RuntimeEvents.SafroleTicketsReceived) async {
+//        logger.trace("sending safrole ticket 2", metadata: ["attempt": "\(event.items.first?.attempt ?? 0)"])
+//        for ticket in event.items {
+//            await broadcast(
+//                to: .safroleStep1Validator,
+//                message: .safroleTicket2(.init(
+//                    epochIndex: 0,
+//                    attempt: ticket.attempt,
+//                    proof: ticket.signature
+//                ))
+//            )
+//        }
+//    }
+//
+//    private func on(workPackageSubmission event: RuntimeEvents.WorkPackagesReceived) async {
+//        logger.trace("sending work package submission", metadata: ["coreIndex": "\(event.coreIndex)"])
+//        await broadcast(
+//            to: .currentValidators,
+//            message: .workPackageSubmission(.init(
+//                coreIndex: event.coreIndex,
+//                workPackage: event.workPackage.value,
+//                extrinsics: event.extrinsics
+//            ))
+//        )
+//    }
+//
+//    private func on(workPackageSharing event: RuntimeEvents.WorkPackageBundleRecived) async {
+//        logger.trace("sending work package sharing", metadata: ["coreIndex": "\(event.coreIndex)"])
+//        await broadcast(
+//            to: .currentValidators,
+//            message: .workPackageSharing(.init(
+//                coreIndex: event.coreIndex,
+//                segmentsRootMappings: event.segmentsRootMappings,
+//                bundle: event.bundle
+//            ))
+//        )
+//    }
 
     private func on(safroleTicketsGenerated event: RuntimeEvents.SafroleTicketsGenerated) async {
         logger.trace("sending tickets", metadata: ["epochIndex": "\(event.epochIndex)"])
