@@ -115,7 +115,7 @@ struct NetworkManagerTests {
             ])
         )
 
-        let event = events.first { $0 is RuntimeEvents.WorkPackageBundleRecivedReply } as! RuntimeEvents.WorkPackageBundleRecivedReply
+        let event = events.first { $0 is RuntimeEvents.WorkPackageBundleReceivedReply } as! RuntimeEvents.WorkPackageBundleReceivedReply
         #expect(event.source == key.ed25519.data)
         #expect(event.workReportHash == workReportHash)
         #expect(event.signature == signature)
@@ -274,7 +274,7 @@ struct NetworkManagerTests {
         // In this test, we publish a WorkPackageBundleReady event
         // with a target that doesn't match any known peer (i.e., not the dev peer),
         // so the send call should fail with .peerNotFound internally.
-        // We then verify that no WorkPackageBundleRecivedReply event is published.
+        // We then verify that no WorkPackageBundleReceivedReply event is published.
 
         let randomKey = Ed25519PublicKey(repeating: 99)
         let bundle = WorkPackageBundle.dummy(config: services.config)
@@ -290,7 +290,7 @@ struct NetworkManagerTests {
 
         // Wait for async processing
         let events = await storeMiddleware.wait()
-        let reply = events.first(where: { $0 is RuntimeEvents.WorkPackageBundleRecivedReply })
+        let reply = events.first(where: { $0 is RuntimeEvents.WorkPackageBundleReceivedReply })
 
         // Ensure that no reply was published
         #expect(reply == nil)
@@ -300,7 +300,7 @@ struct NetworkManagerTests {
     func testWorkPackageBundleReadyInvalidResponse() async throws {
         // Here, we configure the mock network to provide an empty response.
         // That should trigger the "WorkPackageSharing response is invalid" path,
-        // preventing publication of a WorkPackageBundleRecivedReply event.
+        // preventing publication of a WorkPackageBundleReceivedReply event.
 
         network.state.write { $0.simulatedResponseData = [] }
 
@@ -322,7 +322,7 @@ struct NetworkManagerTests {
 
         // Wait for async processing
         let events = await storeMiddleware.wait()
-        let reply = events.first(where: { $0 is RuntimeEvents.WorkPackageBundleRecivedReply })
+        let reply = events.first(where: { $0 is RuntimeEvents.WorkPackageBundleReceivedReply })
 
         // Verify no event was published
         #expect(reply == nil)

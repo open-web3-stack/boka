@@ -56,8 +56,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         }
 
         await subscribe(
-            RuntimeEvents.WorkPackageBundleRecived.self,
-            id: "GuaranteeingService.WorkPackageBundleRecived"
+            RuntimeEvents.WorkPackageBundleReceived.self,
+            id: "GuaranteeingService.WorkPackageBundleReceived"
         ) { [weak self] event in
             try await self?.on(workPackageBundleReceived: event)
         }
@@ -88,10 +88,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         try await refineWorkPackage(coreIndex: event.coreIndex, workPackage: event.workPackage, extrinsics: event.extrinsics)
     }
 
-    private func on(workPackageBundleReceived event: RuntimeEvents.WorkPackageBundleRecived) async throws {
+    private func on(workPackageBundleReceived event: RuntimeEvents.WorkPackageBundleReceived) async throws {
         let workBundleHash = event.bundle.hash()
         guard let (_, signingKey) = signingKey.value else {
-            publish(RuntimeEvents.WorkPackageBundleRecivedResponse(
+            publish(RuntimeEvents.WorkPackageBundleReceivedResponse(
                 workBundleHash: workBundleHash,
                 error: GuaranteeingServiceError.notValidator
             ))
@@ -108,13 +108,13 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
 
             let payload = SigningContext.guarantee + report.hash().data
             let signature = try signingKey.sign(message: payload)
-            publish(RuntimeEvents.WorkPackageBundleRecivedResponse(
+            publish(RuntimeEvents.WorkPackageBundleReceivedResponse(
                 workBundleHash: workBundleHash,
                 workReportHash: report.hash(),
                 signature: signature
             ))
         } catch {
-            publish(RuntimeEvents.WorkPackageBundleRecivedResponse(
+            publish(RuntimeEvents.WorkPackageBundleReceivedResponse(
                 workBundleHash: workBundleHash,
                 error: error
             ))
@@ -238,7 +238,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                 group.addTask {
                     do {
                         let resp = try await self.waitFor(
-                            eventType: RuntimeEvents.WorkPackageBundleRecivedReply.self,
+                            eventType: RuntimeEvents.WorkPackageBundleReceivedReply.self,
                             check: { event in
                                 event.source == validatorKey && event.workReportHash == workReportHash
                             },

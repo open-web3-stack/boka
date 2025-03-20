@@ -111,7 +111,7 @@ public enum RuntimeEvents {
     }
 
     // NetworkManager -> GuaranteeingService: When a work package bundle is recived via CE134 request
-    public struct WorkPackageBundleRecived: Event {
+    public struct WorkPackageBundleReceived: Event {
         public let coreIndex: CoreIndex
         public let segmentsRootMappings: SegmentsRootMappings
         public let bundle: WorkPackageBundle
@@ -128,7 +128,7 @@ public enum RuntimeEvents {
     }
 
     // GuaranteeingService -> NetworkManager: Response to CE134 request
-    public struct WorkPackageBundleRecivedResponse: Event {
+    public struct WorkPackageBundleReceivedResponse: Event {
         public let workBundleHash: Data32
         public let result: Result<(workReportHash: Data32, signature: Ed25519Signature), Error>
 
@@ -151,7 +151,7 @@ public enum RuntimeEvents {
     }
 
     // NetworkManager -> GuaranteeingService: When a work package bundle response is recived via CE134 reply
-    public struct WorkPackageBundleRecivedReply: Event {
+    public struct WorkPackageBundleReceivedReply: Event {
         public let source: Ed25519PublicKey
         public let workReportHash: Data32
         public let signature: Ed25519Signature
