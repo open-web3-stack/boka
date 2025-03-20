@@ -67,6 +67,38 @@ public enum RuntimeEvents {
         }
     }
 
+    public struct SafroleTicket1Received: Event {
+        public var epochIndex: EpochIndex
+        public var attempt: TicketIndex
+        public var proof: BandersnatchRingVRFProof
+
+        public init(
+            epochIndex: EpochIndex,
+            attempt: TicketIndex,
+            proof: BandersnatchRingVRFProof
+        ) {
+            self.epochIndex = epochIndex
+            self.attempt = attempt
+            self.proof = proof
+        }
+    }
+
+    public struct SafroleTicket2Received: Event {
+        public var epochIndex: EpochIndex
+        public var attempt: TicketIndex
+        public var proof: BandersnatchRingVRFProof
+
+        public init(
+            epochIndex: EpochIndex,
+            attempt: TicketIndex,
+            proof: BandersnatchRingVRFProof
+        ) {
+            self.epochIndex = epochIndex
+            self.attempt = attempt
+            self.proof = proof
+        }
+    }
+
     // New safrole ticket received from network
     public struct SafroleTicketsReceived: Event {
         public let items: [ExtrinsicTickets.TicketItem]

@@ -189,7 +189,7 @@ public final class NetworkManager: Sendable {
         )
     }
 
-    private func on(safroleTicket2Received event: RuntimeEvents.SafroleTicketsGenerated) async {
+    private func on(safroleTicket1Received event: RuntimeEvents.SafroleTickets1Received) async {
         for ticket in event.items {
             await broadcast(
                 to: .currentValidators,
