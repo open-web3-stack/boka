@@ -1,6 +1,23 @@
 import Utils
 
 public enum RuntimeEvents {
+    public struct BlockRequestReceived: Event {
+        public enum Direction: UInt8, Codable, Sendable, Equatable, Hashable {
+            case ascendingExcludsive = 0
+            case descendingInclusive = 1
+        }
+
+        public var hash: Data32
+        public var direction: Direction
+        public var maxBlocks: UInt32
+
+        public init(hash: Data32, maxBlocks: UInt32, direction: Direction) {
+            self.hash = hash
+            self.maxBlocks = maxBlocks
+            self.direction = direction
+        }
+    }
+
     public struct BlockImported: Event {
         public let block: BlockRef
         public let state: StateRef

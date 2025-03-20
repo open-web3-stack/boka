@@ -177,6 +177,31 @@ public final class NetworkManager: Sendable {
         }
     }
 
+    private func on(blockRequestReceived event: RuntimeEvents.BlockRequestReceived) async {
+        logger.trace("handling block request", metadata: ["hash": "\(event.hash)", "direction": "\(event.direction)"])
+        await broadcast(
+            to: .currentValidators,
+            message: .blockRequest(.init(
+                hash: event.hash,
+                direction: BlockRequest.Direction(rawValue: event.direction.rawValue)!,
+                maxBlocks: event.maxBlocks
+            ))
+        )
+    }
+
+    private func on(safroleTicket2Received event: RuntimeEvents.SafroleTicketsGenerated) async {
+        for ticket in event.items {
+            await broadcast(
+                to: .currentValidators,
+                message: .safroleTicket2(.init(
+                    epochIndex: event.epochIndex,
+                    attempt: ticket.ticket.attempt,
+                    proof: ticket.ticket.signature
+                ))
+            )
+        }
+    }
+
     private func on(safroleTicketsGenerated event: RuntimeEvents.SafroleTicketsGenerated) async {
         logger.trace("sending tickets", metadata: ["epochIndex": "\(event.epochIndex)"])
         for ticket in event.items {
