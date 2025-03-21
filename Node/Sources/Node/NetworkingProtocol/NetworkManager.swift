@@ -387,6 +387,11 @@ struct HandlerImpl: NetworkProtocolHandler {
             blockchain.publish(event: RuntimeEvents.WorkReportRequestReady(workReportHash: message.workReportHash))
             // TODO: waitfor WorkReportRequestResponse
             return []
+        case let .shardDistribution(message):
+            blockchain
+                .publish(event: RuntimeEvents.ShardDistributionReady(erasureRoot: message.erasureRoot, shardIndex: message.shardIndex))
+            // TODO: waitfor ShardDistributionReceivedResponse
+            return []
         }
     }
 

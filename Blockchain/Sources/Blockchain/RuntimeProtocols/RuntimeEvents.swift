@@ -223,7 +223,30 @@ public enum RuntimeEvents {
         }
     }
 
-    //  Response to workreport request
+    public struct ShardDistributionReady: Event {
+        public var erasureRoot: Data32
+        public var shardIndex: UInt32
+
+        public init(erasureRoot: Data32, shardIndex: UInt32) {
+            self.erasureRoot = erasureRoot
+            self.shardIndex = shardIndex
+        }
+    }
+
+    //  Response to shard distribution
+    public struct ShardDistributionReceivedResponse: Event {
+        public var bundleShard: Data
+        public var segmentShards: [Data]
+        public var justification: Data
+
+        public init(bundleShard: Data, segmentShards: [Data], justification: Data) {
+            self.bundleShard = bundleShard
+            self.segmentShards = segmentShards
+            self.justification = justification
+        }
+    }
+
+    //  Response to work report request
     public struct WorkReportRequestResponse: Event {
         public var workReport: WorkReport
         public let result: Result<WorkReport, Error>
