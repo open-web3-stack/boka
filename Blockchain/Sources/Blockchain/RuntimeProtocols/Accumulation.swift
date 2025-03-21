@@ -217,9 +217,8 @@ extension Accumulation {
 
         logger.debug("[parallel] services to accumulate: \(services)")
 
-        var accountsRef = ServiceAccountsMutRef(state.accounts.value)
-
         for service in services {
+            let accountsRef = ServiceAccountsMutRef(state.accounts.value)
             let singleOutput = try await singleAccumulate(
                 config: config,
                 state: AccumulateState(
@@ -255,10 +254,10 @@ extension Accumulation {
                 break
             }
 
-            accountsRef = singleOutput.state.accounts
             try overallAccountChanges.checkAndMerge(with: accountsRef.changes)
-            accountsRef.clearRecordedChanges()
         }
+
+        overallAccountChanges.apply(to: state.accounts)
 
         return ParallelAccumulationOutput(
             gasUsed: gasUsed,
