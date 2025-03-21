@@ -1,20 +1,17 @@
 import Utils
 
 public enum RuntimeEvents {
-    public struct BlockRequestReceived: Event {
-        public enum Direction: UInt8, Codable, Sendable, Equatable, Hashable {
-            case ascendingExcludsive = 0
-            case descendingInclusive = 1
-        }
+    public struct StateRequestReceived: Event {
+        public var headerHash: Data32
+        public var startKey: Data31
+        public var endKey: Data31
+        public var maxSize: UInt32
 
-        public var hash: Data32
-        public var direction: Direction
-        public var maxBlocks: UInt32
-
-        public init(hash: Data32, maxBlocks: UInt32, direction: Direction) {
-            self.hash = hash
-            self.maxBlocks = maxBlocks
-            self.direction = direction
+        public init(headerHash: Data32, startKey: Data31, endKey: Data31, maxSize: UInt32) {
+            self.headerHash = headerHash
+            self.startKey = startKey
+            self.endKey = endKey
+            self.maxSize = maxSize
         }
     }
 
@@ -64,38 +61,6 @@ public enum RuntimeEvents {
             self.epochIndex = epochIndex
             self.items = items
             self.publicKey = publicKey
-        }
-    }
-
-    public struct SafroleTicket1Received: Event {
-        public var epochIndex: EpochIndex
-        public var attempt: TicketIndex
-        public var proof: BandersnatchRingVRFProof
-
-        public init(
-            epochIndex: EpochIndex,
-            attempt: TicketIndex,
-            proof: BandersnatchRingVRFProof
-        ) {
-            self.epochIndex = epochIndex
-            self.attempt = attempt
-            self.proof = proof
-        }
-    }
-
-    public struct SafroleTicket2Received: Event {
-        public var epochIndex: EpochIndex
-        public var attempt: TicketIndex
-        public var proof: BandersnatchRingVRFProof
-
-        public init(
-            epochIndex: EpochIndex,
-            attempt: TicketIndex,
-            proof: BandersnatchRingVRFProof
-        ) {
-            self.epochIndex = epochIndex
-            self.attempt = attempt
-            self.proof = proof
         }
     }
 
@@ -247,6 +212,30 @@ public enum RuntimeEvents {
             self.workReport = workReport
             self.slot = slot
             self.signatures = signatures
+        }
+    }
+
+    public struct WorkReportRequestReady: Event {
+        public let workReportHash: Data32
+
+        public init(workReportHash: Data32) {
+            self.workReportHash = workReportHash
+        }
+    }
+
+    //  Response to workreport request
+    public struct WorkReportRequestResponse: Event {
+        public var workReport: WorkReport
+        public let result: Result<WorkReport, Error>
+
+        public init(workReport: WorkReport) {
+            self.workReport = workReport
+            result = .success(workReport)
+        }
+
+        public init(workReport: WorkReport, error: Error) {
+            self.workReport = workReport
+            result = .failure(error)
         }
     }
 }

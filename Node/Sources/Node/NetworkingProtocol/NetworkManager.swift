@@ -177,33 +177,8 @@ public final class NetworkManager: Sendable {
         }
     }
 
-    private func on(blockRequestReceived event: RuntimeEvents.BlockRequestReceived) async {
-        logger.trace("handling block request", metadata: ["hash": "\(event.hash)", "direction": "\(event.direction)"])
-        await broadcast(
-            to: .currentValidators,
-            message: .blockRequest(.init(
-                hash: event.hash,
-                direction: BlockRequest.Direction(rawValue: event.direction.rawValue)!,
-                maxBlocks: event.maxBlocks
-            ))
-        )
-    }
-
-    private func on(safroleTicket1Received event: RuntimeEvents.SafroleTickets1Received) async {
-        for ticket in event.items {
-            await broadcast(
-                to: .currentValidators,
-                message: .safroleTicket2(.init(
-                    epochIndex: event.epochIndex,
-                    attempt: ticket.ticket.attempt,
-                    proof: ticket.ticket.signature
-                ))
-            )
-        }
-    }
-
     private func on(safroleTicketsGenerated event: RuntimeEvents.SafroleTicketsGenerated) async {
-        logger.trace("sending tickets", metadata: ["epochIndex": "\(event.epochIndex)"])
+        logger.trace("sending tickets1", metadata: ["epochIndex": "\(event.epochIndex)"])
         for ticket in event.items {
             await broadcast(
                 to: .safroleStep1Validator,
@@ -336,6 +311,19 @@ struct HandlerImpl: NetworkProtocolHandler {
                 }
             }
             return [encoder.data]
+        case let .stateRequest(message):
+            blockchain
+                .publish(
+                    event: RuntimeEvents
+                        .StateRequestReceived(
+                            headerHash: message.headerHash,
+                            startKey: message.startKey,
+                            endKey: message.endKey,
+                            maxSize: message.maxSize
+                        )
+                )
+            // TODO: waitfor xxResponse
+            return []
         case let .safroleTicket1(message):
             blockchain.publish(event: RuntimeEvents.SafroleTicketsReceived(
                 items: [
@@ -394,6 +382,10 @@ struct HandlerImpl: NetworkProtocolHandler {
                             signatures: message.signatures
                         )
                 )
+            return []
+        case let .workReportRequest(message):
+            blockchain.publish(event: RuntimeEvents.WorkReportRequestReady(workReportHash: message.workReportHash))
+            // TODO: waitfor WorkReportRequestResponse
             return []
         }
     }

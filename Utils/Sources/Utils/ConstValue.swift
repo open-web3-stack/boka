@@ -37,6 +37,12 @@ public enum ConstInt12: ConstInt {
     }
 }
 
+public enum ConstInt31: ConstInt {
+    public static var value: Int {
+        31
+    }
+}
+
 public enum ConstInt32: ConstInt {
     public static var value: Int {
         32
