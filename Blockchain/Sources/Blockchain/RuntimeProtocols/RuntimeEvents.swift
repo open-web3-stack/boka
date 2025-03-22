@@ -215,7 +215,7 @@ public enum RuntimeEvents {
         }
     }
 
-    public struct WorkReportRequestReady: Event {
+    public struct WorkReportRequestReceived: Event {
         public let workReportHash: Data32
 
         public init(workReportHash: Data32) {
@@ -223,11 +223,33 @@ public enum RuntimeEvents {
         }
     }
 
-    public struct ShardDistributionReady: Event {
+    public struct WorkReportRequestReady: Event {
+        public let source: Ed25519PublicKey
+        public let workReportHash: Data32
+
+        public init(source: Ed25519PublicKey, workReportHash: Data32) {
+            self.source = source
+            self.workReportHash = workReportHash
+        }
+    }
+
+    public struct ShardDistributionReceived: Event {
         public var erasureRoot: Data32
         public var shardIndex: UInt32
 
         public init(erasureRoot: Data32, shardIndex: UInt32) {
+            self.erasureRoot = erasureRoot
+            self.shardIndex = shardIndex
+        }
+    }
+
+    public struct ShardDistributionReady: Event {
+        public let source: Ed25519PublicKey
+        public var erasureRoot: Data32
+        public var shardIndex: UInt32
+
+        public init(source: Ed25519PublicKey, erasureRoot: Data32, shardIndex: UInt32) {
+            self.source = source
             self.erasureRoot = erasureRoot
             self.shardIndex = shardIndex
         }

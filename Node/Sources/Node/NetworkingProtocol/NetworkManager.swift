@@ -323,6 +323,9 @@ struct HandlerImpl: NetworkProtocolHandler {
                         )
                 )
             // TODO: waitfor xxResponse
+            // let resp = try await blockchain.waitFor(RuntimeEvents.StateRequestReceivedResponse.self) { event in
+            //
+            // }
             return []
         case let .safroleTicket1(message):
             blockchain.publish(event: RuntimeEvents.SafroleTicketsReceived(
@@ -384,13 +387,19 @@ struct HandlerImpl: NetworkProtocolHandler {
                 )
             return []
         case let .workReportRequest(message):
-            blockchain.publish(event: RuntimeEvents.WorkReportRequestReady(workReportHash: message.workReportHash))
+            blockchain.publish(event: RuntimeEvents.WorkReportRequestReceived(workReportHash: message.workReportHash))
             // TODO: waitfor WorkReportRequestResponse
+            // let resp = try await blockchain.waitFor(RuntimeEvents.WorkReportRequestResponse.self) { event in
+            //    message.workReportHash == event.workReport.hash()
+            // }
             return []
         case let .shardDistribution(message):
             blockchain
-                .publish(event: RuntimeEvents.ShardDistributionReady(erasureRoot: message.erasureRoot, shardIndex: message.shardIndex))
+                .publish(event: RuntimeEvents.ShardDistributionReceived(erasureRoot: message.erasureRoot, shardIndex: message.shardIndex))
             // TODO: waitfor ShardDistributionReceivedResponse
+            // let resp = try await blockchain.waitFor(RuntimeEvents.ShardDistributionReceivedResponse.self) { event in
+            //
+            // }
             return []
         }
     }
