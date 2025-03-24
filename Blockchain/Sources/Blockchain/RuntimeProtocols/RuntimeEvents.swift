@@ -16,35 +16,23 @@ public enum RuntimeEvents {
     }
 
     public struct StateRequestReceivedResponse: Event {
-        public enum BoundaryNode: Codable, Sendable {
-            case branch(BranchNode)
-            case ext(ExtensionNode)
-            case leaf(LeafNode)
-        }
-
-        public struct BranchNode: Codable, Sendable {
-            public let children: [Data32?]
-            public let value: Data?
-        }
-
-        public struct ExtensionNode: Codable, Sendable {
-            public let prefix: Data
-            public let child: Data32
-        }
-
-        public struct LeafNode: Codable, Sendable {
-            public let key: Data31
-            public let value: Data
-        }
-
         public var headerHash: Data32
         public var boundaryNodes: [BoundaryNode]
         public var keyValuePairs: [(key: Data31, value: Data)]
+        public let result: Result<(headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data31, value: Data)]), Error>
 
         public init(headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data31, value: Data)]) {
             self.headerHash = headerHash
             self.boundaryNodes = boundaryNodes
             self.keyValuePairs = keyValuePairs
+            result = .success((headerHash, boundaryNodes, keyValuePairs))
+        }
+
+        public init(headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data31, value: Data)], error: Error) {
+            self.headerHash = headerHash
+            self.boundaryNodes = boundaryNodes
+            self.keyValuePairs = keyValuePairs
+            result = .failure(error)
         }
     }
 
@@ -292,12 +280,21 @@ public enum RuntimeEvents {
     public struct ShardDistributionReceivedResponse: Event {
         public var bundleShard: Data
         public var segmentShards: [Data]
-        public var justification: Data
+        public var justification: Justification
+        public let result: Result<(bundleShard: Data, segmentShards: [Data], justification: Justification), Error>
 
-        public init(bundleShard: Data, segmentShards: [Data], justification: Data) {
+        public init(bundleShard: Data, segmentShards: [Data], justification: Justification) {
             self.bundleShard = bundleShard
             self.segmentShards = segmentShards
             self.justification = justification
+            result = .success((bundleShard, segmentShards, justification))
+        }
+
+        public init(bundleShard: Data, segmentShards: [Data], justification: Justification, error: Error) {
+            self.bundleShard = bundleShard
+            self.segmentShards = segmentShards
+            self.justification = justification
+            result = .failure(error)
         }
     }
 
@@ -313,6 +310,40 @@ public enum RuntimeEvents {
 
         public init(workReport: WorkReport, error: Error) {
             self.workReport = workReport
+            result = .failure(error)
+        }
+    }
+
+    public struct AuditShardRequestReceived: Event {
+        public let erasureRoot: Data32
+        public let shardIndex: UInt32
+
+        public init(erasureRoot: Data32, shardIndex: UInt32) {
+            self.erasureRoot = erasureRoot
+            self.shardIndex = shardIndex
+        }
+    }
+
+    public struct AuditShardRequestReceivedResponse: Event {
+        public let erasureRoot: Data32
+        public let shardIndex: UInt32
+        public let bundleShard: Data
+        public let justification: Justification
+        public let result: Result<(erasureRoot: Data32, shardIndex: UInt32, bundleShard: Data, justification: Justification), Error>
+
+        public init(erasureRoot: Data32, shardIndex: UInt32, bundleShard: Data, justification: Justification) {
+            self.erasureRoot = erasureRoot
+            self.shardIndex = shardIndex
+            self.bundleShard = bundleShard
+            self.justification = justification
+            result = .success((erasureRoot, shardIndex, bundleShard, justification))
+        }
+
+        public init(erasureRoot: Data32, shardIndex: UInt32, bundleShard: Data, justification: Justification, error: Error) {
+            self.erasureRoot = erasureRoot
+            self.shardIndex = shardIndex
+            self.bundleShard = bundleShard
+            self.justification = justification
             result = .failure(error)
         }
     }

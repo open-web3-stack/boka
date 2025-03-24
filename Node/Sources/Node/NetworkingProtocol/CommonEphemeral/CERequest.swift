@@ -18,7 +18,7 @@ public enum CERequest: Sendable, Equatable, Hashable {
     case workReportDistrubution(WorkReportDistributionMessage)
     case workReportRequest(WorkReportRequestMessage)
     case shardDistribution(ShardDistributionMessage)
-//    case auditShardRequest(AuditShardRequestMessage)
+    case auditShardRequest(AuditShardRequestMessage)
 //    case segmentShardRequest1(SegmentShardRequestMessage)
 //    case segmentShardRequest2(SegmentShardRequestMessage)
 //    case assuranceDistribution(AssuranceDistributionMessage)
@@ -51,8 +51,8 @@ extension CERequest: RequestProtocol {
             try message.encode()
         case let .shardDistribution(message):
             try message.encode()
-//        case let .auditShardRequest(message):
-//            try message.encode()
+        case let .auditShardRequest(message):
+            try message.encode()
 //        case let .segmentShardRequest1(message):
 //            try message.encode()
 //        case let .segmentShardRequest2(message):
@@ -90,8 +90,8 @@ extension CERequest: RequestProtocol {
             .workReportRequest
         case .shardDistribution:
             .shardDistribution
-//        case .auditShardRequest:
-//            .auditShardRequest
+        case .auditShardRequest:
+            .auditShardRequest
 //        case .segmentShardRequest1:
 //            .segmentShardRequest1
 //        case .segmentShardRequest2:
@@ -129,8 +129,8 @@ extension CERequest: RequestProtocol {
             WorkReportRequestMessage.self
         case .shardDistribution:
             ShardDistributionMessage.self
-//        case .auditShardRequest:
-//            AuditShardRequestMessage.self
+        case .auditShardRequest:
+            AuditShardRequestMessage.self
 //        case .segmentShardRequest1:
 //            SegmentShardRequestMessage.self
 //        case .segmentShardRequest2:
@@ -179,9 +179,9 @@ extension CERequest: RequestProtocol {
         case .shardDistribution:
             guard let message = data as? ShardDistributionMessage else { return nil }
             return .shardDistribution(message)
-//        case .auditShardRequest:
-//            guard let message = data as? AuditShardRequestMessage else { return nil }
-//            return .auditShardRequest(message)
+        case .auditShardRequest:
+            guard let message = data as? AuditShardRequestMessage else { return nil }
+            return .auditShardRequest(message)
 //        case .segmentShardRequest1:
 //            guard let message = data as? SegmentShardRequestMessage else { return nil }
 //            return .segmentShardRequest1(message)

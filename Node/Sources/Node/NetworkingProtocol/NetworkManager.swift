@@ -401,6 +401,14 @@ struct HandlerImpl: NetworkProtocolHandler {
             //
             // }
             return []
+        case let .auditShardRequest(message):
+            blockchain
+                .publish(event: RuntimeEvents.AuditShardRequestReceived(erasureRoot: message.erasureRoot, shardIndex: message.shardIndex))
+            // TODO: waitfor AuditShardRequestReceivedResponse
+            // let resp = try await blockchain.waitFor(RuntimeEvents.AuditShardRequestReceivedResponse.self) { event in
+            //
+            // }
+            return []
         }
     }
 
