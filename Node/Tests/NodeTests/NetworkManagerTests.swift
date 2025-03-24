@@ -405,4 +405,31 @@ struct NetworkManagerTests {
         #expect(event.erasureRoot == erasureRoot)
         #expect(event.shardIndex == shardIndex)
     }
+
+    @Test
+    func testHandleAuditShardRequest() async throws {
+        let erasureRoot = Data32(repeating: 1)
+        let shardIndex: UInt32 = 2
+
+        let auditShardRequestMessage = CERequest.auditShardRequest(AuditShardRequestMessage(
+            erasureRoot: erasureRoot,
+            shardIndex: shardIndex
+        ))
+
+        _ = try await network.handler.handle(ceRequest: auditShardRequestMessage)
+
+        let events = await storeMiddleware.wait()
+
+        let receivedEvent = events.first {
+            if let event = $0 as? RuntimeEvents.AuditShardRequestReceived {
+                return event.erasureRoot == erasureRoot && event.shardIndex == shardIndex
+            }
+            return false
+        } as? RuntimeEvents.AuditShardRequestReceived
+
+        let event = try #require(receivedEvent)
+
+        #expect(event.erasureRoot == erasureRoot)
+        #expect(event.shardIndex == shardIndex)
+    }
 }

@@ -4,7 +4,7 @@ import Utils
 public enum Justification: Codable, Sendable {
     case singleHash(Data32) // 0 ++ Hash
     case doubleHash(Data32, Data32) // 1 ++ Hash ++ Hash
-    case tripleHash(Data32, Data32, Data32) // 1 ++ Hash ++ Hash ++ Hash
+    case segmentShard(Data) // 2 ++ Segment Shard (12 bytes)
 }
 
 extension Justification {
@@ -18,11 +18,9 @@ extension Justification {
             try encoder.encode(1)
             try encoder.encode(hash1)
             try encoder.encode(hash2)
-        case let .tripleHash(hash1, hash2, hash3):
+        case let .segmentShard(segmentShard):
             try encoder.encode(2)
-            try encoder.encode(hash1)
-            try encoder.encode(hash2)
-            try encoder.encode(hash3)
+            try encoder.encode(segmentShard)
         }
         return [encoder.data]
     }
@@ -36,7 +34,7 @@ extension Justification {
         }
 
         let decoder = JamDecoder(data: data, config: config)
-        let type = try decoder.decode(Int.self)
+        let type = try decoder.decode(UInt8.self)
 
         switch type {
         case 0:
@@ -47,10 +45,14 @@ extension Justification {
             let hash2 = try decoder.decode(Data32.self)
             return .doubleHash(hash1, hash2)
         case 2:
-            let hash1 = try decoder.decode(Data32.self)
-            let hash2 = try decoder.decode(Data32.self)
-            let hash3 = try decoder.decode(Data32.self)
-            return .tripleHash(hash1, hash2, hash3)
+            let segmentShard = try decoder.decode(Data.self)
+            guard segmentShard.count == 12 else {
+                throw DecodingError.dataCorrupted(DecodingError.Context(
+                    codingPath: [],
+                    debugDescription: "Segment Shard must be 12 bytes"
+                ))
+            }
+            return .segmentShard(segmentShard)
         default:
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
