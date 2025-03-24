@@ -322,7 +322,7 @@ struct HandlerImpl: NetworkProtocolHandler {
                             maxSize: message.maxSize
                         )
                 )
-            // TODO: waitfor xxResponse
+            // TODO: waitfor StateRequestReceivedResponse
             // let resp = try await blockchain.waitFor(RuntimeEvents.StateRequestReceivedResponse.self) { event in
             //
             // }

@@ -15,6 +15,39 @@ public enum RuntimeEvents {
         }
     }
 
+    public struct StateRequestReceivedResponse: Event {
+        public enum BoundaryNode: Codable, Sendable {
+            case branch(BranchNode)
+            case ext(ExtensionNode)
+            case leaf(LeafNode)
+        }
+
+        public struct BranchNode: Codable, Sendable {
+            public let children: [Data32?]
+            public let value: Data?
+        }
+
+        public struct ExtensionNode: Codable, Sendable {
+            public let prefix: Data
+            public let child: Data32
+        }
+
+        public struct LeafNode: Codable, Sendable {
+            public let key: Data31
+            public let value: Data
+        }
+
+        public var headerHash: Data32
+        public var boundaryNodes: [BoundaryNode]
+        public var keyValuePairs: [(key: Data31, value: Data)]
+
+        public init(headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data31, value: Data)]) {
+            self.headerHash = headerHash
+            self.boundaryNodes = boundaryNodes
+            self.keyValuePairs = keyValuePairs
+        }
+    }
+
     public struct BlockImported: Event {
         public let block: BlockRef
         public let state: StateRef

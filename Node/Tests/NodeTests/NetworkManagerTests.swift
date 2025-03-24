@@ -327,4 +327,82 @@ struct NetworkManagerTests {
         // Verify no event was published
         #expect(reply == nil)
     }
+
+    @Test
+    func testHandleWorkReportDistribution() async throws {
+        let workReport = WorkReport.dummy(config: services.config)
+        let slot: UInt32 = 123
+        let signatures = [ValidatorSignature(validatorIndex: 0, signature: Ed25519Signature(repeating: 20))]
+
+        let distributionMessage = CERequest.workReportDistrubution(WorkReportDistributionMessage(
+            workReport: workReport,
+            slot: slot,
+            signatures: signatures
+        ))
+
+        _ = try await network.handler.handle(ceRequest: distributionMessage)
+
+        let events = await storeMiddleware.wait()
+
+        let receivedEvent = events.first {
+            if let event = $0 as? RuntimeEvents.WorkReportReceived {
+                return event.workReport.hash() == workReport.hash()
+            }
+            return false
+        } as? RuntimeEvents.WorkReportReceived
+
+        let event = try #require(receivedEvent)
+        #expect(event.workReport == workReport)
+        #expect(event.slot == slot)
+        #expect(event.signatures == signatures)
+    }
+
+    @Test
+    func testHandleWorkReportRequest() async throws {
+        let workReportHash = Data32(repeating: 1)
+
+        let requestMessage = CERequest.workReportRequest(WorkReportRequestMessage(
+            workReportHash: workReportHash
+        ))
+
+        _ = try await network.handler.handle(ceRequest: requestMessage)
+
+        let events = await storeMiddleware.wait()
+
+        let receivedEvent = events.first {
+            if let event = $0 as? RuntimeEvents.WorkReportRequestReceived {
+                return event.workReportHash == workReportHash
+            }
+            return false
+        } as? RuntimeEvents.WorkReportRequestReceived
+
+        let event = try #require(receivedEvent)
+        #expect(event.workReportHash == workReportHash)
+    }
+
+    @Test
+    func testHandleShardDistribution() async throws {
+        let erasureRoot = Data32(repeating: 1)
+        let shardIndex: UInt32 = 2
+
+        let distributionMessage = CERequest.shardDistribution(ShardDistributionMessage(
+            erasureRoot: erasureRoot,
+            shardIndex: shardIndex
+        ))
+
+        _ = try await network.handler.handle(ceRequest: distributionMessage)
+
+        let events = await storeMiddleware.wait()
+
+        let receivedEvent = events.first {
+            if let event = $0 as? RuntimeEvents.ShardDistributionReceived {
+                return event.erasureRoot == erasureRoot && event.shardIndex == shardIndex
+            }
+            return false
+        } as? RuntimeEvents.ShardDistributionReceived
+
+        let event = try #require(receivedEvent)
+        #expect(event.erasureRoot == erasureRoot)
+        #expect(event.shardIndex == shardIndex)
+    }
 }
