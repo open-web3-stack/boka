@@ -1,3 +1,5 @@
+import Codec
+import Foundation
 import Utils
 
 public enum RuntimeEvents {
@@ -13,25 +15,28 @@ public enum RuntimeEvents {
             self.endKey = endKey
             self.maxSize = maxSize
         }
+
+        public func generateRequestId() throws -> Data32 {
+            let encoder = JamEncoder()
+            try encoder.encode(headerHash)
+            try encoder.encode(startKey)
+            try encoder.encode(endKey)
+            try encoder.encode(maxSize)
+            return encoder.data.blake2b256hash()
+        }
     }
 
     public struct StateRequestReceivedResponse: Event {
-        public var headerHash: Data32
-        public var boundaryNodes: [BoundaryNode]
-        public var keyValuePairs: [(key: Data31, value: Data)]
+        public var requestId: Data32
         public let result: Result<(headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data31, value: Data)]), Error>
 
-        public init(headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data31, value: Data)]) {
-            self.headerHash = headerHash
-            self.boundaryNodes = boundaryNodes
-            self.keyValuePairs = keyValuePairs
+        public init(requestId: Data32, headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data31, value: Data)]) {
+            self.requestId = requestId
             result = .success((headerHash, boundaryNodes, keyValuePairs))
         }
 
-        public init(headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data31, value: Data)], error: Error) {
-            self.headerHash = headerHash
-            self.boundaryNodes = boundaryNodes
-            self.keyValuePairs = keyValuePairs
+        public init(requestId: Data32, error: Error) {
+            self.requestId = requestId
             result = .failure(error)
         }
     }
@@ -262,6 +267,13 @@ public enum RuntimeEvents {
             self.erasureRoot = erasureRoot
             self.shardIndex = shardIndex
         }
+
+        public func generateRequestId() throws -> Data32 {
+            let encoder = JamEncoder()
+            try encoder.encode(erasureRoot)
+            try encoder.encode(shardIndex)
+            return encoder.data.blake2b256hash()
+        }
     }
 
     public struct ShardDistributionReady: Event {
@@ -278,38 +290,34 @@ public enum RuntimeEvents {
 
     //  Response to shard distribution
     public struct ShardDistributionReceivedResponse: Event {
-        public var bundleShard: Data
-        public var segmentShards: [Data]
-        public var justification: Justification
+        public var requestId: Data32
+
         public let result: Result<(bundleShard: Data, segmentShards: [Data], justification: Justification), Error>
 
-        public init(bundleShard: Data, segmentShards: [Data], justification: Justification) {
-            self.bundleShard = bundleShard
-            self.segmentShards = segmentShards
-            self.justification = justification
+        public init(requestId: Data32, bundleShard: Data, segmentShards: [Data], justification: Justification) {
+            self.requestId = requestId
             result = .success((bundleShard, segmentShards, justification))
         }
 
-        public init(bundleShard: Data, segmentShards: [Data], justification: Justification, error: Error) {
-            self.bundleShard = bundleShard
-            self.segmentShards = segmentShards
-            self.justification = justification
+        public init(requestId: Data32, error: Error) {
+            self.requestId = requestId
             result = .failure(error)
         }
     }
 
     //  Response to work report request
     public struct WorkReportRequestResponse: Event {
-        public var workReport: WorkReport
+        public var workReportHash: Data32
+
         public let result: Result<WorkReport, Error>
 
-        public init(workReport: WorkReport) {
-            self.workReport = workReport
+        public init(workReportHash: Data32, workReport: WorkReport) {
+            self.workReportHash = workReportHash
             result = .success(workReport)
         }
 
-        public init(workReport: WorkReport, error: Error) {
-            self.workReport = workReport
+        public init(workReportHash: Data32, error: Error) {
+            self.workReportHash = workReportHash
             result = .failure(error)
         }
     }
@@ -322,28 +330,27 @@ public enum RuntimeEvents {
             self.erasureRoot = erasureRoot
             self.shardIndex = shardIndex
         }
+
+        public func generateRequestId() throws -> Data32 {
+            let encoder = JamEncoder()
+            try encoder.encode(erasureRoot)
+            try encoder.encode(shardIndex)
+            return encoder.data.blake2b256hash()
+        }
     }
 
     public struct AuditShardRequestReceivedResponse: Event {
-        public let erasureRoot: Data32
-        public let shardIndex: UInt32
-        public let bundleShard: Data
-        public let justification: Justification
+        public var requestId: Data32
+
         public let result: Result<(erasureRoot: Data32, shardIndex: UInt32, bundleShard: Data, justification: Justification), Error>
 
-        public init(erasureRoot: Data32, shardIndex: UInt32, bundleShard: Data, justification: Justification) {
-            self.erasureRoot = erasureRoot
-            self.shardIndex = shardIndex
-            self.bundleShard = bundleShard
-            self.justification = justification
+        public init(requestId: Data32, erasureRoot: Data32, shardIndex: UInt32, bundleShard: Data, justification: Justification) {
+            self.requestId = requestId
             result = .success((erasureRoot, shardIndex, bundleShard, justification))
         }
 
-        public init(erasureRoot: Data32, shardIndex: UInt32, bundleShard: Data, justification: Justification, error: Error) {
-            self.erasureRoot = erasureRoot
-            self.shardIndex = shardIndex
-            self.bundleShard = bundleShard
-            self.justification = justification
+        public init(requestId: Data32, error: Error) {
+            self.requestId = requestId
             result = .failure(error)
         }
     }
