@@ -105,8 +105,8 @@ public final class DataAvailability: ServiceBase2, @unchecked Sendable {
     ///   - segmentsRootMappings: Optional mappings from work package hash to segments root
     /// - Returns: The retrieved segments
     public func fetchSegment(
-        segments _: [WorkItem.ImportedDataSegment],
-        segmentsRootMappings _: SegmentsRootMappings? = nil
+        segments: [WorkItem.ImportedDataSegment],
+        segmentsRootMappings: SegmentsRootMappings? = nil
     ) async throws -> [Data4104] {
         // TODO: Implement segment fetching from the appropriate store
         // 1. Determine which store to fetch from based on segment type
@@ -114,7 +114,7 @@ public final class DataAvailability: ServiceBase2, @unchecked Sendable {
         // 3. Retrieve segments from the data store
         // 4. Verify segment integrity
         // 5. Return the fetched segments
-        throw DataAvailabilityError.segmentNotFound
+        try await dataStore.fetchSegment(segments: segments, segmentsRootMappings: segmentsRootMappings)
     }
 
     /// Export segments to the data availability system
@@ -122,13 +122,19 @@ public final class DataAvailability: ServiceBase2, @unchecked Sendable {
     ///   - data: The segments to export
     ///   - erasureRoot: The erasure root to associate with the segments
     /// - Returns: The segments root
-    public func exportSegments(data _: [Data4104], erasureRoot _: Data32) async throws -> Data32 {
+    public func exportSegments(data: [Data4104], erasureRoot: Data32) async throws -> Data32 {
         // TODO: Implement segment export to the import store
         // 1. Erasure code the segments if needed
         // 2. Calculate the segments root
         // 3. Store segments in the import store
         // 4. Return the segments root
-        throw DataAvailabilityError.storeError
+        let segmentRoot = Merklization.constantDepthMerklize(data.map(\.data))
+
+        for (index, data) in data.enumerated() {
+            try await dataStore.set(data: data, erasureRoot: erasureRoot, index: UInt16(index))
+        }
+
+        return segmentRoot
     }
 
     /// Export a work package bundle to the data availability system
