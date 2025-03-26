@@ -112,7 +112,8 @@ struct NetworkManagerTests {
                         bundle: bundle
                     )),
                 ]),
-            ])
+            ]),
+            "network calls: \(network.calls)"
         )
 
         let event = try #require(events.first { $0 is RuntimeEvents.WorkPackageBundleRecivedReply } as? RuntimeEvents
