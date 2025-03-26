@@ -409,6 +409,32 @@ struct HandlerImpl: NetworkProtocolHandler {
             //
             // }
             return []
+        case let .segmentShardRequest1(message):
+            blockchain
+                .publish(
+                    event: RuntimeEvents
+                        .SegmentShardRequestReceived(
+                            erasureRoot: message.erasureRoot,
+                            shardIndex: message.shardIndex,
+                            segmentIndices: message.segmentIndices
+                        )
+                )
+            // TODO: waitfor AuditShardRequestReceivedResponse
+            // let resp = try await blockchain.waitFor(RuntimeEvents.AuditShardRequestReceivedResponse.self) { event in
+            //
+            // }
+            return []
+        case let .segmentShardRequest2(message):
+            blockchain
+                .publish(
+                    event: RuntimeEvents
+                        .SegmentShardRequestReceived(
+                            erasureRoot: message.erasureRoot,
+                            shardIndex: message.shardIndex,
+                            segmentIndices: message.segmentIndices
+                        )
+                )
+            return []
         }
     }
 

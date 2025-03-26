@@ -19,8 +19,8 @@ public enum CERequest: Sendable, Equatable, Hashable {
     case workReportRequest(WorkReportRequestMessage)
     case shardDistribution(ShardDistributionMessage)
     case auditShardRequest(AuditShardRequestMessage)
-//    case segmentShardRequest1(SegmentShardRequestMessage)
-//    case segmentShardRequest2(SegmentShardRequestMessage)
+    case segmentShardRequest1(SegmentShardRequestMessage)
+    case segmentShardRequest2(SegmentShardRequestMessage)
 //    case assuranceDistribution(AssuranceDistributionMessage)
 //    case preimageAnnouncement(PreimageAnnouncementMessage)
 //    case preimageRequest(PreimageRequestMessage)
@@ -53,10 +53,10 @@ extension CERequest: RequestProtocol {
             try message.encode()
         case let .auditShardRequest(message):
             try message.encode()
-//        case let .segmentShardRequest1(message):
-//            try message.encode()
-//        case let .segmentShardRequest2(message):
-//            try message.encode()
+        case let .segmentShardRequest1(message):
+            try message.encode()
+        case let .segmentShardRequest2(message):
+            try message.encode()
 //        case let .assuranceDistribution(message):
 //            try message.encode()
 //        case let .preimageAnnouncement(message):
@@ -92,10 +92,10 @@ extension CERequest: RequestProtocol {
             .shardDistribution
         case .auditShardRequest:
             .auditShardRequest
-//        case .segmentShardRequest1:
-//            .segmentShardRequest1
-//        case .segmentShardRequest2:
-//            .segmentShardRequest2
+        case .segmentShardRequest1:
+            .segmentShardRequest1
+        case .segmentShardRequest2:
+            .segmentShardRequest2
 //        case .assuranceDistribution:
 //            .assuranceDistribution
 //        case .preimageAnnouncement:
@@ -131,10 +131,10 @@ extension CERequest: RequestProtocol {
             ShardDistributionMessage.self
         case .auditShardRequest:
             AuditShardRequestMessage.self
-//        case .segmentShardRequest1:
-//            SegmentShardRequestMessage.self
-//        case .segmentShardRequest2:
-//            SegmentShardRequestMessage.self
+        case .segmentShardRequest1:
+            SegmentShardRequestMessage.self
+        case .segmentShardRequest2:
+            SegmentShardRequestMessage.self
 //        case .assuranceDistribution:
 //            AssuranceDistributionMessage.self
 //        case .preimageAnnouncement:
@@ -182,12 +182,12 @@ extension CERequest: RequestProtocol {
         case .auditShardRequest:
             guard let message = data as? AuditShardRequestMessage else { return nil }
             return .auditShardRequest(message)
-//        case .segmentShardRequest1:
-//            guard let message = data as? SegmentShardRequestMessage else { return nil }
-//            return .segmentShardRequest1(message)
-//        case .segmentShardRequest2:
-//            guard let message = data as? SegmentShardRequestMessage else { return nil }
-//            return .segmentShardRequest2(message)
+        case .segmentShardRequest1:
+            guard let message = data as? SegmentShardRequestMessage else { return nil }
+            return .segmentShardRequest1(message)
+        case .segmentShardRequest2:
+            guard let message = data as? SegmentShardRequestMessage else { return nil }
+            return .segmentShardRequest2(message)
 //        case .assuranceDistribution:
 //            guard let message = data as? AssuranceDistributionMessage else { return nil }
 //            return .assuranceDistribution(message)

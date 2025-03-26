@@ -354,4 +354,50 @@ public enum RuntimeEvents {
             result = .failure(error)
         }
     }
+
+    public struct SegmentShardRequestReceived: Event {
+        public let erasureRoot: Data32
+        public let shardIndex: UInt32
+        public let segmentIndices: [UInt16]
+
+        public init(
+            erasureRoot: Data32,
+            shardIndex: UInt32,
+            segmentIndices: [UInt16]
+        ) {
+            self.erasureRoot = erasureRoot
+            self.shardIndex = shardIndex
+            self.segmentIndices = segmentIndices
+        }
+
+        public func generateRequestId() throws -> Data32 {
+            let encoder = JamEncoder()
+            try encoder.encode(erasureRoot)
+            try encoder.encode(shardIndex)
+            try encoder.encode(UInt32(segmentIndices.count))
+            try encoder.encode(segmentIndices)
+            return encoder.data.blake2b256hash()
+        }
+    }
+
+    public struct SegmentShardRequestReceivedResponse: Event {
+        public let requestId: Data32
+        public let result: Result<[SegmentShard], Error>
+
+        public init(
+            requestId: Data32,
+            segments: [SegmentShard]
+        ) {
+            self.requestId = requestId
+            result = .success(segments)
+        }
+
+        public init(
+            requestId: Data32,
+            error: Error
+        ) {
+            self.requestId = requestId
+            result = .failure(error)
+        }
+    }
 }

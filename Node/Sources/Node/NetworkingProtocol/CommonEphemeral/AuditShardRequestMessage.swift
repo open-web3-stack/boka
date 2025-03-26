@@ -25,7 +25,7 @@ extension AuditShardRequestMessage: CEMessage {
         guard let data = data.first else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
-                debugDescription: "missing data"
+                debugDescription: "unexpected data"
             ))
         }
 

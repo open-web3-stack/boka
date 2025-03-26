@@ -432,4 +432,30 @@ struct NetworkManagerTests {
         #expect(event.erasureRoot == erasureRoot)
         #expect(event.shardIndex == shardIndex)
     }
+
+    @Test
+    func testHandleSegmentShardRequest() async throws {
+        let testErasureRoot = Data32(repeating: 1)
+        let testShardIndex: UInt32 = 2
+        let testSegmentIndices: [UInt16] = [1, 2, 3]
+
+        let requestMessage = SegmentShardRequestMessage(
+            erasureRoot: testErasureRoot,
+            shardIndex: testShardIndex,
+            segmentIndices: testSegmentIndices
+        )
+
+        _ = try await network.handler.handle(ceRequest: CERequest.segmentShardRequest1(requestMessage))
+        _ = try await network.handler.handle(ceRequest: CERequest.segmentShardRequest2(requestMessage))
+
+        let events = await storeMiddleware.wait()
+
+        for event in events {
+            if let requestEvent = event as? RuntimeEvents.SegmentShardRequestReceived {
+                #expect(requestEvent.erasureRoot == testErasureRoot)
+                #expect(requestEvent.shardIndex == testShardIndex)
+                #expect(requestEvent.segmentIndices == testSegmentIndices)
+            }
+        }
+    }
 }
