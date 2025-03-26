@@ -7,7 +7,7 @@ import Utils
 /**
  * Errors that can occur in the GuaranteeingService.
  */
-public enum GuaranteeingServiceError: Error {
+public enum GuaranteeingServiceError: Error, Equatable {
     /// No authorizer hash found in the core authorization pool
     case noAuthorizerHash
     /// The number of exported segments doesn't match the expected count
@@ -155,7 +155,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      * @param segmentsRootMappings The mappings of work package hashes to segment roots
      * @return True if the bundle is valid, false otherwise
      */
-    private func validateWorkPackageBundle(
+    func validateWorkPackageBundle(
         _ bundle: WorkPackageBundle,
         segmentsRootMappings: SegmentsRootMappings
     ) async throws {
@@ -180,7 +180,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      * @param bundle The work package bundle to validate
      * @return True if the imported segments are valid, false otherwise
      */
-    private func validateImportedSegments(_ bundle: WorkPackageBundle) throws {
+    func validateImportedSegments(_ bundle: WorkPackageBundle) throws {
         // Collect all imported segment references from work items
         let importSegmentCount = bundle.workPackage.workItems.array.flatMap(\.inputs).count
 
@@ -203,7 +203,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      * @param bundle The work package bundle to process
      * @return A work report generated from the bundle
      */
-    private func processWorkPackageBundle(
+    func processWorkPackageBundle(
         coreIndex: CoreIndex,
         segmentsRootMappings: SegmentsRootMappings,
         bundle: WorkPackageBundle
@@ -265,7 +265,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      * @param workPackage The work package to process
      * @param extrinsics The extrinsics associated with the work package
      */
-    private func refineWorkPackage(
+    func refineWorkPackage(
         coreIndex: CoreIndex,
         workPackage: WorkPackageRef,
         extrinsics: [Data]
@@ -385,7 +385,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      * @param state The current state
      * @return An array of core indices assigned to validators
      */
-    private func getCoreAssignment(state: StateRef) -> [CoreIndex] {
+    func getCoreAssignment(state: StateRef) -> [CoreIndex] {
         let currentTime = timeProvider.getTime()
         let timeslot = currentTime.timeToTimeslot(config: config)
 
@@ -400,6 +400,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             return res
         }
 
+        // Generate a new assignment using the current entropy pool
         let newCoreAssignment = state.value.getCoreAssignment(
             config: config,
             randomness: state.value.entropyPool.t2,
@@ -418,7 +419,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      * @param for The work package the mapping is for
      * @return True if the mapping is valid, false otherwise
      */
-    private func validateSegmentsRootMapping(
+    func validateSegmentsRootMapping(
         _ mapping: SegmentsRootMapping,
         for workPackage: WorkPackage
     ) throws {
@@ -446,7 +447,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      * @param workPackage The work package to validate
      * @return True if the authorization is valid, false otherwise
      */
-    private func validateAuthorization(_ workPackage: WorkPackage) async throws {
+    func validateAuthorization(_ workPackage: WorkPackage) async throws {
         // Get the current state
         let head = await dataProvider.bestHead
         let state = try await dataProvider.getState(hash: head.hash)
@@ -492,7 +493,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      * @param workPackage The work package to validate
      * @return True if the work package is valid, false otherwise
      */
-    private func validate(workPackage: WorkPackage) throws {
+    func validate(workPackage: WorkPackage) throws {
         // Basic validation checks
         guard !workPackage.workItems.array.isEmpty else {
             logger.debug("Work package has no work items")
@@ -545,7 +546,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      * @param for The work package to retrieve segments for
      * @return An array of data segments
      */
-    private func retrieveImportSegments(for workPackage: WorkPackage) async throws -> [Data4104] {
+    func retrieveImportSegments(for workPackage: WorkPackage) async throws -> [Data4104] {
         var segments = [Data4104]()
 
         // Collect all import segment references from work items
@@ -576,7 +577,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      * @param for The work package to retrieve justifications for
      * @return An array of justification data
      */
-    private func retrieveJustifications(for workPackage: WorkPackage) async throws -> [Data] {
+    func retrieveJustifications(for workPackage: WorkPackage) async throws -> [Data] {
         var justifications = [Data]()
 
         // Collect all import segment references from work items
@@ -616,7 +617,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      * @param segmentsRootMappings Optional mappings of work package hashes to segment roots
      * @return A tuple containing the bundle, mappings, and work report
      */
-    private func createWorkReport(
+    func createWorkReport(
         state: StateRef,
         coreIndex: CoreIndex,
         workPackage: WorkPackageRef,
