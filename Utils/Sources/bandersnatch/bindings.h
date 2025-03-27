@@ -7,7 +7,7 @@
 
 typedef struct Public Public;
 typedef struct Secret Secret;
-typedef struct RingContext RingContext;
+typedef struct RingContext RingProofParams;
 typedef struct RingCommitment RingCommitment;
 
 
@@ -29,9 +29,9 @@ void public_free(Public *public_);
 
 intptr_t public_serialize_compressed(const Public *public_, uint8_t *out, uintptr_t out_len);
 
-intptr_t ring_context_new(uintptr_t size, RingContext **out_ptr);
+intptr_t ring_context_new(uintptr_t size, RingProofParams **out_ptr);
 
-void ring_context_free(RingContext *ctx);
+void ring_context_free(RingProofParams *ctx);
 
 /**
  * out is 784 bytes
@@ -40,7 +40,7 @@ intptr_t prover_ring_vrf_sign(const Secret *secret,
                               const Public *const *ring,
                               uintptr_t ring_len,
                               uintptr_t prover_idx,
-                              const RingContext *ctx,
+                              const RingProofParams *ctx,
                               const uint8_t *vrf_input_data,
                               uintptr_t vrf_input_len,
                               const uint8_t *aux_data,
@@ -61,7 +61,7 @@ intptr_t prover_ietf_vrf_sign(const Secret *secret,
 
 intptr_t ring_commitment_new_from_ring(const Public *const *ring,
                                        uintptr_t ring_len,
-                                       const RingContext *ctx,
+                                       const RingProofParams *ctx,
                                        RingCommitment **out);
 
 intptr_t ring_commitment_new_from_data(const uint8_t *data, uintptr_t len, RingCommitment **out);
@@ -80,7 +80,7 @@ intptr_t ring_commitment_serialize(const RingCommitment *commitment,
 /**
  * out is 32 bytes
  */
-intptr_t verifier_ring_vrf_verify(const RingContext *ctx,
+intptr_t verifier_ring_vrf_verify(const RingProofParams *ctx,
                                   const RingCommitment *commitment,
                                   const uint8_t *vrf_input_data,
                                   uintptr_t vrf_input_len,

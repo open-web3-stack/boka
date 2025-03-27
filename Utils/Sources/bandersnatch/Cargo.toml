@@ -10,11 +10,12 @@ crate-type = ["staticlib"]
 cbindgen = "0.27.0"
 
 [dependencies]
-ark-ec-vrfs = { git = "https://github.com/davxy/ark-ec-vrfs", rev = "ea35e22", features = [
+ark-ec-vrfs = { version = "0.1.2", features = [
 	"bandersnatch",
 	"ring",
 	"parallel",
 ] }
+
 
 [dev-dependencies]
 hex-literal = "0.4.1"

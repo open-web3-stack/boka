@@ -1,6 +1,7 @@
-use ark_ec_vrfs::{prelude::ark_serialize, suites::bandersnatch::edwards as bandersnatch};
+use ark_ec_vrfs::reexports::ark_serialize;
+use ark_ec_vrfs::suites::bandersnatch;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use bandersnatch::{Public, RingContext, Secret};
+use bandersnatch::{Public, RingProofParams, Secret};
 
 use crate::bandersnatch_vrfs::{
     ietf_vrf_sign, ietf_vrf_verify, ring_context, ring_vrf_sign, ring_vrf_verify, vrf_input_point,
@@ -131,7 +132,7 @@ pub extern "C" fn public_serialize_compressed(
 // MARK: RingContext
 
 #[no_mangle]
-pub extern "C" fn ring_context_new(size: usize, out_ptr: *mut *mut RingContext) -> isize {
+pub extern "C" fn ring_context_new(size: usize, out_ptr: *mut *mut RingProofParams) -> isize {
     if out_ptr.is_null() {
         return 1;
     }
@@ -146,7 +147,7 @@ pub extern "C" fn ring_context_new(size: usize, out_ptr: *mut *mut RingContext) 
 }
 
 #[no_mangle]
-pub extern "C" fn ring_context_free(ctx: *mut RingContext) {
+pub extern "C" fn ring_context_free(ctx: *mut RingProofParams) {
     if !ctx.is_null() {
         unsafe {
             drop(Box::from_raw(ctx));
@@ -163,7 +164,7 @@ pub extern "C" fn prover_ring_vrf_sign(
     ring: *const *const Public,
     ring_len: usize,
     prover_idx: usize,
-    ctx: *const RingContext,
+    ctx: *const RingProofParams,
     vrf_input_data: *const u8,
     vrf_input_len: usize,
     aux_data: *const u8,
@@ -185,7 +186,7 @@ pub extern "C" fn prover_ring_vrf_sign(
     }
     let secret: &Secret = unsafe { &*secret };
     let ring_slice = unsafe { std::slice::from_raw_parts(ring, ring_len) };
-    let ctx: &RingContext = unsafe { &*ctx };
+    let ctx: &RingProofParams = unsafe { &*ctx };
     let vrf_input_slice = unsafe { std::slice::from_raw_parts(vrf_input_data, vrf_input_len) };
     let aux_data_slice = unsafe { std::slice::from_raw_parts(aux_data, aux_data_len) };
     let out_slice = unsafe { std::slice::from_raw_parts_mut(out, out_len) };
@@ -236,21 +237,21 @@ pub extern "C" fn prover_ietf_vrf_sign(
 pub extern "C" fn ring_commitment_new_from_ring(
     ring: *const *const Public,
     ring_len: usize,
-    ctx: *const RingContext,
+    ctx: *const RingProofParams,
     out: *mut *mut RingCommitment,
 ) -> isize {
     if ring.is_null() || ctx.is_null() || out.is_null() {
         return 1;
     }
     let ring_slice: &[*const Public] = unsafe { std::slice::from_raw_parts(ring, ring_len) };
-    let ctx: &RingContext = unsafe { &*ctx };
+    let ctx: &RingProofParams = unsafe { &*ctx };
     // Backend currently requires the wrapped type (plain affine points)
     let pts: Vec<_> = unsafe {
         ring_slice
             .iter()
             .map(|pk| {
                 if pk.is_null() {
-                    ctx.padding_point()
+                    RingProofParams::padding_point()
                 } else {
                     (*(*pk)).0
                 }
@@ -318,7 +319,7 @@ pub extern "C" fn ring_commitment_serialize(
 /// out is 32 bytes
 #[no_mangle]
 pub extern "C" fn verifier_ring_vrf_verify(
-    ctx: *const RingContext,
+    ctx: *const RingProofParams,
     commitment: *const RingCommitment,
     vrf_input_data: *const u8,
     vrf_input_len: usize,
@@ -341,7 +342,7 @@ pub extern "C" fn verifier_ring_vrf_verify(
     if out_len < 32 {
         return 2;
     }
-    let ctx: &RingContext = unsafe { &*ctx };
+    let ctx: &RingProofParams = unsafe { &*ctx };
     let commitment: &RingCommitment = unsafe { &*commitment };
     let vrf_input_slice = unsafe { std::slice::from_raw_parts(vrf_input_data, vrf_input_len) };
     let aux_data_slice = unsafe { std::slice::from_raw_parts(aux_data, aux_data_len) };
