@@ -24,7 +24,7 @@ public enum CERequest: Sendable, Equatable, Hashable {
     case assuranceDistribution(AssuranceDistributionMessage)
     case preimageAnnouncement(PreimageAnnouncementMessage)
     case preimageRequest(PreimageRequestMessage)
-//    case auditAnnouncement(AuditAnnouncementMessage)
+    case auditAnnouncement(AuditAnnouncementMessage)
     case judgementPublication(JudgementPublicationMessage)
 }
 
@@ -63,8 +63,8 @@ extension CERequest: RequestProtocol {
             try message.encode()
         case let .preimageRequest(message):
             try message.encode()
-//        case let .auditAnnouncement(message):
-//            try message.encode()
+        case let .auditAnnouncement(message):
+            try message.encode()
         case let .judgementPublication(message):
             try message.encode()
         }
@@ -102,8 +102,8 @@ extension CERequest: RequestProtocol {
             .preimageAnnouncement
         case .preimageRequest:
             .preimageRequest
-//        case .auditAnnouncement:
-//            .auditAnnouncement
+        case .auditAnnouncement:
+            .auditAnnouncement
         case .judgementPublication:
             .judgementPublication
         }
@@ -141,8 +141,8 @@ extension CERequest: RequestProtocol {
             PreimageAnnouncementMessage.self
         case .preimageRequest:
             PreimageRequestMessage.self
-//        case .auditAnnouncement:
-//            AuditAnnouncementMessage.self
+        case .auditAnnouncement:
+            AuditAnnouncementMessage.self
         case .judgementPublication:
             JudgementPublicationMessage.self
         default:
@@ -197,14 +197,12 @@ extension CERequest: RequestProtocol {
         case .preimageRequest:
             guard let message = data as? PreimageRequestMessage else { return nil }
             return .preimageRequest(message)
-//        case .auditAnnouncement:
-//            guard let message = data as? AuditAnnouncementMessage else { return nil }
-//            return .auditAnnouncement(message)
+        case .auditAnnouncement:
+            guard let message = data as? AuditAnnouncementMessage else { return nil }
+            return .auditAnnouncement(message)
         case .judgementPublication:
             guard let message = data as? JudgementPublicationMessage else { return nil }
             return .judgementPublication(message)
-        default:
-            fatalError("unimplemented")
         }
     }
 

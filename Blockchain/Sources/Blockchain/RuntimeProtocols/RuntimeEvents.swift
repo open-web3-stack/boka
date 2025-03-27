@@ -469,4 +469,23 @@ public enum RuntimeEvents {
             self.signature = signature
         }
     }
+
+    public struct AuditAnnouncementReceived: Event {
+        public let headerHash: Data32
+        public let tranche: UInt8
+        public let announcement: Announcement
+        public let evidence: Evidence
+
+        public init(
+            headerHash: Data32,
+            tranche: UInt8,
+            announcement: Announcement,
+            evidence: Evidence
+        ) {
+            self.headerHash = headerHash
+            self.tranche = tranche
+            self.announcement = announcement
+            self.evidence = evidence
+        }
+    }
 }

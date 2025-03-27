@@ -116,8 +116,8 @@ struct NetworkManagerTests {
             "network calls: \(network.calls)"
         )
 
-        let event = try #require(events.first { $0 is RuntimeEvents.WorkPackageBundleRecivedReply } as? RuntimeEvents
-            .WorkPackageBundleRecivedReply)
+        let event = try #require(events.first { $0 is RuntimeEvents.WorkPackageBundleReceivedReply } as? RuntimeEvents
+            .WorkPackageBundleReceivedReply)
         #expect(event.source == key.ed25519.data)
         #expect(event.workReportHash == workReportHash)
         #expect(event.signature == signature)
@@ -563,5 +563,88 @@ struct NetworkManagerTests {
         }
 
         #expect(receivedCount == 1)
+    }
+
+    @Test
+    func testHandleFirstTrancheAnnouncement() async throws {
+        let testHeaderHash = Data32(repeating: 0xAA)
+        let testAnnouncement = Announcement(
+            workReports: [
+                .init(coreIndex: 1, workReportHash: Data32(repeating: 0xBB)),
+            ],
+            signature: Ed25519Signature(repeating: 0xCC)
+        )
+        let testEvidence = Evidence.firstTranche(Data96(repeating: 0xDD))
+
+        let message = AuditAnnouncementMessage(
+            headerHash: testHeaderHash,
+            tranche: 0,
+            announcement: testAnnouncement,
+            evidence: testEvidence
+        )
+        _ = try await network.handler.handle(ceRequest: .auditAnnouncement(message))
+
+        let events = await storeMiddleware.wait()
+        var receivedCount = 0
+
+        for event in events {
+            if let receivedEvent = event as? RuntimeEvents.AuditAnnouncementReceived {
+                #expect(receivedEvent.headerHash == testHeaderHash)
+                #expect(receivedEvent.tranche == 0)
+                #expect(receivedEvent.announcement.workReports.count == 1)
+                #expect(receivedEvent.evidence == testEvidence)
+                receivedCount += 1
+            }
+        }
+        #expect(receivedCount == 1)
+    }
+
+    @Test
+    func testHandleSubsequentTrancheAnnouncement() async throws {
+        let previousAnnouncement = Announcement(
+            workReports: [
+                .init(coreIndex: 1, workReportHash: Data32(repeating: 0x55)),
+            ],
+            signature: Ed25519Signature(repeating: 0x66)
+        )
+
+        let testNoShow = Evidence.NoShow(
+            validatorIndex: 1,
+            previousAnnouncement: previousAnnouncement
+        )
+
+        let testEvidence = Evidence.subsequentTranche([
+            .init(
+                bandersnatchSig: Data96(repeating: 0xEE),
+                noShows: [testNoShow]
+            ),
+        ])
+
+        let message = AuditAnnouncementMessage(
+            headerHash: Data32(repeating: 0xFF),
+            tranche: 1,
+            announcement: Announcement(
+                workReports: [
+                    .init(coreIndex: 2, workReportHash: Data32(repeating: 0x11)),
+                ],
+                signature: Ed25519Signature(repeating: 0x22)
+            ),
+            evidence: testEvidence
+        )
+
+        _ = try await network.handler.handle(ceRequest: .auditAnnouncement(message))
+        let events = await storeMiddleware.wait()
+
+        var eventMatched = false
+        for event in events {
+            if let receivedEvent = event as? RuntimeEvents.AuditAnnouncementReceived {
+                #expect(receivedEvent.tranche == 1)
+                if case let .subsequentTranche(evidences) = receivedEvent.evidence {
+                    #expect(evidences[0].noShows[0].previousAnnouncement.workReports[0].coreIndex == 1)
+                }
+                eventMatched = true
+            }
+        }
+        #expect(eventMatched)
     }
 }

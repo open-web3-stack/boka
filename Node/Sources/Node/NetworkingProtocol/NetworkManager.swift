@@ -475,6 +475,18 @@ struct HandlerImpl: NetworkProtocolHandler {
                         )
                 )
             return []
+        case let .auditAnnouncement(message):
+            blockchain
+                .publish(
+                    event: RuntimeEvents
+                        .AuditAnnouncementReceived(
+                            headerHash: message.headerHash,
+                            tranche: message.tranche,
+                            announcement: message.announcement,
+                            evidence: message.evidence
+                        )
+                )
+            return []
         }
     }
 
