@@ -434,6 +434,46 @@ struct HandlerImpl: NetworkProtocolHandler {
                             segmentIndices: message.segmentIndices
                         )
                 )
+            // TODO: waitfor AuditShardRequestReceivedResponse
+            return []
+        case let .assuranceDistribution(message):
+            blockchain
+                .publish(
+                    event: RuntimeEvents
+                        .AssuranceDistributionReceived(
+                            headerHash: message.headerHash,
+                            bitfield: message.bitfield,
+                            signature: message.signature
+                        )
+                )
+            return []
+        case let .preimageAnnouncement(message):
+            blockchain
+                .publish(
+                    event: RuntimeEvents
+                        .PreimageAnnouncementReceived(
+                            serviceID: message.serviceID,
+                            hash: message.hash,
+                            preimageLength: message.preimageLength
+                        )
+                )
+            return []
+        case let .preimageRequest(message):
+            blockchain.publish(event: RuntimeEvents.PreimageRequestReceived(hash: message.hash))
+            // TODO: waitfor PreimageRequestReceivedResponse
+            return []
+        case let .judgementPublication(message):
+            blockchain
+                .publish(
+                    event: RuntimeEvents
+                        .JudgementPublicationReceived(
+                            epochIndex: message.epochIndex,
+                            validatorIndex: message.validatorIndex,
+                            validity: message.validity,
+                            workReportHash: message.workReportHash,
+                            signature: message.signature
+                        )
+                )
             return []
         }
     }

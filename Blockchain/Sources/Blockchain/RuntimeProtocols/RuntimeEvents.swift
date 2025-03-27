@@ -400,4 +400,73 @@ public enum RuntimeEvents {
             result = .failure(error)
         }
     }
+
+    public struct AssuranceDistributionReceived: Event {
+        public let headerHash: Data32
+        public let bitfield: Data // (One bit per core)
+        public let signature: Ed25519Signature
+
+        public init(headerHash: Data32, bitfield: Data, signature: Ed25519Signature) {
+            self.headerHash = headerHash
+            self.bitfield = bitfield
+            self.signature = signature
+        }
+    }
+
+    public struct PreimageAnnouncementReceived: Event {
+        public let serviceID: UInt32
+        public let hash: Data32
+        public let preimageLength: UInt32
+
+        public init(serviceID: UInt32, hash: Data32, preimageLength: UInt32) {
+            self.serviceID = serviceID
+            self.hash = hash
+            self.preimageLength = preimageLength
+        }
+    }
+
+    public struct PreimageRequestReceived: Event {
+        public let hash: Data32
+
+        public init(hash: Data32) {
+            self.hash = hash
+        }
+    }
+
+    public struct PreimageRequestReceivedResponse: Event {
+        public let hash: Data32
+        public let result: Result<Data, Error>
+
+        public init(hash: Data32, preimage: Data) {
+            self.hash = hash
+            result = .success(preimage)
+        }
+
+        public init(hash: Data32, error: Error) {
+            self.hash = hash
+            result = .failure(error)
+        }
+    }
+
+    public struct JudgementPublicationReceived: Event {
+        public let epochIndex: EpochIndex
+        public let validatorIndex: ValidatorIndex
+        public let validity: UInt8 // 0 = Invalid, 1 = Valid
+        public let workReportHash: Data32
+        public let signature: Ed25519Signature
+
+        public init(
+            epochIndex: EpochIndex,
+            validatorIndex: ValidatorIndex,
+            validity: UInt8,
+            workReportHash: Data32,
+            signature: Ed25519Signature
+        ) {
+            self.epochIndex = epochIndex
+            self.validatorIndex = validatorIndex
+            self.validity = validity
+            self.workReportHash = workReportHash
+            self.signature = signature
+        }
+    }
 }

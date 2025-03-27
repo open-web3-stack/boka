@@ -21,11 +21,11 @@ public enum CERequest: Sendable, Equatable, Hashable {
     case auditShardRequest(AuditShardRequestMessage)
     case segmentShardRequest1(SegmentShardRequestMessage)
     case segmentShardRequest2(SegmentShardRequestMessage)
-//    case assuranceDistribution(AssuranceDistributionMessage)
-//    case preimageAnnouncement(PreimageAnnouncementMessage)
-//    case preimageRequest(PreimageRequestMessage)
+    case assuranceDistribution(AssuranceDistributionMessage)
+    case preimageAnnouncement(PreimageAnnouncementMessage)
+    case preimageRequest(PreimageRequestMessage)
 //    case auditAnnouncement(AuditAnnouncementMessage)
-//    case judgementPublication(JudgementPublicationMessage)
+    case judgementPublication(JudgementPublicationMessage)
 }
 
 extension CERequest: RequestProtocol {
@@ -57,16 +57,16 @@ extension CERequest: RequestProtocol {
             try message.encode()
         case let .segmentShardRequest2(message):
             try message.encode()
-//        case let .assuranceDistribution(message):
-//            try message.encode()
-//        case let .preimageAnnouncement(message):
-//            try message.encode()
-//        case let .preimageRequest(message):
-//            try message.encode()
+        case let .assuranceDistribution(message):
+            try message.encode()
+        case let .preimageAnnouncement(message):
+            try message.encode()
+        case let .preimageRequest(message):
+            try message.encode()
 //        case let .auditAnnouncement(message):
 //            try message.encode()
-//        case let .judgementPublication(message):
-//            try message.encode()
+        case let .judgementPublication(message):
+            try message.encode()
         }
     }
 
@@ -96,16 +96,16 @@ extension CERequest: RequestProtocol {
             .segmentShardRequest1
         case .segmentShardRequest2:
             .segmentShardRequest2
-//        case .assuranceDistribution:
-//            .assuranceDistribution
-//        case .preimageAnnouncement:
-//            .preimageAnnouncement
-//        case .preimageRequest:
-//            .preimageRequest
+        case .assuranceDistribution:
+            .assuranceDistribution
+        case .preimageAnnouncement:
+            .preimageAnnouncement
+        case .preimageRequest:
+            .preimageRequest
 //        case .auditAnnouncement:
 //            .auditAnnouncement
-//        case .judgementPublication:
-//            .judgementPublication
+        case .judgementPublication:
+            .judgementPublication
         }
     }
 
@@ -135,16 +135,16 @@ extension CERequest: RequestProtocol {
             SegmentShardRequestMessage.self
         case .segmentShardRequest2:
             SegmentShardRequestMessage.self
-//        case .assuranceDistribution:
-//            AssuranceDistributionMessage.self
-//        case .preimageAnnouncement:
-//            PreimageAnnouncementMessage.self
-//        case .preimageRequest:
-//            PreimageRequestMessage.self
+        case .assuranceDistribution:
+            AssuranceDistributionMessage.self
+        case .preimageAnnouncement:
+            PreimageAnnouncementMessage.self
+        case .preimageRequest:
+            PreimageRequestMessage.self
 //        case .auditAnnouncement:
 //            AuditAnnouncementMessage.self
-//        case .judgementPublication:
-//            JudgementPublicationMessage.self
+        case .judgementPublication:
+            JudgementPublicationMessage.self
         default:
             fatalError("unimplemented")
         }
@@ -188,21 +188,21 @@ extension CERequest: RequestProtocol {
         case .segmentShardRequest2:
             guard let message = data as? SegmentShardRequestMessage else { return nil }
             return .segmentShardRequest2(message)
-//        case .assuranceDistribution:
-//            guard let message = data as? AssuranceDistributionMessage else { return nil }
-//            return .assuranceDistribution(message)
-//        case .preimageAnnouncement:
-//            guard let message = data as? PreimageAnnouncementMessage else { return nil }
-//            return .preimageAnnouncement(message)
-//        case .preimageRequest:
-//            guard let message = data as? PreimageRequestMessage else { return nil }
-//            return .preimageRequest(message)
+        case .assuranceDistribution:
+            guard let message = data as? AssuranceDistributionMessage else { return nil }
+            return .assuranceDistribution(message)
+        case .preimageAnnouncement:
+            guard let message = data as? PreimageAnnouncementMessage else { return nil }
+            return .preimageAnnouncement(message)
+        case .preimageRequest:
+            guard let message = data as? PreimageRequestMessage else { return nil }
+            return .preimageRequest(message)
 //        case .auditAnnouncement:
 //            guard let message = data as? AuditAnnouncementMessage else { return nil }
 //            return .auditAnnouncement(message)
-//        case .judgementPublication:
-//            guard let message = data as? JudgementPublicationMessage else { return nil }
-//            return .judgementPublication(message)
+        case .judgementPublication:
+            guard let message = data as? JudgementPublicationMessage else { return nil }
+            return .judgementPublication(message)
         default:
             fatalError("unimplemented")
         }

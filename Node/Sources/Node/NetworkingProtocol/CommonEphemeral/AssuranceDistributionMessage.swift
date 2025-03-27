@@ -8,25 +8,26 @@ public struct AssuranceDistributionMessage: Sendable, Equatable, Codable, Hashab
     public let bitfield: Data // [u8; 43] (One bit per core)
     public let signature: Ed25519Signature
 
-    public init(headerHash: Data32, bitfield: Data, signature: Ed25519Signature) throws {
-        guard bitfield.count == 43 else {
-            throw DecodingError.dataCorrupted(DecodingError.Context(
-                codingPath: [],
-                debugDescription: "Bitfield must be exactly 43 bytes, but received \(bitfield.count) bytes"
-            ))
-        }
+    public init(headerHash: Data32, bitfield: Data, signature: Ed25519Signature) {
         self.headerHash = headerHash
         self.bitfield = bitfield
         self.signature = signature
     }
 }
 
-extension AssuranceDistributionMessage {
-    public func encode() throws -> Data {
-        try JamEncoder.encode(self)
+extension AssuranceDistributionMessage: CEMessage {
+    public func encode() throws -> [Data] {
+        try [JamEncoder.encode(self)]
     }
 
-    public static func decode(data: Data, config: ProtocolConfigRef) throws -> AssuranceDistributionMessage {
+    public static func decode(data: [Data], config: ProtocolConfigRef) throws -> AssuranceDistributionMessage {
+        guard let data = data.first else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(
+                codingPath: [],
+                debugDescription: "unexpected data"
+            ))
+        }
+
         let message = try JamDecoder.decode(AssuranceDistributionMessage.self, from: data, withConfig: config)
         guard message.bitfield.count == 43 else {
             throw DecodingError.dataCorrupted(DecodingError.Context(

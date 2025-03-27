@@ -458,4 +458,108 @@ struct NetworkManagerTests {
             }
         }
     }
+
+    @Test
+    func testHandleAssuranceDistributionMessage() async throws {
+        let testHeaderHash = Data32(repeating: 1)
+        let testBitfield = Data(repeating: 0xFF, count: 43) // 43 bytes bitfield
+        let testSignature = Ed25519Signature(repeating: 2)
+
+        let message = AssuranceDistributionMessage(
+            headerHash: testHeaderHash,
+            bitfield: testBitfield,
+            signature: testSignature
+        )
+
+        _ = try await network.handler.handle(ceRequest: CERequest.assuranceDistribution(message))
+
+        let events = await storeMiddleware.wait()
+
+        for event in events {
+            if let receivedEvent = event as? RuntimeEvents.AssuranceDistributionReceived {
+                #expect(receivedEvent.headerHash == testHeaderHash)
+                #expect(receivedEvent.bitfield == testBitfield)
+                #expect(receivedEvent.signature == testSignature)
+            }
+        }
+    }
+
+    @Test
+    func testHandlePreimageAnnouncementMessage() async throws {
+        let testServiceID: UInt32 = 42
+        let testPreimageHash = Data32(repeating: 1)
+        let testPreimageLength: UInt32 = 256
+
+        let message = PreimageAnnouncementMessage(
+            serviceID: testServiceID,
+            hash: testPreimageHash,
+            preimageLength: testPreimageLength
+        )
+
+        _ = try await network.handler.handle(ceRequest: CERequest.preimageAnnouncement(message))
+
+        let events = await storeMiddleware.wait()
+
+        for event in events {
+            if let receivedEvent = event as? RuntimeEvents.PreimageAnnouncementReceived {
+                #expect(receivedEvent.serviceID == testServiceID)
+                #expect(receivedEvent.hash == testPreimageHash)
+                #expect(receivedEvent.preimageLength == testPreimageLength)
+            }
+        }
+    }
+
+    @Test
+    func testHandlePreimageRequestMessage() async throws {
+        let testPreimageHash = Data32(repeating: 1)
+
+        let message = PreimageRequestMessage(
+            hash: testPreimageHash
+        )
+
+        _ = try await network.handler.handle(ceRequest: CERequest.preimageRequest(message))
+
+        let events = await storeMiddleware.wait()
+
+        for event in events {
+            if let receivedEvent = event as? RuntimeEvents.PreimageRequestReceived {
+                #expect(receivedEvent.hash == testPreimageHash)
+            }
+        }
+    }
+
+    @Test
+    func testHandleJudgementPublication() async throws {
+        let testEpochIndex: EpochIndex = 123
+        let testValidatorIndex: ValidatorIndex = 5
+        let testValidity: UInt8 = 1 // Valid
+        let testWorkReportHash = Data32(repeating: 0xAA)
+        let testSignature = Ed25519Signature(repeating: 0xBB)
+
+        let message = JudgementPublicationMessage(
+            epochIndex: testEpochIndex,
+            validatorIndex: testValidatorIndex,
+            validity: testValidity,
+            workReportHash: testWorkReportHash,
+            signature: testSignature
+        )
+
+        _ = try await network.handler.handle(ceRequest: CERequest.judgementPublication(message))
+
+        let events = await storeMiddleware.wait()
+        var receivedCount = 0
+
+        for event in events {
+            if let receivedEvent = event as? RuntimeEvents.JudgementPublicationReceived {
+                #expect(receivedEvent.epochIndex == testEpochIndex)
+                #expect(receivedEvent.validatorIndex == testValidatorIndex)
+                #expect(receivedEvent.validity == testValidity)
+                #expect(receivedEvent.workReportHash == testWorkReportHash)
+                #expect(receivedEvent.signature == testSignature)
+                receivedCount += 1
+            }
+        }
+
+        #expect(receivedCount == 1)
+    }
 }
