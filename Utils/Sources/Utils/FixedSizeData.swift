@@ -111,7 +111,6 @@ extension FixedSizeData {
 }
 
 public typealias Data12 = FixedSizeData<ConstInt12>
-public typealias Data31 = FixedSizeData<ConstInt31>
 public typealias Data32 = FixedSizeData<ConstInt32>
 public typealias Data48 = FixedSizeData<ConstInt48>
 public typealias Data64 = FixedSizeData<ConstInt64>

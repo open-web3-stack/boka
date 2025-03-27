@@ -5,11 +5,11 @@ import Utils
 public enum RuntimeEvents {
     public struct StateRequestReceived: Event {
         public var headerHash: Data32
-        public var startKey: Data31
-        public var endKey: Data31
+        public var startKey: Data // [u8: 31]
+        public var endKey: Data // [u8: 31]
         public var maxSize: UInt32
 
-        public init(headerHash: Data32, startKey: Data31, endKey: Data31, maxSize: UInt32) {
+        public init(headerHash: Data32, startKey: Data, endKey: Data, maxSize: UInt32) {
             self.headerHash = headerHash
             self.startKey = startKey
             self.endKey = endKey
@@ -28,9 +28,9 @@ public enum RuntimeEvents {
 
     public struct StateRequestReceivedResponse: Event {
         public var requestId: Data32
-        public let result: Result<(headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data31, value: Data)]), Error>
+        public let result: Result<(headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data, value: Data)]), Error>
 
-        public init(requestId: Data32, headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data31, value: Data)]) {
+        public init(requestId: Data32, headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data, value: Data)]) {
             self.requestId = requestId
             result = .success((headerHash, boundaryNodes, keyValuePairs))
         }
