@@ -112,10 +112,12 @@ struct NetworkManagerTests {
                         bundle: bundle
                     )),
                 ]),
-            ])
+            ]),
+            "network calls: \(network.calls)"
         )
 
-        let event = events.first { $0 is RuntimeEvents.WorkPackageBundleReceivedReply } as! RuntimeEvents.WorkPackageBundleReceivedReply
+        let event = try #require(events.first { $0 is RuntimeEvents.WorkPackageBundleRecivedReply } as? RuntimeEvents
+            .WorkPackageBundleRecivedReply)
         #expect(event.source == key.ed25519.data)
         #expect(event.workReportHash == workReportHash)
         #expect(event.signature == signature)
