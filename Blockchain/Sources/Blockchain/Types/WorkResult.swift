@@ -21,21 +21,21 @@ public struct WorkResult: Sendable, Equatable, Codable {
     // which may be either an octet sequence in case it was successful, or a member of the set J, if not
     public var output: WorkOutput
 
-    // TODO: compact encoding for these fields?
+    // TODO: compact encoding for these new fields?
 
     // u: the actual amount of gas used during refinement
-    public var gasUsed: UInt64
+    public var gasUsed: Gas
 
     // i: the number of segments imported from the Segments DA
-    public var numImports: UInt32
+    public var importsCount: UInt32
 
     // e: the number of segments exported into the Segments DA
-    public var numExports: UInt32
+    public var exportsCount: UInt32
 
     // x: the number of the extrinsics used in computing the workload
-    public var numExtrinsics: UInt32
+    public var extrinsicsCount: UInt32
 
-    // z: and total size in octets of the extrinsics used in computing the workload
+    // z: the total size in octets of the extrinsics used in computing the workload
     public var extrinsicSize: UInt32
 
     public init(
@@ -44,10 +44,10 @@ public struct WorkResult: Sendable, Equatable, Codable {
         payloadHash: Data32,
         gasRatio: Gas,
         output: WorkOutput,
-        gasUsed: UInt64,
-        numImports: UInt32,
-        numExports: UInt32,
-        numExtrinsics: UInt32,
+        gasUsed: Gas,
+        importsCount: UInt32,
+        exportsCount: UInt32,
+        extrinsicsCount: UInt32,
         extrinsicSize: UInt32
     ) {
         self.serviceIndex = serviceIndex
@@ -56,9 +56,9 @@ public struct WorkResult: Sendable, Equatable, Codable {
         self.gasRatio = gasRatio
         self.output = output
         self.gasUsed = gasUsed
-        self.numImports = numImports
-        self.numExports = numExports
-        self.numExtrinsics = numExtrinsics
+        self.importsCount = importsCount
+        self.exportsCount = exportsCount
+        self.extrinsicsCount = extrinsicsCount
         self.extrinsicSize = extrinsicSize
     }
 }
@@ -72,10 +72,10 @@ extension WorkResult: Dummy {
             payloadHash: Data32(),
             gasRatio: Gas(0),
             output: .init(.success(Data())),
-            gasUsed: 0,
-            numImports: 0,
-            numExports: 0,
-            numExtrinsics: 0,
+            gasUsed: Gas(0),
+            importsCount: 0,
+            exportsCount: 0,
+            extrinsicsCount: 0,
             extrinsicSize: 0
         )
     }

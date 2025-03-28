@@ -133,8 +133,8 @@ public protocol Accumulation: ServiceAccounts {
     var accumulationHistory: StateKeys.AccumulationHistoryKey.Value { get set }
 }
 
-public typealias AccumulationStats = [ServiceIndex: (Gas, UInt)]
-public typealias TransfersStats = [ServiceIndex: (UInt, Gas)]
+public typealias AccumulationStats = [ServiceIndex: (Gas, UInt32)]
+public typealias TransfersStats = [ServiceIndex: (UInt32, Gas)]
 
 extension Accumulation {
     /// single-service accumulate function ∆1
@@ -483,7 +483,7 @@ extension Accumulation {
                 timeslot: timeslot,
                 transfers: transfers
             )
-            let count = UInt(transfers.count)
+            let count = UInt32(transfers.count)
             if count == 0 { continue }
             transfersStats[service] = (count, gasUsed)
         }
@@ -541,7 +541,7 @@ extension Accumulation {
                 .filter { $0.seriveIndex == service }
                 .reduce(Gas(0)) { $0 + $1.gas }
 
-            accumulateStats[service] = (gasUsed, UInt(num))
+            accumulateStats[service] = (gasUsed, UInt32(num))
         }
 
         return (root, accumulateStats, transfersStats)

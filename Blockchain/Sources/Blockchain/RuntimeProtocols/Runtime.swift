@@ -198,10 +198,10 @@ public final class Runtime {
                 config: config,
                 newTimeslot: block.header.timeslot,
                 extrinsic: block.extrinsic,
-                authorIndex: block.header.authorIndex
-                // TODO:
-                // accumulateStats: accumulateStats,
-                // transfersStats: transfersStats
+                authorIndex: block.header.authorIndex,
+                availableReports: availableReports,
+                accumulateStats: accumulateStats,
+                transfersStats: transfersStats
             )
 
             // after reports as it need old recent history
