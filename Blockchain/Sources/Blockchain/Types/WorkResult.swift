@@ -21,8 +21,6 @@ public struct WorkResult: Sendable, Equatable, Codable {
     // which may be either an octet sequence in case it was successful, or a member of the set J, if not
     public var output: WorkOutput
 
-    // TODO: compact encoding for these new fields?
-
     // u: the actual amount of gas used during refinement
     public var gasUsed: Gas
 

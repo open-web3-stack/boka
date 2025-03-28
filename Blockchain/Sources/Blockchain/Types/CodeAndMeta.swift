@@ -10,7 +10,6 @@ public struct CodeAndMeta: Sendable, Equatable {
     public var metadata: Data
     public var codeBlob: Data
 
-    // TODO: check if this is correct
     public init(data: Data) throws {
         var slice = Slice(base: data, bounds: data.startIndex ..< data.endIndex)
         let metaLength = slice.decode()
