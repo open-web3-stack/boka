@@ -647,4 +647,49 @@ struct NetworkManagerTests {
         }
         #expect(eventMatched)
     }
+
+    @Test
+    func testHandleStateRequest() async throws {
+        let testHeaderHash = Data32(repeating: 0x11)
+        let testStartKey = Data(repeating: 0x22, count: 31)
+        let testEndKey = Data(repeating: 0x33, count: 31)
+        let testMaxSize: UInt32 = 2048
+
+        let message = try StateRequest(
+            headerHash: testHeaderHash,
+            startKey: testStartKey,
+            endKey: testEndKey,
+            maxSize: testMaxSize
+        )
+
+        _ = try await network.handler.handle(ceRequest: .stateRequest(message))
+
+        let events = await storeMiddleware.wait()
+        var receivedCount = 0
+
+        for event in events {
+            if let receivedEvent = event as? RuntimeEvents.StateRequestReceived {
+                #expect(receivedEvent.headerHash == testHeaderHash)
+                #expect(receivedEvent.startKey == testStartKey)
+                #expect(receivedEvent.endKey == testEndKey)
+                #expect(receivedEvent.maxSize == testMaxSize)
+                receivedCount += 1
+            }
+        }
+
+        #expect(receivedCount == 1)
+    }
+
+    @Test
+    func testStateRequestInvalidKeys() async {
+        let invalidKey = Data(repeating: 0x44, count: 30) // 30 bytes (invalid)
+        #expect(throws: Error.self) {
+            try StateRequest(
+                headerHash: Data32(repeating: 0x11),
+                startKey: invalidKey,
+                endKey: Data(repeating: 0x33, count: 31),
+                maxSize: 1024
+            )
+        }
+    }
 }
