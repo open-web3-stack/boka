@@ -441,7 +441,7 @@ struct NetworkManagerTests {
         let testShardIndex: UInt32 = 2
         let testSegmentIndices: [UInt16] = [1, 2, 3]
 
-        let requestMessage = SegmentShardRequestMessage(
+        let requestMessage = try SegmentShardRequestMessage(
             erasureRoot: testErasureRoot,
             shardIndex: testShardIndex,
             segmentIndices: testSegmentIndices

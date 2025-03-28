@@ -4,12 +4,23 @@ import Utils
 
 public enum RuntimeEvents {
     public struct StateRequestReceived: Event {
+        public enum StateRequestReceivedError: Error {
+            case invalidKeyLength(actual: Int, expected: Int)
+        }
+
         public var headerHash: Data32
-        public var startKey: Data // [u8: 31]
-        public var endKey: Data // [u8: 31]
+        public var startKey: Data // [u8; 31]
+        public var endKey: Data // [u8; 31]
         public var maxSize: UInt32
 
-        public init(headerHash: Data32, startKey: Data, endKey: Data, maxSize: UInt32) {
+        public init(headerHash: Data32, startKey: Data, endKey: Data, maxSize: UInt32) throws {
+            guard startKey.count == 31 else {
+                throw StateRequestReceivedError.invalidKeyLength(actual: startKey.count, expected: 31)
+            }
+            guard endKey.count == 31 else {
+                throw StateRequestReceivedError.invalidKeyLength(actual: endKey.count, expected: 31)
+            }
+
             self.headerHash = headerHash
             self.startKey = startKey
             self.endKey = endKey

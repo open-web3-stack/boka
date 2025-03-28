@@ -312,7 +312,7 @@ struct HandlerImpl: NetworkProtocolHandler {
             }
             return [encoder.data]
         case let .stateRequest(message):
-            blockchain
+            try blockchain
                 .publish(
                     event: RuntimeEvents
                         .StateRequestReceived(
