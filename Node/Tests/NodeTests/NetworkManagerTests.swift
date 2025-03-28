@@ -116,8 +116,8 @@ struct NetworkManagerTests {
             "network calls: \(network.calls)"
         )
 
-        let event = try #require(events.first { $0 is RuntimeEvents.WorkPackageBundleRecivedReply } as? RuntimeEvents
-            .WorkPackageBundleRecivedReply)
+        let event = try #require(events.first { $0 is RuntimeEvents.WorkPackageBundleReceivedReply } as? RuntimeEvents
+            .WorkPackageBundleReceivedReply)
         #expect(event.source == key.ed25519.data)
         #expect(event.workReportHash == workReportHash)
         #expect(event.signature == signature)
@@ -276,7 +276,7 @@ struct NetworkManagerTests {
         // In this test, we publish a WorkPackageBundleReady event
         // with a target that doesn't match any known peer (i.e., not the dev peer),
         // so the send call should fail with .peerNotFound internally.
-        // We then verify that no WorkPackageBundleRecivedReply event is published.
+        // We then verify that no WorkPackageBundleReceivedReply event is published.
 
         let randomKey = Ed25519PublicKey(repeating: 99)
         let bundle = WorkPackageBundle.dummy(config: services.config)
@@ -292,7 +292,7 @@ struct NetworkManagerTests {
 
         // Wait for async processing
         let events = await storeMiddleware.wait()
-        let reply = events.first(where: { $0 is RuntimeEvents.WorkPackageBundleRecivedReply })
+        let reply = events.first(where: { $0 is RuntimeEvents.WorkPackageBundleReceivedReply })
 
         // Ensure that no reply was published
         #expect(reply == nil)
@@ -302,7 +302,7 @@ struct NetworkManagerTests {
     func testWorkPackageBundleReadyInvalidResponse() async throws {
         // Here, we configure the mock network to provide an empty response.
         // That should trigger the "WorkPackageSharing response is invalid" path,
-        // preventing publication of a WorkPackageBundleRecivedReply event.
+        // preventing publication of a WorkPackageBundleReceivedReply event.
 
         network.state.write { $0.simulatedResponseData = [] }
 
@@ -324,9 +324,391 @@ struct NetworkManagerTests {
 
         // Wait for async processing
         let events = await storeMiddleware.wait()
-        let reply = events.first(where: { $0 is RuntimeEvents.WorkPackageBundleRecivedReply })
+        let reply = events.first(where: { $0 is RuntimeEvents.WorkPackageBundleReceivedReply })
 
         // Verify no event was published
         #expect(reply == nil)
+    }
+
+    @Test
+    func testHandleWorkReportDistribution() async throws {
+        let workReport = WorkReport.dummy(config: services.config)
+        let slot: UInt32 = 123
+        let signatures = [ValidatorSignature(validatorIndex: 0, signature: Ed25519Signature(repeating: 20))]
+
+        let distributionMessage = CERequest.workReportDistrubution(WorkReportDistributionMessage(
+            workReport: workReport,
+            slot: slot,
+            signatures: signatures
+        ))
+
+        _ = try await network.handler.handle(ceRequest: distributionMessage)
+
+        let events = await storeMiddleware.wait()
+
+        let receivedEvent = events.first {
+            if let event = $0 as? RuntimeEvents.WorkReportReceived {
+                return event.workReport.hash() == workReport.hash()
+            }
+            return false
+        } as? RuntimeEvents.WorkReportReceived
+
+        let event = try #require(receivedEvent)
+        #expect(event.workReport == workReport)
+        #expect(event.slot == slot)
+        #expect(event.signatures == signatures)
+    }
+
+    @Test
+    func testHandleWorkReportRequest() async throws {
+        let workReportHash = Data32(repeating: 1)
+
+        let requestMessage = CERequest.workReportRequest(WorkReportRequestMessage(
+            workReportHash: workReportHash
+        ))
+
+        _ = try await network.handler.handle(ceRequest: requestMessage)
+
+        let events = await storeMiddleware.wait()
+
+        let receivedEvent = events.first {
+            if let event = $0 as? RuntimeEvents.WorkReportRequestReceived {
+                return event.workReportHash == workReportHash
+            }
+            return false
+        } as? RuntimeEvents.WorkReportRequestReceived
+
+        let event = try #require(receivedEvent)
+        #expect(event.workReportHash == workReportHash)
+    }
+
+    @Test
+    func testHandleShardDistribution() async throws {
+        let erasureRoot = Data32(repeating: 1)
+        let shardIndex: UInt32 = 2
+
+        let distributionMessage = CERequest.shardDistribution(ShardDistributionMessage(
+            erasureRoot: erasureRoot,
+            shardIndex: shardIndex
+        ))
+
+        _ = try await network.handler.handle(ceRequest: distributionMessage)
+
+        let events = await storeMiddleware.wait()
+
+        let receivedEvent = events.first {
+            if let event = $0 as? RuntimeEvents.ShardDistributionReceived {
+                return event.erasureRoot == erasureRoot && event.shardIndex == shardIndex
+            }
+            return false
+        } as? RuntimeEvents.ShardDistributionReceived
+
+        let event = try #require(receivedEvent)
+        #expect(event.erasureRoot == erasureRoot)
+        #expect(event.shardIndex == shardIndex)
+    }
+
+    @Test
+    func testHandleAuditShardRequest() async throws {
+        let erasureRoot = Data32(repeating: 1)
+        let shardIndex: UInt32 = 2
+
+        let auditShardRequestMessage = CERequest.auditShardRequest(AuditShardRequestMessage(
+            erasureRoot: erasureRoot,
+            shardIndex: shardIndex
+        ))
+
+        _ = try await network.handler.handle(ceRequest: auditShardRequestMessage)
+
+        let events = await storeMiddleware.wait()
+
+        let receivedEvent = events.first {
+            if let event = $0 as? RuntimeEvents.AuditShardRequestReceived {
+                return event.erasureRoot == erasureRoot && event.shardIndex == shardIndex
+            }
+            return false
+        } as? RuntimeEvents.AuditShardRequestReceived
+
+        let event = try #require(receivedEvent)
+
+        #expect(event.erasureRoot == erasureRoot)
+        #expect(event.shardIndex == shardIndex)
+    }
+
+    @Test
+    func testHandleSegmentShardRequest() async throws {
+        let testErasureRoot = Data32(repeating: 1)
+        let testShardIndex: UInt32 = 2
+        let testSegmentIndices: [UInt16] = [1, 2, 3]
+
+        let requestMessage = try SegmentShardRequestMessage(
+            erasureRoot: testErasureRoot,
+            shardIndex: testShardIndex,
+            segmentIndices: testSegmentIndices
+        )
+
+        _ = try await network.handler.handle(ceRequest: CERequest.segmentShardRequest1(requestMessage))
+        _ = try await network.handler.handle(ceRequest: CERequest.segmentShardRequest2(requestMessage))
+
+        let events = await storeMiddleware.wait()
+
+        for event in events {
+            if let requestEvent = event as? RuntimeEvents.SegmentShardRequestReceived {
+                #expect(requestEvent.erasureRoot == testErasureRoot)
+                #expect(requestEvent.shardIndex == testShardIndex)
+                #expect(requestEvent.segmentIndices == testSegmentIndices)
+            }
+        }
+    }
+
+    @Test
+    func testHandleAssuranceDistributionMessage() async throws {
+        let testHeaderHash = Data32(repeating: 1)
+        let testBitfield = Data(repeating: 0xFF, count: 43) // 43 bytes bitfield
+        let testSignature = Ed25519Signature(repeating: 2)
+
+        let message = try AssuranceDistributionMessage(
+            headerHash: testHeaderHash,
+            bitfield: testBitfield,
+            signature: testSignature
+        )
+
+        _ = try await network.handler.handle(ceRequest: CERequest.assuranceDistribution(message))
+
+        let events = await storeMiddleware.wait()
+
+        for event in events {
+            if let receivedEvent = event as? RuntimeEvents.AssuranceDistributionReceived {
+                #expect(receivedEvent.headerHash == testHeaderHash)
+                #expect(receivedEvent.bitfield == testBitfield)
+                #expect(receivedEvent.signature == testSignature)
+            }
+        }
+    }
+
+    @Test
+    func testHandlePreimageAnnouncementMessage() async throws {
+        let testServiceID: UInt32 = 42
+        let testPreimageHash = Data32(repeating: 1)
+        let testPreimageLength: UInt32 = 256
+
+        let message = PreimageAnnouncementMessage(
+            serviceID: testServiceID,
+            hash: testPreimageHash,
+            preimageLength: testPreimageLength
+        )
+
+        _ = try await network.handler.handle(ceRequest: CERequest.preimageAnnouncement(message))
+
+        let events = await storeMiddleware.wait()
+
+        for event in events {
+            if let receivedEvent = event as? RuntimeEvents.PreimageAnnouncementReceived {
+                #expect(receivedEvent.serviceID == testServiceID)
+                #expect(receivedEvent.hash == testPreimageHash)
+                #expect(receivedEvent.preimageLength == testPreimageLength)
+            }
+        }
+    }
+
+    @Test
+    func testHandlePreimageRequestMessage() async throws {
+        let testPreimageHash = Data32(repeating: 1)
+
+        let message = PreimageRequestMessage(
+            hash: testPreimageHash
+        )
+
+        _ = try await network.handler.handle(ceRequest: CERequest.preimageRequest(message))
+
+        let events = await storeMiddleware.wait()
+
+        for event in events {
+            if let receivedEvent = event as? RuntimeEvents.PreimageRequestReceived {
+                #expect(receivedEvent.hash == testPreimageHash)
+            }
+        }
+    }
+
+    @Test
+    func testHandleJudgementPublication() async throws {
+        let testEpochIndex: EpochIndex = 123
+        let testValidatorIndex: ValidatorIndex = 5
+        let testValidity: UInt8 = 1 // Valid
+        let testWorkReportHash = Data32(repeating: 0xAA)
+        let testSignature = Ed25519Signature(repeating: 0xBB)
+
+        let message = JudgementPublicationMessage(
+            epochIndex: testEpochIndex,
+            validatorIndex: testValidatorIndex,
+            validity: testValidity,
+            workReportHash: testWorkReportHash,
+            signature: testSignature
+        )
+
+        _ = try await network.handler.handle(ceRequest: CERequest.judgementPublication(message))
+
+        let events = await storeMiddleware.wait()
+        var receivedCount = 0
+
+        for event in events {
+            if let receivedEvent = event as? RuntimeEvents.JudgementPublicationReceived {
+                #expect(receivedEvent.epochIndex == testEpochIndex)
+                #expect(receivedEvent.validatorIndex == testValidatorIndex)
+                #expect(receivedEvent.validity == testValidity)
+                #expect(receivedEvent.workReportHash == testWorkReportHash)
+                #expect(receivedEvent.signature == testSignature)
+                receivedCount += 1
+            }
+        }
+
+        #expect(receivedCount == 1)
+    }
+
+    @Test
+    func testHandleFirstTrancheAnnouncement() async throws {
+        let testHeaderHash = Data32(repeating: 0xAA)
+        let testAnnouncement = Announcement(
+            workReports: [
+                .init(coreIndex: 1, workReportHash: Data32(repeating: 0xBB)),
+            ],
+            signature: Ed25519Signature(repeating: 0xCC)
+        )
+        let testEvidence = Evidence.firstTranche(Data96(repeating: 0xDD))
+
+        let message = AuditAnnouncementMessage(
+            headerHash: testHeaderHash,
+            tranche: 0,
+            announcement: testAnnouncement,
+            evidence: testEvidence
+        )
+        _ = try await network.handler.handle(ceRequest: .auditAnnouncement(message))
+
+        let events = await storeMiddleware.wait()
+        var receivedCount = 0
+
+        for event in events {
+            if let receivedEvent = event as? RuntimeEvents.AuditAnnouncementReceived {
+                #expect(receivedEvent.headerHash == testHeaderHash)
+                #expect(receivedEvent.tranche == 0)
+                #expect(receivedEvent.announcement.workReports.count == 1)
+                #expect(receivedEvent.evidence == testEvidence)
+                receivedCount += 1
+            }
+        }
+        #expect(receivedCount == 1)
+    }
+
+    @Test
+    func testHandleSubsequentTrancheAnnouncement() async throws {
+        let previousAnnouncement = Announcement(
+            workReports: [
+                .init(coreIndex: 1, workReportHash: Data32(repeating: 0x55)),
+            ],
+            signature: Ed25519Signature(repeating: 0x66)
+        )
+
+        let testNoShow = Evidence.NoShow(
+            validatorIndex: 1,
+            previousAnnouncement: previousAnnouncement
+        )
+
+        let testEvidence = Evidence.subsequentTranche([
+            .init(
+                bandersnatchSig: Data96(repeating: 0xEE),
+                noShows: [testNoShow]
+            ),
+        ])
+
+        let message = AuditAnnouncementMessage(
+            headerHash: Data32(repeating: 0xFF),
+            tranche: 1,
+            announcement: Announcement(
+                workReports: [
+                    .init(coreIndex: 2, workReportHash: Data32(repeating: 0x11)),
+                ],
+                signature: Ed25519Signature(repeating: 0x22)
+            ),
+            evidence: testEvidence
+        )
+
+        _ = try await network.handler.handle(ceRequest: .auditAnnouncement(message))
+        let events = await storeMiddleware.wait()
+
+        var eventMatched = false
+        for event in events {
+            if let receivedEvent = event as? RuntimeEvents.AuditAnnouncementReceived {
+                #expect(receivedEvent.tranche == 1)
+                if case let .subsequentTranche(evidences) = receivedEvent.evidence {
+                    #expect(evidences[0].noShows[0].previousAnnouncement.workReports[0].coreIndex == 1)
+                }
+                eventMatched = true
+            }
+        }
+        #expect(eventMatched)
+    }
+
+    @Test
+    func testHandleStateRequest() async throws {
+        let testHeaderHash = Data32(repeating: 0x11)
+        let testStartKey = Data(repeating: 0x22, count: 31)
+        let testEndKey = Data(repeating: 0x33, count: 31)
+        let testMaxSize: UInt32 = 2048
+
+        let message = try StateRequest(
+            headerHash: testHeaderHash,
+            startKey: testStartKey,
+            endKey: testEndKey,
+            maxSize: testMaxSize
+        )
+
+        _ = try await network.handler.handle(ceRequest: .stateRequest(message))
+
+        let events = await storeMiddleware.wait()
+        var receivedCount = 0
+        var generateRequestId = Data32()
+        for event in events {
+            if let receivedEvent = event as? RuntimeEvents.StateRequestReceived {
+                #expect(receivedEvent.headerHash == testHeaderHash)
+                #expect(receivedEvent.startKey == testStartKey)
+                #expect(receivedEvent.endKey == testEndKey)
+                #expect(receivedEvent.maxSize == testMaxSize)
+                generateRequestId = try receivedEvent.generateRequestId()
+                receivedCount += 1
+            }
+        }
+
+        #expect(receivedCount == 1)
+        let testNodes = [BoundaryNode]()
+        let testKVPairs = [(key: Data(), value: Data())]
+
+        let response = RuntimeEvents.StateRequestReceivedResponse(
+            requestId: generateRequestId,
+            headerHash: testHeaderHash,
+            boundaryNodes: testNodes,
+            keyValuePairs: testKVPairs
+        )
+        #expect(response.requestId == generateRequestId)
+        #expect(try response.result.get().headerHash == testHeaderHash)
+        let responseFail = RuntimeEvents.StateRequestReceivedResponse(
+            requestId: generateRequestId,
+            error: NSError(domain: "test", code: 1)
+        )
+        #expect(throws: NSError.self) {
+            try responseFail.result.get()
+        }
+    }
+
+    @Test
+    func testStateRequestInvalidKeys() async {
+        let invalidKey = Data(repeating: 0x44, count: 30) // 30 bytes (invalid)
+        #expect(throws: Error.self) {
+            try StateRequest(
+                headerHash: Data32(repeating: 0x11),
+                startKey: invalidKey,
+                endKey: Data(repeating: 0x33, count: 31),
+                maxSize: 1024
+            )
+        }
     }
 }

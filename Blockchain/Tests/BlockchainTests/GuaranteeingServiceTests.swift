@@ -315,7 +315,7 @@ struct GuaranteeingServiceTests {
         ]
 
         // Test handling a bundle event
-        let event = RuntimeEvents.WorkPackageBundleRecived(
+        let event = RuntimeEvents.WorkPackageBundleReceived(
             coreIndex: 0,
             bundle: bundle,
             segmentsRootMappings: mappings
@@ -327,10 +327,10 @@ struct GuaranteeingServiceTests {
         let events = await storeMiddleware.wait()
 
         // Expecting a response event
-        let responseEvents = events.filter { $0 is RuntimeEvents.WorkPackageBundleRecivedResponse }
+        let responseEvents = events.filter { $0 is RuntimeEvents.WorkPackageBundleReceivedResponse }
         #expect(responseEvents.count > 0)
 
-        let responseEvent = try #require(responseEvents.first as? RuntimeEvents.WorkPackageBundleRecivedResponse)
+        let responseEvent = try #require(responseEvents.first as? RuntimeEvents.WorkPackageBundleReceivedResponse)
         // This will often be an error result because the bundle validation is complex,
         // but we're just checking the event flow
         #expect(responseEvent.workBundleHash == bundle.hash())
