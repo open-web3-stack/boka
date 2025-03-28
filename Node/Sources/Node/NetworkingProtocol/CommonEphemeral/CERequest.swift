@@ -145,8 +145,6 @@ extension CERequest: RequestProtocol {
             AuditAnnouncementMessage.self
         case .judgementPublication:
             JudgementPublicationMessage.self
-        default:
-            fatalError("unimplemented")
         }
     }
 

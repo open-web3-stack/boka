@@ -467,7 +467,7 @@ struct NetworkManagerTests {
         let testBitfield = Data(repeating: 0xFF, count: 43) // 43 bytes bitfield
         let testSignature = Ed25519Signature(repeating: 2)
 
-        let message = AssuranceDistributionMessage(
+        let message = try AssuranceDistributionMessage(
             headerHash: testHeaderHash,
             bitfield: testBitfield,
             signature: testSignature
@@ -666,18 +666,37 @@ struct NetworkManagerTests {
 
         let events = await storeMiddleware.wait()
         var receivedCount = 0
-
+        var generateRequestId = Data32()
         for event in events {
             if let receivedEvent = event as? RuntimeEvents.StateRequestReceived {
                 #expect(receivedEvent.headerHash == testHeaderHash)
                 #expect(receivedEvent.startKey == testStartKey)
                 #expect(receivedEvent.endKey == testEndKey)
                 #expect(receivedEvent.maxSize == testMaxSize)
+                generateRequestId = try receivedEvent.generateRequestId()
                 receivedCount += 1
             }
         }
 
         #expect(receivedCount == 1)
+        let testNodes = [BoundaryNode]()
+        let testKVPairs = [(key: Data(), value: Data())]
+
+        let response = RuntimeEvents.StateRequestReceivedResponse(
+            requestId: generateRequestId,
+            headerHash: testHeaderHash,
+            boundaryNodes: testNodes,
+            keyValuePairs: testKVPairs
+        )
+        #expect(response.requestId == generateRequestId)
+        #expect(try response.result.get().headerHash == testHeaderHash)
+        let responseFail = RuntimeEvents.StateRequestReceivedResponse(
+            requestId: generateRequestId,
+            error: NSError(domain: "test", code: 1)
+        )
+        #expect(throws: NSError.self) {
+            try responseFail.result.get()
+        }
     }
 
     @Test
