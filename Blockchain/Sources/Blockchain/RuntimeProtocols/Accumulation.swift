@@ -436,7 +436,7 @@ extension Accumulation {
         timeslot: TimeslotIndex,
         prevTimeslot: TimeslotIndex,
         entropy: Data32
-    ) async throws -> (Data32, AccumulationStats, TransfersStats) {
+    ) async throws -> (root: Data32, AccumulationStats, TransfersStats) {
         let index = Int(timeslot) %% config.value.epochLength
 
         logger.debug("available reports (\(availableReports.count)): \(availableReports.map(\.packageSpecification.workPackageHash))")

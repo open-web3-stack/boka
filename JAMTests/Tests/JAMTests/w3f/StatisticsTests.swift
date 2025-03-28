@@ -39,7 +39,10 @@ struct StatisticsTests {
             config: config,
             newTimeslot: testcase.input.timeslot,
             extrinsic: testcase.input.extrinsic,
-            authorIndex: testcase.input.author
+            authorIndex: testcase.input.author,
+            availableReports: [],
+            accumulateStats: [:],
+            transfersStats: [:]
         )
         state.activityStatistics = result
 
