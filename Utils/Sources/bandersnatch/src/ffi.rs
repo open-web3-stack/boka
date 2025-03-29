@@ -1,6 +1,6 @@
-use ark_ec_vrfs::reexports::ark_serialize;
-use ark_ec_vrfs::suites::bandersnatch;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_vrf::reexports::ark_serialize;
+use ark_vrf::suites::bandersnatch;
 use bandersnatch::{Public, RingProofParams, Secret};
 
 use crate::bandersnatch_vrfs::{

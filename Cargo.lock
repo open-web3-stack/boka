@@ -144,26 +144,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ark-ec-vrfs"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d12ec0c78bba84a70864811b8e8abde8ee9ac3fc4e4ef977cc1b9a2ec9d3127c"
-dependencies = [
- "ark-bls12-381 0.5.0",
- "ark-ec 0.5.0",
- "ark-ed-on-bls12-381-bandersnatch",
- "ark-ff 0.5.0",
- "ark-serialize 0.5.0",
- "ark-std 0.5.0",
- "digest",
- "rand_chacha",
- "rayon",
- "sha2",
- "w3f-ring-proof",
- "zeroize",
-]
-
-[[package]]
 name = "ark-ed-on-bls12-381-bandersnatch"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -375,6 +355,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "ark-vrf"
+version = "0.1.0"
+source = "git+https://github.com/davxy/ark-vrf?tag=v0.1.0#bf2d1cf8ec648cf57b0eb1252639798481e05a29"
+dependencies = [
+ "ark-bls12-381 0.5.0",
+ "ark-ec 0.5.0",
+ "ark-ed-on-bls12-381-bandersnatch",
+ "ark-ff 0.5.0",
+ "ark-serialize 0.5.0",
+ "ark-std 0.5.0",
+ "digest",
+ "rand_chacha",
+ "rayon",
+ "sha2",
+ "w3f-ring-proof",
+ "zeroize",
+]
+
+[[package]]
 name = "arrayref"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -407,7 +406,7 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 name = "bandersnatch-vrfs"
 version = "0.1.0"
 dependencies = [
- "ark-ec-vrfs",
+ "ark-vrf",
  "cbindgen 0.27.0",
  "hex-literal",
 ]

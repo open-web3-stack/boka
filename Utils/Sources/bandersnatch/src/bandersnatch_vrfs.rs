@@ -1,8 +1,8 @@
 // Code copied and modified based on: https://github.com/davxy/bandersnatch-vrfs-spec/blob/470d836ae5c8ee9509892f90cf3eebf21ddf55c2/example/src/main.rs
 
-use ark_ec_vrfs::reexports::ark_serialize;
-use ark_ec_vrfs::suites::bandersnatch;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_vrf::reexports::ark_serialize;
+use ark_vrf::suites::bandersnatch;
 use bandersnatch::{
     IetfProof, Input, Output, PcsParams, Public, RingProof, RingProofParams, Secret,
 };
@@ -42,7 +42,7 @@ fn ring_context_params() -> &'static PcsParams {
 // Construct VRF Input Point from arbitrary data (section 1.2)
 pub fn vrf_input_point(vrf_input_data: &[u8]) -> Result<Input, ()> {
     let point =
-        <bandersnatch::BandersnatchSha512Ell2 as ark_ec_vrfs::Suite>::data_to_point(vrf_input_data)
+        <bandersnatch::BandersnatchSha512Ell2 as ark_vrf::Suite>::data_to_point(vrf_input_data)
             .ok_or(())?;
     Ok(Input::from(point))
 }
@@ -59,7 +59,7 @@ pub fn ring_vrf_sign(
     aux_data: &[u8],
     out_buf: &mut [u8],
 ) -> Result<(), ()> {
-    use ark_ec_vrfs::ring::Prover as _;
+    use ark_vrf::ring::Prover as _;
 
     let input = vrf_input_point(vrf_input_data)?;
     let output = secret.output(input);
@@ -97,7 +97,7 @@ pub fn ietf_vrf_sign(
     aux_data: &[u8],
     out_buf: &mut [u8],
 ) -> Result<(), ()> {
-    use ark_ec_vrfs::ietf::Prover as _;
+    use ark_vrf::ietf::Prover as _;
 
     let input = vrf_input_point(vrf_input_data)?;
     let output = secret.output(input);
@@ -110,7 +110,7 @@ pub fn ietf_vrf_sign(
 }
 
 /// cbindgen:ignore
-pub type RingCommitment = ark_ec_vrfs::ring::RingCommitment<bandersnatch::BandersnatchSha512Ell2>;
+pub type RingCommitment = ark_vrf::ring::RingCommitment<bandersnatch::BandersnatchSha512Ell2>;
 
 /// Anonymous VRF signature verification.
 ///
@@ -125,7 +125,7 @@ pub fn ring_vrf_verify(
     signature: &[u8],
     out_buf: &mut [u8],
 ) -> Result<(), ()> {
-    use ark_ec_vrfs::ring::Verifier as _;
+    use ark_vrf::ring::Verifier as _;
 
     let signature = RingVrfSignature::deserialize_compressed(signature).map_err(|_| ())?;
 
@@ -164,7 +164,7 @@ pub fn ietf_vrf_verify(
     signature: &[u8],
     out_buf: &mut [u8],
 ) -> Result<(), ()> {
-    use ark_ec_vrfs::ietf::Verifier as _;
+    use ark_vrf::ietf::Verifier as _;
 
     let signature = IetfVrfSignature::deserialize_compressed(signature).map_err(|_| ())?;
 
