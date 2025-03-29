@@ -923,7 +923,7 @@ public class Export: HostCall {
         }
         let segment = Data4104(data)!
 
-        if exportSegmentOffset + UInt64(context.exports.count) >= UInt64(config.value.maxWorkPackageManifestEntries) {
+        if exportSegmentOffset + UInt64(context.exports.count) >= UInt64(config.value.maxWorkPackageImportsExports) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), exportSegmentOffset + UInt64(context.exports.count))

@@ -173,7 +173,7 @@ public final class Runtime {
             let availableReports = try updateReports(block: block, state: &newState)
 
             // accumulate
-            let accumulateRoot = try await newState.update(
+            let (accumulateRoot, accumulateStats, transfersStats) = try await newState.update(
                 config: config,
                 availableReports: availableReports,
                 timeslot: block.header.timeslot,
@@ -198,7 +198,10 @@ public final class Runtime {
                 config: config,
                 newTimeslot: block.header.timeslot,
                 extrinsic: block.extrinsic,
-                authorIndex: block.header.authorIndex
+                authorIndex: block.header.authorIndex,
+                availableReports: availableReports,
+                accumulateStats: accumulateStats,
+                transfersStats: transfersStats
             )
 
             // after reports as it need old recent history

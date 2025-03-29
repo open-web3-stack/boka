@@ -7,10 +7,10 @@ public func isAuthorized(
     serviceAccounts: some ServiceAccounts,
     package: WorkPackage,
     coreIndex: CoreIndex
-) async throws -> Result<Data, WorkResultError> {
+) async throws -> (Result<Data, WorkResultError>, Gas) {
     let args = try JamEncoder.encode(package, coreIndex)
     let ctx = IsAuthorizedContext(config: config)
-    let (exitReason, _, output) = try await invokePVM(
+    let (exitReason, gasUsed, output) = try await invokePVM(
         config: config,
         blob: package.authorizationCode(serviceAccounts: serviceAccounts),
         pc: 0,
@@ -19,16 +19,18 @@ public func isAuthorized(
         ctx: ctx
     )
 
-    switch exitReason {
+    let result: Result<Data, WorkResultError> = switch exitReason {
     case .outOfGas:
-        return .failure(.outOfGas)
+        .failure(.outOfGas)
     case .panic(.trap):
-        return .failure(.panic)
+        .failure(.panic)
     default:
         if let output {
-            return .success(output)
+            .success(output)
         } else {
-            return .failure(.panic)
+            .failure(.panic)
         }
     }
+
+    return (result, gasUsed)
 }

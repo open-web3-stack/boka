@@ -1,22 +1,20 @@
 import Foundation
 import Utils
 
+// wrangled operand tuple
 public struct AccumulateArguments: Codable {
-    /// o
-    public var output: WorkOutput
-    /// l
-    public var paylaodHash: Data32
-    /// k
+    /// h
     public var packageHash: Data32
+    /// e
+    public var segmentRoot: Data32
     /// a
+    public var authorizerHash: Data32
+    /// o
     public var authorizationOutput: Data
-
-    public init(output: WorkOutput, paylaodHash: Data32, packageHash: Data32, authorizationOutput: Data) {
-        self.output = output
-        self.paylaodHash = paylaodHash
-        self.packageHash = packageHash
-        self.authorizationOutput = authorizationOutput
-    }
+    /// y
+    public var payloadHash: Data32
+    /// d
+    public var workOutput: WorkOutput
 }
 
 public struct DeferredTransfers: Codable {

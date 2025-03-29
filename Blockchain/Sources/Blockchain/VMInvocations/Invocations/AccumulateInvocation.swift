@@ -18,13 +18,15 @@ public func accumulate(
     logger.debug("accumulating service index: \(serviceIndex)")
 
     guard let accumulatingAccountDetails = try await state.accounts.value.get(serviceAccount: serviceIndex),
-          let codeBlob = try await state.accounts.value.get(
+          let preimage = try await state.accounts.value.get(
               serviceAccount: serviceIndex,
               preimageHash: accumulatingAccountDetails.codeHash
           )
     else {
         return .init(state: state, transfers: [], commitment: nil, gasUsed: Gas(0))
     }
+
+    let codeBlob = try CodeAndMeta(data: preimage).codeBlob
 
     let contextContent = try await AccumulateContext.ContextType(
         x: AccumlateResultContext(

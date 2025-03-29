@@ -303,7 +303,10 @@ extension Safrole {
             let epochMark = try isEpochChange ? EpochMarker(
                 entropy: newEntropyPool.1,
                 ticketsEntropy: newEntropyPool.2,
-                validators: ConfigFixedSizeArray(config: config, array: newNextValidators.map(\.bandersnatch))
+                validators: ConfigFixedSizeArray(
+                    config: config,
+                    array: newNextValidators.map { .init(bandersnatch: $0.bandersnatch, ed25519: $0.ed25519) }
+                )
             ) : nil
 
             let ticketsMark: ConfigFixedSizeArray<Ticket, ProtocolConfig.EpochLength>? =

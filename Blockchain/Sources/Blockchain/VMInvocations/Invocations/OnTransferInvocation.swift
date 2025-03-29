@@ -9,22 +9,26 @@ public func onTransfer(
     serviceAccounts: ServiceAccountsMutRef,
     timeslot: TimeslotIndex,
     transfers: [DeferredTransfers]
-) async throws {
+) async throws -> Gas {
     guard var account = try await serviceAccounts.value.get(serviceAccount: serviceIndex),
-          let codeBlob = try await serviceAccounts.value.get(serviceAccount: serviceIndex, preimageHash: account.codeHash),
+          let preimage = try await serviceAccounts.value.get(serviceAccount: serviceIndex, preimageHash: account.codeHash),
           !transfers.isEmpty
     else {
-        return
+        return Gas(0)
     }
 
+    let codeBlob = try CodeAndMeta(data: preimage).codeBlob
+
     account.balance += transfers.reduce(Balance(0)) { $0 + $1.amount }
+
+    serviceAccounts.set(serviceAccount: serviceIndex, account: account)
 
     let contextContent = OnTransferContext.ContextType(serviceIndex: serviceIndex, accounts: serviceAccounts)
     let ctx = OnTransferContext(context: contextContent, config: config)
     let gasLimitSum = transfers.reduce(Balance(0)) { $0 + $1.gasLimit }
     let argument = try JamEncoder.encode(timeslot, serviceIndex, transfers)
 
-    _ = await invokePVM(
+    let (_, gas, _) = await invokePVM(
         config: config,
         blob: codeBlob,
         pc: 10,
@@ -32,4 +36,6 @@ public func onTransfer(
         argumentData: argument,
         ctx: ctx
     )
+
+    return gas
 }

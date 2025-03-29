@@ -4,7 +4,7 @@ after_includes = """
 
 typedef struct Public Public;
 typedef struct Secret Secret;
-typedef struct RingContext RingContext;
+typedef struct RingContext RingProofParams;
 typedef struct RingCommitment RingCommitment;
 """
 

@@ -99,11 +99,12 @@ extension WorkPackage {
 
     /// c: the authorization code
     public func authorizationCode(serviceAccounts: some ServiceAccounts) async throws -> Data {
-        try await serviceAccounts.historicalLookup(
+        let preimage = try await serviceAccounts.historicalLookup(
             serviceAccount: authorizationServiceIndex,
             timeslot: context.lookupAnchor.timeslot,
             preimageHash: authorizationCodeHash
         ) ?? Data()
+        return try CodeAndMeta(data: preimage).codeBlob
     }
 }
 

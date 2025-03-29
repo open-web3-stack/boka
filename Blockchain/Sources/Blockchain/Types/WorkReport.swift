@@ -68,17 +68,6 @@ extension WorkReport: Hashable32 {
     }
 }
 
-extension WorkReport: EncodedSize {
-    public var encodedSize: Int {
-        authorizerHash.encodedSize + coreIndex.encodedSize + authorizationOutput.encodedSize +
-            refinementContext.encodedSize + packageSpecification.encodedSize + lookup.encodedSize + results.encodedSize
-    }
-
-    public static var encodeedSizeHint: Int? {
-        nil
-    }
-}
-
 extension WorkReport: Validate {
     public enum WorkReportError: Swift.Error {
         case tooBig

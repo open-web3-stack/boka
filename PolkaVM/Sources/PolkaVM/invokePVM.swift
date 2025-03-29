@@ -17,16 +17,17 @@ public func invokePVM(
         let state = try VMState(standardProgramBlob: blob, pc: pc, gas: gas, argumentData: argumentData)
         let engine = Engine(config: config, invocationContext: ctx)
         let exitReason = await engine.execute(state: state)
+        let gasUsed = gas - Gas(state.getGas())
 
         switch exitReason {
         case .outOfGas:
-            return (.outOfGas, Gas(0), nil)
+            return (.outOfGas, gasUsed, nil)
         case .halt:
             let (addr, len): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
             let output = try? state.readMemory(address: addr, length: Int(len))
-            return (.halt, Gas(state.getGas()), output ?? Data())
+            return (.halt, gasUsed, output ?? Data())
         default:
-            return (.panic(.trap), Gas(0), nil)
+            return (.panic(.trap), gasUsed, nil)
         }
     } catch let e as StandardProgram.Error {
         logger.error("standard program initialization failed: \(e)")

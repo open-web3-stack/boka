@@ -475,7 +475,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         )
 
         // Check if the result is a success or failure
-        switch result {
+        switch result.0 {
         case .success:
             return
         case let .failure(error):
@@ -662,7 +662,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         // Run the authorization check
         logger.debug("Authorizing work package", metadata: ["workPackageHash": "\(packageHash)"])
         let res = try await isAuthorized(config: config, serviceAccounts: state.value, package: workPackage.value, coreIndex: coreIndex)
-        let authorizationOutput = try res.mapError(GuaranteeingServiceError.authorizationError).get()
+        let authorizationOutput = try res.0.mapError(GuaranteeingServiceError.authorizationError).get()
         logger.debug("Work package authorized successfully", metadata: ["outputSize": "\(authorizationOutput.count)"])
 
         var workResults = [WorkResult]()
@@ -699,8 +699,13 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                 serviceIndex: item.serviceIndex,
                 codeHash: workPackage.value.authorizationCodeHash,
                 payloadHash: item.payloadBlob.blake2b256hash(),
-                gas: item.refineGasLimit,
-                output: WorkOutput(refineRes.result)
+                gasRatio: item.refineGasLimit,
+                output: WorkOutput(refineRes.result),
+                gasUsed: item.accumulateGasLimit,
+                importsCount: UInt32(item.inputs.count),
+                exportsCount: UInt32(item.outputDataSegmentsCount),
+                extrinsicsCount: UInt32(item.outputs.count),
+                extrinsicSize: UInt32(item.outputs.reduce(into: 0) { $0 += $1.length })
             )
             workResults.append(workResult)
 

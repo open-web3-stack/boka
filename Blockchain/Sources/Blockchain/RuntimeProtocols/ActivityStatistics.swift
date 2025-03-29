@@ -16,7 +16,10 @@ extension ActivityStatistics {
         config: ProtocolConfigRef,
         newTimeslot: TimeslotIndex,
         extrinsic: Extrinsic,
-        authorIndex: ValidatorIndex
+        authorIndex: ValidatorIndex,
+        availableReports: [WorkReport],
+        accumulateStats: AccumulationStats,
+        transfersStats: TransfersStats
     ) throws -> ValidatorActivityStatistics {
         let epochLength = UInt32(config.value.epochLength)
         let currentEpoch = timeslot / epochLength
@@ -26,7 +29,7 @@ extension ActivityStatistics {
         var acc = try isEpochChange
             ? ConfigFixedSizeArray<_, ProtocolConfig.TotalNumberOfValidators>(
                 config: config,
-                defaultValue: ValidatorActivityStatistics.StatisticsItem.dummy(config: config)
+                defaultValue: ValidatorActivityStatistics.ValidatorStatistics.dummy(config: config)
             ) : activityStatistics.accumulator
 
         let prev = isEpochChange ? activityStatistics.accumulator : activityStatistics.previous
@@ -48,9 +51,69 @@ extension ActivityStatistics {
             acc[assurance.validatorIndex].assurances += 1
         }
 
+        // service indices (to be used in the service statistics)
+        var indices = Set(accumulateStats.keys).union(transfersStats.keys)
+        indices.formUnion(extrinsic.preimages.preimages.map(\.serviceIndex))
+        indices.formUnion(extrinsic.reports.guarantees.flatMap(\.workReport.results).map(\.serviceIndex))
+
+        // core and service statistics
+        var coreStats = try ConfigFixedSizeArray<ValidatorActivityStatistics.CoreStatistics, ProtocolConfig.TotalNumberOfCores>(
+            config: config,
+            defaultValue: .dummy(config: config)
+        )
+        var serviceStats = [ServiceIndex: ValidatorActivityStatistics.ServiceStatistics]()
+        for index in indices {
+            serviceStats[index] = .dummy(config: config)
+        }
+
+        for guaranteeItem in extrinsic.reports.guarantees {
+            let report = guaranteeItem.workReport
+            let index = report.coreIndex
+            for result in report.results {
+                coreStats[index].gasUsed += result.gasUsed
+                coreStats[index].importsCount += result.importsCount
+                coreStats[index].exportsCount += result.exportsCount
+                coreStats[index].extrinsicsCount += result.extrinsicsCount
+                coreStats[index].extrinsicSize += result.extrinsicSize
+                coreStats[index].packageSize += report.packageSpecification.length
+
+                let serviceIndex = result.serviceIndex
+                serviceStats[serviceIndex]!.importsCount += result.importsCount
+                serviceStats[serviceIndex]!.exportsCount += result.exportsCount
+                serviceStats[serviceIndex]!.extrinsicsCount += result.extrinsicsCount
+                serviceStats[serviceIndex]!.extrinsicSize += result.extrinsicSize
+                serviceStats[serviceIndex]!.reports.count += 1
+                serviceStats[serviceIndex]!.reports.gasUsed += result.gasUsed
+            }
+        }
+        for report in availableReports {
+            let index = report.coreIndex
+            let segmentsSize = UInt32(config.value.segmentSize) * (UInt32(report.packageSpecification.segmentCount) * 65 + 63) / 64
+            coreStats[index].dataSize += report.packageSpecification.length + segmentsSize
+        }
+        for assuranceItem in extrinsic.availability.assurances {
+            for (index, bool) in assuranceItem.assurance.enumerated() {
+                coreStats[index].assuranceCount += bool ? 1 : 0
+            }
+        }
+        for preimageItem in extrinsic.preimages.preimages {
+            serviceStats[preimageItem.serviceIndex]!.preimages.count += 1
+            serviceStats[preimageItem.serviceIndex]!.preimages.size += UInt32(preimageItem.data.count)
+        }
+        for accumulateItem in accumulateStats {
+            serviceStats[accumulateItem.key]!.accumulates.count += accumulateItem.value.1
+            serviceStats[accumulateItem.key]!.accumulates.gasUsed += accumulateItem.value.0
+        }
+        for transferItem in transfersStats {
+            serviceStats[transferItem.key]!.transfers.count += transferItem.value.0
+            serviceStats[transferItem.key]!.transfers.gasUsed += transferItem.value.1
+        }
+
         return ValidatorActivityStatistics(
             accumulator: acc,
-            previous: prev
+            previous: prev,
+            core: coreStats,
+            service: serviceStats
         )
     }
 }

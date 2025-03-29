@@ -5,11 +5,11 @@ public enum WorkResultError: Error, CaseIterable {
     case outOfGas
     case panic
     /// the number of exports made was invalidly reported
-    case badExports
+    case badExports // ⊚
     /// the service's code was not available for lookup in state at the posterior state of the lookup-anchor block
-    case invalidCode
+    case invalidCode // BAD
     /// code larger than MaxServiceCodeSize
-    case codeTooLarge
+    case codeTooLarge // BIG
 }
 
 public struct WorkOutput: Sendable, Equatable {
