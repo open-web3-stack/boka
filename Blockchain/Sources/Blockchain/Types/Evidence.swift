@@ -27,7 +27,7 @@ public enum Evidence: Codable, Sendable, Equatable, Hashable {
 }
 
 extension Evidence {
-    public func encode() throws -> [Data] {
+    public func encode() throws -> Data {
         let encoder = JamEncoder()
         switch self {
         case let .firstTranche(signature):
@@ -44,20 +44,16 @@ extension Evidence {
                 }
             }
         }
-        return [encoder.data]
+        return encoder.data
     }
 
-    public static func decode(data: [Data], config: ProtocolConfigRef) throws -> Evidence {
-        guard let data = data.first else {
-            throw DecodingError.dataCorrupted(DecodingError.Context(
-                codingPath: [],
-                debugDescription: "unexpected data \(data)"
-            ))
-        }
+    public static func decode(data: Data, tranche: UInt8, config: ProtocolConfigRef) throws -> Evidence {
+        let decoder = JamDecoder(data: data)
+        return try decode(decoder: decoder, tranche: tranche, config: config)
+    }
 
-        let decoder = JamDecoder(data: data, config: config)
-
-        if data.count == ConstInt96.value {
+    public static func decode(decoder: JamDecoder, tranche: UInt8, config _: ProtocolConfigRef) throws -> Evidence {
+        if tranche == 0 {
             return try .firstTranche(decoder.decode(BandersnatchSignature.self))
         }
 
@@ -83,3 +79,42 @@ extension Evidence {
         return .subsequentTranche(evidences)
     }
 }
+
+// extension Evidence {
+//
+//    public static func decode(data: [Data], config: ProtocolConfigRef) throws -> Evidence {
+//        guard let data = data.first else {
+//            throw DecodingError.dataCorrupted(DecodingError.Context(
+//                codingPath: [],
+//                debugDescription: "unexpected data \(data)"
+//            ))
+//        }
+//
+//        let decoder = JamDecoder(data: data, config: config)
+//
+//        if data.count == ConstInt96.value {
+//            return try .firstTranche(decoder.decode(BandersnatchSignature.self))
+//        }
+//
+//        var evidences = [WorkReportEvidence]()
+//        while !decoder.isAtEnd {
+//            let signature = try decoder.decode(BandersnatchSignature.self)
+//            let noShowCount = try decoder.decode(UInt32.self)
+//            var noShows = [NoShow]()
+//
+//            for _ in 0 ..< noShowCount {
+//                try noShows.append(NoShow(
+//                    validatorIndex: decoder.decode(ValidatorIndex.self),
+//                    previousAnnouncement: decoder.decode(Announcement.self)
+//                ))
+//            }
+//
+//            evidences.append(WorkReportEvidence(
+//                bandersnatchSig: signature,
+//                noShows: noShows
+//            ))
+//        }
+//
+//        return .subsequentTranche(evidences)
+//    }
+// }

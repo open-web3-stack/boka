@@ -33,20 +33,19 @@ extension AuditAnnouncementMessage: CEMessage {
         return [encoder.data]
     }
 
-    public static func decode(data: [Data], config: ProtocolConfigRef) throws -> AuditAnnouncementMessage {
-        guard let data = data.first else {
+    public static func decode(data: [Data], config: ProtocolConfigRef) throws -> Self {
+        guard let messageData = data.first else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
                 debugDescription: "unexpected data"
             ))
         }
 
-        let decoder = JamDecoder(data: data, config: config)
+        let decoder = JamDecoder(data: messageData, config: config)
         let headerHash = try decoder.decode(Data32.self)
         let tranche = try decoder.decode(UInt8.self)
         let announcement = try decoder.decode(Announcement.self)
-        let evidence = try decoder.decode(Evidence.self)
-
+        let evidence = try Evidence.decode(decoder: decoder, tranche: tranche, config: config)
         return AuditAnnouncementMessage(
             headerHash: headerHash,
             tranche: tranche,

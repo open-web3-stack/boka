@@ -619,6 +619,8 @@ struct NetworkManagerTests {
             workReportHash: testWorkReportHash,
             signature: testSignature
         )
+        let judgementPublication = try JudgementPublicationMessage.decode(data: message.encode(), config: .dev)
+        #expect(judgementPublication == message)
 
         _ = try await network.handler.handle(ceRequest: CERequest.judgementPublication(message))
 
@@ -648,7 +650,13 @@ struct NetworkManagerTests {
             ],
             signature: Ed25519Signature(repeating: 0xCC)
         )
+
+        let announcement = try Announcement.decode(data: testAnnouncement.encode(), config: .dev)
+        #expect(announcement == testAnnouncement)
+
         let testEvidence = Evidence.firstTranche(Data96(repeating: 0xDD))
+        let evidence = try Evidence.decode(data: testEvidence.encode(), tranche: 0, config: .dev)
+        #expect(evidence == testEvidence)
 
         let message = AuditAnnouncementMessage(
             headerHash: testHeaderHash,
@@ -656,6 +664,10 @@ struct NetworkManagerTests {
             announcement: testAnnouncement,
             evidence: testEvidence
         )
+
+        let auditAnnouncementMessage = try AuditAnnouncementMessage.decode(data: message.encode(), config: .dev)
+        #expect(auditAnnouncementMessage == message)
+
         _ = try await network.handler.handle(ceRequest: .auditAnnouncement(message))
 
         let events = await storeMiddleware.wait()
