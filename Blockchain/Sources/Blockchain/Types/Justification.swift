@@ -4,7 +4,7 @@ import Utils
 public enum Justification: Codable, Sendable {
     case singleHash(Data32) // 0 ++ Hash
     case doubleHash(Data32, Data32) // 1 ++ Hash ++ Hash
-    case segmentShard(Data) // 2 ++ Segment Shard (12 bytes)
+    case segmentShard(Data12) // 2 ++ Segment Shard (12 bytes)
 }
 
 extension Justification {
@@ -45,13 +45,7 @@ extension Justification {
             let hash2 = try decoder.decode(Data32.self)
             return .doubleHash(hash1, hash2)
         case 2:
-            let segmentShard = try decoder.decode(Data.self)
-            guard segmentShard.count == 12 else {
-                throw DecodingError.dataCorrupted(DecodingError.Context(
-                    codingPath: [],
-                    debugDescription: "Segment Shard must be 12 bytes"
-                ))
-            }
+            let segmentShard = try decoder.decode(Data12.self)
             return .segmentShard(segmentShard)
         default:
             throw DecodingError.dataCorrupted(DecodingError.Context(

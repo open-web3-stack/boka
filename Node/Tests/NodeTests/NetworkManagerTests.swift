@@ -410,29 +410,57 @@ struct NetworkManagerTests {
 
     @Test
     func testHandleAuditShardRequest() async throws {
-        let erasureRoot = Data32(repeating: 1)
-        let shardIndex: UInt32 = 2
+        let testErasureRoot = Data32(repeating: 1)
+        let testShardIndex: UInt32 = 2
+        let testBundleShard = Data([0x01, 0x02, 0x03])
+        let testJustification = Justification.singleHash(Data32())
+        let testError = NSError(domain: "test", code: 404)
 
-        let auditShardRequestMessage = CERequest.auditShardRequest(AuditShardRequestMessage(
-            erasureRoot: erasureRoot,
-            shardIndex: shardIndex
-        ))
+        let requestMessage = AuditShardRequestMessage(
+            erasureRoot: testErasureRoot,
+            shardIndex: testShardIndex
+        )
 
-        _ = try await network.handler.handle(ceRequest: auditShardRequestMessage)
+        _ = try await network.handler.handle(ceRequest: .auditShardRequest(requestMessage))
 
         let events = await storeMiddleware.wait()
+        var receivedCount = 0
+        var generatedRequestId = Data32()
 
-        let receivedEvent = events.first {
-            if let event = $0 as? RuntimeEvents.AuditShardRequestReceived {
-                return event.erasureRoot == erasureRoot && event.shardIndex == shardIndex
+        for event in events {
+            if let requestEvent = event as? RuntimeEvents.AuditShardRequestReceived {
+                #expect(requestEvent.erasureRoot == testErasureRoot)
+                #expect(requestEvent.shardIndex == testShardIndex)
+                generatedRequestId = try requestEvent.generateRequestId()
+                receivedCount += 1
             }
-            return false
-        } as? RuntimeEvents.AuditShardRequestReceived
+        }
 
-        let event = try #require(receivedEvent)
+        #expect(receivedCount == 1)
 
-        #expect(event.erasureRoot == erasureRoot)
-        #expect(event.shardIndex == shardIndex)
+        let successResponse = RuntimeEvents.AuditShardRequestReceivedResponse(
+            requestId: generatedRequestId,
+            erasureRoot: testErasureRoot,
+            shardIndex: testShardIndex,
+            bundleShard: testBundleShard,
+            justification: testJustification
+        )
+
+        #expect(successResponse.requestId == generatedRequestId)
+        #expect(try successResponse.result.get().erasureRoot == testErasureRoot)
+        #expect(try successResponse.result.get().shardIndex == testShardIndex)
+        #expect(try successResponse.result.get().bundleShard == testBundleShard)
+        #expect(try successResponse.result.get().justification.encode() == testJustification.encode())
+
+        let failureResponse = RuntimeEvents.AuditShardRequestReceivedResponse(
+            requestId: generatedRequestId,
+            error: testError
+        )
+
+        #expect(failureResponse.requestId == generatedRequestId)
+        #expect(throws: NSError.self) {
+            try failureResponse.result.get()
+        }
     }
 
     @Test
@@ -440,6 +468,8 @@ struct NetworkManagerTests {
         let testErasureRoot = Data32(repeating: 1)
         let testShardIndex: UInt32 = 2
         let testSegmentIndices: [UInt16] = [1, 2, 3]
+        let testSegments = [SegmentShard(shard: Data12(repeating: 0), justification: nil)]
+        let testError = NSError(domain: "test", code: 404)
 
         let requestMessage = try SegmentShardRequestMessage(
             erasureRoot: testErasureRoot,
@@ -447,27 +477,49 @@ struct NetworkManagerTests {
             segmentIndices: testSegmentIndices
         )
 
-        _ = try await network.handler.handle(ceRequest: CERequest.segmentShardRequest1(requestMessage))
-        _ = try await network.handler.handle(ceRequest: CERequest.segmentShardRequest2(requestMessage))
+        _ = try await network.handler.handle(ceRequest: .segmentShardRequest1(requestMessage))
+        _ = try await network.handler.handle(ceRequest: .segmentShardRequest2(requestMessage))
 
         let events = await storeMiddleware.wait()
+        var receivedCount = 0
+        var generatedRequestId = Data32()
 
         for event in events {
             if let requestEvent = event as? RuntimeEvents.SegmentShardRequestReceived {
                 #expect(requestEvent.erasureRoot == testErasureRoot)
                 #expect(requestEvent.shardIndex == testShardIndex)
                 #expect(requestEvent.segmentIndices == testSegmentIndices)
+                generatedRequestId = try requestEvent.generateRequestId()
+                receivedCount += 1
             }
+        }
+
+        #expect(receivedCount == 2)
+
+        let successResponse = RuntimeEvents.SegmentShardRequestReceivedResponse(
+            requestId: generatedRequestId,
+            segments: testSegments
+        )
+        #expect(successResponse.requestId == generatedRequestId)
+        #expect(try successResponse.result.get().count == testSegments.count)
+
+        let failureResponse = RuntimeEvents.SegmentShardRequestReceivedResponse(
+            requestId: generatedRequestId,
+            error: testError
+        )
+        #expect(failureResponse.requestId == generatedRequestId)
+        #expect(throws: NSError.self) {
+            try failureResponse.result.get()
         }
     }
 
     @Test
     func testHandleAssuranceDistributionMessage() async throws {
         let testHeaderHash = Data32(repeating: 1)
-        let testBitfield = Data(repeating: 0xFF, count: 43) // 43 bytes bitfield
+        let testBitfield = Data43(repeating: 0xFF) // 43 bytes bitfield
         let testSignature = Ed25519Signature(repeating: 2)
 
-        let message = try AssuranceDistributionMessage(
+        let message = AssuranceDistributionMessage(
             headerHash: testHeaderHash,
             bitfield: testBitfield,
             signature: testSignature
@@ -514,19 +566,41 @@ struct NetworkManagerTests {
     @Test
     func testHandlePreimageRequestMessage() async throws {
         let testPreimageHash = Data32(repeating: 1)
+        let testPreimage = Data([0x01, 0x02, 0x03])
+        let testError = NSError(domain: "test", code: 404)
 
         let message = PreimageRequestMessage(
             hash: testPreimageHash
         )
 
-        _ = try await network.handler.handle(ceRequest: CERequest.preimageRequest(message))
+        _ = try await network.handler.handle(ceRequest: .preimageRequest(message))
 
         let events = await storeMiddleware.wait()
+        var receivedCount = 0
 
         for event in events {
             if let receivedEvent = event as? RuntimeEvents.PreimageRequestReceived {
                 #expect(receivedEvent.hash == testPreimageHash)
+                receivedCount += 1
             }
+        }
+
+        #expect(receivedCount == 1)
+
+        let successResponse = RuntimeEvents.PreimageRequestReceivedResponse(
+            hash: testPreimageHash,
+            preimage: testPreimage
+        )
+        #expect(successResponse.hash == testPreimageHash)
+        #expect(try successResponse.result.get() == testPreimage)
+
+        let failureResponse = RuntimeEvents.PreimageRequestReceivedResponse(
+            hash: testPreimageHash,
+            error: testError
+        )
+        #expect(failureResponse.hash == testPreimageHash)
+        #expect(throws: NSError.self) {
+            try failureResponse.result.get()
         }
     }
 
@@ -651,11 +725,11 @@ struct NetworkManagerTests {
     @Test
     func testHandleStateRequest() async throws {
         let testHeaderHash = Data32(repeating: 0x11)
-        let testStartKey = Data(repeating: 0x22, count: 31)
-        let testEndKey = Data(repeating: 0x33, count: 31)
+        let testStartKey = Data31(repeating: 0x22)
+        let testEndKey = Data31(repeating: 0x33)
         let testMaxSize: UInt32 = 2048
 
-        let message = try StateRequest(
+        let message = StateRequest(
             headerHash: testHeaderHash,
             startKey: testStartKey,
             endKey: testEndKey,
@@ -680,7 +754,7 @@ struct NetworkManagerTests {
 
         #expect(receivedCount == 1)
         let testNodes = [BoundaryNode]()
-        let testKVPairs = [(key: Data(), value: Data())]
+        let testKVPairs = [(key: Data31(), value: Data())]
 
         let response = RuntimeEvents.StateRequestReceivedResponse(
             requestId: generateRequestId,
@@ -696,19 +770,6 @@ struct NetworkManagerTests {
         )
         #expect(throws: NSError.self) {
             try responseFail.result.get()
-        }
-    }
-
-    @Test
-    func testStateRequestInvalidKeys() async {
-        let invalidKey = Data(repeating: 0x44, count: 30) // 30 bytes (invalid)
-        #expect(throws: Error.self) {
-            try StateRequest(
-                headerHash: Data32(repeating: 0x11),
-                startKey: invalidKey,
-                endKey: Data(repeating: 0x33, count: 31),
-                maxSize: 1024
-            )
         }
     }
 }

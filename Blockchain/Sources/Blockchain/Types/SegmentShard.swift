@@ -2,16 +2,10 @@ import Codec
 import Utils
 
 public struct SegmentShard: Sendable, Codable {
-    public let shard: Data
+    public let shard: Data12
     public let justification: Justification?
 
-    public init(shard: Data, justification: Justification? = nil) throws {
-        guard shard.count == 12 else {
-            throw DecodingError.dataCorrupted(DecodingError.Context(
-                codingPath: [],
-                debugDescription: "Segment Shard must be exactly 12 bytes"
-            ))
-        }
+    public init(shard: Data12, justification: Justification? = nil) {
         self.shard = shard
         self.justification = justification
     }

@@ -4,23 +4,12 @@ import Utils
 
 public enum RuntimeEvents {
     public struct StateRequestReceived: Event {
-        public enum StateRequestReceivedError: Error {
-            case invalidKeyLength(actual: Int, expected: Int)
-        }
-
         public var headerHash: Data32
-        public var startKey: Data // [u8; 31]
-        public var endKey: Data // [u8; 31]
+        public var startKey: Data31 // [u8; 31]
+        public var endKey: Data31 // [u8; 31]
         public var maxSize: UInt32
 
-        public init(headerHash: Data32, startKey: Data, endKey: Data, maxSize: UInt32) throws {
-            guard startKey.count == 31 else {
-                throw StateRequestReceivedError.invalidKeyLength(actual: startKey.count, expected: 31)
-            }
-            guard endKey.count == 31 else {
-                throw StateRequestReceivedError.invalidKeyLength(actual: endKey.count, expected: 31)
-            }
-
+        public init(headerHash: Data32, startKey: Data31, endKey: Data31, maxSize: UInt32) {
             self.headerHash = headerHash
             self.startKey = startKey
             self.endKey = endKey
@@ -39,9 +28,9 @@ public enum RuntimeEvents {
 
     public struct StateRequestReceivedResponse: Event {
         public var requestId: Data32
-        public let result: Result<(headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data, value: Data)]), Error>
+        public let result: Result<(headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data31, value: Data)]), Error>
 
-        public init(requestId: Data32, headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data, value: Data)]) {
+        public init(requestId: Data32, headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data31, value: Data)]) {
             self.requestId = requestId
             result = .success((headerHash, boundaryNodes, keyValuePairs))
         }
@@ -260,16 +249,6 @@ public enum RuntimeEvents {
         }
     }
 
-    public struct WorkReportRequestReady: Event {
-        public let source: Ed25519PublicKey
-        public let workReportHash: Data32
-
-        public init(source: Ed25519PublicKey, workReportHash: Data32) {
-            self.source = source
-            self.workReportHash = workReportHash
-        }
-    }
-
     public struct ShardDistributionReceived: Event {
         public var erasureRoot: Data32
         public var shardIndex: UInt32
@@ -284,18 +263,6 @@ public enum RuntimeEvents {
             try encoder.encode(erasureRoot)
             try encoder.encode(shardIndex)
             return encoder.data.blake2b256hash()
-        }
-    }
-
-    public struct ShardDistributionReady: Event {
-        public let source: Ed25519PublicKey
-        public var erasureRoot: Data32
-        public var shardIndex: UInt32
-
-        public init(source: Ed25519PublicKey, erasureRoot: Data32, shardIndex: UInt32) {
-            self.source = source
-            self.erasureRoot = erasureRoot
-            self.shardIndex = shardIndex
         }
     }
 
@@ -414,10 +381,10 @@ public enum RuntimeEvents {
 
     public struct AssuranceDistributionReceived: Event {
         public let headerHash: Data32
-        public let bitfield: Data // (One bit per core)
+        public let bitfield: Data43 // (One bit per core)
         public let signature: Ed25519Signature
 
-        public init(headerHash: Data32, bitfield: Data, signature: Ed25519Signature) {
+        public init(headerHash: Data32, bitfield: Data43, signature: Ed25519Signature) {
             self.headerHash = headerHash
             self.bitfield = bitfield
             self.signature = signature
