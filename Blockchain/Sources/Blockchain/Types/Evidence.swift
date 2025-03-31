@@ -36,65 +36,6 @@ extension Evidence {
         if tranche == 0 {
             return try .firstTranche(decoder.decode(BandersnatchSignature.self))
         }
-
-        var evidences = [WorkReportEvidence]()
-        while !decoder.isAtEnd {
-            let signature = try decoder.decode(BandersnatchSignature.self)
-            let noShowCount = try decoder.decode(UInt32.self)
-            var noShows = [NoShow]()
-
-            for _ in 0 ..< noShowCount {
-                try noShows.append(NoShow(
-                    validatorIndex: decoder.decode(ValidatorIndex.self),
-                    previousAnnouncement: decoder.decode(Announcement.self)
-                ))
-            }
-
-            evidences.append(WorkReportEvidence(
-                bandersnatchSig: signature,
-                noShows: noShows
-            ))
-        }
-
-        return .subsequentTranche(evidences)
+        return try .subsequentTranche(decoder.decode([WorkReportEvidence].self))
     }
 }
-
-// extension Evidence {
-//
-//    public static func decode(data: [Data], config: ProtocolConfigRef) throws -> Evidence {
-//        guard let data = data.first else {
-//            throw DecodingError.dataCorrupted(DecodingError.Context(
-//                codingPath: [],
-//                debugDescription: "unexpected data \(data)"
-//            ))
-//        }
-//
-//        let decoder = JamDecoder(data: data, config: config)
-//
-//        if data.count == ConstInt96.value {
-//            return try .firstTranche(decoder.decode(BandersnatchSignature.self))
-//        }
-//
-//        var evidences = [WorkReportEvidence]()
-//        while !decoder.isAtEnd {
-//            let signature = try decoder.decode(BandersnatchSignature.self)
-//            let noShowCount = try decoder.decode(UInt32.self)
-//            var noShows = [NoShow]()
-//
-//            for _ in 0 ..< noShowCount {
-//                try noShows.append(NoShow(
-//                    validatorIndex: decoder.decode(ValidatorIndex.self),
-//                    previousAnnouncement: decoder.decode(Announcement.self)
-//                ))
-//            }
-//
-//            evidences.append(WorkReportEvidence(
-//                bandersnatchSig: signature,
-//                noShows: noShows
-//            ))
-//        }
-//
-//        return .subsequentTranche(evidences)
-//    }
-// }

@@ -17,12 +17,7 @@ public enum RuntimeEvents {
         }
 
         public func generateRequestId() throws -> Data32 {
-            let encoder = JamEncoder()
-            try encoder.encode(headerHash)
-            try encoder.encode(startKey)
-            try encoder.encode(endKey)
-            try encoder.encode(maxSize)
-            return encoder.data.blake2b256hash()
+            try JamEncoder.encode(headerHash, startKey, endKey, maxSize).blake2b256hash()
         }
     }
 
@@ -259,10 +254,7 @@ public enum RuntimeEvents {
         }
 
         public func generateRequestId() throws -> Data32 {
-            let encoder = JamEncoder()
-            try encoder.encode(erasureRoot)
-            try encoder.encode(shardIndex)
-            return encoder.data.blake2b256hash()
+            try JamEncoder.encode(erasureRoot, shardIndex).blake2b256hash()
         }
     }
 
@@ -310,10 +302,7 @@ public enum RuntimeEvents {
         }
 
         public func generateRequestId() throws -> Data32 {
-            let encoder = JamEncoder()
-            try encoder.encode(erasureRoot)
-            try encoder.encode(shardIndex)
-            return encoder.data.blake2b256hash()
+            try JamEncoder.encode(erasureRoot, shardIndex).blake2b256hash()
         }
     }
 
@@ -349,12 +338,7 @@ public enum RuntimeEvents {
         }
 
         public func generateRequestId() throws -> Data32 {
-            let encoder = JamEncoder()
-            try encoder.encode(erasureRoot)
-            try encoder.encode(shardIndex)
-            try encoder.encode(UInt32(segmentIndices.count))
-            try encoder.encode(segmentIndices)
-            return encoder.data.blake2b256hash()
+            try JamEncoder.encode(erasureRoot, shardIndex, segmentIndices).blake2b256hash()
         }
     }
 
