@@ -74,14 +74,14 @@ extension ActivityStatistics {
                 coreStats[index].importsCount += result.importsCount
                 coreStats[index].exportsCount += result.exportsCount
                 coreStats[index].extrinsicsCount += result.extrinsicsCount
-                coreStats[index].extrinsicSize += result.extrinsicSize
-                coreStats[index].packageSize += report.packageSpecification.length
+                coreStats[index].extrinsicsSize += result.extrinsicsSize
+                coreStats[index].packageSize += UInt(report.packageSpecification.length)
 
                 let serviceIndex = result.serviceIndex
                 serviceStats[serviceIndex]!.importsCount += result.importsCount
                 serviceStats[serviceIndex]!.exportsCount += result.exportsCount
                 serviceStats[serviceIndex]!.extrinsicsCount += result.extrinsicsCount
-                serviceStats[serviceIndex]!.extrinsicSize += result.extrinsicSize
+                serviceStats[serviceIndex]!.extrinsicsSize += result.extrinsicsSize
                 serviceStats[serviceIndex]!.reports.count += 1
                 serviceStats[serviceIndex]!.reports.gasUsed += result.gasUsed
             }
@@ -89,7 +89,7 @@ extension ActivityStatistics {
         for report in availableReports {
             let index = report.coreIndex
             let segmentsSize = UInt32(config.value.segmentSize) * (UInt32(report.packageSpecification.segmentCount) * 65 + 63) / 64
-            coreStats[index].dataSize += report.packageSpecification.length + segmentsSize
+            coreStats[index].dataSize += UInt(report.packageSpecification.length + segmentsSize)
         }
         for assuranceItem in extrinsic.availability.assurances {
             for (index, bool) in assuranceItem.assurance.enumerated() {
@@ -98,15 +98,15 @@ extension ActivityStatistics {
         }
         for preimageItem in extrinsic.preimages.preimages {
             serviceStats[preimageItem.serviceIndex]!.preimages.count += 1
-            serviceStats[preimageItem.serviceIndex]!.preimages.size += UInt32(preimageItem.data.count)
+            serviceStats[preimageItem.serviceIndex]!.preimages.size += UInt(preimageItem.data.count)
         }
         for accumulateItem in accumulateStats {
-            serviceStats[accumulateItem.key]!.accumulates.count += accumulateItem.value.1
-            serviceStats[accumulateItem.key]!.accumulates.gasUsed += accumulateItem.value.0
+            serviceStats[accumulateItem.key]!.accumulates.count += UInt(accumulateItem.value.1)
+            serviceStats[accumulateItem.key]!.accumulates.gasUsed += UInt(accumulateItem.value.0.value)
         }
         for transferItem in transfersStats {
-            serviceStats[transferItem.key]!.transfers.count += transferItem.value.0
-            serviceStats[transferItem.key]!.transfers.gasUsed += transferItem.value.1
+            serviceStats[transferItem.key]!.transfers.count += UInt(transferItem.value.0)
+            serviceStats[transferItem.key]!.transfers.gasUsed += UInt(transferItem.value.1.value)
         }
 
         return ValidatorActivityStatistics(

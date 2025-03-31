@@ -432,7 +432,7 @@ struct EncoderTests {
         try #expect(JamDecoder.decode(Int64.self, from: encodedInt64) == int64Value)
 
         let encodedUInt = try JamEncoder.encode(uintValue)
-        #expect(encodedUInt == Data([255, 255, 0, 0, 0, 0, 0, 0]))
+        #expect(encodedUInt == Data([192, 255, 255]))
         try #expect(JamDecoder.decode(UInt.self, from: encodedUInt) == uintValue)
 
         let encodedUInt16 = try JamEncoder.encode(uint16Value)

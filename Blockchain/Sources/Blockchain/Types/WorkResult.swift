@@ -22,19 +22,19 @@ public struct WorkResult: Sendable, Equatable, Codable {
     public var output: WorkOutput
 
     // u: the actual amount of gas used during refinement
-    public var gasUsed: Gas
+    public var gasUsed: UInt
 
     // i: the number of segments imported from the Segments DA
-    public var importsCount: UInt32
+    public var importsCount: UInt
 
     // e: the number of segments exported into the Segments DA
-    public var exportsCount: UInt32
+    public var exportsCount: UInt
 
     // x: the number of the extrinsics used in computing the workload
-    public var extrinsicsCount: UInt32
+    public var extrinsicsCount: UInt
 
     // z: the total size in octets of the extrinsics used in computing the workload
-    public var extrinsicSize: UInt32
+    public var extrinsicsSize: UInt
 
     public init(
         serviceIndex: ServiceIndex,
@@ -42,11 +42,11 @@ public struct WorkResult: Sendable, Equatable, Codable {
         payloadHash: Data32,
         gasRatio: Gas,
         output: WorkOutput,
-        gasUsed: Gas,
-        importsCount: UInt32,
-        exportsCount: UInt32,
-        extrinsicsCount: UInt32,
-        extrinsicSize: UInt32
+        gasUsed: UInt,
+        importsCount: UInt,
+        exportsCount: UInt,
+        extrinsicsCount: UInt,
+        extrinsicsSize: UInt
     ) {
         self.serviceIndex = serviceIndex
         self.codeHash = codeHash
@@ -57,7 +57,7 @@ public struct WorkResult: Sendable, Equatable, Codable {
         self.importsCount = importsCount
         self.exportsCount = exportsCount
         self.extrinsicsCount = extrinsicsCount
-        self.extrinsicSize = extrinsicSize
+        self.extrinsicsSize = extrinsicsSize
     }
 }
 
@@ -70,11 +70,11 @@ extension WorkResult: Dummy {
             payloadHash: Data32(),
             gasRatio: Gas(0),
             output: .init(.success(Data())),
-            gasUsed: Gas(0),
+            gasUsed: 0,
             importsCount: 0,
             exportsCount: 0,
             extrinsicsCount: 0,
-            extrinsicSize: 0
+            extrinsicsSize: 0
         )
     }
 }

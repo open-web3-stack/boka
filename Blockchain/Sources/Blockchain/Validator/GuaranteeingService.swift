@@ -661,8 +661,13 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
 
         // Run the authorization check
         logger.debug("Authorizing work package", metadata: ["workPackageHash": "\(packageHash)"])
-        let res = try await isAuthorized(config: config, serviceAccounts: state.value, package: workPackage.value, coreIndex: coreIndex)
-        let authorizationOutput = try res.0.mapError(GuaranteeingServiceError.authorizationError).get()
+        let (authRes, authGasUsed) = try await isAuthorized(
+            config: config,
+            serviceAccounts: state.value,
+            package: workPackage.value,
+            coreIndex: coreIndex
+        )
+        let authorizationOutput = try authRes.mapError(GuaranteeingServiceError.authorizationError).get()
         logger.debug("Work package authorized successfully", metadata: ["outputSize": "\(authorizationOutput.count)"])
 
         var workResults = [WorkResult]()
@@ -683,7 +688,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                          metadata: ["itemIndex": "\(i)", "serviceIndex": "\(item.serviceIndex)"])
 
             // Execute the refine operation to get work result
-            let refineRes = try await refine(
+            let (refineRes, refineExports, refineGasUsed) = try await refine(
                 config: config,
                 serviceAccounts: state.value,
                 workItemIndex: i,
@@ -700,23 +705,23 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                 codeHash: workPackage.value.authorizationCodeHash,
                 payloadHash: item.payloadBlob.blake2b256hash(),
                 gasRatio: item.refineGasLimit,
-                output: WorkOutput(refineRes.result),
-                gasUsed: item.accumulateGasLimit,
-                importsCount: UInt32(item.inputs.count),
-                exportsCount: UInt32(item.outputDataSegmentsCount),
-                extrinsicsCount: UInt32(item.outputs.count),
-                extrinsicSize: UInt32(item.outputs.reduce(into: 0) { $0 += $1.length })
+                output: WorkOutput(refineRes),
+                gasUsed: UInt(refineGasUsed.value),
+                importsCount: UInt(item.inputs.count),
+                exportsCount: UInt(item.outputDataSegmentsCount),
+                extrinsicsCount: UInt(item.outputs.count),
+                extrinsicsSize: UInt(item.outputs.reduce(into: 0) { $0 += $1.length })
             )
             workResults.append(workResult)
 
             // Validate the number of exported segments matches what was declared
-            guard item.outputDataSegmentsCount == refineRes.exports.count else {
+            guard item.outputDataSegmentsCount == refineExports.count else {
                 logger.error("Export segment count mismatch",
-                             metadata: ["expected": "\(item.outputDataSegmentsCount)", "actual": "\(refineRes.exports.count)"])
+                             metadata: ["expected": "\(item.outputDataSegmentsCount)", "actual": "\(refineExports.count)"])
                 throw GuaranteeingServiceError.invalidExports
             }
 
-            exportSegments.append(contentsOf: refineRes.exports)
+            exportSegments.append(contentsOf: refineExports)
         }
 
         logger.debug("Creating work package bundle")
@@ -786,7 +791,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             refinementContext: workPackage.value.context,
             packageSpecification: packageSpecification,
             lookup: oldLookups,
-            results: ConfigLimitedSizeArray(config: config, array: workResults)
+            results: ConfigLimitedSizeArray(config: config, array: workResults),
+            authGasUsed: UInt(authGasUsed.value)
         )
 
         // Cache the work report
