@@ -19,12 +19,7 @@ public struct StateRequest: Codable, Sendable, Equatable, Hashable {
 
 extension StateRequest: CEMessage {
     public func encode() throws -> [Data] {
-        let encoder = JamEncoder()
-        try encoder.encode(headerHash)
-        try encoder.encode(startKey)
-        try encoder.encode(endKey)
-        try encoder.encode(maxSize)
-        return [encoder.data]
+        try [JamEncoder.encode(self)]
     }
 
     public static func decode(data: [Data], config: ProtocolConfigRef) throws -> StateRequest {
@@ -34,12 +29,6 @@ extension StateRequest: CEMessage {
                 debugDescription: "unexpected data \(data)"
             ))
         }
-
-        let decoder = JamDecoder(data: data, config: config)
-        let headerHash = try decoder.decode(Data32.self)
-        let startKey = try decoder.decode(Data31.self)
-        let endKey = try decoder.decode(Data31.self)
-        let maxSize = try decoder.decode(UInt32.self)
-        return StateRequest(headerHash: headerHash, startKey: startKey, endKey: endKey, maxSize: maxSize)
+        return try JamDecoder.decode(StateRequest.self, from: data, withConfig: config)
     }
 }

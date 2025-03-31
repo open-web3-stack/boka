@@ -28,12 +28,7 @@ public struct SegmentShardRequestMessage: Codable, Sendable, Equatable, Hashable
 
 extension SegmentShardRequestMessage: CEMessage {
     public func encode() throws -> [Data] {
-        let encoder = JamEncoder()
-        try encoder.encode(erasureRoot)
-        try encoder.encode(shardIndex)
-        try encoder.encode(UInt32(segmentIndices.count))
-        try encoder.encode(segmentIndices)
-        return [encoder.data]
+        try [JamEncoder.encode(self)]
     }
 
     public static func decode(data: [Data], config: ProtocolConfigRef) throws -> SegmentShardRequestMessage {
@@ -43,24 +38,6 @@ extension SegmentShardRequestMessage: CEMessage {
                 debugDescription: "unexpected data \(data)"
             ))
         }
-
-        let decoder = JamDecoder(data: data, config: config)
-        let erasureRoot = try decoder.decode(Data32.self)
-        let shardIndex = try decoder.decode(UInt32.self)
-        let count = try decoder.decode(UInt32.self)
-        let segmentIndices = try decoder.decode([UInt16].self)
-
-        guard segmentIndices.count == count else {
-            throw DecodingError.dataCorrupted(DecodingError.Context(
-                codingPath: [],
-                debugDescription: "Segment index count mismatch"
-            ))
-        }
-
-        return try SegmentShardRequestMessage(
-            erasureRoot: erasureRoot,
-            shardIndex: shardIndex,
-            segmentIndices: segmentIndices
-        )
+        return try JamDecoder.decode(SegmentShardRequestMessage.self, from: data, withConfig: config)
     }
 }

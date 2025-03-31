@@ -342,6 +342,9 @@ struct NetworkManagerTests {
             signatures: signatures
         ))
 
+        let message = try WorkReportDistributionMessage.decode(data: distributionMessage.encode(), config: services.config)
+        #expect(slot == message.slot)
+
         _ = try await network.handler.handle(ceRequest: distributionMessage)
 
         let events = await storeMiddleware.wait()
@@ -366,6 +369,9 @@ struct NetworkManagerTests {
         let requestMessage = CERequest.workReportRequest(WorkReportRequestMessage(
             workReportHash: workReportHash
         ))
+
+        let message = try WorkReportRequestMessage.decode(data: requestMessage.encode(), config: services.config)
+        #expect(workReportHash == message.workReportHash)
 
         _ = try await network.handler.handle(ceRequest: requestMessage)
 
@@ -392,6 +398,9 @@ struct NetworkManagerTests {
             shardIndex: shardIndex
         ))
 
+        let message = try ShardDistributionMessage.decode(data: distributionMessage.encode(), config: services.config)
+        #expect(shardIndex == message.shardIndex)
+
         _ = try await network.handler.handle(ceRequest: distributionMessage)
 
         let events = await storeMiddleware.wait()
@@ -416,12 +425,15 @@ struct NetworkManagerTests {
         let testJustification = Justification.singleHash(Data32())
         let testError = NSError(domain: "test", code: 404)
 
-        let requestMessage = AuditShardRequestMessage(
+        let requestMessage = CERequest.auditShardRequest(AuditShardRequestMessage(
             erasureRoot: testErasureRoot,
             shardIndex: testShardIndex
-        )
+        ))
 
-        _ = try await network.handler.handle(ceRequest: .auditShardRequest(requestMessage))
+        let message = try AuditShardRequestMessage.decode(data: requestMessage.encode(), config: services.config)
+        #expect(testShardIndex == message.shardIndex)
+
+        _ = try await network.handler.handle(ceRequest: requestMessage)
 
         let events = await storeMiddleware.wait()
         var receivedCount = 0
@@ -477,8 +489,16 @@ struct NetworkManagerTests {
             segmentIndices: testSegmentIndices
         )
 
-        _ = try await network.handler.handle(ceRequest: .segmentShardRequest1(requestMessage))
-        _ = try await network.handler.handle(ceRequest: .segmentShardRequest2(requestMessage))
+        let requestMessage1 = CERequest.segmentShardRequest1(requestMessage)
+        let requestMessage2 = CERequest.segmentShardRequest2(requestMessage)
+
+        let message1 = try SegmentShardRequestMessage.decode(data: requestMessage1.encode(), config: services.config)
+        #expect(testShardIndex == message1.shardIndex)
+        let message2 = try SegmentShardRequestMessage.decode(data: requestMessage2.encode(), config: services.config)
+        #expect(testShardIndex == message2.shardIndex)
+
+        _ = try await network.handler.handle(ceRequest: requestMessage1)
+        _ = try await network.handler.handle(ceRequest: requestMessage2)
 
         let events = await storeMiddleware.wait()
         var receivedCount = 0
@@ -519,13 +539,16 @@ struct NetworkManagerTests {
         let testBitfield = Data43(repeating: 0xFF) // 43 bytes bitfield
         let testSignature = Ed25519Signature(repeating: 2)
 
-        let message = AssuranceDistributionMessage(
+        let requestMessage = CERequest.assuranceDistribution(AssuranceDistributionMessage(
             headerHash: testHeaderHash,
             bitfield: testBitfield,
             signature: testSignature
-        )
+        ))
 
-        _ = try await network.handler.handle(ceRequest: CERequest.assuranceDistribution(message))
+        let message = try AssuranceDistributionMessage.decode(data: requestMessage.encode(), config: services.config)
+        #expect(testBitfield == message.bitfield)
+
+        _ = try await network.handler.handle(ceRequest: requestMessage)
 
         let events = await storeMiddleware.wait()
 
@@ -544,13 +567,16 @@ struct NetworkManagerTests {
         let testPreimageHash = Data32(repeating: 1)
         let testPreimageLength: UInt32 = 256
 
-        let message = PreimageAnnouncementMessage(
+        let requestMessage = CERequest.preimageAnnouncement(PreimageAnnouncementMessage(
             serviceID: testServiceID,
             hash: testPreimageHash,
             preimageLength: testPreimageLength
-        )
+        ))
 
-        _ = try await network.handler.handle(ceRequest: CERequest.preimageAnnouncement(message))
+        let message = try PreimageAnnouncementMessage.decode(data: requestMessage.encode(), config: services.config)
+        #expect(testPreimageHash == message.hash)
+
+        _ = try await network.handler.handle(ceRequest: requestMessage)
 
         let events = await storeMiddleware.wait()
 
@@ -569,11 +595,14 @@ struct NetworkManagerTests {
         let testPreimage = Data([0x01, 0x02, 0x03])
         let testError = NSError(domain: "test", code: 404)
 
-        let message = PreimageRequestMessage(
+        let requestMessage = CERequest.preimageRequest(PreimageRequestMessage(
             hash: testPreimageHash
-        )
+        ))
 
-        _ = try await network.handler.handle(ceRequest: .preimageRequest(message))
+        let message = try PreimageRequestMessage.decode(data: requestMessage.encode(), config: services.config)
+        #expect(testPreimageHash == message.hash)
+
+        _ = try await network.handler.handle(ceRequest: requestMessage)
 
         let events = await storeMiddleware.wait()
         var receivedCount = 0
@@ -612,17 +641,18 @@ struct NetworkManagerTests {
         let testWorkReportHash = Data32(repeating: 0xAA)
         let testSignature = Ed25519Signature(repeating: 0xBB)
 
-        let message = JudgementPublicationMessage(
+        let requestMessage = CERequest.judgementPublication(JudgementPublicationMessage(
             epochIndex: testEpochIndex,
             validatorIndex: testValidatorIndex,
             validity: testValidity,
             workReportHash: testWorkReportHash,
             signature: testSignature
-        )
-        let judgementPublication = try JudgementPublicationMessage.decode(data: message.encode(), config: .dev)
-        #expect(judgementPublication == message)
+        ))
 
-        _ = try await network.handler.handle(ceRequest: CERequest.judgementPublication(message))
+        let message = try JudgementPublicationMessage.decode(data: requestMessage.encode(), config: services.config)
+        #expect(testEpochIndex == message.epochIndex)
+
+        _ = try await network.handler.handle(ceRequest: requestMessage)
 
         let events = await storeMiddleware.wait()
         var receivedCount = 0
@@ -653,15 +683,15 @@ struct NetworkManagerTests {
 
         let testEvidence = Evidence.firstTranche(Data96(repeating: 0xDD))
 
-        let message = AuditAnnouncementMessage(
+        let requestMessage = CERequest.auditAnnouncement(AuditAnnouncementMessage(
             headerHash: testHeaderHash,
             tranche: 0,
             announcement: testAnnouncement,
             evidence: testEvidence
-        )
+        ))
 
-        let auditAnnouncementMessage = try AuditAnnouncementMessage.decode(data: message.encode(), config: .dev)
-        #expect(auditAnnouncementMessage == message)
+        let message = try AuditAnnouncementMessage.decode(data: requestMessage.encode(), config: services.config)
+        #expect(testAnnouncement == message.announcement)
 
         _ = try await network.handler.handle(ceRequest: .auditAnnouncement(message))
 
@@ -736,14 +766,17 @@ struct NetworkManagerTests {
         let testEndKey = Data31(repeating: 0x33)
         let testMaxSize: UInt32 = 2048
 
-        let message = StateRequest(
+        let requestMessage = CERequest.stateRequest(StateRequest(
             headerHash: testHeaderHash,
             startKey: testStartKey,
             endKey: testEndKey,
             maxSize: testMaxSize
-        )
+        ))
 
-        _ = try await network.handler.handle(ceRequest: .stateRequest(message))
+        let message = try StateRequest.decode(data: requestMessage.encode(), config: services.config)
+        #expect(testHeaderHash == message.headerHash)
+
+        _ = try await network.handler.handle(ceRequest: requestMessage)
 
         let events = await storeMiddleware.wait()
         var receivedCount = 0

@@ -15,10 +15,7 @@ public struct AuditShardRequestMessage: Codable, Sendable, Equatable, Hashable {
 
 extension AuditShardRequestMessage: CEMessage {
     public func encode() throws -> [Data] {
-        let encoder = JamEncoder()
-        try encoder.encode(erasureRoot)
-        try encoder.encode(shardIndex)
-        return [encoder.data]
+        try [JamEncoder.encode(self)]
     }
 
     public static func decode(data: [Data], config: ProtocolConfigRef) throws -> AuditShardRequestMessage {
@@ -28,11 +25,6 @@ extension AuditShardRequestMessage: CEMessage {
                 debugDescription: "unexpected data"
             ))
         }
-
-        let decoder = JamDecoder(data: data, config: config)
-        let erasureRoot = try decoder.decode(Data32.self)
-        let shardIndex = try decoder.decode(UInt32.self)
-
-        return AuditShardRequestMessage(erasureRoot: erasureRoot, shardIndex: shardIndex)
+        return try JamDecoder.decode(AuditShardRequestMessage.self, from: data, withConfig: config)
     }
 }
