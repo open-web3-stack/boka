@@ -1,3 +1,4 @@
+import Foundation
 import Utils
 
 public protocol DataStoreProtocol: Sendable {
@@ -14,6 +15,13 @@ public protocol DataStoreProtocol: Sendable {
     // erasure root + index => segment data
     func get(erasureRoot: Data32, index: UInt16) async throws -> Data4104?
     func set(data: Data4104, erasureRoot: Data32, index: UInt16) async throws
+
+    // New methods for timestamp and Paged-Proofs metadata
+    func setTimestamp(erasureRoot: Data32, timestamp: Date) async throws
+    func getTimestamp(erasureRoot: Data32) async throws -> Date?
+
+    func setPagedProofsMetadata(erasureRoot: Data32, metadata: Data) async throws
+    func getPagedProofsMetadata(erasureRoot: Data32) async throws -> Data?
 }
 
 public protocol DataStoreNetworkProtocol: Sendable {

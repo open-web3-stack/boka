@@ -10,7 +10,7 @@ public final class ValidatorService: Sendable {
     private let safrole: SafroleService
     private let safroleTicketPool: SafroleTicketPoolService
     private let blockAuthor: BlockAuthor
-    private let dataAvailability: DataAvailability
+    private let dataAvailability: DataAvailabilityService
 
     private let allServices: [Sendable]
 
@@ -52,7 +52,7 @@ public final class ValidatorService: Sendable {
             safroleTicketPool: safroleTicketPool
         )
 
-        dataAvailability = await DataAvailability(
+        dataAvailability = await DataAvailabilityService(
             config: blockchain.config,
             eventBus: eventBus,
             scheduler: scheduler,
