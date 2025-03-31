@@ -462,7 +462,7 @@ struct NetworkManagerTests {
         #expect(try successResponse.result.get().erasureRoot == testErasureRoot)
         #expect(try successResponse.result.get().shardIndex == testShardIndex)
         #expect(try successResponse.result.get().bundleShard == testBundleShard)
-        #expect(try successResponse.result.get().justification.encode() == testJustification.encode())
+        #expect(try successResponse.result.get().justification == testJustification)
 
         let failureResponse = RuntimeEvents.AuditShardRequestReceivedResponse(
             requestId: generatedRequestId,
