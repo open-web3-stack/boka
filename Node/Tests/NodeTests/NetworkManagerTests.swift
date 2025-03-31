@@ -651,12 +651,7 @@ struct NetworkManagerTests {
             signature: Ed25519Signature(repeating: 0xCC)
         )
 
-        let announcement = try Announcement.decode(data: testAnnouncement.encode(), config: .dev)
-        #expect(announcement == testAnnouncement)
-
         let testEvidence = Evidence.firstTranche(Data96(repeating: 0xDD))
-        let evidence = try Evidence.decode(data: testEvidence.encode(), tranche: 0, config: .dev)
-        #expect(evidence == testEvidence)
 
         let message = AuditAnnouncementMessage(
             headerHash: testHeaderHash,

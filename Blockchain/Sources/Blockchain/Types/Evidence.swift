@@ -27,26 +27,6 @@ public enum Evidence: Codable, Sendable, Equatable, Hashable {
 }
 
 extension Evidence {
-    public func encode() throws -> Data {
-        let encoder = JamEncoder()
-        switch self {
-        case let .firstTranche(signature):
-            try encoder.encode(signature)
-
-        case let .subsequentTranche(evidences):
-            // BandersnatchSignature ++ len ++ [NoShow]
-            for evidence in evidences {
-                try encoder.encode(evidence.bandersnatchSig)
-                try encoder.encode(UInt32(evidence.noShows.count))
-                for noShow in evidence.noShows {
-                    try encoder.encode(noShow.validatorIndex)
-                    try encoder.encode(noShow.previousAnnouncement)
-                }
-            }
-        }
-        return encoder.data
-    }
-
     public static func decode(data: Data, tranche: UInt8, config: ProtocolConfigRef) throws -> Evidence {
         let decoder = JamDecoder(data: data)
         return try decode(decoder: decoder, tranche: tranche, config: config)
