@@ -10,8 +10,8 @@ struct NodeDataSourceTests {
     let dataSource: NodeDataSource
     let networkManager: NetworkManager
     let network: MockNetwork
-    let services: BlockchainServices
     let storeMiddleware: StoreMiddleware
+    let services: BlockchainServices
 
     init() async throws {
         let services = await BlockchainServices()

@@ -4,42 +4,26 @@ import Synchronization
 import TracingUtils
 import Utils
 
-/**
- * Errors that can occur in the GuaranteeingService.
- */
 public enum GuaranteeingServiceError: Error, Equatable {
-    /// No authorizer hash found in the core authorization pool
     case noAuthorizerHash
-    /// The number of exported segments doesn't match the expected count
     case invalidExports
-    /// The work package validation failed
     case invalidWorkPackage
-    /// The work package bundle validation failed
     case invalidBundle
-    /// The segments root was not found in the mappings
     case segmentsRootNotFound
-    /// The node is not a validator
     case notValidator
-    /// The core assignment is invalid
     case invalidCore
-    /// Unable to get enough signatures from other validators
     case unableToGetSignatures
-    /// The work package authorization failed
     case authorizationError(WorkResultError)
-    /// Unable to retrieve imported segments
     case importSegmentsNotFound
-    /// The number of imported segments doesn't match the expected count
     case invalidImportSegmentCount
-    /// Failed to export segments to data availability
     case dataAvailabilityError
-    /// The service account for a work item does not exist
     case serviceAccountNotFound
 }
 
 public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBeforeEpoch, OnSyncCompleted {
     private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore
-    private let dataAvailability: DataAvailability
+    private let dataAvailability: DataAvailabilityService
 
     // Stores the current signing key and validator index
     let signingKey: ThreadSafeContainer<(ValidatorIndex, Ed25519.SecretKey)?> = .init(nil)
@@ -60,7 +44,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
     ) async {
         self.dataProvider = dataProvider
         self.keystore = keystore
-        dataAvailability = await DataAvailability(
+        dataAvailability = await DataAvailabilityService(
             config: config,
             eventBus: eventBus,
             scheduler: scheduler,
@@ -151,52 +135,53 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
     /**
      * Validates a work package bundle and its associated segments root mappings.
      *
+     * As per GP section 14.1, this validates the work package authorization
+     * and ensures all required conditions are met before guaranteeing.
+     *
      * @param bundle The work package bundle to validate
      * @param segmentsRootMappings The mappings of work package hashes to segment roots
-     * @return True if the bundle is valid, false otherwise
      */
     func validateWorkPackageBundle(
         _ bundle: WorkPackageBundle,
         segmentsRootMappings: SegmentsRootMappings
     ) async throws {
-        // First validate the work package itself
         try validate(workPackage: bundle.workPackage)
 
-        // Validate the work package authorization
         try await validateAuthorization(bundle.workPackage)
 
-        // Validate the segments-root mappings
         for mapping in segmentsRootMappings {
             try validateSegmentsRootMapping(mapping, for: bundle.workPackage)
         }
 
-        // Validate imported segments match the declared inputs
         try validateImportedSegments(bundle)
     }
 
     /**
      * Validates that the imported segments in a bundle match the work items' input declarations.
      *
+     * This is part of the validation process described in GP section 14.1, ensuring
+     * that all declared inputs are present and valid.
+     *
      * @param bundle The work package bundle to validate
-     * @return True if the imported segments are valid, false otherwise
      */
     func validateImportedSegments(_ bundle: WorkPackageBundle) throws {
-        // Collect all imported segment references from work items
         let importSegmentCount = bundle.workPackage.workItems.array.flatMap(\.inputs).count
 
-        // Verify we have the correct number of imported segments
         if bundle.importSegments.count != importSegmentCount {
             logger.debug("Import segment count mismatch",
                          metadata: ["expected": "\(importSegmentCount)", "actual": "\(bundle.importSegments.count)"])
             throw GuaranteeingServiceError.invalidImportSegmentCount
         }
 
-        // Additional validation of segment content could be implemented here
+        // TODO: implement additional validation of segment content
     }
 
     /**
      * Processes a work package bundle to create a work report.
      * This is the core function that validates, processes, and generates a work report from a bundle.
+     *
+     * As per GP section 14.2, this implements the work-report creation process:
+     * r = Ξ(p, c) where p is the work package and c is the core index.
      *
      * @param coreIndex The core index to process the bundle for
      * @param segmentsRootMappings The mappings of work package hashes to segment roots
@@ -212,7 +197,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             throw GuaranteeingServiceError.notValidator
         }
 
-        // Check if we've already processed this bundle
         let workPackageHash = bundle.workPackage.hash()
         if let cachedReport = workReportCache.value[workPackageHash] {
             logger.debug("Using cached work report for bundle", metadata: ["workPackageHash": "\(workPackageHash)"])
@@ -221,26 +205,23 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
 
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
 
-        // Get current core assignments
         let coreAssignment = getCoreAssignment(state: state)
 
-        // Verify the validator is assigned to the specified core
         guard let currentCoreIndex = coreAssignment[safe: Int(validatorIndex)] else {
             try throwUnreachable("invalid validator index/core assignment")
         }
         guard currentCoreIndex == coreIndex else {
-            logger.error("Invalid core assignment",
-                         metadata: ["expectedCore": "\(currentCoreIndex)", "actualCore": "\(coreIndex)"])
+            logger.error(
+                "Invalid core assignment",
+                metadata: ["expectedCore": "\(currentCoreIndex)", "actualCore": "\(coreIndex)"]
+            )
             throw GuaranteeingServiceError.invalidCore
         }
 
-        // Get the workPackage reference
         let workPackage = bundle.workPackage.asRef()
 
-        // Validate the bundle
         try await validateWorkPackageBundle(bundle, segmentsRootMappings: segmentsRootMappings)
 
-        // Process the work package bundle and create a work report
         let (_, _, workReport) = try await createWorkReport(
             state: state,
             coreIndex: coreIndex,
@@ -249,7 +230,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             segmentsRootMappings: segmentsRootMappings
         )
 
-        // Cache the work report for future use
         var cacheValue = workReportCache.value
         cacheValue[workPackageHash] = workReport
         workReportCache.value = cacheValue
@@ -260,6 +240,12 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
     /**
      * Processes a work package by refining it, generating a work report, collecting signatures,
      * and distributing the final work report.
+     *
+     * This implements the full guaranteeing workflow described in GP section 14:
+     * - Validates the work package (GP 14.1)
+     * - Creates a work report (GP 14.2)
+     * - Collects signatures from other validators (GP 14.4-14.5)
+     * - Distributes the signed work report (GP 14.5)
      *
      * @param coreIndex The core index to process the work package for
      * @param workPackage The work package to process
@@ -285,10 +271,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             throw GuaranteeingServiceError.invalidCore
         }
 
-        // Validate the work package
         try validate(workPackage: workPackage.value)
 
-        // Generate the work report, bundle, and mappings
         let (bundle, mappings, workReport) = try await createWorkReport(
             state: state,
             coreIndex: coreIndex,
@@ -299,10 +283,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
 
         let workReportHash = workReport.hash()
 
-        // Find other validators assigned to the same core
         var otherValidators = [(ValidatorIndex, Ed25519PublicKey)]()
 
-        // Get the validators for the current epoch
         let currentValidators = state.value.currentValidators
         for (idx, core) in coreAssignment.enumerated() {
             if core == coreIndex, idx != Int(validatorIndex) {
@@ -310,8 +292,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             }
         }
 
-        logger.debug("Requesting signatures from validators",
-                     metadata: ["validatorCount": "\(otherValidators.count)", "coreIndex": "\(coreIndex)"])
+        logger.debug(
+            "Requesting signatures from validators",
+            metadata: ["validatorCount": "\(otherValidators.count)", "coreIndex": "\(coreIndex)"]
+        )
 
         // Announce work package bundle ready to other validators in the same core group and wait for signatures
         var sigs: [ValidatorSignature] = await withTaskGroup(of: Optional<ValidatorSignature>.self) { group in
@@ -379,12 +363,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         ))
     }
 
-    /**
-     * Gets the core assignment for the current timeslot.
-     *
-     * @param state The current state
-     * @return An array of core indices assigned to validators
-     */
     func getCoreAssignment(state: StateRef) -> [CoreIndex] {
         let currentTime = timeProvider.getTime()
         let timeslot = currentTime.timeToTimeslot(config: config)
@@ -415,9 +393,11 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
     /**
      * Validates a segments root mapping against a work package.
      *
+     * This is part of the validation process described in GP section 14.1,
+     * ensuring that segment root mappings are valid and properly formed.
+     *
      * @param mapping The mapping to validate
      * @param for The work package the mapping is for
-     * @return True if the mapping is valid, false otherwise
      */
     func validateSegmentsRootMapping(
         _ mapping: SegmentsRootMapping,
@@ -444,8 +424,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      * 2. The service account exists and has appropriate permissions
      * 3. The code hash matches the expected value
      *
+     * As per GP section 14.1, this validates the work package against the
+     * authorization pool in the most recent chain state.
+     *
      * @param workPackage The work package to validate
-     * @return True if the authorization is valid, false otherwise
      */
     func validateAuthorization(_ workPackage: WorkPackage) async throws {
         // Get the current state
@@ -490,8 +472,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      * 3. The gas limits are within bounds
      * 4. The refinement context is valid
      *
+     * This implements the validation requirements described in GP section 14.1,
+     * ensuring the work package meets all requirements before processing.
+     *
      * @param workPackage The work package to validate
-     * @return True if the work package is valid, false otherwise
      */
     func validate(workPackage: WorkPackage) throws {
         // Basic validation checks
@@ -543,13 +527,15 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
     /**
      * Retrieves imported segments for a work package.
      *
+     * As described in GP section 14.3-14.4, this retrieves the necessary
+     * data segments for processing the work package.
+     *
      * @param for The work package to retrieve segments for
      * @return An array of data segments
      */
     func retrieveImportSegments(for workPackage: WorkPackage) async throws -> [Data4104] {
         var segments = [Data4104]()
 
-        // Collect all import segment references from work items
         let importSegments = workPackage.workItems.array.flatMap(\.inputs)
 
         for segment in importSegments {
@@ -574,13 +560,15 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
     /**
      * Retrieves justifications for imported segments.
      *
+     * This supports the data availability requirements described in GP section 14.3-14.4,
+     * providing proofs for the imported segments.
+     *
      * @param for The work package to retrieve justifications for
      * @return An array of justification data
      */
     func retrieveJustifications(for workPackage: WorkPackage) async throws -> [Data] {
         var justifications = [Data]()
 
-        // Collect all import segment references from work items
         let importSegments = workPackage.workItems.array.flatMap(\.inputs)
 
         for segment in importSegments {
@@ -610,6 +598,12 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      * 3. Exports the resulting segments to data availability
      * 4. Creates and returns a work report
      *
+     * This implements the core work report creation process described in GP section 14.2:
+     * r = Ξ(p, c) where p is the work package and c is the core index.
+     *
+     * It also handles the chunking and distribution of data as per GP section 14.3,
+     * and creates the availability specifications as described in GP section 14.4.
+     *
      * @param state The current state reference
      * @param coreIndex The core index processing this work package
      * @param workPackage The work package to process
@@ -627,11 +621,9 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         // Check cache first
         let packageHash = workPackage.hash
         if let cachedReport = workReportCache.value[packageHash] {
-            // Get the imports and justifications
             let imports = try await retrieveImportSegments(for: workPackage.value)
             let justifications = try await retrieveJustifications(for: workPackage.value)
 
-            // Create the bundle
             let bundle = WorkPackageBundle(
                 workPackage: workPackage.value,
                 extrinsics: extrinsics,
@@ -649,7 +641,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             return (bundle, mappings, cachedReport)
         }
 
-        // Get the authorizer hash from the core pool
         let corePool = state.value.coreAuthorizationPool[coreIndex]
         guard let authorizerHash = corePool.array.first else {
             logger.error("No authorizer hash found for core", metadata: ["coreIndex": "\(coreIndex)"])
@@ -659,7 +650,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         var exportSegmentOffset: UInt16 = 0
         var mappings: SegmentsRootMappings = []
 
-        // Run the authorization check
         logger.debug("Authorizing work package", metadata: ["workPackageHash": "\(packageHash)"])
         let (authRes, authGasUsed) = try await isAuthorized(
             config: config,
@@ -673,7 +663,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         var workResults = [WorkResult]()
         var exportSegments = [Data4104]()
 
-        // Fetch import segments for refinement
         var importSegments = [[Data4104]]()
         for item in workPackage.value.workItems {
             let segment = try await dataAvailability.fetchSegment(segments: item.inputs, segmentsRootMappings: segmentsRootMappings)
@@ -682,12 +671,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
 
         logger.debug("Processing work items", metadata: ["itemCount": "\(workPackage.value.workItems.count)"])
 
-        // Process each work item
         for (i, item) in workPackage.value.workItems.enumerated() {
             logger.debug("Refining work item",
                          metadata: ["itemIndex": "\(i)", "serviceIndex": "\(item.serviceIndex)"])
 
-            // Execute the refine operation to get work result
             let (refineRes, refineExports, refineGasUsed) = try await refine(
                 config: config,
                 serviceAccounts: state.value,
@@ -698,7 +685,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                 exportSegmentOffset: UInt64(exportSegmentOffset)
             )
 
-            // Update export segment offset
             exportSegmentOffset += item.outputDataSegmentsCount
             let workResult = WorkResult(
                 serviceIndex: item.serviceIndex,
@@ -714,7 +700,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             )
             workResults.append(workResult)
 
-            // Validate the number of exported segments matches what was declared
             guard item.outputDataSegmentsCount == refineExports.count else {
                 logger.error("Export segment count mismatch",
                              metadata: ["expected": "\(item.outputDataSegmentsCount)", "actual": "\(refineExports.count)"])
@@ -726,11 +711,9 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
 
         logger.debug("Creating work package bundle")
 
-        // Get the imports and justifications
         let imports = try await retrieveImportSegments(for: workPackage.value)
         let justifications = try await retrieveJustifications(for: workPackage.value)
 
-        // Create the work package bundle
         let bundle = WorkPackageBundle(
             workPackage: workPackage.value,
             extrinsics: extrinsics,
@@ -740,10 +723,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
 
         logger.debug("Exporting work package bundle to data availability")
 
-        // Export the bundle to data availability
-        // This will erasure-code and distribute the bundle to the audit store
-        // as per GP 14.3.1
-        logger.debug("Exporting work package bundle to data availability")
         let (erasureRoot, length) = try await dataAvailability.exportWorkpackageBundle(bundle: bundle)
         if erasureRoot == Data32() {
             throw GuaranteeingServiceError.dataAvailabilityError
@@ -751,9 +730,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
 
         logger.debug("Exporting segments to data availability", metadata: ["segmentCount": "\(exportSegments.count)"])
 
-        // Export the segments to data availability
-        // This will store the segments in the long-term imports store
-        // as per GP 14.3.1
         let segmentRoot = try await dataAvailability.exportSegments(data: exportSegments, erasureRoot: erasureRoot)
         if segmentRoot == Data32() {
             throw GuaranteeingServiceError.dataAvailabilityError
@@ -761,10 +737,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
 
         logger.debug("Creating segments root mapping", metadata: ["segmentRoot": "\(segmentRoot)"])
 
-        // Add the mapping
         mappings.append(SegmentsRootMapping(workPackageHash: packageHash, segmentsRoot: segmentRoot))
 
-        // Create the availability specifications as per GP 14.4.1
         let packageSpecification = AvailabilitySpecifications(
             workPackageHash: packageHash,
             length: length,
@@ -775,7 +749,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
 
         logger.debug("Building lookup dictionary from recent history")
 
-        // Build the lookup dictionary from recent history
         var oldLookups = [Data32: Data32]()
         for item in state.value.recentHistory.items {
             oldLookups.merge(item.lookup, uniquingKeysWith: { _, new in new })
@@ -783,7 +756,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
 
         logger.debug("Creating work report")
 
-        // Create the work report
         let workReport = try WorkReport(
             authorizerHash: authorizerHash,
             coreIndex: coreIndex,
@@ -795,7 +767,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             authGasUsed: UInt(authGasUsed.value)
         )
 
-        // Cache the work report
         workReportCache.write {
             $0[packageHash] = workReport
         }

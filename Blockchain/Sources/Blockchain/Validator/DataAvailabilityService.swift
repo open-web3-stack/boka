@@ -4,71 +4,24 @@ import Synchronization
 import TracingUtils
 import Utils
 
-/// Errors that can occur in the DataAvailability system
 public enum DataAvailabilityError: Error {
-    /// Failed to store data in the data store
     case storeError
-    /// Failed to retrieve data from the data store
     case retrievalError
-    /// Failed to erasure code data
     case erasureCodingError
-    /// Failed to distribute data
     case distributionError
-    /// The requested segment was not found
     case segmentNotFound
-    /// The segments root mapping was not found
     case segmentsRootMappingNotFound
-    /// Invalid segment index
     case invalidSegmentIndex
-    /// Invalid erasure root
     case invalidErasureRoot
-    /// Invalid segments root
     case invalidSegmentsRoot
-    /// Invalid data length
     case invalidDataLength
+    case pagedProofsGenerationError
 }
 
-/// Enum defining the types of data availability stores
-public enum DataAvailabilityStore: String, Sendable {
-    /// Store for imported segments (long-term storage)
-    case imports
-    /// Store for audit data (short-term storage)
-    case audits
-}
-
-/// DataAvailability service responsible for managing the storage, distribution, and retrieval
-/// of data in the blockchain system.
-///
-/// As per GP 14.3.1:
-/// Guarantors are required to erasure-code and distribute two data sets:
-/// 1. Auditable work-package containing the encoded work-package, extrinsic data and self-justifying
-///    imported segments (short-term Audit store)
-/// 2. Exported-segments data together with the Paged-Proofs metadata (long-term store)
-///
-/// Items in the first store are kept until finality of the block in which the availability of the
-/// work-result's work-package is assured. Items in the second store are kept for a minimum of 28 days
-/// (672 complete epochs) following the reporting of the work-report.
-public final class DataAvailability: ServiceBase2, @unchecked Sendable {
-    /// The blockchain data provider
+public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable {
     private let dataProvider: BlockchainDataProvider
-    /// The data store for general blockchain data
     private let dataStore: DataStore
 
-    /// Constants for data retention
-    private enum RetentionPeriods {
-        /// Retention period for audit store (until finality, approximated as 1 hour)
-        static let auditStore: TimeInterval = 60 * 60
-        /// Retention period for import store (28 days = 672 epochs)
-        static let importStore: TimeInterval = 60 * 60 * 24 * 28
-    }
-
-    /// Initialize the DataAvailability service
-    /// - Parameters:
-    ///   - config: The protocol configuration
-    ///   - eventBus: The event bus for publishing events
-    ///   - scheduler: The scheduler for scheduling tasks
-    ///   - dataProvider: The blockchain data provider
-    ///   - dataStore: The data store for general blockchain data
     public init(
         config: ProtocolConfigRef,
         eventBus: EventBus,
@@ -95,11 +48,11 @@ public final class DataAvailability: ServiceBase2, @unchecked Sendable {
         // the encoded work-package, extrinsic data and self-justifying imported segments which is placed in the short-term Audit
         // da store and a second set of exported-segments data together with the Paged-Proofs metadata. Items in the first store
         // are short-lived; assurers are expected to keep them only until finality of the block in which the availability of the work-
-        // result’s work-package is assured. Items in the second, meanwhile, are long-lived and expected to be kept for a minimum
+        // result's work-package is assured. Items in the second, meanwhile, are long-lived and expected to be kept for a minimum
         // of 28 days (672 complete epochs) following the reporting of the work-report.
     }
 
-    /// Fetch segments from the data availability system
+    /// Fetch segments from import store
     /// - Parameters:
     ///   - segments: The segment specifications to retrieve
     ///   - segmentsRootMappings: Optional mappings from work package hash to segments root
@@ -108,45 +61,110 @@ public final class DataAvailability: ServiceBase2, @unchecked Sendable {
         segments: [WorkItem.ImportedDataSegment],
         segmentsRootMappings: SegmentsRootMappings? = nil
     ) async throws -> [Data4104] {
-        // TODO: Implement segment fetching from the appropriate store
-        // 1. Determine which store to fetch from based on segment type
-        // 2. Resolve segment roots from mappings if needed
-        // 3. Retrieve segments from the data store
-        // 4. Verify segment integrity
-        // 5. Return the fetched segments
+        // Delegate segment fetching to the data store.
+        // The dataStore handles resolving segment roots and retrieving from the appropriate underlying storage.
         try await dataStore.fetchSegment(segments: segments, segmentsRootMappings: segmentsRootMappings)
     }
 
-    /// Export segments to the data availability system
+    /// Export segments to import store
     /// - Parameters:
     ///   - data: The segments to export
     ///   - erasureRoot: The erasure root to associate with the segments
     /// - Returns: The segments root
     public func exportSegments(data: [Data4104], erasureRoot: Data32) async throws -> Data32 {
-        // TODO: Implement segment export to the import store
-        // 1. Erasure code the segments if needed
-        // 2. Calculate the segments root
-        // 3. Store segments in the import store
-        // 4. Return the segments root
         let segmentRoot = Merklization.constantDepthMerklize(data.map(\.data))
 
-        for (index, data) in data.enumerated() {
-            try await dataStore.set(data: data, erasureRoot: erasureRoot, index: UInt16(index))
+        let currentTimestamp = Date()
+        try await dataStore.setTimestamp(erasureRoot: erasureRoot, timestamp: currentTimestamp)
+
+        let pagedProofsMetadata = try generatePagedProofsMetadata(data: data, segmentRoot: segmentRoot)
+        try await dataStore.setPagedProofsMetadata(erasureRoot: erasureRoot, metadata: pagedProofsMetadata)
+
+        for (index, segmentData) in data.enumerated() {
+            try await dataStore.set(
+                data: segmentData,
+                erasureRoot: erasureRoot,
+                index: UInt16(index)
+            )
         }
 
         return segmentRoot
     }
 
-    /// Export a work package bundle to the data availability system
+    /// Generate Paged-Proofs metadata for a set of segments
+    /// - Parameters:
+    ///   - data: The segments data
+    ///   - segmentRoot: The segments root
+    /// - Returns: The Paged-Proofs metadata
+    /// - Throws: DataAvailabilityError if metadata generation fails
+    private func generatePagedProofsMetadata(data: [Data4104], segmentRoot: Data32) throws -> Data {
+        // TODO: replace this with real implementation
+
+        // Use JamEncoder to properly encode the metadata
+        let segmentCount = UInt32(data.count)
+        var segmentHashes: [Data32] = []
+
+        // Calculate segment hashes
+        for segment in data {
+            segmentHashes.append(segment.data.blake2b256hash())
+        }
+
+        // Encode the metadata using JamEncoder
+        return try JamEncoder.encode(segmentCount, segmentRoot, segmentHashes)
+    }
+
+    /// Export a work package bundle to audit store
     /// - Parameter bundle: The bundle to export
     /// - Returns: The erasure root and length of the bundle
-    public func exportWorkpackageBundle(bundle _: WorkPackageBundle) async throws -> (erasureRoot: Data32, length: DataLength) {
-        // TODO: Implement work package bundle export to the audit store
+    public func exportWorkpackageBundle(bundle: WorkPackageBundle) async throws -> (erasureRoot: Data32, length: DataLength) {
         // 1. Serialize the bundle
-        // 2. Calculate the erasure root and length
-        // 3. Store the bundle in the audit store
-        // 4. Return the erasure root and length
-        throw DataAvailabilityError.storeError
+        let serializedData = try JamEncoder.encode(bundle)
+        let dataLength = DataLength(UInt32(serializedData.count))
+
+        // 2. Calculate the erasure root
+        // TODO: replace this with real implementation
+        let erasureRoot = serializedData.blake2b256hash()
+
+        // 3. Extract the work package hash from the bundle
+        let workPackageHash = bundle.workPackage.hash()
+
+        // 4. Store the serialized bundle in the audit store (short-term storage)
+
+        // chunk the bundle into segments
+
+        let segmentCount = serializedData.count / 4104
+        var segments = [Data4104]()
+        for i in 0 ..< segmentCount {
+            let start = i * 4104
+            let end = min(start + 4104, serializedData.count)
+            var segment = Data(count: 4104)
+            segment.withUnsafeMutableBytes { destPtr in
+                serializedData.withUnsafeBytes { sourcePtr in
+                    destPtr.baseAddress!.copyMemory(from: sourcePtr.baseAddress! + start, byteCount: end - start)
+                }
+            }
+            segments.append(Data4104(segment)!)
+        }
+
+        // Store the segment in the data store
+        for (i, segment) in segments.enumerated() {
+            try await dataStore.set(data: segment, erasureRoot: erasureRoot, index: UInt16(i))
+        }
+
+        // 5. Calculate the segments root
+        // TODO: replace this with real implementation
+        let segmentsRoot = serializedData.blake2b256hash()
+
+        // 6. Map the work package hash to the segments root
+        try await dataStore.setSegmentRoot(segmentRoot: segmentsRoot, forWorkPackageHash: workPackageHash)
+
+        // 7. Set the timestamp for retention tracking
+        // As per GP 14.3.1, items in the audit store are kept until finality (approx. 1 hour)
+        let currentTimestamp = Date()
+        try await dataStore.setTimestamp(erasureRoot: erasureRoot, timestamp: currentTimestamp)
+
+        // 8. Return the erasure root and length
+        return (erasureRoot: erasureRoot, length: dataLength)
     }
 
     /// Verify that a segment belongs to an erasure root
