@@ -27,45 +27,50 @@ public enum Evidence: Sendable, Equatable, Hashable {
 }
 
 extension Evidence: Codable {
+    enum CodingKeys: String, CodingKey {
+        case firstTranche
+        case subsequentTranche
+    }
+
+    enum EvidenceCodingError: Error {
+        case invalidVariant
+    }
+
     public init(from decoder: Decoder) throws {
         if decoder.isJamCodec {
             var container = try decoder.unkeyedContainer()
-
-            if let signature = try? container.decode(BandersnatchSignature.self) {
+            let variant = try container.decode(UInt8.self)
+            switch variant {
+            case 0:
+                let signature = try container.decode(BandersnatchSignature.self)
                 self = .firstTranche(signature)
-                return
-            }
-            container = try decoder.unkeyedContainer()
-            if let evidences = try? container.decode([WorkReportEvidence].self) {
+            case 1:
+                let evidences = try container.decode([WorkReportEvidence].self)
                 self = .subsequentTranche(evidences)
-                return
-            }
-
-            throw DecodingError.dataCorrupted(
-                DecodingError.Context(
-                    codingPath: decoder.codingPath,
-                    debugDescription: "Could not decode Evidence as either firstTranche or subsequentTranche"
+            default:
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(
+                        codingPath: decoder.codingPath,
+                        debugDescription: "Invalid Evidence variant: \(variant)"
+                    )
                 )
-            )
+            }
         } else {
-            let container = try decoder.singleValueContainer()
-
-            if let signature = try? container.decode(BandersnatchSignature.self) {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            if container.contains(.firstTranche) {
+                let signature = try container.decode(BandersnatchSignature.self, forKey: .firstTranche)
                 self = .firstTranche(signature)
-                return
-            }
-
-            if let evidences = try? container.decode([WorkReportEvidence].self) {
+            } else if container.contains(.subsequentTranche) {
+                let evidences = try container.decode([WorkReportEvidence].self, forKey: .subsequentTranche)
                 self = .subsequentTranche(evidences)
-                return
-            }
-
-            throw DecodingError.dataCorrupted(
-                DecodingError.Context(
-                    codingPath: decoder.codingPath,
-                    debugDescription: "Could not decode Evidence as either BandersnatchSignature or [WorkReportEvidence]"
+            } else {
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(
+                        codingPath: container.codingPath,
+                        debugDescription: "No valid Evidence variant found"
+                    )
                 )
-            )
+            }
         }
     }
 
@@ -74,17 +79,19 @@ extension Evidence: Codable {
             var container = encoder.unkeyedContainer()
             switch self {
             case let .firstTranche(signature):
+                try container.encode(UInt8(0))
                 try container.encode(signature)
             case let .subsequentTranche(evidences):
+                try container.encode(UInt8(1))
                 try container.encode(evidences)
             }
         } else {
-            var container = encoder.singleValueContainer()
+            var container = encoder.container(keyedBy: CodingKeys.self)
             switch self {
             case let .firstTranche(signature):
-                try container.encode(signature)
+                try container.encode(signature, forKey: .firstTranche)
             case let .subsequentTranche(evidences):
-                try container.encode(evidences)
+                try container.encode(evidences, forKey: .subsequentTranche)
             }
         }
     }
