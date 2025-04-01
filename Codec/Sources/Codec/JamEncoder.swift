@@ -80,6 +80,10 @@ private class EncodeContext: Encoder {
         }
     }
 
+    fileprivate func encodeCompact(_ value: some UnsignedInteger) {
+        data.append(contentsOf: value.encode(method: .variableWidth))
+    }
+
     fileprivate func encodeData(_ value: Data, lengthPrefix: Bool) {
         if lengthPrefix {
             let length = UInt32(value.count)
@@ -183,8 +187,7 @@ private struct JamKeyedEncodingContainer<K: CodingKey>: KeyedEncodingContainerPr
     }
 
     mutating func encode(_ value: UInt, forKey _: K) throws {
-        let uintValue = UInt64(value)
-        encoder.encodeInt(uintValue)
+        encoder.encodeCompact(value)
     }
 
     mutating func encode(_ value: UInt8, forKey _: K) throws {
@@ -419,8 +422,7 @@ private struct JamUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     }
 
     mutating func encode(_ value: UInt) throws {
-        let uintValue = UInt64(value)
-        encoder.encodeInt(uintValue)
+        encoder.encodeCompact(value)
         count += 1
     }
 
@@ -500,7 +502,7 @@ private struct JamSingleValueEncodingContainer: SingleValueEncodingContainer {
     }
 
     mutating func encode(_ value: UInt) throws {
-        encoder.encodeInt(UInt64(value))
+        encoder.encodeCompact(value)
     }
 
     mutating func encode(_ value: UInt8) throws {

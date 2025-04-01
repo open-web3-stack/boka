@@ -39,14 +39,15 @@ public struct AccumulationOutput {
     public var state: AccumulateState
     public var transfers: [DeferredTransfers]
     public var commitments: Set<Commitment>
+    public var gasUsed: [(seriveIndex: ServiceIndex, gas: Gas)]
 }
 
 /// parallelized accumulation function ∆* output
 public struct ParallelAccumulationOutput {
-    public var gasUsed: Gas
     public var state: AccumulateState
     public var transfers: [DeferredTransfers]
     public var commitments: Set<Commitment>
+    public var gasUsed: [(seriveIndex: ServiceIndex, gas: Gas)]
 }
 
 /// single-service accumulation function ∆1 output
@@ -132,6 +133,9 @@ public protocol Accumulation: ServiceAccounts {
     var accumulationHistory: StateKeys.AccumulationHistoryKey.Value { get set }
 }
 
+public typealias AccumulationStats = [ServiceIndex: (Gas, UInt32)]
+public typealias TransfersStats = [ServiceIndex: (UInt32, Gas)]
+
 extension Accumulation {
     /// single-service accumulate function ∆1
     private mutating func singleAccumulate(
@@ -154,10 +158,12 @@ extension Accumulation {
             for result in report.results where result.serviceIndex == service {
                 gas += result.gasRatio
                 arguments.append(AccumulateArguments(
-                    output: result.output,
-                    paylaodHash: result.payloadHash,
                     packageHash: report.packageSpecification.workPackageHash,
-                    authorizationOutput: report.authorizationOutput
+                    segmentRoot: report.packageSpecification.segmentRoot,
+                    authorizerHash: report.authorizerHash,
+                    authorizationOutput: report.authorizationOutput,
+                    payloadHash: result.payloadHash,
+                    workOutput: result.output
                 ))
             }
         }
@@ -189,7 +195,7 @@ extension Accumulation {
         timeslot: TimeslotIndex
     ) async throws -> ParallelAccumulationOutput {
         var services = [ServiceIndex]()
-        var gasUsed = Gas(0)
+        var gasUsed: [(seriveIndex: ServiceIndex, gas: Gas)] = []
         var transfers: [DeferredTransfers] = []
         var commitments = Set<Commitment>()
         var newPrivilegedServices: PrivilegedServices?
@@ -234,7 +240,7 @@ extension Accumulation {
                 entropy: entropy,
                 timeslot: timeslot
             )
-            gasUsed += singleOutput.gasUsed
+            gasUsed.append((service, singleOutput.gasUsed))
 
             if let commitment = singleOutput.commitment {
                 commitments.insert(Commitment(service: service, hash: commitment))
@@ -261,15 +267,15 @@ extension Accumulation {
         }
 
         return ParallelAccumulationOutput(
-            gasUsed: gasUsed,
             state: AccumulateState(
-                accounts: state.accounts,
+                accounts: accountsRef,
                 validatorQueue: newValidatorQueue ?? validatorQueue,
                 authorizationQueue: newAuthorizationQueue ?? authorizationQueue,
                 privilegedServices: newPrivilegedServices ?? privilegedServices
             ),
             transfers: transfers,
-            commitments: commitments
+            commitments: commitments,
+            gasUsed: gasUsed
         )
     }
 
@@ -303,7 +309,8 @@ extension Accumulation {
                 numAccumulated: 0,
                 state: state,
                 transfers: [],
-                commitments: Set()
+                commitments: Set(),
+                gasUsed: []
             )
         } else {
             logger.debug("[outer] can accumulate until index: \(i)")
@@ -321,7 +328,7 @@ extension Accumulation {
                 state: parallelOutput.state,
                 workReports: Array(workReports[i ..< workReports.count]),
                 privilegedGas: [:],
-                gasLimit: gasLimit - parallelOutput.gasUsed,
+                gasLimit: gasLimit - parallelOutput.gasUsed.reduce(Gas(0)) { $0 + $1.gas },
                 entropy: entropy,
                 timeslot: timeslot
             )
@@ -329,7 +336,8 @@ extension Accumulation {
                 numAccumulated: i + outerOutput.numAccumulated,
                 state: outerOutput.state,
                 transfers: parallelOutput.transfers + outerOutput.transfers,
-                commitments: parallelOutput.commitments.union(outerOutput.commitments)
+                commitments: parallelOutput.commitments.union(outerOutput.commitments),
+                gasUsed: parallelOutput.gasUsed + outerOutput.gasUsed
             )
         }
     }
@@ -428,7 +436,7 @@ extension Accumulation {
         timeslot: TimeslotIndex,
         prevTimeslot: TimeslotIndex,
         entropy: Data32
-    ) async throws -> Data32 {
+    ) async throws -> (root: Data32, AccumulationStats, TransfersStats) {
         let index = Int(timeslot) %% config.value.epochLength
 
         logger.debug("available reports (\(availableReports.count)): \(availableReports.map(\.packageSpecification.workPackageHash))")
@@ -461,19 +469,23 @@ extension Accumulation {
         validatorQueue = accumulateOutput.state.validatorQueue
         privilegedServices = accumulateOutput.state.privilegedServices
 
-        // transfers
+        // transfers execution + transfers statistics
         var transferGroups = [ServiceIndex: [DeferredTransfers]]()
+        var transfersStats = TransfersStats()
         for transfer in accumulateOutput.transfers {
             transferGroups[transfer.destination, default: []].append(transfer)
         }
-        for (service, transfers) in transferGroups {
-            try await onTransfer(
+        for (service, transfers) in transferGroups.sorted(by: { $0.key < $1.key }) {
+            let gasUsed = try await onTransfer(
                 config: config,
                 serviceIndex: service,
                 serviceAccounts: accountsMutRef,
                 timeslot: timeslot,
                 transfers: transfers
             )
+            let count = UInt32(transfers.count)
+            if count == 0 { continue }
+            transfersStats[service] = (count, gasUsed)
         }
 
         self = accountsMutRef.value as! Self
@@ -505,7 +517,7 @@ extension Accumulation {
         let commitmentsSorted = accumulateOutput.commitments.sorted { $0.serviceIndex < $1.serviceIndex }
         logger.debug("accumulation commitments sorted: \(commitmentsSorted)")
 
-        // accumulate root
+        // get accumulate root
         let nodes = try commitmentsSorted.map { try JamEncoder.encode($0.serviceIndex) + JamEncoder.encode($0.hash) }
 
         logger.debug("accumulation commitments encoded: \(nodes.map { $0.toHexString() })")
@@ -514,6 +526,24 @@ extension Accumulation {
 
         logger.debug("accumulation root: \(root)")
 
-        return root
+        // get accumulation statistics
+        var accumulateStats = AccumulationStats()
+        for (service, _) in accumulateOutput.gasUsed {
+            if accumulateStats[service] != nil { continue }
+
+            let num = accumulated.filter { report in
+                report.results.contains { $0.serviceIndex == service }
+            }.count
+
+            if num == 0 { continue }
+
+            let gasUsed = accumulateOutput.gasUsed
+                .filter { $0.seriveIndex == service }
+                .reduce(Gas(0)) { $0 + $1.gas }
+
+            accumulateStats[service] = (gasUsed, UInt32(num))
+        }
+
+        return (root, accumulateStats, transfersStats)
     }
 }
