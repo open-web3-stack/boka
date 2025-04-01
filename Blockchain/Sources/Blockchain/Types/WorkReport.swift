@@ -28,6 +28,9 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
         ProtocolConfig.MaxWorkItems
     >
 
+    // g
+    public var authGasUsed: UInt
+
     public init(
         authorizerHash: Data32,
         coreIndex: CoreIndex,
@@ -35,7 +38,8 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
         refinementContext: RefinementContext,
         packageSpecification: AvailabilitySpecifications,
         lookup: [Data32: Data32],
-        results: ConfigLimitedSizeArray<WorkResult, ProtocolConfig.Int1, ProtocolConfig.MaxWorkItems>
+        results: ConfigLimitedSizeArray<WorkResult, ProtocolConfig.Int1, ProtocolConfig.MaxWorkItems>,
+        authGasUsed: UInt
     ) {
         self.authorizerHash = authorizerHash
         self.coreIndex = coreIndex
@@ -44,6 +48,7 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
         self.packageSpecification = packageSpecification
         self.lookup = lookup
         self.results = results
+        self.authGasUsed = authGasUsed
     }
 }
 
@@ -57,7 +62,8 @@ extension WorkReport: Dummy {
             refinementContext: RefinementContext.dummy(config: config),
             packageSpecification: AvailabilitySpecifications.dummy(config: config),
             lookup: [:],
-            results: try! ConfigLimitedSizeArray(config: config, defaultValue: WorkResult.dummy(config: config))
+            results: try! ConfigLimitedSizeArray(config: config, defaultValue: WorkResult.dummy(config: config)),
+            authGasUsed: 0
         )
     }
 }
@@ -65,17 +71,6 @@ extension WorkReport: Dummy {
 extension WorkReport: Hashable32 {
     public func hash() -> Data32 {
         try! JamEncoder.encode(self).blake2b256hash()
-    }
-}
-
-extension WorkReport: EncodedSize {
-    public var encodedSize: Int {
-        authorizerHash.encodedSize + coreIndex.encodedSize + authorizationOutput.encodedSize +
-            refinementContext.encodedSize + packageSpecification.encodedSize + lookup.encodedSize + results.encodedSize
-    }
-
-    public static var encodeedSizeHint: Int? {
-        nil
     }
 }
 

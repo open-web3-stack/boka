@@ -126,6 +126,13 @@ struct CodecTests {
                 "result": json["output"]!["success"] == nil ? json["output"]! : [
                     "ok": json["output"]!["success"]!,
                 ].json,
+                "refine_load": [
+                    "gas_used": json["gasUsed"]!,
+                    "imports": json["importsCount"]!,
+                    "exports": json["exportsCount"]!,
+                    "extrinsic_count": json["extrinsicsCount"]!,
+                    "extrinsic_size": json["extrinsicsSize"]!,
+                ].json,
             ].json
         }
         if value is WorkItem {
@@ -171,6 +178,7 @@ struct CodecTests {
                 "auth_output": json["authorizationOutput"]!,
                 "results": transform(json["results"]!, value: value.results),
                 "segment_root_lookup": transform(json["lookup"]!, value: value.lookup),
+                "auth_gas_used": json["authGasUsed"]!,
             ].json
         }
         if value is AvailabilitySpecifications {
