@@ -7,6 +7,10 @@ import Utils
 @testable import Networking
 
 struct PeerTests {
+    enum TestError: Error {
+        case invalidResponse
+    }
+
     struct MockRequest<Kind: StreamKindProtocol>: RequestProtocol {
         var kind: Kind
         var data: [Data]
@@ -875,10 +879,11 @@ struct PeerTests {
         }
     }
 
-    @Test("High concurrent request", .disabled("TODO: Fix this test"))
+    @Test
     func highConcurrentRequest() async throws {
-        var peers: [Peer<MockStreamHandler>] = []
         let peersCount = 50
+        var peers: [Peer<MockStreamHandler>] = []
+
         // Create peers
         for i in 0 ..< peersCount {
             let peer = try Peer(
@@ -896,41 +901,48 @@ struct PeerTests {
             peers.append(peer)
         }
 
+        // Establish connections concurrently
         var connections = [Connection<MockStreamHandler>]()
-        for i in 0 ..< peersCount {
-            let peer = peers[i]
-            for j in i + 1 ..< peersCount {
-                let otherPeer = peers[j]
-                let conn = try peer.connect(
-                    to: otherPeer.listenAddress(),
-                    role: .validator
-                )
+        try await withThrowingTaskGroup(of: Connection<MockStreamHandler>.self) { group in
+            for i in 0 ..< peersCount {
+                let peer = peers[i]
+                for j in i + 1 ..< peersCount {
+                    let otherPeer = peers[j]
+                    group.addTask {
+                        try peer.connect(to: otherPeer.listenAddress(), role: .validator)
+                    }
+                }
+            }
+            for try await conn in group {
                 connections.append(conn)
             }
         }
 
-        for conn in connections {
-            try await conn.ready()
-        }
-
-        // Send multiple requests from each peer
-        for (idx, peer) in peers.enumerated() {
-            let tasks = (1 ..< peersCount).map { i in
-                let other = peers[(idx + i) % peers.count]
-                return Task {
-                    let type = i % 2 == 0 ? EphemeralStreamKind.typeA : EphemeralStreamKind.typeB
-                    let messageData = [Data("Concurrent request \(i)".utf8)]
-                    let response = try await peer.getConnection(
-                        publicKey: other.publicKey
-                    )
-                    .unwrap()
-                    .request(MockRequest(kind: type, data: messageData))
-                    #expect(response == [messageData[0] + Data(" response".utf8)], "Peer should receive correct response")
+        // Ensure all connections are ready
+        await withThrowingTaskGroup(of: Void.self) { group in
+            for conn in connections {
+                group.addTask {
+                    try await conn.ready()
                 }
             }
-            // Wait for all tasks to complete
-            for task in tasks {
-                try await task.value
+        }
+
+        // Concurrent requests
+        await withThrowingTaskGroup(of: Void.self) { group in
+            for (idx, peer) in peers.enumerated() {
+                for i in 1 ..< peersCount {
+                    let other = peers[(idx + i) % peers.count]
+                    group.addTask {
+                        let type = i % 2 == 0 ? EphemeralStreamKind.typeA : EphemeralStreamKind.typeB
+                        let messageData = [Data("Concurrent request \(i)".utf8)]
+                        let connection = try peer.getConnection(publicKey: other.publicKey).unwrap()
+                        let response = try await connection.request(MockRequest(kind: type, data: messageData))
+
+                        if response != [messageData[0] + Data(" response".utf8)] {
+                            throw TestError.invalidResponse
+                        }
+                    }
+                }
             }
         }
     }
