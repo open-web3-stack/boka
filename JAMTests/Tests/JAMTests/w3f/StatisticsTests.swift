@@ -51,11 +51,15 @@ struct StatisticsTests {
 
     @Test(arguments: try StatisticsTests.loadTests(variant: .tiny))
     func tinyTests(_ testcase: Testcase) throws {
-        try statisticsTests(testcase, variant: .tiny)
+        withKnownIssue("https://github.com/w3f/jamtestvectors/pull/28#issuecomment-2762410106", isIntermittent: true) {
+            try statisticsTests(testcase, variant: .tiny)
+        }
     }
 
     @Test(arguments: try StatisticsTests.loadTests(variant: .full))
     func fullTests(_ testcase: Testcase) throws {
-        try statisticsTests(testcase, variant: .full)
+        withKnownIssue("https://github.com/w3f/jamtestvectors/pull/28#issuecomment-2762410106", isIntermittent: true) {
+            try statisticsTests(testcase, variant: .full)
+        }
     }
 }
