@@ -3,7 +3,7 @@ import Testing
 
 @testable import Codec
 
-@Suite struct IntegerCodecTests {
+struct IntegerCodecTests {
     static func fixedWidthTestCasesSimple() -> [(UInt8, EncodeMethod, [UInt8])] {
         [
             (42, .fixedWidth(0), []),
@@ -14,7 +14,7 @@ import Testing
     }
 
     @Test(arguments: fixedWidthTestCasesSimple())
-    func fixedWidthTestCasesSimple(testCase: (UInt8, EncodeMethod, [UInt8])) {
+    func fixedWidthTestCasesSimpleTest(testCase: (UInt8, EncodeMethod, [UInt8])) {
         let (value, method, expected) = testCase
         let array = Array(value.encode(method: method))
         #expect(array == expected)
@@ -33,7 +33,7 @@ import Testing
     }
 
     @Test(arguments: fixedWidthTestCasesComplex())
-    func fixedWidthTestCasesComplex(testCase: (UInt64, EncodeMethod, [UInt8])) {
+    func fixedWidthTestCasesComplexTest(testCase: (UInt64, EncodeMethod, [UInt8])) {
         let (value, method, expected) = testCase
         let array = Array(value.encode(method: method))
         #expect(array == expected)

@@ -1,6 +1,41 @@
+import Codec
+import Foundation
 import Utils
 
 public enum RuntimeEvents {
+    public struct StateRequestReceived: Event {
+        public var headerHash: Data32
+        public var startKey: Data31
+        public var endKey: Data31
+        public var maxSize: UInt32
+
+        public init(headerHash: Data32, startKey: Data31, endKey: Data31, maxSize: UInt32) {
+            self.headerHash = headerHash
+            self.startKey = startKey
+            self.endKey = endKey
+            self.maxSize = maxSize
+        }
+
+        public func generateRequestId() throws -> Data32 {
+            try JamEncoder.encode(headerHash, startKey, endKey, maxSize).blake2b256hash()
+        }
+    }
+
+    public struct StateRequestReceivedResponse: Event {
+        public var requestId: Data32
+        public let result: Result<(headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data31, value: Data)]), Error>
+
+        public init(requestId: Data32, headerHash: Data32, boundaryNodes: [BoundaryNode], keyValuePairs: [(key: Data31, value: Data)]) {
+            self.requestId = requestId
+            result = .success((headerHash, boundaryNodes, keyValuePairs))
+        }
+
+        public init(requestId: Data32, error: Error) {
+            self.requestId = requestId
+            result = .failure(error)
+        }
+    }
+
     public struct BlockImported: Event {
         public let block: BlockRef
         public let state: StateRef
@@ -111,7 +146,7 @@ public enum RuntimeEvents {
     }
 
     // NetworkManager -> GuaranteeingService: When a work package bundle is recived via CE134 request
-    public struct WorkPackageBundleRecived: Event {
+    public struct WorkPackageBundleReceived: Event {
         public let coreIndex: CoreIndex
         public let segmentsRootMappings: SegmentsRootMappings
         public let bundle: WorkPackageBundle
@@ -128,7 +163,7 @@ public enum RuntimeEvents {
     }
 
     // GuaranteeingService -> NetworkManager: Response to CE134 request
-    public struct WorkPackageBundleRecivedResponse: Event {
+    public struct WorkPackageBundleReceivedResponse: Event {
         public let workBundleHash: Data32
         public let result: Result<(workReportHash: Data32, signature: Ed25519Signature), Error>
 
@@ -151,7 +186,7 @@ public enum RuntimeEvents {
     }
 
     // NetworkManager -> GuaranteeingService: When a work package bundle response is recived via CE134 reply
-    public struct WorkPackageBundleRecivedReply: Event {
+    public struct WorkPackageBundleReceivedReply: Event {
         public let source: Ed25519PublicKey
         public let workReportHash: Data32
         public let signature: Ed25519Signature
@@ -198,6 +233,221 @@ public enum RuntimeEvents {
             self.workReport = workReport
             self.slot = slot
             self.signatures = signatures
+        }
+    }
+
+    public struct WorkReportRequestReceived: Event {
+        public let workReportHash: Data32
+
+        public init(workReportHash: Data32) {
+            self.workReportHash = workReportHash
+        }
+    }
+
+    public struct ShardDistributionReceived: Event {
+        public var erasureRoot: Data32
+        public var shardIndex: UInt32
+
+        public init(erasureRoot: Data32, shardIndex: UInt32) {
+            self.erasureRoot = erasureRoot
+            self.shardIndex = shardIndex
+        }
+
+        public func generateRequestId() throws -> Data32 {
+            try JamEncoder.encode(erasureRoot, shardIndex).blake2b256hash()
+        }
+    }
+
+    //  Response to shard distribution
+    public struct ShardDistributionReceivedResponse: Event {
+        public var requestId: Data32
+
+        public let result: Result<(bundleShard: Data, segmentShards: [Data], justification: Justification), Error>
+
+        public init(requestId: Data32, bundleShard: Data, segmentShards: [Data], justification: Justification) {
+            self.requestId = requestId
+            result = .success((bundleShard, segmentShards, justification))
+        }
+
+        public init(requestId: Data32, error: Error) {
+            self.requestId = requestId
+            result = .failure(error)
+        }
+    }
+
+    //  Response to work report request
+    public struct WorkReportRequestResponse: Event {
+        public var workReportHash: Data32
+
+        public let result: Result<WorkReport, Error>
+
+        public init(workReportHash: Data32, workReport: WorkReport) {
+            self.workReportHash = workReportHash
+            result = .success(workReport)
+        }
+
+        public init(workReportHash: Data32, error: Error) {
+            self.workReportHash = workReportHash
+            result = .failure(error)
+        }
+    }
+
+    public struct AuditShardRequestReceived: Event {
+        public let erasureRoot: Data32
+        public let shardIndex: UInt32
+
+        public init(erasureRoot: Data32, shardIndex: UInt32) {
+            self.erasureRoot = erasureRoot
+            self.shardIndex = shardIndex
+        }
+
+        public func generateRequestId() throws -> Data32 {
+            try JamEncoder.encode(erasureRoot, shardIndex).blake2b256hash()
+        }
+    }
+
+    public struct AuditShardRequestReceivedResponse: Event {
+        public var requestId: Data32
+
+        public let result: Result<(erasureRoot: Data32, shardIndex: UInt32, bundleShard: Data, justification: Justification), Error>
+
+        public init(requestId: Data32, erasureRoot: Data32, shardIndex: UInt32, bundleShard: Data, justification: Justification) {
+            self.requestId = requestId
+            result = .success((erasureRoot, shardIndex, bundleShard, justification))
+        }
+
+        public init(requestId: Data32, error: Error) {
+            self.requestId = requestId
+            result = .failure(error)
+        }
+    }
+
+    public struct SegmentShardRequestReceived: Event {
+        public let erasureRoot: Data32
+        public let shardIndex: UInt32
+        public let segmentIndices: [UInt16]
+
+        public init(
+            erasureRoot: Data32,
+            shardIndex: UInt32,
+            segmentIndices: [UInt16]
+        ) {
+            self.erasureRoot = erasureRoot
+            self.shardIndex = shardIndex
+            self.segmentIndices = segmentIndices
+        }
+
+        public func generateRequestId() throws -> Data32 {
+            try JamEncoder.encode(erasureRoot, shardIndex, segmentIndices).blake2b256hash()
+        }
+    }
+
+    public struct SegmentShardRequestReceivedResponse: Event {
+        public let requestId: Data32
+        public let result: Result<[SegmentShard], Error>
+
+        public init(
+            requestId: Data32,
+            segments: [SegmentShard]
+        ) {
+            self.requestId = requestId
+            result = .success(segments)
+        }
+
+        public init(
+            requestId: Data32,
+            error: Error
+        ) {
+            self.requestId = requestId
+            result = .failure(error)
+        }
+    }
+
+    public struct AssuranceDistributionReceived: Event {
+        public let headerHash: Data32
+        public let bitfield: ConfigSizeBitString<ProtocolConfig.TotalNumberOfCores>
+        public let signature: Ed25519Signature
+
+        public init(headerHash: Data32, bitfield: ConfigSizeBitString<ProtocolConfig.TotalNumberOfCores>, signature: Ed25519Signature) {
+            self.headerHash = headerHash
+            self.bitfield = bitfield
+            self.signature = signature
+        }
+    }
+
+    public struct PreimageAnnouncementReceived: Event {
+        public let serviceID: UInt32
+        public let hash: Data32
+        public let preimageLength: UInt32
+
+        public init(serviceID: UInt32, hash: Data32, preimageLength: UInt32) {
+            self.serviceID = serviceID
+            self.hash = hash
+            self.preimageLength = preimageLength
+        }
+    }
+
+    public struct PreimageRequestReceived: Event {
+        public let hash: Data32
+
+        public init(hash: Data32) {
+            self.hash = hash
+        }
+    }
+
+    public struct PreimageRequestReceivedResponse: Event {
+        public let hash: Data32
+        public let result: Result<Data, Error>
+
+        public init(hash: Data32, preimage: Data) {
+            self.hash = hash
+            result = .success(preimage)
+        }
+
+        public init(hash: Data32, error: Error) {
+            self.hash = hash
+            result = .failure(error)
+        }
+    }
+
+    public struct JudgementPublicationReceived: Event {
+        public let epochIndex: EpochIndex
+        public let validatorIndex: ValidatorIndex
+        public let validity: UInt8 // 0 = Invalid, 1 = Valid
+        public let workReportHash: Data32
+        public let signature: Ed25519Signature
+
+        public init(
+            epochIndex: EpochIndex,
+            validatorIndex: ValidatorIndex,
+            validity: UInt8,
+            workReportHash: Data32,
+            signature: Ed25519Signature
+        ) {
+            self.epochIndex = epochIndex
+            self.validatorIndex = validatorIndex
+            self.validity = validity
+            self.workReportHash = workReportHash
+            self.signature = signature
+        }
+    }
+
+    public struct AuditAnnouncementReceived: Event {
+        public let headerHash: Data32
+        public let tranche: UInt8
+        public let announcement: Announcement
+        public let evidence: Evidence
+
+        public init(
+            headerHash: Data32,
+            tranche: UInt8,
+            announcement: Announcement,
+            evidence: Evidence
+        ) {
+            self.headerHash = headerHash
+            self.tranche = tranche
+            self.announcement = announcement
+            self.evidence = evidence
         }
     }
 }
