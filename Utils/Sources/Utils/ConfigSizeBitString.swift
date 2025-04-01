@@ -7,7 +7,7 @@ public enum ConfigSizeBitStringError: Error {
     case invalidIndex
 }
 
-public struct ConfigSizeBitString<TBitLength: ReadInt>: Equatable, Sendable, Codable {
+public struct ConfigSizeBitString<TBitLength: ReadInt>: Equatable, Sendable, Codable, Hashable {
     /// Byte storage for bits.
     private var bytes: Data
     /// Bit length

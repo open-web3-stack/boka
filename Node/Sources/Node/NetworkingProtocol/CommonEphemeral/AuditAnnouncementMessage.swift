@@ -45,7 +45,7 @@ extension AuditAnnouncementMessage: CEMessage {
         let headerHash = try decoder.decode(Data32.self)
         let tranche = try decoder.decode(UInt8.self)
         let announcement = try decoder.decode(Announcement.self)
-        let evidence = try Evidence.decode(data: data[1], tranche: tranche, config: config)
+        let evidence = try JamDecoder(data: data[1], config: config).decode(Evidence.self)
         return AuditAnnouncementMessage(
             headerHash: headerHash,
             tranche: tranche,

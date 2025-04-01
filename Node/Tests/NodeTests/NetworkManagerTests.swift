@@ -536,7 +536,11 @@ struct NetworkManagerTests {
     @Test
     func testHandleAssuranceDistributionMessage() async throws {
         let testHeaderHash = Data32(repeating: 1)
-        let testBitfield = Data43(repeating: 0xFF) // 43 bytes bitfield
+        let testBitfield = try ConfigSizeBitString<ProtocolConfig.TotalNumberOfCores>(
+            config: services.config,
+            data: Data(repeating: 0, count: (services.config.value.totalNumberOfCores + 7) >> 3)
+        )
+
         let testSignature = Ed25519Signature(repeating: 2)
 
         let requestMessage = CERequest.assuranceDistribution(AssuranceDistributionMessage(

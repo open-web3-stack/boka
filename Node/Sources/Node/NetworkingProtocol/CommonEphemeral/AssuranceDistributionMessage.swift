@@ -8,7 +8,7 @@ public struct AssuranceDistributionMessage: Sendable, Equatable, Codable, Hashab
     public let bitfield: ConfigSizeBitString<ProtocolConfig.TotalNumberOfCores>
     public let signature: Ed25519Signature
 
-    public init(headerHash: Data32, bitfield: Data43, signature: Ed25519Signature) {
+    public init(headerHash: Data32, bitfield: ConfigSizeBitString<ProtocolConfig.TotalNumberOfCores>, signature: Ed25519Signature) {
         self.headerHash = headerHash
         self.bitfield = bitfield
         self.signature = signature

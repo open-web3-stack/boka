@@ -1,7 +1,7 @@
 import Codec
 import Utils
 
-public enum Evidence: Codable, Sendable, Equatable, Hashable {
+public enum Evidence: Sendable, Equatable, Hashable {
     public struct NoShow: Codable, Sendable, Equatable, Hashable {
         public let validatorIndex: ValidatorIndex
         public let previousAnnouncement: Announcement
@@ -26,16 +26,66 @@ public enum Evidence: Codable, Sendable, Equatable, Hashable {
     case subsequentTranche([WorkReportEvidence])
 }
 
-extension Evidence {
-    public static func decode(data: Data, tranche: UInt8, config: ProtocolConfigRef) throws -> Evidence {
-        let decoder = JamDecoder(data: data, config: config)
-        return try decode(decoder: decoder, tranche: tranche, config: config)
+extension Evidence: Codable {
+    public init(from decoder: Decoder) throws {
+        if decoder.isJamCodec {
+            var container = try decoder.unkeyedContainer()
+
+            if let signature = try? container.decode(BandersnatchSignature.self) {
+                self = .firstTranche(signature)
+                return
+            }
+            container = try decoder.unkeyedContainer()
+            if let evidences = try? container.decode([WorkReportEvidence].self) {
+                self = .subsequentTranche(evidences)
+                return
+            }
+
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Could not decode Evidence as either firstTranche or subsequentTranche"
+                )
+            )
+        } else {
+            let container = try decoder.singleValueContainer()
+
+            if let signature = try? container.decode(BandersnatchSignature.self) {
+                self = .firstTranche(signature)
+                return
+            }
+
+            if let evidences = try? container.decode([WorkReportEvidence].self) {
+                self = .subsequentTranche(evidences)
+                return
+            }
+
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Could not decode Evidence as either BandersnatchSignature or [WorkReportEvidence]"
+                )
+            )
+        }
     }
 
-    public static func decode(decoder: JamDecoder, tranche: UInt8, config _: ProtocolConfigRef) throws -> Evidence {
-        if tranche == 0 {
-            return try .firstTranche(decoder.decode(BandersnatchSignature.self))
+    public func encode(to encoder: Encoder) throws {
+        if encoder.isJamCodec {
+            var container = encoder.unkeyedContainer()
+            switch self {
+            case let .firstTranche(signature):
+                try container.encode(signature)
+            case let .subsequentTranche(evidences):
+                try container.encode(evidences)
+            }
+        } else {
+            var container = encoder.singleValueContainer()
+            switch self {
+            case let .firstTranche(signature):
+                try container.encode(signature)
+            case let .subsequentTranche(evidences):
+                try container.encode(evidences)
+            }
         }
-        return try .subsequentTranche(decoder.decode([WorkReportEvidence].self))
     }
 }
