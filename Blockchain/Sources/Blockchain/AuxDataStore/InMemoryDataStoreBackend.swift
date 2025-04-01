@@ -1,3 +1,4 @@
+import Foundation
 import Utils
 
 public actor InMemoryDataStoreBackend {
@@ -9,6 +10,12 @@ public actor InMemoryDataStoreBackend {
 
     // erasure root + index => segment data
     private var chunks: [Data32: [UInt16: Data4104]] = [:]
+
+    // erasure root => timestamp
+    private var timestamps: [Data32: Date] = [:]
+
+    // erasure root => Paged-Proofs metadata
+    private var pagedProofsMetadata: [Data32: Data] = [:]
 
     public init() {}
 }
@@ -44,6 +51,22 @@ extension InMemoryDataStoreBackend: DataStoreProtocol {
 
     public func set(data: Data4104, erasureRoot: Data32, index: UInt16) async throws {
         chunks[erasureRoot, default: [:]][index] = data
+    }
+
+    public func setTimestamp(erasureRoot: Data32, timestamp: Date) async throws {
+        timestamps[erasureRoot] = timestamp
+    }
+
+    public func getTimestamp(erasureRoot: Data32) async throws -> Date? {
+        timestamps[erasureRoot]
+    }
+
+    public func setPagedProofsMetadata(erasureRoot: Data32, metadata: Data) async throws {
+        pagedProofsMetadata[erasureRoot] = metadata
+    }
+
+    public func getPagedProofsMetadata(erasureRoot: Data32) async throws -> Data? {
+        pagedProofsMetadata[erasureRoot]
     }
 }
 
