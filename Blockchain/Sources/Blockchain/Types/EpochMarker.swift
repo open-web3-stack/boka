@@ -34,7 +34,7 @@ extension EpochMarker: Dummy {
         EpochMarker(
             entropy: Data32(),
             ticketsEntropy: Data32(),
-            validators: try! ConfigFixedSizeArray(config: config)
+            validators: try! ConfigFixedSizeArray(config: config, defaultValue: Keys(bandersnatch: Data32(), ed25519: Data32()))
         )
     }
 }
