@@ -18,6 +18,6 @@ public struct ExtensionNode: Codable, Sendable {
 }
 
 public struct LeafNode: Codable, Sendable {
-    public let key: Data31 // [u8:31]
+    public let key: Data31
     public let value: Data
 }
