@@ -30,11 +30,11 @@ public struct WorkResult: Sendable, Equatable, Codable {
     // e: the number of segments exported into the Segments DA
     public var exportsCount: UInt
 
-    // x: the number of the extrinsics used in computing the workload
-    public var extrinsicsCount: UInt
-
     // z: the total size in octets of the extrinsics used in computing the workload
     public var extrinsicsSize: UInt
+
+    // x: the number of the extrinsics used in computing the workload
+    public var extrinsicsCount: UInt
 
     public init(
         serviceIndex: ServiceIndex,
