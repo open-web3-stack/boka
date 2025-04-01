@@ -20,6 +20,9 @@ struct ReportsTestcaseState: Codable, Equatable {
         ProtocolConfig.TotalNumberOfCores
     >
     @CodingAs<SortedKeyValues<ServiceIndex, ServiceAccountDetails>> var services: [ServiceIndex: ServiceAccountDetails]
+    // NOTE: we are not updating stats in guaranteeing STF
+    var coresStatistics: ConfigFixedSizeArray<CoreStatistics, ProtocolConfig.TotalNumberOfCores>
+    @CodingAs<SortedKeyValues<ServiceIndex, ServiceStatistics>> var servicesStatistics: [ServiceIndex: ServiceStatistics]
 }
 
 struct ReportsInput: Codable {
@@ -114,7 +117,10 @@ struct ReportsTests {
                     offenders: state.offenders.sorted(),
                     recentHistory: state.recentHistory,
                     coreAuthorizationPool: state.coreAuthorizationPool,
-                    services: state.services
+                    services: state.services,
+                    // NOTE: just use testcase postState since we don't udpate stats in guaranteeing STF
+                    coresStatistics: testcase.postState.coresStatistics,
+                    servicesStatistics: testcase.postState.servicesStatistics
                 )
                 let expectedOutput = ReportsOutput(
                     reported: reported.map { report in

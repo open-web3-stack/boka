@@ -18,7 +18,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     /// C = 341: The total number of cores.
     public var totalNumberOfCores: Int
 
-    /// D = 28, 800: The period in timeslots after which an unreferenced preimage may be expunged.
+    /// D = 19,200: The period in timeslots after which an unreferenced preimage may be expunged.
     public var preimagePurgePeriod: Int
 
     /// E = 600: The length of an epoch in timeslots.
@@ -43,7 +43,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     /// H = 8: The size of recent history, in blocks.
     public var recentHistorySize: Int
 
-    /// I = 4: The maximum amount of work items in a package.
+    /// I = 16: The maximum amount of work items in a package.
     public var maxWorkItems: Int
 
     /// J = 8: The maximum sum of dependency items in a work-report.
@@ -70,6 +70,9 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     /// R = 10: The rotation period of validator-core assignments, in timeslots.
     public var coreAssignmentRotationPeriod: Int
 
+    /// T = 128: The maximum number of extrinsics in a work-package.
+    public var maxWorkPackageExtrinsics: Int
+
     /// U = 5: The period in timeslots after which reported but unavailable work may be replaced.
     public var preimageReplacementPeriod: Int
 
@@ -82,8 +85,8 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     /// WE = 684: The basic size of our erasure-coded pieces.
     public var erasureCodedPieceSize: Int
 
-    /// WM = 2^11: The maximum number of entries in a work-package manifest.
-    public var maxWorkPackageManifestEntries: Int
+    /// WM = 3,072: The maximum number of imports and exports in a work-package.
+    public var maxWorkPackageImportsExports: Int
 
     /// WB = 12 * 2^20: The maximum size of an encoded work-package together with its extrinsic data and import implications, in octets.
     public var maxEncodedWorkPackageSize: Int
@@ -139,11 +142,12 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         slotPeriodSeconds: Int,
         maxAuthorizationsQueueItems: Int,
         coreAssignmentRotationPeriod: Int,
+        maxWorkPackageExtrinsics: Int,
         maxServiceCodeSize: Int,
         preimageReplacementPeriod: Int,
         totalNumberOfValidators: Int,
         erasureCodedPieceSize: Int,
-        maxWorkPackageManifestEntries: Int,
+        maxWorkPackageImportsExports: Int,
         maxEncodedWorkPackageSize: Int,
         segmentSize: Int,
         maxWorkReportOutputSize: Int,
@@ -177,11 +181,12 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         self.slotPeriodSeconds = slotPeriodSeconds
         self.maxAuthorizationsQueueItems = maxAuthorizationsQueueItems
         self.coreAssignmentRotationPeriod = coreAssignmentRotationPeriod
+        self.maxWorkPackageExtrinsics = maxWorkPackageExtrinsics
         self.maxServiceCodeSize = maxServiceCodeSize
         self.preimageReplacementPeriod = preimageReplacementPeriod
         self.totalNumberOfValidators = totalNumberOfValidators
         self.erasureCodedPieceSize = erasureCodedPieceSize
-        self.maxWorkPackageManifestEntries = maxWorkPackageManifestEntries
+        self.maxWorkPackageImportsExports = maxWorkPackageImportsExports
         self.maxEncodedWorkPackageSize = maxEncodedWorkPackageSize
         self.segmentSize = segmentSize
         self.maxWorkReportOutputSize = maxWorkReportOutputSize
@@ -252,6 +257,8 @@ extension ProtocolConfig {
                 ? other.maxAuthorizationsQueueItems : maxAuthorizationsQueueItems,
             coreAssignmentRotationPeriod: other.coreAssignmentRotationPeriod != 0
                 ? other.coreAssignmentRotationPeriod : coreAssignmentRotationPeriod,
+            maxWorkPackageExtrinsics: other.maxWorkPackageExtrinsics != 0
+                ? other.maxWorkPackageExtrinsics : maxWorkPackageExtrinsics,
             maxServiceCodeSize: other.maxServiceCodeSize != 0
                 ? other.maxServiceCodeSize : maxServiceCodeSize,
             preimageReplacementPeriod: other.preimageReplacementPeriod != 0
@@ -260,8 +267,8 @@ extension ProtocolConfig {
                 ? other.totalNumberOfValidators : totalNumberOfValidators,
             erasureCodedPieceSize: other.erasureCodedPieceSize != 0
                 ? other.erasureCodedPieceSize : erasureCodedPieceSize,
-            maxWorkPackageManifestEntries: other.maxWorkPackageManifestEntries != 0
-                ? other.maxWorkPackageManifestEntries : maxWorkPackageManifestEntries,
+            maxWorkPackageImportsExports: other.maxWorkPackageImportsExports != 0
+                ? other.maxWorkPackageImportsExports : maxWorkPackageImportsExports,
             maxEncodedWorkPackageSize: other.maxEncodedWorkPackageSize != 0
                 ? other.maxEncodedWorkPackageSize : maxEncodedWorkPackageSize,
             segmentSize: other.segmentSize != 0 ? other.segmentSize : segmentSize,
@@ -338,6 +345,9 @@ extension ProtocolConfig {
         coreAssignmentRotationPeriod = try decode(
             .coreAssignmentRotationPeriod, defaultValue: 0, required: required
         )
+        maxWorkPackageExtrinsics = try decode(
+            .maxWorkPackageExtrinsics, defaultValue: 0, required: required
+        )
         maxServiceCodeSize = try decode(.maxServiceCodeSize, defaultValue: 0, required: required)
         preimageReplacementPeriod = try decode(
             .preimageReplacementPeriod, defaultValue: 0, required: required
@@ -346,8 +356,8 @@ extension ProtocolConfig {
             .totalNumberOfValidators, defaultValue: 0, required: required
         )
         erasureCodedPieceSize = try decode(.erasureCodedPieceSize, defaultValue: 0, required: required)
-        maxWorkPackageManifestEntries = try decode(
-            .maxWorkPackageManifestEntries, defaultValue: 0, required: required
+        maxWorkPackageImportsExports = try decode(
+            .maxWorkPackageImportsExports, defaultValue: 0, required: required
         )
         maxEncodedWorkPackageSize = try decode(
             .maxEncodedWorkPackageSize, defaultValue: 0, required: required
@@ -543,6 +553,13 @@ extension ProtocolConfig {
         }
     }
 
+    public enum MaxWorkPackageExtrinsics: ReadInt {
+        public typealias TConfig = ProtocolConfigRef
+        public static func read(config: ProtocolConfigRef) -> Int {
+            config.value.maxWorkPackageExtrinsics
+        }
+    }
+
     public enum MaxServiceCodeSize: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
@@ -571,10 +588,10 @@ extension ProtocolConfig {
         }
     }
 
-    public enum MaxWorkPackageManifestEntries: ReadInt {
+    public enum MaxWorkPackageImportsExports: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
-            config.value.maxWorkPackageManifestEntries
+            config.value.maxWorkPackageImportsExports
         }
     }
 

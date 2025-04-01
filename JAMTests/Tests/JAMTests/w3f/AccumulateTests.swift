@@ -180,11 +180,11 @@ struct AccumulateTests {
         }
 
         switch result {
-        case let .success(root):
+        case let .success(content):
             switch testcase.output {
             case let .ok(expectedRoot):
                 // NOTE: timeslot and entropy are not changed by accumulate
-                #expect(root == expectedRoot, "root mismatch")
+                #expect(content.root == expectedRoot, "root mismatch")
                 #expect(fullState.accumulationQueue == testcase.postState.accumulationQueue, "AccumulationQueue mismatch")
                 #expect(fullState.accumulationHistory == testcase.postState.accumulationHistory, "AccumulationHistory mismatch")
                 #expect(fullState.privilegedServices == testcase.postState.privilegedServices, "PrivilegedServices mismatch")

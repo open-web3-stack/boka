@@ -16,23 +16,25 @@ public func refine(
     importSegments: [[Data4104]],
     /// Export segment offset
     exportSegmentOffset: UInt64
-) async throws -> (result: Result<Data, WorkResultError>, exports: [Data4104]) {
+) async throws -> (result: Result<Data, WorkResultError>, exports: [Data4104], gasUsed: Gas) {
     let workItem = workPackage.workItems[workItemIndex]
     let service = workItem.serviceIndex
 
-    let codeBlob = try await serviceAccounts.historicalLookup(
+    let preimage = try await serviceAccounts.historicalLookup(
         serviceAccount: service,
         timeslot: workPackage.context.lookupAnchor.timeslot,
         preimageHash: workItem.codeHash
     )
 
-    guard let codeBlob, try await serviceAccounts.get(serviceAccount: service) != nil else {
-        return (.failure(.invalidCode), [])
+    guard let preimage, try await serviceAccounts.get(serviceAccount: service) != nil else {
+        return (.failure(.invalidCode), [], Gas(0))
     }
 
-    guard codeBlob.count <= config.value.maxServiceCodeSize else {
-        return (.failure(.codeTooLarge), [])
+    guard preimage.count <= config.value.maxServiceCodeSize else {
+        return (.failure(.codeTooLarge), [], Gas(0))
     }
+
+    let codeBlob = try CodeAndMeta(data: preimage).codeBlob
 
     let argumentData = try await JamEncoder.encode(
         service,
@@ -53,7 +55,7 @@ public func refine(
         authorizerOutput: authorizerOutput
     )
 
-    let (exitReason, _, output) = await invokePVM(
+    let (exitReason, gasUsed, output) = await invokePVM(
         config: config,
         blob: codeBlob,
         pc: 0,
@@ -64,14 +66,14 @@ public func refine(
 
     switch exitReason {
     case .outOfGas:
-        return (.failure(.outOfGas), [])
+        return (.failure(.outOfGas), [], gasUsed)
     case .panic(.trap):
-        return (.failure(.panic), [])
+        return (.failure(.panic), [], gasUsed)
     default:
         if let output {
-            return (.success(output), ctx.context.exports)
+            return (.success(output), ctx.context.exports, gasUsed)
         } else {
-            return (.failure(.panic), [])
+            return (.failure(.panic), [], gasUsed)
         }
     }
 }

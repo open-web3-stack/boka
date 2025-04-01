@@ -120,6 +120,19 @@ private class DecodeContext: Decoder {
         }
     }
 
+    fileprivate func decodeCompact<T: FixedWidthInteger>(codingPath: @autoclosure () -> [CodingKey]) throws -> T {
+        let value = try input.decodeUInt64()
+        guard let res = T(exactly: value) else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: codingPath(),
+                    debugDescription: "Invalid compact value"
+                )
+            )
+        }
+        return res
+    }
+
     fileprivate func decodeData(codingPath: @autoclosure () -> [CodingKey]) throws -> Data {
         let length = try input.decodeUInt64()
         // sanity check: length must be less than 4gb
@@ -279,10 +292,7 @@ private struct JamKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPr
     }
 
     func decode(_: UInt.Type, forKey key: K) throws -> UInt {
-        guard let value = try UInt(exactly: decode(UInt64.self, forKey: key)) else {
-            throw DecodingError.dataCorruptedError(forKey: key, in: self, debugDescription: "UInt out of range")
-        }
-        return value
+        try decoder.decodeCompact(codingPath: codingPath + [key])
     }
 
     func decode(_: UInt8.Type, forKey _: K) throws -> UInt8 {
@@ -412,9 +422,7 @@ private struct JamUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
 
     mutating func decode(_: UInt.Type) throws -> UInt {
-        guard let value = try UInt(exactly: decode(UInt64.self)) else {
-            throw DecodingError.dataCorruptedError(in: self, debugDescription: "UInt out of range")
-        }
+        let value: UInt = try decoder.decodeCompact(codingPath: codingPath)
         currentIndex += 1
         return value
     }
@@ -516,10 +524,7 @@ private struct JamSingleValueDecodingContainer: SingleValueDecodingContainer {
     }
 
     func decode(_: UInt.Type) throws -> UInt {
-        guard let value = try UInt(exactly: decode(UInt64.self)) else {
-            throw DecodingError.dataCorruptedError(in: self, debugDescription: "UInt out of range")
-        }
-        return value
+        try decoder.decodeCompact(codingPath: codingPath)
     }
 
     func decode(_: UInt8.Type) throws -> UInt8 {
