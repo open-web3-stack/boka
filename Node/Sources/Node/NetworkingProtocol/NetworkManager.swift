@@ -178,7 +178,7 @@ public final class NetworkManager: Sendable {
     }
 
     private func on(safroleTicketsGenerated event: RuntimeEvents.SafroleTicketsGenerated) async {
-        logger.trace("sending tickets", metadata: ["epochIndex": "\(event.epochIndex)"])
+        logger.trace("sending tickets1", metadata: ["epochIndex": "\(event.epochIndex)"])
         for ticket in event.items {
             await broadcast(
                 to: .safroleStep1Validator,
@@ -234,7 +234,7 @@ public final class NetworkManager: Sendable {
             let workReportHash = try decoder.decode(Data32.self)
             let signature = try decoder.decode(Ed25519Signature.self)
 
-            blockchain.publish(event: RuntimeEvents.WorkPackageBundleRecivedReply(
+            blockchain.publish(event: RuntimeEvents.WorkPackageBundleReceivedReply(
                 source: target,
                 workReportHash: workReportHash,
                 signature: signature
@@ -311,6 +311,22 @@ struct HandlerImpl: NetworkProtocolHandler {
                 }
             }
             return [encoder.data]
+        case let .stateRequest(message):
+            try blockchain
+                .publish(
+                    event: RuntimeEvents
+                        .StateRequestReceived(
+                            headerHash: message.headerHash,
+                            startKey: message.startKey,
+                            endKey: message.endKey,
+                            maxSize: message.maxSize
+                        )
+                )
+            // TODO: waitfor StateRequestReceivedResponse
+            // let resp = try await blockchain.waitFor(RuntimeEvents.StateRequestReceivedResponse.self) { event in
+            //
+            // }
+            return []
         case let .safroleTicket1(message):
             blockchain.publish(event: RuntimeEvents.SafroleTicketsReceived(
                 items: [
@@ -348,13 +364,13 @@ struct HandlerImpl: NetworkProtocolHandler {
             blockchain
                 .publish(
                     event: RuntimeEvents
-                        .WorkPackageBundleRecived(
+                        .WorkPackageBundleReceived(
                             coreIndex: message.coreIndex,
                             bundle: message.bundle,
                             segmentsRootMappings: message.segmentsRootMappings
                         )
                 )
-            let resp = try await blockchain.waitFor(RuntimeEvents.WorkPackageBundleRecivedResponse.self) { event in
+            let resp = try await blockchain.waitFor(RuntimeEvents.WorkPackageBundleReceivedResponse.self) { event in
                 hash == event.workBundleHash
             }
             let (workReportHash, signature) = try resp.result.get()
@@ -367,6 +383,107 @@ struct HandlerImpl: NetworkProtocolHandler {
                             workReport: message.workReport,
                             slot: message.slot,
                             signatures: message.signatures
+                        )
+                )
+            return []
+        case let .workReportRequest(message):
+            blockchain.publish(event: RuntimeEvents.WorkReportRequestReceived(workReportHash: message.workReportHash))
+            // TODO: waitfor WorkReportRequestResponse
+            // let resp = try await blockchain.waitFor(RuntimeEvents.WorkReportRequestResponse.self) { event in
+            //    message.workReportHash == event.workReport.hash()
+            // }
+            return []
+        case let .shardDistribution(message):
+            blockchain
+                .publish(event: RuntimeEvents.ShardDistributionReceived(erasureRoot: message.erasureRoot, shardIndex: message.shardIndex))
+            // TODO: waitfor ShardDistributionReceivedResponse
+            // let resp = try await blockchain.waitFor(RuntimeEvents.ShardDistributionReceivedResponse.self) { event in
+            //
+            // }
+            return []
+        case let .auditShardRequest(message):
+            blockchain
+                .publish(event: RuntimeEvents.AuditShardRequestReceived(erasureRoot: message.erasureRoot, shardIndex: message.shardIndex))
+            // TODO: waitfor AuditShardRequestReceivedResponse
+            // let resp = try await blockchain.waitFor(RuntimeEvents.AuditShardRequestReceivedResponse.self) { event in
+            //
+            // }
+            return []
+        case let .segmentShardRequest1(message):
+            blockchain
+                .publish(
+                    event: RuntimeEvents
+                        .SegmentShardRequestReceived(
+                            erasureRoot: message.erasureRoot,
+                            shardIndex: message.shardIndex,
+                            segmentIndices: message.segmentIndices
+                        )
+                )
+            // TODO: waitfor AuditShardRequestReceivedResponse
+            // let resp = try await blockchain.waitFor(RuntimeEvents.AuditShardRequestReceivedResponse.self) { event in
+            //
+            // }
+            return []
+        case let .segmentShardRequest2(message):
+            blockchain
+                .publish(
+                    event: RuntimeEvents
+                        .SegmentShardRequestReceived(
+                            erasureRoot: message.erasureRoot,
+                            shardIndex: message.shardIndex,
+                            segmentIndices: message.segmentIndices
+                        )
+                )
+            // TODO: waitfor AuditShardRequestReceivedResponse
+            return []
+        case let .assuranceDistribution(message):
+            blockchain
+                .publish(
+                    event: RuntimeEvents
+                        .AssuranceDistributionReceived(
+                            headerHash: message.headerHash,
+                            bitfield: message.bitfield,
+                            signature: message.signature
+                        )
+                )
+            return []
+        case let .preimageAnnouncement(message):
+            blockchain
+                .publish(
+                    event: RuntimeEvents
+                        .PreimageAnnouncementReceived(
+                            serviceID: message.serviceID,
+                            hash: message.hash,
+                            preimageLength: message.preimageLength
+                        )
+                )
+            return []
+        case let .preimageRequest(message):
+            blockchain.publish(event: RuntimeEvents.PreimageRequestReceived(hash: message.hash))
+            // TODO: waitfor PreimageRequestReceivedResponse
+            return []
+        case let .judgementPublication(message):
+            blockchain
+                .publish(
+                    event: RuntimeEvents
+                        .JudgementPublicationReceived(
+                            epochIndex: message.epochIndex,
+                            validatorIndex: message.validatorIndex,
+                            validity: message.validity,
+                            workReportHash: message.workReportHash,
+                            signature: message.signature
+                        )
+                )
+            return []
+        case let .auditAnnouncement(message):
+            blockchain
+                .publish(
+                    event: RuntimeEvents
+                        .AuditAnnouncementReceived(
+                            headerHash: message.headerHash,
+                            tranche: message.tranche,
+                            announcement: message.announcement,
+                            evidence: message.evidence
                         )
                 )
             return []
