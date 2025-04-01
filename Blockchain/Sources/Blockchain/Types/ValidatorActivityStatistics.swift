@@ -1,6 +1,68 @@
 import Codec
 import Utils
 
+public struct CoreStatistics: Sendable, Equatable, Codable {
+    // y: total actual amount of gas used during refinement
+    public var gasUsed: UInt
+
+    // i: total number of segments imported from the Segments DA
+    public var importsCount: UInt
+
+    // e: total number of segments exported into the Segments DA
+    public var exportsCount: UInt
+
+    // x: total number of the extrinsics used in computing the workload
+    public var extrinsicsCount: UInt
+
+    // z: total size in octets of the extrinsics used in computing the workload
+    public var extrinsicsSize: UInt
+
+    // b: total package data length
+    public var packageSize: UInt
+
+    // d: total incoming data size (package length + total segments size)
+    public var dataSize: UInt
+
+    // p: total number of assurance
+    public var assuranceCount: UInt
+}
+
+public struct ServiceStatistics: Sendable, Equatable, Codable {
+    public struct CountAndGas: Sendable, Equatable, Codable {
+        public var count: UInt
+        public var gasUsed: UInt
+    }
+
+    public struct PreimagesAndSize: Sendable, Equatable, Codable {
+        public var count: UInt
+        public var size: UInt
+    }
+
+    // i: total number of segments imported from the Segments DA
+    public var importsCount: UInt
+
+    // e: total number of segments exported into the Segments DA
+    public var exportsCount: UInt
+
+    // x: total number of the extrinsics used in computing the workload
+    public var extrinsicsCount: UInt
+
+    // z: total size in octets of the extrinsics used in computing the workload
+    public var extrinsicsSize: UInt
+
+    // r: total number of reports and gas used
+    public var reports: CountAndGas
+
+    // p: total number of preimages and size
+    public var preimages: PreimagesAndSize
+
+    // a: accumulate count and gas used
+    public var accumulates: CountAndGas
+
+    // t: tansfer count and gas used
+    public var transfers: CountAndGas
+}
+
 public struct ValidatorActivityStatistics: Sendable, Equatable, Codable {
     public struct ValidatorStatistics: Sendable, Equatable, Codable {
         // b: The number of blocks produced by the validator.
@@ -31,68 +93,6 @@ public struct ValidatorActivityStatistics: Sendable, Equatable, Codable {
             self.guarantees = guarantees
             self.assurances = assurances
         }
-    }
-
-    public struct CoreStatistics: Sendable, Equatable, Codable {
-        // y: total actual amount of gas used during refinement
-        public var gasUsed: UInt
-
-        // i: total number of segments imported from the Segments DA
-        public var importsCount: UInt
-
-        // e: total number of segments exported into the Segments DA
-        public var exportsCount: UInt
-
-        // x: total number of the extrinsics used in computing the workload
-        public var extrinsicsCount: UInt
-
-        // z: total size in octets of the extrinsics used in computing the workload
-        public var extrinsicsSize: UInt
-
-        // b: total package data length
-        public var packageSize: UInt
-
-        // d: total incoming data size (package length + total segments size)
-        public var dataSize: UInt
-
-        // p: total number of assurance
-        public var assuranceCount: UInt
-    }
-
-    public struct ServiceStatistics: Sendable, Equatable, Codable {
-        public struct CountAndGas: Sendable, Equatable, Codable {
-            public var count: UInt
-            public var gasUsed: UInt
-        }
-
-        public struct PreimagesAndSize: Sendable, Equatable, Codable {
-            public var count: UInt
-            public var size: UInt
-        }
-
-        // i: total number of segments imported from the Segments DA
-        public var importsCount: UInt
-
-        // e: total number of segments exported into the Segments DA
-        public var exportsCount: UInt
-
-        // x: total number of the extrinsics used in computing the workload
-        public var extrinsicsCount: UInt
-
-        // z: total size in octets of the extrinsics used in computing the workload
-        public var extrinsicsSize: UInt
-
-        // r: total number of reports and gas used
-        public var reports: CountAndGas
-
-        // p: total number of preimages and size
-        public var preimages: PreimagesAndSize
-
-        // a: accumulate count and gas used
-        public var accumulates: CountAndGas
-
-        // t: tansfer count and gas used
-        public var transfers: CountAndGas
     }
 
     public var accumulator: ConfigFixedSizeArray<ValidatorStatistics, ProtocolConfig.TotalNumberOfValidators>
@@ -133,10 +133,10 @@ extension ValidatorActivityStatistics.ValidatorStatistics: Dummy {
     }
 }
 
-extension ValidatorActivityStatistics.CoreStatistics: Dummy {
+extension CoreStatistics: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(config _: Config) -> ValidatorActivityStatistics.CoreStatistics {
-        ValidatorActivityStatistics.CoreStatistics(
+    public static func dummy(config _: Config) -> CoreStatistics {
+        CoreStatistics(
             gasUsed: 0,
             importsCount: 0,
             exportsCount: 0,
@@ -149,10 +149,10 @@ extension ValidatorActivityStatistics.CoreStatistics: Dummy {
     }
 }
 
-extension ValidatorActivityStatistics.ServiceStatistics: Dummy {
+extension ServiceStatistics: Dummy {
     public typealias Config = ProtocolConfigRef
-    public static func dummy(config _: Config) -> ValidatorActivityStatistics.ServiceStatistics {
-        ValidatorActivityStatistics.ServiceStatistics(
+    public static func dummy(config _: Config) -> ServiceStatistics {
+        ServiceStatistics(
             importsCount: 0,
             exportsCount: 0,
             extrinsicsCount: 0,

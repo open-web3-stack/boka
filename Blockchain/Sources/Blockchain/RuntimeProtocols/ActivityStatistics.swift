@@ -57,11 +57,11 @@ extension ActivityStatistics {
         indices.formUnion(extrinsic.reports.guarantees.flatMap(\.workReport.results).map(\.serviceIndex))
 
         // core and service statistics
-        var coreStats = try ConfigFixedSizeArray<ValidatorActivityStatistics.CoreStatistics, ProtocolConfig.TotalNumberOfCores>(
+        var coreStats = try ConfigFixedSizeArray<CoreStatistics, ProtocolConfig.TotalNumberOfCores>(
             config: config,
             defaultValue: .dummy(config: config)
         )
-        var serviceStats = [ServiceIndex: ValidatorActivityStatistics.ServiceStatistics]()
+        var serviceStats = [ServiceIndex: ServiceStatistics]()
         for index in indices {
             serviceStats[index] = .dummy(config: config)
         }
