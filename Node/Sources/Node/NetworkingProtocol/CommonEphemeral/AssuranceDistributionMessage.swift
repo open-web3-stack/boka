@@ -5,7 +5,7 @@ import Utils
 
 public struct AssuranceDistributionMessage: Sendable, Equatable, Codable, Hashable {
     public let headerHash: Data32
-    public let bitfield: Data43 // [u8; 43] (One bit per core)
+    public let bitfield: ConfigSizeBitString<ProtocolConfig.TotalNumberOfCores>
     public let signature: Ed25519Signature
 
     public init(headerHash: Data32, bitfield: Data43, signature: Ed25519Signature) {
