@@ -197,12 +197,12 @@ final class NodeTests {
     @Test
     func moreMultiplePeers() async throws {
         var nodeDescriptions: [NodeDescription] = [
-            NodeDescription(isValidator: true, database: getDatabase(99999)),
-            NodeDescription(isValidator: true, devSeed: 1, database: getDatabase(100_000)),
+            NodeDescription(isValidator: true, database: getDatabase(10000)),
+            NodeDescription(isValidator: true, devSeed: 1, database: getDatabase(10001)),
         ]
 
         for i in 2 ..< 20 {
-            nodeDescriptions.append(NodeDescription(devSeed: UInt32(i), database: .inMemory))
+            nodeDescriptions.append(NodeDescription(devSeed: UInt32(i + 10000), database: .inMemory))
         }
         let (nodes, scheduler) = try await Topology(
             nodes: nodeDescriptions,
@@ -211,8 +211,8 @@ final class NodeTests {
             }
         ).build(genesis: .preset(.minimal))
 
-        let (validator1, validator1StoreMiddleware) = nodes[0]
-        let (validator2, validator2StoreMiddleware) = nodes[1]
+        let (validator1, _) = nodes[0]
+        let (validator2, _) = nodes[1]
         let nonValidatorNodes = nodes[2...]
 
         var allSynced = false
@@ -220,8 +220,6 @@ final class NodeTests {
             await scheduler.advance(by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds))
 
             try await withThrowingTaskGroup(of: Void.self) { group in
-                await validator1StoreMiddleware.wait()
-                await validator2StoreMiddleware.wait()
                 for (_, middleware) in nodes {
                     group.addTask { await middleware.wait() }
                 }
@@ -229,27 +227,25 @@ final class NodeTests {
             }
 
             // check if allSynced
-            if slot % 5 == 0 {
-                let validator1Head = await validator1.dataProvider.bestHead
-                let validator2Head = await validator2.dataProvider.bestHead
+            let validator1Head = await validator1.dataProvider.bestHead
+            let validator2Head = await validator2.dataProvider.bestHead
 
-                guard validator1Head.hash == validator2Head.hash else {
-                    continue
-                }
+            guard validator1Head.hash == validator2Head.hash else {
+                continue
+            }
 
-                allSynced = try await withThrowingTaskGroup(of: Bool.self) { group in
-                    for (node, _) in nonValidatorNodes {
-                        group.addTask { [dataProvider = node.dataProvider] in
-                            let nodeBestHead = await dataProvider.bestHead
-                            return nodeBestHead.hash != validator1Head.hash
-                        }
+            allSynced = try await withThrowingTaskGroup(of: Bool.self) { group in
+                for (node, _) in nonValidatorNodes {
+                    group.addTask { [dataProvider = node.dataProvider] in
+                        let nodeBestHead = await dataProvider.bestHead
+                        return nodeBestHead.hash != validator1Head.hash
                     }
-                    return try await group.allSatisfy(\.self)
                 }
+                return try await group.allSatisfy(\.self)
+            }
 
-                if allSynced {
-                    break
-                }
+            if allSynced {
+                break
             }
         }
         #expect(allSynced == true)
