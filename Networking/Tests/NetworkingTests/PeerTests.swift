@@ -129,7 +129,7 @@ struct PeerTests {
         typealias EphemeralHandler = MockEphemeralStreamHandler
     }
 
-    @Test("Connection rotation strategy", .disabled("TODO: Fix this test"))
+    @Test
     func connectionRotationStrategy() async throws {
         var peers: [Peer<MockStreamHandler>] = []
         var handlers: [MockPresistentStreamHandler] = []
@@ -172,10 +172,17 @@ struct PeerTests {
             try await con.ready()
         }
 
+        for _ in 0 ..< 50 {
+            if centerPeer.peersCount == 3 {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+
         #expect(centerPeer.peersCount == 3)
 
         centerPeer.broadcast(kind: .uniqueA, message: .init(kind: .uniqueA, data: [Data("connection rotation strategy".utf8)]))
-        try? await Task.sleep(for: .milliseconds(100))
+        try? await Task.sleep(for: .milliseconds(500))
         var receivedCount = 0
         for handler in handlers {
             receivedCount += await handler.receivedData.count
