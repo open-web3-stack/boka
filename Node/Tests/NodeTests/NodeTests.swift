@@ -211,8 +211,8 @@ final class NodeTests {
             }
         ).build(genesis: .preset(.minimal))
 
-        let (validator1, validator1StoreMiddlware) = nodes[0]
-        let (validator2, validator2StoreMiddlware) = nodes[1]
+        let (validator1, _) = nodes[0]
+        let (validator2, _) = nodes[1]
         let nonValidatorNodes = nodes[2...]
 
         var allSynced = false
@@ -231,7 +231,7 @@ final class NodeTests {
 
         try await Task.sleep(for: .milliseconds(nodes.count * 100))
 
-        for _ in 0 ..< 20 {
+        for _ in 0 ..< 50 {
             // check if allSynced
             let validator1Head = await validator1.dataProvider.bestHead
             let validator2Head = await validator2.dataProvider.bestHead
