@@ -197,8 +197,8 @@ final class NodeTests {
     @Test
     func moreMultiplePeers() async throws {
         var nodeDescriptions: [NodeDescription] = [
-            NodeDescription(isValidator: true, database: getDatabase(10000)),
-            NodeDescription(isValidator: true, devSeed: 1, database: getDatabase(10001)),
+            NodeDescription(isValidator: true, database: getDatabase(0)),
+            NodeDescription(isValidator: true, devSeed: 1, database: getDatabase(1)),
         ]
 
         for i in 2 ..< 20 {
@@ -222,10 +222,13 @@ final class NodeTests {
         var allSynced = false
         let maxIterations = 100
 
-        for _ in 0 ..< 20 {
+        for _ in 0 ..< 5 {
             await scheduler.advance(
                 by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds)
             )
+            for (_, middleware) in nodes {
+                await middleware.wait()
+            }
         }
 
         try await Task.sleep(for: .milliseconds(nodes.count * 200))
@@ -253,7 +256,9 @@ final class NodeTests {
             if allSynced {
                 break
             }
-            try await Task.sleep(for: .milliseconds(200))
+            for (_, middleware) in nodes {
+                await middleware.wait()
+            }
         }
 
         #expect(allSynced == true)
