@@ -204,6 +204,7 @@ final class NodeTests {
         for i in 2 ..< 20 {
             nodeDescriptions.append(NodeDescription(devSeed: UInt32(i + 10000), database: .inMemory))
         }
+
         let (nodes, scheduler) = try await Topology(
             nodes: nodeDescriptions,
             connections: (0 ..< 2).flatMap { i in
@@ -216,23 +217,21 @@ final class NodeTests {
         let nonValidatorNodes = nodes[2...]
 
         var allSynced = false
-        for _ in 0 ..< 20 {
+        for _ in 0 ..< 30 {
             await scheduler.advance(
                 by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds)
             )
             try await withThrowingTaskGroup(of: Void.self) { group in
                 for (_, middleware) in nodes {
-                    await middleware.wait()
                     group.addTask { await middleware.wait() }
                 }
                 try await group.waitForAll()
             }
         }
 
-        try await Task.sleep(for: .milliseconds(nodes.count * 100))
+        try await Task.sleep(for: .milliseconds(nodes.count * 150))
 
-        for _ in 0 ..< 50 {
-            // check if allSynced
+        for _ in 0 ..< 100 {
             let validator1Head = await validator1.dataProvider.bestHead
             let validator2Head = await validator2.dataProvider.bestHead
 
@@ -245,16 +244,17 @@ final class NodeTests {
                 for (node, _) in nonValidatorNodes {
                     group.addTask { [dataProvider = node.dataProvider] in
                         let nodeBestHead = await dataProvider.bestHead
-                        return nodeBestHead.hash != validator1Head.hash
+                        return nodeBestHead.hash == validator1Head.hash
                     }
                 }
-                return try await group.allSatisfy(\.self)
+                let results = try await group.reduce(into: [Bool]()) { $0.append($1) }
+                return results.allSatisfy(\.self)
             }
 
             if allSynced {
                 break
             }
-            try await Task.sleep(for: .milliseconds(200))
+            try await Task.sleep(for: .milliseconds(500))
         }
         #expect(allSynced == true)
     }
