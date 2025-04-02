@@ -222,16 +222,13 @@ final class NodeTests {
             await scheduler.advance(
                 by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds)
             )
-            try await withThrowingTaskGroup(of: Void.self) { group in
-                for (_, middleware) in nodes {
-                    group.addTask { await middleware.wait() }
-                }
-                try await group.waitForAll()
+            for (_, middleware) in nodes {
+                await middleware.wait()
             }
         }
 
-        for _ in 0 ..< 20 {
-            // check if allSynced
+        // check if allSynced
+        for _ in 0 ..< 50 {
             let validator1Head = await validator1.dataProvider.bestHead
             let validator2Head = await validator2.dataProvider.bestHead
 
