@@ -215,20 +215,24 @@ final class NodeTests {
         let (validator2, validator2StoreMiddlware) = nodes[1]
         let nonValidatorNodes = nodes[2...]
 
-        try await Task.sleep(for: .milliseconds(nodes.count * 100))
-
         var allSynced = false
         for _ in 0 ..< 20 {
             await scheduler.advance(
                 by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds)
             )
-            for (_, middleware) in nodes {
-                await middleware.wait()
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                for (_, middleware) in nodes {
+                    await middleware.wait()
+                    group.addTask { await middleware.wait() }
+                }
+                try await group.waitForAll()
             }
         }
 
-        // check if allSynced
-        for _ in 0 ..< 50 {
+        try await Task.sleep(for: .milliseconds(nodes.count * 100))
+
+        for _ in 0 ..< 20 {
+            // check if allSynced
             let validator1Head = await validator1.dataProvider.bestHead
             let validator2Head = await validator2.dataProvider.bestHead
 
