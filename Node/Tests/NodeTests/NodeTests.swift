@@ -194,15 +194,13 @@ final class NodeTests {
         }
     }
 
-    @Test("moreMultiplePeers", .disabled("TODO: Fix this test"))
+    @Test
     func moreMultiplePeers() async throws {
-        // Create multiple nodes
         var nodeDescriptions: [NodeDescription] = [
             NodeDescription(isValidator: true, database: getDatabase(0)),
             NodeDescription(isValidator: true, devSeed: 1, database: getDatabase(1)),
         ]
 
-        // Add 18 non-validator nodes
         for i in 2 ... 19 {
             nodeDescriptions.append(NodeDescription(devSeed: UInt32(i), database: .inMemory))
         }
@@ -210,42 +208,54 @@ final class NodeTests {
         let (nodes, scheduler) = try await Topology(
             nodes: nodeDescriptions,
             connections: (0 ..< 2).flatMap { i in
-                (2 ..< 20).map { j in (i, j) } // connected topology
+                (2 ..< 20).map { j in (i, j) }
             }
         ).build(genesis: .preset(.minimal))
 
         let (validator1, validator1StoreMiddlware) = nodes[0]
         let (validator2, validator2StoreMiddlware) = nodes[1]
+        let nonValidatorNodes = nodes[2...]
 
-        // Extract non-validator nodes and their middleware
-        let nonValidatorNodes = nodes[2...].map(\.self)
-
-        try await Task.sleep(for: .milliseconds(nodes.count * 100))
         let (node1, _) = nonValidatorNodes[0]
         let (node2, _) = nonValidatorNodes[1]
-        // Verify connections for a sample of non-validator nodes
         #expect(node1.network.peersCount == 2)
         #expect(node2.network.peersCount == 2)
+
         // Advance time to produce blocks
         for _ in 0 ..< 30 {
-            await scheduler.advance(
-                by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds)
-            )
-            await validator1StoreMiddlware.wait()
-            await validator2StoreMiddlware.wait()
+            await scheduler.advance(by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds))
 
-            for (_, middleware) in nonValidatorNodes {
-                await middleware.wait()
+            await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask { await validator1StoreMiddlware.wait() }
+                group.addTask { await validator2StoreMiddlware.wait() }
+                for (_, middleware) in nonValidatorNodes {
+                    group.addTask { await middleware.wait() }
+                }
             }
         }
-        try await Task.sleep(for: .milliseconds(nodes.count * 100))
+
         let validator1BestHead = await validator1.dataProvider.bestHead
         let validator2BestHead = await validator2.dataProvider.bestHead
+        #expect(validator1BestHead.hash == validator2BestHead.hash)
 
-        for (node, _) in nonValidatorNodes {
-            let nodeBestHead = await node.dataProvider.bestHead
-            #expect(validator1BestHead.hash == nodeBestHead.hash)
-            #expect(validator2BestHead.hash == nodeBestHead.hash)
+        var allNodesSynced = false
+        for _ in 0 ..< 50 {
+            allNodesSynced = try await withThrowingTaskGroup(of: Bool.self) { group in
+                for (node, _) in nonValidatorNodes {
+                    group.addTask { [dataProvider = node.dataProvider] in
+                        let nodeBestHead = await dataProvider.bestHead
+                        return nodeBestHead.hash != validator1BestHead.hash
+                    }
+                }
+                return try await group.reduce(true) { $0 && $1 }
+            }
+
+            if allNodesSynced {
+                break
+            }
+
+            try await Task.sleep(for: .milliseconds(100))
         }
+        #expect(allNodesSynced == true)
     }
 }
