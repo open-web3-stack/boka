@@ -194,17 +194,16 @@ final class NodeTests {
         }
     }
 
-    @Test("moreMultiplePeers", .disabled("TODO: Fix this test"))
+    @Test
     func moreMultiplePeers() async throws {
         var nodeDescriptions: [NodeDescription] = [
-            NodeDescription(isValidator: true, database: getDatabase(0)),
-            NodeDescription(isValidator: true, devSeed: 1, database: getDatabase(1)),
+            NodeDescription(isValidator: true, database: getDatabase(99999)),
+            NodeDescription(isValidator: true, devSeed: 1, database: getDatabase(100_000)),
         ]
 
-        for i in 2 ... 19 {
+        for i in 2 ..< 20 {
             nodeDescriptions.append(NodeDescription(devSeed: UInt32(i), database: .inMemory))
         }
-
         let (nodes, scheduler) = try await Topology(
             nodes: nodeDescriptions,
             connections: (0 ..< 2).flatMap { i in
@@ -212,50 +211,47 @@ final class NodeTests {
             }
         ).build(genesis: .preset(.minimal))
 
-        let (validator1, validator1StoreMiddlware) = nodes[0]
-        let (validator2, validator2StoreMiddlware) = nodes[1]
+        let (validator1, validator1StoreMiddleware) = nodes[0]
+        let (validator2, validator2StoreMiddleware) = nodes[1]
         let nonValidatorNodes = nodes[2...]
 
-        let (node1, _) = nonValidatorNodes[0]
-        let (node2, _) = nonValidatorNodes[1]
-        #expect(node1.network.peersCount == 2)
-        #expect(node2.network.peersCount == 2)
-
-        // Advance time to produce blocks
-        for _ in 0 ..< 30 {
+        var allSynced = false
+        for slot in 0 ..< 50 {
             await scheduler.advance(by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds))
 
-            await withThrowingTaskGroup(of: Void.self) { group in
-                group.addTask { await validator1StoreMiddlware.wait() }
-                group.addTask { await validator2StoreMiddlware.wait() }
-                for (_, middleware) in nonValidatorNodes {
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                await validator1StoreMiddleware.wait()
+                await validator2StoreMiddleware.wait()
+                for (_, middleware) in nodes {
                     group.addTask { await middleware.wait() }
                 }
+                try await group.waitForAll()
             }
-        }
 
-        let validator1BestHead = await validator1.dataProvider.bestHead
-        let validator2BestHead = await validator2.dataProvider.bestHead
-        #expect(validator1BestHead.hash == validator2BestHead.hash)
+            // check if allSynced
+            if slot % 5 == 0 {
+                let validator1Head = await validator1.dataProvider.bestHead
+                let validator2Head = await validator2.dataProvider.bestHead
 
-        var allNodesSynced = false
-        for _ in 0 ..< 50 {
-            allNodesSynced = try await withThrowingTaskGroup(of: Bool.self) { group in
-                for (node, _) in nonValidatorNodes {
-                    group.addTask { [dataProvider = node.dataProvider] in
-                        let nodeBestHead = await dataProvider.bestHead
-                        return nodeBestHead.hash != validator1BestHead.hash
-                    }
+                guard validator1Head.hash == validator2Head.hash else {
+                    continue
                 }
-                return try await group.allSatisfy(\.self)
-            }
 
-            if allNodesSynced {
-                break
-            }
+                allSynced = try await withThrowingTaskGroup(of: Bool.self) { group in
+                    for (node, _) in nonValidatorNodes {
+                        group.addTask { [dataProvider = node.dataProvider] in
+                            let nodeBestHead = await dataProvider.bestHead
+                            return nodeBestHead.hash != validator1Head.hash
+                        }
+                    }
+                    return try await group.allSatisfy(\.self)
+                }
 
-            try await Task.sleep(for: .milliseconds(100))
+                if allSynced {
+                    break
+                }
+            }
         }
-        #expect(allNodesSynced == true)
+        #expect(allSynced == true)
     }
 }

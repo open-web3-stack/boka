@@ -146,8 +146,8 @@ struct PeerTests {
                 peerSettings: PeerSettings(maxBuilderConnections: 3)
             )
         )
-        // Create 5 peer nodes
-        for i in 0 ..< 5 {
+        // Create 10 peer nodes
+        for i in 0 ..< 10 {
             let handler = MockPresistentStreamHandler()
             handlers.append(handler)
             let peer = try Peer(
@@ -166,13 +166,13 @@ struct PeerTests {
         }
 
         // Make some connections
-        for i in 0 ..< 5 {
+        for i in 0 ..< 10 {
             let peer = peers[i]
             let con = try peer.connect(to: centerPeer.listenAddress(), role: .builder)
             try await con.ready()
         }
-
-        for _ in 0 ..< 50 {
+        // Waiting for rotation strategy done
+        for _ in 0 ..< 100 {
             if centerPeer.peersCount == 3 {
                 break
             }
