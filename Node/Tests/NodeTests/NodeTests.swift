@@ -247,7 +247,7 @@ final class NodeTests {
                         return nodeBestHead.hash != validator1BestHead.hash
                     }
                 }
-                return try await group.reduce(true) { $0 && $1 }
+                return try await group.allSatisfy(\.self)
             }
 
             if allNodesSynced {
