@@ -202,14 +202,17 @@ final class NodeTests {
         ]
 
         for i in 2 ..< 20 {
-            nodeDescriptions.append(NodeDescription(devSeed: UInt32(i + 10000), database: .inMemory))
+            nodeDescriptions.append(NodeDescription(devSeed: UInt32(i), database: .inMemory))
+        }
+
+        let connections = (0 ..< 20).map { i in
+            let next = (i + 1) % 20
+            return (i, next)
         }
 
         let (nodes, scheduler) = try await Topology(
             nodes: nodeDescriptions,
-            connections: (0 ..< 2).flatMap { i in
-                (2 ..< 20).map { j in (i, j) }
-            }
+            connections: connections
         ).build(genesis: .preset(.minimal))
 
         let (validator1, _) = nodes[0]
@@ -217,21 +220,17 @@ final class NodeTests {
         let nonValidatorNodes = nodes[2...]
 
         var allSynced = false
-        for _ in 0 ..< 30 {
+        let maxIterations = 100
+
+        for _ in 0 ..< 20 {
             await scheduler.advance(
                 by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds)
             )
-            try await withThrowingTaskGroup(of: Void.self) { group in
-                for (_, middleware) in nodes {
-                    group.addTask { await middleware.wait() }
-                }
-                try await group.waitForAll()
-            }
         }
 
-        try await Task.sleep(for: .milliseconds(nodes.count * 150))
+        try await Task.sleep(for: .milliseconds(nodes.count * 200))
 
-        for _ in 0 ..< 100 {
+        for _ in 0 ..< maxIterations {
             let validator1Head = await validator1.dataProvider.bestHead
             let validator2Head = await validator2.dataProvider.bestHead
 
@@ -254,8 +253,9 @@ final class NodeTests {
             if allSynced {
                 break
             }
-            try await Task.sleep(for: .milliseconds(500))
+            try await Task.sleep(for: .milliseconds(200))
         }
+
         #expect(allSynced == true)
     }
 }
