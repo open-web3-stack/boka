@@ -170,9 +170,10 @@ struct PeerTests {
             let peer = peers[i]
             let con = try peer.connect(to: centerPeer.listenAddress(), role: .builder)
             try await con.ready()
+            try await Task.sleep(for: .milliseconds(100))
         }
         // Waiting for rotation strategy done
-        for _ in 0 ..< 100 {
+        for _ in 0 ..< 50 {
             if centerPeer.peersCount == 3 {
                 break
             }
