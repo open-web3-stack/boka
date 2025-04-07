@@ -112,6 +112,13 @@ public final class NetworkManager: Sendable {
             ) { [weak self] event in
                 await self?.on(beforeEpochChange: event)
             }
+
+            await subscriptions.subscribe(
+                RuntimeEvents.WorkReportGenerated.self,
+                id: "NetworkManager.WorkReportGenerated"
+            ) { [weak self] event in
+                await self?.on(workReportGenerated: event)
+            }
         }
     }
 
@@ -263,6 +270,21 @@ public final class NetworkManager: Sendable {
         }
     }
 
+    private func on(workReportGenerated event: RuntimeEvents.WorkReportGenerated) async {
+        logger.trace("sending guaranteed work-report",
+                     metadata: ["slot": "\(event.slot)",
+                                "signatures": "\(event.signatures.count)"])
+
+        await broadcast(
+            to: .currentValidators,
+            message: .workReportDistrubution(.init(
+                workReport: event.workReport,
+                slot: event.slot,
+                signatures: event.signatures
+            ))
+        )
+    }
+
     public var peersCount: Int {
         network.peersCount
     }
@@ -312,7 +334,7 @@ struct HandlerImpl: NetworkProtocolHandler {
             }
             return [encoder.data]
         case let .stateRequest(message):
-            try blockchain
+            blockchain
                 .publish(
                     event: RuntimeEvents
                         .StateRequestReceived(
