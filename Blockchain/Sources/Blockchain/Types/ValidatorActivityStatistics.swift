@@ -41,8 +41,8 @@ public struct ServiceStatistics: Sendable, Equatable, Codable {
     // p: total number of preimages and size
     public var preimages: PreimagesAndSize
 
-    // r: total number of reports and gas used
-    public var reports: CountAndGas
+    // r: total number of refinements and gas used
+    public var refines: CountAndGas
 
     // i: total number of segments imported from the Segments DA
     public var importsCount: UInt
@@ -98,7 +98,7 @@ public struct ValidatorActivityStatistics: Sendable, Equatable, Codable {
     public var accumulator: ConfigFixedSizeArray<ValidatorStatistics, ProtocolConfig.TotalNumberOfValidators>
     public var previous: ConfigFixedSizeArray<ValidatorStatistics, ProtocolConfig.TotalNumberOfValidators>
     public var core: ConfigFixedSizeArray<CoreStatistics, ProtocolConfig.TotalNumberOfCores>
-    @CodingAs<SortedKeyValues<ServiceIndex, ServiceStatistics>> public var service: [ServiceIndex: ServiceStatistics]
+    @CodingAs<SortedKeyValues<UInt, ServiceStatistics>> public var service: [UInt: ServiceStatistics]
 }
 
 extension ValidatorActivityStatistics: Dummy {
@@ -154,7 +154,7 @@ extension ServiceStatistics: Dummy {
     public static func dummy(config _: Config) -> ServiceStatistics {
         ServiceStatistics(
             preimages: .init(count: 0, size: 0),
-            reports: .init(count: 0, gasUsed: 0),
+            refines: .init(count: 0, gasUsed: 0),
             importsCount: 0,
             exportsCount: 0,
             extrinsicsSize: 0,

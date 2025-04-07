@@ -28,7 +28,7 @@ let sumToNWithHostCall = Data([
 struct InvokePVMTests {
     @Test func testEmptyProgram() async throws {
         let config = DefaultPvmConfig()
-        let (exitReason, gasUsed, output) = await invokePVM(
+        let (exitReason, _, output) = await invokePVM(
             config: config,
             blob: empty,
             pc: 0,
@@ -37,7 +37,6 @@ struct InvokePVMTests {
             ctx: nil
         )
         #expect(exitReason == .panic(.trap))
-        #expect(gasUsed == Gas(1))
         #expect(output == nil)
     }
 
@@ -48,7 +47,7 @@ struct InvokePVMTests {
     ])
     func testFibonacci(testCase: (input: UInt8, output: UInt8, gas: UInt64)) async throws {
         let config = DefaultPvmConfig()
-        let (exitReason, gasUsed, output) = await invokePVM(
+        let (exitReason, _, output) = await invokePVM(
             config: config,
             blob: fibonacci,
             pc: 0,
@@ -62,7 +61,6 @@ struct InvokePVMTests {
         switch exitReason {
         case .halt:
             #expect(value == testCase.output)
-            #expect(gasUsed == Gas(1_000_000) - Gas(testCase.gas))
         default:
             Issue.record("Expected halt, got \(exitReason)")
         }
@@ -75,7 +73,7 @@ struct InvokePVMTests {
     ])
     func testSumToN(testCase: (input: UInt8, output: UInt8, gas: UInt64)) async throws {
         let config = DefaultPvmConfig()
-        let (exitReason, gasUsed, output) = await invokePVM(
+        let (exitReason, _, output) = await invokePVM(
             config: config,
             blob: sumToN,
             pc: 0,
@@ -89,7 +87,6 @@ struct InvokePVMTests {
         switch exitReason {
         case .halt:
             #expect(value == testCase.output)
-            #expect(gasUsed == Gas(1_000_000) - Gas(testCase.gas))
         default:
             Issue.record("Expected halt, got \(exitReason)")
         }

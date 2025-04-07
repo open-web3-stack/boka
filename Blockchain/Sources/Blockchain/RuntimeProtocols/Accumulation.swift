@@ -150,9 +150,7 @@ extension Accumulation {
         var gas = Gas(0)
         var arguments: [AccumulateArguments] = []
 
-        for basicGas in privilegedGas.values {
-            gas += basicGas
-        }
+        gas += privilegedGas[service] ?? Gas(0)
 
         for report in workReports {
             for result in report.results where result.serviceIndex == service {
