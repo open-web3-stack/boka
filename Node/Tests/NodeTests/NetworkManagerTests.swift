@@ -175,9 +175,11 @@ struct NetworkManagerTests {
 
         // Test handling block request
         let response = try await network.handler.handle(ceRequest: .blockRequest(blockRequest))
-
         // Verify response
         let data = try #require(response.first)
+
+        // Wait for event processing
+        await storeMiddleware.wait()
 
         let decoder = JamDecoder(data: data, config: services.config)
         let block = try decoder.decode(BlockRef.self)
@@ -225,6 +227,9 @@ struct NetworkManagerTests {
 
         // Test handling block request
         let response = try await network.handler.handle(ceRequest: .blockRequest(blockRequest))
+
+        // Wait for event processing
+        await storeMiddleware.wait()
 
         // Verify response
         let data = try #require(response.first)

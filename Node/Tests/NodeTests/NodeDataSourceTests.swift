@@ -53,6 +53,9 @@ struct NodeDataSourceTests {
         #expect(workPackageEvent.coreIndex == 0)
         #expect(workPackageEvent.workPackage.value == workPackage)
         #expect(workPackageEvent.extrinsics == extrinsic)
+
+        // Wait for event processing
+        await storeMiddleware.wait()
     }
 
     @Test func createKey() async throws {
