@@ -410,11 +410,15 @@ struct HandlerImpl: NetworkProtocolHandler {
             return []
         case let .workReportRequest(message):
             blockchain.publish(event: RuntimeEvents.WorkReportRequestReceived(workReportHash: message.workReportHash))
-            // TODO: waitfor WorkReportRequestResponse
-            // let resp = try await blockchain.waitFor(RuntimeEvents.WorkReportRequestResponse.self) { event in
-            //    message.workReportHash == event.workReport.hash()
-            // }
-            return []
+            let resp = try await blockchain.waitFor(RuntimeEvents.WorkReportRequestResponse.self) { event in
+                message.workReportHash == event.workReportHash
+            }
+            switch resp.result {
+            case let .success(workReport):
+                return try [JamEncoder.encode(workReport)]
+            case let .failure(error):
+                throw error
+            }
         case let .shardDistribution(message):
             blockchain
                 .publish(event: RuntimeEvents.ShardDistributionReceived(erasureRoot: message.erasureRoot, shardIndex: message.shardIndex))
