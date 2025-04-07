@@ -52,6 +52,7 @@ struct Topology {
                 keystore: keystore,
                 scheduler: scheduler
             )
+            await storeMiddleware.wait()
             ret.append((node, storeMiddleware))
         }
 
