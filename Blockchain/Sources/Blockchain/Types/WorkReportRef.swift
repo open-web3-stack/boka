@@ -12,26 +12,12 @@ public final class WorkReportRef: RefWithHash<WorkReport>, @unchecked Sendable {
     public var results: ConfigLimitedSizeArray<WorkResult, ProtocolConfig.Int1, ProtocolConfig.MaxWorkItems> { value.results }
     public var authGasUsed: UInt { value.authGasUsed }
 
-    public convenience init(
-        authorizerHash: Data32,
-        coreIndex: CoreIndex,
-        authorizationOutput: Data,
-        refinementContext: RefinementContext,
-        packageSpecification: AvailabilitySpecifications,
-        lookup: [Data32: Data32],
-        results: ConfigLimitedSizeArray<WorkResult, ProtocolConfig.Int1, ProtocolConfig.MaxWorkItems>,
-        authGasUsed: UInt
-    ) {
-        self.init(WorkReport(
-            authorizerHash: authorizerHash,
-            coreIndex: coreIndex,
-            authorizationOutput: authorizationOutput,
-            refinementContext: refinementContext,
-            packageSpecification: packageSpecification,
-            lookup: lookup,
-            results: results,
-            authGasUsed: authGasUsed
-        ))
+    override public var description: String {
+        "WorkReportRef(hash: \(hash), core: \(coreIndex), results: \(results.count), gas: \(authGasUsed))"
+    }
+
+    public required init(_ workReport: WorkReport) {
+        super.init(workReport)
     }
 }
 
@@ -53,18 +39,6 @@ extension WorkReportRef {
 
 extension WorkReportRef {
     public static func dummy(config: ProtocolConfigRef) -> WorkReportRef {
-        WorkReportRef(
-            authorizerHash: Data32(),
-            coreIndex: 0,
-            authorizationOutput: Data(),
-            refinementContext: RefinementContext.dummy(config: config),
-            packageSpecification: AvailabilitySpecifications.dummy(config: config),
-            lookup: [:],
-            results: try! ConfigLimitedSizeArray(
-                config: config,
-                defaultValue: WorkResult.dummy(config: config)
-            ),
-            authGasUsed: 0
-        )
+        WorkReportRef(WorkReport.dummy(config: config))
     }
 }
