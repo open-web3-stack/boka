@@ -19,7 +19,7 @@ let package = Package(
         .package(path: "../Blockchain"),
         .package(path: "../Codec"),
         .package(path: "../Utils"),
-        .package(url: "https://github.com/apple/swift-testing.git", branch: "6.1"),
+        .package(url: "https://github.com/apple/swift-testing.git", branch: "6.0.3"),
     ],
     targets: [
         .target(
