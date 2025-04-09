@@ -40,5 +40,3 @@ extension GuaranteedWorkReport {
         GuaranteedWorkReportRef(self)
     }
 }
-
-public typealias GuaranteedWorkReportRef = RefWithHash<GuaranteedWorkReport>

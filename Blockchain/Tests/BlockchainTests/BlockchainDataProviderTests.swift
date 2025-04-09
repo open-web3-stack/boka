@@ -185,4 +185,33 @@ struct BlockchainDataProviderTests {
         #expect(try await provider.hasBlock(hash: block.hash) == false)
         #expect(try await provider.hasState(hash: block.hash) == false)
     }
+
+    @Test func guaranteedWorkReportOperations() async throws {
+        // Create a dummy work report and guaranteed work report
+        let workReport = WorkReport.dummy(config: config)
+        let guaranteedReport = GuaranteedWorkReport(
+            workReport: workReport,
+            slot: 1,
+            signatures: []
+        )
+        let reportRef = guaranteedReport.asRef()
+
+        // Test adding and retrieving
+        try await provider.add(guaranteedWorkReport: reportRef)
+
+        // Verify existence
+        #expect(try await provider.hasGuaranteedWorkReport(hash: reportRef.hash))
+
+        // Verify retrieval
+        let retrieved = try await provider.getGuaranteedWorkReport(hash: reportRef.hash)
+        #expect(retrieved?.hash == reportRef.hash)
+    }
+
+    @Test func guaranteedWorkReportOperationsErrors() async throws {
+        let nonExistentHash = Data32.random()
+        // Test checking non-existent report
+        #expect(try await provider.hasGuaranteedWorkReport(hash: nonExistentHash) == false)
+        // Test getting non-existent report
+        #expect(try await provider.getGuaranteedWorkReport(hash: nonExistentHash) == nil)
+    }
 }
