@@ -99,14 +99,12 @@ struct NetworkManagerTests {
 
         // Wait for event processing
         let events = await storeMiddleware.wait()
-        try await Task.sleep(for: .microseconds(100))
-
         // Verify network calls
         #expect(
             network.contain(calls: [
                 .init(function: "connect", parameters: ["address": devPeers.first!, "role": PeerRole.validator]),
                 .init(function: "sendToPeer", parameters: [
-                    "peerId": PeerId(publicKey: key.ed25519.data.data, address: NetAddr(address: "127.0.0.1:5000")!),
+                    "peerId": PeerId(publicKey: key.ed25519.data.data, address: devPeers.first!),
                     "message": CERequest.workPackageSharing(.init(
                         coreIndex: 1,
                         segmentsRootMappings: segmentsRootMappings,
@@ -116,8 +114,6 @@ struct NetworkManagerTests {
             ]),
             "network calls: \(network.calls)"
         )
-        try await Task.sleep(for: .microseconds(200))
-
         let event = try #require(events.first { $0 is RuntimeEvents.WorkPackageBundleReceivedReply } as? RuntimeEvents
             .WorkPackageBundleReceivedReply)
         #expect(event.source == key.ed25519.data)

@@ -22,6 +22,16 @@ public actor InMemoryDataProvider {
 }
 
 extension InMemoryDataProvider: BlockchainDataProviderProtocol {
+    public func hasGuaranteedWorkReport(hash _: Data32) async throws -> Bool {
+        true
+    }
+
+    public func getGuaranteedWorkReport(hash _: Data32) async throws -> GuaranteedWorkReportRef? {
+        nil
+    }
+
+    public func add(guaranteedWorkReport _: GuaranteedWorkReportRef) async throws {}
+
     public func getKeys(prefix: Data32, count: UInt32, startKey: Data32?, blockHash: Data32?) async throws -> [String] {
         guard let stateRef = try getState(hash: blockHash ?? genesisBlockHash) else {
             return []

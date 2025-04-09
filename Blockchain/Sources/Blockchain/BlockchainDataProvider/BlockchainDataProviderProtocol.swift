@@ -1,7 +1,7 @@
 import Utils
 
 public protocol BlockchainDataProviderProtocol: Sendable {
-//    func hasWorkReport(hash: Data32) async throws -> Bool
+    func hasGuaranteedWorkReport(hash: Data32) async throws -> Bool
     func hasBlock(hash: Data32) async throws -> Bool
     func hasState(hash: Data32) async throws -> Bool
     func isHead(hash: Data32) async throws -> Bool
@@ -10,7 +10,7 @@ public protocol BlockchainDataProviderProtocol: Sendable {
 
     func getHeader(hash: Data32) async throws -> HeaderRef?
 
-//    func getWorkReport(hash: Data32) async throws -> WorkReportRef?
+    func getGuaranteedWorkReport(hash: Data32) async throws -> GuaranteedWorkReportRef?
 
     func getBlock(hash: Data32) async throws -> BlockRef?
 
@@ -29,7 +29,7 @@ public protocol BlockchainDataProviderProtocol: Sendable {
     /// return empty set if not found
     func getBlockHash(byNumber number: UInt32) async throws -> Set<Data32>
 
-//    func addWorkReport(workReport: WorkReportRef) async throws
+    func add(guaranteedWorkReport: GuaranteedWorkReportRef) async throws
     func add(block: BlockRef) async throws
     func add(state: StateRef) async throws
     func setFinalizedHead(hash: Data32) async throws
