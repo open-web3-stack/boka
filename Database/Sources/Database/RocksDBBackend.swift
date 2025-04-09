@@ -225,7 +225,7 @@ extension RocksDBBackend: BlockchainDataProviderProtocol {
         // TODO: batch delete
 
         try blocks.delete(key: hash)
-
+        try guaranteedWorkReports.delete(key: hash)
         if let block = try await getBlock(hash: hash) {
             try blockHashByTimeslot.delete(key: block.header.timeslot)
         }
