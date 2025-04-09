@@ -99,6 +99,7 @@ struct NetworkManagerTests {
 
         // Wait for event processing
         let events = await storeMiddleware.wait()
+        try await Task.sleep(for: .microseconds(100))
 
         // Verify network calls
         #expect(
@@ -115,6 +116,7 @@ struct NetworkManagerTests {
             ]),
             "network calls: \(network.calls)"
         )
+        try await Task.sleep(for: .microseconds(200))
 
         let event = try #require(events.first { $0 is RuntimeEvents.WorkPackageBundleReceivedReply } as? RuntimeEvents
             .WorkPackageBundleReceivedReply)
