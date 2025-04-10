@@ -16,9 +16,12 @@ public enum DataAvailabilityError: Error {
     case invalidSegmentsRoot
     case invalidDataLength
     case pagedProofsGenerationError
+    case invalidWorkReportSlot
+    case invalidWorkReport
+    case insufficientSignatures
 }
 
-public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable {
+public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, OnSyncCompleted {
     private let dataProvider: BlockchainDataProvider
     private let dataStore: DataStore
 
@@ -39,6 +42,14 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable {
             await self?.purge(epoch: epoch)
         }
     }
+
+    public func onSyncCompleted() async {
+        await subscribe(RuntimeEvents.WorkReportReceived.self, id: "DataAvailabilityService.WorkReportReceived") { [weak self] event in
+            await self?.handleWorkReportReceived(event)
+        }
+    }
+
+    public func handleWorkReportReceived(_: RuntimeEvents.WorkReportReceived) async {}
 
     /// Purge old data from the data availability stores
     /// - Parameter epoch: The current epoch index

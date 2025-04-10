@@ -275,23 +275,6 @@ public enum RuntimeEvents {
         }
     }
 
-    //  Response to work report request
-    public struct WorkReportRequestResponse: Event {
-        public var workReportHash: Data32
-
-        public let result: Result<WorkReport, Error>
-
-        public init(workReportHash: Data32, workReport: WorkReport) {
-            self.workReportHash = workReportHash
-            result = .success(workReport)
-        }
-
-        public init(workReportHash: Data32, error: Error) {
-            self.workReportHash = workReportHash
-            result = .failure(error)
-        }
-    }
-
     public struct AuditShardRequestReceived: Event {
         public let erasureRoot: Data32
         public let shardIndex: UInt32

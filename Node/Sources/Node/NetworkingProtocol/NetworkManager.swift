@@ -274,10 +274,9 @@ public final class NetworkManager: Sendable {
         logger.trace("sending guaranteed work-report",
                      metadata: ["slot": "\(event.slot)",
                                 "signatures": "\(event.signatures.count)"])
-
         await broadcast(
             to: .currentValidators,
-            message: .workReportDistrubution(.init(
+            message: .workReportDistribution(.init(
                 workReport: event.workReport,
                 slot: event.slot,
                 signatures: event.signatures
@@ -397,7 +396,7 @@ struct HandlerImpl: NetworkProtocolHandler {
             }
             let (workReportHash, signature) = try resp.result.get()
             return try [JamEncoder.encode(workReportHash, signature)]
-        case let .workReportDistrubution(message):
+        case let .workReportDistribution(message):
             blockchain
                 .publish(
                     event: RuntimeEvents
@@ -409,16 +408,11 @@ struct HandlerImpl: NetworkProtocolHandler {
                 )
             return []
         case let .workReportRequest(message):
-            blockchain.publish(event: RuntimeEvents.WorkReportRequestReceived(workReportHash: message.workReportHash))
-            let resp = try await blockchain.waitFor(RuntimeEvents.WorkReportRequestResponse.self) { event in
-                message.workReportHash == event.workReportHash
+            let workReportRef = try await blockchain.dataProvider.getGuaranteedWorkReport(hash: message.workReportHash)
+            if let workReport = workReportRef {
+                return try [JamEncoder.encode(workReport.value)]
             }
-            switch resp.result {
-            case let .success(workReport):
-                return try [JamEncoder.encode(workReport)]
-            case let .failure(error):
-                throw error
-            }
+            return []
         case let .shardDistribution(message):
             blockchain
                 .publish(event: RuntimeEvents.ShardDistributionReceived(erasureRoot: message.erasureRoot, shardIndex: message.shardIndex))

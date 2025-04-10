@@ -339,7 +339,7 @@ struct NetworkManagerTests {
         let slot: UInt32 = 123
         let signatures = [ValidatorSignature(validatorIndex: 0, signature: Ed25519Signature(repeating: 20))]
 
-        let distributionMessage = CERequest.workReportDistrubution(WorkReportDistributionMessage(
+        let distributionMessage = CERequest.workReportDistribution(WorkReportDistributionMessage(
             workReport: workReport,
             slot: slot,
             signatures: signatures
@@ -376,19 +376,10 @@ struct NetworkManagerTests {
         let message = try WorkReportRequestMessage.decode(data: requestMessage.encode(), config: services.config)
         #expect(workReportHash == message.workReportHash)
 
-        _ = try await network.handler.handle(ceRequest: requestMessage)
+        let data = try await network.handler.handle(ceRequest: requestMessage)
 
-        let events = await storeMiddleware.wait()
-
-        let receivedEvent = events.first {
-            if let event = $0 as? RuntimeEvents.WorkReportRequestReceived {
-                return event.workReportHash == workReportHash
-            }
-            return false
-        } as? RuntimeEvents.WorkReportRequestReceived
-
-        let event = try #require(receivedEvent)
-        #expect(event.workReportHash == workReportHash)
+        await storeMiddleware.wait()
+        #expect(data == [])
     }
 
     @Test
