@@ -1,219 +1,204 @@
-use erasure_coding::{
-    ChunkIndex, Segment, SubShardDecoder, SubShardEncoder, SEGMENT_SIZE, TOTAL_SHARDS,
-};
 use std::{ptr, slice};
 
-/// Fixed size segment of a larger data.
-/// Data is padded when unaligned with
-/// the segment size.
-#[repr(C)]
 #[derive(Clone, Copy, Debug)]
-pub struct CSegment {
-    /// Fix size chunk of data. Length is `SEGMENT_SIZE``
+pub struct Shard {
     data: *mut u8,
-    /// The index of this segment against its full data.
     index: u32,
 }
 
-impl From<Segment> for CSegment {
-    fn from(segment: Segment) -> Self {
-        let mut vec_data = Vec::from(*segment.data);
+#[no_mangle]
+pub extern "C" fn shard_new(
+    data: *const u8,
+    data_len: usize,
+    index: u32,
+    out: *mut *mut Shard,
+) -> isize {
+    if data.is_null() || out.is_null() || data_len == 0 {
+        return 1;
+    }
 
-        let c_segment = CSegment {
-            data: vec_data.as_mut_ptr(),
-            index: segment.index,
+    unsafe {
+        let data_slice = slice::from_raw_parts(data, data_len);
+
+        let mut data_vec = Vec::with_capacity(data_len);
+        data_vec.extend_from_slice(data_slice);
+
+        let shard = Shard {
+            data: data_vec.as_mut_ptr(),
+            index,
         };
 
-        std::mem::forget(vec_data);
+        // Prevent Vec from deallocating the memory (hand it over to the Shard)
+        std::mem::forget(data_vec);
 
-        c_segment
+        *out = Box::into_raw(Box::new(shard));
     }
+
+    0
 }
 
-impl From<CSegment> for Segment {
-    fn from(c_segment: CSegment) -> Self {
-        let vec_data = unsafe { Vec::from_raw_parts(c_segment.data, SEGMENT_SIZE, SEGMENT_SIZE) };
-
-        Segment {
-            data: Box::new(vec_data.try_into().unwrap()),
-            index: c_segment.index,
+#[no_mangle]
+pub extern "C" fn shard_free(shard: *mut Shard) {
+    if !shard.is_null() {
+        unsafe {
+            let shard = Box::from_raw(shard);
+            if !shard.data.is_null() {
+                drop(Box::from_raw(shard.data));
+            }
         }
     }
 }
 
-/// Initializes a new SubShardEncoder.
 #[no_mangle]
-pub extern "C" fn subshard_encoder_new() -> *mut SubShardEncoder {
-    Box::into_raw(Box::new(SubShardEncoder::new().unwrap()))
-}
-
-/// Frees the SubShardEncoder.
-#[no_mangle]
-pub extern "C" fn subshard_encoder_free(encoder: *mut SubShardEncoder) {
-    if !encoder.is_null() {
-        unsafe { drop(Box::from_raw(encoder)) };
-    }
-}
-
-/// Constructs erasure-coded chunks from segments.
-///
-/// A chunk is a group of subshards `[[u8; 12]; TOTAL_SHARDS]`.
-///
-/// out_chunks is N chunks `[[u8; 12]; TOTAL_SHARDS]` flattened to 1 dimensional u8 array.
-/// out_len is N * TOTAL_SHARDS
-#[no_mangle]
-pub extern "C" fn subshard_encoder_construct(
-    encoder: *mut SubShardEncoder,
-    segments: *const CSegment,
-    num_segments: usize,
-    success: *mut bool,
-    out_chunks: *mut u8,
-    out_len: *mut usize,
-) {
-    if encoder.is_null() || segments.is_null() || out_chunks.is_null() || out_len.is_null() {
-        unsafe { *success = false };
-        return;
+pub extern "C" fn shard_get_data(shard: *const Shard, out_data: *mut *const u8) -> isize {
+    if shard.is_null() || out_data.is_null() {
+        return 1;
     }
 
-    let encoder = unsafe { &mut *encoder };
-    let segments_vec: Vec<Segment> = unsafe {
-        slice::from_raw_parts(segments, num_segments)
-            .iter()
-            .map(|segment| Segment::from(*segment))
-            .collect()
-    };
-    let r_segments: &[Segment] = &segments_vec;
+    unsafe {
+        let shard_ref = &*shard;
+        if shard_ref.data.is_null() {
+            return 2;
+        }
 
-    match encoder.construct_chunks(r_segments) {
-        Ok(result) => {
-            let total_subshards = result.len() * TOTAL_SHARDS;
-            let mut data: Vec<u8> = Vec::with_capacity(total_subshards);
+        *out_data = shard_ref.data;
+    }
 
-            for boxed_array in result {
-                for subshard in boxed_array.iter() {
-                    data.extend_from_slice(subshard);
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn shard_get_index(shard: *const Shard, out_index: *mut u32) -> isize {
+    if shard.is_null() || out_index.is_null() {
+        return 1;
+    }
+
+    unsafe {
+        let shard_ref = &*shard;
+        *out_index = shard_ref.index;
+    }
+
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn reed_solomon_encode(
+    original: *const *const u8,
+    original_count: usize,
+    recovery_count: usize,
+    shard_size: usize,
+    out_recovery: *mut *mut u8,
+) -> isize {
+    if original.is_null()
+        || out_recovery.is_null()
+        || original_count == 0
+        || recovery_count == 0
+        || shard_size == 0
+    {
+        return 1;
+    }
+
+    let mut original_slices = Vec::with_capacity(original_count);
+
+    unsafe {
+        for i in 0..original_count {
+            let ptr = *original.add(i);
+            if ptr.is_null() {
+                return 2;
+            }
+            original_slices.push(slice::from_raw_parts(ptr, shard_size));
+        }
+    }
+
+    match reed_solomon_simd::encode(original_count, recovery_count, original_slices) {
+        Ok(recovery_vecs) => {
+            for (i, recovery_data) in recovery_vecs.iter().enumerate() {
+                if i >= recovery_count {
+                    break;
+                }
+
+                let out_ptr = unsafe { *out_recovery.add(i) };
+                if out_ptr.is_null() {
+                    return 3;
+                }
+
+                unsafe {
+                    ptr::copy_nonoverlapping(
+                        recovery_data.as_ptr(),
+                        out_ptr,
+                        recovery_data.len().min(shard_size),
+                    );
                 }
             }
+            0
+        }
+        Err(_) => 4,
+    }
+}
 
-            unsafe {
-                ptr::copy_nonoverlapping(data.as_ptr(), out_chunks, data.len());
-                *out_len = total_subshards;
+#[no_mangle]
+pub extern "C" fn reed_solomon_recovery(
+    original_count: usize,
+    recovery_count: usize,
+    original_shards: *const Shard,
+    original_len: usize,
+    recovery_shards: *const Shard,
+    recovery_len: usize,
+    shard_size: usize,
+    out_original: *mut *mut u8,
+) -> isize {
+    if (original_shards.is_null() && original_len > 0)
+        || (recovery_shards.is_null() && recovery_len > 0)
+        || out_original.is_null()
+        || original_count == 0
+        || recovery_count == 0
+        || shard_size == 0
+    {
+        return 1;
+    }
+
+    let mut original_vec = Vec::new();
+    if original_len > 0 {
+        let original_slice = unsafe { slice::from_raw_parts(original_shards, original_len) };
+        for shard in original_slice {
+            if !shard.data.is_null() {
+                let data = unsafe { slice::from_raw_parts(shard.data, shard_size) };
+                original_vec.push((shard.index as usize, data.to_vec()));
             }
-
-            unsafe { *success = true };
-        }
-        Err(_) => {
-            unsafe { *success = false };
         }
     }
-}
 
-/// Initializes a new SubShardDecoder.
-#[no_mangle]
-pub extern "C" fn subshard_decoder_new() -> *mut SubShardDecoder {
-    Box::into_raw(Box::new(SubShardDecoder::new().unwrap()))
-}
-
-/// Frees the SubShardDecoder.
-#[no_mangle]
-pub extern "C" fn subshard_decoder_free(decoder: *mut SubShardDecoder) {
-    if !decoder.is_null() {
-        unsafe {
-            drop(Box::from_raw(decoder));
-        };
+    let mut recovery_vec = Vec::new();
+    if recovery_len > 0 {
+        let recovery_slice = unsafe { slice::from_raw_parts(recovery_shards, recovery_len) };
+        for shard in recovery_slice {
+            if !shard.data.is_null() {
+                let data = unsafe { slice::from_raw_parts(shard.data, shard_size) };
+                recovery_vec.push((shard.index as usize, data.to_vec()));
+            }
+        }
     }
-}
 
-#[repr(C)]
-#[derive(Debug)]
-pub struct SegmentTuple {
-    pub index: u8,
-    pub segment: CSegment,
-}
+    match reed_solomon_simd::decode(original_count, recovery_count, original_vec, recovery_vec) {
+        Ok(restored) => {
+            for i in 0..original_count {
+                if let Some(data) = restored.get(&i) {
+                    let out_ptr = unsafe { *out_original.add(i) };
+                    if out_ptr.is_null() {
+                        return 2;
+                    }
 
-/// Result of the reconstruct.
-#[repr(C)]
-pub struct ReconstructResult {
-    pub segments: *mut SegmentTuple,
-    pub num_segments: usize,
-    pub num_decodes: usize,
-}
-
-#[no_mangle]
-pub extern "C" fn reconstruct_result_free(result: *mut ReconstructResult) {
-    if !result.is_null() {
-        unsafe {
-            let boxed_result = Box::from_raw(result);
-
-            // free each CSegment's data pointer
-            for i in 0..boxed_result.num_segments {
-                let segment = &*boxed_result.segments.add(i);
-                if !segment.segment.data.is_null() {
-                    drop(Box::from_raw(segment.segment.data));
+                    unsafe {
+                        ptr::copy_nonoverlapping(
+                            data.as_ptr(),
+                            out_ptr,
+                            data.len().min(shard_size),
+                        );
+                    }
                 }
             }
-
-            drop(Box::from_raw(boxed_result.segments));
-            drop(boxed_result);
+            0
         }
-    }
-}
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct SubShardTuple {
-    pub seg_index: u8,
-    pub chunk_index: ChunkIndex,
-    pub subshard: [u8; 12],
-}
-
-/// Reconstructs data from a list of subshards.
-#[no_mangle]
-pub extern "C" fn subshard_decoder_reconstruct(
-    decoder: *mut SubShardDecoder,
-    subshards: *const SubShardTuple,
-    num_subshards: usize,
-    success: *mut bool,
-) -> *mut ReconstructResult {
-    if decoder.is_null() || subshards.is_null() {
-        unsafe { *success = false };
-        return ptr::null_mut();
-    }
-
-    let decoder = unsafe { &mut *decoder };
-    let subshards_slice = unsafe { slice::from_raw_parts(subshards, num_subshards) };
-
-    let subshards_vec: Vec<(u8, ChunkIndex, &[u8; 12])> = subshards_slice
-        .iter()
-        .map(|t| (t.seg_index, t.chunk_index, &t.subshard))
-        .collect();
-
-    match decoder.reconstruct(&mut subshards_vec.iter().cloned()) {
-        Ok((segments, num_decodes)) => {
-            let mut segments_vec: Vec<SegmentTuple> = segments
-                .into_iter()
-                .map(|(index, segment)| SegmentTuple {
-                    index,
-                    segment: segment.into(),
-                })
-                .collect();
-            let segments_len = segments_vec.len();
-            let segments_ptr = segments_vec.as_mut_ptr();
-
-            // prevent the Vec from being deallocated, will be freed in reconstruct_result_free
-            std::mem::forget(segments_vec);
-
-            let result = ReconstructResult {
-                segments: segments_ptr,
-                num_segments: segments_len,
-                num_decodes,
-            };
-            unsafe { *success = true };
-            Box::into_raw(Box::new(result))
-        }
-        Err(_) => {
-            unsafe { *success = false };
-            std::ptr::null_mut()
-        }
+        Err(_) => 3,
     }
 }
