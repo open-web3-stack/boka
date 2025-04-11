@@ -236,6 +236,21 @@ public enum RuntimeEvents {
         }
     }
 
+    public struct WorkReportReceivedResponse: Event {
+        public let workReportHash: Data32
+        public let result: Result<Void, Error>
+
+        public init(workReportHash: Data32) {
+            self.workReportHash = workReportHash
+            result = .success(())
+        }
+
+        public init(workReportHash: Data32, error: Error) {
+            self.workReportHash = workReportHash
+            result = .failure(error)
+        }
+    }
+
     public struct WorkReportRequestReceived: Event {
         public let workReportHash: Data32
 

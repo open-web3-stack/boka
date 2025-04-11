@@ -397,6 +397,7 @@ struct HandlerImpl: NetworkProtocolHandler {
             let (workReportHash, signature) = try resp.result.get()
             return try [JamEncoder.encode(workReportHash, signature)]
         case let .workReportDistribution(message):
+            let hash = message.workReport.hash()
             blockchain
                 .publish(
                     event: RuntimeEvents
@@ -406,6 +407,13 @@ struct HandlerImpl: NetworkProtocolHandler {
                             signatures: message.signatures
                         )
                 )
+
+            let resp = try await blockchain.waitFor(RuntimeEvents.WorkReportReceivedResponse.self) { event in
+                hash == event.workReportHash
+            }
+            if case let .failure(error) = resp.result {
+                throw error // failed
+            }
             return []
         case let .workReportRequest(message):
             let workReportRef = try await blockchain.dataProvider.getGuaranteedWorkReport(hash: message.workReportHash)

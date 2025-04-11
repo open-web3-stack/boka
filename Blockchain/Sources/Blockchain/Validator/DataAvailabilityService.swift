@@ -49,7 +49,9 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         }
     }
 
-    public func handleWorkReportReceived(_: RuntimeEvents.WorkReportReceived) async {}
+    public func handleWorkReportReceived(_ event: RuntimeEvents.WorkReportReceived) async {
+        await workReportDistribution(workReport: event.workReport, slot: event.slot, signatures: event.signatures)
+    }
 
     /// Purge old data from the data availability stores
     /// - Parameter epoch: The current epoch index
@@ -189,6 +191,49 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         // This would normally verify the Merkle proof
         // For now, we'll just return true
         true
+    }
+
+    // MARK: - Work-report Distribution (CE 135)
+
+    public func workReportDistribution(
+        workReport: WorkReport,
+        slot: UInt32,
+        signatures: [ValidatorSignature]
+    ) async {
+        let hash = workReport.hash()
+
+        do {
+            // verify slot
+            if await isSlotValid(slot) {
+                throw DataAvailabilityError.invalidWorkReportSlot
+            }
+            // verify signatures
+            try await validate(signatures: signatures)
+
+            // store guaranteedWorkReport
+            let report = GuaranteedWorkReport(
+                workReport: workReport,
+                slot: slot,
+                signatures: signatures
+            )
+            try await dataProvider.add(guaranteedWorkReport: GuaranteedWorkReportRef(report))
+            // response success result
+            publish(RuntimeEvents.WorkReportReceivedResponse(workReportHash: hash))
+        } catch {
+            publish(RuntimeEvents.WorkReportReceivedResponse(workReportHash: hash, error: error))
+        }
+    }
+
+    private func isSlotValid(_ slot: UInt32) async -> Bool {
+        let currentSlot = await dataProvider.bestHead.timeslot
+        return slot + 5 >= currentSlot && slot <= currentSlot + 3
+    }
+
+    private func validate(signatures: [ValidatorSignature]) async throws {
+        guard signatures.count >= 3 else {
+            throw DataAvailabilityError.insufficientSignatures
+        }
+        // TODO: more validates
     }
 
     // MARK: - Shard Distribution (CE 137)

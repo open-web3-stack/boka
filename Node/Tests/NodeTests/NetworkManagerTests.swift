@@ -348,21 +348,11 @@ struct NetworkManagerTests {
         let message = try WorkReportDistributionMessage.decode(data: distributionMessage.encode(), config: services.config)
         #expect(slot == message.slot)
 
-        _ = try await network.handler.handle(ceRequest: distributionMessage)
+        _ = await services.dataAvailabilityService
 
-        let events = await storeMiddleware.wait()
-
-        let receivedEvent = events.first {
-            if let event = $0 as? RuntimeEvents.WorkReportReceived {
-                return event.workReport.hash() == workReport.hash()
-            }
-            return false
-        } as? RuntimeEvents.WorkReportReceived
-
-        let event = try #require(receivedEvent)
-        #expect(event.workReport == workReport)
-        #expect(event.slot == slot)
-        #expect(event.signatures == signatures)
+        await #expect(throws: Error.self) {
+            _ = try await network.handler.handle(ceRequest: distributionMessage)
+        }
     }
 
     @Test
