@@ -48,6 +48,8 @@ struct OpenRPC: AsyncParsableCommand {
     }
 }
 
+// MARK: - Schema Generation Utilities
+
 private protocol OptionalProtocol {
     static var wrappedType: Any.Type { get }
 }
@@ -56,10 +58,6 @@ extension Optional: OptionalProtocol {
     static var wrappedType: Any.Type {
         Wrapped.self
     }
-}
-
-func build(@JSONSchemaBuilder _ content: () -> any JSONSchemaComponent) -> any JSONSchemaComponent {
-    content()
 }
 
 func createSpecContent(type: Any.Type, name: String?) -> SpecContent {
@@ -100,27 +98,24 @@ func getSchema(type: Any.Type) -> any JSONSchemaComponent {
     let info = try! typeInfo(of: type)
     switch info.kind {
     case .struct, .class:
-        return JSONObject {
-            for field in info.properties {
-                JSONProperty(key: field.name) {
-                    getSchema(type: field.type)
-                }
-            }
-        }.title(getName(type: type))
+        return buildObjectSchema(type: type, properties: info.properties)
     default:
         return JSONObject().title(getName(type: type))
     }
 }
 
-extension Optional: TypeDescription {
-    static var name: String {
-        "Optional<\(getName(type: Wrapped.self))>"
+private func buildObjectSchema(type: Any.Type, properties: [PropertyInfo]) -> any JSONSchemaComponent {
+    JSONObject {
+        for field in properties {
+            JSONProperty(key: field.name) {
+                getSchema(type: field.type)
+            }
+        }
     }
-
-    static var schema: any JSONSchemaComponent {
-        getSchema(type: Wrapped.self)
-    }
+    .title(getName(type: type))
 }
+
+// MARK: - Primitive Types Conformance
 
 extension Bool: TypeDescription {
     static var name: String { "Bool" }
@@ -131,6 +126,8 @@ extension String: TypeDescription {
     static var name: String { "String" }
     static var schema: any JSONSchemaComponent { JSONString() }
 }
+
+// MARK: - Numeric Types Conformance
 
 extension BinaryInteger where Self: TypeDescription {
     static var name: String { String(describing: Self.self) }
@@ -147,6 +144,8 @@ extension UInt16: TypeDescription {}
 extension UInt32: TypeDescription {}
 extension UInt64: TypeDescription {}
 extension UInt: TypeDescription {}
+
+// MARK: - Data Types Conformance
 
 extension Data: TypeDescription {
     static var name: String { "Data" }
@@ -166,27 +165,28 @@ extension FixedSizeData: TypeDescription {
     }
 }
 
+// MARK: - Collection Types Conformance
+
 extension Array: TypeDescription {
-    static var name: String {
-        "Array<\(getName(type: Element.self))>"
-    }
+    static var name: String { "Array<\(getName(type: Element.self))>" }
 
     static var schema: any JSONSchemaComponent {
         JSONArray {
-            JSONComponents.AnyComponent(getSchema(type: Element.self))
+            getSchema(type: Element.self)
         }
+        .title(name)
     }
 }
 
 extension Set: TypeDescription {
-    static var name: String {
-        "Set<\(getName(type: Element.self))>"
-    }
+    static var name: String { "Set<\(getName(type: Element.self))>" }
 
     static var schema: any JSONSchemaComponent {
         JSONArray {
-            JSONComponents.AnyComponent(getSchema(type: Element.self))
+            getSchema(type: Element.self)
         }
+        .title(name)
+        .uniqueItems()
     }
 }
 
@@ -196,44 +196,52 @@ extension Dictionary: TypeDescription {
     }
 
     static var schema: any JSONSchemaComponent {
-        JSONObject().title(name)
+        JSONObject()
+            .title(name)
+            .additionalProperties(getSchema(type: Value.self))
     }
 }
 
+// MARK: - Special Array Types Conformance
+
 extension LimitedSizeArray: TypeDescription {
     static var name: String {
-        if minLength == maxLength {
-            "Array\(minLength)<\(getName(type: T.self))>"
-        } else {
-            "Array<\(getName(type: T.self))>[\(minLength) ..< \(maxLength)]"
-        }
+        minLength == maxLength
+            ? "Array\(minLength)<\(getName(type: T.self))>"
+            : "Array<\(getName(type: T.self))>[\(minLength)..<\(maxLength)]"
     }
 
     static var schema: any JSONSchemaComponent {
         JSONArray {
-            JSONComponents.AnyComponent(getSchema(type: T.self))
+            getSchema(type: T.self)
         }
+        .title(name)
+        .minItems(minLength)
+        .maxItems(maxLength)
     }
 }
 
 extension ConfigLimitedSizeArray: TypeDescription {
     static var name: String {
-        "Array<\(getName(type: T.self))>[\(getName(type: TMinLength.self)) ..< \(getName(type: TMaxLength.self))]"
+        "Array<\(getName(type: T.self))>[\(getName(type: TMinLength.self))..<\(getName(type: TMaxLength.self))]"
     }
 
     static var schema: any JSONSchemaComponent {
         JSONArray {
-            JSONComponents.AnyComponent(getSchema(type: T.self))
+            getSchema(type: T.self)
         }
+        .title(name)
     }
 }
 
-extension Ref: TypeDescription {
-    static var name: String {
-        getName(type: T.self)
-    }
+// MARK: - Optional and Reference Types Conformance
 
-    static var schema: any JSONSchemaComponent {
-        getSchema(type: T.self)
-    }
+extension Optional: TypeDescription {
+    static var name: String { "Optional<\(getName(type: Wrapped.self))>" }
+    static var schema: any JSONSchemaComponent { getSchema(type: Wrapped.self) }
+}
+
+extension Ref: TypeDescription {
+    static var name: String { getName(type: T.self) }
+    static var schema: any JSONSchemaComponent { getSchema(type: T.self) }
 }
