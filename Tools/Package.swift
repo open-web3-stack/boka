@@ -9,6 +9,7 @@ let package = Package(
         .macOS(.v15),
     ],
     dependencies: [
+        .package(path: "../PolkaVM"),
         .package(path: "../RPC"),
         .package(path: "../TracingUtils"),
         .package(path: "../Utils"),
@@ -20,9 +21,10 @@ let package = Package(
         .executableTarget(
             name: "Tools",
             dependencies: [
+                "PolkaVM",
                 "RPC",
-                "Utils",
                 "TracingUtils",
+                "Utils",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "JSONSchema", package: "swift-json-schema"),
                 .product(name: "JSONSchemaBuilder", package: "swift-json-schema"),

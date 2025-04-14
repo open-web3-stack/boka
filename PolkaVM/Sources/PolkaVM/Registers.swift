@@ -152,3 +152,15 @@ extension Registers: Codable {
         }
     }
 }
+
+extension Registers: CustomStringConvertible {
+    public var description: String {
+        var res = ""
+        for i in 0 ..< 13 {
+            let value = self[Registers.Index(raw: UInt8(i))]
+            let formatted = String(format: "%08X", value)
+            res += "w\(i):\t0x\(formatted) | \(value)\n"
+        }
+        return res
+    }
+}
