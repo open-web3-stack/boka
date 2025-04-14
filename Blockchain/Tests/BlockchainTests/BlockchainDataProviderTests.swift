@@ -200,10 +200,10 @@ struct BlockchainDataProviderTests {
         try await provider.add(guaranteedWorkReport: reportRef)
 
         // Verify existence
-        #expect(try await provider.hasGuaranteedWorkReport(hash: reportRef.hash))
+        #expect(try await provider.hasGuaranteedWorkReport(hash: workReport.hash()))
 
         // Verify retrieval
-        let retrieved = try await provider.getGuaranteedWorkReport(hash: reportRef.hash)
+        let retrieved = try await provider.getGuaranteedWorkReport(hash: workReport.hash())
         #expect(retrieved?.hash == reportRef.hash)
     }
 

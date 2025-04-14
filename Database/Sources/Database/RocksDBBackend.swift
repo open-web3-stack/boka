@@ -82,7 +82,7 @@ extension RocksDBBackend: BlockchainDataProviderProtocol {
     }
 
     public func add(guaranteedWorkReport: GuaranteedWorkReportRef) async throws {
-        let hash = guaranteedWorkReport.hash
+        let hash = guaranteedWorkReport.workReport.hash()
         try guaranteedWorkReports.put(key: hash, value: guaranteedWorkReport)
     }
 
