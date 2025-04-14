@@ -60,8 +60,19 @@ func build(@JSONSchemaBuilder _ content: () -> any JSONSchemaComponent) -> any J
     content()
 }
 
+func wrapSchema(_ schema: any JSONSchemaComponent) -> some JSONSchemaComponent {
+    JSONSchemaComponentContainer(component: schema)
+}
+
+struct JSONSchemaComponentContainer: JSONSchemaComponent {
+    let component: any JSONSchemaComponent
+
+    func definition() -> JSONSchema {
+        component.definition()
+    }
+}
+
 func createSpecContent(type: Any.Type, name: String?) -> SpecContent {
-    // if it is optional
     if let type = type as? OptionalProtocol.Type {
         return createSpecContentInner(type: type.wrappedType, required: false)
     } else {
@@ -81,7 +92,6 @@ func createSpecContent(type: Any.Type, name: String?) -> SpecContent {
 
 protocol TypeDescription {
     static var name: String { get }
-
     static var schema: any JSONSchemaComponent { get }
 }
 
@@ -102,14 +112,13 @@ func getSchema(type: Any.Type) -> any JSONSchemaComponent {
     case .struct, .class:
         let properties = info.properties.map { field -> any JSONPropertyComponent in
             JSONProperty(key: field.name) {
-                getSchema(type: field.type)
+                wrapSchema(getSchema(type: field.type))
             }
         }
 
         return JSONObject {
             JSONComponents.Group(components: properties)
-        }
-        .title(getName(type: type))
+        }.title(getName(type: type))
 
     default:
         return JSONObject().title(getName(type: type))
@@ -127,33 +136,18 @@ extension Optional: TypeDescription {
 }
 
 extension Bool: TypeDescription {
-    static var name: String {
-        "Bool"
-    }
-
-    static var schema: any JSONSchemaComponent {
-        JSONBoolean()
-    }
+    static var name: String { "Bool" }
+    static var schema: any JSONSchemaComponent { JSONBoolean() }
 }
 
 extension String: TypeDescription {
-    static var name: String {
-        "String"
-    }
-
-    static var schema: any JSONSchemaComponent {
-        JSONString()
-    }
+    static var name: String { "String" }
+    static var schema: any JSONSchemaComponent { JSONString() }
 }
 
 extension BinaryInteger where Self: TypeDescription {
-    static var name: String {
-        String(describing: Self.self)
-    }
-
-    static var schema: any JSONSchemaComponent {
-        JSONInteger()
-    }
+    static var name: String { String(describing: Self.self) }
+    static var schema: any JSONSchemaComponent { JSONInteger() }
 }
 
 extension Int8: TypeDescription {}
@@ -168,14 +162,9 @@ extension UInt64: TypeDescription {}
 extension UInt: TypeDescription {}
 
 extension Data: TypeDescription {
-    static var name: String {
-        "Data"
-    }
-
+    static var name: String { "Data" }
     static var schema: any JSONSchemaComponent {
-        JSONString()
-            .title(name)
-            .pattern("^0x[0-9a-fA-F]*$")
+        JSONString().title(name).pattern("^0x[0-9a-fA-F]*$")
     }
 }
 
@@ -185,9 +174,7 @@ extension FixedSizeData: TypeDescription {
     }
 
     static var schema: any JSONSchemaComponent {
-        JSONString()
-            .title(name)
-            .pattern("^0x[0-9a-fA-F]{\(T.value * 2)}$")
+        JSONString().title(name).pattern("^0x[0-9a-fA-F]{\(T.value * 2)}$")
     }
 }
 
@@ -197,7 +184,9 @@ extension Array: TypeDescription {
     }
 
     static var schema: any JSONSchemaComponent {
-        JSONArray { JSONComponents.AnyComponent(getSchema(type: Element.self)) }
+        JSONArray {
+            wrapSchema(getSchema(type: Element.self))
+        }
     }
 }
 
@@ -217,7 +206,9 @@ extension Set: TypeDescription {
     }
 
     static var schema: any JSONSchemaComponent {
-        JSONArray { JSONComponents.AnyComponent(getSchema(type: Element.self)) }
+        JSONArray {
+            wrapSchema(getSchema(type: Element.self))
+        }
     }
 }
 
@@ -231,7 +222,9 @@ extension LimitedSizeArray: TypeDescription {
     }
 
     static var schema: any JSONSchemaComponent {
-        JSONArray { JSONComponents.AnyComponent(getSchema(type: T.self)) }
+        JSONArray {
+            wrapSchema(getSchema(type: T.self))
+        }
     }
 }
 
@@ -241,7 +234,9 @@ extension ConfigLimitedSizeArray: TypeDescription {
     }
 
     static var schema: any JSONSchemaComponent {
-        JSONArray { JSONComponents.AnyComponent(getSchema(type: T.self)) }
+        JSONArray {
+            wrapSchema(getSchema(type: T.self))
+        }
     }
 }
 
