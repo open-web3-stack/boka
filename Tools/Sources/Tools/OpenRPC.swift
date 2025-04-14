@@ -74,7 +74,7 @@ func createSpecContent(type: Any.Type, name: String?) -> SpecContent {
             summary: nil,
             description: nil,
             required: required,
-            schema: getSchema(type: type).definition
+            schema: getSchema(type: type).definition()
         )
     }
 }
@@ -104,7 +104,7 @@ func getSchema(type: Any.Type) -> any JSONSchemaComponent {
             JSONObject {
                 for field in info.properties {
                     JSONProperty(key: field.name) {
-                        getSchema(type: field.type)
+                        JSONComponents.AnyComponent(getSchema(type: field.type))
                     }
                 }
             }.title(getName(type: type))
@@ -197,7 +197,7 @@ extension Array: TypeDescription {
     }
 
     static var schema: any JSONSchemaComponent {
-        JSONArray().items { getSchema(type: Element.self) }
+        JSONArray { JSONComponents.AnyComponent(getSchema(type: Element.self)) }
     }
 }
 
@@ -217,7 +217,7 @@ extension Set: TypeDescription {
     }
 
     static var schema: any JSONSchemaComponent {
-        JSONArray().items { getSchema(type: Element.self) }
+        JSONArray { JSONComponents.AnyComponent(getSchema(type: Element.self)) }
     }
 }
 
@@ -231,7 +231,7 @@ extension LimitedSizeArray: TypeDescription {
     }
 
     static var schema: any JSONSchemaComponent {
-        JSONArray().items { getSchema(type: T.self) }
+        JSONArray { JSONComponents.AnyComponent(getSchema(type: T.self)) }
     }
 }
 
@@ -241,7 +241,7 @@ extension ConfigLimitedSizeArray: TypeDescription {
     }
 
     static var schema: any JSONSchemaComponent {
-        JSONArray().items { getSchema(type: T.self) }
+        JSONArray { JSONComponents.AnyComponent(getSchema(type: T.self)) }
     }
 }
 
