@@ -100,19 +100,19 @@ func getSchema(type: Any.Type) -> any JSONSchemaComponent {
     let info = try! typeInfo(of: type)
     switch info.kind {
     case .struct, .class:
-        return build {
-            JSONObject {
-                for field in info.properties {
-                    JSONProperty(key: field.name) {
-                        JSONComponents.AnyComponent(getSchema(type: field.type))
-                    }
-                }
-            }.title(getName(type: type))
+        let properties = info.properties.map { field -> any JSONPropertyComponent in
+            JSONProperty(key: field.name) {
+                getSchema(type: field.type)
+            }
         }
+
+        return JSONObject {
+            JSONComponents.Group(components: properties)
+        }
+        .title(getName(type: type))
+
     default:
-        return build {
-            JSONObject().title(getName(type: type))
-        }
+        return JSONObject().title(getName(type: type))
     }
 }
 
