@@ -65,7 +65,7 @@ extension Optional: OptionalProtocol {
 struct AnyJSONSchemaComponent: JSONSchemaComponent, @unchecked Sendable {
     typealias Output = Any
 
-    private let _schemaValue: [KeywordIdentifier: JSONValue]
+    private var _schemaValue: [KeywordIdentifier: JSONValue]
     private let _parse: @Sendable (JSONValue) -> Parsed<Any, ParseIssue>
 
     init(wrapped component: some JSONSchemaComponent) {
@@ -75,7 +75,9 @@ struct AnyJSONSchemaComponent: JSONSchemaComponent, @unchecked Sendable {
 
     var schemaValue: [KeywordIdentifier: JSONValue] {
         get { _schemaValue }
-        set { fatalError("schemaValue is read-only") }
+        set {
+            _schemaValue = newValue
+        }
     }
 
     func parse(_ value: JSONValue) -> Parsed<Any, ParseIssue> {
