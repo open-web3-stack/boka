@@ -67,10 +67,7 @@ struct AnyJSONSchemaComponent: JSONSchemaComponent, @unchecked Sendable {
         }
     }
 
-    var schemaValue: [KeywordIdentifier: JSONValue] {
-        get { _schemaValue }
-        set {}
-    }
+    var schemaValue: [KeywordIdentifier: JSONValue] { _schemaValue }
 
     func parse(_ value: JSONValue) -> Parsed<Any, ParseIssue> {
         _parse(value)
