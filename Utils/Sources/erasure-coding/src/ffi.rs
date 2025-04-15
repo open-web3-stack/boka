@@ -98,13 +98,17 @@ pub extern "C" fn reed_solomon_encode(
         return 1;
     }
 
+    if shard_size % 2 != 0 {
+        return 2;
+    }
+
     let mut original_slices = Vec::with_capacity(original_count);
 
     unsafe {
         for i in 0..original_count {
             let ptr = *original.add(i);
             if ptr.is_null() {
-                return 2;
+                return 3;
             }
             original_slices.push(slice::from_raw_parts(ptr, shard_size));
         }
@@ -119,20 +123,19 @@ pub extern "C" fn reed_solomon_encode(
 
                 let out_ptr = unsafe { *out_recovery.add(i) };
                 if out_ptr.is_null() {
-                    return 3;
+                    return 4;
                 }
 
                 unsafe {
-                    ptr::copy_nonoverlapping(
-                        recovery_data.as_ptr(),
-                        out_ptr,
-                        recovery_data.len().min(shard_size),
-                    );
+                    ptr::copy_nonoverlapping(recovery_data.as_ptr(), out_ptr, recovery_data.len());
                 }
             }
             0
         }
-        Err(_) => 4,
+        Err(e) => {
+            println!("FFI: Error in reed_solomon_encode, error: {:?}", e);
+            4
+        }
     }
 }
 
@@ -140,38 +143,25 @@ pub extern "C" fn reed_solomon_encode(
 pub extern "C" fn reed_solomon_recovery(
     original_count: usize,
     recovery_count: usize,
-    original_shards: *const Shard,
-    original_len: usize,
-    recovery_shards: *const Shard,
+    recovery_shards: *const *const Shard,
     recovery_len: usize,
     shard_size: usize,
     out_original: *mut *mut u8,
 ) -> isize {
-    if (original_shards.is_null() && original_len > 0)
-        || (recovery_shards.is_null() && recovery_len > 0)
-        || out_original.is_null()
-        || original_count == 0
-        || recovery_count == 0
-        || shard_size == 0
-    {
+    if out_original.is_null() || original_count == 0 || recovery_count == 0 || shard_size == 0 {
         return 1;
     }
 
-    let mut original_vec = Vec::new();
-    if original_len > 0 {
-        let original_slice = unsafe { slice::from_raw_parts(original_shards, original_len) };
-        for shard in original_slice {
-            if !shard.data.is_null() {
-                let data = unsafe { slice::from_raw_parts(shard.data, shard_size) };
-                original_vec.push((shard.index as usize, data.to_vec()));
-            }
-        }
+    if shard_size % 2 != 0 {
+        return 2;
     }
 
     let mut recovery_vec = Vec::new();
     if recovery_len > 0 {
-        let recovery_slice = unsafe { slice::from_raw_parts(recovery_shards, recovery_len) };
-        for shard in recovery_slice {
+        for i in 0..recovery_len {
+            let shard_ptr = unsafe { *recovery_shards.add(i) };
+            let shard = unsafe { &*shard_ptr };
+
             if !shard.data.is_null() {
                 let data = unsafe { slice::from_raw_parts(shard.data, shard_size) };
                 recovery_vec.push((shard.index as usize, data.to_vec()));
@@ -179,26 +169,30 @@ pub extern "C" fn reed_solomon_recovery(
         }
     }
 
-    match reed_solomon_simd::decode(original_count, recovery_count, original_vec, recovery_vec) {
+    match reed_solomon_simd::decode(
+        original_count,
+        recovery_count,
+        Vec::<(usize, Vec<u8>)>::new(),
+        recovery_vec,
+    ) {
         Ok(restored) => {
             for i in 0..original_count {
                 if let Some(data) = restored.get(&i) {
                     let out_ptr = unsafe { *out_original.add(i) };
                     if out_ptr.is_null() {
-                        return 2;
+                        return 3;
                     }
 
                     unsafe {
-                        ptr::copy_nonoverlapping(
-                            data.as_ptr(),
-                            out_ptr,
-                            data.len().min(shard_size),
-                        );
+                        ptr::copy_nonoverlapping(data.as_ptr(), out_ptr, data.len());
                     }
                 }
             }
             0
         }
-        Err(_) => 3,
+        Err(e) => {
+            println!("FFI: Error in reed_solomon_recovery, error: {:?}", e);
+            4
+        }
     }
 }
