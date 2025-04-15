@@ -61,34 +61,34 @@ extension ActivityStatistics {
             config: config,
             defaultValue: .dummy(config: config)
         )
-        var serviceStats = [ServiceIndex: ServiceStatistics]()
+        var serviceStats = [UInt: ServiceStatistics]()
         for index in indices {
-            serviceStats[index] = .dummy(config: config)
+            serviceStats[UInt(index)] = .dummy(config: config)
         }
 
         for guaranteeItem in extrinsic.reports.guarantees {
             let report = guaranteeItem.workReport
             let index = report.coreIndex
+            coreStats[index].packageSize += UInt(report.packageSpecification.length)
             for result in report.results {
                 coreStats[index].gasUsed += result.gasUsed
                 coreStats[index].importsCount += result.importsCount
                 coreStats[index].exportsCount += result.exportsCount
                 coreStats[index].extrinsicsCount += result.extrinsicsCount
                 coreStats[index].extrinsicsSize += result.extrinsicsSize
-                coreStats[index].packageSize += UInt(report.packageSpecification.length)
 
-                let serviceIndex = result.serviceIndex
+                let serviceIndex = UInt(result.serviceIndex)
                 serviceStats[serviceIndex]!.importsCount += result.importsCount
                 serviceStats[serviceIndex]!.exportsCount += result.exportsCount
                 serviceStats[serviceIndex]!.extrinsicsCount += result.extrinsicsCount
                 serviceStats[serviceIndex]!.extrinsicsSize += result.extrinsicsSize
-                serviceStats[serviceIndex]!.reports.count += 1
-                serviceStats[serviceIndex]!.reports.gasUsed += result.gasUsed
+                serviceStats[serviceIndex]!.refines.count += 1
+                serviceStats[serviceIndex]!.refines.gasUsed += result.gasUsed
             }
         }
         for report in availableReports {
             let index = report.coreIndex
-            let segmentsSize = UInt32(config.value.segmentSize) * (UInt32(report.packageSpecification.segmentCount) * 65 + 63) / 64
+            let segmentsSize = UInt32(config.value.segmentSize) * ((UInt32(report.packageSpecification.segmentCount) * 65 + 63) / 64)
             coreStats[index].dataSize += UInt(report.packageSpecification.length + segmentsSize)
         }
         for assuranceItem in extrinsic.availability.assurances {
@@ -97,16 +97,19 @@ extension ActivityStatistics {
             }
         }
         for preimageItem in extrinsic.preimages.preimages {
-            serviceStats[preimageItem.serviceIndex]!.preimages.count += 1
-            serviceStats[preimageItem.serviceIndex]!.preimages.size += UInt(preimageItem.data.count)
+            let index = UInt(preimageItem.serviceIndex)
+            serviceStats[index]!.preimages.count += 1
+            serviceStats[index]!.preimages.size += UInt(preimageItem.data.count)
         }
         for accumulateItem in accumulateStats {
-            serviceStats[accumulateItem.key]!.accumulates.count += UInt(accumulateItem.value.1)
-            serviceStats[accumulateItem.key]!.accumulates.gasUsed += UInt(accumulateItem.value.0.value)
+            let index = UInt(accumulateItem.key)
+            serviceStats[index]!.accumulates.count += UInt(accumulateItem.value.1)
+            serviceStats[index]!.accumulates.gasUsed += UInt(accumulateItem.value.0.value)
         }
         for transferItem in transfersStats {
-            serviceStats[transferItem.key]!.transfers.count += UInt(transferItem.value.0)
-            serviceStats[transferItem.key]!.transfers.gasUsed += UInt(transferItem.value.1.value)
+            let index = UInt(transferItem.key)
+            serviceStats[index]!.transfers.count += UInt(transferItem.value.0)
+            serviceStats[index]!.transfers.gasUsed += UInt(transferItem.value.1.value)
         }
 
         return ValidatorActivityStatistics(

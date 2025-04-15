@@ -155,6 +155,8 @@ public final class Runtime {
         let block = block.value
         var newState = prevState.value
 
+        logger.debug("H_t=\(block.header.timeslot)")
+
         do {
             try updateSafrole(block: block, state: &newState)
 

@@ -1170,6 +1170,10 @@ public class Expunge: HostCall {
 public class Log: HostCall {
     public static var identifier: UInt8 { 100 }
 
+    public func gasCost(state _: VMState) -> Gas {
+        Gas(0)
+    }
+
     public enum Level: UInt32, Codable {
         case error = 0
         case debug = 1
