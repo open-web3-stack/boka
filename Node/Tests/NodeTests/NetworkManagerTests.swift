@@ -98,7 +98,10 @@ struct NetworkManagerTests {
             ))
 
         // Wait for event processing
-        try await Task.sleep(for: .milliseconds(2000))
+        let startTime = Date()
+        while network.calls.count < 2, Date().timeIntervalSince(startTime) < 10.0 {
+            try await Task.sleep(for: .milliseconds(100))
+        }
         let events = await storeMiddleware.wait()
         // Verify network calls
         #expect(
@@ -115,7 +118,6 @@ struct NetworkManagerTests {
             ]),
             "network calls: \(network.calls)"
         )
-        try await Task.sleep(for: .milliseconds(500))
         let event = try #require(events.first { $0 is RuntimeEvents.WorkPackageBundleReceivedReply } as? RuntimeEvents
             .WorkPackageBundleReceivedReply)
         #expect(event.source == key.ed25519.data)
