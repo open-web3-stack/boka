@@ -10,6 +10,7 @@ struct Boka: AsyncParsableCommand {
         version: "0.0.1",
         subcommands: [
             OpenRPC.self,
+            PVM.self,
         ]
     )
 
