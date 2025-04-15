@@ -99,7 +99,7 @@ struct NetworkManagerTests {
 
         // Wait for event processing
         let startTime = Date()
-        while network.calls.count < 2, Date().timeIntervalSince(startTime) < 10.0 {
+        while network.calls.count < 3, Date().timeIntervalSince(startTime) < 10.0 {
             try await Task.sleep(for: .milliseconds(100))
         }
         let events = await storeMiddleware.wait()
