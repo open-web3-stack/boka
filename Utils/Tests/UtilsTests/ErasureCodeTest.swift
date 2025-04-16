@@ -24,11 +24,15 @@ func createShards(from data: Data, count: Int) -> [Data] {
 
 @Suite struct ErasureCodingUnitTests {
     @Test(arguments: [
+        (4, 2, 5),
+        (16, 2, 5),
+        (32, 2, 5),
         (64, 4, 6),
         (100, 5, 10),
+        (312, 12, 16),
         (512, 8, 10),
         (1024, 8, 14),
-        (4096, 12, 20),
+        (4104, 12, 18),
     ] as [(Int, Int, Int)])
     func testEncodeRecover(testCase: (Int, Int, Int)) throws {
         let dataLength = testCase.0
@@ -38,9 +42,9 @@ func createShards(from data: Data, count: Int) -> [Data] {
 
         let originalData = Data((0 ..< dataLength).map { UInt8(($0 * 15) % 256) })
 
-        let original = createShards(from: originalData, count: originalCount)
+        let originalShards = createShards(from: originalData, count: originalCount)
 
-        let recovery = try ErasureCoding.encode(original: original, recoveryCount: recoveryCount)
+        let recovery = try ErasureCoding.encode(original: originalShards, recoveryCount: recoveryCount)
 
         #expect(recovery.count == recoveryCount)
 
@@ -137,24 +141,26 @@ func createShards(from data: Data, count: Int) -> [Data] {
     }
 
     @Test(arguments: [
-        // (64, 4, 9),
-        // (512, 8, 10),
-        // (1024, 8, 14),
-        // (4104, 4, 6), // tiny
-        // (4104, 8, 12), // small
-        (300, 12, 16),
-        // (300, 8, 16),
-        // (4104, 12, 18), // medium
-        // (4104, 684, 1023), // full
+        (12, 4, 5),
+        (64, 4, 9),
+        (36, 12, 16),
+        (312, 12, 16),
+        (512, 8, 10),
+        (1024, 8, 14),
+        (4104, 4, 6), // tiny
+        (4104, 8, 12), // small
+        (4104, 12, 18), // medium
+        (4104, 684, 1023), // full
     ] as [(Int, Int, Int)])
     func testChunkReconstruct(testCase: (Int, Int, Int)) throws {
         let dataLength = testCase.0
-        let originalCount = testCase.1
+        let basicSize = testCase.1
+        let originalCount = basicSize / 2
         let recoveryCount = testCase.2
 
         let originalData = Data((0 ..< dataLength).map { UInt8(($0 * 15) % 256) })
 
-        let recovery = try ErasureCoding.chunk(data: originalData, originalCount: originalCount, recoveryCount: recoveryCount)
+        let recovery = try ErasureCoding.chunk(data: originalData, basicSize: basicSize, recoveryCount: recoveryCount)
 
         #expect(recovery.count == recoveryCount)
 
@@ -165,7 +171,7 @@ func createShards(from data: Data, count: Int) -> [Data] {
         }
 
         let recovered = try ErasureCoding.reconstruct(
-            shards: partialRecovery, originalCount: originalCount, recoveryCount: recoveryCount
+            shards: partialRecovery, basicSize: basicSize, originalCount: originalCount, recoveryCount: recoveryCount
         )
 
         #expect(recovered == originalData)

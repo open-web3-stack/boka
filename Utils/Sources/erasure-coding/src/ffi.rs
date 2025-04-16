@@ -196,3 +196,61 @@ pub extern "C" fn reed_solomon_recovery(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn debug_original_reed_solomon_encode_recover() {
+        let original_count = 2;
+        let recovery_count = 5;
+
+        let original_data = vec![vec![0u8, 15u8], vec![30u8, 45u8]];
+
+        println!("Original shards:");
+        for (i, shard) in original_data.iter().enumerate() {
+            println!("Shard {}: {:?}", i, shard);
+        }
+
+        let original_slices: Vec<&[u8]> = original_data.iter().map(|v| v.as_slice()).collect();
+
+        let recovery_result =
+            reed_solomon_simd::encode(original_count, recovery_count, original_slices);
+        assert!(recovery_result.is_ok());
+
+        let recovery_data = recovery_result.unwrap();
+
+        println!("Recovery shards from reed_solomon_simd:");
+        for (i, shard) in recovery_data.iter().enumerate() {
+            println!("Shard {}: {:?}", i, shard);
+        }
+
+        let mut recovery_shards = Vec::new();
+        for i in (recovery_count - original_count)..recovery_count {
+            recovery_shards.push((i, recovery_data[i].clone()));
+        }
+
+        println!("Recovery shards used for decode:");
+        for (i, (idx, shard)) in recovery_shards.iter().enumerate() {
+            println!("Shard {} (index {}): {:?}", i, idx, shard);
+        }
+
+        let restored_result = reed_solomon_simd::decode(
+            original_count,
+            recovery_count,
+            Vec::<(usize, Vec<u8>)>::new(),
+            recovery_shards,
+        );
+
+        assert!(restored_result.is_ok());
+        let restored = restored_result.unwrap();
+
+        println!("Restored original shards:");
+        for i in 0..original_count {
+            if let Some(data) = restored.get(&i) {
+                println!("Shard {}: {:?}", i, data);
+                assert_eq!(*data, original_data[i]);
+            }
+        }
+    }
+}
