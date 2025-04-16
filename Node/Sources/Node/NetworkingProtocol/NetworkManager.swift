@@ -225,6 +225,7 @@ public final class NetworkManager: Sendable {
     private func on(workPackageBundleReady event: RuntimeEvents.WorkPackageBundleReady) async {
         await withSpan("NetworkManager.on(workPackageBundleReady)", logger: logger) { _ in
             let target = event.target
+
             let resp = try await send(to: target, message: .workPackageSharing(.init(
                 coreIndex: event.coreIndex,
                 segmentsRootMappings: event.segmentsRootMappings,
@@ -255,7 +256,7 @@ public final class NetworkManager: Sendable {
             let currentValidators = event.state.currentValidators
             let nextValidators = event.state.nextValidators
             let allValidators = Set([currentValidators.array, nextValidators.array].joined())
-
+            print("NetworkManager.onBeforeEpoch \(allValidators)")
             var peerIdByPublicKey: [Data32: PeerId] = [:]
             for validator in allValidators {
                 if let addr = NetAddr(address: validator.metadataString) {

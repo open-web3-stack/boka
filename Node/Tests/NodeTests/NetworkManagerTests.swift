@@ -86,8 +86,10 @@ struct NetworkManagerTests {
         let workReportHash = Data32(repeating: 2)
         let signature = Ed25519Signature(repeating: 3)
         let expectedResp = try JamEncoder.encode(workReportHash, signature)
+        await services.publishOnBeforeEpochEvent()
         network.state.write {
             $0.simulatedResponseData = [expectedResp]
+            $0.simulatedPeerRole = .validator
         }
         // Publish WorkPackagesReceived event
         await services.blockchain
@@ -97,18 +99,18 @@ struct NetworkManagerTests {
                 bundle: bundle,
                 segmentsRootMappings: segmentsRootMappings
             ))
+        try? await Task.sleep(for: .milliseconds(1000))
+
         // Wait for event processing
         let events = await storeMiddleware.wait()
-        var maxRetry = 20
-        while network.calls.count < 3, maxRetry > 0 {
-            maxRetry -= 1
-            try? await Task.sleep(for: .milliseconds(100))
-        }
-        let event = events.first { $0 is RuntimeEvents.WorkPackageBundleReceivedReply } as! RuntimeEvents
+
+        #expect(network.calls.count == 3)
+
+        let event = events.first { $0 is RuntimeEvents.WorkPackageBundleReceivedReply } as? RuntimeEvents
             .WorkPackageBundleReceivedReply
-        #expect(event.source == key.ed25519.data)
-        #expect(event.workReportHash == workReportHash)
-        #expect(event.signature == signature)
+        #expect(event?.source == key.ed25519.data)
+        #expect(event?.workReportHash == workReportHash)
+        #expect(event?.signature == signature)
     }
 
     @Test
@@ -230,6 +232,38 @@ struct NetworkManagerTests {
     }
 
     @Test
+    func testWorkPackageBundleReadyInvalidResponse() async throws {
+        // Here, we configure the mock network to provide an empty response.
+        // That should trigger the "WorkPackageSharing response is invalid" path,
+        // preventing publication of a WorkPackageBundleReceivedReply event.
+
+        network.state.write { $0.simulatedResponseData = [] }
+
+        // Since the dev peer public key in the mock is all zeros,
+        // we'll use Data32(repeating: 0) for the target to avoid a peerNotFound error.
+        let target = Data32(repeating: 0)
+        let bundle = WorkPackageBundle.dummy(config: services.config)
+        let segmentsRootMappings = [SegmentsRootMapping(
+            workPackageHash: Data32(),
+            segmentsRoot: Data32()
+        )]
+
+        await services.blockchain.publish(event: RuntimeEvents.WorkPackageBundleReady(
+            target: target,
+            coreIndex: 321,
+            bundle: bundle,
+            segmentsRootMappings: segmentsRootMappings
+        ))
+
+        // Wait for async processing
+        let events = await storeMiddleware.wait()
+        let reply = events.first(where: { $0 is RuntimeEvents.WorkPackageBundleReceivedReply })
+
+        // Verify no event was published
+        #expect(reply == nil)
+    }
+
+    @Test
     func testHandleWorkPackageSubmission() async throws {
         // Create work package and extrinsics
         let workPackage = WorkPackageRef.dummy(config: services.config)
@@ -288,38 +322,6 @@ struct NetworkManagerTests {
         let reply = events.first(where: { $0 is RuntimeEvents.WorkPackageBundleReceivedReply })
 
         // Ensure that no reply was published
-        #expect(reply == nil)
-    }
-
-    @Test
-    func testWorkPackageBundleReadyInvalidResponse() async throws {
-        // Here, we configure the mock network to provide an empty response.
-        // That should trigger the "WorkPackageSharing response is invalid" path,
-        // preventing publication of a WorkPackageBundleReceivedReply event.
-
-        network.state.write { $0.simulatedResponseData = [] }
-
-        // Since the dev peer public key in the mock is all zeros,
-        // we'll use Data32(repeating: 0) for the target to avoid a peerNotFound error.
-        let target = Data32(repeating: 0)
-        let bundle = WorkPackageBundle.dummy(config: services.config)
-        let segmentsRootMappings = [SegmentsRootMapping(
-            workPackageHash: Data32(),
-            segmentsRoot: Data32()
-        )]
-
-        await services.blockchain.publish(event: RuntimeEvents.WorkPackageBundleReady(
-            target: target,
-            coreIndex: 321,
-            bundle: bundle,
-            segmentsRootMappings: segmentsRootMappings
-        ))
-
-        // Wait for async processing
-        let events = await storeMiddleware.wait()
-        let reply = events.first(where: { $0 is RuntimeEvents.WorkPackageBundleReceivedReply })
-
-        // Verify no event was published
         #expect(reply == nil)
     }
 
