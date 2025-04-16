@@ -88,6 +88,8 @@ struct NetworkManagerTests {
         let expectedResp = try JamEncoder.encode(workReportHash, signature)
         network.state.write { $0.simulatedResponseData = [expectedResp] }
 
+        try await Task.sleep(for: .milliseconds(500))
+
         // Publish WorkPackagesReceived event
         await services.blockchain
             .publish(event: RuntimeEvents.WorkPackageBundleReady(
@@ -98,10 +100,6 @@ struct NetworkManagerTests {
             ))
 
         // Wait for event processing
-        let startTime = Date()
-        while network.calls.count < 3, Date().timeIntervalSince(startTime) < 10.0 {
-            try await Task.sleep(for: .milliseconds(100))
-        }
         let events = await storeMiddleware.wait()
         // Verify network calls
         #expect(
