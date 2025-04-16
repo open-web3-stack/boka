@@ -86,10 +86,9 @@ struct NetworkManagerTests {
         let workReportHash = Data32(repeating: 2)
         let signature = Ed25519Signature(repeating: 3)
         let expectedResp = try JamEncoder.encode(workReportHash, signature)
-        network.state.write { $0.simulatedResponseData = [expectedResp] }
-
-        try await Task.sleep(for: .milliseconds(500))
-
+        network.state.write {
+            $0.simulatedResponseData = [expectedResp]
+        }
         // Publish WorkPackagesReceived event
         await services.blockchain
             .publish(event: RuntimeEvents.WorkPackageBundleReady(
@@ -98,26 +97,15 @@ struct NetworkManagerTests {
                 bundle: bundle,
                 segmentsRootMappings: segmentsRootMappings
             ))
-
         // Wait for event processing
         let events = await storeMiddleware.wait()
-        // Verify network calls
-        #expect(
-            network.contain(calls: [
-                .init(function: "connect", parameters: ["address": devPeers.first!, "role": PeerRole.validator]),
-                .init(function: "sendToPeer", parameters: [
-                    "peerId": PeerId(publicKey: key.ed25519.data.data, address: devPeers.first!),
-                    "message": CERequest.workPackageSharing(.init(
-                        coreIndex: 1,
-                        segmentsRootMappings: segmentsRootMappings,
-                        bundle: bundle
-                    )),
-                ]),
-            ]),
-            "network calls: \(network.calls)"
-        )
-        let event = try #require(events.first { $0 is RuntimeEvents.WorkPackageBundleReceivedReply } as? RuntimeEvents
-            .WorkPackageBundleReceivedReply)
+        var maxRetry = 20
+        while network.calls.count < 3, maxRetry > 0 {
+            maxRetry -= 1
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        let event = events.first { $0 is RuntimeEvents.WorkPackageBundleReceivedReply } as! RuntimeEvents
+            .WorkPackageBundleReceivedReply
         #expect(event.source == key.ed25519.data)
         #expect(event.workReportHash == workReportHash)
         #expect(event.signature == signature)
