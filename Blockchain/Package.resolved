@@ -1,5 +1,5 @@
 {
-  "originHash" : "653eff92c0b101b13d9ec17170dd383380bf31cf51922af0915e8046af171eb5",
+  "originHash" : "70f026b0b2979b5824592ab2cbdf4ae1a235fd69ecef967a7fbc6585ba704548",
   "pins" : [
     {
       "identity" : "blake2.swift",
@@ -87,7 +87,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-testing.git",
       "state" : {
-        "branch" : "6.0.3",
+        "branch" : "release/6.0",
         "revision" : "18c42c19cac3fafd61cab1156d4088664b7424ae"
       }
     }

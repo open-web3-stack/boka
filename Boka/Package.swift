@@ -14,7 +14,7 @@ let package = Package(
         .package(url: "https://github.com/slashmo/swift-otel.git", from: "0.9.0"),
         .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.6.0"),
         .package(url: "https://github.com/vapor/console-kit.git", from: "4.15.0"),
-        .package(url: "https://github.com/apple/swift-testing.git", branch: "6.1"),
+        .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
     ],
     targets: [
