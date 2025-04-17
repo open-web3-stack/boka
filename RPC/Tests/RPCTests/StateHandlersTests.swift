@@ -37,7 +37,7 @@ final class StateHandlersTests {
         try await app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
             let resp = try! res.content.decode(JSONResponse.self, using: JSONDecoder())
-            #expect(resp.result!.value != nil)
+            #expect(resp.result?.value != nil)
         }
         try await app.asyncShutdown()
     }
@@ -52,7 +52,7 @@ final class StateHandlersTests {
         try await app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
             let resp = try! res.content.decode(JSONResponse.self, using: JSONDecoder())
-            #expect(resp.result!.value != nil)
+            #expect(resp.result?.value != nil)
         }
         try await app.asyncShutdown()
     }
