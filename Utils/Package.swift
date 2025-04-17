@@ -20,7 +20,7 @@ let package = Package(
         .package(path: "../TracingUtils"),
         .package(url: "https://github.com/tesseract-one/Blake2.swift.git", from: "0.2.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0" ..< "4.0.0"),
-        .package(url: "https://github.com/apple/swift-testing.git", branch: "6.0.3"),
+        .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
         .package(url: "https://github.com/apple/swift-numerics.git", branch: "main"),
     ],
     targets: [
