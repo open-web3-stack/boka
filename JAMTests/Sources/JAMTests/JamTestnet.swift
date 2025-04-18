@@ -145,8 +145,8 @@ struct TestState: Codable {
 }
 
 enum JamTestnet {
-    static func loadTests(path: String, src: TestsSource) throws -> [Testcase] {
-        try TestLoader.getTestcases(path: path, extension: "bin", src: src)
+    static func loadTests(path: String, src: TestsSource, ext: String = "bin") throws -> [Testcase] {
+        try TestLoader.getTestcases(path: path, extension: ext, src: src)
     }
 
     static func decodeTestcase(_ input: Testcase, config: ProtocolConfigRef = TestVariants.tiny.config) throws -> JamTestnetTestcase {
