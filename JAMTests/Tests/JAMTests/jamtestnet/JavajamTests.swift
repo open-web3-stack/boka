@@ -31,7 +31,7 @@ struct JavajamTests {
         }
 
         let originalCount = config.value.totalNumberOfCores
-        let basicSize = originalCount * 2
+        let basicSize = config.value.erasureCodedPieceSize
         let recoveryCount = config.value.totalNumberOfValidators
 
         #expect(recoveryShards.count == recoveryCount)
