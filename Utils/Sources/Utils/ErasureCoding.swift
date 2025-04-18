@@ -22,6 +22,11 @@ public enum ErasureCoding {
     public struct Shard {
         public let data: Data
         public let index: UInt32
+
+        public init(data: Data, index: UInt32) {
+            self.data = data
+            self.index = index
+        }
     }
 
     final class InnerShard {
@@ -268,7 +273,7 @@ public enum ErasureCoding {
     /// C_k: erasure-code chunking function (eq H.6)
     /// - Parameters:
     ///   - data: the original data
-    ///   - basicSize: ≈ 2 * number of cores; 684 for full config, aka `W_E`. Note that `k` will be `|data| / originalCount`
+    ///   - basicSize: ≈ 2 * number of cores; 684 for full config. Note that `k` will be `|data| / basicSize`
     ///   - recoveryCount: ≈ number of validators; 1023 for full config
     /// - Returns: the list of smaller data chunks
     public static func chunk(data: Data, basicSize: Int, recoveryCount: Int) throws -> [Data] {
@@ -299,7 +304,7 @@ public enum ErasureCoding {
     /// R_k: erasure-code reconstruction function (eq H.7)
     /// - Parameters:
     ///   - shards: the shards to reconstruct the original data, should be ordered
-    ///   - basicSize: ≈ 2 * number of cores; 684 for full config, aka `W_E`. Note that `k` will be `|data| / originalCount`
+    ///   - basicSize: ≈ 2 * number of cores; 684 for full config. Note that `k` will be `|data| / basicSize`
     ///   - originalCount: the total number of original items
     ///   - recoveryCount: the total number of recovery items
     /// - Returns: the reconstructed original data

@@ -221,8 +221,10 @@ func createShards(from data: Data, count: Int) -> [Data] {
     // func testReconstruct(testCase: ECTestCase) throws {
     //     let data = Data(fromHexString: testCase.data)!
     //     let recovery = testCase.segment.segments.map(\.segmentEc)[0].map { Data(fromHexString: $0)! }
-    //     let originalCount = 684
+    //     let originalCount = 342
     //     let recoveryCount = 1026
+    //     let basicSize = 684
+    //     // let k = 1
     //     var partialRecovery = [ErasureCoding.Shard]()
 
     //     for i in recoveryCount - originalCount ..< recoveryCount {
@@ -231,6 +233,7 @@ func createShards(from data: Data, count: Int) -> [Data] {
 
     //     let recovered = try ErasureCoding.reconstruct(
     //         shards: partialRecovery,
+    //         basicSize: basicSize,
     //         originalCount: originalCount,
     //         recoveryCount: recoveryCount
     //     )
