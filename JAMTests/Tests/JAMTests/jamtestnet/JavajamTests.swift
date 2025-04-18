@@ -54,10 +54,8 @@ struct JavajamTests {
 
             #expect(generatedShards.count == recoveryCount, "should generate expected number of recovery shards")
 
-            for (index, shard) in recoveryShards.enumerated() {
-                if index < generatedShards.count {
-                    #expect(generatedShards[index] == shard.data, "generated shard at index \(index) should match test data")
-                }
+            for (index, shard) in recoveryShards.enumerated() where index < generatedShards.count {
+                #expect(generatedShards[index] == shard.data, "generated shard at index \(index) should match test data")
             }
         }
     }
