@@ -329,8 +329,28 @@ struct NetworkManagerTests {
     func testHandleWorkReportDistribution() async throws {
         let workReport = WorkReport.dummy(config: services.config)
         let slot: UInt32 = 123
-        let signatures = [ValidatorSignature(validatorIndex: 0, signature: Ed25519Signature(repeating: 20))]
+        let signature = ValidatorSignature(validatorIndex: 0, signature: Ed25519Signature(repeating: 20))
+        let signatures = [signature, signature, signature]
+        let distributionMessage = CERequest.workReportDistribution(WorkReportDistributionMessage(
+            workReport: workReport,
+            slot: slot,
+            signatures: signatures
+        ))
 
+        let message = try WorkReportDistributionMessage.decode(data: distributionMessage.encode(), config: services.config)
+        #expect(slot == message.slot)
+
+        _ = await services.dataAvailabilityService
+        let data = try await network.handler.handle(ceRequest: distributionMessage)
+        await storeMiddleware.wait()
+        #expect(data == [])
+    }
+
+    @Test
+    func testHandleInvalidWorkReportDistribution() async throws {
+        let workReport = WorkReport.dummy(config: services.config)
+        let slot: UInt32 = 123
+        let signatures = [ValidatorSignature(validatorIndex: 0, signature: Ed25519Signature(repeating: 20))]
         let distributionMessage = CERequest.workReportDistribution(WorkReportDistributionMessage(
             workReport: workReport,
             slot: slot,

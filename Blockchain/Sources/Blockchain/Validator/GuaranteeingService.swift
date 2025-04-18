@@ -352,9 +352,6 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         let currentTime = timeProvider.getTime()
         let timeslot = currentTime.timeToTimeslot(config: config) + 1
 
-        logger.debug("Generated work report",
-                     metadata: ["reportHash": "\(workReportHash)", "timeslot": "\(timeslot)", "signatures": "\(sigs.count)"])
-
         // Save GuaranteedWorkReport to local db
         try await dataProvider
             .add(guaranteedWorkReport:
