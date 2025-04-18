@@ -33,7 +33,10 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
             logger.debug("block already imported", metadata: ["hash": "\(block.hash)"])
             return
         }
-
+        // TODO: if current block is light
+        // check if dataProvider.hasGuaranteedWorkReport
+        // send workReportDistribution waiting for response
+        // save to full block
         try await withSpan("importBlock") { span in
             span.attributes.blockHash = block.hash.description
 

@@ -53,7 +53,7 @@ final class SystemHandlersTests {
         let req = JSONRequest(jsonrpc: "2.0", method: "system_health", params: nil, id: 1)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
+        try app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
             #expect(res.status == .ok)
             let resp = try res.content.decode(JSONResponse.self, using: JSONDecoder())
             #expect((resp.result!.value as! Utils.JSON).bool == true)
@@ -64,7 +64,7 @@ final class SystemHandlersTests {
         let req = JSONRequest(jsonrpc: "2.0", method: "system_implementation", params: nil, id: 2)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
+        try app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
             #expect(res.status == .ok)
             let resp = try res.content.decode(JSONResponse.self, using: JSONDecoder())
             #expect((resp.result!.value as! Utils.JSON).string == "Boka")
@@ -75,7 +75,7 @@ final class SystemHandlersTests {
         let req = JSONRequest(jsonrpc: "2.0", method: "system_version", params: nil, id: 3)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
+        try app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
             #expect(res.status == .ok)
             let resp = try res.content.decode(JSONResponse.self, using: JSONDecoder())
             #expect((resp.result!.value as! Utils.JSON).string == "0.0.1")
@@ -86,7 +86,7 @@ final class SystemHandlersTests {
         let req = JSONRequest(jsonrpc: "2.0", method: "system_properties", params: nil, id: 4)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
+        try app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
             #expect(res.status == .ok)
             let resp = try res.content.decode(JSONResponse.self, using: JSONDecoder())
             #expect(resp.result?.value != nil)
@@ -97,7 +97,7 @@ final class SystemHandlersTests {
         let req = JSONRequest(jsonrpc: "2.0", method: "system_nodeRoles", params: nil, id: 5)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
+        try app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
             #expect(res.status == .ok)
             let resp = try res.content.decode(JSONResponse.self, using: JSONDecoder())
             #expect((resp.result!.value as! Utils.JSON).array == [])
@@ -108,7 +108,7 @@ final class SystemHandlersTests {
         let req = JSONRequest(jsonrpc: "2.0", method: "system_chain", params: nil, id: 6)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
+        try app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
             #expect(res.status == .ok)
             let resp = try res.content.decode(JSONResponse.self, using: JSONDecoder())
             #expect((resp.result!.value as! Utils.JSON).string == "dev")

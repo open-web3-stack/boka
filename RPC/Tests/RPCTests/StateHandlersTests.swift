@@ -34,10 +34,10 @@ final class StateHandlersTests {
         let req = JSONRequest(jsonrpc: "2.0", method: "state_getKeys", params: params, id: 1)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try await app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
+        try await app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
             let resp = try! res.content.decode(JSONResponse.self, using: JSONDecoder())
-            #expect(resp.result!.value != nil)
+            #expect(resp.result?.value != nil)
         }
         try await app.asyncShutdown()
     }
@@ -49,10 +49,10 @@ final class StateHandlersTests {
         let req = JSONRequest(jsonrpc: "2.0", method: "state_getStorage", params: params, id: 2)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try await app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
+        try await app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
             let resp = try! res.content.decode(JSONResponse.self, using: JSONDecoder())
-            #expect(resp.result!.value != nil)
+            #expect(resp.result?.value != nil)
         }
         try await app.asyncShutdown()
     }

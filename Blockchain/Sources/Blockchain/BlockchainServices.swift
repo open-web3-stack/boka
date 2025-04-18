@@ -23,6 +23,9 @@ public class BlockchainServices: @unchecked Sendable {
     private var _guaranteeingService: GuaranteeingService?
     private weak var _guaranteeingServiceRef: GuaranteeingService?
 
+    private var _dataAvailabilityService: DataAvailabilityService?
+    private weak var _dataAvailabilityServiceRef: DataAvailabilityService?
+
     private let schedulerService: ServiceBase2
 
     public init(
@@ -63,6 +66,7 @@ public class BlockchainServices: @unchecked Sendable {
         _blockchain = nil
         _blockAuthor = nil
         _guaranteeingService = nil
+        _dataAvailabilityService = nil
 
         if let _blockchainRef {
             fatalError("BlockchainServices: blockchain still alive. retain count: \(_getRetainCount(_blockchainRef))")
@@ -74,6 +78,30 @@ public class BlockchainServices: @unchecked Sendable {
 
         if let _guaranteeingServiceRef {
             fatalError("BlockchainServices: guaranteeingService still alive. retain count: \(_getRetainCount(_guaranteeingServiceRef))")
+        }
+
+        if let _dataAvailabilityServiceRef {
+            fatalError(
+                "BlockchainServices: dataAvailabilityService still alive. retain count: \(_getRetainCount(_dataAvailabilityServiceRef))"
+            )
+        }
+    }
+
+    public var dataAvailabilityService: DataAvailabilityService {
+        get async {
+            if let _dataAvailabilityService {
+                return _dataAvailabilityService
+            }
+            _dataAvailabilityService = await DataAvailabilityService(
+                config: config,
+                eventBus: eventBus,
+                scheduler: scheduler,
+                dataProvider: dataProvider,
+                dataStore: dataStore
+            )
+            _dataAvailabilityServiceRef = _dataAvailabilityService
+            await _dataAvailabilityService!.onSyncCompleted()
+            return _dataAvailabilityService!
         }
     }
 

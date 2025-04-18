@@ -15,7 +15,7 @@ public enum CERequest: Sendable, Equatable, Hashable {
     case safroleTicket2(SafroleTicketMessage)
     case workPackageSubmission(WorkPackageSubmissionMessage)
     case workPackageSharing(WorkPackageSharingMessage)
-    case workReportDistrubution(WorkReportDistributionMessage)
+    case workReportDistribution(WorkReportDistributionMessage)
     case workReportRequest(WorkReportRequestMessage)
     case shardDistribution(ShardDistributionMessage)
     case auditShardRequest(AuditShardRequestMessage)
@@ -45,7 +45,7 @@ extension CERequest: RequestProtocol {
             try message.encode()
         case let .workPackageSharing(message):
             try message.encode()
-        case let .workReportDistrubution(message):
+        case let .workReportDistribution(message):
             try message.encode()
         case let .workReportRequest(message):
             try message.encode()
@@ -84,8 +84,8 @@ extension CERequest: RequestProtocol {
             .workPackageSubmission
         case .workPackageSharing:
             .workPackageSharing
-        case .workReportDistrubution:
-            .workReportDistrubution
+        case .workReportDistribution:
+            .workReportDistribution
         case .workReportRequest:
             .workReportRequest
         case .shardDistribution:
@@ -123,7 +123,7 @@ extension CERequest: RequestProtocol {
             WorkPackageSubmissionMessage.self
         case .workPackageSharing:
             WorkPackageSharingMessage.self
-        case .workReportDistrubution:
+        case .workReportDistribution:
             WorkReportDistributionMessage.self
         case .workReportRequest:
             WorkReportRequestMessage.self
@@ -168,9 +168,9 @@ extension CERequest: RequestProtocol {
         case .workPackageSharing:
             guard let message = data as? WorkPackageSharingMessage else { return nil }
             return .workPackageSharing(message)
-        case .workReportDistrubution:
+        case .workReportDistribution:
             guard let message = data as? WorkReportDistributionMessage else { return nil }
-            return .workReportDistrubution(message)
+            return .workReportDistribution(message)
         case .workReportRequest:
             guard let message = data as? WorkReportRequestMessage else { return nil }
             return .workReportRequest(message)

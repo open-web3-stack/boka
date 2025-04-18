@@ -23,6 +23,9 @@ enum StoreId: UInt8, ColumnFamilyKey {
     // 0x00 + node hash => ref count
     // 0x01 + value hash => ref count
     case stateRefs = 4
+    // guaranteedWorkReports
+    // workReportHash => guaranteedWorkReport
+    case guaranteedWorkReports = 5
 }
 
 enum MetaKey: UInt8 {
