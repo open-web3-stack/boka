@@ -20,7 +20,7 @@ let package = Package(
         .package(path: "../Utils"),
         .package(path: "../TracingUtils"),
         .package(path: "../PolkaVM"),
-        .package(url: "https://github.com/apple/swift-testing.git", branch: "0.10.0"),
+        .package(url: "https://github.com/apple/swift-testing.git", branch: "6.0.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.

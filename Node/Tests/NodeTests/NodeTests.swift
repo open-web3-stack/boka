@@ -85,6 +85,11 @@ final class NodeTests {
         await #expect(throws: StateBackendError.self) {
             _ = try await validatorNode.blockchain.dataProvider.getStorage(key: Data32.random(), blockHash: nil)
         }
+        let guaranteedWorkReport = GuaranteedWorkReport.dummy(config: .dev)
+        let hash = guaranteedWorkReport.workReport.hash()
+        try await validatorNode.blockchain.dataProvider.add(guaranteedWorkReport: GuaranteedWorkReportRef(guaranteedWorkReport))
+        #expect(try await (validatorNode.blockchain.dataProvider.getGuaranteedWorkReport(hash: hash)) != nil)
+        #expect(try await validatorNode.blockchain.dataProvider.hasGuaranteedWorkReport(hash: hash) == true)
     }
 
     @Test func sync() async throws {

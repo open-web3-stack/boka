@@ -41,7 +41,7 @@ final class TelemetryHandlersTests {
         let req = JSONRequest(jsonrpc: "2.0", method: "telemetry_name", params: nil, id: 1)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
+        try app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
             #expect(res.status == .ok)
             let resp = try res.content.decode(JSONResponse.self, using: JSONDecoder())
             #expect((resp.result!.value as! Utils.JSON).string == "TestNode")
@@ -52,7 +52,7 @@ final class TelemetryHandlersTests {
         let req = JSONRequest(jsonrpc: "2.0", method: "telemetry_peersCount", params: nil, id: 2)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
+        try app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
             #expect(res.status == .ok)
             let resp = try res.content.decode(JSONResponse.self, using: JSONDecoder())
             #expect((resp.result!.value as! Utils.JSON).number == 42)
@@ -63,7 +63,7 @@ final class TelemetryHandlersTests {
         let req = JSONRequest(jsonrpc: "2.0", method: "telemetry_networkKey", params: nil, id: 3)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
+        try app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
             #expect(res.status == .ok)
             let resp = try res.content.decode(JSONResponse.self, using: JSONDecoder())
             #expect((resp.result!.value as! Utils.JSON).string == "Ed25519:TestKey")

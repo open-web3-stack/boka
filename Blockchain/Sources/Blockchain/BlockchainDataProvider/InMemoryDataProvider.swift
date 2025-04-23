@@ -9,6 +9,7 @@ public actor InMemoryDataProvider {
     private var blockByHash: [Data32: BlockRef] = [:]
     private var stateByBlockHash: [Data32: StateRef] = [:]
     private var hashByTimeslot: [TimeslotIndex: Set<Data32>] = [:]
+    private var guaranteedWorkReports: [Data32: GuaranteedWorkReportRef] = [:]
     public let genesisBlockHash: Data32
 
     public init(genesisState: StateRef, genesisBlock: BlockRef) async {
@@ -22,6 +23,18 @@ public actor InMemoryDataProvider {
 }
 
 extension InMemoryDataProvider: BlockchainDataProviderProtocol {
+    public func hasGuaranteedWorkReport(hash: Data32) async throws -> Bool {
+        guaranteedWorkReports[hash] != nil
+    }
+
+    public func getGuaranteedWorkReport(hash: Data32) async throws -> GuaranteedWorkReportRef? {
+        guaranteedWorkReports[hash]
+    }
+
+    public func add(guaranteedWorkReport: GuaranteedWorkReportRef) async throws {
+        guaranteedWorkReports[guaranteedWorkReport.value.workReport.hash()] = guaranteedWorkReport
+    }
+
     public func getKeys(prefix: Data32, count: UInt32, startKey: Data32?, blockHash: Data32?) async throws -> [String] {
         guard let stateRef = try getState(hash: blockHash ?? genesisBlockHash) else {
             return []
@@ -120,6 +133,7 @@ extension InMemoryDataProvider: BlockchainDataProviderProtocol {
         let timeslot = blockByHash[hash]?.header.timeslot ?? stateByBlockHash[hash]?.value.timeslot
         stateByBlockHash.removeValue(forKey: hash)
         blockByHash.removeValue(forKey: hash)
+        guaranteedWorkReports.removeValue(forKey: hash)
 
         if let timeslot {
             hashByTimeslot[timeslot]?.remove(hash)

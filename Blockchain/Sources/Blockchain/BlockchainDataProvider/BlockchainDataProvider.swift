@@ -58,6 +58,18 @@ public actor BlockchainDataProvider {
 }
 
 extension BlockchainDataProvider {
+    public func hasGuaranteedWorkReport(hash: Data32) async throws -> Bool {
+        try await dataProvider.hasGuaranteedWorkReport(hash: hash)
+    }
+
+    public func getGuaranteedWorkReport(hash: Data32) async throws -> GuaranteedWorkReportRef? {
+        try await dataProvider.getGuaranteedWorkReport(hash: hash)
+    }
+
+    public func add(guaranteedWorkReport: GuaranteedWorkReportRef) async throws {
+        try await dataProvider.add(guaranteedWorkReport: guaranteedWorkReport)
+    }
+
     public func hasBlock(hash: Data32) async throws -> Bool {
         try await dataProvider.hasBlock(hash: hash)
     }

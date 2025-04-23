@@ -112,6 +112,13 @@ public final class NetworkManager: Sendable {
             ) { [weak self] event in
                 await self?.on(beforeEpochChange: event)
             }
+
+            await subscriptions.subscribe(
+                RuntimeEvents.WorkReportGenerated.self,
+                id: "NetworkManager.WorkReportGenerated"
+            ) { [weak self] event in
+                await self?.on(workReportGenerated: event)
+            }
         }
     }
 
@@ -218,6 +225,7 @@ public final class NetworkManager: Sendable {
     private func on(workPackageBundleReady event: RuntimeEvents.WorkPackageBundleReady) async {
         await withSpan("NetworkManager.on(workPackageBundleReady)", logger: logger) { _ in
             let target = event.target
+
             let resp = try await send(to: target, message: .workPackageSharing(.init(
                 coreIndex: event.coreIndex,
                 segmentsRootMappings: event.segmentsRootMappings,
@@ -248,7 +256,7 @@ public final class NetworkManager: Sendable {
             let currentValidators = event.state.currentValidators
             let nextValidators = event.state.nextValidators
             let allValidators = Set([currentValidators.array, nextValidators.array].joined())
-
+            print("NetworkManager.onBeforeEpoch \(allValidators)")
             var peerIdByPublicKey: [Data32: PeerId] = [:]
             for validator in allValidators {
                 if let addr = NetAddr(address: validator.metadataString) {
@@ -261,6 +269,20 @@ public final class NetworkManager: Sendable {
 
             await storage.set(peerIdByPublicKey)
         }
+    }
+
+    private func on(workReportGenerated event: RuntimeEvents.WorkReportGenerated) async {
+        logger.trace("sending guaranteed work-report",
+                     metadata: ["slot": "\(event.slot)",
+                                "signatures": "\(event.signatures.count)"])
+        await broadcast(
+            to: .currentValidators,
+            message: .workReportDistribution(.init(
+                workReport: event.workReport,
+                slot: event.slot,
+                signatures: event.signatures
+            ))
+        )
     }
 
     public var peersCount: Int {
@@ -312,7 +334,7 @@ struct HandlerImpl: NetworkProtocolHandler {
             }
             return [encoder.data]
         case let .stateRequest(message):
-            try blockchain
+            blockchain
                 .publish(
                     event: RuntimeEvents
                         .StateRequestReceived(
@@ -375,7 +397,8 @@ struct HandlerImpl: NetworkProtocolHandler {
             }
             let (workReportHash, signature) = try resp.result.get()
             return try [JamEncoder.encode(workReportHash, signature)]
-        case let .workReportDistrubution(message):
+        case let .workReportDistribution(message):
+            let hash = message.workReport.hash()
             blockchain
                 .publish(
                     event: RuntimeEvents
@@ -385,13 +408,19 @@ struct HandlerImpl: NetworkProtocolHandler {
                             signatures: message.signatures
                         )
                 )
+
+            let resp = try await blockchain.waitFor(RuntimeEvents.WorkReportReceivedResponse.self) { event in
+                hash == event.workReportHash
+            }
+            if case let .failure(error) = resp.result {
+                throw error // failed
+            }
             return []
         case let .workReportRequest(message):
-            blockchain.publish(event: RuntimeEvents.WorkReportRequestReceived(workReportHash: message.workReportHash))
-            // TODO: waitfor WorkReportRequestResponse
-            // let resp = try await blockchain.waitFor(RuntimeEvents.WorkReportRequestResponse.self) { event in
-            //    message.workReportHash == event.workReport.hash()
-            // }
+            let workReportRef = try await blockchain.dataProvider.getGuaranteedWorkReport(hash: message.workReportHash)
+            if let workReport = workReportRef {
+                return try [JamEncoder.encode(workReport.value)]
+            }
             return []
         case let .shardDistribution(message):
             blockchain
