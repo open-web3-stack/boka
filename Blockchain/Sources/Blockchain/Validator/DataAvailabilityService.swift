@@ -16,9 +16,12 @@ public enum DataAvailabilityError: Error {
     case invalidSegmentsRoot
     case invalidDataLength
     case pagedProofsGenerationError
+    case invalidWorkReportSlot
+    case invalidWorkReport
+    case insufficientSignatures
 }
 
-public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable {
+public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, OnSyncCompleted {
     private let dataProvider: BlockchainDataProvider
     private let dataStore: DataStore
 
@@ -38,6 +41,16 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable {
         scheduleForNextEpoch("DataAvailability.scheduleForNextEpoch") { [weak self] epoch in
             await self?.purge(epoch: epoch)
         }
+    }
+
+    public func onSyncCompleted() async {
+        await subscribe(RuntimeEvents.WorkReportReceived.self, id: "DataAvailabilityService.WorkReportReceived") { [weak self] event in
+            await self?.handleWorkReportReceived(event)
+        }
+    }
+
+    public func handleWorkReportReceived(_ event: RuntimeEvents.WorkReportReceived) async {
+        await workReportDistribution(workReport: event.workReport, slot: event.slot, signatures: event.signatures)
     }
 
     /// Purge old data from the data availability stores
@@ -178,6 +191,49 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable {
         // This would normally verify the Merkle proof
         // For now, we'll just return true
         true
+    }
+
+    // MARK: - Work-report Distribution (CE 135)
+
+    public func workReportDistribution(
+        workReport: WorkReport,
+        slot: UInt32,
+        signatures: [ValidatorSignature]
+    ) async {
+        let hash = workReport.hash()
+
+        do {
+            // verify slot
+            if await isSlotValid(slot) {
+                throw DataAvailabilityError.invalidWorkReportSlot
+            }
+            // verify signatures
+            try await validate(signatures: signatures)
+
+            // store guaranteedWorkReport
+            let report = GuaranteedWorkReport(
+                workReport: workReport,
+                slot: slot,
+                signatures: signatures
+            )
+            try await dataProvider.add(guaranteedWorkReport: GuaranteedWorkReportRef(report))
+            // response success result
+            publish(RuntimeEvents.WorkReportReceivedResponse(workReportHash: hash))
+        } catch {
+            publish(RuntimeEvents.WorkReportReceivedResponse(workReportHash: hash, error: error))
+        }
+    }
+
+    private func isSlotValid(_ slot: UInt32) async -> Bool {
+        let currentSlot = await dataProvider.bestHead.timeslot
+        return slot + 5 >= currentSlot && slot <= currentSlot + 3
+    }
+
+    private func validate(signatures: [ValidatorSignature]) async throws {
+        guard signatures.count >= 3 else {
+            throw DataAvailabilityError.insufficientSignatures
+        }
+        // TODO: more validates
     }
 
     // MARK: - Shard Distribution (CE 137)

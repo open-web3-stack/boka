@@ -24,6 +24,7 @@ public final class RocksDBBackend: Sendable {
     private let stateValue: Store<StoreId, BinaryCoder<Data32, Data>>
     private let stateRefs: Store<StoreId, BinaryCoder<Data, UInt32>>
     private let stateRefsRaw: Store<StoreId, BinaryCoder<Data32, UInt32>>
+    private let guaranteedWorkReports: Store<StoreId, JamCoder<Data32, GuaranteedWorkReportRef>>
 
     public let genesisBlockHash: Data32
 
@@ -40,7 +41,7 @@ public final class RocksDBBackend: Sendable {
         stateValue = Store(db: db, column: .state, coder: BinaryCoder(config: config, prefix: Data([1])))
         stateRefs = Store(db: db, column: .stateRefs, coder: BinaryCoder(config: config, prefix: Data([0])))
         stateRefsRaw = Store(db: db, column: .stateRefs, coder: BinaryCoder(config: config, prefix: Data([1])))
-
+        guaranteedWorkReports = Store(db: db, column: .guaranteedWorkReports, coder: JamCoder(config: config))
         genesisBlockHash = genesisBlock.hash
 
         let genesis = try meta.get(key: MetaKey.genesisHash.key)
@@ -72,6 +73,19 @@ public final class RocksDBBackend: Sendable {
 }
 
 extension RocksDBBackend: BlockchainDataProviderProtocol {
+    public func hasGuaranteedWorkReport(hash: Data32) async throws -> Bool {
+        try guaranteedWorkReports.exists(key: hash)
+    }
+
+    public func getGuaranteedWorkReport(hash: Data32) async throws -> GuaranteedWorkReportRef? {
+        try guaranteedWorkReports.get(key: hash)
+    }
+
+    public func add(guaranteedWorkReport: GuaranteedWorkReportRef) async throws {
+        let hash = guaranteedWorkReport.workReport.hash()
+        try guaranteedWorkReports.put(key: hash, value: guaranteedWorkReport)
+    }
+
     public func getKeys(prefix: Data32, count: UInt32, startKey: Data32?, blockHash: Data32?) async throws -> [String] {
         logger.trace("""
         getKeys() prefix: \(prefix), count: \(count),
@@ -211,7 +225,7 @@ extension RocksDBBackend: BlockchainDataProviderProtocol {
         // TODO: batch delete
 
         try blocks.delete(key: hash)
-
+        try guaranteedWorkReports.delete(key: hash)
         if let block = try await getBlock(hash: hash) {
             try blockHashByTimeslot.delete(key: block.header.timeslot)
         }
