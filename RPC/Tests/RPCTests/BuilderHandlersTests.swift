@@ -36,7 +36,7 @@ final class BuilderRPCControllerTests {
         let req = JSONRequest(jsonrpc: "2.0", method: "builder_submitWorkPackage", params: params, id: 0)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try await app.test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
+        try await app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
             let resp = try? res.content.decode(JSONResponse.self, using: JSONDecoder())
             #expect(resp?.result?.value as? JSON == .boolean(true))

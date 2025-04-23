@@ -127,7 +127,7 @@ final class MockNetwork: NetworkProtocol {
             idx += 1
         }
 
-        return idx == toCheck.count
+        return idx >= toCheck.count
     }
 }
 

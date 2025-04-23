@@ -1,6 +1,7 @@
 import Utils
 
 public protocol BlockchainDataProviderProtocol: Sendable {
+    func hasGuaranteedWorkReport(hash: Data32) async throws -> Bool
     func hasBlock(hash: Data32) async throws -> Bool
     func hasState(hash: Data32) async throws -> Bool
     func isHead(hash: Data32) async throws -> Bool
@@ -8,6 +9,8 @@ public protocol BlockchainDataProviderProtocol: Sendable {
     func getBlockNumber(hash: Data32) async throws -> UInt32?
 
     func getHeader(hash: Data32) async throws -> HeaderRef?
+
+    func getGuaranteedWorkReport(hash: Data32) async throws -> GuaranteedWorkReportRef?
 
     func getBlock(hash: Data32) async throws -> BlockRef?
 
@@ -26,6 +29,7 @@ public protocol BlockchainDataProviderProtocol: Sendable {
     /// return empty set if not found
     func getBlockHash(byNumber number: UInt32) async throws -> Set<Data32>
 
+    func add(guaranteedWorkReport: GuaranteedWorkReportRef) async throws
     func add(block: BlockRef) async throws
     func add(state: StateRef) async throws
     func setFinalizedHead(hash: Data32) async throws
@@ -33,7 +37,7 @@ public protocol BlockchainDataProviderProtocol: Sendable {
     /// throw BlockchainDataProviderError.noData if parent is not a head
     func updateHead(hash: Data32, parent: Data32) async throws
 
-    /// remove header, block and state
+    /// remove header, block, workReport, state
     func remove(hash: Data32) async throws
 
     var genesisBlockHash: Data32 { get }

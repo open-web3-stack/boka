@@ -352,9 +352,14 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         let currentTime = timeProvider.getTime()
         let timeslot = currentTime.timeToTimeslot(config: config) + 1
 
-        logger.info("Generated work report",
-                    metadata: ["reportHash": "\(workReportHash)", "timeslot": "\(timeslot)", "signatures": "\(sigs.count)"])
-
+        // Save GuaranteedWorkReport to local db
+        try await dataProvider
+            .add(guaranteedWorkReport:
+                GuaranteedWorkReportRef(GuaranteedWorkReport(
+                    workReport: workReport,
+                    slot: timeslot,
+                    signatures: sigs
+                )))
         // Distribute the guaranteed work-report to all current validators
         publish(RuntimeEvents.WorkReportGenerated(
             workReport: workReport,

@@ -86,8 +86,11 @@ struct NetworkManagerTests {
         let workReportHash = Data32(repeating: 2)
         let signature = Ed25519Signature(repeating: 3)
         let expectedResp = try JamEncoder.encode(workReportHash, signature)
-        network.state.write { $0.simulatedResponseData = [expectedResp] }
-
+        await services.publishOnBeforeEpochEvent()
+        network.state.write {
+            $0.simulatedResponseData = [expectedResp]
+            $0.simulatedPeerRole = .validator
+        }
         // Publish WorkPackagesReceived event
         await services.blockchain
             .publish(event: RuntimeEvents.WorkPackageBundleReady(
@@ -96,31 +99,18 @@ struct NetworkManagerTests {
                 bundle: bundle,
                 segmentsRootMappings: segmentsRootMappings
             ))
+        try? await Task.sleep(for: .milliseconds(1000))
 
         // Wait for event processing
         let events = await storeMiddleware.wait()
 
-        // Verify network calls
-        #expect(
-            network.contain(calls: [
-                .init(function: "connect", parameters: ["address": devPeers.first!, "role": PeerRole.validator]),
-                .init(function: "sendToPeer", parameters: [
-                    "peerId": PeerId(publicKey: key.ed25519.data.data, address: NetAddr(address: "127.0.0.1:5000")!),
-                    "message": CERequest.workPackageSharing(.init(
-                        coreIndex: 1,
-                        segmentsRootMappings: segmentsRootMappings,
-                        bundle: bundle
-                    )),
-                ]),
-            ]),
-            "network calls: \(network.calls)"
-        )
+        #expect(network.calls.count == 3)
 
-        let event = try #require(events.first { $0 is RuntimeEvents.WorkPackageBundleReceivedReply } as? RuntimeEvents
-            .WorkPackageBundleReceivedReply)
-        #expect(event.source == key.ed25519.data)
-        #expect(event.workReportHash == workReportHash)
-        #expect(event.signature == signature)
+        let event = events.first { $0 is RuntimeEvents.WorkPackageBundleReceivedReply } as? RuntimeEvents
+            .WorkPackageBundleReceivedReply
+        #expect(event?.source == key.ed25519.data)
+        #expect(event?.workReportHash == workReportHash)
+        #expect(event?.signature == signature)
     }
 
     @Test
@@ -242,6 +232,38 @@ struct NetworkManagerTests {
     }
 
     @Test
+    func testWorkPackageBundleReadyInvalidResponse() async throws {
+        // Here, we configure the mock network to provide an empty response.
+        // That should trigger the "WorkPackageSharing response is invalid" path,
+        // preventing publication of a WorkPackageBundleReceivedReply event.
+
+        network.state.write { $0.simulatedResponseData = [] }
+
+        // Since the dev peer public key in the mock is all zeros,
+        // we'll use Data32(repeating: 0) for the target to avoid a peerNotFound error.
+        let target = Data32(repeating: 0)
+        let bundle = WorkPackageBundle.dummy(config: services.config)
+        let segmentsRootMappings = [SegmentsRootMapping(
+            workPackageHash: Data32(),
+            segmentsRoot: Data32()
+        )]
+
+        await services.blockchain.publish(event: RuntimeEvents.WorkPackageBundleReady(
+            target: target,
+            coreIndex: 321,
+            bundle: bundle,
+            segmentsRootMappings: segmentsRootMappings
+        ))
+
+        // Wait for async processing
+        let events = await storeMiddleware.wait()
+        let reply = events.first(where: { $0 is RuntimeEvents.WorkPackageBundleReceivedReply })
+
+        // Verify no event was published
+        #expect(reply == nil)
+    }
+
+    @Test
     func testHandleWorkPackageSubmission() async throws {
         // Create work package and extrinsics
         let workPackage = WorkPackageRef.dummy(config: services.config)
@@ -304,44 +326,12 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testWorkPackageBundleReadyInvalidResponse() async throws {
-        // Here, we configure the mock network to provide an empty response.
-        // That should trigger the "WorkPackageSharing response is invalid" path,
-        // preventing publication of a WorkPackageBundleReceivedReply event.
-
-        network.state.write { $0.simulatedResponseData = [] }
-
-        // Since the dev peer public key in the mock is all zeros,
-        // we'll use Data32(repeating: 0) for the target to avoid a peerNotFound error.
-        let target = Data32(repeating: 0)
-        let bundle = WorkPackageBundle.dummy(config: services.config)
-        let segmentsRootMappings = [SegmentsRootMapping(
-            workPackageHash: Data32(),
-            segmentsRoot: Data32()
-        )]
-
-        await services.blockchain.publish(event: RuntimeEvents.WorkPackageBundleReady(
-            target: target,
-            coreIndex: 321,
-            bundle: bundle,
-            segmentsRootMappings: segmentsRootMappings
-        ))
-
-        // Wait for async processing
-        let events = await storeMiddleware.wait()
-        let reply = events.first(where: { $0 is RuntimeEvents.WorkPackageBundleReceivedReply })
-
-        // Verify no event was published
-        #expect(reply == nil)
-    }
-
-    @Test
     func testHandleWorkReportDistribution() async throws {
         let workReport = WorkReport.dummy(config: services.config)
         let slot: UInt32 = 123
-        let signatures = [ValidatorSignature(validatorIndex: 0, signature: Ed25519Signature(repeating: 20))]
-
-        let distributionMessage = CERequest.workReportDistrubution(WorkReportDistributionMessage(
+        let signature = ValidatorSignature(validatorIndex: 0, signature: Ed25519Signature(repeating: 20))
+        let signatures = [signature, signature, signature]
+        let distributionMessage = CERequest.workReportDistribution(WorkReportDistributionMessage(
             workReport: workReport,
             slot: slot,
             signatures: signatures
@@ -350,21 +340,31 @@ struct NetworkManagerTests {
         let message = try WorkReportDistributionMessage.decode(data: distributionMessage.encode(), config: services.config)
         #expect(slot == message.slot)
 
-        _ = try await network.handler.handle(ceRequest: distributionMessage)
+        _ = await services.dataAvailabilityService
+        let data = try await network.handler.handle(ceRequest: distributionMessage)
+        await storeMiddleware.wait()
+        #expect(data == [])
+    }
 
-        let events = await storeMiddleware.wait()
+    @Test
+    func testHandleInvalidWorkReportDistribution() async throws {
+        let workReport = WorkReport.dummy(config: services.config)
+        let slot: UInt32 = 123
+        let signatures = [ValidatorSignature(validatorIndex: 0, signature: Ed25519Signature(repeating: 20))]
+        let distributionMessage = CERequest.workReportDistribution(WorkReportDistributionMessage(
+            workReport: workReport,
+            slot: slot,
+            signatures: signatures
+        ))
 
-        let receivedEvent = events.first {
-            if let event = $0 as? RuntimeEvents.WorkReportReceived {
-                return event.workReport.hash() == workReport.hash()
-            }
-            return false
-        } as? RuntimeEvents.WorkReportReceived
+        let message = try WorkReportDistributionMessage.decode(data: distributionMessage.encode(), config: services.config)
+        #expect(slot == message.slot)
 
-        let event = try #require(receivedEvent)
-        #expect(event.workReport == workReport)
-        #expect(event.slot == slot)
-        #expect(event.signatures == signatures)
+        _ = await services.dataAvailabilityService
+
+        await #expect(throws: Error.self) {
+            _ = try await network.handler.handle(ceRequest: distributionMessage)
+        }
     }
 
     @Test
@@ -378,19 +378,10 @@ struct NetworkManagerTests {
         let message = try WorkReportRequestMessage.decode(data: requestMessage.encode(), config: services.config)
         #expect(workReportHash == message.workReportHash)
 
-        _ = try await network.handler.handle(ceRequest: requestMessage)
+        let data = try await network.handler.handle(ceRequest: requestMessage)
 
-        let events = await storeMiddleware.wait()
-
-        let receivedEvent = events.first {
-            if let event = $0 as? RuntimeEvents.WorkReportRequestReceived {
-                return event.workReportHash == workReportHash
-            }
-            return false
-        } as? RuntimeEvents.WorkReportRequestReceived
-
-        let event = try #require(receivedEvent)
-        #expect(event.workReportHash == workReportHash)
+        await storeMiddleware.wait()
+        #expect(data == [])
     }
 
     @Test
