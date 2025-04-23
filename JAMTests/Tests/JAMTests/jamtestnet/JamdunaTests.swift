@@ -6,7 +6,7 @@ import Utils
 struct JamdunaTests {
     @Test(arguments: try JamTestnet.loadTests(path: "data/safrole/state_transitions", src: .jamduna))
     func safroleTests(_ input: Testcase) async throws {
-        try await CommonTests.test(input)
+        try await STFTests.test(input)
     }
 
     // @Test(arguments: try JamTestnet.loadTests(path: "data/safrole/state_transitions_fuzzed", src: .jamduna))
@@ -14,27 +14,27 @@ struct JamdunaTests {
     //     if !input.description.starts(with: "1_005_A") {
     //         return
     //     }
-    //     _ = try await CommonTests.test(input)
+    //     _ = try await STFTests.test(input)
     // }
 
     @Test(arguments: try JamTestnet.loadTests(path: "data/fallback/state_transitions", src: .jamduna))
     func fallbackTests(_ input: Testcase) async throws {
-        try await CommonTests.test(input)
+        try await STFTests.test(input)
     }
 
     @Test(arguments: try JamTestnet.loadTests(path: "data/assurances/state_transitions", src: .jamduna))
     func assurancesTests(_ input: Testcase) async throws {
-        _ = try await CommonTests.test(input)
+        _ = try await STFTests.test(input)
     }
 
     // @Test(arguments: try JamTestnet.loadTests(path: "data/assurances/state_transitions_fuzzed", src: .jamduna))
     // func assurancesFuzzedTests(_ input: Testcase) async throws {
-    //     _ = try await CommonTests.test(input)
+    //     _ = try await STFTests.test(input)
     // }
 
     @Test(arguments: try JamTestnet.loadTests(path: "data/orderedaccumulation/state_transitions", src: .jamduna))
     func orderedaccumulationTests(_ input: Testcase) async throws {
-        _ = try await CommonTests.test(input)
+        _ = try await STFTests.test(input)
     }
 
     @Test(arguments: try JamTestnet.loadTests(path: "data/disputes/state_transitions", src: .jamduna))
@@ -44,6 +44,6 @@ struct JamdunaTests {
             return
         }
 
-        try await CommonTests.test(input)
+        try await STFTests.test(input)
     }
 }
