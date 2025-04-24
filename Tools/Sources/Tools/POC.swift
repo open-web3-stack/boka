@@ -8,11 +8,6 @@ import Foundation
     import Darwin
 #endif
 
-// Helper function for logging to standard error
-func log(_ message: String) {
-    fputs(message + "\n", stderr)
-}
-
 // MARK: - IPC Message Protocol
 
 enum IPCMessage: UInt32 {
@@ -101,7 +96,7 @@ struct POC: AsyncParsableCommand {
     // MARK: - Child Entry Point
 
     func runChildMode(shmName: String) throws {
-        log("[Child] Starting child mode…")
+        print("[Child] Starting child mode…")
         // Use dedicated IPC FDs (3 and 4) rather than standard in/out.
         let pipeInFD = FileHandle(fileDescriptor: IPC_READ_FD)
         let pipeOutFD = FileHandle(fileDescriptor: IPC_WRITE_FD)
@@ -111,14 +106,14 @@ struct POC: AsyncParsableCommand {
         if shmFD < 0 {
             throw POCError.shmOpenFailed(errno: errno)
         }
-        log("[Child] Shared memory opened successfully with FD: \(shmFD)")
+        print("[Child] Shared memory opened successfully with FD: \(shmFD)")
 
         // 2) Map shared memory for IPC data only
         let childMap = mmap(nil, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shmFD, 0)
         guard childMap != MAP_FAILED else {
             throw POCError.mmapFailed(errno: errno)
         }
-        log("[Child] Shared memory mapped successfully at address: \(childMap!)")
+        print("[Child] Shared memory mapped successfully at address: \(childMap!)")
 
         // 3) Allocate a separate JIT region for executing injected code
         let codeMap = mmap(
@@ -132,26 +127,26 @@ struct POC: AsyncParsableCommand {
             throw POCError.mmapFailed(errno: errno)
         }
 
-        log("[Child] JIT region allocated successfully at address: \(codeMap!)")
+        print("[Child] JIT region allocated successfully at address: \(codeMap!)")
 
         // Copy generated machine code from shared memory into JIT buffer
         pthread_jit_write_protect_np(0)
         memcpy(codeMap, childMap!.advanced(by: CODE_OFFSET), CODE_SIZE)
 
-        log("[Child] Code copied to JIT region")
+        print("[Child] Code copied to JIT region")
 
         sys_icache_invalidate(codeMap, Int(SHM_SIZE))
         pthread_jit_write_protect_np(1)
 
-        log("[Child] JIT region invalidated")
+        print("[Child] JIT region invalidated")
 
         // 3) Listen for IPC messages on the dedicated FDs.
         outer:
             while true
         {
-            log("[Child] Waiting for IPC message on fd: \(pipeInFD)")
+            print("[Child] Waiting for IPC message on fd: \(pipeInFD)")
             let messageResult = IPCMessage.read(from: pipeInFD)
-            log("[Child] Received IPC message: \(messageResult)")
+            print("[Child] Received IPC message: \(messageResult)")
 
             switch messageResult {
             case let .success(message):
@@ -165,24 +160,24 @@ struct POC: AsyncParsableCommand {
                     let op1 = childMap!.advanced(by: DATA_OFFSET + 12).loadUnaligned(as: UInt64.self)
                     let op2 = childMap!.advanced(by: DATA_OFFSET + 20).loadUnaligned(as: UInt64.self)
 
-                    log("[Child] Executing code function with operands \(op1) and \(op2)")
+                    print("[Child] Executing code function with operands \(op1) and \(op2)")
                     let res = fn(op1, op2)
-                    log("[Child] Function returned \(res)")
+                    print("[Child] Function returned \(res)")
 
                     // Store the result back to shared memory at offset +4 (keeping the original layout)
                     childMap!.advanced(by: DATA_OFFSET + 4).storeBytes(of: res, as: UInt64.self)
 
-                    log("[Child] Executed code function, sending DONE response")
+                    print("[Child] Executed code function, sending DONE response")
                     try IPCMessage.done.write(to: pipeOutFD).get()
-                    log("[Child] DONE response sent")
+                    print("[Child] DONE response sent")
                 case .exit:
-                    log("[Child] Received EXIT command, terminating child mode")
+                    print("[Child] Received EXIT command, terminating child mode")
                     break outer
                 default:
-                    log("[Child] Received unexpected message: \(message)")
+                    print("[Child] Received unexpected message: \(message)")
                 }
             case let .failure(error):
-                log("[Child] Error: \(error)")
+                print("[Child] Error: \(error)")
                 break outer
             }
         }
