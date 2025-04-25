@@ -25,11 +25,17 @@ let package = Package(
                 "RPC",
                 "TracingUtils",
                 "Utils",
+                "CTools",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "JSONSchema", package: "swift-json-schema"),
                 .product(name: "JSONSchemaBuilder", package: "swift-json-schema"),
                 .product(name: "Runtime", package: "Runtime"),
             ]
+        ),
+        .target(
+            name: "CTools",
+            sources: ["ctools.h", "ctools.c"],
+            publicHeadersPath: "."
         ),
     ],
     swiftLanguageModes: [.version("6")]
