@@ -275,7 +275,7 @@ public enum RuntimeEvents {
 
     //  Response to shard distribution
     public struct ShardDistributionReceivedResponse: Event {
-        public var requestId: Data32
+        public let requestId: Data32
 
         public let result: Result<(bundleShard: Data, segmentShards: [Data], justification: Justification), Error>
 

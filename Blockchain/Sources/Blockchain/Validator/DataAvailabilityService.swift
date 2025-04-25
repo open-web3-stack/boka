@@ -19,6 +19,9 @@ public enum DataAvailabilityError: Error {
     case invalidWorkReportSlot
     case invalidWorkReport
     case insufficientSignatures
+    case invalidMerklePath
+    case emptySegmentShards
+    case invalidJustificationFormat
 }
 
 public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, OnSyncCompleted {
@@ -47,10 +50,19 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         await subscribe(RuntimeEvents.WorkReportReceived.self, id: "DataAvailabilityService.WorkReportReceived") { [weak self] event in
             await self?.handleWorkReportReceived(event)
         }
+        await subscribe(RuntimeEvents.ShardDistributionReceived.self,
+                        id: "DataAvailabilityService.ShardDistributionReceived")
+        { [weak self] event in
+            await self?.handleShardDistributionReceived(event)
+        }
     }
 
     public func handleWorkReportReceived(_ event: RuntimeEvents.WorkReportReceived) async {
         await workReportDistribution(workReport: event.workReport, slot: event.slot, signatures: event.signatures)
+    }
+
+    public func handleShardDistributionReceived(_ event: RuntimeEvents.ShardDistributionReceived) async {
+        try? await shardDistribution(erasureRoot: event.erasureRoot, shardIndex: event.shardIndex)
     }
 
     /// Purge old data from the data availability stores
@@ -238,23 +250,82 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
     // MARK: - Shard Distribution (CE 137)
 
-    /// Distribute shards to validators
-    /// - Parameters:
-    ///   - shards: The shards to distribute
-    ///   - erasureRoot: The erasure root of the data
-    ///   - validators: The validators to distribute to
-    /// - Returns: Success status of the distribution
-    public func distributeShards(
-        shards _: [Data4104],
+    public func shardDistribution(
+        erasureRoot: Data32,
+        shardIndex: UInt32
+    ) async throws {
+        // Generate request ID
+        let requestId = try JamEncoder.encode(erasureRoot, shardIndex).blake2b256hash()
+        do {
+            // Fetch shard data from local storage
+            let (bundleShard, segmentShards) = (Data(), [Data()])
+            // await dataProvider.getShards(
+            //    erasureRoot: erasureRoot,
+            //    shardIndex: shardIndex
+            // )
+
+            // Generate Merkle proof justification
+            let justification = try await generateJustification(
+                erasureRoot: erasureRoot,
+                shardIndex: shardIndex,
+                bundleShard: bundleShard,
+                segmentShards: segmentShards
+            )
+
+            // Respond with shards + proof
+            publish(RuntimeEvents.ShardDistributionReceivedResponse(
+                requestId: requestId,
+                bundleShard: bundleShard,
+                segmentShards: segmentShards,
+                justification: justification
+            ))
+
+        } catch {
+            publish(RuntimeEvents.ShardDistributionReceivedResponse(
+                requestId: requestId,
+                error: error
+            ))
+        }
+    }
+
+    private func generateJustification(
         erasureRoot _: Data32,
-        validators _: [ValidatorIndex]
-    ) async throws -> Bool {
-        // TODO: Implement shard distribution to validators
-        // 1. Determine which shards go to which validators
-        // 2. Send shards to validators over the network
-        // 3. Track distribution status
-        // 4. Return success status
-        throw DataAvailabilityError.distributionError
+        shardIndex: UInt32,
+        bundleShard _: Data,
+        segmentShards: [Data]
+    ) async throws -> Justification {
+        guard !segmentShards.isEmpty else {
+            throw DataAvailabilityError.emptySegmentShards
+        }
+
+        // GP T(s,i,H)
+        let merklePath = Merklization.trace(
+            segmentShards,
+            index: Int(shardIndex),
+            hasher: Blake2b256.self
+        )
+
+        switch merklePath.count {
+        case 1:
+            // 0 ++ Hash
+            guard case let .right(hash) = merklePath.first! else {
+                throw DataAvailabilityError.invalidMerklePath
+            }
+            return .singleHash(hash)
+
+        case 2:
+            // 1 ++ Hash ++ Hash
+            guard case let .right(hash1) = merklePath[0],
+                  case let .right(hash2) = merklePath[1]
+            else {
+                throw DataAvailabilityError.invalidMerklePath
+            }
+            return .doubleHash(hash1, hash2)
+
+        default:
+            // TODO: 2 ++ Segment Shard (12 bytes)
+            return .segmentShard(Data12())
+        }
     }
 
     // MARK: - Audit Shard Requests (CE 138)
