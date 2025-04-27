@@ -252,7 +252,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
     public func shardDistribution(
         erasureRoot: Data32,
-        shardIndex: UInt32
+        shardIndex: UInt16
     ) async throws {
         // Generate request ID
         let requestId = try JamEncoder.encode(erasureRoot, shardIndex).blake2b256hash()
@@ -290,7 +290,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
     private func generateJustification(
         erasureRoot _: Data32,
-        shardIndex: UInt32,
+        shardIndex: UInt16,
         bundleShard _: Data,
         segmentShards: [Data]
     ) async throws -> Justification {

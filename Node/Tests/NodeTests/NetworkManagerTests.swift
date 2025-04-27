@@ -387,7 +387,7 @@ struct NetworkManagerTests {
     @Test
     func testHandleShardDistribution() async throws {
         let erasureRoot = Data32(repeating: 1)
-        let shardIndex: UInt32 = 2
+        let shardIndex: UInt16 = 2
 
         let distributionMessage = CERequest.shardDistribution(ShardDistributionMessage(
             erasureRoot: erasureRoot,
