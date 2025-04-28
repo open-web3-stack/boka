@@ -146,17 +146,17 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         let serializedData = try JamEncoder.encode(bundle)
         let dataLength = DataLength(UInt32(serializedData.count))
 
-        // 2. Calculate the erasure root
+        // Calculate the erasure root
         // TODO: replace this with real implementation
         let erasureRoot = serializedData.blake2b256hash()
 
-        // 3. Extract the work package hash from the bundle
-        let workPackageHash = bundle.workPackage.hash()
-
-        // 4. Store the serialized bundle in the audit store (short-term storage)
-
-        // chunk the bundle into segments
-
+        // Bundle shards
+        let bundleShards = try ErasureCoding.chunk(
+            data: serializedData,
+            basicSize: config.value.erasureCodedPieceSize,
+            recoveryCount: config.value.totalNumberOfValidators
+        )
+        // Chunk the bundle into segments
         let segmentCount = serializedData.count / 4104
         var segments = [Data4104]()
         for i in 0 ..< segmentCount {
@@ -171,6 +171,18 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             segments.append(Data4104(segment)!)
         }
 
+        // Segment shard root
+
+        // Work-package bundle shard hash
+        // Segment shard root
+        let nodes = [Data]()
+        // ErasureRoot
+        // let erasureRoot = Merklization.binaryMerklize(nodes)
+
+        // 3. Extract the work package hash from the bundle
+        let workPackageHash = bundle.workPackage.hash()
+
+        // 4. Store the serialized bundle in the audit store (short-term storage)
         // Store the segment in the data store
         for (i, segment) in segments.enumerated() {
             try await dataStore.set(data: segment, erasureRoot: erasureRoot, index: UInt16(i))
@@ -178,7 +190,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
         // 5. Calculate the segments root
         // TODO: replace this with real implementation
-        let segmentsRoot = serializedData.blake2b256hash()
+        let segmentsRoot = Merklization.constantDepthMerklize(segments.map(\.data))
 
         // 6. Map the work package hash to the segments root
         try await dataStore.setSegmentRoot(segmentRoot: segmentsRoot, forWorkPackageHash: workPackageHash)
@@ -259,10 +271,6 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         do {
             // Fetch shard data from local storage
             let (bundleShard, segmentShards) = (Data(), [Data()])
-            // await dataProvider.getShards(
-            //    erasureRoot: erasureRoot,
-            //    shardIndex: shardIndex
-            // )
 
             // Generate Merkle proof justification
             let justification = try await generateJustification(
