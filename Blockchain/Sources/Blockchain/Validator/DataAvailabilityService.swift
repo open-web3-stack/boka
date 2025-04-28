@@ -175,6 +175,11 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
         // Work-package bundle shard hash
         // Segment shard root
+        let segmentShards = try ErasureCoding.chunk(
+            data: serializedData,
+            basicSize: config.value.segmentSize,
+            recoveryCount: serializedData.count / config.value.segmentSize
+        )
         let nodes = [Data]()
         // ErasureRoot
         // let erasureRoot = Merklization.binaryMerklize(nodes)
