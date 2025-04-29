@@ -148,9 +148,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
         // Calculate the erasure root
         // TODO: replace this with real implementation
-        let erasureRoot = serializedData.blake2b256hash()
-
-        // Bundle shards
+        // Work-package bundle shard hash
         let bundleShards = try ErasureCoding.chunk(
             data: serializedData,
             basicSize: config.value.erasureCodedPieceSize,
@@ -171,18 +169,22 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             segments.append(Data4104(segment)!)
         }
 
-        // Segment shard root
-
-        // Work-package bundle shard hash
+        // TODO: Segment shard root
         // Segment shard root
         let segmentShards = try ErasureCoding.chunk(
             data: serializedData,
             basicSize: config.value.segmentSize,
             recoveryCount: serializedData.count / config.value.segmentSize
         )
-        let nodes = [Data]()
+        var nodes = [Data]()
+        // workpackage bundle shard hash + segment shard root
+        for i in 0 ..< bundleShards.count {
+            let shardHash = bundleShards[i].blake2b256hash()
+            let segmentShard = segmentShards[i]
+            try nodes.append(JamEncoder.encode(shardHash) + JamEncoder.encode(segmentShard))
+        }
         // ErasureRoot
-        // let erasureRoot = Merklization.binaryMerklize(nodes)
+        let erasureRoot = Merklization.binaryMerklize(nodes)
 
         // 3. Extract the work package hash from the bundle
         let workPackageHash = bundle.workPackage.hash()
