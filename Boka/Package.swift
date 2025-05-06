@@ -30,6 +30,9 @@ let package = Package(
                 .product(name: "OTLPGRPC", package: "swift-otel"),
                 .product(name: "ConsoleKit", package: "console-kit"),
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
             ]
         ),
         .testTarget(
@@ -37,6 +40,9 @@ let package = Package(
             dependencies: [
                 "Boka",
                 .product(name: "Testing", package: "swift-testing"),
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
             ]
         ),
     ],
