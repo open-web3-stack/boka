@@ -32,6 +32,9 @@ let package = Package(
                 "Utils",
                 "PolkaVM",
                 "TracingUtils",
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
             ]
         ),
         .testTarget(
@@ -39,6 +42,9 @@ let package = Package(
             dependencies: [
                 "Blockchain",
                 .product(name: "Testing", package: "swift-testing"),
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
             ]
         ),
     ],

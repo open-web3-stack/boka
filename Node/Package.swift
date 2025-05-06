@@ -37,6 +37,9 @@ let package = Package(
                 "Utils",
                 "Database",
                 .product(name: "AsyncChannels", package: "Async-Channels"),
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
             ]
         ),
         .testTarget(
@@ -47,6 +50,9 @@ let package = Package(
             ],
             resources: [
                 .copy("chainfiles"),
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
             ]
         ),
     ],
