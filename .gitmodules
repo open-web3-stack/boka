@@ -10,3 +10,6 @@
 [submodule "JAMTests/jamduna"]
 	path = JAMTests/jamduna
 	url = https://github.com/jam-duna/jamtestnet.git
+[submodule "PolkaVM/Sources/asmjit"]
+	path = PolkaVM/Sources/asmjit
+	url = https://github.com/asmjit/asmjit.git

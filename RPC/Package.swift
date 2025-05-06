@@ -32,6 +32,9 @@ let package = Package(
                 "Utils",
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "AsyncKit", package: "async-kit"),
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
             ]
         ),
         .testTarget(
@@ -40,6 +43,9 @@ let package = Package(
                 .target(name: "RPC"),
                 .product(name: "XCTVapor", package: "vapor"),
                 .product(name: "Testing", package: "swift-testing"),
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
             ]
         ),
     ],

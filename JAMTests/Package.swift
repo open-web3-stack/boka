@@ -36,6 +36,9 @@ let package = Package(
                 .copy("../../jamduna"),
                 .copy("../../javajam"),
                 .copy("../../jamixir"),
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
             ]
         ),
         .testTarget(
@@ -48,6 +51,9 @@ let package = Package(
                 "PolkaVM",
                 "JAMTests",
                 .product(name: "Testing", package: "swift-testing"),
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
             ]
         ),
     ],
