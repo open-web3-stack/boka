@@ -27,16 +27,37 @@ let package = Package(
             dependencies: [
                 "Utils",
                 "TracingUtils",
+                "CppHelper",
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "LRUCache", package: "LRUCache"),
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
             ]
         ),
         .testTarget(
             name: "PolkaVMTests",
             dependencies: [
                 "PolkaVM",
+                "CppHelper",
                 .product(name: "Testing", package: "swift-testing"),
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
             ]
+        ),
+        .target(
+            name: "CppHelper",
+            dependencies: [
+                "asmjit",
+            ],
+            sources: ["."],
+            publicHeadersPath: "."
+        ),
+        .target(
+            name: "asmjit",
+            sources: ["src/asmjit"],
+            publicHeadersPath: "src"
         ),
     ],
     swiftLanguageModes: [.version("6")]

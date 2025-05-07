@@ -30,12 +30,18 @@ let package = Package(
                 .product(name: "JSONSchema", package: "swift-json-schema"),
                 .product(name: "JSONSchemaBuilder", package: "swift-json-schema"),
                 .product(name: "Runtime", package: "Runtime"),
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
             ]
         ),
         .target(
             name: "CTools",
-            sources: ["ctools.h", "ctools.c"],
-            publicHeadersPath: "."
+            sources: ["."],
+            publicHeadersPath: ".",
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
+            ]
         ),
     ],
     swiftLanguageModes: [.version("6")]

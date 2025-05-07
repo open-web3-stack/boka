@@ -29,6 +29,9 @@ let package = Package(
                 "Blockchain",
                 "Codec",
                 "Utils",
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
             ]
         ),
         .target(
@@ -54,6 +57,9 @@ let package = Package(
             dependencies: [
                 "Database",
                 .product(name: "Testing", package: "swift-testing"),
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
             ]
         ),
         .testTarget(

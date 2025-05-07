@@ -44,6 +44,10 @@
 
 #pragma once
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
 #ifdef _WIN32
 #ifdef ROCKSDB_DLL
 #ifdef ROCKSDB_LIBRARY_EXPORTS
@@ -61,10 +65,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
 
 /* Exported types */
 
