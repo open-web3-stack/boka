@@ -142,7 +142,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     /// - Parameter bundle: The bundle to export
     /// - Returns: The erasure root and length of the bundle
     public func exportWorkpackageBundle(bundle: WorkPackageBundle) async throws -> (erasureRoot: Data32, length: DataLength) {
-        // 1. Serialize the bundle
+        // Serialize the bundle
         let serializedData = try JamEncoder.encode(bundle)
         let dataLength = DataLength(UInt32(serializedData.count))
 
@@ -169,40 +169,33 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             segments.append(Data4104(segment)!)
         }
 
-        // TODO: Segment shard root
-        // Segment shard root
-        let segmentShards = try ErasureCoding.chunk(
-            data: serializedData,
-            basicSize: config.value.segmentSize,
-            recoveryCount: serializedData.count / config.value.segmentSize
-        )
+        // Calculate the segments root
+        // TODO: replace this with real implementation
+        let segmentsRoot = Merklization.constantDepthMerklize(segments.map(\.data))
+
         var nodes = [Data]()
         // workpackage bundle shard hash + segment shard root
         for i in 0 ..< bundleShards.count {
             let shardHash = bundleShards[i].blake2b256hash()
-            let segmentShard = segmentShards[i]
-            try nodes.append(JamEncoder.encode(shardHash) + JamEncoder.encode(segmentShard))
+            try nodes.append(JamEncoder.encode(shardHash) + JamEncoder.encode(segmentsRoot))
         }
+
         // ErasureRoot
         let erasureRoot = Merklization.binaryMerklize(nodes)
 
-        // 3. Extract the work package hash from the bundle
+        // Extract the work package hash from the bundle
         let workPackageHash = bundle.workPackage.hash()
 
-        // 4. Store the serialized bundle in the audit store (short-term storage)
+        // Store the serialized bundle in the audit store (short-term storage)
         // Store the segment in the data store
         for (i, segment) in segments.enumerated() {
             try await dataStore.set(data: segment, erasureRoot: erasureRoot, index: UInt16(i))
         }
 
-        // 5. Calculate the segments root
-        // TODO: replace this with real implementation
-        let segmentsRoot = Merklization.constantDepthMerklize(segments.map(\.data))
-
-        // 6. Map the work package hash to the segments root
+        // Map the work package hash to the segments root
         try await dataStore.setSegmentRoot(segmentRoot: segmentsRoot, forWorkPackageHash: workPackageHash)
 
-        // 7. Set the timestamp for retention tracking
+        // Set the timestamp for retention tracking
         // As per GP 14.3.1, items in the audit store are kept until finality (approx. 1 hour)
         let currentTimestamp = Date()
         try await dataStore.setTimestamp(erasureRoot: erasureRoot, timestamp: currentTimestamp)
