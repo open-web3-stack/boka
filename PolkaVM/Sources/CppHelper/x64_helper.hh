@@ -15,13 +15,24 @@
 // - 2: Invalid output parameter
 // - Other: AsmJit error codes
 //
-// Register usage (System V ABI):
+// Function parameters (System V ABI):
 // - rdi: registers_ptr (guest VM registers array)
 // - rsi: memory_base_ptr (guest VM memory)
 // - edx: memory_size (guest VM memory size)
 // - rcx: gas_ptr (guest VM gas counter)
 // - r8d: initial_pvm_pc (starting program counter)
 // - r9: invocation_context_ptr (JITHostFunctionTable)
+//
+// Static register allocation (x86_64):
+// - rbx: VM_REGISTERS_PTR - Guest VM registers array
+// - r12: VM_MEMORY_PTR - Guest VM memory base
+// - r13d: VM_MEMORY_SIZE - Guest VM memory size
+// - r14: VM_GAS_PTR - Guest VM gas counter
+// - r15d: VM_PC - Guest VM program counter
+// - rbp: VM_CONTEXT_PTR - Invocation context pointer
+// - rax, r10, r11: Temporary registers for computation
+// - rdi, rsi, rdx, rcx, r8, r9: Parameter passing for function calls
+// - rax: Return value register
 int32_t compilePolkaVMCode_x64(
     const uint8_t* _Nonnull codeBuffer,
     size_t codeSize,

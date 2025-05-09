@@ -8,6 +8,39 @@
 
 using namespace asmjit;
 
+// Static register mapping for AArch64
+namespace {
+    // VM state registers (using callee-saved registers)
+    const a64::Gp VM_REGISTERS_PTR = a64::x19;  // Guest VM registers array
+    const a64::Gp VM_MEMORY_PTR = a64::x20;     // Guest VM memory base
+    const a64::Gp VM_MEMORY_SIZE = a64::w21;    // Guest VM memory size (32-bit)
+    const a64::Gp VM_GAS_PTR = a64::x22;        // Guest VM gas counter
+    const a64::Gp VM_PC = a64::w23;             // Guest VM program counter (32-bit)
+    const a64::Gp VM_CONTEXT_PTR = a64::x24;    // Invocation context pointer
+    
+    // Temporary registers (caller-saved)
+    const a64::Gp TEMP_REG0 = a64::x9;          // General purpose temp
+    const a64::Gp TEMP_REG1 = a64::x10;         // General purpose temp
+    const a64::Gp TEMP_REG2 = a64::x11;         // General purpose temp
+    const a64::Gp TEMP_REG3 = a64::x12;         // General purpose temp
+    const a64::Gp TEMP_REG4 = a64::x13;         // General purpose temp
+    const a64::Gp TEMP_REG5 = a64::x14;         // General purpose temp
+    const a64::Gp TEMP_REG6 = a64::x15;         // General purpose temp
+    
+    // Parameter registers (AArch64 ABI)
+    const a64::Gp PARAM_REG0 = a64::x0;         // First parameter
+    const a64::Gp PARAM_REG1 = a64::x1;         // Second parameter
+    const a64::Gp PARAM_REG2 = a64::x2;         // Third parameter
+    const a64::Gp PARAM_REG3 = a64::x3;         // Fourth parameter
+    const a64::Gp PARAM_REG4 = a64::x4;         // Fifth parameter
+    const a64::Gp PARAM_REG5 = a64::x5;         // Sixth parameter
+    const a64::Gp PARAM_REG6 = a64::x6;         // Seventh parameter
+    const a64::Gp PARAM_REG7 = a64::x7;         // Eighth parameter
+    
+    // Return register
+    const a64::Gp RETURN_REG = a64::x0;         // Return value register
+}
+
 int32_t compilePolkaVMCode_a64(
     const uint8_t* codeBuffer,
     size_t codeSize,
@@ -43,60 +76,63 @@ int32_t compilePolkaVMCode_a64(
     Label L_HostCallSuccessful = a.newLabel();
     Label L_HostCallFailedPathReturn = a.newLabel();
 
-    // TODO: Implement full PolkaVM bytecode to AArch64 translation
+    // Function prologue - save callee-saved registers that we'll use
+    a.sub(a64::sp, a64::sp, 64);  // Allocate stack space for 4 pairs of registers (8 registers * 8 bytes)
+    a.stp(a64::x19, a64::x20, a64::ptr(a64::sp, 0));  // VM_REGISTERS_PTR, VM_MEMORY_PTR
+    a.stp(a64::x21, a64::x22, a64::ptr(a64::sp, 16)); // VM_MEMORY_SIZE, VM_GAS_PTR
+    a.stp(a64::x23, a64::x24, a64::ptr(a64::sp, 32)); // VM_PC, VM_CONTEXT_PTR
+    a.stp(a64::x29, a64::x30, a64::ptr(a64::sp, 48)); // Frame pointer, Link register
     
-    // Register usage for AArch64 ABI:
-    // - x0-x7: Parameter/result registers (caller-saved)
-    // - x8: Indirect result location register
-    // - x9-x15: Temporary registers (caller-saved)
-    // - x16-x17: Intra-procedure-call temporary registers
-    // - x18: Platform register (reserved)
-    // - x19-x28: Callee-saved registers
-    // - x29: Frame pointer
-    // - x30: Link register
-    // - sp: Stack pointer
+    // Initialize our static register mapping from function parameters
+    // AArch64 ABI: x0-x7 are parameter registers
+    a.mov(VM_REGISTERS_PTR, PARAM_REG0);  // x0: registers_ptr
+    a.mov(VM_MEMORY_PTR, PARAM_REG1);     // x1: memory_base_ptr
+    a.mov(VM_MEMORY_SIZE, PARAM_REG2.w()); // w2: memory_size
+    a.mov(VM_GAS_PTR, PARAM_REG3);        // x3: gas_ptr
+    a.mov(VM_PC, PARAM_REG4.w());         // w4: initial_pvm_pc
+    a.mov(VM_CONTEXT_PTR, PARAM_REG5);    // x5: invocation_context_ptr
 
     // Example ECALL implementation
     if (codeSize > 0 && initialPC == 0) {
         std::cout << "JIT (AArch64): Simulating ECALL #1" << std::endl;
         uint32_t host_call_idx = 1;
 
-        // Save JIT function arguments to callee-saved registers
-        a.mov(a64::x19, a64::x0); // Save registers_ptr
-        a.mov(a64::x20, a64::x1); // Save memory_base_ptr
-        a.mov(a64::x21, a64::x2); // Save memory_size
-        a.mov(a64::x22, a64::x3); // Save gas_ptr
-        a.mov(a64::x23, a64::x4); // Save initial_pvm_pc
-        a.mov(a64::x24, a64::x5); // Save invocation_context_ptr
+        // Setup arguments for pvm_host_call_trampoline using our static register mapping
+        a.mov(PARAM_REG0, VM_CONTEXT_PTR);     // arg0: invocation_context_ptr
+        a.mov(PARAM_REG1, host_call_idx);      // arg1: host_call_idx
+        a.mov(PARAM_REG2, VM_REGISTERS_PTR);   // arg2: guest_registers_ptr
+        a.mov(PARAM_REG3, VM_MEMORY_PTR);      // arg3: guest_memory_base_ptr
+        a.mov(PARAM_REG4.w(), VM_MEMORY_SIZE); // arg4: guest_memory_size
+        a.mov(PARAM_REG5, VM_GAS_PTR);         // arg5: guest_gas_ptr
 
-        // Setup arguments for pvm_host_call_trampoline
-        a.mov(a64::x0, a64::x24);     // arg0: invocation_context_ptr
-        a.mov(a64::x1, host_call_idx); // arg1: host_call_idx
-        a.mov(a64::x2, a64::x19);     // arg2: guest_registers_ptr
-        a.mov(a64::x3, a64::x20);     // arg3: guest_memory_base_ptr
-        a.mov(a64::w4, a64::w21);     // arg4: guest_memory_size
-        a.mov(a64::x5, a64::x22);     // arg5: guest_gas_ptr
-
-        // Call trampoline using x9 (temporary register)
-        a.mov(a64::x9, reinterpret_cast<uint64_t>(pvm_host_call_trampoline));
-        a.blr(a64::x9); // Result returned in x0
+        // Call trampoline using TEMP_REG0 (x9)
+        a.mov(TEMP_REG0, reinterpret_cast<uint64_t>(pvm_host_call_trampoline));
+        a.blr(TEMP_REG0); // Result returned in x0 (RETURN_REG)
 
         // Check for error (0xFFFFFFFF)
-        a.cmp(a64::x0, 0xFFFFFFFF);
+        a.cmp(RETURN_REG, 0xFFFFFFFF);
         a.b_ne(L_HostCallSuccessful);
 
         // Host call failed path
-        a.mov(a64::x0, 1); // Return ExitReason.Panic
+        a.mov(RETURN_REG, 1); // Return ExitReason.Panic
         a.b(L_HostCallFailedPathReturn);
 
         a.bind(L_HostCallSuccessful);
         // Store host call result to PVM_R0 (first element in registers array)
-        a.str(a64::x0, a64::ptr(a64::x19));
+        a.str(RETURN_REG, a64::ptr(VM_REGISTERS_PTR));
     }
 
     // Default exit path
-    a.mov(a64::x0, 0); // Return ExitReason.Halt
+    a.mov(RETURN_REG, 0); // Return ExitReason.Halt
     a.bind(L_HostCallFailedPathReturn);
+    
+    // Function epilogue - restore callee-saved registers
+    a.ldp(a64::x29, a64::x30, a64::ptr(a64::sp, 48)); // Frame pointer, Link register
+    a.ldp(a64::x23, a64::x24, a64::ptr(a64::sp, 32)); // VM_PC, VM_CONTEXT_PTR
+    a.ldp(a64::x21, a64::x22, a64::ptr(a64::sp, 16)); // VM_MEMORY_SIZE, VM_GAS_PTR
+    a.ldp(a64::x19, a64::x20, a64::ptr(a64::sp, 0));  // VM_REGISTERS_PTR, VM_MEMORY_PTR
+    a.add(a64::sp, a64::sp, 64);  // Deallocate stack space
+    
     a.ret(a64::x30);
 
     err = rt.add(reinterpret_cast<void**>(funcOut), &code);
