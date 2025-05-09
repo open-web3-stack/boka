@@ -37,6 +37,7 @@ final class JITCompiler {
     // TODO: Add support for instruction-specific optimizations (e.g., specialized handlers for hot instructions)
     // TODO: Implement branch prediction hints based on interpreter execution patterns
     // TODO: Add support for memory access pattern optimizations (prefetching, alignment)
+    // TODO: Ensure gas accounting in JIT-compiled code matches interpreter exactly for each instruction type
     func compile(
         blob: Data,
         initialPC: UInt32,

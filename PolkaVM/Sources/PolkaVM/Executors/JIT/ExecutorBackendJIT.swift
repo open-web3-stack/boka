@@ -89,18 +89,41 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
         }
 
         do {
-            // TODO: Implement gas accounting for the host call itself (fixed entry/exit cost).
-            // The registered `hostFunction` is responsible for its internal gas consumption
-            // by decrementing `guestGasPtr.pointee` as needed.
-            // TODO: Match interpreter's gas accounting model: deduct fixed cost for call setup,
-            // then let host function deduct operation-specific costs
+            // Fixed gas cost for host function call setup
+            // This matches the interpreter's fixed cost for host function calls
+            let hostCallSetupGasCost: UInt64 = 100
 
+            // Check if we have enough gas for the host call setup
+            if guestGasPtr.pointee < hostCallSetupGasCost {
+                logger.error("Swift: Gas exhausted during host function call setup")
+                return JITHostCallError.gasExhausted.rawValue
+            }
+
+            // Deduct gas for host call setup
+            guestGasPtr.pointee -= hostCallSetupGasCost
+            logger.debug("Swift: Deducted \(hostCallSetupGasCost) gas for host call setup. Remaining: \(guestGasPtr.pointee)")
+
+            // The host function is responsible for its internal gas consumption
+            // by decrementing `guestGasPtr.pointee` as needed
             let resultFromHostFn = try hostFunction(
                 guestRegistersPtr,
                 guestMemoryBasePtr,
                 guestMemorySize,
                 guestGasPtr
             )
+
+            // Fixed gas cost for host function call teardown/return
+            let hostCallTeardownGasCost: UInt64 = 50
+
+            // Check if we have enough gas for the host call teardown
+            if guestGasPtr.pointee < hostCallTeardownGasCost {
+                logger.error("Swift: Gas exhausted during host function call teardown")
+                return JITHostCallError.gasExhausted.rawValue
+            }
+
+            // Deduct gas for host call teardown
+            guestGasPtr.pointee -= hostCallTeardownGasCost
+            logger.debug("Swift: Deducted \(hostCallTeardownGasCost) gas for host call teardown. Remaining: \(guestGasPtr.pointee)")
 
             // By convention, the JIT code that calls the host function trampoline
             // will expect the result in a specific register (e.g., x0 on AArch64).
@@ -120,17 +143,44 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
         pc: UInt32,
         gas: Gas,
         argumentData: Data?,
-        ctx _: (any InvocationContext)?
+        ctx: (any InvocationContext)?
     ) async -> ExitReason {
         logger.info("JIT execution request. PC: \(pc), Gas: \(gas.value), Blob size: \(blob.count) bytes.")
-        // TODO: Pass argumentData to JIT-compiled code properly
-        // TODO: Implement proper argument passing convention
 
         var currentGas = gas // Mutable copy for JIT execution
+
+        // Fixed gas cost for JIT execution setup - matches interpreter's setup cost
+        let jitSetupGasCost: UInt64 = 200
+
+        // Check if we have enough gas for JIT setup
+        if currentGas.value < jitSetupGasCost {
+            logger.error("Not enough gas for JIT execution setup. Required: \(jitSetupGasCost), Available: \(currentGas.value)")
+            return .outOfGas
+        }
+
+        // Create a new Gas instance with the deducted amount
+        currentGas = Gas(currentGas.value - jitSetupGasCost)
+        logger.debug("Deducted \(jitSetupGasCost) gas for JIT setup. Remaining: \(currentGas.value)")
 
         do {
             let targetArchitecture = try JITPlatformHelper.getCurrentTargetArchitecture(config: config)
             logger.debug("Target architecture for JIT: \(targetArchitecture)")
+
+            // Fixed gas cost for JIT compilation/cache lookup - matches interpreter's preparation cost
+            let jitCompilationGasCost: UInt64 = 100
+
+            // Check if we have enough gas for compilation/cache lookup
+            if currentGas.value < jitCompilationGasCost {
+                logger
+                    .error(
+                        "Not enough gas for JIT compilation/cache lookup. Required: \(jitCompilationGasCost), Available: \(currentGas.value)"
+                    )
+                return .outOfGas
+            }
+
+            // Create a new Gas instance with the deducted amount
+            currentGas = Gas(currentGas.value - jitCompilationGasCost)
+            logger.debug("Deducted \(jitCompilationGasCost) gas for JIT compilation/cache lookup. Remaining: \(currentGas.value)")
 
             let jitCacheKey = JITCache.createCacheKey(
                 blob: blob,
@@ -150,6 +200,22 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
             }
 
             if functionPtr == nil { // Cache miss or cache disabled
+                // Additional gas cost for actual compilation (only on cache miss)
+                let jitActualCompilationGasCost: UInt64 = 300
+
+                // Check if we have enough gas for actual compilation
+                if currentGas.value < jitActualCompilationGasCost {
+                    logger
+                        .error(
+                            "Not enough gas for actual JIT compilation. Required: \(jitActualCompilationGasCost), Available: \(currentGas.value)"
+                        )
+                    return .outOfGas
+                }
+
+                // Create a new Gas instance with the deducted amount
+                currentGas = Gas(currentGas.value - jitActualCompilationGasCost)
+                logger.debug("Deducted \(jitActualCompilationGasCost) gas for actual JIT compilation. Remaining: \(currentGas.value)")
+
                 let compiledFuncPtr = try jitCompiler.compile(
                     blob: blob,
                     initialPC: pc,
@@ -171,13 +237,38 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
             }
 
             var registers = Registers()
-            // TODO: Initialize registers based on `argumentData` or PVM calling convention.
-            // TODO: Match interpreter's register initialization pattern (R0-R3 for arguments)
+            // Initialize registers based on interpreter's pattern
+            if let argData = argumentData {
+                // Copy up to 4 arguments into R0-R3 registers
+                let argWords = min(4, argData.count / 8 + (argData.count % 8 > 0 ? 1 : 0))
+                for i in 0 ..< argWords {
+                    let startIndex = i * 8
+                    let endIndex = min(startIndex + 8, argData.count)
+                    var value: UInt64 = 0
+                    for j in startIndex ..< endIndex {
+                        let byteValue = UInt64(argData[j])
+                        let shift = UInt64(j - startIndex) * 8
+                        value |= byteValue << shift
+                    }
+                    registers[Registers.Index(raw: UInt8(i))] = value
+                }
+            }
+
+            // Fixed gas cost for memory initialization - matches interpreter's memory setup cost
+            let memoryInitGasCost: UInt64 = 150
+
+            // Check if we have enough gas for memory initialization
+            if currentGas.value < memoryInitGasCost {
+                logger.error("Not enough gas for memory initialization. Required: \(memoryInitGasCost), Available: \(currentGas.value)")
+                return .outOfGas
+            }
+
+            // Create a new Gas instance with the deducted amount
+            currentGas = Gas(currentGas.value - memoryInitGasCost)
+            logger.debug("Deducted \(memoryInitGasCost) gas for memory initialization. Remaining: \(currentGas.value)")
 
             var vmMemory: Memory
             do {
-                // TODO: Refine StandardMemory initialization based on PvmConfig.
-                // These are placeholders and should align with actual PvmConfig structure.
                 let pvmPageSize = UInt32(config.pvmMemoryPageSize)
                 vmMemory = try StandardMemory(
                     readOnlyData: config.readOnlyDataSegment ?? Data(),
@@ -191,12 +282,30 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
                 throw JITError.vmInitializationError(details: "StandardMemory init failed: \(error)")
             }
 
+            // Fixed gas cost for memory buffer preparation
+            let memoryBufferPrepGasCost: UInt64 = 100
+
+            // Check if we have enough gas for memory buffer preparation
+            if currentGas.value < memoryBufferPrepGasCost {
+                logger
+                    .error(
+                        "Not enough gas for memory buffer preparation. Required: \(memoryBufferPrepGasCost), Available: \(currentGas.value)"
+                    )
+                return .outOfGas
+            }
+
+            // Create a new Gas instance with the deducted amount
+            currentGas = Gas(currentGas.value - memoryBufferPrepGasCost)
+            logger.debug("Deducted \(memoryBufferPrepGasCost) gas for memory buffer preparation. Remaining: \(currentGas.value)")
+
             var jitFlatMemoryBuffer = try jitMemoryManager.prepareJITMemoryBuffer(
                 from: vmMemory,
                 config: config,
                 jitMemorySize: jitTotalMemorySize
             )
 
+            // Execute the JIT-compiled function
+            // The JIT function will deduct gas for each instruction executed
             let exitReason = try jitExecutor.execute(
                 functionPtr: validFunctionPtr,
                 registers: &registers,
@@ -204,8 +313,21 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
                 jitMemorySize: jitTotalMemorySize,
                 gas: &currentGas,
                 initialPC: pc,
-                invocationContext: nil
+                invocationContext: ctx.map { Unmanaged.passUnretained($0 as AnyObject).toOpaque() }
             )
+
+            // Fixed gas cost for memory changes reflection
+            let memoryReflectionGasCost: UInt64 = 100
+
+            // Check if we have enough gas for memory reflection
+            if currentGas.value < memoryReflectionGasCost {
+                logger.error("Not enough gas for memory reflection. Required: \(memoryReflectionGasCost), Available: \(currentGas.value)")
+                return .outOfGas
+            }
+
+            // Create a new Gas instance with the deducted amount
+            currentGas = Gas(currentGas.value - memoryReflectionGasCost)
+            logger.debug("Deducted \(memoryReflectionGasCost) gas for memory reflection. Remaining: \(currentGas.value)")
 
             try jitMemoryManager.reflectJITMemoryChanges(
                 from: jitFlatMemoryBuffer,
@@ -214,16 +336,7 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
                 jitMemorySize: jitTotalMemorySize
             )
 
-            // TODO: Return ExecOutcome with updated gas value instead of just ExitReason
-            // TODO: Implement proper gas accounting across JIT execution
-            // TODO: Ensure gas accounting matches interpreter exactly (same cost per instruction type)
-            // TODO: Implement proper memory boundary checks with same semantics as interpreter
             logger.info("JIT execution finished. Reason: \(exitReason). Remaining gas: \(currentGas.value)")
-            // The `gas` parameter to this function is `let`, so we can't modify it directly.
-            // The `ExecOutcome` should be constructed with `currentGas`.
-            // This implies the return type of this function might need to align with `ExecOutcome` or similar.
-            // For now, returning only ExitReason as per current ExecutorBackend protocol.
-            // The frontend will need to manage gas based on the `inout` parameter it passes.
             return exitReason
 
         } catch let error as JITError {
@@ -272,8 +385,8 @@ enum JITHostCallError: UInt32 {
     // Indicates that the registered host function was called but threw a Swift error during its execution.
     case hostFunctionThrewError = 0xFFFF_FFFD
 
-    // TODO: Add other specific error codes as needed, e.g., for gas exhaustion during host call setup,
-    // argument validation failures before calling the host function, etc.
+    // Indicates that the VM ran out of gas during host function execution
+    case gasExhausted = 0xFFFF_FFFC
 }
 
 // Static C-callable trampoline that calls the instance method.

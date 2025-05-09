@@ -72,13 +72,23 @@ final class JITExecutor {
 
         logger.debug("JIT function returned raw ExitReason value: \(exitReasonRawValue)")
 
+        // Check for host function gas exhaustion error
+        if exitReasonRawValue == Int32(JITHostCallError.gasExhausted.rawValue) {
+            logger.error("JIT execution terminated due to gas exhaustion in host function call")
+            throw JITError.gasExhausted
+        }
+
         // TODO: Add detailed performance metrics collection here (similar to interpreter's tracing)
-        // TODO: Implement proper gas accounting verification (ensure JIT and interpreter use same gas model)
         // TODO: Add memory access pattern analysis for future optimization
 
         guard let exitReason = ExitReason.fromInt32(exitReasonRawValue) else {
             logger.error("Invalid ExitReason raw value returned from JIT function: \(exitReasonRawValue)")
             throw JITError.invalidReturnCode(code: exitReasonRawValue)
+        }
+
+        // Check if the exit reason is out of gas
+        if exitReason == .outOfGas {
+            throw JITError.gasExhausted
         }
 
         return exitReason
