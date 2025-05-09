@@ -1,3 +1,5 @@
+import Foundation // For Data type
+
 public protocol PvmConfig {
     // ZA = 2: The pvm dynamic address alignment factor.
     var pvmDynamicAddressAlignmentFactor: Int { get }
@@ -10,6 +12,20 @@ public protocol PvmConfig {
 
     // ZP = 2^12: The pvm memory page size.
     var pvmMemoryPageSize: Int { get }
+
+    // Memory layout configurations (potentially used by JIT and StandardMemory)
+    var initialHeapPages: UInt32 { get }
+    var stackPages: UInt32 { get }
+    var readOnlyDataSegment: Data? { get }
+    var readWriteDataSegment: Data? { get }
+}
+
+// Default implementations for JIT and memory layout configurations
+extension PvmConfig {
+    public var initialHeapPages: UInt32 { 16 }
+    public var stackPages: UInt32 { 16 }
+    public var readOnlyDataSegment: Data? { nil }
+    public var readWriteDataSegment: Data? { nil }
 }
 
 public struct DefaultPvmConfig: PvmConfig {
