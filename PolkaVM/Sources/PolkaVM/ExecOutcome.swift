@@ -4,6 +4,11 @@ public enum ExitReason: Equatable {
         case invalidInstructionIndex
         case invalidDynamicJump
         case invalidBranch
+        // JIT-specific panic reasons
+        case jitCompilationFailed
+        case jitMemoryError
+        case jitExecutionError
+        case jitInvalidFunctionPointer
     }
 
     case halt
@@ -24,6 +29,10 @@ public enum ExitReason: Equatable {
             case .invalidInstructionIndex: 2
             case .invalidDynamicJump: 3
             case .invalidBranch: 4
+            case .jitCompilationFailed: 10
+            case .jitMemoryError: 11
+            case .jitExecutionError: 12
+            case .jitInvalidFunctionPointer: 13
             }
         case .outOfGas: 5
         case .hostCall: 6 // Associated value (UInt32) is lost in this simple conversion
@@ -39,6 +48,11 @@ public enum ExitReason: Equatable {
         case 3: .panic(.invalidDynamicJump)
         case 4: .panic(.invalidBranch)
         case 5: .outOfGas
+        // JIT-specific panic reasons
+        case 10: .panic(.jitCompilationFailed)
+        case 11: .panic(.jitMemoryError)
+        case 12: .panic(.jitExecutionError)
+        case 13: .panic(.jitInvalidFunctionPointer)
         // Cases 6 and 7 would need to decide on default associated values or be unrepresentable here
         // For now, let's make them unrepresentable to highlight the issue.
         // case 6: return .hostCall(0) // Placeholder default ID

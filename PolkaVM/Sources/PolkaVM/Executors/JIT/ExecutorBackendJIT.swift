@@ -228,13 +228,10 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
 
         } catch let error as JITError {
             logger.error("JIT execution failed with JITError: \(error)")
-            // TODO: Create specific panic reasons for different JIT errors
-            // TODO: Add detailed error information to panic reasons
-            return .panic(.trap) // Placeholder for JITError conversion
+            return error.toExitReason()
         } catch {
             logger.error("JIT execution failed with an unexpected error: \(error)")
-            // TODO: Implement comprehensive error handling for all possible JIT failures
-            return .panic(.trap) // Placeholder for unexpected errors
+            return .panic(.trap) // Generic trap for unexpected errors
         }
     }
 }
@@ -263,6 +260,7 @@ public typealias PolkaVMHostCallCHandler = @convention(c) (
 // Otherwise, the returned UInt32 is the successful result from the host function.
 // These values are chosen to be at the high end of the UInt32 range to minimize
 // collision with legitimate success values returned by host functions.
+
 enum JITHostCallError: UInt32 {
     // Indicates an internal error within the JIT host call mechanism,
     // such as the owner context being nil.

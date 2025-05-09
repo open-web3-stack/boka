@@ -60,13 +60,32 @@ enum JITError: Error, CustomStringConvertible {
         switch self {
         case .gasExhausted:
             .outOfGas
-        case .memoryAccessViolation:
-            .panic(.trap) // Use .trap as fallback
-        case .hostFunctionError:
-            .panic(.trap) // Use .trap as fallback
-        default:
-            // Most JIT errors map to a generic trap
-            .panic(.trap)
+        case let .memoryAccessViolation(address, _):
+            .pageFault(address)
+        case let .hostFunctionError(index, _):
+            .hostCall(index)
+        case .compilationFailed:
+            .panic(.jitCompilationFailed)
+        case .executionFailed:
+            .panic(.jitExecutionError)
+        case .invalidReturnCode:
+            .panic(.jitExecutionError)
+        case .targetArchUnsupported:
+            .panic(.jitCompilationFailed)
+        case .vmInitializationError:
+            .panic(.jitMemoryError)
+        case .functionPointerNil:
+            .panic(.jitInvalidFunctionPointer)
+        case .failedToGetBlobBaseAddress, .failedToGetFlatMemoryBaseAddress:
+            .panic(.jitMemoryError)
+        case .flatMemoryBufferSizeMismatch:
+            .panic(.jitMemoryError)
+        case .cppHelperError:
+            .panic(.jitExecutionError)
+        case .invalidArgument:
+            .panic(.jitCompilationFailed)
+        case .memoryAllocationFailed:
+            .panic(.jitMemoryError)
         }
     }
 }
