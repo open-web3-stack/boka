@@ -8,6 +8,8 @@ import Utils
 
 // TODO: Add optimization level support in PvmConfig
 // TODO: Implement proper error mapping from C++ error codes
+// TODO: Add instruction-specific compilation strategies based on interpreter profiling data
+// TODO: Implement memory access pattern optimizations based on interpreter memory usage
 
 // Type alias for the C ABI of JIT-compiled functions.
 // This signature is platform-agnostic from the Swift side.
@@ -32,6 +34,9 @@ final class JITCompiler {
     // TODO: Update CppHelper interface to support optimization levels
     // TODO: Add support for passing PvmConfig settings to C++ compiler
     // TODO: Implement proper nullability annotations in C++ interface (_Nullable/_Nonnull)
+    // TODO: Add support for instruction-specific optimizations (e.g., specialized handlers for hot instructions)
+    // TODO: Implement branch prediction hints based on interpreter execution patterns
+    // TODO: Add support for memory access pattern optimizations (prefetching, alignment)
     func compile(
         blob: Data,
         initialPC: UInt32,

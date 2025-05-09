@@ -5,8 +5,10 @@ import Foundation
 import TracingUtils
 import Utils
 
-// TODO: Add performance metrics collection
+// TODO: Add performance metrics collection (instruction counts, execution time, memory access patterns)
 // TODO: Implement proper error handling for JIT execution failures
+// TODO: Add support for instruction tracing to match interpreter's debug capabilities
+// TODO: Implement memory access tracking for profiling and optimization
 
 final class JITExecutor {
     private let logger = Logger(label: "JITExecutor")
@@ -69,6 +71,10 @@ final class JITExecutor {
         gas = Gas(gasValue) // Update Gas struct with the (potentially) modified value.
 
         logger.debug("JIT function returned raw ExitReason value: \(exitReasonRawValue)")
+
+        // TODO: Add detailed performance metrics collection here (similar to interpreter's tracing)
+        // TODO: Implement proper gas accounting verification (ensure JIT and interpreter use same gas model)
+        // TODO: Add memory access pattern analysis for future optimization
 
         guard let exitReason = ExitReason.fromInt32(exitReasonRawValue) else {
             logger.error("Invalid ExitReason raw value returned from JIT function: \(exitReasonRawValue)")

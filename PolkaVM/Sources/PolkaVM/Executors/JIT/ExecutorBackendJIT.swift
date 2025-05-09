@@ -7,8 +7,9 @@ import Foundation
 import TracingUtils
 import Utils
 
-// TODO: Implement proper error mapping from JIT errors to ExitReason
-// TODO: Add comprehensive performance metrics
+// TODO: Implement proper error mapping from JIT errors to ExitReason (align with interpreter's ExitReason handling)
+// TODO: Add comprehensive performance metrics for instruction execution frequency and timing
+// TODO: Implement instruction-specific optimizations based on interpreter hotspots
 
 final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
     private let logger = Logger(label: "ExecutorBackendJIT")
@@ -18,8 +19,9 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
     private let jitExecutor = JITExecutor()
     private let jitMemoryManager = JITMemoryManager()
 
-    // TODO: Improve HostFunction signature with proper VMState access
-    // TODO: Add gas accounting for host function calls
+    // TODO: Improve HostFunction signature with proper VMState access (similar to interpreter's InvocationContext)
+    // TODO: Add gas accounting for host function calls (deduct gas before and after host function execution)
+    // TODO: Implement proper error propagation from host functions to JIT execution flow
     public typealias HostFunction = (
         _ guestRegisters: UnsafeMutablePointer<UInt64>,
         _ guestMemoryBase: UnsafeMutablePointer<UInt8>,
@@ -32,13 +34,15 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
     // This will hold the JITHostFunctionTable struct itself, and we'll pass a pointer to it.
     private var jitHostFunctionTableStorage: JITHostFunctionTable! // force unwrapped so we can have cyclic reference
 
-    // TODO: Implement thread safety for JIT execution
-    // TODO: Add support for debugging JIT-compiled code
-    // TODO: Implement proper memory management for JIT code
+    // TODO: Implement thread safety for JIT execution (similar to interpreter's async execution model)
+    // TODO: Add support for debugging JIT-compiled code (instruction tracing, register dumps)
+    // TODO: Implement proper memory management for JIT code (code cache eviction policies)
+    // TODO: Add support for tiered compilation (interpret first, then JIT hot paths)
 
     // TODO: The init method should ideally take a PvmConfig or target architecture string
     // to correctly initialize CppHelper. For now, we'll use a placeholder or attempt
     // to get the host architecture if JITPlatformHelper allows without a full config.
+    // TODO: Initialize JIT with instruction handlers that match interpreter behavior exactly
     init() {
         // Need to match with JITHostFunctionFn in helper.hh
         // we can't use JITHostFunctionFn directly due to Swift compiler bug
@@ -88,6 +92,8 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
             // TODO: Implement gas accounting for the host call itself (fixed entry/exit cost).
             // The registered `hostFunction` is responsible for its internal gas consumption
             // by decrementing `guestGasPtr.pointee` as needed.
+            // TODO: Match interpreter's gas accounting model: deduct fixed cost for call setup,
+            // then let host function deduct operation-specific costs
 
             let resultFromHostFn = try hostFunction(
                 guestRegistersPtr,
@@ -166,6 +172,7 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
 
             var registers = Registers()
             // TODO: Initialize registers based on `argumentData` or PVM calling convention.
+            // TODO: Match interpreter's register initialization pattern (R0-R3 for arguments)
 
             var vmMemory: Memory
             do {
@@ -209,6 +216,8 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
 
             // TODO: Return ExecOutcome with updated gas value instead of just ExitReason
             // TODO: Implement proper gas accounting across JIT execution
+            // TODO: Ensure gas accounting matches interpreter exactly (same cost per instruction type)
+            // TODO: Implement proper memory boundary checks with same semantics as interpreter
             logger.info("JIT execution finished. Reason: \(exitReason). Remaining gas: \(currentGas.value)")
             // The `gas` parameter to this function is `let`, so we can't modify it directly.
             // The `ExecOutcome` should be constructed with `currentGas`.
