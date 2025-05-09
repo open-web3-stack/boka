@@ -3,9 +3,8 @@
 #include <stdio.h>
 #include <cstring>
 
-// C++ Trampoline for calling the Swift host function dispatcher
-// This function is called by the JIT-generated code.
-// It's declared in helper.hh and defined here.
+// Trampoline for JIT code to call Swift host functions
+// Called by JIT-generated code when executing ECALL instructions
 uint32_t pvm_host_call_trampoline(
     JITHostFunctionTable* host_table,
     uint32_t host_call_index,
@@ -15,14 +14,11 @@ uint32_t pvm_host_call_trampoline(
     uint64_t* guest_gas_ptr) {
 
     if (!host_table || !host_table->dispatchHostCall) {
-        // TODO: Log error - host table or dispatch function is null.
-        // This indicates a setup problem.
-        // Return a specific error code that the JIT epilogue can interpret as a VM panic.
-        // For now, using a magic number. This should align with PolkaVM's ExitReason.PanicReason.
-        return 0xFFFFFFFF; // Placeholder for HostFunctionError or similar
+        // TODO: Implement proper error logging with error codes
+        return 0xFFFFFFFF; // Error code for HostFunctionError (matches ExitReason.PanicReason)
     }
 
-    // Call the Swift function pointer
+    // Dispatch to Swift implementation
     return host_table->dispatchHostCall(
         host_table->ownerContext,
         host_call_index,
