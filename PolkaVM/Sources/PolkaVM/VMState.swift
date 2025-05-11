@@ -17,7 +17,7 @@ public class VMState {
     private var gas: GasInt
     private var memory: Memory
 
-    public var isExecutingInst: Bool = false
+    private var isExecutingInst: Bool = false
 
     public init(program: ProgramCode, pc: UInt32, registers: Registers, gas: Gas, memory: Memory) {
         self.program = program
@@ -138,5 +138,11 @@ public class VMState {
     public func writeRegister(_ index: Registers.Index, _ value: some FixedWidthInteger) {
         logger.trace("write w\(index.value) (\(value))")
         registers[index] = UInt64(truncatingIfNeeded: value)
+    }
+
+    public func withExecutingInst<R>(_ block: () throws -> R) rethrows -> R {
+        isExecutingInst = true
+        defer { isExecutingInst = false }
+        return try block()
     }
 }
