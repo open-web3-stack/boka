@@ -41,6 +41,27 @@ namespace {
     const a64::Gp RETURN_REG = a64::x0;         // Return value register
 }
 
+// Forward declaration for instruction parsing function
+extern "C" {
+    // Function to be called from C++ to parse an instruction at a given PC
+    // Returns a pointer to the parsed instruction or nullptr if parsing failed
+    void* parseInstruction(const uint8_t* codeBuffer, size_t codeSize, uint32_t pc);
+    
+    // Function to be called from C++ to generate code for an instruction
+    // Returns true if code generation was successful, false otherwise
+    bool generateInstructionCode(
+        void* assembler,
+        const char* targetArch,
+        void* instruction,
+        uint32_t pc,
+        uint32_t nextPC,
+        void* gasPtr
+    );
+    
+    // Function to release the parsed instruction
+    void releaseInstruction(void* instruction);
+}
+
 int32_t compilePolkaVMCode_a64(
     const uint8_t* codeBuffer,
     size_t codeSize,
@@ -75,6 +96,10 @@ int32_t compilePolkaVMCode_a64(
     a64::Assembler a(&code);
     Label L_HostCallSuccessful = a.newLabel();
     Label L_HostCallFailedPathReturn = a.newLabel();
+    Label L_MainLoop = a.newLabel();
+    Label L_ExitSuccess = a.newLabel();
+    Label L_ExitOutOfGas = a.newLabel();
+    Label L_ExitPanic = a.newLabel();
 
     // Function prologue - save callee-saved registers that we'll use
     a.sub(a64::sp, a64::sp, 64);  // Allocate stack space for 4 pairs of registers (8 registers * 8 bytes)
@@ -92,38 +117,65 @@ int32_t compilePolkaVMCode_a64(
     a.mov(VM_PC, PARAM_REG4.w());         // w4: initial_pvm_pc
     a.mov(VM_CONTEXT_PTR, PARAM_REG5);    // x5: invocation_context_ptr
 
-    // Example ECALL implementation
-    if (codeSize > 0 && initialPC == 0) {
-        std::cout << "JIT (AArch64): Simulating ECALL #1" << std::endl;
-        uint32_t host_call_idx = 1;
-
-        // Setup arguments for pvm_host_call_trampoline using our static register mapping
-        a.mov(PARAM_REG0, VM_CONTEXT_PTR);     // arg0: invocation_context_ptr
-        a.mov(PARAM_REG1, host_call_idx);      // arg1: host_call_idx
-        a.mov(PARAM_REG2, VM_REGISTERS_PTR);   // arg2: guest_registers_ptr
-        a.mov(PARAM_REG3, VM_MEMORY_PTR);      // arg3: guest_memory_base_ptr
-        a.mov(PARAM_REG4.w(), VM_MEMORY_SIZE); // arg4: guest_memory_size
-        a.mov(PARAM_REG5, VM_GAS_PTR);         // arg5: guest_gas_ptr
-
-        // Call trampoline using TEMP_REG0 (x9)
-        a.mov(TEMP_REG0, reinterpret_cast<uint64_t>(pvm_host_call_trampoline));
-        a.blr(TEMP_REG0); // Result returned in x0 (RETURN_REG)
-
-        // Check for error (0xFFFFFFFF)
-        a.cmp(RETURN_REG, 0xFFFFFFFF);
-        a.b_ne(L_HostCallSuccessful);
-
-        // Host call failed path
-        a.mov(RETURN_REG, 1); // Return ExitReason.Panic
-        a.b(L_HostCallFailedPathReturn);
-
-        a.bind(L_HostCallSuccessful);
-        // Store host call result to PVM_R0 (first element in registers array)
-        a.str(RETURN_REG, a64::ptr(VM_REGISTERS_PTR));
-    }
-
-    // Default exit path
+    // Main instruction execution loop
+    a.bind(L_MainLoop);
+    
+    // Parse the instruction at the current PC
+    a.mov(PARAM_REG0, reinterpret_cast<uint64_t>(codeBuffer));
+    a.mov(PARAM_REG1, codeSize);
+    a.mov(PARAM_REG2.w(), VM_PC);
+    a.mov(TEMP_REG0, reinterpret_cast<uint64_t>(parseInstruction));
+    a.blr(TEMP_REG0); // Call parseInstruction, result in x0
+    
+    // Check if parsing failed (x0 == nullptr)
+    a.cmp(RETURN_REG, 0);
+    a.b_eq(L_ExitPanic); // If parsing failed, exit with panic
+    
+    // Calculate next PC (current PC + instruction size)
+    // For simplicity, we'll just increment by 1 for now
+    // In a real implementation, we'd need to determine the actual instruction size
+    a.add(TEMP_REG1.w(), VM_PC, 1);
+    
+    // Generate code for the instruction
+    a.mov(PARAM_REG0, reinterpret_cast<uint64_t>(&a)); // Assembler pointer
+    a.mov(PARAM_REG1, reinterpret_cast<uint64_t>("aarch64")); // Target architecture
+    a.mov(PARAM_REG2, RETURN_REG); // Instruction pointer (from parseInstruction)
+    a.mov(PARAM_REG3.w(), VM_PC); // Current PC
+    a.mov(PARAM_REG4.w(), TEMP_REG1.w()); // Next PC
+    a.mov(PARAM_REG5, VM_GAS_PTR); // Gas pointer
+    a.mov(TEMP_REG0, reinterpret_cast<uint64_t>(generateInstructionCode));
+    a.blr(TEMP_REG0); // Call generateInstructionCode, result in x0
+    
+    // Release the instruction
+    a.mov(PARAM_REG0, RETURN_REG); // Instruction pointer
+    a.mov(TEMP_REG0, reinterpret_cast<uint64_t>(releaseInstruction));
+    a.blr(TEMP_REG0); // Call releaseInstruction
+    
+    // Check if code generation was successful
+    a.cmp(RETURN_REG, 0);
+    a.b_eq(L_ExitPanic); // If code generation failed, exit with panic
+    
+    // Check if we should continue execution
+    // For now, we'll just loop back to the main loop
+    a.b(L_MainLoop);
+    
+    // Exit paths
+    
+    // Success exit path
+    a.bind(L_ExitSuccess);
     a.mov(RETURN_REG, 0); // Return ExitReason.Halt
+    a.b(L_HostCallFailedPathReturn);
+    
+    // Out of gas exit path
+    a.bind(L_ExitOutOfGas);
+    a.mov(RETURN_REG, 2); // Return ExitReason.OutOfGas
+    a.b(L_HostCallFailedPathReturn);
+    
+    // Panic exit path
+    a.bind(L_ExitPanic);
+    a.mov(RETURN_REG, 1); // Return ExitReason.Panic
+    
+    // Common exit path
     a.bind(L_HostCallFailedPathReturn);
     
     // Function epilogue - restore callee-saved registers

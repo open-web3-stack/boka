@@ -17,12 +17,12 @@ namespace {
     const x86::Gp VM_GAS_PTR = x86::r14;        // Guest VM gas counter
     const x86::Gp VM_PC = x86::r15d;            // Guest VM program counter (32-bit)
     const x86::Gp VM_CONTEXT_PTR = x86::rbp;    // Invocation context pointer
-    
+
     // Temporary registers (caller-saved)
     const x86::Gp TEMP_REG0 = x86::rax;         // General purpose temp
     const x86::Gp TEMP_REG1 = x86::r10;         // General purpose temp
     const x86::Gp TEMP_REG2 = x86::r11;         // General purpose temp
-    
+
     // Parameter registers (System V AMD64 ABI)
     const x86::Gp PARAM_REG0 = x86::rdi;        // First parameter
     const x86::Gp PARAM_REG1 = x86::rsi;        // Second parameter
@@ -66,6 +66,10 @@ int32_t compilePolkaVMCode_x64(
     x86::Assembler a(&code);
     Label L_HostCallSuccessful = a.newLabel();
     Label L_HostCallFailedPathReturn = a.newLabel();
+    Label L_MainLoop = a.newLabel();
+    Label L_ExitSuccess = a.newLabel();
+    Label L_ExitOutOfGas = a.newLabel();
+    Label L_ExitPanic = a.newLabel();
 
     // Function prologue - save callee-saved registers that we'll use
     a.push(VM_REGISTERS_PTR);  // rbx
@@ -74,7 +78,7 @@ int32_t compilePolkaVMCode_x64(
     a.push(VM_MEMORY_SIZE.r64());  // r13
     a.push(VM_GAS_PTR);        // r14
     a.push(VM_PC.r64());       // r15
-    
+
     // Initialize our static register mapping from function parameters
     // System V AMD64 ABI: rdi, rsi, rdx, rcx, r8, r9
     a.mov(VM_REGISTERS_PTR, PARAM_REG0);  // rdi: registers_ptr
@@ -84,40 +88,34 @@ int32_t compilePolkaVMCode_x64(
     a.mov(VM_PC, PARAM_REG4.r32());       // r8d: initial_pvm_pc
     a.mov(VM_CONTEXT_PTR, PARAM_REG5);    // r9: invocation_context_ptr
 
-    // Example ECALL implementation
-    if (codeSize > 0 && initialPC == 0) {
-        std::cout << "JIT (x86_64): Simulating ECALL #1" << std::endl;
-        uint32_t host_call_idx = 1;
+    // Main instruction execution loop
+    a.bind(L_MainLoop);
 
-        // Setup arguments for pvm_host_call_trampoline using our static register mapping
-        a.mov(PARAM_REG0, VM_CONTEXT_PTR);     // arg0: invocation_context_ptr
-        a.mov(PARAM_REG1.r32(), host_call_idx); // arg1: host_call_idx
-        a.mov(PARAM_REG2, VM_REGISTERS_PTR);   // arg2: guest_registers_ptr
-        a.mov(PARAM_REG3, VM_MEMORY_PTR);      // arg3: guest_memory_base_ptr
-        a.mov(PARAM_REG4.r32(), VM_MEMORY_SIZE);// arg4: guest_memory_size
-        a.mov(PARAM_REG5, VM_GAS_PTR);         // arg5: guest_gas_ptr
+	// TODO: ???
 
-        // Call trampoline using TEMP_REG0 (rax)
-        a.mov(TEMP_REG0, reinterpret_cast<uint64_t>(pvm_host_call_trampoline));
-        a.call(TEMP_REG0); // Result returned in eax (TEMP_REG0.r32())
+    // Check if we should continue execution
+    // For now, we'll just loop back to the main loop
+    a.jmp(L_MainLoop);
 
-        // Check for error (0xFFFFFFFF)
-        a.cmp(TEMP_REG0.r32(), 0xFFFFFFFF);
-        a.jne(L_HostCallSuccessful);
+    // Exit paths
 
-        // Host call failed path
-        a.mov(TEMP_REG0.r32(), 1); // Return ExitReason.Panic
-        a.jmp(L_HostCallFailedPathReturn);
-
-        a.bind(L_HostCallSuccessful);
-        // Store host call result to PVM_R0 (first element in registers array)
-        a.mov(x86::ptr(VM_REGISTERS_PTR), TEMP_REG0.r32());
-    }
-
-    // Default exit path
+    // Success exit path
+    a.bind(L_ExitSuccess);
     a.mov(TEMP_REG0.r32(), 0); // Return ExitReason.Halt
+    a.jmp(L_HostCallFailedPathReturn);
+
+    // Out of gas exit path
+    a.bind(L_ExitOutOfGas);
+    a.mov(TEMP_REG0.r32(), 2); // Return ExitReason.OutOfGas
+    a.jmp(L_HostCallFailedPathReturn);
+
+    // Panic exit path
+    a.bind(L_ExitPanic);
+    a.mov(TEMP_REG0.r32(), 1); // Return ExitReason.Panic
+
+    // Common exit path
     a.bind(L_HostCallFailedPathReturn);
-    
+
     // Function epilogue - restore callee-saved registers
     a.pop(VM_PC.r64());       // r15
     a.pop(VM_GAS_PTR);        // r14
@@ -125,12 +123,12 @@ int32_t compilePolkaVMCode_x64(
     a.pop(VM_MEMORY_PTR);     // r12
     a.pop(VM_CONTEXT_PTR);    // rbp
     a.pop(VM_REGISTERS_PTR);  // rbx
-    
+
     a.ret();
 
     err = rt.add(reinterpret_cast<void**>(funcOut), &code);
     if (err) {
-        fprintf(stderr, "AsmJit (x86_64) failed to add JITed code to runtime: %s\n", 
+        fprintf(stderr, "AsmJit (x86_64) failed to add JITed code to runtime: %s\n",
                 DebugUtils::errorAsString(err));
         return err;
     }

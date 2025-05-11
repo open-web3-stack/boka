@@ -17,7 +17,6 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
     private let jitCache = JITCache()
     private let jitCompiler = JITCompiler()
     private let jitExecutor = JITExecutor()
-    private let jitMemoryManager = JITMemoryManager()
 
     // TODO: Improve HostFunction signature with proper VMState access (similar to interpreter's InvocationContext)
     // TODO: Add gas accounting for host function calls (deduct gas before and after host function execution)
@@ -166,22 +165,6 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
             let targetArchitecture = try JITPlatformHelper.getCurrentTargetArchitecture(config: config)
             logger.debug("Target architecture for JIT: \(targetArchitecture)")
 
-            // Fixed gas cost for JIT compilation/cache lookup - matches interpreter's preparation cost
-            let jitCompilationGasCost: UInt64 = 100
-
-            // Check if we have enough gas for compilation/cache lookup
-            if currentGas.value < jitCompilationGasCost {
-                logger
-                    .error(
-                        "Not enough gas for JIT compilation/cache lookup. Required: \(jitCompilationGasCost), Available: \(currentGas.value)"
-                    )
-                return .outOfGas
-            }
-
-            // Create a new Gas instance with the deducted amount
-            currentGas = Gas(currentGas.value - jitCompilationGasCost)
-            logger.debug("Deducted \(jitCompilationGasCost) gas for JIT compilation/cache lookup. Remaining: \(currentGas.value)")
-
             let jitCacheKey = JITCache.createCacheKey(
                 blob: blob,
                 initialPC: pc,
@@ -189,7 +172,6 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
                 config: config
             )
 
-            let jitTotalMemorySize = jitMemoryManager.getJITTotalMemorySize(config: config)
             var functionPtr: UnsafeMutableRawPointer?
             let functionAddress = await jitCache.getCachedFunction(forKey: jitCacheKey)
             if let address = functionAddress {
@@ -203,15 +185,6 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
                 // Additional gas cost for actual compilation (only on cache miss)
                 let jitActualCompilationGasCost: UInt64 = 300
 
-                // Check if we have enough gas for actual compilation
-                if currentGas.value < jitActualCompilationGasCost {
-                    logger
-                        .error(
-                            "Not enough gas for actual JIT compilation. Required: \(jitActualCompilationGasCost), Available: \(currentGas.value)"
-                        )
-                    return .outOfGas
-                }
-
                 // Create a new Gas instance with the deducted amount
                 currentGas = Gas(currentGas.value - jitActualCompilationGasCost)
                 logger.debug("Deducted \(jitActualCompilationGasCost) gas for actual JIT compilation. Remaining: \(currentGas.value)")
@@ -221,7 +194,7 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
                     initialPC: pc,
                     config: config,
                     targetArchitecture: targetArchitecture,
-                    jitMemorySize: jitTotalMemorySize
+                    jitMemorySize: UInt32.max // TODO:
                 )
                 functionPtr = compiledFuncPtr
 
@@ -267,21 +240,6 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
             currentGas = Gas(currentGas.value - memoryInitGasCost)
             logger.debug("Deducted \(memoryInitGasCost) gas for memory initialization. Remaining: \(currentGas.value)")
 
-            var vmMemory: Memory
-            do {
-                let pvmPageSize = UInt32(config.pvmMemoryPageSize)
-                vmMemory = try StandardMemory(
-                    readOnlyData: config.readOnlyDataSegment ?? Data(),
-                    readWriteData: config.readWriteDataSegment ?? Data(),
-                    argumentData: argumentData ?? Data(),
-                    heapEmptyPagesSize: config.initialHeapPages * pvmPageSize,
-                    stackSize: config.stackPages * pvmPageSize
-                )
-            } catch {
-                logger.error("Failed to initialize VM memory: \(error)")
-                throw JITError.vmInitializationError(details: "StandardMemory init failed: \(error)")
-            }
-
             // Fixed gas cost for memory buffer preparation
             let memoryBufferPrepGasCost: UInt64 = 100
 
@@ -298,18 +256,13 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
             currentGas = Gas(currentGas.value - memoryBufferPrepGasCost)
             logger.debug("Deducted \(memoryBufferPrepGasCost) gas for memory buffer preparation. Remaining: \(currentGas.value)")
 
-            var jitFlatMemoryBuffer = try jitMemoryManager.prepareJITMemoryBuffer(
-                from: vmMemory,
-                config: config,
-                jitMemorySize: jitTotalMemorySize
-            )
+            let jitTotalMemorySize = UInt32.max
 
             // Execute the JIT-compiled function
             // The JIT function will deduct gas for each instruction executed
             let exitReason = try jitExecutor.execute(
                 functionPtr: validFunctionPtr,
                 registers: &registers,
-                jitFlatMemoryBuffer: &jitFlatMemoryBuffer,
                 jitMemorySize: jitTotalMemorySize,
                 gas: &currentGas,
                 initialPC: pc,
@@ -328,13 +281,6 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
             // Create a new Gas instance with the deducted amount
             currentGas = Gas(currentGas.value - memoryReflectionGasCost)
             logger.debug("Deducted \(memoryReflectionGasCost) gas for memory reflection. Remaining: \(currentGas.value)")
-
-            try jitMemoryManager.reflectJITMemoryChanges(
-                from: jitFlatMemoryBuffer,
-                to: &vmMemory,
-                config: config,
-                jitMemorySize: jitTotalMemorySize
-            )
 
             logger.info("JIT execution finished. Reason: \(exitReason). Remaining gas: \(currentGas.value)")
             return exitReason

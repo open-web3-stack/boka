@@ -6,121 +6,69 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <asmjit/asmjit.h>
+#include <asmjit/a64.h>
 
-// Static register allocation for PolkaVM JIT
-// These are architecture-specific register mappings
+#include "registers.hh"
 
-// x86_64 (AMD64) register allocation
-namespace x64_reg {
-    // VM state registers (using callee-saved registers)
-    constexpr int VM_REGISTERS_PTR = 0;  // rbx - Guest VM registers array
-    constexpr int VM_MEMORY_PTR = 1;     // r12 - Guest VM memory base
-    constexpr int VM_MEMORY_SIZE = 2;    // r13d - Guest VM memory size
-    constexpr int VM_GAS_PTR = 3;        // r14 - Guest VM gas counter
-    constexpr int VM_PC = 4;             // r15d - Guest VM program counter
-    constexpr int VM_CONTEXT_PTR = 5;    // rbp - Invocation context pointer
-    
-    // Temporary registers (caller-saved)
-    constexpr int TEMP_REG0 = 6;         // rax - General purpose temp
-    constexpr int TEMP_REG1 = 7;         // r10 - General purpose temp
-    constexpr int TEMP_REG2 = 8;         // r11 - General purpose temp
-    constexpr int TEMP_REG3 = 9;         // rcx - General purpose temp
-    constexpr int TEMP_REG4 = 10;        // rdx - General purpose temp
-    constexpr int TEMP_REG5 = 11;        // rsi - General purpose temp
-    constexpr int TEMP_REG6 = 12;        // rdi - General purpose temp
-    constexpr int TEMP_REG7 = 13;        // r8 - General purpose temp
-    constexpr int TEMP_REG8 = 14;        // r9 - General purpose temp
-}
+// JIT instruction generation interface
+// This is the C++ implementation of the JITInstructionGenerator protocol
+namespace jit_instruction {
+    // Control flow instruction generators
 
-// AArch64 (ARM64) register allocation
-namespace a64_reg {
-    // VM state registers (using callee-saved registers)
-    constexpr int VM_REGISTERS_PTR = 0;  // x19 - Guest VM registers array
-    constexpr int VM_MEMORY_PTR = 1;     // x20 - Guest VM memory base
-    constexpr int VM_MEMORY_SIZE = 2;    // w21 - Guest VM memory size
-    constexpr int VM_GAS_PTR = 3;        // x22 - Guest VM gas counter
-    constexpr int VM_PC = 4;             // w23 - Guest VM program counter
-    constexpr int VM_CONTEXT_PTR = 5;    // x24 - Invocation context pointer
-    
-    // Temporary registers (caller-saved)
-    constexpr int TEMP_REG0 = 6;         // x0 - General purpose temp
-    constexpr int TEMP_REG1 = 7;         // x1 - General purpose temp
-    constexpr int TEMP_REG2 = 8;         // x2 - General purpose temp
-    constexpr int TEMP_REG3 = 9;         // x3 - General purpose temp
-    constexpr int TEMP_REG4 = 10;        // x4 - General purpose temp
-    constexpr int TEMP_REG5 = 11;        // x5 - General purpose temp
-    constexpr int TEMP_REG6 = 12;        // x9 - General purpose temp
-    constexpr int TEMP_REG7 = 13;        // x10 - General purpose temp
-    constexpr int TEMP_REG8 = 14;        // x11 - General purpose temp
-}
+    // Generate gas accounting code
+    bool jit_emitGasAccounting(
+        void* _Nonnull assembler,
+        const char* _Nonnull target_arch,
+        uint64_t gas_cost,
+        void* _Nonnull gas_ptr
+    );
 
-// Physical register mapping constants for x86_64
-namespace x64_reg_id {
-    // Register IDs for x86_64 (matching asmjit::x86::Gp::kId* constants)
-    constexpr int kIdAx = 0;   // rax
-    constexpr int kIdCx = 1;   // rcx
-    constexpr int kIdDx = 2;   // rdx
-    constexpr int kIdBx = 3;   // rbx
-    constexpr int kIdSp = 4;   // rsp
-    constexpr int kIdBp = 5;   // rbp
-    constexpr int kIdSi = 6;   // rsi
-    constexpr int kIdDi = 7;   // rdi
-    constexpr int kIdR8 = 8;   // r8
-    constexpr int kIdR9 = 9;   // r9
-    constexpr int kIdR10 = 10; // r10
-    constexpr int kIdR11 = 11; // r11
-    constexpr int kIdR12 = 12; // r12
-    constexpr int kIdR13 = 13; // r13
-    constexpr int kIdR14 = 14; // r14
-    constexpr int kIdR15 = 15; // r15
-}
+    // Generate trap instruction
+    bool jit_generateTrap(
+        void* _Nonnull assembler,
+        const char* _Nonnull target_arch
+    );
 
-// Physical register mapping functions
-// These functions map logical VM registers to physical CPU registers
-namespace reg_map {
-    // Get the physical register for a VM register index in x86_64
-    inline int getPhysicalRegX64(int vmReg) {
-        switch (vmReg) {
-            case x64_reg::VM_REGISTERS_PTR: return x64_reg_id::kIdBx;  // rbx
-            case x64_reg::VM_MEMORY_PTR:    return x64_reg_id::kIdR12; // r12
-            case x64_reg::VM_MEMORY_SIZE:   return x64_reg_id::kIdR13; // r13
-            case x64_reg::VM_GAS_PTR:       return x64_reg_id::kIdR14; // r14
-            case x64_reg::VM_PC:            return x64_reg_id::kIdR15; // r15
-            case x64_reg::VM_CONTEXT_PTR:   return x64_reg_id::kIdBp;  // rbp
-            case x64_reg::TEMP_REG0:        return x64_reg_id::kIdAx;  // rax
-            case x64_reg::TEMP_REG1:        return x64_reg_id::kIdR10; // r10
-            case x64_reg::TEMP_REG2:        return x64_reg_id::kIdR11; // r11
-            case x64_reg::TEMP_REG3:        return x64_reg_id::kIdCx;  // rcx
-            case x64_reg::TEMP_REG4:        return x64_reg_id::kIdDx;  // rdx
-            case x64_reg::TEMP_REG5:        return x64_reg_id::kIdSi;  // rsi
-            case x64_reg::TEMP_REG6:        return x64_reg_id::kIdDi;  // rdi
-            case x64_reg::TEMP_REG7:        return x64_reg_id::kIdR8;  // r8
-            case x64_reg::TEMP_REG8:        return x64_reg_id::kIdR9;  // r9
-            default: return x64_reg_id::kIdAx; // Default to rax
-        }
-    }
+    // Generate jump instruction
+    bool jit_generateJump(
+        void* _Nonnull assembler,
+        const char* _Nonnull target_arch,
+        uint32_t target_pc
+    );
 
-    // Get the physical register for a VM register index in AArch64
-    inline int getPhysicalRegA64(int vmReg) {
-        switch (vmReg) {
-            case a64_reg::VM_REGISTERS_PTR: return 19; // x19
-            case a64_reg::VM_MEMORY_PTR:    return 20; // x20
-            case a64_reg::VM_MEMORY_SIZE:   return 21; // w21/x21
-            case a64_reg::VM_GAS_PTR:       return 22; // x22
-            case a64_reg::VM_PC:            return 23; // w23/x23
-            case a64_reg::VM_CONTEXT_PTR:   return 24; // x24
-            case a64_reg::TEMP_REG0:        return 0;  // x0
-            case a64_reg::TEMP_REG1:        return 1;  // x1
-            case a64_reg::TEMP_REG2:        return 2;  // x2
-            case a64_reg::TEMP_REG3:        return 3;  // x3
-            case a64_reg::TEMP_REG4:        return 4;  // x4
-            case a64_reg::TEMP_REG5:        return 5;  // x5
-            case a64_reg::TEMP_REG6:        return 9;  // x9
-            case a64_reg::TEMP_REG7:        return 10; // x10
-            case a64_reg::TEMP_REG8:        return 11; // x11
-            default: return 0; // Default to x0
-        }
-    }
+    // Generate jump indirect instruction
+    bool jit_generateJumpIndirect(
+        void* _Nonnull assembler,
+        const char* _Nonnull target_arch,
+        uint8_t reg_index
+    );
+
+    // Generate ecalli instruction (calls into host)
+    bool jit_generateEcalli(
+        void* _Nonnull assembler,
+        const char* _Nonnull target_arch,
+        uint32_t func_idx,
+        void* _Nonnull gas_ptr
+    );
+
+    // Generate load immediate and jump
+    bool jit_generateLoadImmJump(
+        void* _Nonnull assembler,
+        const char* _Nonnull target_arch,
+        uint8_t dest_reg,
+        uint32_t immediate,
+        uint32_t target_pc
+    );
+
+    // Generate load immediate and jump indirect
+    bool jit_generateLoadImmJumpInd(
+        void* _Nonnull assembler,
+        const char* _Nonnull target_arch,
+        uint8_t dest_reg,
+        uint32_t immediate,
+        uint8_t jump_reg
+    );
 }
 
 // Function signature matching JITHostFunctionFnSwift in ExecutorBackendJIT.swift

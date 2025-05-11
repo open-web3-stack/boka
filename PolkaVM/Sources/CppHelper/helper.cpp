@@ -2,6 +2,9 @@
 #include "helper.hh"
 #include <stdio.h>
 #include <cstring>
+#include <functional>
+
+using namespace asmjit;
 
 // Trampoline for JIT code to call Swift host functions
 // Called by JIT-generated code when executing ECALL instructions

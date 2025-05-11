@@ -20,7 +20,7 @@ public enum ExitReason: Equatable {
     // TODO: Review and refine these integer codes for JIT communication.
     // Especially for cases with associated values, a more complex ABI might be needed
     // if the associated values must be passed back from JIT.
-    public func toInt32() -> Int32 {
+    public func toUInt64() -> UInt64 {
         switch self {
         case .halt: 0
         case let .panic(reason):
@@ -35,29 +35,29 @@ public enum ExitReason: Equatable {
             case .jitInvalidFunctionPointer: 13
             }
         case .outOfGas: 5
-        case .hostCall: 6 // Associated value (UInt32) is lost in this simple conversion
-        case .pageFault: 7 // Associated value (UInt32) is lost
+        case let .hostCall(id): 6 + UInt64(id) << 32
+        case let .pageFault(address): 7 + UInt64(address) << 32
         }
     }
 
-    public static func fromInt32(_ rawValue: Int32) -> ExitReason? {
-        switch rawValue {
-        case 0: .halt
-        case 1: .panic(.trap)
-        case 2: .panic(.invalidInstructionIndex)
-        case 3: .panic(.invalidDynamicJump)
-        case 4: .panic(.invalidBranch)
-        case 5: .outOfGas
+    public static func fromUInt64(_ rawValue: UInt64) -> ExitReason {
+        switch rawValue & 0xFF {
+        case 0: return .halt
+        case 1: return .panic(.trap)
+        case 2: return .panic(.invalidInstructionIndex)
+        case 3: return .panic(.invalidDynamicJump)
+        case 4: return .panic(.invalidBranch)
+        case 5: return .outOfGas
+        case 6: return .hostCall(UInt32(rawValue >> 32))
+        case 7: return .pageFault(UInt32(rawValue >> 32))
         // JIT-specific panic reasons
-        case 10: .panic(.jitCompilationFailed)
-        case 11: .panic(.jitMemoryError)
-        case 12: .panic(.jitExecutionError)
-        case 13: .panic(.jitInvalidFunctionPointer)
-        // Cases 6 and 7 would need to decide on default associated values or be unrepresentable here
-        // For now, let's make them unrepresentable to highlight the issue.
-        // case 6: return .hostCall(0) // Placeholder default ID
-        // case 7: return .pageFault(0) // Placeholder default address
-        default: nil // Unknown code
+        case 10: return .panic(.jitCompilationFailed)
+        case 11: return .panic(.jitMemoryError)
+        case 12: return .panic(.jitExecutionError)
+        case 13: return .panic(.jitInvalidFunctionPointer)
+        default:
+            print("Unknown exit reason: \(rawValue)")
+            return .halt
         }
     }
 }
