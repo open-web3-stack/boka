@@ -14,7 +14,7 @@ public func invokePVM(
     ctx: (any InvocationContext)?
 ) async -> (ExitReason, Gas, Data?) {
     do {
-        let state = try VMState(standardProgramBlob: blob, pc: pc, gas: gas, argumentData: argumentData)
+        let state = try VMStateInterpreter(standardProgramBlob: blob, pc: pc, gas: gas, argumentData: argumentData)
         let engine = Engine(config: config, invocationContext: ctx)
         let exitReason = await engine.execute(state: state)
         let gasUsed = gas - Gas(state.getGas())
