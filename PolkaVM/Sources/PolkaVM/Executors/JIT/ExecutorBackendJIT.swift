@@ -252,19 +252,6 @@ final class ExecutorBackendJIT: ExecutorBackend {
             currentProgramCode = nil
             jitHostFunctionTableWrapper.table.invocationContext = nil
 
-            // Fixed gas cost for memory changes reflection
-            let memoryReflectionGasCost: UInt64 = 100
-
-            // Check if we have enough gas for memory reflection
-            if currentGas.value < memoryReflectionGasCost {
-                logger.error("Not enough gas for memory reflection. Required: \(memoryReflectionGasCost), Available: \(currentGas.value)")
-                return .outOfGas
-            }
-
-            // Create a new Gas instance with the deducted amount
-            currentGas = Gas(currentGas.value - memoryReflectionGasCost)
-            logger.debug("Deducted \(memoryReflectionGasCost) gas for memory reflection. Remaining: \(currentGas.value)")
-
             logger.debug("JIT execution finished. Reason: \(exitReason). Remaining gas: \(currentGas.value)")
             return exitReason
 
@@ -277,24 +264,6 @@ final class ExecutorBackendJIT: ExecutorBackend {
         }
     }
 }
-
-//
-// The temporary extension PvmConfig from the original file has been removed.
-// These properties need to be formally added to the PvmConfig definition.
-
-// Type for a C-callable host function trampoline
-// It receives an opaque context (pointer to ExecutorBackendJIT instance),
-// guest registers, guest memory, gas, and the host call index.
-// Returns a status or result (e.g., value for R0 or an error code).
-public typealias PolkaVMHostCallCHandler = @convention(c) (
-    _ opaqueOwnerContext: UnsafeMutableRawPointer?, // Points to ExecutorBackendJIT instance
-    _ hostCallIndex: UInt32,
-    _ guestRegisters: UnsafeMutablePointer<UInt64>, // Guest registers (PolkaVM format)
-    _ guestMemoryBase: UnsafeMutablePointer<UInt8>, // Guest memory base
-    _ guestMemorySize: UInt32, // Guest memory size (for bounds checks)
-    _ guestGas: UnsafeMutablePointer<UInt64>, // Guest gas counter
-    _ invocationContext: UnsafeMutableRawPointer? // InvocationContext for host function dispatch
-) -> UInt32 // Represents a value to be written to a specific register (e.g. R0 by convention) or a JITHostCallError rawValue.
 
 // Defines standardized error codes for JIT host function calls.
 // These raw values are returned by the host call C trampoline to the JIT-compiled code.
