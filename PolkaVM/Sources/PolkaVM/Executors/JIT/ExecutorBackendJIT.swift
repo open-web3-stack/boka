@@ -18,20 +18,35 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
     private let jitCompiler = JITCompiler()
     private let jitExecutor = JITExecutor()
 
-    // TODO: Improve HostFunction signature with proper VMState access (similar to interpreter's InvocationContext)
-    // TODO: Add gas accounting for host function calls (deduct gas before and after host function execution)
-    // TODO: Implement proper error propagation from host functions to JIT execution flow
-    public typealias HostFunction = (
-        _ guestRegisters: UnsafeMutablePointer<UInt64>,
-        _ guestMemoryBase: UnsafeMutablePointer<UInt8>,
-        _ guestMemorySize: UInt32,
-        _ guestGas: UnsafeMutablePointer<UInt64>
-        // TODO: Add specific arguments extracted from registers if needed
-    ) throws -> UInt32 // Return value to be placed in a guest register (e.g., R0), or an error indicator.
-
-    private var registeredHostFunctions: [UInt32: HostFunction] = [:]
     // This will hold the JITHostFunctionTable struct itself, and we'll pass a pointer to it.
     private var jitHostFunctionTableStorage: JITHostFunctionTable! // force unwrapped so we can have cyclic reference
+
+    // Store the program code during execution for VMStateJIT
+    private var currentProgramCode: ProgramCode?
+
+    // We need a class wrapper for JITHostFunctionTable to avoid dangling pointer issues
+    private class JITHostFunctionTableWrapper {
+        var table: JITHostFunctionTable
+
+        init(table: JITHostFunctionTable) {
+            self.table = table
+        }
+    }
+
+    // Wrapper to store the JITHostFunctionTable in a class for proper reference semantics
+    private var jitHostFunctionTableWrapper: JITHostFunctionTableWrapper!
+
+    // Queue for main async work
+    private let mainExecutionQueue = DispatchQueue(label: "com.polka.vm.jitexecution", qos: .userInitiated)
+
+    // Using a simpler approach to handle host calls that doesn't require async/await
+    private var syncHostCallHandler: ((
+        UInt32,
+        UnsafeMutablePointer<UInt64>,
+        UnsafeMutablePointer<UInt8>,
+        UInt32,
+        UnsafeMutablePointer<UInt64>
+    ) -> UInt32)?
 
     // TODO: Implement thread safety for JIT execution (similar to interpreter's async execution model)
     // TODO: Add support for debugging JIT-compiled code (instruction tracing, register dumps)
@@ -51,7 +66,8 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
             UnsafeMutablePointer<UInt64>,
             UnsafeMutablePointer<UInt8>,
             UInt32,
-            UnsafeMutablePointer<UInt64>
+            UnsafeMutablePointer<UInt64>,
+            UnsafeMutableRawPointer?
         ) -> UInt32
 
         // double unsafeBitCast to workaround Swift compiler bug
@@ -61,60 +77,46 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
         )
         jitHostFunctionTableStorage = JITHostFunctionTable(
             dispatchHostCall: unsafeBitCast(fnPtr, to: JITHostFunctionFn.self),
-            ownerContext: Unmanaged.passUnretained(self).toOpaque()
+            ownerContext: Unmanaged.passUnretained(self).toOpaque(),
+            invocationContext: nil
         )
+
+        // Create a wrapper for the table
+        jitHostFunctionTableWrapper = JITHostFunctionTableWrapper(table: jitHostFunctionTableStorage)
     }
 
-    // Public method to register host functions
-    public func registerHostFunction(index: UInt32, function: @escaping HostFunction) {
-        registeredHostFunctions[index] = function
-        logger.info("Registered host function for index \(index)")
-    }
-
-    // Instance method to handle the dispatch, called by the C trampoline
+    // Simple synchronous handler for host functions
+    // This is the bridge between the sync world of JIT and the async world of Swift
     fileprivate func dispatchHostCall(
         hostCallIndex: UInt32,
         guestRegistersPtr: UnsafeMutablePointer<UInt64>,
         guestMemoryBasePtr: UnsafeMutablePointer<UInt8>,
         guestMemorySize: UInt32,
-        guestGasPtr: UnsafeMutablePointer<UInt64>
+        guestGasPtr: UnsafeMutablePointer<UInt64>,
+        invocationContextPtr _: UnsafeMutableRawPointer?
     ) -> UInt32 { // Return value for guest (e.g., to be put in R0) or error code
-        logger.debug("Swift: Instance dispatchHostCall received call for index \(hostCallIndex)")
+        logger.debug("Swift: dispatchHostCall received call for index \(hostCallIndex)")
 
-        guard let hostFunction = registeredHostFunctions[hostCallIndex] else {
-            logger.error("Swift: No host function registered for index \(hostCallIndex)")
-            // Return error code for "host function not found".
-            return JITHostCallError.hostFunctionNotFound.rawValue
+        // Fixed gas cost for host function call setup
+        let hostCallSetupGasCost: UInt64 = 100
+
+        // Check if we have enough gas for the host call setup
+        if guestGasPtr.pointee < hostCallSetupGasCost {
+            logger.error("Swift: Gas exhausted during host function call setup")
+            return JITHostCallError.gasExhausted.rawValue
         }
 
-        do {
-            // Fixed gas cost for host function call setup
-            // This matches the interpreter's fixed cost for host function calls
-            let hostCallSetupGasCost: UInt64 = 100
+        // Deduct gas for host call setup
+        guestGasPtr.pointee -= hostCallSetupGasCost
 
-            // Check if we have enough gas for the host call setup
-            if guestGasPtr.pointee < hostCallSetupGasCost {
-                logger.error("Swift: Gas exhausted during host function call setup")
-                return JITHostCallError.gasExhausted.rawValue
-            }
+        // Use the syncHandler to handle host calls
+        if let handler = syncHostCallHandler {
+            let result = handler(hostCallIndex, guestRegistersPtr, guestMemoryBasePtr, guestMemorySize, guestGasPtr)
 
-            // Deduct gas for host call setup
-            guestGasPtr.pointee -= hostCallSetupGasCost
-            logger.debug("Swift: Deducted \(hostCallSetupGasCost) gas for host call setup. Remaining: \(guestGasPtr.pointee)")
-
-            // The host function is responsible for its internal gas consumption
-            // by decrementing `guestGasPtr.pointee` as needed
-            let resultFromHostFn = try hostFunction(
-                guestRegistersPtr,
-                guestMemoryBasePtr,
-                guestMemorySize,
-                guestGasPtr
-            )
-
-            // Fixed gas cost for host function call teardown/return
+            // Fixed gas cost for host function call teardown
             let hostCallTeardownGasCost: UInt64 = 50
 
-            // Check if we have enough gas for the host call teardown
+            // Check if we have enough gas for teardown
             if guestGasPtr.pointee < hostCallTeardownGasCost {
                 logger.error("Swift: Gas exhausted during host function call teardown")
                 return JITHostCallError.gasExhausted.rawValue
@@ -122,17 +124,12 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
 
             // Deduct gas for host call teardown
             guestGasPtr.pointee -= hostCallTeardownGasCost
-            logger.debug("Swift: Deducted \(hostCallTeardownGasCost) gas for host call teardown. Remaining: \(guestGasPtr.pointee)")
 
-            // By convention, the JIT code that calls the host function trampoline
-            // will expect the result in a specific register (e.g., x0 on AArch64).
-            // The C++ trampoline will place `resultFromHostFn` into this return register.
-            logger.debug("Swift: Host function \(hostCallIndex) executed successfully, result: \(resultFromHostFn)")
-            return resultFromHostFn
-        } catch {
-            logger.error("Swift: Host function \(hostCallIndex) threw an error: \(error)")
-            // Return error code for "host function threw error".
-            return JITHostCallError.hostFunctionThrewError.rawValue
+            logger.debug("Swift: Host function \(hostCallIndex) executed successfully via sync handler")
+            return result
+        } else {
+            logger.error("Swift: No host function handler available")
+            return JITHostCallError.internalErrorInvalidContext.rawValue
         }
     }
 
@@ -258,16 +255,100 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
 
             let jitTotalMemorySize = UInt32.max
 
+            // Set up program code for host function calls
+            do {
+                currentProgramCode = try ProgramCode(blob)
+            } catch {
+                logger.error("Failed to create ProgramCode: \(error)")
+                return .panic(.invalidInstructionIndex)
+            }
+
+            // Set up the synchronous handler that will bridge to async context if invoked
+            // We're capturing the invocationContext into a closure that will be called synchronously
+            if let invocationContext = ctx {
+                // Initialize the synchronous handler
+                syncHostCallHandler = { hostCallIndex, guestRegistersPtr, guestMemoryBasePtr, guestMemorySize, guestGasPtr -> UInt32 in
+                    guard let programCode = self.currentProgramCode else {
+                        self.logger.error("No program code available for host call")
+                        return JITHostCallError.internalErrorInvalidContext.rawValue
+                    }
+
+                    // Create a VMStateJIT adapter
+                    let vmState = VMStateJIT(
+                        jitMemoryBasePtr: guestMemoryBasePtr,
+                        jitMemorySize: guestMemorySize,
+                        jitRegistersPtr: guestRegistersPtr,
+                        jitGasPtr: guestGasPtr,
+                        programCode: programCode,
+                        initialPC: 0 // TODO: track real PC
+                    )
+
+                    // We need to convert the async operation to sync
+                    // Create a placeholder synchronization mechanism
+                    let semaphore = DispatchSemaphore(value: 0)
+                    var asyncResult: ExecOutcome?
+
+                    // Kick off the async operation but wait for it to complete
+                    Task {
+                        asyncResult = await invocationContext.dispatch(index: hostCallIndex, state: vmState)
+                        semaphore.signal()
+                    }
+
+                    // Wait for the async operation to complete
+                    semaphore.wait()
+
+                    // Process the async result and return appropriate status
+                    if let result = asyncResult {
+                        switch result {
+                        case .continued:
+                            return 0 // Success
+                        case let .exit(reason):
+                            switch reason {
+                            case .halt:
+                                return JITHostCallError.hostRequestedHalt.rawValue
+                            case .outOfGas:
+                                return JITHostCallError.gasExhausted.rawValue
+                            case let .hostCall(nestedIndex):
+                                self.logger.error("Nested host calls not supported: \(nestedIndex)")
+                                return JITHostCallError.hostFunctionThrewError.rawValue
+                            case let .pageFault(address):
+                                self.logger.error("Page fault at address \(address)")
+                                return JITHostCallError.pageFault.rawValue
+                            case .panic:
+                                return JITHostCallError.hostFunctionThrewError.rawValue
+                            }
+                        }
+                    } else {
+                        self.logger.error("No result from async host function call")
+                        return JITHostCallError.hostFunctionThrewError.rawValue
+                    }
+                }
+            } else {
+                // Clear the handler if no context provided
+                syncHostCallHandler = nil
+            }
+
+            // Update the invocation context in the JIT host function table
+            jitHostFunctionTableWrapper.table.invocationContext = nil // We're using the syncHandler now
+
+            // Get a pointer to the JITHostFunctionTableWrapper
+            let invocationContextPointer = Unmanaged.passUnretained(jitHostFunctionTableWrapper).toOpaque()
+
             // Execute the JIT-compiled function
-            // The JIT function will deduct gas for each instruction executed
+            // The JIT function will use our syncHostCallHandler via the C trampoline
             let exitReason = try jitExecutor.execute(
                 functionPtr: validFunctionPtr,
                 registers: &registers,
                 jitMemorySize: jitTotalMemorySize,
                 gas: &currentGas,
                 initialPC: pc,
-                invocationContext: ctx.map { Unmanaged.passUnretained($0 as AnyObject).toOpaque() }
+                invocationContext: invocationContextPointer
             )
+
+            // Clear the references after execution
+            syncHostCallHandler = nil
+            currentProgramCode = nil
+            jitHostFunctionTableWrapper.table.invocationContext = nil
 
             // Fixed gas cost for memory changes reflection
             let memoryReflectionGasCost: UInt64 = 100
@@ -309,7 +390,8 @@ public typealias PolkaVMHostCallCHandler = @convention(c) (
     _ guestRegisters: UnsafeMutablePointer<UInt64>, // Guest registers (PolkaVM format)
     _ guestMemoryBase: UnsafeMutablePointer<UInt8>, // Guest memory base
     _ guestMemorySize: UInt32, // Guest memory size (for bounds checks)
-    _ guestGas: UnsafeMutablePointer<UInt64> // Guest gas counter
+    _ guestGas: UnsafeMutablePointer<UInt64>, // Guest gas counter
+    _ invocationContext: UnsafeMutableRawPointer? // InvocationContext for host function dispatch
 ) -> UInt32 // Represents a value to be written to a specific register (e.g. R0 by convention) or a JITHostCallError rawValue.
 
 // Defines standardized error codes for JIT host function calls.
@@ -333,6 +415,12 @@ enum JITHostCallError: UInt32 {
 
     // Indicates that the VM ran out of gas during host function execution
     case gasExhausted = 0xFFFF_FFFC
+
+    // Indicates that a page fault occurred during host function execution
+    case pageFault = 0xFFFF_FFFB
+
+    // Indicates that the host function requested the VM to halt
+    case hostRequestedHalt = 0xFFFF_FFFA
 }
 
 // Static C-callable trampoline that calls the instance method.
@@ -342,28 +430,21 @@ private func dispatchHostCall_C_Trampoline(
     guestRegistersPtr: UnsafeMutablePointer<UInt64>,
     guestMemoryBasePtr: UnsafeMutablePointer<UInt8>,
     guestMemorySize: UInt32,
-    guestGasPtr: UnsafeMutablePointer<UInt64>
+    guestGasPtr: UnsafeMutablePointer<UInt64>,
+    invocationContextPtr: UnsafeMutableRawPointer?
 ) -> UInt32 {
     guard let ownerCtxPtr = opaqueOwnerContext else {
-        // This is a critical error: the context to find the Swift instance is missing.
-        // Ideally, log this error through a mechanism available in a static context if possible,
-        // or ensure this path is never taken by robust setup.
-        // Logger(label: "ExecutorBackendJIT_StaticTrampoline").error("dispatchHostCall_C_Trampoline: opaqueOwnerContext is nil.")
-        // Return a specific error code indicating context failure.
-        // This UInt32 will be checked by the JITed code. If it's this sentinel,
-        // the JITed code should trigger a VM panic.
-        // Return a specific error code indicating context failure.
-        // The JITed code should check this and trigger a VM panic.
         return JITHostCallError.internalErrorInvalidContext.rawValue
     }
     let backendInstance = Unmanaged<ExecutorBackendJIT>.fromOpaque(ownerCtxPtr).takeUnretainedValue()
 
-    // Call the instance method that actually handles the dispatch.
+    // Call the instance method that handles the dispatch
     return backendInstance.dispatchHostCall(
         hostCallIndex: hostCallIndex,
         guestRegistersPtr: guestRegistersPtr,
         guestMemoryBasePtr: guestMemoryBasePtr,
         guestMemorySize: guestMemorySize,
-        guestGasPtr: guestGasPtr
+        guestGasPtr: guestGasPtr,
+        invocationContextPtr: invocationContextPtr
     )
 }

@@ -79,13 +79,15 @@ typedef uint32_t (* _Nonnull JITHostFunctionFn)(
 	uint64_t* _Nonnull guestRegisters,
 	uint8_t* _Nonnull guestMemoryBase,
 	uint32_t guestMemorySize,
-	uint64_t* _Nonnull guestGas
+	uint64_t* _Nonnull guestGas,
+	void* _Nullable invocationContext
 );
 
 // Table passed as `invocationContext` to JIT-compiled functions
 struct JITHostFunctionTable {
     JITHostFunctionFn dispatchHostCall;
     void* _Nonnull ownerContext; // Opaque pointer to Swift ExecutorBackendJIT
+    void* _Nullable invocationContext; // Opaque pointer to InvocationContext
 };
 
 // Trampoline for JIT code to call Swift host functions

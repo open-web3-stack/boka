@@ -21,13 +21,14 @@ uint32_t pvm_host_call_trampoline(
         return 0xFFFFFFFF; // Error code for HostFunctionError (matches ExitReason.PanicReason)
     }
 
-    // Dispatch to Swift implementation
+    // Dispatch to Swift implementation with invocationContext (passed implicitly through host_table)
     return host_table->dispatchHostCall(
         host_table->ownerContext,
         host_call_index,
         guest_registers_ptr,
         guest_memory_base_ptr,
         guest_memory_size,
-        guest_gas_ptr
+        guest_gas_ptr,
+        host_table->invocationContext
     );
 }

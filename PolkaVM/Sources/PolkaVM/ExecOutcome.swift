@@ -1,5 +1,5 @@
-public enum ExitReason: Equatable {
-    public enum PanicReason {
+public enum ExitReason: Equatable, Sendable {
+    public enum PanicReason: Sendable {
         case trap
         case invalidInstructionIndex
         case invalidDynamicJump
@@ -62,7 +62,7 @@ public enum ExitReason: Equatable {
     }
 }
 
-public enum ExecOutcome {
+public enum ExecOutcome: Sendable {
     case continued // continue is a reserved keyword
     case exit(ExitReason)
 }
