@@ -7,14 +7,11 @@ import Foundation
 import TracingUtils
 import Utils
 
-// TODO: Implement proper error mapping from JIT errors to ExitReason (align with interpreter's ExitReason handling)
-// TODO: Add comprehensive performance metrics for instruction execution frequency and timing
-// TODO: Implement instruction-specific optimizations based on interpreter hotspots
+// TODO: Build a cache system for generated code
 
-final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
+final class ExecutorBackendJIT: ExecutorBackend {
     private let logger = Logger(label: "ExecutorBackendJIT")
 
-    private let jitCache = JITCache()
     private let jitCompiler = JITCompiler()
     private let jitExecutor = JITExecutor()
 
@@ -35,9 +32,6 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
 
     // Wrapper to store the JITHostFunctionTable in a class for proper reference semantics
     private var jitHostFunctionTableWrapper: JITHostFunctionTableWrapper!
-
-    // Queue for main async work
-    private let mainExecutionQueue = DispatchQueue(label: "com.polka.vm.jitexecution", qos: .userInitiated)
 
     // Using a simpler approach to handle host calls that doesn't require async/await
     private var syncHostCallHandler: ((
@@ -141,117 +135,25 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
         argumentData: Data?,
         ctx: (any InvocationContext)?
     ) async -> ExitReason {
-        logger.info("JIT execution request. PC: \(pc), Gas: \(gas.value), Blob size: \(blob.count) bytes.")
+        logger.debug("JIT execution request. PC: \(pc), Gas: \(gas.value), Blob size: \(blob.count) bytes.")
 
         var currentGas = gas // Mutable copy for JIT execution
 
-        // Fixed gas cost for JIT execution setup - matches interpreter's setup cost
-        let jitSetupGasCost: UInt64 = 200
-
-        // Check if we have enough gas for JIT setup
-        if currentGas.value < jitSetupGasCost {
-            logger.error("Not enough gas for JIT execution setup. Required: \(jitSetupGasCost), Available: \(currentGas.value)")
-            return .outOfGas
-        }
-
-        // Create a new Gas instance with the deducted amount
-        currentGas = Gas(currentGas.value - jitSetupGasCost)
-        logger.debug("Deducted \(jitSetupGasCost) gas for JIT setup. Remaining: \(currentGas.value)")
-
         do {
-            let targetArchitecture = try JITPlatformHelper.getCurrentTargetArchitecture(config: config)
+            let targetArchitecture = JITPlatform.getCurrentTargetArchitecture()
             logger.debug("Target architecture for JIT: \(targetArchitecture)")
 
-            let jitCacheKey = JITCache.createCacheKey(
+            // TODO: lookup from cache
+
+            let compiledFuncPtr = try jitCompiler.compile(
                 blob: blob,
                 initialPC: pc,
+                config: config,
                 targetArchitecture: targetArchitecture,
-                config: config
+                jitMemorySize: UInt32.max // TODO:
             )
 
-            var functionPtr: UnsafeMutableRawPointer?
-            let functionAddress = await jitCache.getCachedFunction(forKey: jitCacheKey)
-            if let address = functionAddress {
-                functionPtr = UnsafeMutableRawPointer(bitPattern: address)
-                logger.debug("JIT cache hit. Using cached function.")
-            } else {
-                logger.debug("JIT cache miss. Proceeding to compilation.")
-            }
-
-            if functionPtr == nil { // Cache miss or cache disabled
-                // Additional gas cost for actual compilation (only on cache miss)
-                let jitActualCompilationGasCost: UInt64 = 300
-
-                // Create a new Gas instance with the deducted amount
-                currentGas = Gas(currentGas.value - jitActualCompilationGasCost)
-                logger.debug("Deducted \(jitActualCompilationGasCost) gas for actual JIT compilation. Remaining: \(currentGas.value)")
-
-                let compiledFuncPtr = try jitCompiler.compile(
-                    blob: blob,
-                    initialPC: pc,
-                    config: config,
-                    targetArchitecture: targetArchitecture,
-                    jitMemorySize: UInt32.max // TODO:
-                )
-                functionPtr = compiledFuncPtr
-
-                let functionAddressToCache = UInt(bitPattern: compiledFuncPtr)
-                await jitCache.cacheFunction(functionAddressToCache, forKey: jitCacheKey)
-                logger.debug("Compilation successful. Function cached.")
-            }
-
-            guard let validFunctionPtr = functionPtr else {
-                // This case should ideally be caught by errors in compile or cache logic.
-                logger.error("Function pointer is unexpectedly nil after cache check/compilation.")
-                throw JITError.functionPointerNil
-            }
-
-            var registers = Registers()
-            // Initialize registers based on interpreter's pattern
-            if let argData = argumentData {
-                // Copy up to 4 arguments into R0-R3 registers
-                let argWords = min(4, argData.count / 8 + (argData.count % 8 > 0 ? 1 : 0))
-                for i in 0 ..< argWords {
-                    let startIndex = i * 8
-                    let endIndex = min(startIndex + 8, argData.count)
-                    var value: UInt64 = 0
-                    for j in startIndex ..< endIndex {
-                        let byteValue = UInt64(argData[j])
-                        let shift = UInt64(j - startIndex) * 8
-                        value |= byteValue << shift
-                    }
-                    registers[Registers.Index(raw: UInt8(i))] = value
-                }
-            }
-
-            // Fixed gas cost for memory initialization - matches interpreter's memory setup cost
-            let memoryInitGasCost: UInt64 = 150
-
-            // Check if we have enough gas for memory initialization
-            if currentGas.value < memoryInitGasCost {
-                logger.error("Not enough gas for memory initialization. Required: \(memoryInitGasCost), Available: \(currentGas.value)")
-                return .outOfGas
-            }
-
-            // Create a new Gas instance with the deducted amount
-            currentGas = Gas(currentGas.value - memoryInitGasCost)
-            logger.debug("Deducted \(memoryInitGasCost) gas for memory initialization. Remaining: \(currentGas.value)")
-
-            // Fixed gas cost for memory buffer preparation
-            let memoryBufferPrepGasCost: UInt64 = 100
-
-            // Check if we have enough gas for memory buffer preparation
-            if currentGas.value < memoryBufferPrepGasCost {
-                logger
-                    .error(
-                        "Not enough gas for memory buffer preparation. Required: \(memoryBufferPrepGasCost), Available: \(currentGas.value)"
-                    )
-                return .outOfGas
-            }
-
-            // Create a new Gas instance with the deducted amount
-            currentGas = Gas(currentGas.value - memoryBufferPrepGasCost)
-            logger.debug("Deducted \(memoryBufferPrepGasCost) gas for memory buffer preparation. Remaining: \(currentGas.value)")
+            var registers = Registers(config: config, argumentData: argumentData)
 
             let jitTotalMemorySize = UInt32.max
 
@@ -337,7 +239,7 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
             // Execute the JIT-compiled function
             // The JIT function will use our syncHostCallHandler via the C trampoline
             let exitReason = try jitExecutor.execute(
-                functionPtr: validFunctionPtr,
+                functionPtr: compiledFuncPtr,
                 registers: &registers,
                 jitMemorySize: jitTotalMemorySize,
                 gas: &currentGas,
@@ -363,7 +265,7 @@ final class ExecutorBackendJIT: ExecutorBackend, @unchecked Sendable {
             currentGas = Gas(currentGas.value - memoryReflectionGasCost)
             logger.debug("Deducted \(memoryReflectionGasCost) gas for memory reflection. Remaining: \(currentGas.value)")
 
-            logger.info("JIT execution finished. Reason: \(exitReason). Remaining gas: \(currentGas.value)")
+            logger.debug("JIT execution finished. Reason: \(exitReason). Remaining gas: \(currentGas.value)")
             return exitReason
 
         } catch let error as JITError {

@@ -12,12 +12,6 @@ public protocol PvmConfig {
 
     // ZP = 2^12: The pvm memory page size.
     var pvmMemoryPageSize: Int { get }
-
-    // Memory layout configurations (potentially used by JIT and StandardMemory)
-    var initialHeapPages: UInt32 { get }
-    var stackPages: UInt32 { get }
-    var readOnlyDataSegment: Data? { get }
-    var readWriteDataSegment: Data? { get }
 }
 
 // Default implementations for JIT and memory layout configurations
@@ -26,6 +20,10 @@ extension PvmConfig {
     public var stackPages: UInt32 { 16 }
     public var readOnlyDataSegment: Data? { nil }
     public var readWriteDataSegment: Data? { nil }
+
+    public var pvmProgramInitRegister1Value: Int { (1 << 32) - (1 << 16) }
+    public var pvmProgramInitStackBaseAddress: Int { (1 << 32) - (2 * pvmProgramInitZoneSize) - pvmProgramInitInputDataSize }
+    public var pvmProgramInitInputStartAddress: Int { pvmProgramInitStackBaseAddress + pvmProgramInitZoneSize }
 }
 
 public struct DefaultPvmConfig: PvmConfig {
@@ -34,18 +32,10 @@ public struct DefaultPvmConfig: PvmConfig {
     public let pvmProgramInitZoneSize: Int
     public let pvmMemoryPageSize: Int
 
-    public let pvmProgramInitRegister1Value: Int
-    public let pvmProgramInitStackBaseAddress: Int
-    public let pvmProgramInitInputStartAddress: Int
-
     public init() {
         pvmDynamicAddressAlignmentFactor = 2
         pvmProgramInitInputDataSize = 1 << 24
         pvmProgramInitZoneSize = 1 << 16
         pvmMemoryPageSize = 1 << 12
-
-        pvmProgramInitRegister1Value = (1 << 32) - (1 << 16)
-        pvmProgramInitStackBaseAddress = (1 << 32) - (2 * pvmProgramInitZoneSize) - pvmProgramInitInputDataSize
-        pvmProgramInitInputStartAddress = pvmProgramInitStackBaseAddress + pvmProgramInitZoneSize
     }
 }

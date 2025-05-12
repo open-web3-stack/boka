@@ -22,7 +22,7 @@ final class JITCompiler {
         blob _: Data,
         initialPC _: UInt32,
         config _: PvmConfig,
-        targetArchitecture _: String,
+        targetArchitecture _: JITPlatform,
         jitMemorySize _: UInt32
     ) throws -> UnsafeMutableRawPointer {
         fatalError("TODO: unimplemented")
@@ -39,7 +39,7 @@ final class JITCompiler {
         blob _: Data,
         initialPC _: UInt32,
         compilerPtr _: UnsafeMutableRawPointer,
-        targetArchitecture _: String
+        targetArchitecture _: JITPlatform
     ) throws -> Bool {
         fatalError("TODO: unimplemented")
     }
