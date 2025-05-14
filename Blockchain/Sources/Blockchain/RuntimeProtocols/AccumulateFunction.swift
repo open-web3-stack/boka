@@ -15,6 +15,8 @@ public struct AccumulateArguments: Codable {
     public var payloadHash: Data32
     /// d
     public var workOutput: WorkOutput
+    /// g
+    public var gasRatio: Gas
 }
 
 public struct DeferredTransfers: Codable {
@@ -80,6 +82,9 @@ public class AccumlateResultContext {
     public var transfers: [DeferredTransfers]
     /// y
     public var yield: Data32?
+    /// p: preimages to be provided
+    public var providePreimages: Set<ServicePreimagePair>
+
     public var accountChanges: AccountChanges
 
     public init(
@@ -92,6 +97,7 @@ public class AccumlateResultContext {
         self.nextAccountIndex = nextAccountIndex
         transfers = []
         yield = nil
+        providePreimages = []
         accountChanges = AccountChanges()
     }
 }

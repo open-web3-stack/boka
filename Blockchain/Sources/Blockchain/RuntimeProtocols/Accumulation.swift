@@ -53,6 +53,16 @@ public struct ParallelAccumulationOutput {
 /// single-service accumulation function ∆1 output
 public typealias SingleAccumulationOutput = AccumulationResult
 
+public struct ServicePreimagePair: Hashable {
+    public var serviceIndex: ServiceIndex
+    public var preimage: Data
+
+    public init(service: ServiceIndex, preimage: Data) {
+        serviceIndex = service
+        self.preimage = preimage
+    }
+}
+
 public struct AccumulationResult {
     // o
     public var state: AccumulateState
@@ -62,6 +72,8 @@ public struct AccumulationResult {
     public var commitment: Data32?
     // u
     public var gasUsed: Gas
+    // p
+    public var providePreimages: Set<ServicePreimagePair>
 }
 
 public struct AccountChanges {
@@ -161,7 +173,8 @@ extension Accumulation {
                     authorizerHash: report.authorizerHash,
                     authorizationOutput: report.authorizationOutput,
                     payloadHash: result.payloadHash,
-                    workOutput: result.output
+                    workOutput: result.output,
+                    gasRatio: result.gasRatio
                 ))
             }
         }
@@ -222,6 +235,7 @@ extension Accumulation {
         logger.debug("[parallel] services to accumulate: \(services)")
 
         var accountsRef = ServiceAccountsMutRef(state.accounts.value)
+        var servicePreimageSet = Set<ServicePreimagePair>()
 
         for service in services {
             let singleOutput = try await singleAccumulate(
@@ -248,6 +262,8 @@ extension Accumulation {
                 transfers.append(transfer)
             }
 
+            servicePreimageSet.formUnion(singleOutput.providePreimages)
+
             switch service {
             case privilegedServices.blessed:
                 newPrivilegedServices = singleOutput.state.privilegedServices
@@ -263,6 +279,12 @@ extension Accumulation {
             try overallAccountChanges.checkAndMerge(with: accountsRef.changes)
             accountsRef.clearRecordedChanges()
         }
+
+        try await preimageIntegration(
+            servicePreimageSet: servicePreimageSet,
+            accounts: accountsRef,
+            timeslot: timeslot
+        )
 
         return ParallelAccumulationOutput(
             state: AccumulateState(
@@ -337,6 +359,31 @@ extension Accumulation {
                 commitments: parallelOutput.commitments.union(outerOutput.commitments),
                 gasUsed: parallelOutput.gasUsed + outerOutput.gasUsed
             )
+        }
+    }
+
+    // P: preimage integration function
+    private func preimageIntegration(
+        servicePreimageSet: Set<ServicePreimagePair>,
+        accounts: ServiceAccountsMutRef,
+        timeslot: TimeslotIndex
+    ) async throws {
+        for item in servicePreimageSet {
+            let serviceIndex = item.serviceIndex
+            let preimage = item.preimage
+            let preimageHash = Blake2b256.hash(preimage)
+            guard let preimageInfo = try await accounts.value.get(
+                serviceAccount: serviceIndex,
+                preimageHash: preimageHash,
+                length: UInt32(preimage.count)
+            ) else {
+                continue
+            }
+
+            if preimageInfo.isEmpty {
+                accounts.set(serviceAccount: serviceIndex, preimageHash: preimageHash, length: UInt32(preimage.count), value: [timeslot])
+                accounts.set(serviceAccount: serviceIndex, preimageHash: preimageHash, value: preimage)
+            }
         }
     }
 

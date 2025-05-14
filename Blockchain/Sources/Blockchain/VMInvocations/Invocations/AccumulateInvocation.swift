@@ -23,10 +23,14 @@ public func accumulate(
               preimageHash: accumulatingAccountDetails.codeHash
           )
     else {
-        return .init(state: state, transfers: [], commitment: nil, gasUsed: Gas(0))
+        return .init(state: state, transfers: [], commitment: nil, gasUsed: Gas(0), providePreimages: [])
     }
 
     let codeBlob = try CodeAndMeta(data: preimage).codeBlob
+
+    if codeBlob.count > config.value.maxServiceCodeSize {
+        return .init(state: state, transfers: [], commitment: nil, gasUsed: Gas(0), providePreimages: [])
+    }
 
     let contextContent = try await AccumulateContext.ContextType(
         x: AccumlateResultContext(
@@ -71,13 +75,31 @@ private func collapse(
 ) throws -> AccumulationResult {
     switch exitReason {
     case .panic, .outOfGas:
-        .init(state: context.y.state, transfers: context.y.transfers, commitment: context.y.yield, gasUsed: gas)
+        .init(
+            state: context.y.state,
+            transfers: context.y.transfers,
+            commitment: context.y.yield,
+            gasUsed: gas,
+            providePreimages: context.y.providePreimages
+        )
     default:
         if let output, let o = Data32(output) {
-            .init(state: context.x.state, transfers: context.x.transfers, commitment: o, gasUsed: gas)
+            .init(
+                state: context.x.state,
+                transfers: context.x.transfers,
+                commitment: o,
+                gasUsed: gas,
+                providePreimages: context.x.providePreimages
+            )
 
         } else {
-            .init(state: context.x.state, transfers: context.x.transfers, commitment: context.x.yield, gasUsed: gas)
+            .init(
+                state: context.x.state,
+                transfers: context.x.transfers,
+                commitment: context.x.yield,
+                gasUsed: gas,
+                providePreimages: context.x.providePreimages
+            )
         }
     }
 }
