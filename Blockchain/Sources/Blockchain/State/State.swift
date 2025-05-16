@@ -317,7 +317,7 @@ extension State: Dummy {
             (StateKeys.AccumulationHistoryKey(), accumulationHistory),
         ]
 
-        var store: [Data32: Data] = [:]
+        var store: [Data31: Data] = [:]
         for (key, value) in kv {
             store[key.encode()] = try! JamEncoder.encode(value)
         }
