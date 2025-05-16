@@ -662,8 +662,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             package: workPackage.value,
             coreIndex: coreIndex
         )
-        let authorizationOutput = try authRes.mapError(GuaranteeingServiceError.authorizationError).get()
-        logger.debug("Work package authorized successfully", metadata: ["outputSize": "\(authorizationOutput.count)"])
+        let authorizerTrace = try authRes.mapError(GuaranteeingServiceError.authorizationError).get()
+        logger.debug("Work package authorized successfully", metadata: ["traceSize": "\(authorizerTrace.count)"])
 
         var workResults = [WorkResult]()
         var exportSegments = [Data4104]()
@@ -685,7 +685,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                 serviceAccounts: state.value,
                 workItemIndex: i,
                 workPackage: workPackage.value,
-                authorizerOutput: authorizationOutput,
+                authorizerTrace: authorizerTrace,
                 importSegments: importSegments,
                 exportSegmentOffset: UInt64(exportSegmentOffset)
             )
@@ -764,7 +764,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         let workReport = try WorkReport(
             authorizerHash: authorizerHash,
             coreIndex: coreIndex,
-            authorizationOutput: authorizationOutput,
+            authorizerTrace: authorizerTrace,
             refinementContext: workPackage.value.context,
             packageSpecification: packageSpecification,
             lookup: oldLookups,

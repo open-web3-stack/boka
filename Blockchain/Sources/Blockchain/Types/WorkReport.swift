@@ -15,8 +15,8 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
     // a: authorizer hash
     public var authorizerHash: Data32
 
-    // o: authorization output
-    public var authorizationOutput: Data
+    // o: authorizer trace
+    public var authorizerTrace: Data
 
     // l: segment-root lookup dictionary
     @CodingAs<SortedKeyValues<Data32, Data32>> public var lookup: [Data32: Data32]
@@ -34,7 +34,7 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
     public init(
         authorizerHash: Data32,
         coreIndex: CoreIndex,
-        authorizationOutput: Data,
+        authorizerTrace: Data,
         refinementContext: RefinementContext,
         packageSpecification: AvailabilitySpecifications,
         lookup: [Data32: Data32],
@@ -43,7 +43,7 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
     ) {
         self.authorizerHash = authorizerHash
         self.coreIndex = coreIndex
-        self.authorizationOutput = authorizationOutput
+        self.authorizerTrace = authorizerTrace
         self.refinementContext = refinementContext
         self.packageSpecification = packageSpecification
         self.lookup = lookup
@@ -58,7 +58,7 @@ extension WorkReport: Dummy {
         WorkReport(
             authorizerHash: Data32(),
             coreIndex: 0,
-            authorizationOutput: Data(),
+            authorizerTrace: Data(),
             refinementContext: RefinementContext.dummy(config: config),
             packageSpecification: AvailabilitySpecifications.dummy(config: config),
             lookup: [:],
@@ -86,7 +86,7 @@ extension WorkReport: Validate {
             throw .tooManyDependencies
         }
         let resultOutputSize = results.compactMap { result in try? result.output.result.get() }.reduce(0) { $0 + $1.count }
-        guard authorizationOutput.count + resultOutputSize <= config.value.maxWorkReportOutputSize else {
+        guard authorizerTrace.count + resultOutputSize <= config.value.maxWorkReportOutputSize else {
             throw .tooBig
         }
         guard coreIndex < UInt32(config.value.totalNumberOfCores) else {

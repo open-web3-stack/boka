@@ -171,7 +171,7 @@ extension Accumulation {
                     packageHash: report.packageSpecification.workPackageHash,
                     segmentRoot: report.packageSpecification.segmentRoot,
                     authorizerHash: report.authorizerHash,
-                    authorizationOutput: report.authorizationOutput,
+                    authorizerTrace: report.authorizerTrace,
                     payloadHash: result.payloadHash,
                     workOutput: result.output,
                     gasRatio: result.gasRatio

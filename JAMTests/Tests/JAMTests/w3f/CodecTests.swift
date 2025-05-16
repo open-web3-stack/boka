@@ -175,7 +175,7 @@ struct CodecTests {
                 "context": transform(json["refinementContext"]!, value: value.refinementContext),
                 "core_index": json["coreIndex"]!,
                 "authorizer_hash": json["authorizerHash"]!,
-                "auth_output": json["authorizationOutput"]!,
+                "auth_output": json["authorizerTrace"]!,
                 "results": transform(json["results"]!, value: value.results),
                 "segment_root_lookup": transform(json["lookup"]!, value: value.lookup),
                 "auth_gas_used": json["authGasUsed"]!,

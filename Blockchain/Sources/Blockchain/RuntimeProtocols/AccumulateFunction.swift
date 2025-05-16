@@ -10,7 +10,7 @@ public struct AccumulateArguments: Codable {
     /// a
     public var authorizerHash: Data32
     /// o
-    public var authorizationOutput: Data
+    public var authorizerTrace: Data
     /// y
     public var payloadHash: Data32
     /// d
