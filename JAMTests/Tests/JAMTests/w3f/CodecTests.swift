@@ -154,7 +154,7 @@ struct CodecTests {
                         "len": item["length"]!,
                     ].json
                 }.json,
-                "export_count": json["outputDataSegmentsCount"]!,
+                "export_count": json["exportsCount"]!,
             ].json
         }
         if let value = value as? WorkPackage {
@@ -163,7 +163,7 @@ struct CodecTests {
                 "auth_code_host": json["authorizationServiceIndex"]!,
                 "authorizer": [
                     "code_hash": json["authorizationCodeHash"]!,
-                    "params": json["parameterizationBlob"]!,
+                    "params": json["configurationBlob"]!,
                 ].json,
                 "context": transform(json["context"]!, value: value.context),
                 "items": transform(json["workItems"]!, value: value.workItems),
@@ -176,7 +176,7 @@ struct CodecTests {
                 "core_index": json["coreIndex"]!,
                 "authorizer_hash": json["authorizerHash"]!,
                 "auth_output": json["authorizerTrace"]!,
-                "results": transform(json["results"]!, value: value.results),
+                "results": transform(json["results"]!, value: value.digests),
                 "segment_root_lookup": transform(json["lookup"]!, value: value.lookup),
                 "auth_gas_used": json["authGasUsed"]!,
             ].json

@@ -690,7 +690,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                 exportSegmentOffset: UInt64(exportSegmentOffset)
             )
 
-            exportSegmentOffset += item.outputDataSegmentsCount
+            exportSegmentOffset += item.exportsCount
             let workDigest = WorkDigest(
                 serviceIndex: item.serviceIndex,
                 codeHash: workPackage.value.authorizationCodeHash,
@@ -699,15 +699,15 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                 result: WorkResult(refineRes),
                 gasUsed: UInt(refineGasUsed.value),
                 importsCount: UInt(item.inputs.count),
-                exportsCount: UInt(item.outputDataSegmentsCount),
+                exportsCount: UInt(item.exportsCount),
                 extrinsicsCount: UInt(item.outputs.count),
                 extrinsicsSize: UInt(item.outputs.reduce(into: 0) { $0 += $1.length })
             )
             workDigests.append(workDigest)
 
-            guard item.outputDataSegmentsCount == refineExports.count else {
+            guard item.exportsCount == refineExports.count else {
                 logger.error("Export segment count mismatch",
-                             metadata: ["expected": "\(item.outputDataSegmentsCount)", "actual": "\(refineExports.count)"])
+                             metadata: ["expected": "\(item.exportsCount)", "actual": "\(refineExports.count)"])
                 throw GuaranteeingServiceError.invalidExports
             }
 
