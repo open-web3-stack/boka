@@ -217,7 +217,7 @@ public enum StateKeys {
     }
 
     public struct ActivityStatisticsKey: StateKey {
-        public typealias Value = ValidatorActivityStatistics
+        public typealias Value = Statistics
 
         public init() {}
 

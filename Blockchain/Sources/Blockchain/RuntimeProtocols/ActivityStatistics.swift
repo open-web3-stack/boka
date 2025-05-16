@@ -6,7 +6,7 @@ enum ActivityStatisticsError: Error {
 }
 
 public protocol ActivityStatistics {
-    var activityStatistics: ValidatorActivityStatistics { get }
+    var activityStatistics: Statistics { get }
     var timeslot: TimeslotIndex { get }
     var currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators> { get }
 }
@@ -20,7 +20,7 @@ extension ActivityStatistics {
         availableReports: [WorkReport],
         accumulateStats: AccumulationStats,
         transfersStats: TransfersStats
-    ) throws -> ValidatorActivityStatistics {
+    ) throws -> Statistics {
         let epochLength = UInt32(config.value.epochLength)
         let currentEpoch = timeslot / epochLength
         let newEpoch = newTimeslot / epochLength
@@ -29,7 +29,7 @@ extension ActivityStatistics {
         var acc = try isEpochChange
             ? ConfigFixedSizeArray<_, ProtocolConfig.TotalNumberOfValidators>(
                 config: config,
-                defaultValue: ValidatorActivityStatistics.ValidatorStatistics.dummy(config: config)
+                defaultValue: Statistics.Validator.dummy(config: config)
             ) : activityStatistics.accumulator
 
         let prev = isEpochChange ? activityStatistics.accumulator : activityStatistics.previous
@@ -57,11 +57,11 @@ extension ActivityStatistics {
         indices.formUnion(extrinsic.reports.guarantees.flatMap(\.workReport.digests).map(\.serviceIndex))
 
         // core and service statistics
-        var coreStats = try ConfigFixedSizeArray<CoreStatistics, ProtocolConfig.TotalNumberOfCores>(
+        var coreStats = try ConfigFixedSizeArray<Statistics.Core, ProtocolConfig.TotalNumberOfCores>(
             config: config,
             defaultValue: .dummy(config: config)
         )
-        var serviceStats = [UInt: ServiceStatistics]()
+        var serviceStats = [UInt: Statistics.Service]()
         for index in indices {
             serviceStats[UInt(index)] = .dummy(config: config)
         }
@@ -112,7 +112,7 @@ extension ActivityStatistics {
             serviceStats[index]!.transfers.gasUsed += UInt(transferItem.value.1.value)
         }
 
-        return ValidatorActivityStatistics(
+        return Statistics(
             accumulator: acc,
             previous: prev,
             core: coreStats,
