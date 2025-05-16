@@ -14,7 +14,7 @@ public struct AccumulateArguments: Codable {
     /// y
     public var payloadHash: Data32
     /// d
-    public var workOutput: WorkOutput
+    public var workResult: WorkResult
     /// g
     public var gasRatio: Gas
 }

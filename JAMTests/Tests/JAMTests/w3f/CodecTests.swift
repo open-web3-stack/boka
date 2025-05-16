@@ -117,7 +117,7 @@ struct CodecTests {
                 ].json
             }.json
         }
-        if value is WorkResult {
+        if value is WorkDigest {
             return [
                 "code_hash": json["codeHash"]!,
                 "accumulate_gas": json["gasRatio"]!,
@@ -331,13 +331,13 @@ struct CodecTests {
 
     @Test
     func work_result_0() throws {
-        let (actual, expected) = try Self.test(WorkResult.self, path: "work_result_0")
+        let (actual, expected) = try Self.test(WorkDigest.self, path: "work_result_0")
         #expect(actual == expected)
     }
 
     @Test
     func work_result_1() throws {
-        let (actual, expected) = try Self.test(WorkResult.self, path: "work_result_1")
+        let (actual, expected) = try Self.test(WorkDigest.self, path: "work_result_1")
         #expect(actual == expected)
     }
 }

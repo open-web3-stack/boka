@@ -665,7 +665,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         let authorizerTrace = try authRes.mapError(GuaranteeingServiceError.authorizationError).get()
         logger.debug("Work package authorized successfully", metadata: ["traceSize": "\(authorizerTrace.count)"])
 
-        var workResults = [WorkResult]()
+        var workDigests = [WorkDigest]()
         var exportSegments = [Data4104]()
 
         var importSegments = [[Data4104]]()
@@ -691,19 +691,19 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             )
 
             exportSegmentOffset += item.outputDataSegmentsCount
-            let workResult = WorkResult(
+            let workDigest = WorkDigest(
                 serviceIndex: item.serviceIndex,
                 codeHash: workPackage.value.authorizationCodeHash,
                 payloadHash: item.payloadBlob.blake2b256hash(),
                 gasRatio: item.refineGasLimit,
-                output: WorkOutput(refineRes),
+                result: WorkResult(refineRes),
                 gasUsed: UInt(refineGasUsed.value),
                 importsCount: UInt(item.inputs.count),
                 exportsCount: UInt(item.outputDataSegmentsCount),
                 extrinsicsCount: UInt(item.outputs.count),
                 extrinsicsSize: UInt(item.outputs.reduce(into: 0) { $0 += $1.length })
             )
-            workResults.append(workResult)
+            workDigests.append(workDigest)
 
             guard item.outputDataSegmentsCount == refineExports.count else {
                 logger.error("Export segment count mismatch",
@@ -768,7 +768,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             refinementContext: workPackage.value.context,
             packageSpecification: packageSpecification,
             lookup: oldLookups,
-            results: ConfigLimitedSizeArray(config: config, array: workResults),
+            digests: ConfigLimitedSizeArray(config: config, array: workDigests),
             authGasUsed: UInt(authGasUsed.value)
         )
 

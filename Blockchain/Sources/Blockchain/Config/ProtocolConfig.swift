@@ -101,7 +101,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     public var segmentSize: Int
 
     /// WR = 48 * 2^10: The maximum total size of all unbounded blobs in a work-report, in octets.
-    public var maxWorkReportOutputSize: Int
+    public var maxWorkReportBlobSize: Int
 
     /// WP = 6: The number of erasure-coded pieces in a segment.
     public var erasureCodedSegmentSize: Int
@@ -158,7 +158,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         maxWorkPackageExports: Int,
         maxEncodedWorkPackageSize: Int,
         segmentSize: Int,
-        maxWorkReportOutputSize: Int,
+        maxWorkReportBlobSize: Int,
         erasureCodedSegmentSize: Int,
         ticketSubmissionEndSlot: Int,
         pvmDynamicAddressAlignmentFactor: Int,
@@ -199,7 +199,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         self.maxWorkPackageExports = maxWorkPackageExports
         self.maxEncodedWorkPackageSize = maxEncodedWorkPackageSize
         self.segmentSize = segmentSize
-        self.maxWorkReportOutputSize = maxWorkReportOutputSize
+        self.maxWorkReportBlobSize = maxWorkReportBlobSize
         self.erasureCodedSegmentSize = erasureCodedSegmentSize
         self.ticketSubmissionEndSlot = ticketSubmissionEndSlot
         self.pvmDynamicAddressAlignmentFactor = pvmDynamicAddressAlignmentFactor
@@ -286,8 +286,8 @@ extension ProtocolConfig {
             maxEncodedWorkPackageSize: other.maxEncodedWorkPackageSize != 0
                 ? other.maxEncodedWorkPackageSize : maxEncodedWorkPackageSize,
             segmentSize: other.segmentSize != 0 ? other.segmentSize : segmentSize,
-            maxWorkReportOutputSize: other.maxWorkReportOutputSize != 0
-                ? other.maxWorkReportOutputSize : maxWorkReportOutputSize,
+            maxWorkReportBlobSize: other.maxWorkReportBlobSize != 0
+                ? other.maxWorkReportBlobSize : maxWorkReportBlobSize,
             erasureCodedSegmentSize: other.erasureCodedSegmentSize != 0
                 ? other.erasureCodedSegmentSize : erasureCodedSegmentSize,
             ticketSubmissionEndSlot: other.ticketSubmissionEndSlot != 0
@@ -381,8 +381,8 @@ extension ProtocolConfig {
             .maxEncodedWorkPackageSize, defaultValue: 0, required: required
         )
         segmentSize = try decode(.segmentSize, defaultValue: 0, required: required)
-        maxWorkReportOutputSize = try decode(
-            .maxWorkReportOutputSize, defaultValue: 0, required: required
+        maxWorkReportBlobSize = try decode(
+            .maxWorkReportBlobSize, defaultValue: 0, required: required
         )
         erasureCodedSegmentSize = try decode(
             .erasureCodedSegmentSize, defaultValue: 0, required: required
@@ -634,10 +634,10 @@ extension ProtocolConfig {
         }
     }
 
-    public enum MaxWorkReportOutputSize: ReadInt {
+    public enum MaxWorkReportBlobSize: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
-            config.value.maxWorkReportOutputSize
+            config.value.maxWorkReportBlobSize
         }
     }
 

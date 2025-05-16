@@ -165,16 +165,16 @@ extension Accumulation {
         gas += privilegedGas[service] ?? Gas(0)
 
         for report in workReports {
-            for result in report.results where result.serviceIndex == service {
-                gas += result.gasRatio
+            for digest in report.digests where digest.serviceIndex == service {
+                gas += digest.gasRatio
                 arguments.append(AccumulateArguments(
                     packageHash: report.packageSpecification.workPackageHash,
                     segmentRoot: report.packageSpecification.segmentRoot,
                     authorizerHash: report.authorizerHash,
                     authorizerTrace: report.authorizerTrace,
-                    payloadHash: result.payloadHash,
-                    workOutput: result.output,
-                    gasRatio: result.gasRatio
+                    payloadHash: digest.payloadHash,
+                    workResult: digest.result,
+                    gasRatio: digest.gasRatio
                 ))
             }
         }
@@ -223,8 +223,8 @@ extension Accumulation {
         var overallAccountChanges = AccountChanges()
 
         for report in workReports {
-            for result in report.results {
-                services.append(result.serviceIndex)
+            for digest in report.digests {
+                services.append(digest.serviceIndex)
             }
         }
 
@@ -314,12 +314,12 @@ extension Accumulation {
 
         for report in workReports {
             var canAccumulate = true
-            for result in report.results {
-                if result.gasRatio + sumGasRequired > gasLimit {
+            for digest in report.digests {
+                if digest.gasRatio + sumGasRequired > gasLimit {
                     canAccumulate = false
                     break
                 }
-                sumGasRequired += result.gasRatio
+                sumGasRequired += digest.gasRatio
             }
             i += canAccumulate ? 1 : 0
         }
@@ -577,7 +577,7 @@ extension Accumulation {
             if accumulateStats[service] != nil { continue }
 
             let num = accumulated.filter { report in
-                report.results.contains { $0.serviceIndex == service }
+                report.digests.contains { $0.serviceIndex == service }
             }.count
 
             if num == 0 { continue }

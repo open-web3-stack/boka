@@ -22,8 +22,8 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
     @CodingAs<SortedKeyValues<Data32, Data32>> public var lookup: [Data32: Data32]
 
     // r: the results of the evaluation of each of the items in the package
-    public var results: ConfigLimitedSizeArray<
-        WorkResult,
+    public var digests: ConfigLimitedSizeArray<
+        WorkDigest,
         ProtocolConfig.Int1,
         ProtocolConfig.MaxWorkItems
     >
@@ -38,7 +38,7 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
         refinementContext: RefinementContext,
         packageSpecification: AvailabilitySpecifications,
         lookup: [Data32: Data32],
-        results: ConfigLimitedSizeArray<WorkResult, ProtocolConfig.Int1, ProtocolConfig.MaxWorkItems>,
+        digests: ConfigLimitedSizeArray<WorkDigest, ProtocolConfig.Int1, ProtocolConfig.MaxWorkItems>,
         authGasUsed: UInt
     ) {
         self.authorizerHash = authorizerHash
@@ -47,7 +47,7 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
         self.refinementContext = refinementContext
         self.packageSpecification = packageSpecification
         self.lookup = lookup
-        self.results = results
+        self.digests = digests
         self.authGasUsed = authGasUsed
     }
 }
@@ -62,7 +62,7 @@ extension WorkReport: Dummy {
             refinementContext: RefinementContext.dummy(config: config),
             packageSpecification: AvailabilitySpecifications.dummy(config: config),
             lookup: [:],
-            results: try! ConfigLimitedSizeArray(config: config, defaultValue: WorkResult.dummy(config: config)),
+            digests: try! ConfigLimitedSizeArray(config: config, defaultValue: WorkDigest.dummy(config: config)),
             authGasUsed: 0
         )
     }
@@ -85,8 +85,8 @@ extension WorkReport: Validate {
         guard refinementContext.prerequisiteWorkPackages.count + lookup.count <= config.value.maxDepsInWorkReport else {
             throw .tooManyDependencies
         }
-        let resultOutputSize = results.compactMap { result in try? result.output.result.get() }.reduce(0) { $0 + $1.count }
-        guard authorizerTrace.count + resultOutputSize <= config.value.maxWorkReportOutputSize else {
+        let resultBlobSize = digests.compactMap { digest in try? digest.result.result.get() }.reduce(0) { $0 + $1.count }
+        guard authorizerTrace.count + resultBlobSize <= config.value.maxWorkReportBlobSize else {
             throw .tooBig
         }
         guard coreIndex < UInt32(config.value.totalNumberOfCores) else {

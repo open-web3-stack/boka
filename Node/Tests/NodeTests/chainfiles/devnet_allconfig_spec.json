@@ -17,7 +17,7 @@
 		"maxAuthorizationsQueueItems" : 10,
 		"segmentSize": 4104,
 		"maxEncodedWorkPackageSize" : 12582912,
-		"maxWorkReportOutputSize": 98304,
+		"maxWorkReportBlobSize": 98304,
 		"maxLookupAnchorAge" : 14400,
 		"maxAuthorizerCodeSize" : 64000,
 		"maxServiceCodeSize" : 4000000,
