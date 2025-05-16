@@ -31,7 +31,7 @@ public class RefineContext: InvocationContext {
     public let service: ServiceIndex
     public let serviceAccounts: ServiceAccounts
     public let workPackage: WorkPackage
-    public let authorizerOutput: Data
+    public let authorizerTrace: Data
 
     public init(
         config: ProtocolConfigRef,
@@ -41,7 +41,7 @@ public class RefineContext: InvocationContext {
         service: ServiceIndex,
         serviceAccounts: some ServiceAccounts,
         workPackage: WorkPackage,
-        authorizerOutput: Data
+        authorizerTrace: Data
     ) {
         self.config = config
         self.context = context
@@ -50,7 +50,7 @@ public class RefineContext: InvocationContext {
         self.service = service
         self.serviceAccounts = serviceAccounts
         self.workPackage = workPackage
-        self.authorizerOutput = authorizerOutput
+        self.authorizerTrace = authorizerTrace
     }
 
     public func dispatch(index: UInt32, state: VMState) async -> ExecOutcome {
@@ -73,7 +73,7 @@ public class RefineContext: InvocationContext {
                 serviceAccounts: ServiceAccountsRef(serviceAccounts),
                 serviceIndex: service,
                 workPackage: workPackage,
-                authorizerOutput: authorizerOutput,
+                authorizerTrace: authorizerTrace,
                 importSegments: importSegments
             )
             .call(config: config, state: state)

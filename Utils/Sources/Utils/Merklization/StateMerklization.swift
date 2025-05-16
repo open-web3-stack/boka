@@ -4,34 +4,34 @@ public enum MerklizeError: Error {
     case invalidIndex
 }
 
-/// State Merklization function from GP D.2
+/// State Merklization function
 ///
-/// Input is serialized state defined in the GP D.1
-public func stateMerklize(kv: [Data32: Data], i: Int = 0) throws(MerklizeError) -> Data32 {
+/// Input is serialized state
+public func stateMerklize(kv: [Data31: Data], i: Int = 0) throws(MerklizeError) -> Data32 {
     func branch(l: Data32, r: Data32) -> Data64 {
         var data = l.data + r.data
         data[0] = l.data[0] & 0x7F // clear the highest bit
         return Data64(data)!
     }
 
-    func embeddedLeaf(key: Data32, value: Data, size: UInt8) -> Data64 {
+    func embeddedLeaf(key: Data31, value: Data, size: UInt8) -> Data64 {
         var data = Data(capacity: 64)
         data.append(0b1000_0000 | size)
-        data += key.data[relative: ..<31]
+        data += key.data
         data += value
         data.append(contentsOf: repeatElement(0, count: 32 - Int(size)))
         return Data64(data)!
     }
 
-    func regularLeaf(key: Data32, value: Data) -> Data64 {
+    func regularLeaf(key: Data31, value: Data) -> Data64 {
         var data = Data(capacity: 64)
         data.append(0b1100_0000)
-        data += key.data[relative: ..<31]
+        data += key.data
         data += value.blake2b256hash().data
         return Data64(data)!
     }
 
-    func leaf(key: Data32, value: Data) -> Data64 {
+    func leaf(key: Data31, value: Data) -> Data64 {
         if value.count <= 32 {
             embeddedLeaf(key: key, value: value, size: UInt8(value.count))
         } else {
@@ -56,8 +56,8 @@ public func stateMerklize(kv: [Data32: Data], i: Int = 0) throws(MerklizeError) 
         return leaf(key: first.key, value: first.value).blake2b256hash()
     }
 
-    var l: [Data32: Data] = [:]
-    var r: [Data32: Data] = [:]
+    var l: [Data31: Data] = [:]
+    var r: [Data31: Data] = [:]
     for (k, v) in kv {
         if try bit(k.data, i) {
             r[k] = v

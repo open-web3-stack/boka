@@ -1,80 +1,151 @@
 import Codec
 import Foundation
-import Utils
 
-// L
-public struct WorkResult: Sendable, Equatable, Codable {
-    // s: the index of the service whose state is to be altered and thus whose refine code was already executed
-    public var serviceIndex: ServiceIndex
+public enum WorkResultError: Error, CaseIterable {
+    case outOfGas
+    case panic
+    /// (circledcirc) the number of exports made was invalidly reported
+    case badExports
+    /// (circleddash) oversize reports
+    case overSize
+    /// (BAD) the service's code was not available for lookup in state at the posterior state of the lookup-anchor block
+    case invalidCode
+    /// (BIG) code larger than MaxServiceCodeSize
+    case codeTooLarge
+}
 
-    // c: the hash of the code of the service at the time of being reported
-    public var codeHash: Data32
+public struct WorkResult: Sendable, Equatable {
+    public var result: Result<Data, WorkResultError>
 
-    // y: the hash of the payload
-    public var payloadHash: Data32
-
-    // g: the gas prioritization ratio
-    // used when determining how much gas should be allocated to execute of this item’s accumulate
-    public var gasRatio: Gas
-
-    // d: the actual output datum or error of the execution of the code
-    // which may be either an octet sequence in case it was successful, or a member of the set J, if not
-    public var output: WorkOutput
-
-    // u: the actual amount of gas used during refinement
-    public var gasUsed: UInt
-
-    // i: the number of segments imported from the Segments DA
-    public var importsCount: UInt
-
-    // x: the number of the extrinsics used in computing the workload
-    public var extrinsicsCount: UInt
-
-    // z: the total size in octets of the extrinsics used in computing the workload
-    public var extrinsicsSize: UInt
-
-    // e: the number of segments exported into the Segments DA
-    public var exportsCount: UInt
-
-    public init(
-        serviceIndex: ServiceIndex,
-        codeHash: Data32,
-        payloadHash: Data32,
-        gasRatio: Gas,
-        output: WorkOutput,
-        gasUsed: UInt,
-        importsCount: UInt,
-        exportsCount: UInt,
-        extrinsicsCount: UInt,
-        extrinsicsSize: UInt
-    ) {
-        self.serviceIndex = serviceIndex
-        self.codeHash = codeHash
-        self.payloadHash = payloadHash
-        self.gasRatio = gasRatio
-        self.output = output
-        self.gasUsed = gasUsed
-        self.importsCount = importsCount
-        self.exportsCount = exportsCount
-        self.extrinsicsCount = extrinsicsCount
-        self.extrinsicsSize = extrinsicsSize
+    public init(_ result: Result<Data, WorkResultError>) {
+        self.result = result
     }
 }
 
-extension WorkResult: Dummy {
-    public typealias Config = ProtocolConfigRef
-    public static func dummy(config _: Config) -> WorkResult {
-        WorkResult(
-            serviceIndex: 0,
-            codeHash: Data32(),
-            payloadHash: Data32(),
-            gasRatio: Gas(0),
-            output: .init(.success(Data())),
-            gasUsed: 0,
-            importsCount: 0,
-            exportsCount: 0,
-            extrinsicsCount: 0,
-            extrinsicsSize: 0
-        )
+extension WorkResult: Codable {
+    enum CodingKeys: String, CodingKey {
+        case success
+        case outOfGas
+        case panic
+        case badExports
+        case overSize
+        case invalidCode
+        case codeTooLarge
+    }
+
+    public init(from decoder: Decoder) throws {
+        if decoder.isJamCodec {
+            var container = try decoder.unkeyedContainer()
+            let variant = try container.decode(UInt8.self)
+            switch variant {
+            case 0:
+                self = try .init(.success(container.decode(Data.self)))
+            case 1:
+                self = .init(.failure(.outOfGas))
+            case 2:
+                self = .init(.failure(.panic))
+            case 3:
+                self = .init(.failure(.badExports))
+            case 4:
+                self = .init(.failure(.overSize))
+            case 5:
+                self = .init(.failure(.invalidCode))
+            case 6:
+                self = .init(.failure(.codeTooLarge))
+            default:
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(
+                        codingPath: decoder.codingPath,
+                        debugDescription: "Invalid WorkResultError: unknown variant \(variant)"
+                    )
+                )
+            }
+        } else {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            if container.contains(.success) {
+                self = try .init(.success(container.decode(Data.self, forKey: .success)))
+            } else if container.contains(.outOfGas) {
+                self = .init(.failure(.outOfGas))
+            } else if container.contains(.panic) {
+                self = .init(.failure(.panic))
+            } else if container.contains(.badExports) {
+                self = .init(.failure(.badExports))
+            } else if container.contains(.overSize) {
+                self = .init(.failure(.overSize))
+            } else if container.contains(.invalidCode) {
+                self = .init(.failure(.invalidCode))
+            } else if container.contains(.codeTooLarge) {
+                self = .init(.failure(.codeTooLarge))
+            } else {
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(
+                        codingPath: container.codingPath,
+                        debugDescription: "Not valid key founded"
+                    )
+                )
+            }
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        if encoder.isJamCodec {
+            var container = encoder.unkeyedContainer()
+            switch result {
+            case let .success(success):
+                try container.encode(UInt8(0))
+                try container.encode(success)
+            case let .failure(failure):
+                switch failure {
+                case .outOfGas:
+                    try container.encode(UInt8(1))
+                case .panic:
+                    try container.encode(UInt8(2))
+                case .badExports:
+                    try container.encode(UInt8(3))
+                case .overSize:
+                    try container.encode(UInt8(4))
+                case .invalidCode:
+                    try container.encode(UInt8(5))
+                case .codeTooLarge:
+                    try container.encode(UInt8(6))
+                }
+            }
+        } else {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            switch result {
+            case let .success(success):
+                try container.encode(success, forKey: .success)
+            case let .failure(failure):
+                switch failure {
+                case .outOfGas:
+                    try container.encodeNil(forKey: .outOfGas)
+                case .panic:
+                    try container.encodeNil(forKey: .panic)
+                case .badExports:
+                    try container.encodeNil(forKey: .badExports)
+                case .overSize:
+                    try container.encodeNil(forKey: .overSize)
+                case .invalidCode:
+                    try container.encodeNil(forKey: .invalidCode)
+                case .codeTooLarge:
+                    try container.encodeNil(forKey: .codeTooLarge)
+                }
+            }
+        }
+    }
+}
+
+extension WorkResult: EncodedSize {
+    public var encodedSize: Int {
+        switch result {
+        case let .success(success):
+            success.encodedSize + 1
+        case .failure:
+            1
+        }
+    }
+
+    public static var encodeedSizeHint: Int? {
+        nil
     }
 }

@@ -289,7 +289,7 @@ extension State: Dummy {
             basicGas: [:]
         )
         let judgements: StateKeys.JudgementsKey.Value = JudgementsState.dummy(config: config)
-        let activityStatistics: StateKeys.ActivityStatisticsKey.Value = ValidatorActivityStatistics.dummy(config: config)
+        let activityStatistics: StateKeys.ActivityStatisticsKey.Value = Statistics.dummy(config: config)
         let accumulationQueue: StateKeys.AccumulationQueueKey.Value = try! ConfigFixedSizeArray(
             config: config,
             defaultValue: [AccumulationQueueItem]()
@@ -317,7 +317,7 @@ extension State: Dummy {
             (StateKeys.AccumulationHistoryKey(), accumulationHistory),
         ]
 
-        var store: [Data32: Data] = [:]
+        var store: [Data31: Data] = [:]
         for (key, value) in kv {
             store[key.encode()] = try! JamEncoder.encode(value)
         }

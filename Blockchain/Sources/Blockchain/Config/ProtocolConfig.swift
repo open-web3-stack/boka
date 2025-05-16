@@ -79,14 +79,20 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     /// V = 1023: The total number of validators.
     public var totalNumberOfValidators: Int
 
+    /// WA = 64,000: The maximum size of is-authorized code in octets.
+    public var maxAuthorizerCodeSize: Int
+
     /// WC = 4,000,000: The maximum size of service code in octets.
     public var maxServiceCodeSize: Int
 
     /// WE = 684: The basic size of our erasure-coded pieces.
     public var erasureCodedPieceSize: Int
 
-    /// WM = 3,072: The maximum number of imports and exports in a work-package.
-    public var maxWorkPackageImportsExports: Int
+    /// WM = 3,072: The maximum number of imports in a work-package.
+    public var maxWorkPackageImports: Int
+
+    /// WM = 3,072: The maximum number of exports in a work-package.
+    public var maxWorkPackageExports: Int
 
     /// WB = 12 * 2^20: The maximum size of an encoded work-package together with its extrinsic data and import implications, in octets.
     public var maxEncodedWorkPackageSize: Int
@@ -94,8 +100,8 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     /// WG = WP*WE = 4104: The size of a segment in octets.
     public var segmentSize: Int
 
-    /// WR = 48 * 2^10: The maximum total size of all output blobs in a work-report, in octets.
-    public var maxWorkReportOutputSize: Int
+    /// WR = 48 * 2^10: The maximum total size of all unbounded blobs in a work-report, in octets.
+    public var maxWorkReportBlobSize: Int
 
     /// WP = 6: The number of erasure-coded pieces in a segment.
     public var erasureCodedSegmentSize: Int
@@ -143,14 +149,16 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         maxAuthorizationsQueueItems: Int,
         coreAssignmentRotationPeriod: Int,
         maxWorkPackageExtrinsics: Int,
+        maxAuthorizerCodeSize: Int,
         maxServiceCodeSize: Int,
         preimageReplacementPeriod: Int,
         totalNumberOfValidators: Int,
         erasureCodedPieceSize: Int,
-        maxWorkPackageImportsExports: Int,
+        maxWorkPackageImports: Int,
+        maxWorkPackageExports: Int,
         maxEncodedWorkPackageSize: Int,
         segmentSize: Int,
-        maxWorkReportOutputSize: Int,
+        maxWorkReportBlobSize: Int,
         erasureCodedSegmentSize: Int,
         ticketSubmissionEndSlot: Int,
         pvmDynamicAddressAlignmentFactor: Int,
@@ -182,14 +190,16 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         self.maxAuthorizationsQueueItems = maxAuthorizationsQueueItems
         self.coreAssignmentRotationPeriod = coreAssignmentRotationPeriod
         self.maxWorkPackageExtrinsics = maxWorkPackageExtrinsics
+        self.maxAuthorizerCodeSize = maxAuthorizerCodeSize
         self.maxServiceCodeSize = maxServiceCodeSize
         self.preimageReplacementPeriod = preimageReplacementPeriod
         self.totalNumberOfValidators = totalNumberOfValidators
         self.erasureCodedPieceSize = erasureCodedPieceSize
-        self.maxWorkPackageImportsExports = maxWorkPackageImportsExports
+        self.maxWorkPackageImports = maxWorkPackageImports
+        self.maxWorkPackageExports = maxWorkPackageExports
         self.maxEncodedWorkPackageSize = maxEncodedWorkPackageSize
         self.segmentSize = segmentSize
-        self.maxWorkReportOutputSize = maxWorkReportOutputSize
+        self.maxWorkReportBlobSize = maxWorkReportBlobSize
         self.erasureCodedSegmentSize = erasureCodedSegmentSize
         self.ticketSubmissionEndSlot = ticketSubmissionEndSlot
         self.pvmDynamicAddressAlignmentFactor = pvmDynamicAddressAlignmentFactor
@@ -259,6 +269,8 @@ extension ProtocolConfig {
                 ? other.coreAssignmentRotationPeriod : coreAssignmentRotationPeriod,
             maxWorkPackageExtrinsics: other.maxWorkPackageExtrinsics != 0
                 ? other.maxWorkPackageExtrinsics : maxWorkPackageExtrinsics,
+            maxAuthorizerCodeSize: other.maxAuthorizerCodeSize != 0
+                ? other.maxAuthorizerCodeSize : maxAuthorizerCodeSize,
             maxServiceCodeSize: other.maxServiceCodeSize != 0
                 ? other.maxServiceCodeSize : maxServiceCodeSize,
             preimageReplacementPeriod: other.preimageReplacementPeriod != 0
@@ -267,13 +279,15 @@ extension ProtocolConfig {
                 ? other.totalNumberOfValidators : totalNumberOfValidators,
             erasureCodedPieceSize: other.erasureCodedPieceSize != 0
                 ? other.erasureCodedPieceSize : erasureCodedPieceSize,
-            maxWorkPackageImportsExports: other.maxWorkPackageImportsExports != 0
-                ? other.maxWorkPackageImportsExports : maxWorkPackageImportsExports,
+            maxWorkPackageImports: other.maxWorkPackageImports != 0
+                ? other.maxWorkPackageImports : maxWorkPackageImports,
+            maxWorkPackageExports: other.maxWorkPackageExports != 0
+                ? other.maxWorkPackageExports : maxWorkPackageExports,
             maxEncodedWorkPackageSize: other.maxEncodedWorkPackageSize != 0
                 ? other.maxEncodedWorkPackageSize : maxEncodedWorkPackageSize,
             segmentSize: other.segmentSize != 0 ? other.segmentSize : segmentSize,
-            maxWorkReportOutputSize: other.maxWorkReportOutputSize != 0
-                ? other.maxWorkReportOutputSize : maxWorkReportOutputSize,
+            maxWorkReportBlobSize: other.maxWorkReportBlobSize != 0
+                ? other.maxWorkReportBlobSize : maxWorkReportBlobSize,
             erasureCodedSegmentSize: other.erasureCodedSegmentSize != 0
                 ? other.erasureCodedSegmentSize : erasureCodedSegmentSize,
             ticketSubmissionEndSlot: other.ticketSubmissionEndSlot != 0
@@ -348,6 +362,7 @@ extension ProtocolConfig {
         maxWorkPackageExtrinsics = try decode(
             .maxWorkPackageExtrinsics, defaultValue: 0, required: required
         )
+        maxAuthorizerCodeSize = try decode(.maxAuthorizerCodeSize, defaultValue: 0, required: required)
         maxServiceCodeSize = try decode(.maxServiceCodeSize, defaultValue: 0, required: required)
         preimageReplacementPeriod = try decode(
             .preimageReplacementPeriod, defaultValue: 0, required: required
@@ -356,15 +371,18 @@ extension ProtocolConfig {
             .totalNumberOfValidators, defaultValue: 0, required: required
         )
         erasureCodedPieceSize = try decode(.erasureCodedPieceSize, defaultValue: 0, required: required)
-        maxWorkPackageImportsExports = try decode(
-            .maxWorkPackageImportsExports, defaultValue: 0, required: required
+        maxWorkPackageImports = try decode(
+            .maxWorkPackageImports, defaultValue: 0, required: required
+        )
+        maxWorkPackageExports = try decode(
+            .maxWorkPackageExports, defaultValue: 0, required: required
         )
         maxEncodedWorkPackageSize = try decode(
             .maxEncodedWorkPackageSize, defaultValue: 0, required: required
         )
         segmentSize = try decode(.segmentSize, defaultValue: 0, required: required)
-        maxWorkReportOutputSize = try decode(
-            .maxWorkReportOutputSize, defaultValue: 0, required: required
+        maxWorkReportBlobSize = try decode(
+            .maxWorkReportBlobSize, defaultValue: 0, required: required
         )
         erasureCodedSegmentSize = try decode(
             .erasureCodedSegmentSize, defaultValue: 0, required: required
@@ -560,6 +578,13 @@ extension ProtocolConfig {
         }
     }
 
+    public enum MaxAuthorizerCodeSize: ReadInt {
+        public typealias TConfig = ProtocolConfigRef
+        public static func read(config: ProtocolConfigRef) -> Int {
+            config.value.maxAuthorizerCodeSize
+        }
+    }
+
     public enum MaxServiceCodeSize: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
@@ -588,10 +613,10 @@ extension ProtocolConfig {
         }
     }
 
-    public enum MaxWorkPackageImportsExports: ReadInt {
+    public enum MaxWorkPackageImports: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
-            config.value.maxWorkPackageImportsExports
+            config.value.maxWorkPackageImports
         }
     }
 
@@ -609,10 +634,10 @@ extension ProtocolConfig {
         }
     }
 
-    public enum MaxWorkReportOutputSize: ReadInt {
+    public enum MaxWorkReportBlobSize: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
-            config.value.maxWorkReportOutputSize
+            config.value.maxWorkReportBlobSize
         }
     }
 

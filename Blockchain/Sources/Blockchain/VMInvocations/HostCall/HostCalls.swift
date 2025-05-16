@@ -817,7 +817,7 @@ public class Fetch: HostCall {
     public let serviceAccounts: ServiceAccountsRef
     public let serviceIndex: ServiceIndex
     public let workPackage: WorkPackage
-    public let authorizerOutput: Data
+    public let authorizerTrace: Data
     public let importSegments: [[Data4104]]
 
     public init(
@@ -825,14 +825,14 @@ public class Fetch: HostCall {
         serviceAccounts: ServiceAccountsRef,
         serviceIndex: ServiceIndex,
         workPackage: WorkPackage,
-        authorizerOutput: Data,
+        authorizerTrace: Data,
         importSegments: [[Data4104]]
     ) {
         self.context = context
         self.serviceAccounts = serviceAccounts
         self.serviceIndex = serviceIndex
         self.workPackage = workPackage
-        self.authorizerOutput = authorizerOutput
+        self.authorizerTrace = authorizerTrace
         self.importSegments = importSegments
     }
 
@@ -846,7 +846,7 @@ public class Fetch: HostCall {
         case 0:
             value = try JamEncoder.encode(workPackage)
         case 1:
-            value = authorizerOutput
+            value = authorizerTrace
         case 2:
             if reg11 < workPackage.workItems.count {
                 value = workPackage.workItems[Int(reg11)].payloadBlob
@@ -923,7 +923,7 @@ public class Export: HostCall {
         }
         let segment = Data4104(data)!
 
-        if exportSegmentOffset + UInt64(context.exports.count) >= UInt64(config.value.maxWorkPackageImportsExports) {
+        if exportSegmentOffset + UInt64(context.exports.count) >= UInt64(config.value.maxWorkPackageImports) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), exportSegmentOffset + UInt64(context.exports.count))

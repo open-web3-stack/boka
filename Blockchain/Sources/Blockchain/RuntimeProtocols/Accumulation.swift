@@ -53,6 +53,16 @@ public struct ParallelAccumulationOutput {
 /// single-service accumulation function ∆1 output
 public typealias SingleAccumulationOutput = AccumulationResult
 
+public struct ServicePreimagePair: Hashable {
+    public var serviceIndex: ServiceIndex
+    public var preimage: Data
+
+    public init(service: ServiceIndex, preimage: Data) {
+        serviceIndex = service
+        self.preimage = preimage
+    }
+}
+
 public struct AccumulationResult {
     // o
     public var state: AccumulateState
@@ -62,6 +72,8 @@ public struct AccumulationResult {
     public var commitment: Data32?
     // u
     public var gasUsed: Gas
+    // p
+    public var providePreimages: Set<ServicePreimagePair>
 }
 
 public struct AccountChanges {
@@ -148,20 +160,21 @@ extension Accumulation {
         timeslot: TimeslotIndex
     ) async throws -> SingleAccumulationOutput {
         var gas = Gas(0)
-        var arguments: [AccumulateArguments] = []
+        var arguments: [OperandTuple] = []
 
         gas += privilegedGas[service] ?? Gas(0)
 
         for report in workReports {
-            for result in report.results where result.serviceIndex == service {
-                gas += result.gasRatio
-                arguments.append(AccumulateArguments(
+            for digest in report.digests where digest.serviceIndex == service {
+                gas += digest.gasLimit
+                arguments.append(OperandTuple(
                     packageHash: report.packageSpecification.workPackageHash,
                     segmentRoot: report.packageSpecification.segmentRoot,
                     authorizerHash: report.authorizerHash,
-                    authorizationOutput: report.authorizationOutput,
-                    payloadHash: result.payloadHash,
-                    workOutput: result.output
+                    authorizerTrace: report.authorizerTrace,
+                    payloadHash: digest.payloadHash,
+                    workResult: digest.result,
+                    gasLimit: digest.gasLimit
                 ))
             }
         }
@@ -210,8 +223,8 @@ extension Accumulation {
         var overallAccountChanges = AccountChanges()
 
         for report in workReports {
-            for result in report.results {
-                services.append(result.serviceIndex)
+            for digest in report.digests {
+                services.append(digest.serviceIndex)
             }
         }
 
@@ -222,6 +235,7 @@ extension Accumulation {
         logger.debug("[parallel] services to accumulate: \(services)")
 
         var accountsRef = ServiceAccountsMutRef(state.accounts.value)
+        var servicePreimageSet = Set<ServicePreimagePair>()
 
         for service in services {
             let singleOutput = try await singleAccumulate(
@@ -248,6 +262,8 @@ extension Accumulation {
                 transfers.append(transfer)
             }
 
+            servicePreimageSet.formUnion(singleOutput.providePreimages)
+
             switch service {
             case privilegedServices.blessed:
                 newPrivilegedServices = singleOutput.state.privilegedServices
@@ -263,6 +279,12 @@ extension Accumulation {
             try overallAccountChanges.checkAndMerge(with: accountsRef.changes)
             accountsRef.clearRecordedChanges()
         }
+
+        try await preimageIntegration(
+            servicePreimageSet: servicePreimageSet,
+            accounts: accountsRef,
+            timeslot: timeslot
+        )
 
         return ParallelAccumulationOutput(
             state: AccumulateState(
@@ -292,12 +314,12 @@ extension Accumulation {
 
         for report in workReports {
             var canAccumulate = true
-            for result in report.results {
-                if result.gasRatio + sumGasRequired > gasLimit {
+            for digest in report.digests {
+                if digest.gasLimit + sumGasRequired > gasLimit {
                     canAccumulate = false
                     break
                 }
-                sumGasRequired += result.gasRatio
+                sumGasRequired += digest.gasLimit
             }
             i += canAccumulate ? 1 : 0
         }
@@ -337,6 +359,31 @@ extension Accumulation {
                 commitments: parallelOutput.commitments.union(outerOutput.commitments),
                 gasUsed: parallelOutput.gasUsed + outerOutput.gasUsed
             )
+        }
+    }
+
+    // P: preimage integration function
+    private func preimageIntegration(
+        servicePreimageSet: Set<ServicePreimagePair>,
+        accounts: ServiceAccountsMutRef,
+        timeslot: TimeslotIndex
+    ) async throws {
+        for item in servicePreimageSet {
+            let serviceIndex = item.serviceIndex
+            let preimage = item.preimage
+            let preimageHash = Blake2b256.hash(preimage)
+            guard let preimageInfo = try await accounts.value.get(
+                serviceAccount: serviceIndex,
+                preimageHash: preimageHash,
+                length: UInt32(preimage.count)
+            ) else {
+                continue
+            }
+
+            if preimageInfo.isEmpty {
+                accounts.set(serviceAccount: serviceIndex, preimageHash: preimageHash, length: UInt32(preimage.count), value: [timeslot])
+                accounts.set(serviceAccount: serviceIndex, preimageHash: preimageHash, value: preimage)
+            }
         }
     }
 
@@ -530,7 +577,7 @@ extension Accumulation {
             if accumulateStats[service] != nil { continue }
 
             let num = accumulated.filter { report in
-                report.results.contains { $0.serviceIndex == service }
+                report.digests.contains { $0.serviceIndex == service }
             }.count
 
             if num == 0 { continue }

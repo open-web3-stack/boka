@@ -7,7 +7,7 @@ import Utils
 @testable import JAMTests
 
 struct StatisticsState: Equatable, Codable, ActivityStatistics {
-    var activityStatistics: ValidatorActivityStatistics
+    var activityStatistics: Statistics
     var timeslot: TimeslotIndex
     var currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
 }

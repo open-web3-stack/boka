@@ -85,7 +85,7 @@ public struct WorkItem: Sendable, Equatable, Codable, Hashable {
     public var outputs: [HashAndLength]
 
     // e: the number of data segments exported by this work item
-    public var outputDataSegmentsCount: UInt16
+    public var exportsCount: UInt16
 
     public init(
         serviceIndex: ServiceIndex,
@@ -95,7 +95,7 @@ public struct WorkItem: Sendable, Equatable, Codable, Hashable {
         accumulateGasLimit: Gas,
         inputs: [ImportedDataSegment],
         outputs: [HashAndLength],
-        outputDataSegmentsCount: UInt16
+        exportsCount: UInt16
     ) {
         self.serviceIndex = serviceIndex
         self.codeHash = codeHash
@@ -104,7 +104,7 @@ public struct WorkItem: Sendable, Equatable, Codable, Hashable {
         self.accumulateGasLimit = accumulateGasLimit
         self.inputs = inputs
         self.outputs = outputs
-        self.outputDataSegmentsCount = outputDataSegmentsCount
+        self.exportsCount = exportsCount
     }
 }
 
@@ -119,7 +119,7 @@ extension WorkItem: Dummy {
             accumulateGasLimit: Gas(0),
             inputs: [],
             outputs: [],
-            outputDataSegmentsCount: 0
+            exportsCount: 0
         )
     }
 }
