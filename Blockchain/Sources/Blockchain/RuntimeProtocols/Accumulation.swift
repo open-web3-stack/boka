@@ -166,7 +166,7 @@ extension Accumulation {
 
         for report in workReports {
             for digest in report.digests where digest.serviceIndex == service {
-                gas += digest.gasRatio
+                gas += digest.gasLimit
                 arguments.append(AccumulateArguments(
                     packageHash: report.packageSpecification.workPackageHash,
                     segmentRoot: report.packageSpecification.segmentRoot,
@@ -174,7 +174,7 @@ extension Accumulation {
                     authorizerTrace: report.authorizerTrace,
                     payloadHash: digest.payloadHash,
                     workResult: digest.result,
-                    gasRatio: digest.gasRatio
+                    gasLimit: digest.gasLimit
                 ))
             }
         }
@@ -315,11 +315,11 @@ extension Accumulation {
         for report in workReports {
             var canAccumulate = true
             for digest in report.digests {
-                if digest.gasRatio + sumGasRequired > gasLimit {
+                if digest.gasLimit + sumGasRequired > gasLimit {
                     canAccumulate = false
                     break
                 }
-                sumGasRequired += digest.gasRatio
+                sumGasRequired += digest.gasLimit
             }
             i += canAccumulate ? 1 : 0
         }

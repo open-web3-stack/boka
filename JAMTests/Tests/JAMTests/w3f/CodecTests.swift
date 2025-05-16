@@ -120,7 +120,7 @@ struct CodecTests {
         if value is WorkDigest {
             return [
                 "code_hash": json["codeHash"]!,
-                "accumulate_gas": json["gasRatio"]!,
+                "accumulate_gas": json["gasLimit"]!,
                 "payload_hash": json["payloadHash"]!,
                 "service_id": json["serviceIndex"]!,
                 "result": json["output"]!["success"] == nil ? json["output"]! : [

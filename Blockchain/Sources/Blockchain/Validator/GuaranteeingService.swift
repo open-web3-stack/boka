@@ -695,7 +695,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                 serviceIndex: item.serviceIndex,
                 codeHash: workPackage.value.authorizationCodeHash,
                 payloadHash: item.payloadBlob.blake2b256hash(),
-                gasRatio: item.refineGasLimit,
+                gasLimit: item.refineGasLimit,
                 result: WorkResult(refineRes),
                 gasUsed: UInt(refineGasUsed.value),
                 importsCount: UInt(item.inputs.count),

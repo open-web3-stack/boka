@@ -54,7 +54,7 @@ extension ActivityStatistics {
         // service indices (to be used in the service statistics)
         var indices = Set(accumulateStats.keys).union(transfersStats.keys)
         indices.formUnion(extrinsic.preimages.preimages.map(\.serviceIndex))
-        indices.formUnion(extrinsic.reports.guarantees.flatMap(\.workReport.results).map(\.serviceIndex))
+        indices.formUnion(extrinsic.reports.guarantees.flatMap(\.workReport.digests).map(\.serviceIndex))
 
         // core and service statistics
         var coreStats = try ConfigFixedSizeArray<CoreStatistics, ProtocolConfig.TotalNumberOfCores>(
@@ -70,20 +70,20 @@ extension ActivityStatistics {
             let report = guaranteeItem.workReport
             let index = report.coreIndex
             coreStats[index].packageSize += UInt(report.packageSpecification.length)
-            for result in report.results {
-                coreStats[index].gasUsed += result.gasUsed
-                coreStats[index].importsCount += result.importsCount
-                coreStats[index].exportsCount += result.exportsCount
-                coreStats[index].extrinsicsCount += result.extrinsicsCount
-                coreStats[index].extrinsicsSize += result.extrinsicsSize
+            for digest in report.digests {
+                coreStats[index].gasUsed += digest.gasUsed
+                coreStats[index].importsCount += digest.importsCount
+                coreStats[index].exportsCount += digest.exportsCount
+                coreStats[index].extrinsicsCount += digest.extrinsicsCount
+                coreStats[index].extrinsicsSize += digest.extrinsicsSize
 
-                let serviceIndex = UInt(result.serviceIndex)
-                serviceStats[serviceIndex]!.importsCount += result.importsCount
-                serviceStats[serviceIndex]!.exportsCount += result.exportsCount
-                serviceStats[serviceIndex]!.extrinsicsCount += result.extrinsicsCount
-                serviceStats[serviceIndex]!.extrinsicsSize += result.extrinsicsSize
+                let serviceIndex = UInt(digest.serviceIndex)
+                serviceStats[serviceIndex]!.importsCount += digest.importsCount
+                serviceStats[serviceIndex]!.exportsCount += digest.exportsCount
+                serviceStats[serviceIndex]!.extrinsicsCount += digest.extrinsicsCount
+                serviceStats[serviceIndex]!.extrinsicsSize += digest.extrinsicsSize
                 serviceStats[serviceIndex]!.refines.count += 1
-                serviceStats[serviceIndex]!.refines.gasUsed += result.gasUsed
+                serviceStats[serviceIndex]!.refines.gasUsed += digest.gasUsed
             }
         }
         for report in availableReports {

@@ -13,12 +13,10 @@ public struct WorkDigest: Sendable, Equatable, Codable {
     // y: the hash of the payload
     public var payloadHash: Data32
 
-    // g: the gas prioritization ratio
-    // used when determining how much gas should be allocated to execute of this item’s accumulate
-    public var gasRatio: Gas
+    // g: the gas limit for executing this item's accumulate
+    public var gasLimit: Gas
 
-    // d: the actual output datum or error of the execution of the code
-    // which may be either an octet sequence in case it was successful, or a member of the set J, if not
+    // d: the work result
     public var result: WorkResult
 
     // u: the actual amount of gas used during refinement
@@ -40,7 +38,7 @@ public struct WorkDigest: Sendable, Equatable, Codable {
         serviceIndex: ServiceIndex,
         codeHash: Data32,
         payloadHash: Data32,
-        gasRatio: Gas,
+        gasLimit: Gas,
         result: WorkResult,
         gasUsed: UInt,
         importsCount: UInt,
@@ -51,7 +49,7 @@ public struct WorkDigest: Sendable, Equatable, Codable {
         self.serviceIndex = serviceIndex
         self.codeHash = codeHash
         self.payloadHash = payloadHash
-        self.gasRatio = gasRatio
+        self.gasLimit = gasLimit
         self.result = result
         self.gasUsed = gasUsed
         self.importsCount = importsCount
@@ -68,7 +66,7 @@ extension WorkDigest: Dummy {
             serviceIndex: 0,
             codeHash: Data32(),
             payloadHash: Data32(),
-            gasRatio: Gas(0),
+            gasLimit: Gas(0),
             result: .init(.success(Data())),
             gasUsed: 0,
             importsCount: 0,

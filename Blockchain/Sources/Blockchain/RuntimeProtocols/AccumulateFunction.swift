@@ -16,7 +16,7 @@ public struct AccumulateArguments: Codable {
     /// d
     public var workResult: WorkResult
     /// g
-    public var gasRatio: Gas
+    public var gasLimit: Gas
 }
 
 public struct DeferredTransfers: Codable {
