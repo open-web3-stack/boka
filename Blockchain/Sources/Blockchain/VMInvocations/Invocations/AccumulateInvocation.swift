@@ -11,7 +11,7 @@ public func accumulate(
     state: AccumulateState,
     serviceIndex: ServiceIndex,
     gas: Gas,
-    arguments: [AccumulateArguments],
+    arguments: [OperandTuple],
     initialIndex: ServiceIndex,
     timeslot: TimeslotIndex
 ) async throws -> AccumulationResult {

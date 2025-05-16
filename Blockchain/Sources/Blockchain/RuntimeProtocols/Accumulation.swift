@@ -160,14 +160,14 @@ extension Accumulation {
         timeslot: TimeslotIndex
     ) async throws -> SingleAccumulationOutput {
         var gas = Gas(0)
-        var arguments: [AccumulateArguments] = []
+        var arguments: [OperandTuple] = []
 
         gas += privilegedGas[service] ?? Gas(0)
 
         for report in workReports {
             for digest in report.digests where digest.serviceIndex == service {
                 gas += digest.gasLimit
-                arguments.append(AccumulateArguments(
+                arguments.append(OperandTuple(
                     packageHash: report.packageSpecification.workPackageHash,
                     segmentRoot: report.packageSpecification.segmentRoot,
                     authorizerHash: report.authorizerHash,

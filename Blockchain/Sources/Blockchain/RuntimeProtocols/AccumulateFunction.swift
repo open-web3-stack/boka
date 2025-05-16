@@ -2,21 +2,21 @@ import Foundation
 import Utils
 
 // wrangled operand tuple
-public struct AccumulateArguments: Codable {
+public struct OperandTuple: Codable {
     /// h
     public var packageHash: Data32
     /// e
     public var segmentRoot: Data32
     /// a
     public var authorizerHash: Data32
-    /// o
-    public var authorizerTrace: Data
     /// y
     public var payloadHash: Data32
-    /// d
-    public var workResult: WorkResult
     /// g
     public var gasLimit: Gas
+    /// d
+    public var workResult: WorkResult
+    /// o
+    public var authorizerTrace: Data
 }
 
 public struct DeferredTransfers: Codable {
