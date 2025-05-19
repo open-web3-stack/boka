@@ -60,12 +60,15 @@ public struct AccumulateState {
     /// x
     public var privilegedServices: PrivilegedServices
 
+    public var entropy: Data32 // eta'_0
+
     public func copy() -> AccumulateState {
         AccumulateState(
             accounts: ServiceAccountsMutRef(accounts.value),
             validatorQueue: validatorQueue,
             authorizationQueue: authorizationQueue,
-            privilegedServices: privilegedServices
+            privilegedServices: privilegedServices,
+            entropy: entropy
         )
     }
 }
@@ -82,8 +85,8 @@ public class AccumlateResultContext {
     public var transfers: [DeferredTransfers]
     /// y
     public var yield: Data32?
-    /// p: preimages to be provided
-    public var providePreimages: Set<ServicePreimagePair>
+    /// p
+    public var provide: Set<ServicePreimagePair>
 
     public var accountChanges: AccountChanges
 
@@ -97,7 +100,7 @@ public class AccumlateResultContext {
         self.nextAccountIndex = nextAccountIndex
         transfers = []
         yield = nil
-        providePreimages = []
+        provide = []
         accountChanges = AccountChanges()
     }
 }

@@ -12,7 +12,6 @@ public func accumulate(
     serviceIndex: ServiceIndex,
     gas: Gas,
     arguments: [OperandTuple],
-    initialIndex: ServiceIndex,
     timeslot: TimeslotIndex
 ) async throws -> AccumulationResult {
     logger.debug("accumulating service index: \(serviceIndex)")
@@ -23,35 +22,35 @@ public func accumulate(
               preimageHash: accumulatingAccountDetails.codeHash
           )
     else {
-        return .init(state: state, transfers: [], commitment: nil, gasUsed: Gas(0), providePreimages: [])
+        return .init(state: state, transfers: [], commitment: nil, gasUsed: Gas(0), provide: [])
     }
 
     let codeBlob = try CodeAndMeta(data: preimage).codeBlob
 
     if codeBlob.count > config.value.maxServiceCodeSize {
-        return .init(state: state, transfers: [], commitment: nil, gasUsed: Gas(0), providePreimages: [])
+        return .init(state: state, transfers: [], commitment: nil, gasUsed: Gas(0), provide: [])
     }
 
-    let contextContent = try await AccumulateContext.ContextType(
+    let initialIndex = try Blake2b256.hash(JamEncoder.encode(serviceIndex, state.entropy, timeslot)).data.decode(UInt32.self)
+    let nextAccountIndex = try await AccumulateContext.check(
+        i: initialIndex % serviceIndexModValue + 256,
+        accounts: state.accounts.toRef()
+    )
+
+    let contextContent = AccumulateContext.ContextType(
         x: AccumlateResultContext(
             serviceIndex: serviceIndex,
             state: state,
-            nextAccountIndex: AccumulateContext.check(
-                i: initialIndex % serviceIndexModValue + 256,
-                accounts: state.accounts.toRef()
-            )
+            nextAccountIndex: nextAccountIndex
         ),
         y: AccumlateResultContext(
             serviceIndex: serviceIndex,
             state: state.copy(),
-            nextAccountIndex: AccumulateContext.check(
-                i: initialIndex % serviceIndexModValue + 256,
-                accounts: state.accounts.toRef()
-            )
+            nextAccountIndex: nextAccountIndex
         )
     )
-    let ctx = AccumulateContext(context: contextContent, config: config, timeslot: timeslot)
-    let argument = try JamEncoder.encode(timeslot, serviceIndex, arguments)
+    let ctx = AccumulateContext(context: contextContent, config: config, timeslot: timeslot, operands: arguments)
+    let argument = try JamEncoder.encode(timeslot, serviceIndex, arguments.count)
 
     let (exitReason, gas, output) = await invokePVM(
         config: config,
@@ -80,7 +79,7 @@ private func collapse(
             transfers: context.y.transfers,
             commitment: context.y.yield,
             gasUsed: gas,
-            providePreimages: context.y.providePreimages
+            provide: context.y.provide
         )
     default:
         if let output, let o = Data32(output) {
@@ -89,7 +88,7 @@ private func collapse(
                 transfers: context.x.transfers,
                 commitment: o,
                 gasUsed: gas,
-                providePreimages: context.x.providePreimages
+                provide: context.x.provide
             )
 
         } else {
@@ -98,7 +97,7 @@ private func collapse(
                 transfers: context.x.transfers,
                 commitment: context.x.yield,
                 gasUsed: gas,
-                providePreimages: context.x.providePreimages
+                provide: context.x.provide
             )
         }
     }

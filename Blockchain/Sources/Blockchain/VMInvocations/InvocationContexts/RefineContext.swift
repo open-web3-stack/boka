@@ -26,11 +26,14 @@ public class RefineContext: InvocationContext {
 
     public let config: ProtocolConfigRef
     public var context: ContextType
+
+    // other info needed for dispatches
     public let importSegments: [[Data4104]]
     public let exportSegmentOffset: UInt64
     public let service: ServiceIndex
     public let serviceAccounts: ServiceAccounts
     public let workPackage: WorkPackage
+    public let workItemIndex: Int
     public let authorizerTrace: Data
 
     public init(
@@ -41,6 +44,7 @@ public class RefineContext: InvocationContext {
         service: ServiceIndex,
         serviceAccounts: some ServiceAccounts,
         workPackage: WorkPackage,
+        workItemIndex: Int,
         authorizerTrace: Data
     ) {
         self.config = config
@@ -50,6 +54,7 @@ public class RefineContext: InvocationContext {
         self.service = service
         self.serviceAccounts = serviceAccounts
         self.workPackage = workPackage
+        self.workItemIndex = workItemIndex
         self.authorizerTrace = authorizerTrace
     }
 
@@ -69,12 +74,12 @@ public class RefineContext: InvocationContext {
             .call(config: config, state: state)
         case Fetch.identifier:
             return await Fetch(
-                context: context,
                 serviceAccounts: ServiceAccountsRef(serviceAccounts),
-                serviceIndex: service,
                 workPackage: workPackage,
+                entropy: Data32(),
                 authorizerTrace: authorizerTrace,
-                importSegments: importSegments
+                workItemIndex: workItemIndex,
+                importSegments: importSegments,
             )
             .call(config: config, state: state)
         case Export.identifier:

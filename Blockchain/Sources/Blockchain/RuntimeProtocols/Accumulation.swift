@@ -73,7 +73,7 @@ public struct AccumulationResult {
     // u
     public var gasUsed: Gas
     // p
-    public var providePreimages: Set<ServicePreimagePair>
+    public var provide: Set<ServicePreimagePair>
 }
 
 public struct AccountChanges {
@@ -156,7 +156,6 @@ extension Accumulation {
         workReports: [WorkReport],
         service: ServiceIndex,
         privilegedGas: [ServiceIndex: Gas],
-        entropy: Data32,
         timeslot: TimeslotIndex
     ) async throws -> SingleAccumulationOutput {
         var gas = Gas(0)
@@ -171,10 +170,10 @@ extension Accumulation {
                     packageHash: report.packageSpecification.workPackageHash,
                     segmentRoot: report.packageSpecification.segmentRoot,
                     authorizerHash: report.authorizerHash,
-                    authorizerTrace: report.authorizerTrace,
                     payloadHash: digest.payloadHash,
+                    gasLimit: digest.gasLimit,
                     workResult: digest.result,
-                    gasLimit: digest.gasLimit
+                    authorizerTrace: report.authorizerTrace
                 ))
             }
         }
@@ -187,7 +186,6 @@ extension Accumulation {
             serviceIndex: service,
             gas: gas,
             arguments: arguments,
-            initialIndex: Blake2b256.hash(JamEncoder.encode(service, entropy, timeslot)).data.decode(UInt32.self),
             timeslot: timeslot
         )
 
@@ -202,7 +200,6 @@ extension Accumulation {
         state: AccumulateState,
         workReports: [WorkReport],
         privilegedGas: [ServiceIndex: Gas],
-        entropy: Data32,
         timeslot: TimeslotIndex
     ) async throws -> ParallelAccumulationOutput {
         var services = [ServiceIndex]()
@@ -244,12 +241,12 @@ extension Accumulation {
                     accounts: accountsRef,
                     validatorQueue: state.validatorQueue,
                     authorizationQueue: state.authorizationQueue,
-                    privilegedServices: state.privilegedServices
+                    privilegedServices: state.privilegedServices,
+                    entropy: state.entropy
                 ),
                 workReports: workReports,
                 service: service,
                 privilegedGas: privilegedGas,
-                entropy: entropy,
                 timeslot: timeslot
             )
             gasUsed.append((service, singleOutput.gasUsed))
@@ -262,7 +259,7 @@ extension Accumulation {
                 transfers.append(transfer)
             }
 
-            servicePreimageSet.formUnion(singleOutput.providePreimages)
+            servicePreimageSet.formUnion(singleOutput.provide)
 
             switch service {
             case privilegedServices.blessed:
@@ -291,7 +288,8 @@ extension Accumulation {
                 accounts: accountsRef,
                 validatorQueue: newValidatorQueue ?? validatorQueue,
                 authorizationQueue: newAuthorizationQueue ?? authorizationQueue,
-                privilegedServices: newPrivilegedServices ?? privilegedServices
+                privilegedServices: newPrivilegedServices ?? privilegedServices,
+                entropy: state.entropy
             ),
             transfers: transfers,
             commitments: commitments,
@@ -306,7 +304,6 @@ extension Accumulation {
         workReports: [WorkReport],
         privilegedGas: [ServiceIndex: Gas],
         gasLimit: Gas,
-        entropy: Data32,
         timeslot: TimeslotIndex
     ) async throws -> AccumulationOutput {
         var i = 0
@@ -340,7 +337,6 @@ extension Accumulation {
                 state: state,
                 workReports: Array(workReports[0 ..< i]),
                 privilegedGas: privilegedGas,
-                entropy: entropy,
                 timeslot: timeslot
             )
             let outerOutput = try await outerAccumulate(
@@ -349,7 +345,6 @@ extension Accumulation {
                 workReports: Array(workReports[i ..< workReports.count]),
                 privilegedGas: [:],
                 gasLimit: gasLimit - parallelOutput.gasUsed.reduce(Gas(0)) { $0 + $1.gas },
-                entropy: entropy,
                 timeslot: timeslot
             )
             return AccumulationOutput(
@@ -454,7 +449,6 @@ extension Accumulation {
         config: ProtocolConfigRef,
         workReports: [WorkReport],
         state: AccumulateState,
-        entropy: Data32,
         timeslot: TimeslotIndex
     ) async throws -> AccumulationOutput {
         let sumPrevilegedGas = privilegedServices.basicGas.values.reduce(Gas(0)) { $0 + $1.value }
@@ -467,7 +461,6 @@ extension Accumulation {
             workReports: workReports,
             privilegedGas: privilegedServices.basicGas,
             gasLimit: gasLimit,
-            entropy: entropy,
             timeslot: timeslot
         )
     }
@@ -499,14 +492,14 @@ extension Accumulation {
             accounts: accountsMutRef,
             validatorQueue: validatorQueue,
             authorizationQueue: authorizationQueue,
-            privilegedServices: privilegedServices
+            privilegedServices: privilegedServices,
+            entropy: entropy
         )
 
         let accumulateOutput = try await execution(
             config: config,
             workReports: accumulatableReports,
             state: initialAccState,
-            entropy: entropy,
             timeslot: timeslot
         )
 
@@ -526,6 +519,7 @@ extension Accumulation {
                 serviceIndex: service,
                 serviceAccounts: accountsMutRef,
                 timeslot: timeslot,
+                entropy: entropy,
                 transfers: transfers
             )
             let count = UInt32(transfers.count)

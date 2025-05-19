@@ -66,7 +66,7 @@ public struct WorkItem: Sendable, Equatable, Codable, Hashable {
     // s
     public var serviceIndex: ServiceIndex
 
-    // c
+    // h
     public var codeHash: Data32
 
     // y

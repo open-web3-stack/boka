@@ -19,16 +19,25 @@ public class AccumulateContext: InvocationContext {
 
     public let config: ProtocolConfigRef
     public var context: ContextType
-    public let timeslot: TimeslotIndex
 
-    public init(context: ContextType, config: ProtocolConfigRef, timeslot: TimeslotIndex) {
+    // other info needed for dispatches
+    public let timeslot: TimeslotIndex
+    public let operands: [OperandTuple]
+
+    public init(context: ContextType, config: ProtocolConfigRef, timeslot: TimeslotIndex, operands: [OperandTuple]) {
         self.config = config
         self.context = context
         self.timeslot = timeslot
+        self.operands = operands
     }
 
     public func dispatch(index: UInt32, state: VMState) async -> ExecOutcome {
         switch UInt8(index) {
+        case GasFn.identifier:
+            return await GasFn().call(config: config, state: state)
+        case Fetch.identifier:
+            return await Fetch(entropy: context.x.state.entropy, operands: operands)
+                .call(config: config, state: state)
         case Read.identifier:
             return await Read(serviceIndex: context.x.serviceIndex, accounts: context.x.state.accounts.toRef())
                 .call(config: config, state: state)
@@ -38,8 +47,6 @@ public class AccumulateContext: InvocationContext {
         case Lookup.identifier:
             return await Lookup(serviceIndex: context.x.serviceIndex, accounts: context.x.state.accounts.toRef())
                 .call(config: config, state: state)
-        case GasFn.identifier:
-            return await GasFn().call(config: config, state: state)
         case Info.identifier:
             return await Info(serviceIndex: context.x.serviceIndex, accounts: context.x.state.accounts.toRef())
                 .call(config: config, state: state)
@@ -68,6 +75,8 @@ public class AccumulateContext: InvocationContext {
             return await Forget(x: context.x, timeslot: timeslot).call(config: config, state: state)
         case Yield.identifier:
             return await Yield(x: context.x).call(config: config, state: state)
+        case Provide.identifier:
+            return await Provide(x: context.x).call(config: config, state: state)
         case Log.identifier:
             return await Log(service: context.x.serviceIndex).call(config: config, state: state)
         default:

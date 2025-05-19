@@ -92,18 +92,23 @@ extension WorkPackage {
 
 extension WorkPackage {
     /// a: work-package’s implied authorizer, the hash of the concatenation of the authorization code
-    /// and the parameterization
-    public func authorizer(serviceAccounts: some ServiceAccounts) async throws -> Data32 {
-        try await Blake2b256.hash(authorizationCode(serviceAccounts: serviceAccounts), configurationBlob)
+    /// and the configuration
+    public func authorizer(serviceAccounts: some ServiceAccounts) async throws -> Data32? {
+        guard let authorizationCode = try await authorizationCode(serviceAccounts: serviceAccounts) else {
+            return nil
+        }
+        return Blake2b256.hash(authorizationCode, configurationBlob)
     }
 
     /// c: the authorization code
-    public func authorizationCode(serviceAccounts: some ServiceAccounts) async throws -> Data {
-        let preimage = try await serviceAccounts.historicalLookup(
+    public func authorizationCode(serviceAccounts: some ServiceAccounts) async throws -> Data? {
+        guard let preimage = try await serviceAccounts.historicalLookup(
             serviceAccount: authorizationServiceIndex,
             timeslot: context.lookupAnchor.timeslot,
             preimageHash: authorizationCodeHash
-        ) ?? Data()
+        ) else {
+            return nil
+        }
         return try CodeAndMeta(data: preimage).codeBlob
     }
 }
