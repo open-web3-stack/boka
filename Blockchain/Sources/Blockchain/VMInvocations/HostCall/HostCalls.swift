@@ -34,6 +34,7 @@ public class Fetch: HostCall {
     public let workItemIndex: Int?
     // overline i
     public let importSegments: [[Data4104]]?
+    // overline x (no need pass in)
     // o
     public let operands: [OperandTuple]?
     // t
@@ -59,23 +60,6 @@ public class Fetch: HostCall {
         self.importSegments = importSegments
         self.operands = operands
         self.transfers = transfers
-    }
-
-    // overline x
-    private func getBlobs() async throws -> [[Data]]? {
-        guard let workPackage, let serviceAccounts else {
-            return nil
-        }
-        var blobs: [[Data]] = []
-        for item in workPackage.workItems {
-            var cur: [Data] = []
-            for output in item.outputs {
-                let blob = try await serviceAccounts.value.get(serviceAccount: item.serviceIndex, preimageHash: output.hash)
-                cur.append(blob ?? Data())
-            }
-            blobs.append(cur)
-        }
-        return blobs
     }
 
     private func getWorkItemMeta(item: WorkItem) throws -> Data {
@@ -109,14 +93,20 @@ public class Fetch: HostCall {
                 value = authorizerTrace
             }
         case 3:
-            let blobs = try await getBlobs()
-            if let blobs, reg11 < blobs.count, reg12 < blobs[Int(reg11)].count {
-                value = blobs[Int(reg11)][Int(reg12)]
+            if let workPackage, let serviceAccounts, reg11 < workPackage.workItems.count {
+                let item = workPackage.workItems[Int(reg11)]
+                let outputs = item.outputs
+                if reg12 < outputs.count {
+                    value = try await serviceAccounts.value.get(serviceAccount: item.serviceIndex, preimageHash: outputs[Int(reg12)].hash)
+                }
             }
         case 4:
-            let blobs = try await getBlobs()
-            if let workItemIndex, let blobs, reg11 < blobs[workItemIndex].count {
-                value = blobs[workItemIndex][Int(reg11)]
+            if let workItemIndex, let workPackage, let serviceAccounts {
+                let item = workPackage.workItems[workItemIndex]
+                let outputs = item.outputs
+                if reg11 < outputs.count {
+                    value = try await serviceAccounts.value.get(serviceAccount: item.serviceIndex, preimageHash: outputs[Int(reg11)].hash)
+                }
             }
         case 5:
             if let importSegments, reg11 < importSegments.count, reg12 < importSegments[Int(reg11)].count {
