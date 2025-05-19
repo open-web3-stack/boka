@@ -255,6 +255,9 @@ final class ExecutorBackendJIT: ExecutorBackend {
             logger.debug("JIT execution finished. Reason: \(exitReason). Remaining gas: \(currentGas.value)")
             return exitReason
 
+        } catch let error as JITCompiler.CompilationError {
+            logger.error("JIT compilation failed: \(error)")
+            return .panic(.trap)
         } catch let error as JITError {
             logger.error("JIT execution failed with JITError: \(error)")
             return error.toExitReason()

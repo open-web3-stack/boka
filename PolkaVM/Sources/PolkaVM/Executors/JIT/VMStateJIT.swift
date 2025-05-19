@@ -17,7 +17,29 @@ final class VMStateJIT: VMState, @unchecked Sendable {
     private let jitGasPtr: UnsafeMutablePointer<UInt64>
     private let programCode: ProgramCode
 
+    // Track current program counter
     private var pcValue: UInt32
+
+    // Memory view instances - created lazily for efficiency
+    private lazy var readonlyMemoryView: ReadonlyMemory = {
+        do {
+            return try createReadonlyMemoryView()
+        } catch {
+            logger.error("Failed to create ReadonlyMemory: \(error)")
+            // Return an empty memory as a fallback - shouldn't happen in practice
+            return ReadonlyMemory(try! GeneralMemory(pageMap: [], chunks: []))
+        }
+    }()
+
+    private lazy var generalMemoryView: GeneralMemory = {
+        do {
+            return try createGeneralMemoryView()
+        } catch {
+            logger.error("Failed to create GeneralMemory: \(error)")
+            // Return an empty memory as a fallback - shouldn't happen in practice
+            return try! GeneralMemory(pageMap: [], chunks: [])
+        }
+    }()
 
     init(
         jitMemoryBasePtr: UnsafeMutablePointer<UInt8>,
@@ -33,6 +55,8 @@ final class VMStateJIT: VMState, @unchecked Sendable {
         self.jitGasPtr = jitGasPtr
         self.programCode = programCode
         pcValue = initialPC
+
+        logger.debug("VMStateJIT initialized with memSize: \(jitMemorySize), initialPC: \(initialPC)")
     }
 
     // MARK: - VMState Protocol Implementation
@@ -48,8 +72,14 @@ final class VMStateJIT: VMState, @unchecked Sendable {
     // Register Operations
 
     func getRegisters() -> Registers {
-        let registers = Registers()
-        // TODO: Properly copy all registers from JIT memory
+        var registers = Registers()
+
+        // Copy all register values from JIT registers array
+        for i in 0 ..< 13 { // There are 13 registers in Registers
+            let regValue = jitRegistersPtr[Int(i)]
+            registers[Registers.Index(raw: UInt8(i))] = regValue
+        }
+
         return registers
     }
 
@@ -78,31 +108,31 @@ final class VMStateJIT: VMState, @unchecked Sendable {
     // Memory Operations
 
     func getMemory() -> ReadonlyMemory {
-        // Create a read-only view of the JIT memory
-        // TODO: Implement proper ReadonlyMemory wrapper around JIT memory
-        let pageMap: [(address: UInt32, length: UInt32, writable: Bool)] = [(0, jitMemorySize, true)]
-        let chunks: [(address: UInt32, data: Data)] = []
-        do {
-            return try ReadonlyMemory(GeneralMemory(pageMap: pageMap, chunks: chunks))
-        } catch {
-            logger.error("Failed to create ReadonlyMemory: \(error)")
-            // Return an empty memory as a fallback
-            return ReadonlyMemory(try! GeneralMemory(pageMap: [], chunks: []))
-        }
+        readonlyMemoryView
     }
 
     func getMemoryUnsafe() -> GeneralMemory {
-        // Create a GeneralMemory wrapper around the JIT memory
-        // TODO: Implement proper GeneralMemory wrapper around JIT memory
+        generalMemoryView
+    }
+
+    // Create a memory view that directly accesses the JIT-managed memory
+    private func createReadonlyMemoryView() throws -> ReadonlyMemory {
+        try ReadonlyMemory(createGeneralMemoryView())
+    }
+
+    private func createGeneralMemoryView() throws -> GeneralMemory {
+        // Create a single page map entry covering the entire memory range
         let pageMap: [(address: UInt32, length: UInt32, writable: Bool)] = [(0, jitMemorySize, true)]
-        let chunks: [(address: UInt32, data: Data)] = []
-        do {
-            return try GeneralMemory(pageMap: pageMap, chunks: chunks)
-        } catch {
-            logger.error("Failed to create GeneralMemory: \(error)")
-            // Return an empty memory as a fallback
-            return try! GeneralMemory(pageMap: [], chunks: [])
-        }
+
+        // Create direct chunk access to the memory buffer
+        // We create a Data view of the memory for GeneralMemory
+        let memoryData = Data(bytes: jitMemoryBasePtr, count: Int(jitMemorySize))
+
+        // Create a GeneralMemory instance with the page map and data chunks
+        return try GeneralMemory(
+            pageMap: pageMap,
+            chunks: [(0, memoryData)]
+        )
     }
 
     func isMemoryReadable(address: some FixedWidthInteger, length: Int) -> Bool {
@@ -157,8 +187,10 @@ final class VMStateJIT: VMState, @unchecked Sendable {
     }
 
     func sbrk(_: UInt32) throws -> UInt32 {
-        // TODO: Implement memory allocation
-        // For now, throw an error as this is not directly supported
+        // In JIT mode, memory allocation would need to be handled by the JIT runtime
+        // This would require coordination with the memory sandbox mechanism
+        // TODO: Implement proper memory allocation that works with JIT sandbox
+        logger.error("sbrk not implemented in JIT mode")
         throw VMError.invalidInstructionMemoryAccess
     }
 
@@ -187,7 +219,8 @@ final class VMStateJIT: VMState, @unchecked Sendable {
     // Execution Control
 
     func withExecutingInst<R>(_ block: () throws -> R) rethrows -> R {
-        // Execute the block
+        // In JIT mode, most execution happens in compiled code
+        // This is mainly for compatibility with the VMState protocol
         try block()
     }
 }
