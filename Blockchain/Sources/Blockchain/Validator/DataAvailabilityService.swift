@@ -147,7 +147,6 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         let dataLength = DataLength(UInt32(serializedData.count))
 
         // Calculate the erasure root
-        // TODO: replace this with real implementation
         // Work-package bundle shard hash
         let bundleShards = try ErasureCoding.chunk(
             data: serializedData,
@@ -170,7 +169,6 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         }
 
         // Calculate the segments root
-        // TODO: replace this with real implementation
         let segmentsRoot = Merklization.constantDepthMerklize(segments.map(\.data))
 
         var nodes = [Data]()
@@ -269,7 +267,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         // Generate request ID
         let requestId = try JamEncoder.encode(erasureRoot, shardIndex).blake2b256hash()
         do {
-            // Fetch shard data from local storage
+            // TODO: Fetch shard data from local storage
             let (bundleShard, segmentShards) = (Data(), [Data()])
 
             // Generate Merkle proof justification
@@ -313,6 +311,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             hasher: Blake2b256.self
         )
 
+        // TODO: Got Justification
         switch merklePath.count {
         case 1:
             // 0 ++ Hash
