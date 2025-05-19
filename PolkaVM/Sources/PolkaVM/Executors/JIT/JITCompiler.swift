@@ -42,7 +42,7 @@ final class JITCompiler {
         }
 
         // Buffer for the output function pointer
-        var compiledFuncPtr: UnsafeMutableRawPointer? = nil
+        var compiledFuncPtr: UnsafeMutableRawPointer?
 
         var resultCode: Int32 = 0
 
