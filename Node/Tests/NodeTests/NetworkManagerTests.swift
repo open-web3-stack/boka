@@ -397,20 +397,13 @@ struct NetworkManagerTests {
         let message = try ShardDistributionMessage.decode(data: distributionMessage.encode(), config: services.config)
         #expect(shardIndex == message.shardIndex)
 
-        _ = try await network.handler.handle(ceRequest: distributionMessage)
-
         let events = await storeMiddleware.wait()
 
-        let receivedEvent = events.first {
-            if let event = $0 as? RuntimeEvents.ShardDistributionReceived {
-                return event.erasureRoot == erasureRoot && event.shardIndex == shardIndex
-            }
-            return false
-        } as? RuntimeEvents.ShardDistributionReceived
+        _ = await services.dataAvailabilityService
 
-        let event = try #require(receivedEvent)
-        #expect(event.erasureRoot == erasureRoot)
-        #expect(event.shardIndex == shardIndex)
+        await #expect(throws: Error.self) {
+            _ = try await network.handler.handle(ceRequest: distributionMessage)
+        }
     }
 
     @Test
