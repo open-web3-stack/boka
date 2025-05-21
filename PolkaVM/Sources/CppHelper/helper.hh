@@ -6,9 +6,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <asmjit/asmjit.h>
-#include <asmjit/a64.h>
-
-#include "registers.hh"
 
 // JIT instruction generation interface
 // This is the C++ implementation of the JITInstructionGenerator protocol
