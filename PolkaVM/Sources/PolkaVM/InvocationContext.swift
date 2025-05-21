@@ -1,4 +1,4 @@
-public protocol InvocationContext<ContextType>: Sendable {
+public protocol InvocationContext<ContextType> {
     associatedtype ContextType
 
     /// Items required for the invocation, some items inside this context might be mutated after the host-call

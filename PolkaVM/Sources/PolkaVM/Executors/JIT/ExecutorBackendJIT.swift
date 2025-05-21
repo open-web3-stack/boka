@@ -190,9 +190,12 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     let semaphore = DispatchSemaphore(value: 0)
                     var asyncResult: ExecOutcome?
 
+                    // TODO: consider make InvocationContext Sendable
+                    let boxedCtx = UncheckedSendableBox(invocationContext)
+
                     // Kick off the async operation but wait for it to complete
                     Task {
-                        asyncResult = await invocationContext.dispatch(index: hostCallIndex, state: vmState)
+                        asyncResult = await boxedCtx.value.dispatch(index: hostCallIndex, state: vmState)
                         semaphore.signal()
                     }
 

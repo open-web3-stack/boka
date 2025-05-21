@@ -1,3 +1,5 @@
+#pragma once
+
 #include <asmjit/asmjit.h>
 #include <asmjit/a64.h>
 
@@ -8,7 +10,7 @@
 namespace x64_reg {
     // VM state registers
     constexpr int VM_GLOBAL_STATE_PTR = 0;  // r15 - VM global state pointer
-    
+
     // Guest VM registers
     constexpr int GUEST_REG0 = 1;           // rax
     constexpr int GUEST_REG1 = 2;           // rdx
@@ -23,7 +25,7 @@ namespace x64_reg {
     constexpr int GUEST_REG10 = 11;         // r12
     constexpr int GUEST_REG11 = 12;         // r13
     constexpr int GUEST_REG12 = 13;         // r14
-    
+
     // Temporary register used by the recompiler
     constexpr int TEMP_REG = 14;            // rcx
 }
@@ -32,7 +34,7 @@ namespace x64_reg {
 namespace a64_reg {
     // VM state registers
     constexpr int VM_GLOBAL_STATE_PTR = 0;  // x28 - VM global state pointer
-    
+
     // Guest VM registers
     constexpr int GUEST_REG0 = 1;           // x0
     constexpr int GUEST_REG1 = 2;           // x1
@@ -50,7 +52,7 @@ namespace a64_reg {
     constexpr int GUEST_REG13 = 14;         // x20
     constexpr int GUEST_REG14 = 15;         // x21
     constexpr int GUEST_REG15 = 16;         // x22
-    
+
     // Temporary register used by the recompiler
     constexpr int TEMP_REG = 17;            // x8
 }
