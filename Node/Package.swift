@@ -22,7 +22,7 @@ let package = Package(
         .package(path: "../TracingUtils"),
         .package(path: "../Utils"),
         .package(path: "../Database"),
-        .package(url: "https://github.com/apple/swift-testing.git", branch: "6.0.3"),
+        .package(url: "https://github.com/apple/swift-testing.git", branch: "6.0.0"),
         .package(url: "https://github.com/gh123man/Async-Channels.git", from: "1.0.2"),
     ],
     targets: [

@@ -19,6 +19,9 @@ public enum DataAvailabilityError: Error {
     case invalidWorkReportSlot
     case invalidWorkReport
     case insufficientSignatures
+    case invalidMerklePath
+    case emptySegmentShards
+    case invalidJustificationFormat
 }
 
 public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, OnSyncCompleted {
@@ -47,10 +50,19 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         await subscribe(RuntimeEvents.WorkReportReceived.self, id: "DataAvailabilityService.WorkReportReceived") { [weak self] event in
             await self?.handleWorkReportReceived(event)
         }
+        await subscribe(RuntimeEvents.ShardDistributionReceived.self,
+                        id: "DataAvailabilityService.ShardDistributionReceived")
+        { [weak self] event in
+            await self?.handleShardDistributionReceived(event)
+        }
     }
 
     public func handleWorkReportReceived(_ event: RuntimeEvents.WorkReportReceived) async {
         await workReportDistribution(workReport: event.workReport, slot: event.slot, signatures: event.signatures)
+    }
+
+    public func handleShardDistributionReceived(_ event: RuntimeEvents.ShardDistributionReceived) async {
+        try? await shardDistribution(erasureRoot: event.erasureRoot, shardIndex: event.shardIndex)
     }
 
     /// Purge old data from the data availability stores
@@ -130,21 +142,18 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     /// - Parameter bundle: The bundle to export
     /// - Returns: The erasure root and length of the bundle
     public func exportWorkpackageBundle(bundle: WorkPackageBundle) async throws -> (erasureRoot: Data32, length: DataLength) {
-        // 1. Serialize the bundle
+        // Serialize the bundle
         let serializedData = try JamEncoder.encode(bundle)
         let dataLength = DataLength(UInt32(serializedData.count))
 
-        // 2. Calculate the erasure root
-        // TODO: replace this with real implementation
-        let erasureRoot = serializedData.blake2b256hash()
-
-        // 3. Extract the work package hash from the bundle
-        let workPackageHash = bundle.workPackage.hash()
-
-        // 4. Store the serialized bundle in the audit store (short-term storage)
-
-        // chunk the bundle into segments
-
+        // Calculate the erasure root
+        // Work-package bundle shard hash
+        let bundleShards = try ErasureCoding.chunk(
+            data: serializedData,
+            basicSize: config.value.erasureCodedPieceSize,
+            recoveryCount: config.value.totalNumberOfValidators
+        )
+        // Chunk the bundle into segments
         let segmentCount = serializedData.count / 4104
         var segments = [Data4104]()
         for i in 0 ..< segmentCount {
@@ -159,19 +168,32 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             segments.append(Data4104(segment)!)
         }
 
+        // Calculate the segments root
+        let segmentsRoot = Merklization.constantDepthMerklize(segments.map(\.data))
+
+        var nodes = [Data]()
+        // workpackage bundle shard hash + segment shard root
+        for i in 0 ..< bundleShards.count {
+            let shardHash = bundleShards[i].blake2b256hash()
+            try nodes.append(JamEncoder.encode(shardHash) + JamEncoder.encode(segmentsRoot))
+        }
+
+        // ErasureRoot
+        let erasureRoot = Merklization.binaryMerklize(nodes)
+
+        // Extract the work package hash from the bundle
+        let workPackageHash = bundle.workPackage.hash()
+
+        // Store the serialized bundle in the audit store (short-term storage)
         // Store the segment in the data store
         for (i, segment) in segments.enumerated() {
             try await dataStore.set(data: segment, erasureRoot: erasureRoot, index: UInt16(i))
         }
 
-        // 5. Calculate the segments root
-        // TODO: replace this with real implementation
-        let segmentsRoot = serializedData.blake2b256hash()
-
-        // 6. Map the work package hash to the segments root
+        // Map the work package hash to the segments root
         try await dataStore.setSegmentRoot(segmentRoot: segmentsRoot, forWorkPackageHash: workPackageHash)
 
-        // 7. Set the timestamp for retention tracking
+        // Set the timestamp for retention tracking
         // As per GP 14.3.1, items in the audit store are kept until finality (approx. 1 hour)
         let currentTimestamp = Date()
         try await dataStore.setTimestamp(erasureRoot: erasureRoot, timestamp: currentTimestamp)
@@ -238,23 +260,79 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
     // MARK: - Shard Distribution (CE 137)
 
-    /// Distribute shards to validators
-    /// - Parameters:
-    ///   - shards: The shards to distribute
-    ///   - erasureRoot: The erasure root of the data
-    ///   - validators: The validators to distribute to
-    /// - Returns: Success status of the distribution
-    public func distributeShards(
-        shards _: [Data4104],
+    public func shardDistribution(
+        erasureRoot: Data32,
+        shardIndex: UInt16
+    ) async throws {
+        // Generate request ID
+        let requestId = try JamEncoder.encode(erasureRoot, shardIndex).blake2b256hash()
+        do {
+            // TODO: Fetch shard data from local storage
+            let (bundleShard, segmentShards) = (Data(), [Data()])
+
+            // Generate Merkle proof justification
+            let justification = try await generateJustification(
+                erasureRoot: erasureRoot,
+                shardIndex: shardIndex,
+                bundleShard: bundleShard,
+                segmentShards: segmentShards
+            )
+
+            // Respond with shards + proof
+            publish(RuntimeEvents.ShardDistributionReceivedResponse(
+                requestId: requestId,
+                bundleShard: bundleShard,
+                segmentShards: segmentShards,
+                justification: justification
+            ))
+
+        } catch {
+            publish(RuntimeEvents.ShardDistributionReceivedResponse(
+                requestId: requestId,
+                error: error
+            ))
+        }
+    }
+
+    private func generateJustification(
         erasureRoot _: Data32,
-        validators _: [ValidatorIndex]
-    ) async throws -> Bool {
-        // TODO: Implement shard distribution to validators
-        // 1. Determine which shards go to which validators
-        // 2. Send shards to validators over the network
-        // 3. Track distribution status
-        // 4. Return success status
-        throw DataAvailabilityError.distributionError
+        shardIndex: UInt16,
+        bundleShard _: Data,
+        segmentShards: [Data]
+    ) async throws -> Justification {
+        guard !segmentShards.isEmpty else {
+            throw DataAvailabilityError.emptySegmentShards
+        }
+
+        // GP T(s,i,H)
+        let merklePath = Merklization.trace(
+            segmentShards,
+            index: Int(shardIndex),
+            hasher: Blake2b256.self
+        )
+
+        // TODO: Got Justification
+        switch merklePath.count {
+        case 1:
+            // 0 ++ Hash
+            guard case let .right(hash) = merklePath.first! else {
+                throw DataAvailabilityError.invalidMerklePath
+            }
+            return .singleHash(hash)
+
+        case 2:
+            // 1 ++ Hash ++ Hash
+            guard case let .right(hash1) = merklePath[0],
+                  case let .right(hash2) = merklePath[1]
+            else {
+                throw DataAvailabilityError.invalidMerklePath
+            }
+            return .doubleHash(hash1, hash2)
+
+        default:
+            // TODO: 2 ++ Segment Shard (12 bytes)
+            return .segmentShard(Data12())
+        }
     }
 
     // MARK: - Audit Shard Requests (CE 138)

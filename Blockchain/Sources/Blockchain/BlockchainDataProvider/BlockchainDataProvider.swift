@@ -172,8 +172,12 @@ extension BlockchainDataProvider {
 
     public func remove(hash: Data32) async throws {
         logger.debug("removing block: \(hash)")
-
         try await dataProvider.remove(hash: hash)
+    }
+
+    public func remove(workReportHash: Data32) async throws {
+        logger.debug("removing workReportHash: \(workReportHash)")
+        try await dataProvider.remove(workReportHash: workReportHash)
     }
 
     public nonisolated var genesisBlockHash: Data32 {

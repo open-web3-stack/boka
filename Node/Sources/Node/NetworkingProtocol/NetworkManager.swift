@@ -412,9 +412,7 @@ struct HandlerImpl: NetworkProtocolHandler {
             let resp = try await blockchain.waitFor(RuntimeEvents.WorkReportReceivedResponse.self) { event in
                 hash == event.workReportHash
             }
-            if case let .failure(error) = resp.result {
-                throw error // failed
-            }
+            _ = try resp.result.get()
             return []
         case let .workReportRequest(message):
             let workReportRef = try await blockchain.dataProvider.getGuaranteedWorkReport(hash: message.workReportHash)
@@ -423,13 +421,16 @@ struct HandlerImpl: NetworkProtocolHandler {
             }
             return []
         case let .shardDistribution(message):
-            blockchain
-                .publish(event: RuntimeEvents.ShardDistributionReceived(erasureRoot: message.erasureRoot, shardIndex: message.shardIndex))
-            // TODO: waitfor ShardDistributionReceivedResponse
-            // let resp = try await blockchain.waitFor(RuntimeEvents.ShardDistributionReceivedResponse.self) { event in
-            //
-            // }
-            return []
+            let receivedEvent = RuntimeEvents.ShardDistributionReceived(erasureRoot: message.erasureRoot, shardIndex: message.shardIndex)
+            let requestId = try receivedEvent.generateRequestId()
+
+            blockchain.publish(event: receivedEvent)
+
+            let resp = try await blockchain.waitFor(RuntimeEvents.ShardDistributionReceivedResponse.self) { event in
+                requestId == event.requestId
+            }
+            let (bundleShard, segmentShards, justification) = try resp.result.get()
+            return try [JamEncoder.encode(bundleShard, segmentShards, justification)]
         case let .auditShardRequest(message):
             blockchain
                 .publish(event: RuntimeEvents.AuditShardRequestReceived(erasureRoot: message.erasureRoot, shardIndex: message.shardIndex))
