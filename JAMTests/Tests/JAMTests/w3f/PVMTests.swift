@@ -85,7 +85,7 @@ struct PVMTests {
             pageMap: testCase.initialPageMap.map { (address: $0.address, length: $0.length, writable: $0.isWritable) },
             chunks: testCase.initialMemory.map { (address: $0.address, data: Data($0.contents)) }
         )
-        let vmState = VMState(
+        let vmState = VMStateInterpreter(
             program: program,
             pc: testCase.initialPC,
             registers: Registers(testCase.initialRegs),

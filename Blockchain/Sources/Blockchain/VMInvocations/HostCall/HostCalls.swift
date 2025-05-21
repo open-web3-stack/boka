@@ -1116,7 +1116,13 @@ public class Invoke: HostCall {
         }
 
         let program = try ProgramCode(innerPvm.code)
-        let vm = VMState(program: program, pc: innerPvm.pc, registers: Registers(registers), gas: Gas(gas), memory: innerPvm.memory)
+        let vm = VMStateInterpreter(
+            program: program,
+            pc: innerPvm.pc,
+            registers: Registers(registers),
+            gas: Gas(gas),
+            memory: innerPvm.memory
+        )
         let engine = Engine(config: DefaultPvmConfig())
         let exitReason = await engine.execute(state: vm)
 

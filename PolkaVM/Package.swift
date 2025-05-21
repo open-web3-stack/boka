@@ -57,7 +57,10 @@ let package = Package(
         .target(
             name: "asmjit",
             sources: ["src/asmjit"],
-            publicHeadersPath: "src"
+            publicHeadersPath: "src",
+            cxxSettings: [
+                .unsafeFlags(["-Wno-incomplete-umbrella"]),
+            ]
         ),
     ],
     swiftLanguageModes: [.version("6")]
