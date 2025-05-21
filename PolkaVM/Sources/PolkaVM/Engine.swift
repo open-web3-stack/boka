@@ -13,7 +13,7 @@ public class Engine {
         self.invocationContext = invocationContext
     }
 
-    public func execute(state: VMState) async -> ExitReason {
+    public func execute(state: any VMState) async -> ExitReason {
         let context = ExecutionContext(state: state, config: config)
         while true {
             guard state.getGas() > GasInt(0) else {
@@ -32,7 +32,7 @@ public class Engine {
         }
     }
 
-    func hostCall(state: VMState, callIndex: UInt32) async -> ExecOutcome {
+    func hostCall(state: any VMState, callIndex: UInt32) async -> ExecOutcome {
         guard let invocationContext else {
             return .exit(.panic(.trap))
         }

@@ -4,7 +4,7 @@ import TracingUtils
 
 private let logger = Logger(label: "AccumulateContext")
 
-public class AccumulateContext: InvocationContext {
+public final class AccumulateContext: InvocationContext {
     public class AccumulateContextType {
         var x: AccumlateResultContext
         var y: AccumlateResultContext // only set in checkpoint host-call

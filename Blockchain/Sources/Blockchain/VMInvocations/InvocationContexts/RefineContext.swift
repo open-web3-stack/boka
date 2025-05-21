@@ -11,7 +11,7 @@ public struct InnerPvm {
     public var pc: UInt32
 }
 
-public class RefineContext: InvocationContext {
+public final class RefineContext: InvocationContext {
     public class RefineContextType {
         var pvms: [UInt64: InnerPvm]
         var exports: [Data4104]

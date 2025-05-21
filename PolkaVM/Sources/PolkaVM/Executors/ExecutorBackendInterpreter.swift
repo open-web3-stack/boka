@@ -14,7 +14,7 @@ final class ExecutorBackendInterpreter: ExecutorBackend {
         ctx: (any InvocationContext)?
     ) async -> ExitReason {
         do {
-            let state = try VMState(standardProgramBlob: blob, pc: pc, gas: gas, argumentData: argumentData)
+            let state = try VMStateInterpreter(standardProgramBlob: blob, pc: pc, gas: gas, argumentData: argumentData)
             let engine = Engine(config: config, invocationContext: ctx)
             return await engine.execute(state: state)
         } catch {

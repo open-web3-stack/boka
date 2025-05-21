@@ -4,7 +4,7 @@ import TracingUtils
 
 private let logger = Logger(label: "IsAuthorizedContext")
 
-public class IsAuthorizedContext: InvocationContext {
+public final class IsAuthorizedContext: InvocationContext {
     public typealias ContextType = Void
 
     public var context: ContextType = ()
