@@ -81,9 +81,9 @@ final class NodeTests {
         // Verify block was produced
         #expect(newTimeslot > initialTimeslot)
         #expect(try await validatorNode.blockchain.dataProvider.hasBlock(hash: newBestHead.hash))
-        #expect(try await validatorNode.blockchain.dataProvider.getKeys(prefix: Data32(), count: 0, startKey: nil, blockHash: nil).isEmpty)
+        #expect(try await validatorNode.blockchain.dataProvider.getKeys(prefix: Data31(), count: 0, startKey: nil, blockHash: nil).isEmpty)
         await #expect(throws: StateBackendError.self) {
-            _ = try await validatorNode.blockchain.dataProvider.getStorage(key: Data32.random(), blockHash: nil)
+            _ = try await validatorNode.blockchain.dataProvider.getStorage(key: Data31.random(), blockHash: nil)
         }
         let guaranteedWorkReport = GuaranteedWorkReport.dummy(config: .dev)
         let hash = guaranteedWorkReport.workReport.hash()

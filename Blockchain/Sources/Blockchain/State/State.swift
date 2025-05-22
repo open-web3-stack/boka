@@ -232,7 +232,7 @@ public struct State: Sendable {
         }
     }
 
-    public func read(key: Data32) async throws -> Data? {
+    public func read(key: Data31) async throws -> Data? {
         let res = try layer[key].map { try JamEncoder.encode($0) }
         if let res {
             return res
