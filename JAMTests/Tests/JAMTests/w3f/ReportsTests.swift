@@ -21,13 +21,14 @@ struct ReportsTestcaseState: Codable, Equatable {
     >
     @CodingAs<SortedKeyValues<ServiceIndex, ServiceAccountDetails>> var services: [ServiceIndex: ServiceAccountDetails]
     // NOTE: we are not updating stats in guaranteeing STF
-    var coresStatistics: ConfigFixedSizeArray<CoreStatistics, ProtocolConfig.TotalNumberOfCores>
-    @CodingAs<SortedKeyValues<ServiceIndex, ServiceStatistics>> var servicesStatistics: [ServiceIndex: ServiceStatistics]
+    var coresStatistics: ConfigFixedSizeArray<Statistics.Core, ProtocolConfig.TotalNumberOfCores>
+    @CodingAs<SortedKeyValues<ServiceIndex, Statistics.Service>> var servicesStatistics: [ServiceIndex: Statistics.Service]
 }
 
 struct ReportsInput: Codable {
     var reports: ExtrinsicGuarantees
     var timeslot: TimeslotIndex
+    var knownPackages: [Data32]
 }
 
 struct ReportedPackage: Codable, Equatable {

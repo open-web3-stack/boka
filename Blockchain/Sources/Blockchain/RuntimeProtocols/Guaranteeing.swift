@@ -81,7 +81,7 @@ extension Guaranteeing {
 
     public func requiredStorageKeys(extrinsic: ExtrinsicGuarantees) -> [any StateKey] {
         extrinsic.guarantees
-            .flatMap(\.workReport.results)
+            .flatMap(\.workReport.digests)
             .map { StateKeys.ServiceAccountKey(index: $0.serviceIndex) }
     }
 
@@ -163,20 +163,20 @@ extension Guaranteeing {
                 throw .invalidReportAuthorizer
             }
 
-            for result in report.results {
-                guard let acc = serviceAccount(index: result.serviceIndex) else {
+            for digest in report.digests {
+                guard let acc = serviceAccount(index: digest.serviceIndex) else {
                     throw .invalidServiceIndex
                 }
 
-                guard acc.codeHash == result.codeHash else {
+                guard acc.codeHash == digest.codeHash else {
                     throw .invalidResultCodeHash
                 }
 
-                guard result.gasRatio >= acc.minAccumlateGas else {
+                guard digest.gasLimit >= acc.minAccumlateGas else {
                     throw .invalidServiceGas
                 }
 
-                totalGasUsage += result.gasRatio
+                totalGasUsage += digest.gasLimit
             }
 
             guard totalGasUsage <= config.value.workReportAccumulationGas else {

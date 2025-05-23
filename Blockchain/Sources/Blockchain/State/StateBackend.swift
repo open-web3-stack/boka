@@ -38,7 +38,7 @@ public final class StateBackend: Sendable {
         throw StateBackendError.missingState(key: key)
     }
 
-    public func getKeys(_ prefix: Data32, _ startKey: Data32?, _ limit: UInt32?) async throws -> [(key: Data, value: Data)] {
+    public func getKeys(_ prefix: Data31, _ startKey: Data31?, _ limit: UInt32?) async throws -> [(key: Data, value: Data)] {
         try await impl.readAll(prefix: prefix.data, startKey: startKey?.data, limit: limit)
     }
 
@@ -51,16 +51,16 @@ public final class StateBackend: Sendable {
         return ret
     }
 
-    public func write(_ values: any Sequence<(key: Data32, value: (Codable & Sendable)?)>) async throws {
+    public func write(_ values: any Sequence<(key: Data31, value: (Codable & Sendable)?)>) async throws {
         try await trie.update(values.map { try (key: $0.key, value: $0.value.map { try JamEncoder.encode($0) }) })
         try await trie.save()
     }
 
-    public func readRaw(_ key: Data32) async throws -> Data? {
+    public func readRaw(_ key: Data31) async throws -> Data? {
         try await trie.read(key: key)
     }
 
-    public func writeRaw(_ values: [(key: Data32, value: Data?)]) async throws {
+    public func writeRaw(_ values: [(key: Data31, value: Data?)]) async throws {
         try await trie.update(values)
         try await trie.save()
     }

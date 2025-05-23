@@ -25,7 +25,7 @@ final class StateHandlersTests {
         let hashHex = await dataProvider.bestHead.hash.toHexString()
         let params = JSON.array(
             [
-                .string(hashHex),
+                .string(String(hashHex.prefix(62))),
                 .init(integerLiteral: 10),
                 .null,
                 .null,
@@ -45,7 +45,7 @@ final class StateHandlersTests {
     @Test func getStorage() async throws {
         try await setUp()
         let hashHex = await dataProvider.bestHead.hash.toHexString()
-        let params = JSON.array([.string(hashHex)])
+        let params = JSON.array([.string(String(hashHex.prefix(62)))])
         let req = JSONRequest(jsonrpc: "2.0", method: "state_getStorage", params: params, id: 2)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)

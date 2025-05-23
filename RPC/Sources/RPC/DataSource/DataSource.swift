@@ -14,12 +14,12 @@ public protocol SystemDataSource: Sendable {
 public protocol ChainDataSource: Sendable {
     func getBestBlock() async throws -> BlockRef
     func getBlock(hash: Data32) async throws -> BlockRef?
-    func getState(blockHash: Data32, key: Data32) async throws -> Data?
+    func getState(blockHash: Data32, key: Data31) async throws -> Data?
     func getBlockHash(byTimeslot timeslot: TimeslotIndex) async throws -> Set<Data32>
     func getHeader(hash: Data32) async throws -> HeaderRef?
     func getFinalizedHead() async throws -> Data32?
-    func getKeys(prefix: Data32, count: UInt32, startKey: Data32?, blockHash: Data32?) async throws -> [String]
-    func getStorage(key: Data32, blockHash: Data32?) async throws -> [String]
+    func getKeys(prefix: Data31, count: UInt32, startKey: Data31?, blockHash: Data32?) async throws -> [String]
+    func getStorage(key: Data31, blockHash: Data32?) async throws -> [String]
 }
 
 public protocol BuilderDataSource: Sendable {

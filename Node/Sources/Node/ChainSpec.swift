@@ -83,10 +83,10 @@ public struct ChainSpec: Codable, Equatable {
         try JamDecoder.decode(BlockRef.self, from: block, withConfig: getConfig())
     }
 
-    public func getState() throws -> [Data32: Data] {
-        var output: [Data32: Data] = [:]
+    public func getState() throws -> [Data31: Data] {
+        var output: [Data31: Data] = [:]
         for (key, value) in state {
-            try output[Data32(fromHexString: key).unwrap()] = value
+            try output[Data31(fromHexString: key).unwrap()] = value
         }
         return output
     }

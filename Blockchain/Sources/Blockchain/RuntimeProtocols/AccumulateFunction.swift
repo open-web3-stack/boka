@@ -2,7 +2,7 @@ import Foundation
 import Utils
 
 // wrangled operand tuple
-public struct AccumulateArguments: Codable {
+public struct OperandTuple: Codable {
     /// h
     public var packageHash: Data32
     /// e
@@ -10,11 +10,13 @@ public struct AccumulateArguments: Codable {
     /// a
     public var authorizerHash: Data32
     /// o
-    public var authorizationOutput: Data
+    public var authorizerTrace: Data
     /// y
     public var payloadHash: Data32
+    /// g
+    public var gasLimit: Gas
     /// d
-    public var workOutput: WorkOutput
+    public var workResult: WorkResult
 }
 
 public struct DeferredTransfers: Codable {
@@ -58,12 +60,15 @@ public struct AccumulateState {
     /// x
     public var privilegedServices: PrivilegedServices
 
+    public var entropy: Data32 // eta'_0
+
     public func copy() -> AccumulateState {
         AccumulateState(
             accounts: ServiceAccountsMutRef(accounts.value),
             validatorQueue: validatorQueue,
             authorizationQueue: authorizationQueue,
-            privilegedServices: privilegedServices
+            privilegedServices: privilegedServices,
+            entropy: entropy
         )
     }
 }
@@ -80,6 +85,9 @@ public class AccumlateResultContext {
     public var transfers: [DeferredTransfers]
     /// y
     public var yield: Data32?
+    /// p
+    public var provide: Set<ServicePreimagePair>
+
     public var accountChanges: AccountChanges
 
     public init(
@@ -92,6 +100,7 @@ public class AccumlateResultContext {
         self.nextAccountIndex = nextAccountIndex
         transfers = []
         yield = nil
+        provide = []
         accountChanges = AccountChanges()
     }
 }

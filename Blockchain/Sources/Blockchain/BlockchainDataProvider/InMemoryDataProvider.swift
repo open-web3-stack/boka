@@ -35,7 +35,7 @@ extension InMemoryDataProvider: BlockchainDataProviderProtocol {
         guaranteedWorkReports[guaranteedWorkReport.value.workReport.hash()] = guaranteedWorkReport
     }
 
-    public func getKeys(prefix: Data32, count: UInt32, startKey: Data32?, blockHash: Data32?) async throws -> [String] {
+    public func getKeys(prefix: Data31, count: UInt32, startKey: Data31?, blockHash: Data32?) async throws -> [String] {
         guard let stateRef = try getState(hash: blockHash ?? genesisBlockHash) else {
             return []
         }
@@ -43,7 +43,7 @@ extension InMemoryDataProvider: BlockchainDataProviderProtocol {
         return try await stateRef.value.backend.getKeys(prefix, startKey, count).map { $0.key.toHexString() }
     }
 
-    public func getStorage(key: Data32, blockHash: Data32?) async throws -> [String] {
+    public func getStorage(key: Data31, blockHash: Data32?) async throws -> [String] {
         guard let stateRef = try getState(hash: blockHash ?? genesisBlockHash) else {
             return []
         }

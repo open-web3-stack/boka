@@ -11,7 +11,7 @@ public func refine(
     /// The work package
     workPackage: WorkPackage,
     /// The output of the authorizer
-    authorizerOutput: Data,
+    authorizerTrace: Data,
     /// all work items's import segments
     importSegments: [[Data4104]],
     /// Export segment offset
@@ -36,12 +36,11 @@ public func refine(
 
     let codeBlob = try CodeAndMeta(data: preimage).codeBlob
 
-    let argumentData = try await JamEncoder.encode(
+    let argumentData = try JamEncoder.encode(
+        workItemIndex,
         service,
         workItem.payloadBlob,
         workPackage.hash(),
-        workPackage.context,
-        workPackage.authorizer(serviceAccounts: serviceAccounts)
     )
 
     let ctx = RefineContext(
@@ -52,7 +51,8 @@ public func refine(
         service: service,
         serviceAccounts: serviceAccounts,
         workPackage: workPackage,
-        authorizerOutput: authorizerOutput
+        workItemIndex: workItemIndex,
+        authorizerTrace: authorizerTrace
     )
 
     let (exitReason, gasUsed, output) = await invokePVM(

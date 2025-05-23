@@ -16,13 +16,13 @@ public final class DummyNodeDataSource: Sendable {
 }
 
 extension DummyNodeDataSource: ChainDataSource {
-    public func getKeys(prefix _: Data32, count _: UInt32, startKey _: Data32?, blockHash _: Data32?) async throws
+    public func getKeys(prefix _: Data31, count _: UInt32, startKey _: Data31?, blockHash _: Data32?) async throws
         -> [String]
     {
         ["key1", "key2", "key3"]
     }
 
-    public func getStorage(key _: Data32, blockHash _: Data32?) async throws -> [String] {
+    public func getStorage(key _: Data31, blockHash _: Data32?) async throws -> [String] {
         ["value1", "value2"]
     }
 
@@ -38,7 +38,7 @@ extension DummyNodeDataSource: ChainDataSource {
         try await chainDataProvider.getBlock(hash: hash)
     }
 
-    public func getState(blockHash: Data32, key: Data32) async throws -> Data? {
+    public func getState(blockHash: Data32, key: Data31) async throws -> Data? {
         let state = try await chainDataProvider.getState(hash: blockHash)
         return try await state.value.read(key: key)
     }

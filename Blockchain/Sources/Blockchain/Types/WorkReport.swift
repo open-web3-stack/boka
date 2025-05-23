@@ -10,20 +10,20 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
     public var refinementContext: RefinementContext
 
     // c: the core-index
-    public var coreIndex: CoreIndex
+    public var coreIndex: UInt
 
     // a: authorizer hash
     public var authorizerHash: Data32
 
-    // o: authorization output
-    public var authorizationOutput: Data
+    // o: authorizer trace
+    public var authorizerTrace: Data
 
     // l: segment-root lookup dictionary
     @CodingAs<SortedKeyValues<Data32, Data32>> public var lookup: [Data32: Data32]
 
     // r: the results of the evaluation of each of the items in the package
-    public var results: ConfigLimitedSizeArray<
-        WorkResult,
+    public var digests: ConfigLimitedSizeArray<
+        WorkDigest,
         ProtocolConfig.Int1,
         ProtocolConfig.MaxWorkItems
     >
@@ -33,21 +33,21 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
 
     public init(
         authorizerHash: Data32,
-        coreIndex: CoreIndex,
-        authorizationOutput: Data,
+        coreIndex: UInt,
+        authorizerTrace: Data,
         refinementContext: RefinementContext,
         packageSpecification: AvailabilitySpecifications,
         lookup: [Data32: Data32],
-        results: ConfigLimitedSizeArray<WorkResult, ProtocolConfig.Int1, ProtocolConfig.MaxWorkItems>,
+        digests: ConfigLimitedSizeArray<WorkDigest, ProtocolConfig.Int1, ProtocolConfig.MaxWorkItems>,
         authGasUsed: UInt
     ) {
         self.authorizerHash = authorizerHash
         self.coreIndex = coreIndex
-        self.authorizationOutput = authorizationOutput
+        self.authorizerTrace = authorizerTrace
         self.refinementContext = refinementContext
         self.packageSpecification = packageSpecification
         self.lookup = lookup
-        self.results = results
+        self.digests = digests
         self.authGasUsed = authGasUsed
     }
 }
@@ -58,11 +58,11 @@ extension WorkReport: Dummy {
         WorkReport(
             authorizerHash: Data32(),
             coreIndex: 0,
-            authorizationOutput: Data(),
+            authorizerTrace: Data(),
             refinementContext: RefinementContext.dummy(config: config),
             packageSpecification: AvailabilitySpecifications.dummy(config: config),
             lookup: [:],
-            results: try! ConfigLimitedSizeArray(config: config, defaultValue: WorkResult.dummy(config: config)),
+            digests: try! ConfigLimitedSizeArray(config: config, defaultValue: WorkDigest.dummy(config: config)),
             authGasUsed: 0
         )
     }
@@ -85,8 +85,8 @@ extension WorkReport: Validate {
         guard refinementContext.prerequisiteWorkPackages.count + lookup.count <= config.value.maxDepsInWorkReport else {
             throw .tooManyDependencies
         }
-        let resultOutputSize = results.compactMap { result in try? result.output.result.get() }.reduce(0) { $0 + $1.count }
-        guard authorizationOutput.count + resultOutputSize <= config.value.maxWorkReportOutputSize else {
+        let resultBlobSize = digests.compactMap { digest in try? digest.result.result.get() }.reduce(0) { $0 + $1.count }
+        guard authorizerTrace.count + resultBlobSize <= config.value.maxWorkReportBlobSize else {
             throw .tooBig
         }
         guard coreIndex < UInt32(config.value.totalNumberOfCores) else {

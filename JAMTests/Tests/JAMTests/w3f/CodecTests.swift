@@ -117,14 +117,14 @@ struct CodecTests {
                 ].json
             }.json
         }
-        if value is WorkResult {
+        if value is WorkDigest {
             return [
                 "code_hash": json["codeHash"]!,
-                "accumulate_gas": json["gasRatio"]!,
+                "accumulate_gas": json["gasLimit"]!,
                 "payload_hash": json["payloadHash"]!,
                 "service_id": json["serviceIndex"]!,
-                "result": json["output"]!["success"] == nil ? json["output"]! : [
-                    "ok": json["output"]!["success"]!,
+                "result": json["result"]!["success"] == nil ? json["result"]! : [
+                    "ok": json["result"]!["success"]!,
                 ].json,
                 "refine_load": [
                     "gas_used": json["gasUsed"]!,
@@ -154,7 +154,7 @@ struct CodecTests {
                         "len": item["length"]!,
                     ].json
                 }.json,
-                "export_count": json["outputDataSegmentsCount"]!,
+                "export_count": json["exportsCount"]!,
             ].json
         }
         if let value = value as? WorkPackage {
@@ -163,7 +163,7 @@ struct CodecTests {
                 "auth_code_host": json["authorizationServiceIndex"]!,
                 "authorizer": [
                     "code_hash": json["authorizationCodeHash"]!,
-                    "params": json["parameterizationBlob"]!,
+                    "params": json["configurationBlob"]!,
                 ].json,
                 "context": transform(json["context"]!, value: value.context),
                 "items": transform(json["workItems"]!, value: value.workItems),
@@ -175,8 +175,8 @@ struct CodecTests {
                 "context": transform(json["refinementContext"]!, value: value.refinementContext),
                 "core_index": json["coreIndex"]!,
                 "authorizer_hash": json["authorizerHash"]!,
-                "auth_output": json["authorizationOutput"]!,
-                "results": transform(json["results"]!, value: value.results),
+                "auth_output": json["authorizerTrace"]!,
+                "results": transform(json["digests"]!, value: value.digests),
                 "segment_root_lookup": transform(json["lookup"]!, value: value.lookup),
                 "auth_gas_used": json["authGasUsed"]!,
             ].json
@@ -331,13 +331,13 @@ struct CodecTests {
 
     @Test
     func work_result_0() throws {
-        let (actual, expected) = try Self.test(WorkResult.self, path: "work_result_0")
+        let (actual, expected) = try Self.test(WorkDigest.self, path: "work_result_0")
         #expect(actual == expected)
     }
 
     @Test
     func work_result_1() throws {
-        let (actual, expected) = try Self.test(WorkResult.self, path: "work_result_1")
+        let (actual, expected) = try Self.test(WorkDigest.self, path: "work_result_1")
         #expect(actual == expected)
     }
 }

@@ -28,6 +28,8 @@ private struct AccountsMapEntry: Codable, Equatable {
 
 private struct PreimagesState: Equatable, Codable, Preimages {
     var accounts: [AccountsMapEntry] = []
+    // NOTE: we are not using/updating stats in preimage stf, may need to check
+    var serviceStatistics: [ServiceStatisticsMapEntry]
 
     func get(serviceAccount index: ServiceIndex, preimageHash hash: Data32) async throws -> Data? {
         for account in accounts where account.index == index {
@@ -100,6 +102,8 @@ struct PreimagesTests {
             switch testcase.output {
             case .none:
                 state.mergeWith(postState: postState)
+                // NOTE: we are not using/updating stats in preimage stf, may need to check
+                state.serviceStatistics = testcase.postState.serviceStatistics
                 #expect(state == testcase.postState)
             case .some:
                 Issue.record("Expected error, got \(result)")
