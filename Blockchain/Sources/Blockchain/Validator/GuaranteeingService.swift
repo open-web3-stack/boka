@@ -763,7 +763,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
 
         let workReport = try WorkReport(
             authorizerHash: authorizerHash,
-            coreIndex: coreIndex,
+            coreIndex: UInt(coreIndex),
             authorizerTrace: authorizerTrace,
             refinementContext: workPackage.value.context,
             packageSpecification: packageSpecification,

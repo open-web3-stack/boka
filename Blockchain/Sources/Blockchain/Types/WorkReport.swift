@@ -10,7 +10,7 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
     public var refinementContext: RefinementContext
 
     // c: the core-index
-    public var coreIndex: CoreIndex
+    public var coreIndex: UInt
 
     // a: authorizer hash
     public var authorizerHash: Data32
@@ -33,7 +33,7 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
 
     public init(
         authorizerHash: Data32,
-        coreIndex: CoreIndex,
+        coreIndex: UInt,
         authorizerTrace: Data,
         refinementContext: RefinementContext,
         packageSpecification: AvailabilitySpecifications,

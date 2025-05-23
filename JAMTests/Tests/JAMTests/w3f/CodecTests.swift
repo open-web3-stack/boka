@@ -123,8 +123,8 @@ struct CodecTests {
                 "accumulate_gas": json["gasLimit"]!,
                 "payload_hash": json["payloadHash"]!,
                 "service_id": json["serviceIndex"]!,
-                "result": json["output"]!["success"] == nil ? json["output"]! : [
-                    "ok": json["output"]!["success"]!,
+                "result": json["result"]!["success"] == nil ? json["result"]! : [
+                    "ok": json["result"]!["success"]!,
                 ].json,
                 "refine_load": [
                     "gas_used": json["gasUsed"]!,
@@ -176,7 +176,7 @@ struct CodecTests {
                 "core_index": json["coreIndex"]!,
                 "authorizer_hash": json["authorizerHash"]!,
                 "auth_output": json["authorizerTrace"]!,
-                "results": transform(json["results"]!, value: value.digests),
+                "results": transform(json["digests"]!, value: value.digests),
                 "segment_root_lookup": transform(json["lookup"]!, value: value.lookup),
                 "auth_gas_used": json["authGasUsed"]!,
             ].json

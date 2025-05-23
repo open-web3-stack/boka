@@ -96,6 +96,16 @@ extension ConfigLimitedSizeArray: RandomAccessCollection {
         }
     }
 
+    public subscript(position: UInt) -> T {
+        get {
+            array[Int(position)]
+        }
+        set {
+            array[Int(position)] = newValue
+            validate()
+        }
+    }
+
     public subscript(position: UInt32) -> T {
         get {
             array[Int(position)]
