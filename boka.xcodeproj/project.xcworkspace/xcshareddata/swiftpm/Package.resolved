@@ -1,5 +1,5 @@
 {
-  "originHash" : "29f4f0920a303b91d3ab3d9a73e42e497b83eeafb0e20a02a020e5dbbc9bd47c",
+  "originHash" : "b24bc350cefbc4a11375aec1aa77c5f0b7f73e4db0612fec8566457591c3980d",
   "pins" : [
     {
       "identity" : "async-channels",
@@ -301,7 +301,7 @@
     {
       "identity" : "swift-syntax",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-syntax.git",
+      "location" : "https://github.com/swiftlang/swift-syntax.git",
       "state" : {
         "revision" : "0687f71944021d616d34d922343dcef086855920",
         "version" : "600.0.1"
@@ -321,8 +321,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-testing.git",
       "state" : {
-        "branch" : "0.10.0",
-        "revision" : "69d59cfc76e5daf498ca61f5af409f594768eef9"
+        "branch" : "6.0.0",
+        "revision" : "9aa8076dff01b66bcff9335cde02380d59acacc0"
       }
     },
     {
@@ -330,8 +330,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/vapor.git",
       "state" : {
-        "revision" : "87b0edd2633c35de543cb7573efe5fbf456181bc",
-        "version" : "4.114.1"
+        "branch" : "4.107.0",
+        "revision" : "ec23f07eb2eda35f6f179a8c4607769287073f8d"
       }
     },
     {

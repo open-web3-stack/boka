@@ -1,7 +1,9 @@
 import Foundation
-import MsQuicSwift
-@testable import Networking
 import Testing
+import TracingUtils
+import Utils
+
+@testable import MsQuicSwift
 
 struct NetAddrTests {
     @Test
