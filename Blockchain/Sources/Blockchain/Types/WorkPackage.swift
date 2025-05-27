@@ -14,7 +14,7 @@ public struct WorkPackage: Comparable, Sendable, Equatable, Codable, Hashable {
     public var authorizationCodeHash: Data32
 
     // p
-    public var parameterizationBlob: Data
+    public var configurationBlob: Data
 
     // x
     public var context: RefinementContext
@@ -30,7 +30,7 @@ public struct WorkPackage: Comparable, Sendable, Equatable, Codable, Hashable {
         authorizationToken: Data,
         authorizationServiceIndex: ServiceIndex,
         authorizationCodeHash: Data32,
-        parameterizationBlob: Data,
+        configurationBlob: Data,
         context: RefinementContext,
         workItems: ConfigLimitedSizeArray<
             WorkItem,
@@ -41,7 +41,7 @@ public struct WorkPackage: Comparable, Sendable, Equatable, Codable, Hashable {
         self.authorizationToken = authorizationToken
         self.authorizationServiceIndex = authorizationServiceIndex
         self.authorizationCodeHash = authorizationCodeHash
-        self.parameterizationBlob = parameterizationBlob
+        self.configurationBlob = configurationBlob
         self.context = context
         self.workItems = workItems
     }
@@ -73,7 +73,7 @@ extension WorkPackage: Dummy {
             authorizationToken: Data(),
             authorizationServiceIndex: 0,
             authorizationCodeHash: Data32(),
-            parameterizationBlob: Data(),
+            configurationBlob: Data(),
             context: RefinementContext.dummy(config: config),
             workItems: try! ConfigLimitedSizeArray(config: config, defaultValue: WorkItem.dummy(config: config))
         )
@@ -92,18 +92,23 @@ extension WorkPackage {
 
 extension WorkPackage {
     /// a: work-package’s implied authorizer, the hash of the concatenation of the authorization code
-    /// and the parameterization
-    public func authorizer(serviceAccounts: some ServiceAccounts) async throws -> Data32 {
-        try await Blake2b256.hash(authorizationCode(serviceAccounts: serviceAccounts), parameterizationBlob)
+    /// and the configuration
+    public func authorizer(serviceAccounts: some ServiceAccounts) async throws -> Data32? {
+        guard let authorizationCode = try await authorizationCode(serviceAccounts: serviceAccounts) else {
+            return nil
+        }
+        return Blake2b256.hash(authorizationCode, configurationBlob)
     }
 
     /// c: the authorization code
-    public func authorizationCode(serviceAccounts: some ServiceAccounts) async throws -> Data {
-        let preimage = try await serviceAccounts.historicalLookup(
+    public func authorizationCode(serviceAccounts: some ServiceAccounts) async throws -> Data? {
+        guard let preimage = try await serviceAccounts.historicalLookup(
             serviceAccount: authorizationServiceIndex,
             timeslot: context.lookupAnchor.timeslot,
             preimageHash: authorizationCodeHash
-        ) ?? Data()
+        ) else {
+            return nil
+        }
         return try CodeAndMeta(data: preimage).codeBlob
     }
 }

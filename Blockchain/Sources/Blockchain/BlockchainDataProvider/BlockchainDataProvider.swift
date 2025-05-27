@@ -114,11 +114,11 @@ extension BlockchainDataProvider {
         try await dataProvider.getFinalizedHead()
     }
 
-    public func getKeys(prefix: Data32, count: UInt32, startKey: Data32?, blockHash: Data32?) async throws -> [String] {
+    public func getKeys(prefix: Data31, count: UInt32, startKey: Data31?, blockHash: Data32?) async throws -> [String] {
         try await dataProvider.getKeys(prefix: prefix, count: count, startKey: startKey, blockHash: blockHash)
     }
 
-    public func getStorage(key: Data32, blockHash: Data32?) async throws -> [String] {
+    public func getStorage(key: Data31, blockHash: Data32?) async throws -> [String] {
         try await dataProvider.getStorage(key: key, blockHash: blockHash)
     }
 

@@ -187,7 +187,7 @@ public final class Runtime {
                 let authorizationResult = try newState.update(
                     config: config,
                     timeslot: block.header.timeslot,
-                    auths: block.extrinsic.reports.guarantees.map { ($0.workReport.coreIndex, $0.workReport.authorizerHash) }
+                    auths: block.extrinsic.reports.guarantees.map { (CoreIndex($0.workReport.coreIndex), $0.workReport.authorizerHash) }
                 )
                 newState.mergeWith(postState: authorizationResult)
             } catch let error as AuthorizationError {

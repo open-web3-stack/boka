@@ -3,7 +3,7 @@ import Utils
 
 public protocol StateKey: Hashable, Sendable {
     associatedtype Value: Codable & Sendable
-    func encode() -> Data32
+    func encode() -> Data31
     static var optional: Bool { get }
 }
 
@@ -15,14 +15,14 @@ extension StateKey {
     public static var optional: Bool { false }
 }
 
-private func constructKey(_ idx: UInt8) -> Data32 {
-    var data = Data(repeating: 0, count: 32)
+private func constructKey(_ idx: UInt8) -> Data31 {
+    var data = Data(repeating: 0, count: 31)
     data[0] = idx
-    return Data32(data)!
+    return Data31(data)!
 }
 
-private func constructKey(_ idx: UInt8, _ service: ServiceIndex) -> Data32 {
-    var data = Data(repeating: 0, count: 32)
+private func constructKey(_ idx: UInt8, _ service: ServiceIndex) -> Data31 {
+    var data = Data(repeating: 0, count: 31)
     data[0] = idx
     withUnsafeBytes(of: service) { ptr in
         data[1] = ptr.load(as: UInt8.self)
@@ -30,11 +30,11 @@ private func constructKey(_ idx: UInt8, _ service: ServiceIndex) -> Data32 {
         data[5] = ptr.load(fromByteOffset: 2, as: UInt8.self)
         data[7] = ptr.load(fromByteOffset: 3, as: UInt8.self)
     }
-    return Data32(data)!
+    return Data31(data)!
 }
 
-private func constructKey(_ service: ServiceIndex, _ val: UInt32, _ data: Data) -> Data32 {
-    var stateKey = Data(capacity: 32)
+private func constructKey(_ service: ServiceIndex, _ val: UInt32, _ data: Data) -> Data31 {
+    var stateKey = Data(capacity: 31)
 
     withUnsafeBytes(of: service) { servicePtr in
         withUnsafeBytes(of: val) { valPtr in
@@ -48,8 +48,8 @@ private func constructKey(_ service: ServiceIndex, _ val: UInt32, _ data: Data) 
             stateKey.append(valPtr.load(fromByteOffset: 3, as: UInt8.self))
         }
     }
-    stateKey.append(contentsOf: data[relative: 0 ..< 24])
-    return Data32(stateKey)!
+    stateKey.append(contentsOf: data[relative: 0 ..< 23])
+    return Data31(stateKey)!
 }
 
 public enum StateKeys {
@@ -83,7 +83,7 @@ public enum StateKeys {
 
         public init() {}
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(1)
         }
     }
@@ -99,7 +99,7 @@ public enum StateKeys {
 
         public init() {}
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(2)
         }
     }
@@ -109,7 +109,7 @@ public enum StateKeys {
 
         public init() {}
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(3)
         }
     }
@@ -119,7 +119,7 @@ public enum StateKeys {
 
         public init() {}
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(4)
         }
     }
@@ -129,7 +129,7 @@ public enum StateKeys {
 
         public init() {}
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(5)
         }
     }
@@ -139,7 +139,7 @@ public enum StateKeys {
 
         public init() {}
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(6)
         }
     }
@@ -152,7 +152,7 @@ public enum StateKeys {
 
         public init() {}
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(7)
         }
     }
@@ -165,7 +165,7 @@ public enum StateKeys {
 
         public init() {}
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(8)
         }
     }
@@ -178,7 +178,7 @@ public enum StateKeys {
 
         public init() {}
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(9)
         }
     }
@@ -191,7 +191,7 @@ public enum StateKeys {
 
         public init() {}
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(10)
         }
     }
@@ -201,7 +201,7 @@ public enum StateKeys {
 
         public init() {}
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(11)
         }
     }
@@ -211,17 +211,17 @@ public enum StateKeys {
 
         public init() {}
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(12)
         }
     }
 
     public struct ActivityStatisticsKey: StateKey {
-        public typealias Value = ValidatorActivityStatistics
+        public typealias Value = Statistics
 
         public init() {}
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(13)
         }
     }
@@ -234,7 +234,7 @@ public enum StateKeys {
 
         public init() {}
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(14)
         }
     }
@@ -247,7 +247,7 @@ public enum StateKeys {
 
         public init() {}
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(15)
         }
     }
@@ -262,7 +262,7 @@ public enum StateKeys {
             self.index = index
         }
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(255, index)
         }
     }
@@ -279,7 +279,7 @@ public enum StateKeys {
             self.key = key
         }
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(index, UInt32.max, key.data)
         }
     }
@@ -296,7 +296,7 @@ public enum StateKeys {
             self.hash = hash
         }
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(index, UInt32.max - 1, hash.data[relative: 1...])
         }
     }
@@ -315,7 +315,7 @@ public enum StateKeys {
             self.length = length
         }
 
-        public func encode() -> Data32 {
+        public func encode() -> Data31 {
             constructKey(index, length, hash.blake2b256hash().data[2...])
         }
     }

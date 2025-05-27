@@ -21,7 +21,7 @@ enum STFTests {
         let result = try await JamTestnet.runSTF(testcase)
         switch result {
         case let .success(stateRef):
-            let expectedState = try testcase.postState.toState()
+            let expectedState = try await testcase.postState.toState()
             // compare details
             #expect(stateRef.value.coreAuthorizationPool == expectedState.coreAuthorizationPool)
             #expect(stateRef.value.authorizationQueue == expectedState.authorizationQueue)

@@ -17,6 +17,179 @@ public class GasFn: HostCall {
     }
 }
 
+/// Fetch
+public class Fetch: HostCall {
+    public static var identifier: UInt8 { 18 }
+
+    public let serviceAccounts: ServiceAccountsRef?
+    public let serviceIndex: ServiceIndex?
+
+    // p
+    public let workPackage: WorkPackage?
+    // n
+    public let entropy: Data32?
+    // r
+    public let authorizerTrace: Data?
+    // i
+    public let workItemIndex: Int?
+    // overline i
+    public let importSegments: [[Data4104]]?
+    // overline x (no need pass in)
+    // o
+    public let operands: [OperandTuple]?
+    // t
+    public let transfers: [DeferredTransfers]?
+
+    public init(
+        serviceAccounts: ServiceAccountsRef? = nil,
+        serviceIndex: ServiceIndex? = nil,
+        workPackage: WorkPackage? = nil,
+        entropy: Data32? = nil,
+        authorizerTrace: Data? = nil,
+        workItemIndex: Int? = nil,
+        importSegments: [[Data4104]]? = nil,
+        operands: [OperandTuple]? = nil,
+        transfers: [DeferredTransfers]? = nil
+    ) {
+        self.serviceAccounts = serviceAccounts
+        self.serviceIndex = serviceIndex
+        self.workPackage = workPackage
+        self.entropy = entropy
+        self.authorizerTrace = authorizerTrace
+        self.workItemIndex = workItemIndex
+        self.importSegments = importSegments
+        self.operands = operands
+        self.transfers = transfers
+    }
+
+    private func getWorkItemMeta(item: WorkItem) throws -> Data {
+        let encoder = JamEncoder(capacity: 4 + 4 + 8 + 8 + 2 + 2 + 2 + 4)
+        try encoder.encode(item.serviceIndex)
+        try encoder.encode(item.codeHash)
+        try encoder.encode(item.refineGasLimit)
+        try encoder.encode(item.accumulateGasLimit)
+        try encoder.encode(item.exportsCount)
+        try encoder.encode(item.inputs.count)
+        try encoder.encode(item.outputs.count)
+        try encoder.encode(item.payloadBlob.count)
+        return encoder.data
+    }
+
+    public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
+        let reg10: UInt64 = state.readRegister(Registers.Index(raw: 10))
+        let reg11: UInt64 = state.readRegister(Registers.Index(raw: 11))
+        let reg12: UInt64 = state.readRegister(Registers.Index(raw: 12))
+
+        var value: Data?
+        switch reg10 {
+        case 0:
+            value = config.value.encoded
+        case 1:
+            if let entropy {
+                value = entropy.data
+            }
+        case 2:
+            if let authorizerTrace {
+                value = authorizerTrace
+            }
+        case 3:
+            if let workPackage, let serviceAccounts, reg11 < workPackage.workItems.count {
+                let item = workPackage.workItems[Int(reg11)]
+                let outputs = item.outputs
+                if reg12 < outputs.count {
+                    value = try await serviceAccounts.value.get(serviceAccount: item.serviceIndex, preimageHash: outputs[Int(reg12)].hash)
+                }
+            }
+        case 4:
+            if let workItemIndex, let workPackage, let serviceAccounts {
+                let item = workPackage.workItems[workItemIndex]
+                let outputs = item.outputs
+                if reg11 < outputs.count {
+                    value = try await serviceAccounts.value.get(serviceAccount: item.serviceIndex, preimageHash: outputs[Int(reg11)].hash)
+                }
+            }
+        case 5:
+            if let importSegments, reg11 < importSegments.count, reg12 < importSegments[Int(reg11)].count {
+                value = importSegments[Int(reg11)][Int(reg12)].data
+            }
+        case 6:
+            if let workItemIndex, let importSegments, reg11 < importSegments[workItemIndex].count {
+                value = importSegments[workItemIndex][Int(reg11)].data
+            }
+        case 7:
+            if let workPackage {
+                value = try JamEncoder.encode(workPackage)
+            }
+        case 8:
+            if let workPackage {
+                value = try JamEncoder.encode(workPackage.authorizationCodeHash, workPackage.configurationBlob)
+            }
+        case 9:
+            if let workPackage {
+                value = workPackage.authorizationToken
+            }
+        case 10:
+            if let workPackage {
+                value = try JamEncoder.encode(workPackage.context)
+            }
+        case 11:
+            if let workPackage {
+                var arr: [Data] = []
+                for item in workPackage.workItems {
+                    let meta = try getWorkItemMeta(item: item)
+                    arr.append(meta)
+                }
+                value = try JamEncoder.encode(arr)
+            }
+        case 12:
+            if let workPackage, reg11 < workPackage.workItems.count {
+                value = try getWorkItemMeta(item: workPackage.workItems[Int(reg11)])
+            }
+        case 13:
+            if let workPackage, reg11 < workPackage.workItems.count {
+                value = workPackage.workItems[Int(reg11)].payloadBlob
+            }
+        case 14:
+            if let operands {
+                value = try JamEncoder.encode(operands)
+            }
+        case 15:
+            if let operands, reg11 < operands.count {
+                value = try JamEncoder.encode(operands[Int(reg11)])
+            }
+        case 16:
+            if let transfers {
+                value = try JamEncoder.encode(transfers)
+            }
+        case 17:
+            if let transfers, reg11 < transfers.count {
+                value = try JamEncoder.encode(transfers[Int(reg11)])
+            }
+        default:
+            value = nil
+        }
+
+        let writeAddr: UInt32 = state.readRegister(Registers.Index(raw: 7))
+
+        let reg8: UInt64 = state.readRegister(Registers.Index(raw: 8))
+        let reg9: UInt64 = state.readRegister(Registers.Index(raw: 9))
+
+        let first = min(Int(reg8), value?.count ?? 0)
+        let len = min(Int(reg9), (value?.count ?? 0) - first)
+
+        let isWritable = state.isMemoryWritable(address: writeAddr, length: len)
+
+        if !isWritable {
+            throw VMInvocationsError.panic
+        } else if value == nil {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
+        } else {
+            state.writeRegister(Registers.Index(raw: 7), value!.count)
+            try state.writeMemory(address: writeAddr, values: value![relative: first ..< (first + len)])
+        }
+    }
+}
+
 /// Lookup a preimage from a service account
 public class Lookup: HostCall {
     public static var identifier: UInt8 { 1 }
@@ -741,6 +914,52 @@ public class Yield: HostCall {
     }
 }
 
+/// Provide some preimages (will be made available after invocation)
+public class Provide: HostCall {
+    public static var identifier: UInt8 { 27 }
+
+    public let x: AccumlateResultContext
+
+    public init(x: AccumlateResultContext) {
+        self.x = x
+    }
+
+    public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
+        let serviceIndex: UInt32 = if x.serviceIndex == UInt64.max {
+            x.serviceIndex
+        } else {
+            state.readRegister(.init(raw: 7))
+        }
+        let (startAddr, length): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 8), Registers.Index(raw: 9))
+        let preimage = try? state.readMemory(address: startAddr, length: Int(length))
+        let accountDetails = try await x.state.accounts.value.get(serviceAccount: serviceIndex)
+        var preimageLookupOk = false
+        if let preimage {
+            let lookup = try await x.state.accounts.value.get(
+                serviceAccount: x.serviceIndex,
+                preimageHash: Blake2b256.hash(preimage),
+                length: length
+            )
+            if let lookup, lookup.isEmpty {
+                preimageLookupOk = true
+            }
+        }
+
+        if preimage == nil {
+            throw VMInvocationsError.panic
+        } else if accountDetails == nil {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
+        } else if !preimageLookupOk {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
+        } else if x.provide.contains(.init(service: serviceIndex, preimage: preimage!)) {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
+        } else {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
+            x.provide.insert(.init(service: serviceIndex, preimage: preimage!))
+        }
+    }
+}
+
 // MARK: - Refine
 
 /// Historical lookup
@@ -809,91 +1028,6 @@ public class HistoricalLookup: HostCall {
     }
 }
 
-/// Fetch a segment to memory
-public class Fetch: HostCall {
-    public static var identifier: UInt8 { 18 }
-
-    public let context: RefineContext.ContextType
-    public let serviceAccounts: ServiceAccountsRef
-    public let serviceIndex: ServiceIndex
-    public let workPackage: WorkPackage
-    public let authorizerOutput: Data
-    public let importSegments: [[Data4104]]
-
-    public init(
-        context: RefineContext.ContextType,
-        serviceAccounts: ServiceAccountsRef,
-        serviceIndex: ServiceIndex,
-        workPackage: WorkPackage,
-        authorizerOutput: Data,
-        importSegments: [[Data4104]]
-    ) {
-        self.context = context
-        self.serviceAccounts = serviceAccounts
-        self.serviceIndex = serviceIndex
-        self.workPackage = workPackage
-        self.authorizerOutput = authorizerOutput
-        self.importSegments = importSegments
-    }
-
-    public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
-        let reg10: UInt64 = state.readRegister(Registers.Index(raw: 10))
-        let reg11: UInt64 = state.readRegister(Registers.Index(raw: 11))
-        let reg12: UInt64 = state.readRegister(Registers.Index(raw: 12))
-
-        var value: Data?
-        switch reg10 {
-        case 0:
-            value = try JamEncoder.encode(workPackage)
-        case 1:
-            value = authorizerOutput
-        case 2:
-            if reg11 < workPackage.workItems.count {
-                value = workPackage.workItems[Int(reg11)].payloadBlob
-            }
-        case 3:
-            if reg11 < workPackage.workItems.count, reg12 < workPackage.workItems[Int(reg11)].outputs.count {
-                let hash = workPackage.workItems[Int(reg11)].outputs[Int(reg12)].hash
-                value = try await serviceAccounts.value.get(serviceAccount: serviceIndex, preimageHash: hash)
-            }
-        case 4:
-            if reg11 < workPackage.workItems[Int(serviceIndex)].outputs.count {
-                let hash = workPackage.workItems[Int(serviceIndex)].outputs[Int(reg11)].hash
-                value = try await serviceAccounts.value.get(serviceAccount: serviceIndex, preimageHash: hash)
-            }
-        case 5:
-            if reg11 < importSegments.count, reg12 < importSegments[Int(reg11)].count {
-                value = importSegments[Int(reg11)][Int(reg12)].data
-            }
-        case 6:
-            if reg11 < importSegments[Int(serviceIndex)].count {
-                value = importSegments[Int(serviceIndex)][Int(reg11)].data
-            }
-        default:
-            value = nil
-        }
-
-        let writeAddr: UInt32 = state.readRegister(Registers.Index(raw: 7))
-
-        let reg8: UInt64 = state.readRegister(Registers.Index(raw: 8))
-        let reg9: UInt64 = state.readRegister(Registers.Index(raw: 9))
-
-        let first = min(Int(reg8), value?.count ?? 0)
-        let len = min(Int(reg9), (value?.count ?? 0) - first)
-
-        let isWritable = state.isMemoryWritable(address: writeAddr, length: len)
-
-        if !isWritable {
-            throw VMInvocationsError.panic
-        } else if value == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
-        } else {
-            state.writeRegister(Registers.Index(raw: 7), value!.count)
-            try state.writeMemory(address: writeAddr, values: value![relative: first ..< (first + len)])
-        }
-    }
-}
-
 /// Export a segment from memory
 public class Export: HostCall {
     public static var identifier: UInt8 { 19 }
@@ -923,7 +1057,7 @@ public class Export: HostCall {
         }
         let segment = Data4104(data)!
 
-        if exportSegmentOffset + UInt64(context.exports.count) >= UInt64(config.value.maxWorkPackageImportsExports) {
+        if exportSegmentOffset + UInt64(context.exports.count) >= UInt64(config.value.maxWorkPackageImports) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), exportSegmentOffset + UInt64(context.exports.count))
