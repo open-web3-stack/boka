@@ -16,7 +16,7 @@ public enum StateHandlers {
     }
 
     public struct GetKeys: RPCHandler {
-        public typealias Request = Request4<Data32, UInt32, Data32?, Data32?>
+        public typealias Request = Request4<Data31, UInt32, Data31?, Data32?>
         public typealias Response = [String]
 
         public static var method: String { "state_getKeys" }
@@ -35,7 +35,7 @@ public enum StateHandlers {
     }
 
     public struct GetStorage: RPCHandler {
-        public typealias Request = Request2<Data32, Data32?>
+        public typealias Request = Request2<Data31, Data32?>
         public typealias Response = [String]
 
         public static var method: String { "state_getStorage" }
