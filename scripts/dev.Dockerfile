@@ -1,4 +1,4 @@
-FROM swift:6.0-noble AS builder
+FROM swift:6.1-noble AS builder
 WORKDIR /boka
 
 RUN apt-get update && \
@@ -29,13 +29,26 @@ WORKDIR /boka
 FROM phusion/baseimage:noble-1.0.0
 LABEL maintainer="hello@laminar.one"
 
-# from https://github.com/swiftlang/swift-docker/blob/38e4244ebab3d6a4e702fb30449827d6c28ee1fd/6.0/ubuntu/24.04/slim/Dockerfile
+# from https://github.com/swiftlang/swift-docker/blob/fad056fa5f65f926323f0ff61129cb4e6b1eec11/6.1/ubuntu/24.04/Dockerfile
 RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true && apt-get -q update && \
     apt-get -q install -y \
-    libcurl4 \
-    libxml2 \
+    binutils \
+    git \
+    unzip \
+    gnupg2 \
+    libc6-dev \
+    libcurl4-openssl-dev \
+    libedit2 \
+    libgcc-13-dev \
+    libpython3-dev \
+    libsqlite3-0 \
+    libstdc++-13-dev \
+    libxml2-dev \
+    libncurses-dev \
+    libz3-dev \
+    pkg-config \
     tzdata \
-	librocksdb-dev \
+    zlib1g-dev \
     && rm -r /var/lib/apt/lists/*
 
 # Everything up to here should cache nicely between Swift versions, assuming dev dependencies change little
@@ -45,8 +58,8 @@ RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true && ap
 # uid           [ unknown] Swift 6.x Release Signing Key <swift-infrastructure@forums.swift.org>
 ARG SWIFT_SIGNING_KEY=52BB7E3DE28A71BE22EC05FFEF80A866B47A981F
 ARG SWIFT_PLATFORM=ubuntu24.04
-ARG SWIFT_BRANCH=swift-6.0.1-release
-ARG SWIFT_VERSION=swift-6.0.1-RELEASE
+ARG SWIFT_BRANCH=swift-6.1-release
+ARG SWIFT_VERSION=swift-6.1-RELEASE
 ARG SWIFT_WEBROOT=https://download.swift.org
 
 ENV SWIFT_SIGNING_KEY=$SWIFT_SIGNING_KEY \
@@ -70,9 +83,9 @@ RUN set -e; \
     SWIFT_WEBDIR="$SWIFT_WEBROOT/$SWIFT_BRANCH/$(echo $SWIFT_PLATFORM | tr -d .)$OS_ARCH_SUFFIX" \
     && SWIFT_BIN_URL="$SWIFT_WEBDIR/$SWIFT_VERSION/$SWIFT_VERSION-$SWIFT_PLATFORM$OS_ARCH_SUFFIX.tar.gz" \
     && SWIFT_SIG_URL="$SWIFT_BIN_URL.sig" \
-    # - Grab curl and gpg here so we cache better up above
+    # - Grab curl here so we cache better up above
     && export DEBIAN_FRONTEND=noninteractive \
-    && apt-get -q update && apt-get -q install -y curl gnupg && rm -rf /var/lib/apt/lists/* \
+    && apt-get -q update && apt-get -q install -y curl && rm -rf /var/lib/apt/lists/* \
     # - Download the GPG keys, Swift toolchain, and toolchain signature, and verify.
     && export GNUPGHOME="$(mktemp -d)" \
     && curl -fsSL "$SWIFT_BIN_URL" -o swift.tar.gz "$SWIFT_SIG_URL" -o swift.tar.gz.sig \
@@ -80,11 +93,9 @@ RUN set -e; \
     && gpg --batch --verify swift.tar.gz.sig swift.tar.gz \
     # - Unpack the toolchain, set libs permissions, and clean up.
     && tar -xzf swift.tar.gz --directory / --strip-components=1 \
-        $SWIFT_VERSION-$SWIFT_PLATFORM$OS_ARCH_SUFFIX/usr/lib/swift/linux \
-        $SWIFT_VERSION-$SWIFT_PLATFORM$OS_ARCH_SUFFIX/usr/libexec/swift/linux \
-    && chmod -R o+r /usr/lib/swift /usr/libexec/swift \
+    && chmod -R o+r /usr/lib/swift \
     && rm -rf "$GNUPGHOME" swift.tar.gz.sig swift.tar.gz \
-    && apt-get purge --auto-remove -y curl gnupg
+    && apt-get purge --auto-remove -y curl
 
 RUN useradd -m -u 1001 -U -s /bin/sh -d /boka boka
 
