@@ -5,9 +5,9 @@ import Utils
 
 public struct ShardDistributionMessage: Codable, Sendable, Equatable, Hashable {
     public var erasureRoot: Data32
-    public var shardIndex: UInt32
+    public var shardIndex: UInt16
 
-    public init(erasureRoot: Data32, shardIndex: UInt32) {
+    public init(erasureRoot: Data32, shardIndex: UInt16) {
         self.erasureRoot = erasureRoot
         self.shardIndex = shardIndex
     }

@@ -5,8 +5,8 @@ import Utils
 
 public struct StateRequest: Codable, Sendable, Equatable, Hashable {
     public var headerHash: Data32
-    public var startKey: Data31 // [u8; 31]
-    public var endKey: Data31 // [u8; 31]
+    public var startKey: Data31
+    public var endKey: Data31
     public var maxSize: UInt32
 
     public init(headerHash: Data32, startKey: Data31, endKey: Data31, maxSize: UInt32) {

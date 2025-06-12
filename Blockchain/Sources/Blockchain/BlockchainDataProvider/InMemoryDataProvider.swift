@@ -129,6 +129,10 @@ extension InMemoryDataProvider: BlockchainDataProviderProtocol {
         heads.insert(hash)
     }
 
+    public func remove(workReportHash hash: Data32) {
+        guaranteedWorkReports.removeValue(forKey: hash)
+    }
+
     public func remove(hash: Data32) {
         let timeslot = blockByHash[hash]?.header.timeslot ?? stateByBlockHash[hash]?.value.timeslot
         stateByBlockHash.removeValue(forKey: hash)
