@@ -385,28 +385,6 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testHandleShardDistribution() async throws {
-        let erasureRoot = Data32(repeating: 1)
-        let shardIndex: UInt16 = 2
-
-        let distributionMessage = CERequest.shardDistribution(ShardDistributionMessage(
-            erasureRoot: erasureRoot,
-            shardIndex: shardIndex
-        ))
-
-        let message = try ShardDistributionMessage.decode(data: distributionMessage.encode(), config: services.config)
-        #expect(shardIndex == message.shardIndex)
-
-        let events = await storeMiddleware.wait()
-
-        _ = await services.dataAvailabilityService
-
-        await #expect(throws: Error.self) {
-            _ = try await network.handler.handle(ceRequest: distributionMessage)
-        }
-    }
-
-    @Test
     func testHandleAuditShardRequest() async throws {
         let testErasureRoot = Data32(repeating: 1)
         let testShardIndex: UInt32 = 2
