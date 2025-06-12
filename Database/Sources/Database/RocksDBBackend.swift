@@ -28,7 +28,7 @@ public final class RocksDBBackend: Sendable {
 
     public let genesisBlockHash: Data32
 
-    public init(path: URL, config: ProtocolConfigRef, genesisBlock: BlockRef, genesisStateData: [Data32: Data]) async throws {
+    public init(path: URL, config: ProtocolConfigRef, genesisBlock: BlockRef, genesisStateData: [Data31: Data]) async throws {
         self.config = config
         db = try RocksDB(path: path)
         meta = Store(db: db, column: .meta, coder: RawCoder())
@@ -86,7 +86,7 @@ extension RocksDBBackend: BlockchainDataProviderProtocol {
         try guaranteedWorkReports.put(key: hash, value: guaranteedWorkReport)
     }
 
-    public func getKeys(prefix: Data32, count: UInt32, startKey: Data32?, blockHash: Data32?) async throws -> [String] {
+    public func getKeys(prefix: Data31, count: UInt32, startKey: Data31?, blockHash: Data32?) async throws -> [String] {
         logger.trace("""
         getKeys() prefix: \(prefix), count: \(count),
         startKey: \(String(describing: startKey)), blockHash: \(String(describing: blockHash))
@@ -98,7 +98,7 @@ extension RocksDBBackend: BlockchainDataProviderProtocol {
         return try await stateRef.value.backend.getKeys(prefix, startKey, count).map { $0.key.toHexString() }
     }
 
-    public func getStorage(key: Data32, blockHash: Data32?) async throws -> [String] {
+    public func getStorage(key: Data31, blockHash: Data32?) async throws -> [String] {
         logger.trace("getStorage() key: \(key), blockHash: \(String(describing: blockHash))")
 
         guard let stateRef = try await getState(hash: blockHash ?? genesisBlockHash) else {

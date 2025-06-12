@@ -119,11 +119,11 @@ extension NodeDataSource: KeystoreDataSource {
 }
 
 extension NodeDataSource: ChainDataSource {
-    public func getKeys(prefix: Data32, count: UInt32, startKey: Data32?, blockHash: Data32?) async throws -> [String] {
+    public func getKeys(prefix: Data31, count: UInt32, startKey: Data31?, blockHash: Data32?) async throws -> [String] {
         try await chainDataProvider.getKeys(prefix: prefix, count: count, startKey: startKey, blockHash: blockHash)
     }
 
-    public func getStorage(key: Data32, blockHash: Utils.Data32?) async throws -> [String] {
+    public func getStorage(key: Data31, blockHash: Utils.Data32?) async throws -> [String] {
         try await chainDataProvider.getStorage(key: key, blockHash: blockHash)
     }
 
@@ -135,7 +135,7 @@ extension NodeDataSource: ChainDataSource {
         try await chainDataProvider.getBlock(hash: hash)
     }
 
-    public func getState(blockHash: Data32, key: Data32) async throws -> Data? {
+    public func getState(blockHash: Data32, key: Data31) async throws -> Data? {
         let state = try await chainDataProvider.getState(hash: blockHash)
         return try await state.value.read(key: key)
     }

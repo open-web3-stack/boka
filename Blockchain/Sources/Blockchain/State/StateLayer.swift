@@ -22,7 +22,7 @@ private enum StateLayerValue: Sendable {
 }
 
 public struct StateLayer: Sendable {
-    private var changes: [Data32: StateLayerValue] = [:]
+    private var changes: [Data31: StateLayerValue] = [:]
 
     public init(backend: StateBackend) async throws {
         let results = try await backend.batchRead(StateKeys.prefetchKeys)
@@ -242,7 +242,7 @@ public struct StateLayer: Sendable {
 }
 
 extension StateLayer {
-    public func toKV() -> some Sequence<(key: Data32, value: (Codable & Sendable)?)> {
+    public func toKV() -> some Sequence<(key: Data31, value: (Codable & Sendable)?)> {
         changes.map { (key: $0.key, value: $0.value.value()) }
     }
 }
@@ -265,7 +265,7 @@ extension StateLayer {
         }
     }
 
-    public subscript(key: Data32) -> (Codable & Sendable)? {
+    public subscript(key: Data31) -> (Codable & Sendable)? {
         get {
             changes[key]?.value()
         }

@@ -662,10 +662,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             package: workPackage.value,
             coreIndex: coreIndex
         )
-        let authorizationOutput = try authRes.mapError(GuaranteeingServiceError.authorizationError).get()
-        logger.debug("Work package authorized successfully", metadata: ["outputSize": "\(authorizationOutput.count)"])
+        let authorizerTrace = try authRes.mapError(GuaranteeingServiceError.authorizationError).get()
+        logger.debug("Work package authorized successfully", metadata: ["traceSize": "\(authorizerTrace.count)"])
 
-        var workResults = [WorkResult]()
+        var workDigests = [WorkDigest]()
         var exportSegments = [Data4104]()
 
         var importSegments = [[Data4104]]()
@@ -685,29 +685,29 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                 serviceAccounts: state.value,
                 workItemIndex: i,
                 workPackage: workPackage.value,
-                authorizerOutput: authorizationOutput,
+                authorizerTrace: authorizerTrace,
                 importSegments: importSegments,
                 exportSegmentOffset: UInt64(exportSegmentOffset)
             )
 
-            exportSegmentOffset += item.outputDataSegmentsCount
-            let workResult = WorkResult(
+            exportSegmentOffset += item.exportsCount
+            let workDigest = WorkDigest(
                 serviceIndex: item.serviceIndex,
                 codeHash: workPackage.value.authorizationCodeHash,
                 payloadHash: item.payloadBlob.blake2b256hash(),
-                gasRatio: item.refineGasLimit,
-                output: WorkOutput(refineRes),
+                gasLimit: item.refineGasLimit,
+                result: WorkResult(refineRes),
                 gasUsed: UInt(refineGasUsed.value),
                 importsCount: UInt(item.inputs.count),
-                exportsCount: UInt(item.outputDataSegmentsCount),
+                exportsCount: UInt(item.exportsCount),
                 extrinsicsCount: UInt(item.outputs.count),
                 extrinsicsSize: UInt(item.outputs.reduce(into: 0) { $0 += $1.length })
             )
-            workResults.append(workResult)
+            workDigests.append(workDigest)
 
-            guard item.outputDataSegmentsCount == refineExports.count else {
+            guard item.exportsCount == refineExports.count else {
                 logger.error("Export segment count mismatch",
-                             metadata: ["expected": "\(item.outputDataSegmentsCount)", "actual": "\(refineExports.count)"])
+                             metadata: ["expected": "\(item.exportsCount)", "actual": "\(refineExports.count)"])
                 throw GuaranteeingServiceError.invalidExports
             }
 
@@ -763,12 +763,12 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
 
         let workReport = try WorkReport(
             authorizerHash: authorizerHash,
-            coreIndex: coreIndex,
-            authorizationOutput: authorizationOutput,
+            coreIndex: UInt(coreIndex),
+            authorizerTrace: authorizerTrace,
             refinementContext: workPackage.value.context,
             packageSpecification: packageSpecification,
             lookup: oldLookups,
-            results: ConfigLimitedSizeArray(config: config, array: workResults),
+            digests: ConfigLimitedSizeArray(config: config, array: workDigests),
             authGasUsed: UInt(authGasUsed.value)
         )
 

@@ -55,8 +55,8 @@ private struct TrieNode {
         !isBranch
     }
 
-    func isLeaf(key: Data32) -> Bool {
-        isLeaf && left.data[relative: 1 ..< 32] == key.data.prefix(31)
+    func isLeaf(key: Data31) -> Bool {
+        isLeaf && left.data[relative: 1 ..< 32] == key.data
     }
 
     var value: Data? {
@@ -70,16 +70,16 @@ private struct TrieNode {
         return right.data[relative: 0 ..< Int(len)]
     }
 
-    static func leaf(key: Data32, value: Data) -> TrieNode {
+    static func leaf(key: Data31, value: Data) -> TrieNode {
         var newKey = Data(capacity: 32)
         if value.count <= 32 {
             newKey.append(0b1000_0000 | UInt8(value.count))
-            newKey += key.data.prefix(31)
+            newKey += key.data
             let newValue = value + Data(repeating: 0, count: 32 - value.count)
             return .init(left: Data32(newKey)!, right: Data32(newValue)!, type: .embeddedLeaf, isNew: true, rawValue: value)
         }
         newKey.append(0b1100_0000)
-        newKey += key.data.prefix(31)
+        newKey += key.data
         return .init(left: Data32(newKey)!, right: value.blake2b256hash(), type: .regularLeaf, isNew: true, rawValue: value)
     }
 
@@ -106,7 +106,7 @@ public actor StateTrie {
         self.backend = backend
     }
 
-    public func read(key: Data32) async throws -> Data? {
+    public func read(key: Data31) async throws -> Data? {
         let node = try await find(hash: rootHash, key: key, depth: 0)
         guard let node else {
             return nil
@@ -117,7 +117,7 @@ public actor StateTrie {
         return try await backend.readValue(hash: node.right)
     }
 
-    private func find(hash: Data32, key: Data32, depth: UInt8) async throws -> TrieNode? {
+    private func find(hash: Data32, key: Data31, depth: UInt8) async throws -> TrieNode? {
         guard let node = try await get(hash: hash) else {
             return nil
         }
@@ -158,7 +158,7 @@ public actor StateTrie {
         return node
     }
 
-    public func update(_ updates: [(key: Data32, value: Data?)]) async throws {
+    public func update(_ updates: [(key: Data31, value: Data?)]) async throws {
         // TODO: somehow improve the efficiency of this
         for (key, value) in updates {
             if let value {
@@ -220,7 +220,7 @@ public actor StateTrie {
     }
 
     private func insert(
-        hash: Data32, key: Data32, value: Data, depth: UInt8
+        hash: Data32, key: Data31, value: Data, depth: UInt8
     ) async throws -> Data32 {
         guard let parent = try await get(hash: hash) else {
             let node = TrieNode.leaf(key: key, value: value)
@@ -248,7 +248,7 @@ public actor StateTrie {
         }
     }
 
-    private func insertLeafNode(existing: TrieNode, newKey: Data32, newValue: Data, depth: UInt8) async throws -> Data32 {
+    private func insertLeafNode(existing: TrieNode, newKey: Data31, newValue: Data, depth: UInt8) async throws -> Data32 {
         if existing.isLeaf(key: newKey) {
             // update existing leaf
             let newLeaf = TrieNode.leaf(key: newKey, value: newValue)
@@ -284,7 +284,7 @@ public actor StateTrie {
         }
     }
 
-    private func delete(hash: Data32, key: Data32, depth: UInt8) async throws -> Data32 {
+    private func delete(hash: Data32, key: Data31, depth: UInt8) async throws -> Data32 {
         let node = try await get(hash: hash).unwrap(orError: StateTrieError.invalidParent)
 
         if node.isBranch {

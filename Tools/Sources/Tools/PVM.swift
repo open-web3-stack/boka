@@ -50,7 +50,7 @@ struct PVM: AsyncParsableCommand {
             let gasValue = Gas(gas)
 
             do {
-                let state = try VMState(standardProgramBlob: blob, pc: pc, gas: gasValue, argumentData: argumentData)
+                let state = try VMStateInterpreter(standardProgramBlob: blob, pc: pc, gas: gasValue, argumentData: argumentData)
                 let engine = Engine(config: config, invocationContext: nil)
                 let exitReason = await engine.execute(state: state)
                 let gasUsed = gasValue - Gas(state.getGas())

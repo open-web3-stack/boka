@@ -18,6 +18,7 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
         argumentData _: Data?,
         ctx _: (any InvocationContext)?
     ) async -> ExitReason {
+        // TODO: spawn a child process, setup IPC channel, and execute the blob in child process
         fatalError("unimplemented")
     }
 }

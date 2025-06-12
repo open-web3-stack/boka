@@ -11,7 +11,7 @@ public struct InnerPvm {
     public var pc: UInt32
 }
 
-public class RefineContext: InvocationContext {
+public final class RefineContext: InvocationContext {
     public class RefineContextType {
         var pvms: [UInt64: InnerPvm]
         var exports: [Data4104]
@@ -26,12 +26,15 @@ public class RefineContext: InvocationContext {
 
     public let config: ProtocolConfigRef
     public var context: ContextType
+
+    // other info needed for dispatches
     public let importSegments: [[Data4104]]
     public let exportSegmentOffset: UInt64
     public let service: ServiceIndex
     public let serviceAccounts: ServiceAccounts
     public let workPackage: WorkPackage
-    public let authorizerOutput: Data
+    public let workItemIndex: Int
+    public let authorizerTrace: Data
 
     public init(
         config: ProtocolConfigRef,
@@ -41,7 +44,8 @@ public class RefineContext: InvocationContext {
         service: ServiceIndex,
         serviceAccounts: some ServiceAccounts,
         workPackage: WorkPackage,
-        authorizerOutput: Data
+        workItemIndex: Int,
+        authorizerTrace: Data
     ) {
         self.config = config
         self.context = context
@@ -50,7 +54,8 @@ public class RefineContext: InvocationContext {
         self.service = service
         self.serviceAccounts = serviceAccounts
         self.workPackage = workPackage
-        self.authorizerOutput = authorizerOutput
+        self.workItemIndex = workItemIndex
+        self.authorizerTrace = authorizerTrace
     }
 
     public func dispatch(index: UInt32, state: VMState) async -> ExecOutcome {
@@ -69,12 +74,12 @@ public class RefineContext: InvocationContext {
             .call(config: config, state: state)
         case Fetch.identifier:
             return await Fetch(
-                context: context,
                 serviceAccounts: ServiceAccountsRef(serviceAccounts),
-                serviceIndex: service,
                 workPackage: workPackage,
-                authorizerOutput: authorizerOutput,
-                importSegments: importSegments
+                entropy: Data32(),
+                authorizerTrace: authorizerTrace,
+                workItemIndex: workItemIndex,
+                importSegments: importSegments,
             )
             .call(config: config, state: state)
         case Export.identifier:

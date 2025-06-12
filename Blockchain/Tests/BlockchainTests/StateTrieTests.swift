@@ -4,8 +4,8 @@ import Utils
 
 @testable import Blockchain
 
-private func merklize(_ data: some Sequence<(key: Data32, value: Data)>) -> Data32 {
-    var dict: [Data32: Data] = [:]
+private func merklize(_ data: some Sequence<(key: Data31, value: Data)>) -> Data32 {
+    var dict: [Data31: Data] = [:]
     for (key, value) in data {
         dict[key] = value
     }
@@ -20,7 +20,7 @@ struct StateTrieTests {
     @Test
     func testEmptyTrie() async throws {
         let trie = StateTrie(rootHash: Data32(), backend: backend)
-        let key = Data32.random()
+        let key = Data31.random()
         let value = try await trie.read(key: key)
         #expect(value == nil)
     }
@@ -28,7 +28,7 @@ struct StateTrieTests {
     @Test
     func testInsertAndRetrieveSingleValue() async throws {
         let trie = StateTrie(rootHash: Data32(), backend: backend)
-        let key = Data([1]).blake2b256hash()
+        let key = Data31(Data([1]).blake2b256hash().data[relative: 0 ..< 31])!
         let value = Data("test value".utf8)
 
         try await trie.update([(key: key, value: value)])
@@ -41,12 +41,12 @@ struct StateTrieTests {
     @Test
     func testInsertAndRetrieveSimple() async throws {
         let trie = StateTrie(rootHash: Data32(), backend: backend)
-        let remainKey = Data(repeating: 0, count: 31)
+        let remainKey = Data(repeating: 0, count: 30)
         let pairs = [
-            (key: Data32(Data([0b0000_0000]) + remainKey)!, value: Data([0])),
-            (key: Data32(Data([0b1000_0000]) + remainKey)!, value: Data([1])),
-            (key: Data32(Data([0b0100_0000]) + remainKey)!, value: Data([2])),
-            (key: Data32(Data([0b1100_0000]) + remainKey)!, value: Data([3])),
+            (key: Data31(Data([0b0000_0000]) + remainKey)!, value: Data([0])),
+            (key: Data31(Data([0b1000_0000]) + remainKey)!, value: Data([1])),
+            (key: Data31(Data([0b0100_0000]) + remainKey)!, value: Data([2])),
+            (key: Data31(Data([0b1100_0000]) + remainKey)!, value: Data([3])),
         ]
 
         for (i, pair) in pairs.enumerated() {
@@ -75,7 +75,7 @@ struct StateTrieTests {
         let trie = StateTrie(rootHash: Data32(), backend: backend)
         let pairs = (0 ..< 50).map { i in
             let data = Data([UInt8(i)])
-            return (key: data.blake2b256hash(), value: data)
+            return (key: Data31(data.blake2b256hash().data[relative: 0 ..< 31])!, value: data)
         }
 
         for (i, pair) in pairs.enumerated() {
@@ -104,7 +104,7 @@ struct StateTrieTests {
     @Test
     func testUpdateExistingValue() async throws {
         let trie = StateTrie(rootHash: Data32(), backend: backend)
-        let key = Data32.random()
+        let key = Data31.random()
         let value1 = Data("value1".utf8)
         let value2 = Data("value2".utf8)
 
@@ -121,7 +121,7 @@ struct StateTrieTests {
     @Test
     func testDeleteValue() async throws {
         let trie = StateTrie(rootHash: Data32(), backend: backend)
-        let key = Data32.random()
+        let key = Data31.random()
         let value = Data("test".utf8)
 
         try await trie.update([(key: key, value: value)])
@@ -139,7 +139,7 @@ struct StateTrieTests {
     @Test
     func testLargeValue() async throws {
         let trie = StateTrie(rootHash: Data32(), backend: backend)
-        let key = Data32.random()
+        let key = Data31.random()
         let value = Data(repeating: 0xFF, count: 1000) // Value larger than 32 bytes
 
         try await trie.update([(key: key, value: value)])
@@ -156,7 +156,7 @@ struct StateTrieTests {
         let trie = StateTrie(rootHash: Data32(), backend: backend)
         let initialRoot = await trie.rootHash
 
-        let key = Data32.random()
+        let key = Data31.random()
         let value = Data("test".utf8)
 
         try await trie.update([(key: key, value: value)])
@@ -173,7 +173,7 @@ struct StateTrieTests {
 
         let pairs = (0 ..< 5).map { i in
             let data = Data(String(i).utf8)
-            return (key: data.blake2b256hash(), value: data)
+            return (key: Data31(data.blake2b256hash().data[relative: 0 ..< 31])!, value: data)
         }
 
         // Apply same updates to both tries
