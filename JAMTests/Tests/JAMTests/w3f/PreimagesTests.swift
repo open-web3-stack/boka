@@ -80,7 +80,7 @@ private struct PreimagesTestcase: Codable {
 
 struct PreimagesTests {
     static func loadTests() throws -> [Testcase] {
-        try TestLoader.getTestcases(path: "preimages/data", extension: "bin")
+        try TestLoader.getTestcases(path: "stf/preimages/data", extension: "bin")
     }
 
     func preimagesTests(_ testcase: Testcase, variant: TestVariants) async throws {

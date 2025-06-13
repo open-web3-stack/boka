@@ -26,7 +26,7 @@ struct StatisticsTestcase: Codable {
 
 struct StatisticsTests {
     static func loadTests(variant: TestVariants) throws -> [Testcase] {
-        try TestLoader.getTestcases(path: "statistics/\(variant)", extension: "bin")
+        try TestLoader.getTestcases(path: "stf/statistics/\(variant)", extension: "bin")
     }
 
     func statisticsTests(_ testcase: Testcase, variant: TestVariants) throws {

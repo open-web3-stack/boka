@@ -26,7 +26,7 @@ struct RecentHistoryTestcase: Codable {
 
 struct RecentHistoryTests {
     static func loadTests() throws -> [Testcase] {
-        try TestLoader.getTestcases(path: "history/data", extension: "bin")
+        try TestLoader.getTestcases(path: "stf/history/data", extension: "bin")
     }
 
     @Test(arguments: try loadTests())
