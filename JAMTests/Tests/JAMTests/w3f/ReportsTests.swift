@@ -20,7 +20,6 @@ struct ReportsTestcaseState: Codable, Equatable {
         ProtocolConfig.TotalNumberOfCores
     >
     @CodingAs<SortedKeyValues<ServiceIndex, ServiceAccountDetails>> var services: [ServiceIndex: ServiceAccountDetails]
-    // NOTE: we are not updating stats in guaranteeing STF
     var coresStatistics: ConfigFixedSizeArray<Statistics.Core, ProtocolConfig.TotalNumberOfCores>
     @CodingAs<SortedKeyValues<ServiceIndex, Statistics.Service>> var servicesStatistics: [ServiceIndex: Statistics.Service]
 }
@@ -119,7 +118,7 @@ struct ReportsTests {
                     recentHistory: state.recentHistory,
                     coreAuthorizationPool: state.coreAuthorizationPool,
                     services: state.services,
-                    // NOTE: just use testcase postState since we don't udpate stats in guaranteeing STF
+                    // NOTE: just use testcase postState since we don't update stats in guaranteeing STF
                     coresStatistics: testcase.postState.coresStatistics,
                     servicesStatistics: testcase.postState.servicesStatistics
                 )
