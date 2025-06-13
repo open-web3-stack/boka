@@ -150,7 +150,7 @@ struct AccumulateTests {
     // }
 
     static func loadTests(variant: TestVariants) throws -> [Testcase] {
-        try TestLoader.getTestcases(path: "accumulate/\(variant)", extension: "bin")
+        try TestLoader.getTestcases(path: "stf/accumulate/\(variant)", extension: "bin")
     }
 
     func accumulateTests(_ testcase: Testcase, variant: TestVariants) async throws {

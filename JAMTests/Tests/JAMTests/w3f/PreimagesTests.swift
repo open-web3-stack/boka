@@ -28,7 +28,6 @@ private struct AccountsMapEntry: Codable, Equatable {
 
 private struct PreimagesState: Equatable, Codable, Preimages {
     var accounts: [AccountsMapEntry] = []
-    // NOTE: we are not using/updating stats in preimage stf, may need to check
     var serviceStatistics: [ServiceStatisticsMapEntry]
 
     func get(serviceAccount index: ServiceIndex, preimageHash hash: Data32) async throws -> Data? {
@@ -80,7 +79,7 @@ private struct PreimagesTestcase: Codable {
 
 struct PreimagesTests {
     static func loadTests() throws -> [Testcase] {
-        try TestLoader.getTestcases(path: "preimages/data", extension: "bin")
+        try TestLoader.getTestcases(path: "stf/preimages/data", extension: "bin")
     }
 
     func preimagesTests(_ testcase: Testcase, variant: TestVariants) async throws {
@@ -102,7 +101,7 @@ struct PreimagesTests {
             switch testcase.output {
             case .none:
                 state.mergeWith(postState: postState)
-                // NOTE: we are not using/updating stats in preimage stf, may need to check
+                // NOTE: we are not updating stats in preimage stf, so not checking this
                 state.serviceStatistics = testcase.postState.serviceStatistics
                 #expect(state == testcase.postState)
             case .some:
