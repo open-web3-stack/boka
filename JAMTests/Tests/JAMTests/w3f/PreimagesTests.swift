@@ -78,8 +78,8 @@ private struct PreimagesTestcase: Codable {
 }
 
 struct PreimagesTests {
-    static func loadTests() throws -> [Testcase] {
-        try TestLoader.getTestcases(path: "stf/preimages/data", extension: "bin")
+    static func loadTests(variant: TestVariants) throws -> [Testcase] {
+        try TestLoader.getTestcases(path: "stf/preimages/\(variant)", extension: "bin")
     }
 
     func preimagesTests(_ testcase: Testcase, variant: TestVariants) async throws {
@@ -118,8 +118,13 @@ struct PreimagesTests {
         }
     }
 
-    @Test(arguments: try PreimagesTests.loadTests())
-    func tests(_ testcase: Testcase) async throws {
+    @Test(arguments: try PreimagesTests.loadTests(variant: .tiny))
+    func tinyTests(_ testcase: Testcase) async throws {
+        try await preimagesTests(testcase, variant: .tiny)
+    }
+
+    @Test(arguments: try PreimagesTests.loadTests(variant: .full))
+    func fullTests(_ testcase: Testcase) async throws {
         try await preimagesTests(testcase, variant: .full)
     }
 }
