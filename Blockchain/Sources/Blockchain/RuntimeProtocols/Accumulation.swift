@@ -170,10 +170,10 @@ extension Accumulation {
                     packageHash: report.packageSpecification.workPackageHash,
                     segmentRoot: report.packageSpecification.segmentRoot,
                     authorizerHash: report.authorizerHash,
-                    authorizerTrace: report.authorizerTrace,
                     payloadHash: digest.payloadHash,
                     gasLimit: digest.gasLimit,
                     workResult: digest.result,
+                    authorizerTrace: report.authorizerTrace,
                 ))
             }
         }
