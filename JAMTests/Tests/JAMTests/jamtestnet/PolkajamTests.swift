@@ -24,4 +24,11 @@ struct PolkajamTests {
     //         _ = try await STFTests.test(input)
     //     }
     // }
+
+    // @Test(arguments: try JamTestnet.loadTests(path: "traces/reports-l1", src: .w3f))
+    // func reportsl0Tests(_ input: Testcase) async throws {
+    //     await withKnownIssue("TODO: debug", isIntermittent: true) {
+    //         _ = try await STFTests.test(input)
+    //     }
+    // }
 }
