@@ -28,7 +28,6 @@ private struct AccountsMapEntry: Codable, Equatable {
 
 private struct PreimagesState: Equatable, Codable, Preimages {
     var accounts: [AccountsMapEntry] = []
-    // NOTE: we are not using/updating stats in preimage stf, may need to check
     var serviceStatistics: [ServiceStatisticsMapEntry]
 
     func get(serviceAccount index: ServiceIndex, preimageHash hash: Data32) async throws -> Data? {
@@ -79,8 +78,8 @@ private struct PreimagesTestcase: Codable {
 }
 
 struct PreimagesTests {
-    static func loadTests() throws -> [Testcase] {
-        try TestLoader.getTestcases(path: "preimages/data", extension: "bin")
+    static func loadTests(variant: TestVariants) throws -> [Testcase] {
+        try TestLoader.getTestcases(path: "stf/preimages/\(variant)", extension: "bin")
     }
 
     func preimagesTests(_ testcase: Testcase, variant: TestVariants) async throws {
@@ -102,7 +101,7 @@ struct PreimagesTests {
             switch testcase.output {
             case .none:
                 state.mergeWith(postState: postState)
-                // NOTE: we are not using/updating stats in preimage stf, may need to check
+                // NOTE: we are not updating stats in preimage stf, so not checking this
                 state.serviceStatistics = testcase.postState.serviceStatistics
                 #expect(state == testcase.postState)
             case .some:
@@ -119,8 +118,13 @@ struct PreimagesTests {
         }
     }
 
-    @Test(arguments: try PreimagesTests.loadTests())
-    func tests(_ testcase: Testcase) async throws {
+    @Test(arguments: try PreimagesTests.loadTests(variant: .tiny))
+    func tinyTests(_ testcase: Testcase) async throws {
+        try await preimagesTests(testcase, variant: .tiny)
+    }
+
+    @Test(arguments: try PreimagesTests.loadTests(variant: .full))
+    func fullTests(_ testcase: Testcase) async throws {
         try await preimagesTests(testcase, variant: .full)
     }
 }

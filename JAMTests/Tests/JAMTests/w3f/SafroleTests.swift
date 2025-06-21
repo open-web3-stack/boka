@@ -86,7 +86,7 @@ struct SafroleTestcase: Codable {
 
 struct SafroleTests {
     static func loadTests(variant: TestVariants) throws -> [Testcase] {
-        try TestLoader.getTestcases(path: "safrole/\(variant)", extension: "bin")
+        try TestLoader.getTestcases(path: "stf/safrole/\(variant)", extension: "bin")
     }
 
     func safroleTests(_ input: Testcase, variant: TestVariants) throws {

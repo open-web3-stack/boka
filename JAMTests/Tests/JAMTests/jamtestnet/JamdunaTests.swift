@@ -5,7 +5,7 @@ import Utils
 
 struct JamdunaTests {
     @Test(arguments: try JamTestnet.loadTests(path: "data/generic/state_transitions", src: .jamduna))
-    func safroleTests(_ input: Testcase) async throws {
+    func genericTests(_ input: Testcase) async throws {
         await withKnownIssue("TODO: debug", isIntermittent: true) {
             try await STFTests.test(input)
         }
