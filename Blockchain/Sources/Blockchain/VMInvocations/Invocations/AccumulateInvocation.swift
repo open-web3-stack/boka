@@ -50,7 +50,7 @@ public func accumulate(
         )
     )
     let ctx = AccumulateContext(context: contextContent, config: config, timeslot: timeslot, operands: arguments)
-    let argument = try JamEncoder.encode(timeslot, serviceIndex, arguments.count)
+    let argument = try JamEncoder.encode(UInt(timeslot), UInt(serviceIndex), UInt(arguments.count))
 
     let (exitReason, gas, output) = await invokePVM(
         config: config,

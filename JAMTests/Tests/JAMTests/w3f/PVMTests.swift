@@ -117,6 +117,6 @@ struct PVMTests {
                 #expect(value == byte)
             }
         }
-        // #expect(vmState.getGas() == testCase.expectedGas)
+        #expect(vmState.getGas().value == testCase.expectedGas.value)
     }
 }

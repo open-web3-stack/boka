@@ -31,7 +31,7 @@ public func onTransfer(
     let contextContent = OnTransferContext.ContextType(serviceIndex: serviceIndex, accounts: serviceAccounts)
     let ctx = OnTransferContext(context: contextContent, config: config, entropy: entropy, transfers: transfers)
     let gasLimitSum = transfers.reduce(Balance(0)) { $0 + $1.gasLimit }
-    let argument = try JamEncoder.encode(timeslot, serviceIndex, transfers.count)
+    let argument = try JamEncoder.encode(UInt(timeslot), UInt(serviceIndex), UInt(transfers.count))
 
     let (_, gas, _) = await invokePVM(
         config: config,

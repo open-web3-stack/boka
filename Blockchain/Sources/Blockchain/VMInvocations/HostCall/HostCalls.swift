@@ -63,15 +63,15 @@ public class Fetch: HostCall {
     }
 
     private func getWorkItemMeta(item: WorkItem) throws -> Data {
-        let encoder = JamEncoder(capacity: 4 + 4 + 8 + 8 + 2 + 2 + 2 + 4)
+        let encoder = JamEncoder(capacity: 4 + 32 + 8 + 8 + 2 + 2 + 2 + 4)
         try encoder.encode(item.serviceIndex)
         try encoder.encode(item.codeHash)
         try encoder.encode(item.refineGasLimit)
         try encoder.encode(item.accumulateGasLimit)
         try encoder.encode(item.exportsCount)
-        try encoder.encode(item.inputs.count)
-        try encoder.encode(item.outputs.count)
-        try encoder.encode(item.payloadBlob.count)
+        try encoder.encode(UInt16(item.inputs.count))
+        try encoder.encode(UInt16(item.outputs.count))
+        try encoder.encode(UInt32(item.payloadBlob.count))
         return encoder.data
     }
 
@@ -177,7 +177,11 @@ public class Fetch: HostCall {
         let first = min(Int(reg8), value?.count ?? 0)
         let len = min(Int(reg9), (value?.count ?? 0) - first)
 
+        logger.debug("writeAddr: \(writeAddr), first: \(first), len: \(len)")
+
         let isWritable = state.isMemoryWritable(address: writeAddr, length: len)
+
+        logger.debug("isWritable: \(isWritable), value: \(value?.toDebugHexString() ?? "nil")")
 
         if !isWritable {
             throw VMInvocationsError.panic

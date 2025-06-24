@@ -123,6 +123,7 @@ public class PageMap {
     ///
     /// If the pages are not readable, return (false, faultPageIndex).
     public func isReadable(pageStart: UInt32, pages: Int) -> (result: Bool, page: UInt32) {
+        guard pageTable[pageStart] != nil else { return (false, pageStart) }
         let pageRange = pageStart ..< pageStart + UInt32(pages)
         let cacheValue = isReadableCache.value(forKey: pageRange)
         if let cacheValue {
@@ -157,6 +158,7 @@ public class PageMap {
     ///
     /// If the pages are not writable, return (false, faultPageIndex).
     public func isWritable(pageStart: UInt32, pages: Int) -> (result: Bool, page: UInt32) {
+        guard pageTable[pageStart] != nil else { return (false, pageStart) }
         let pageRange = pageStart ..< pageStart + UInt32(pages)
         let cacheValue = isWritableCache.value(forKey: pageRange)
         if let cacheValue {

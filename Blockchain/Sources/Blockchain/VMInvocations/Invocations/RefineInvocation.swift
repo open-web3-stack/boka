@@ -37,8 +37,8 @@ public func refine(
     let codeBlob = try CodeAndMeta(data: preimage).codeBlob
 
     let argumentData = try JamEncoder.encode(
-        workItemIndex,
-        service,
+        UInt(workItemIndex),
+        UInt(service),
         workItem.payloadBlob,
         workPackage.hash(),
     )

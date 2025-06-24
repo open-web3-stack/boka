@@ -152,7 +152,7 @@ private struct FullAccumulateState: Accumulation {
 
 struct AccumulateTests {
     init() {
-        // setupTestLogger()
+        setupTestLogger()
     }
 
     static func loadTests(variant: TestVariants) throws -> [Testcase] {
@@ -163,12 +163,6 @@ struct AccumulateTests {
         let config = variant.config
         let decoder = JamDecoder(data: testcase.data, config: config)
         let testcase = try decoder.decode(AccumulateTestcase.self)
-
-        // print("pre state entropy: \(testcase.preState.entropy))")
-        // print("pre state ready queue: \(testcase.preState.accumulationQueue))")
-        // print("pre state history: \(testcase.preState.accumulationHistory))")
-        // print("pre state privilegedServices: \(testcase.preState.privilegedServices))")
-        // print("pre state accounts: \(testcase.preState.accounts))")
 
         let preState = testcase.preState
         var fullState = try FullAccumulateState(
@@ -231,7 +225,7 @@ struct AccumulateTests {
 
     @Test(arguments: try AccumulateTests.loadTests(variant: .tiny))
     func tinyTests(_ testcase: Testcase) async throws {
-        if !testcase.description.contains("accumulate_ready_queued_reports-1") {
+        if !testcase.description.contains("process_one_immediate_report-1") {
             return
         }
         await withKnownIssue("TODO: debug", isIntermittent: true) {
