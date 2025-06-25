@@ -390,6 +390,28 @@ extension State: ServiceAccounts {
     }
 
     public mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data32, value: Data?) {
+        // update footprint
+        let oldValue = layer[serviceAccount: index, storageKey: key]
+        let oldAccount = layer[serviceAccount: index]
+        if let oldValue {
+            if let value {
+                // replace: update byte count difference
+                layer[serviceAccount: index]?.totalByteLength =
+                    max(0, (oldAccount?.totalByteLength ?? 0) - (32 + UInt64(oldValue.count))) + (32 + UInt64(value.count))
+            } else {
+                // remove: decrease count and bytes
+                layer[serviceAccount: index]?.itemsCount = max(0, (oldAccount?.itemsCount ?? 0) - 1)
+                layer[serviceAccount: index]?.totalByteLength = max(0, (oldAccount?.totalByteLength ?? 0) - (32 + UInt64(oldValue.count)))
+            }
+        } else {
+            if let value {
+                // add: increase count and bytes
+                layer[serviceAccount: index]?.itemsCount = (oldAccount?.itemsCount ?? 0) + 1
+                layer[serviceAccount: index]?.totalByteLength = (oldAccount?.totalByteLength ?? 0) + 32 + UInt64(value.count)
+            }
+        }
+
+        // update value
         layer[serviceAccount: index, storageKey: key] = value
     }
 
@@ -403,6 +425,28 @@ extension State: ServiceAccounts {
         length: UInt32,
         value: StateKeys.ServiceAccountPreimageInfoKey.Value?
     ) {
+        // update footprint
+        let oldValue = layer[serviceAccount: index, preimageHash: hash, length: length]
+        let oldAccount = layer[serviceAccount: index]
+        if let oldValue {
+            if let value {
+                // replace: update byte count difference
+                layer[serviceAccount: index]?.totalByteLength =
+                    max(0, (oldAccount?.totalByteLength ?? 0) - (81 + UInt64(oldValue.count))) + (81 + UInt64(value.count))
+            } else {
+                // remove: decrease count and bytes
+                layer[serviceAccount: index]?.itemsCount = max(0, (oldAccount?.itemsCount ?? 0) - 2)
+                layer[serviceAccount: index]?.totalByteLength = max(0, (oldAccount?.totalByteLength ?? 0) - (81 + UInt64(oldValue.count)))
+            }
+        } else {
+            if let value {
+                // add: increase count and bytes
+                layer[serviceAccount: index]?.itemsCount = (oldAccount?.itemsCount ?? 0) + 2
+                layer[serviceAccount: index]?.totalByteLength = (oldAccount?.totalByteLength ?? 0) + 81 + UInt64(value.count)
+            }
+        }
+
+        // update value
         layer[serviceAccount: index, preimageHash: hash, length: length] = value
     }
 }

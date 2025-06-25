@@ -112,7 +112,7 @@ public struct AccountChanges {
             throw .duplicatedNewService
         }
         guard altered.isDisjoint(with: other.altered) else {
-            logger.debug("altered accounts have duplicates, self: \(altered), other: \(other.altered)")
+            logger.debug("same service being altered in parallel, self: \(altered), other: \(other.altered)")
             throw .duplicatedContributionToService
         }
         guard removed.isDisjoint(with: other.removed) else {
@@ -234,7 +234,7 @@ extension Accumulation {
         var accountsRef = ServiceAccountsMutRef(state.accounts.value)
         var servicePreimageSet = Set<ServicePreimagePair>()
 
-        for service in services {
+        for service in Set(services) {
             let singleOutput = try await singleAccumulate(
                 config: config,
                 state: AccumulateState(
@@ -527,7 +527,7 @@ extension Accumulation {
             transfersStats[service] = (count, gasUsed)
         }
 
-        self = accountsMutRef.value as! Self
+        self = accumulateOutput.state.accounts.value as! Self
 
         // update accumulation history
         let accumulated = accumulatableReports[0 ..< accumulateOutput.numAccumulated]

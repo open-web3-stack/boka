@@ -84,8 +84,10 @@ public class VMStateInterpreter: VMState {
     }
 
     public func writeMemory(address: some FixedWidthInteger, values: some Sequence<UInt8>) throws {
+        let data = Data(values)
+        guard !data.isEmpty else { return }
         try validateAddress(address)
-        try memory.write(address: UInt32(truncatingIfNeeded: address), values: Data(values))
+        try memory.write(address: UInt32(truncatingIfNeeded: address), values: data)
     }
 
     public func sbrk(_ increment: UInt32) throws -> UInt32 {
