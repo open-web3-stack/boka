@@ -71,7 +71,6 @@ public class Engine {
             context.state.consumeGas(blockGas)
         }
 
-        // log
         logStep(pc: pc, instruction: inst, context: context)
 
         return inst.execute(context: context, skip: skip)

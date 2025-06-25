@@ -30,16 +30,6 @@ struct StatsState: ActivityStatistics {
     var activityStatistics: Statistics
     var timeslot: TimeslotIndex
     var currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
-
-    init(
-        activityStatistics: Statistics,
-        timeslot: TimeslotIndex,
-        currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
-    ) {
-        self.activityStatistics = activityStatistics
-        self.timeslot = timeslot
-        self.currentValidators = currentValidators
-    }
 }
 
 struct StatisticsTests {
