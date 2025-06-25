@@ -5,7 +5,7 @@ import Utils
 
 @testable import JAMTests
 
-enum STFTests {
+enum TraceTest {
     static func test(_ input: Testcase) async throws {
         // setupTestLogger()
 

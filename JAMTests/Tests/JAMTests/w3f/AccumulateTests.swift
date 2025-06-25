@@ -139,14 +139,13 @@ private struct FullAccumulateState: Accumulation {
         let oldValue = storages[index]?[key]
         let oldAccount = accounts[index]
         if let oldValue {
-            if let value {
+            if let value, let oldAccount {
                 // replace: update byte count difference
-                accounts[index]?.totalByteLength =
-                    max(0, (oldAccount?.totalByteLength ?? 0) - (32 + UInt64(oldValue.count))) + (32 + UInt64(value.count))
+                accounts[index]?.totalByteLength = oldAccount.totalByteLength - UInt64(oldValue.count) + UInt64(value.count)
             } else {
                 // remove: decrease count and bytes
-                accounts[index]?.itemsCount = max(0, (oldAccount?.itemsCount ?? 0) - 1)
-                accounts[index]?.totalByteLength = max(0, (oldAccount?.totalByteLength ?? 0) - (32 + UInt64(oldValue.count)))
+                accounts[index]?.itemsCount = UInt32(max(0, Int(oldAccount?.itemsCount ?? 0) - 1))
+                accounts[index]?.totalByteLength = UInt64(max(0, Int(oldAccount?.totalByteLength ?? 0) - (32 + oldValue.count)))
             }
         } else {
             if let value {
@@ -175,14 +174,13 @@ private struct FullAccumulateState: Accumulation {
         let oldValue = preimageInfo[index]?[hash]
         let oldAccount = accounts[index]
         if let oldValue {
-            if let value {
+            if let value, let oldAccount {
                 // replace: update byte count difference
-                accounts[index]?.totalByteLength =
-                    max(0, (oldAccount?.totalByteLength ?? 0) - (81 + UInt64(oldValue.count))) + (81 + UInt64(value.count))
+                accounts[index]?.totalByteLength = oldAccount.totalByteLength - UInt64(oldValue.count) + UInt64(value.count)
             } else {
                 // remove: decrease count and bytes
-                accounts[index]?.itemsCount = max(0, (oldAccount?.itemsCount ?? 0) - 2)
-                accounts[index]?.totalByteLength = max(0, (oldAccount?.totalByteLength ?? 0) - (81 + UInt64(oldValue.count)))
+                accounts[index]?.itemsCount = UInt32(max(0, Int(oldAccount?.itemsCount ?? 0) - 2))
+                accounts[index]?.totalByteLength = UInt64(max(0, Int(oldAccount?.totalByteLength ?? 0) - (81 + oldValue.count)))
             }
         } else {
             if let value {

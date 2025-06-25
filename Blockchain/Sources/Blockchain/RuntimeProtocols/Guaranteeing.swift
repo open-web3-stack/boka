@@ -109,7 +109,7 @@ extension Guaranteeing {
         let previousCoreAssignment = getCoreAssignment(
             config: config,
             randomness: previousRandomness,
-            timeslot: timeslot - coreAssignmentRotationPeriod
+            timeslot: UInt32(max(0, Int(timeslot) - Int(coreAssignmentRotationPeriod)))
         )
         let pareviousCoreKeys = withoutOffenders(keys: previousValidators.map(\.ed25519))
 

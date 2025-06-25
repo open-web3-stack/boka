@@ -52,7 +52,8 @@ struct TestState: Codable {
 
 enum JamTestnet {
     static func loadTests(path: String, src: TestsSource, ext: String = "bin") throws -> [Testcase] {
-        try TestLoader.getTestcases(path: path, extension: ext, src: src)
+        // filter genesis which has no tests
+        try TestLoader.getTestcases(path: path, extension: ext, src: src).filter { $0.description != "genesis.bin" }
     }
 
     static func decodeTestcase(_ input: Testcase, config: ProtocolConfigRef = TestVariants.tiny.config) throws -> JamTestnetTestcase {

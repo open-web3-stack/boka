@@ -8,7 +8,7 @@ import Utils
 struct JavajamTests {
     @Test(arguments: try JamTestnet.loadTests(path: "stf/state_transitions", src: .javajam))
     func stfTests(_ input: Testcase) async throws {
-        try await STFTests.test(input)
+        try await TraceTest.test(input)
     }
 
     // TODO: try again after updating our erasure coding
