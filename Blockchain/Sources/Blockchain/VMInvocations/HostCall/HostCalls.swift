@@ -401,7 +401,7 @@ public class Info: HostCall {
             m = nil
         }
 
-        if !state.isMemoryWritable(address: o, length: Int(m!.count)) {
+        if let m, !state.isMemoryWritable(address: o, length: Int(m.count)) {
             throw VMInvocationsError.panic
         } else if m == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)

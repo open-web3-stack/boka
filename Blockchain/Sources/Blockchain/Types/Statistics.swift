@@ -103,7 +103,7 @@ public struct Statistics: Sendable, Equatable, Codable {
     public var core: ConfigFixedSizeArray<Core, ProtocolConfig.TotalNumberOfCores>
 
     // service statistics
-    @CodingAs<SortedKeyValues<UInt, Service>> public var service: [UInt: Service]
+    @CodingAs<SortedKeyValues<UInt32, Service>> public var service: [UInt32: Service]
 }
 
 extension Statistics: Dummy {

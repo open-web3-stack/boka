@@ -166,50 +166,6 @@ public struct State: Sendable {
         }
     }
 
-    // δ: The (prior) state of the service accounts.
-    public subscript(serviceAccount index: ServiceIndex) -> StateKeys.ServiceAccountKey.Value? {
-        get {
-            layer[serviceAccount: index]
-        }
-        set {
-            layer[serviceAccount: index] = newValue
-        }
-    }
-
-    // s
-    public subscript(serviceAccount index: ServiceIndex, storageKey key: Data32) -> StateKeys.ServiceAccountStorageKey.Value? {
-        get {
-            layer[serviceAccount: index, storageKey: key]
-        }
-        set {
-            layer[serviceAccount: index, storageKey: key] = newValue
-        }
-    }
-
-    // p
-    public subscript(
-        serviceAccount index: ServiceIndex, preimageHash hash: Data32
-    ) -> StateKeys.ServiceAccountPreimagesKey.Value? {
-        get {
-            layer[serviceAccount: index, preimageHash: hash]
-        }
-        set {
-            layer[serviceAccount: index, preimageHash: hash] = newValue
-        }
-    }
-
-    // l
-    public subscript(
-        serviceAccount index: ServiceIndex, preimageHash hash: Data32, length length: UInt32
-    ) -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
-        get {
-            layer[serviceAccount: index, preimageHash: hash, length: length]
-        }
-        set {
-            layer[serviceAccount: index, preimageHash: hash, length: length] = newValue
-        }
-    }
-
     public mutating func load(keys: [any StateKey]) async throws {
         let pairs = try await backend.batchRead(keys)
         for (key, value) in pairs {
@@ -502,8 +458,8 @@ extension State: Guaranteeing {
         judgements.punishSet
     }
 
-    public func serviceAccount(index: ServiceIndex) -> ServiceAccountDetails? {
-        self[serviceAccount: index] ?? nil
+    public func serviceAccount(index: ServiceIndex) async throws -> ServiceAccountDetails? {
+        try await get(serviceAccount: index)
     }
 }
 
@@ -518,9 +474,17 @@ extension State: ActivityStatistics {}
 extension State: Preimages {
     public mutating func mergeWith(postState: PreimagesPostState) {
         for update in postState.updates {
-            self[serviceAccount: update.serviceIndex, preimageHash: update.hash] = update.data
-            self[serviceAccount: update.serviceIndex, preimageHash: update.hash, length: update.length] =
-                LimitedSizeArray([update.timeslot])
+            set(
+                serviceAccount: update.serviceIndex,
+                preimageHash: update.hash,
+                value: update.data
+            )
+            set(
+                serviceAccount: update.serviceIndex,
+                preimageHash: update.hash,
+                length: update.length,
+                value: StateKeys.ServiceAccountPreimageInfoKey.Value([update.timeslot])
+            )
         }
     }
 }

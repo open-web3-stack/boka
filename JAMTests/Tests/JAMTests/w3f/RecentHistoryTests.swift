@@ -34,9 +34,11 @@ struct RecentHistoryTests {
         let testcase = try JamDecoder.decode(RecentHistoryTestcase.self, from: testcase.data, withConfig: config)
 
         var state = testcase.preState
+        state.updatePartial(
+            parentStateRoot: testcase.input.parentStateRoot
+        )
         state.update(
             headerHash: testcase.input.headerHash,
-            parentStateRoot: testcase.input.parentStateRoot,
             accumulateRoot: testcase.input.accumulateRoot,
             lookup: Dictionary(uniqueKeysWithValues: testcase.input.workPackages.map { (
                 $0.hash,

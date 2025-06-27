@@ -75,7 +75,7 @@ struct ReportsTests {
         try TestLoader.getTestcases(path: "stf/reports/\(variant)", extension: "bin")
     }
 
-    func reportsTests(_ testcase: Testcase, variant: TestVariants) throws {
+    func reportsTests(_ testcase: Testcase, variant: TestVariants) async throws {
         if testcase.description == "no_enough_guarantees-1.bin" {
             // we can't decode such test because it is intentially invalid
             return
@@ -97,9 +97,9 @@ struct ReportsTests {
             accumulationQueue: try! ConfigFixedSizeArray(config: config, defaultValue: []),
             accumulationHistory: try! ConfigFixedSizeArray(config: config, defaultValue: .init())
         )
-        let result = Result {
+        let result = await Result {
             try testcase.input.reports.validate(config: config)
-            return try state.update(
+            return try await state.update(
                 config: config,
                 timeslot: testcase.input.timeslot,
                 extrinsic: testcase.input.reports
@@ -148,12 +148,12 @@ struct ReportsTests {
     }
 
     @Test(arguments: try ReportsTests.loadTests(variant: .tiny))
-    func tinyTests(_ testcase: Testcase) throws {
-        try reportsTests(testcase, variant: .tiny)
+    func tinyTests(_ testcase: Testcase) async throws {
+        try await reportsTests(testcase, variant: .tiny)
     }
 
     @Test(arguments: try ReportsTests.loadTests(variant: .full))
-    func fullTests(_ testcase: Testcase) throws {
-        try reportsTests(testcase, variant: .full)
+    func fullTests(_ testcase: Testcase) async throws {
+        try await reportsTests(testcase, variant: .full)
     }
 }

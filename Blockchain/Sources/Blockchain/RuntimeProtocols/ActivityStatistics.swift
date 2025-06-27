@@ -61,9 +61,9 @@ extension ActivityStatistics {
             config: config,
             defaultValue: .dummy(config: config)
         )
-        var serviceStats = [UInt: Statistics.Service]()
+        var serviceStats = [UInt32: Statistics.Service]()
         for index in indices {
-            serviceStats[UInt(index)] = .dummy(config: config)
+            serviceStats[UInt32(index)] = .dummy(config: config)
         }
 
         for guaranteeItem in extrinsic.reports.guarantees {
@@ -77,7 +77,7 @@ extension ActivityStatistics {
                 coreStats[index].extrinsicsCount += digest.extrinsicsCount
                 coreStats[index].extrinsicsSize += digest.extrinsicsSize
 
-                let serviceIndex = UInt(digest.serviceIndex)
+                let serviceIndex = UInt32(digest.serviceIndex)
                 serviceStats[serviceIndex]!.importsCount += digest.importsCount
                 serviceStats[serviceIndex]!.exportsCount += digest.exportsCount
                 serviceStats[serviceIndex]!.extrinsicsCount += digest.extrinsicsCount
@@ -97,17 +97,17 @@ extension ActivityStatistics {
             }
         }
         for preimageItem in extrinsic.preimages.preimages {
-            let index = UInt(preimageItem.serviceIndex)
+            let index = UInt32(preimageItem.serviceIndex)
             serviceStats[index]!.preimages.count += 1
             serviceStats[index]!.preimages.size += UInt(preimageItem.data.count)
         }
         for accumulateItem in accumulateStats {
-            let index = UInt(accumulateItem.key)
+            let index = UInt32(accumulateItem.key)
             serviceStats[index]!.accumulates.count += UInt(accumulateItem.value.1)
             serviceStats[index]!.accumulates.gasUsed += UInt(accumulateItem.value.0.value)
         }
         for transferItem in transfersStats {
-            let index = UInt(transferItem.key)
+            let index = UInt32(transferItem.key)
             serviceStats[index]!.transfers.count += UInt(transferItem.value.0)
             serviceStats[index]!.transfers.gasUsed += UInt(transferItem.value.1.value)
         }
