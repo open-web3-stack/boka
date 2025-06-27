@@ -7,20 +7,12 @@ import Utils
 @testable import JAMTests
 
 struct CodecTests {
-    static func config() -> ProtocolConfigRef {
-        var config = ProtocolConfigRef.mainnet.value
-        config.totalNumberOfValidators = 6
-        config.epochLength = 12
-        config.totalNumberOfCores = 2
-        return Ref(config)
-    }
+    static func test(_ type: (some Codable).Type, path: String, variant: TestVariants) throws -> (JSON, JSON) {
+        let config = variant.config
 
-    static func test(_ type: (some Codable).Type, path: String) throws -> (JSON, JSON) {
-        let config = config()
-
-        let jsonData = try TestLoader.getFile(path: "codec/data/\(path)", extension: "json")
+        let jsonData = try TestLoader.getFile(path: "codec/\(variant)/\(path)", extension: "json")
         let json = try JSONDecoder().decode(JSON.self, from: jsonData)
-        let bin = try TestLoader.getFile(path: "codec/data/\(path)", extension: "bin")
+        let bin = try TestLoader.getFile(path: "codec/\(variant)/\(path)", extension: "bin")
 
         let decoded = try JamDecoder.decode(type, from: bin, withConfig: config)
         let encoded = try JamEncoder.encode(decoded)
@@ -35,6 +27,16 @@ struct CodecTests {
         let transformed = Self.transform(redecoded, value: decoded)
 
         return (transformed, json)
+    }
+
+    func testBothVariants(_ type: (some Codable).Type, path: String) throws {
+        // Test with tiny variant
+        let (actualTiny, expectedTiny) = try Self.test(type, path: path, variant: .tiny)
+        #expect(actualTiny == expectedTiny)
+
+        // Test with full variant
+        let (actualFull, expectedFull) = try Self.test(type, path: path, variant: .full)
+        #expect(actualFull == expectedFull)
     }
 
     static func transform(_ json: JSON, value: Any) -> JSON {
@@ -253,91 +255,76 @@ struct CodecTests {
 
     @Test
     func assurances_extrinsic() throws {
-        let (actual, expected) = try Self.test(ExtrinsicAvailability.self, path: "assurances_extrinsic")
-        #expect(actual == expected)
+        try testBothVariants(ExtrinsicAvailability.self, path: "assurances_extrinsic")
     }
 
     @Test
     func block() throws {
-        let (actual, expected) = try Self.test(Block.self, path: "block")
-        #expect(actual == expected)
+        try testBothVariants(Block.self, path: "block")
     }
 
     @Test
     func disputes_extrinsic() throws {
-        let (actual, expected) = try Self.test(ExtrinsicDisputes.self, path: "disputes_extrinsic")
-        #expect(actual == expected)
+        try testBothVariants(ExtrinsicDisputes.self, path: "disputes_extrinsic")
     }
 
     @Test
     func extrinsic() throws {
-        let (actual, expected) = try Self.test(Extrinsic.self, path: "extrinsic")
-        #expect(actual == expected)
+        try testBothVariants(Extrinsic.self, path: "extrinsic")
     }
 
     @Test
     func guarantees_extrinsic() throws {
-        let (actual, expected) = try Self.test(ExtrinsicGuarantees.self, path: "guarantees_extrinsic")
-        #expect(actual == expected)
+        try testBothVariants(ExtrinsicGuarantees.self, path: "guarantees_extrinsic")
     }
 
     @Test
     func header_0() throws {
-        let (actual, expected) = try Self.test(Header.self, path: "header_0")
-        #expect(actual == expected)
+        try testBothVariants(Header.self, path: "header_0")
     }
 
     @Test
     func header_1() throws {
-        let (actual, expected) = try Self.test(Header.self, path: "header_1")
-        #expect(actual == expected)
+        try testBothVariants(Header.self, path: "header_1")
     }
 
     @Test
     func preimages_extrinsic() throws {
-        let (actual, expected) = try Self.test(ExtrinsicPreimages.self, path: "preimages_extrinsic")
-        #expect(actual == expected)
+        try testBothVariants(ExtrinsicPreimages.self, path: "preimages_extrinsic")
     }
 
     @Test
     func refine_context() throws {
-        let (actual, expected) = try Self.test(RefinementContext.self, path: "refine_context")
-        #expect(actual == expected)
+        try testBothVariants(RefinementContext.self, path: "refine_context")
     }
 
     @Test
     func tickets_extrinsic() throws {
-        let (actual, expected) = try Self.test(ExtrinsicTickets.self, path: "tickets_extrinsic")
-        #expect(actual == expected)
+        try testBothVariants(ExtrinsicTickets.self, path: "tickets_extrinsic")
     }
 
     @Test
     func work_item() throws {
-        let (actual, expected) = try Self.test(WorkItem.self, path: "work_item")
-        #expect(actual == expected)
+        try testBothVariants(WorkItem.self, path: "work_item")
     }
 
     @Test
     func work_package() throws {
-        let (actual, expected) = try Self.test(WorkPackage.self, path: "work_package")
-        #expect(actual == expected)
+        try testBothVariants(WorkPackage.self, path: "work_package")
     }
 
     @Test
     func work_report() throws {
-        let (actual, expected) = try Self.test(WorkReport.self, path: "work_report")
-        #expect(actual == expected)
+        try testBothVariants(WorkReport.self, path: "work_report")
     }
 
     @Test
     func work_result_0() throws {
-        let (actual, expected) = try Self.test(WorkDigest.self, path: "work_result_0")
-        #expect(actual == expected)
+        try testBothVariants(WorkDigest.self, path: "work_result_0")
     }
 
     @Test
     func work_result_1() throws {
-        let (actual, expected) = try Self.test(WorkDigest.self, path: "work_result_1")
-        #expect(actual == expected)
+        try testBothVariants(WorkDigest.self, path: "work_result_1")
     }
 }

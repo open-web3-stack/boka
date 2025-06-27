@@ -1,7 +1,7 @@
 import Foundation
 import TracingUtils
 
-private let logger = Logger(label: "Insts   ")
+private let logger = Logger(label: "Insts ")
 
 extension Instructions {
     enum Constants {

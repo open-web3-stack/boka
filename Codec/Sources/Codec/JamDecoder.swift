@@ -67,6 +67,22 @@ extension Optional: OptionalWrapper where Wrapped: Decodable {
     }
 }
 
+/// A default coding key used for types not belong to trivial encoding types
+private struct DefaultKey: CodingKey {
+    let stringValue: String
+    let intValue: Int? = nil
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+    }
+
+    init?(intValue _: Int) { nil }
+
+    init(for type: (some Any).Type) {
+        stringValue = "<\(type)>"
+    }
+}
+
 private class DecodeContext: Decoder {
     struct PushCodingPath: ~Copyable {
         let decoder: DecodeContext
@@ -134,12 +150,16 @@ private class DecodeContext: Decoder {
     }
 
     fileprivate func decodeData(codingPath: @autoclosure () -> [CodingKey]) throws -> Data {
+        let path = codingPath()
+        if path.isEmpty {
+            return try input.readAll()
+        }
         let length = try input.decodeUInt64()
         // sanity check: length must be less than 4gb
         guard length < 0x1_0000_0000 else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
-                    codingPath: codingPath(),
+                    codingPath: path,
                     debugDescription: "Invalid data length"
                 )
             )
@@ -149,12 +169,16 @@ private class DecodeContext: Decoder {
     }
 
     fileprivate func decodeData(codingPath: @autoclosure () -> [CodingKey]) throws -> [UInt8] {
+        let path = codingPath()
+        if path.isEmpty {
+            return try [UInt8](input.readAll())
+        }
         let length = try input.decodeUInt64()
         // sanity check: length must be less than 4gb
         guard length < 0x1_0000_0000 else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
-                    codingPath: codingPath(),
+                    codingPath: path,
                     debugDescription: "Invalid data length"
                 )
             )
@@ -220,7 +244,8 @@ private class DecodeContext: Decoder {
         } else if let type = type as? any ArrayWrapper.Type {
             try decodeArray(type, key: key) as! T
         } else {
-            try withExtendedLifetime(PushCodingPath(decoder: self, key: key)) {
+            // ensure a coding key is present non trivial encoding types
+            try withExtendedLifetime(PushCodingPath(decoder: self, key: key ?? DefaultKey(for: type))) {
                 try .init(from: self)
             }
         }

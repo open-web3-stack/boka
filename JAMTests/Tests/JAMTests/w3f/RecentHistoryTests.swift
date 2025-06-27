@@ -25,19 +25,20 @@ struct RecentHistoryTestcase: Codable {
 }
 
 struct RecentHistoryTests {
-    static func loadTests() throws -> [Testcase] {
-        try TestLoader.getTestcases(path: "history/data", extension: "bin")
+    static func loadTests(variant: TestVariants) throws -> [Testcase] {
+        try TestLoader.getTestcases(path: "stf/history/\(variant)", extension: "bin")
     }
 
-    @Test(arguments: try loadTests())
-    func recentHistory(_ testcase: Testcase) throws {
-        let config = ProtocolConfigRef.mainnet
+    func recentHistory(_ testcase: Testcase, variant: TestVariants) throws {
+        let config = variant.config
         let testcase = try JamDecoder.decode(RecentHistoryTestcase.self, from: testcase.data, withConfig: config)
 
         var state = testcase.preState
+        state.updatePartial(
+            parentStateRoot: testcase.input.parentStateRoot
+        )
         state.update(
             headerHash: testcase.input.headerHash,
-            parentStateRoot: testcase.input.parentStateRoot,
             accumulateRoot: testcase.input.accumulateRoot,
             lookup: Dictionary(uniqueKeysWithValues: testcase.input.workPackages.map { (
                 $0.hash,
@@ -46,5 +47,15 @@ struct RecentHistoryTests {
         )
 
         #expect(state == testcase.postState)
+    }
+
+    @Test(arguments: try RecentHistoryTests.loadTests(variant: .tiny))
+    func tinyTests(_ testcase: Testcase) throws {
+        try recentHistory(testcase, variant: .tiny)
+    }
+
+    @Test(arguments: try RecentHistoryTests.loadTests(variant: .full))
+    func fullTests(_ testcase: Testcase) throws {
+        try recentHistory(testcase, variant: .full)
     }
 }

@@ -166,50 +166,6 @@ public struct State: Sendable {
         }
     }
 
-    // δ: The (prior) state of the service accounts.
-    public subscript(serviceAccount index: ServiceIndex) -> StateKeys.ServiceAccountKey.Value? {
-        get {
-            layer[serviceAccount: index]
-        }
-        set {
-            layer[serviceAccount: index] = newValue
-        }
-    }
-
-    // s
-    public subscript(serviceAccount index: ServiceIndex, storageKey key: Data32) -> StateKeys.ServiceAccountStorageKey.Value? {
-        get {
-            layer[serviceAccount: index, storageKey: key]
-        }
-        set {
-            layer[serviceAccount: index, storageKey: key] = newValue
-        }
-    }
-
-    // p
-    public subscript(
-        serviceAccount index: ServiceIndex, preimageHash hash: Data32
-    ) -> StateKeys.ServiceAccountPreimagesKey.Value? {
-        get {
-            layer[serviceAccount: index, preimageHash: hash]
-        }
-        set {
-            layer[serviceAccount: index, preimageHash: hash] = newValue
-        }
-    }
-
-    // l
-    public subscript(
-        serviceAccount index: ServiceIndex, preimageHash hash: Data32, length length: UInt32
-    ) -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
-        get {
-            layer[serviceAccount: index, preimageHash: hash, length: length]
-        }
-        set {
-            layer[serviceAccount: index, preimageHash: hash, length: length] = newValue
-        }
-    }
-
     public mutating func load(keys: [any StateKey]) async throws {
         let pairs = try await backend.batchRead(keys)
         for (key, value) in pairs {
@@ -390,6 +346,28 @@ extension State: ServiceAccounts {
     }
 
     public mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data32, value: Data?) {
+        // update footprint
+        let oldValue = layer[serviceAccount: index, storageKey: key]
+        let oldAccount = layer[serviceAccount: index]
+        if let oldValue {
+            if let value, let oldAccount {
+                // replace: update byte count difference
+                layer[serviceAccount: index]?.totalByteLength = oldAccount.totalByteLength - UInt64(oldValue.count) + UInt64(value.count)
+            } else {
+                // remove: decrease count and bytes
+                layer[serviceAccount: index]?.itemsCount = UInt32(max(0, Int(oldAccount?.itemsCount ?? 0) - 1))
+                layer[serviceAccount: index]?.totalByteLength =
+                    UInt64(max(0, Int(oldAccount?.totalByteLength ?? 0) - (32 + oldValue.count)))
+            }
+        } else {
+            if let value {
+                // add: increase count and bytes
+                layer[serviceAccount: index]?.itemsCount = (oldAccount?.itemsCount ?? 0) + 1
+                layer[serviceAccount: index]?.totalByteLength = (oldAccount?.totalByteLength ?? 0) + 32 + UInt64(value.count)
+            }
+        }
+
+        // update value
         layer[serviceAccount: index, storageKey: key] = value
     }
 
@@ -403,6 +381,28 @@ extension State: ServiceAccounts {
         length: UInt32,
         value: StateKeys.ServiceAccountPreimageInfoKey.Value?
     ) {
+        // update footprint
+        let oldValue = layer[serviceAccount: index, preimageHash: hash, length: length]
+        let oldAccount = layer[serviceAccount: index]
+        if let oldValue {
+            if let value, let oldAccount {
+                // replace: update byte count difference
+                layer[serviceAccount: index]?.totalByteLength = oldAccount.totalByteLength - UInt64(oldValue.count) + UInt64(value.count)
+            } else {
+                // remove: decrease count and bytes
+                layer[serviceAccount: index]?.itemsCount = UInt32(max(0, Int(oldAccount?.itemsCount ?? 0) - 2))
+                layer[serviceAccount: index]?.totalByteLength =
+                    UInt64(max(0, Int(oldAccount?.totalByteLength ?? 0) - (81 + oldValue.count)))
+            }
+        } else {
+            if let value {
+                // add: increase count and bytes
+                layer[serviceAccount: index]?.itemsCount = (oldAccount?.itemsCount ?? 0) + 2
+                layer[serviceAccount: index]?.totalByteLength = (oldAccount?.totalByteLength ?? 0) + 81 + UInt64(value.count)
+            }
+        }
+
+        // update value
         layer[serviceAccount: index, preimageHash: hash, length: length] = value
     }
 }
@@ -458,8 +458,8 @@ extension State: Guaranteeing {
         judgements.punishSet
     }
 
-    public func serviceAccount(index: ServiceIndex) -> ServiceAccountDetails? {
-        self[serviceAccount: index] ?? nil
+    public func serviceAccount(index: ServiceIndex) async throws -> ServiceAccountDetails? {
+        try await get(serviceAccount: index)
     }
 }
 
@@ -474,9 +474,17 @@ extension State: ActivityStatistics {}
 extension State: Preimages {
     public mutating func mergeWith(postState: PreimagesPostState) {
         for update in postState.updates {
-            self[serviceAccount: update.serviceIndex, preimageHash: update.hash] = update.data
-            self[serviceAccount: update.serviceIndex, preimageHash: update.hash, length: update.length] =
-                LimitedSizeArray([update.timeslot])
+            set(
+                serviceAccount: update.serviceIndex,
+                preimageHash: update.hash,
+                value: update.data
+            )
+            set(
+                serviceAccount: update.serviceIndex,
+                preimageHash: update.hash,
+                length: update.length,
+                value: StateKeys.ServiceAccountPreimageInfoKey.Value([update.timeslot])
+            )
         }
     }
 }

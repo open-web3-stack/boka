@@ -145,3 +145,19 @@ extension SaturatingNumber: EncodedSize {
         MemoryLayout<T>.size
     }
 }
+
+extension SaturatingNumber: CompactEncodable {
+    public func toUInt() throws -> UInt {
+        guard let result = UInt(exactly: value) else {
+            throw CompactEncodingError.valueOutOfRange(value: "\(value)", sourceType: "\(T.self)", targetType: "UInt")
+        }
+        return result
+    }
+
+    public static func fromUInt(_ value: UInt) throws -> SaturatingNumber<T> {
+        guard let converted = T(exactly: value) else {
+            throw CompactEncodingError.valueOutOfRange(value: "\(value)", sourceType: "UInt", targetType: "\(T.self)")
+        }
+        return SaturatingNumber(converted)
+    }
+}
