@@ -414,7 +414,15 @@ public class Info: HostCall {
             m = nil
         }
 
-        if let m, !state.isMemoryWritable(address: o, length: Int(m.count)) {
+        let isWritable = m != nil && state.isMemoryWritable(address: o, length: Int(m!.count))
+
+        logger.debug("m: \(m?.debugDescription ?? "nil"), isWritable: \(isWritable)")
+
+        if let m, isWritable {
+            try state.writeMemory(address: o, values: m)
+        }
+
+        if !isWritable {
             throw VMInvocationsError.panic
         } else if m == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
