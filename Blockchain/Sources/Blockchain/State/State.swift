@@ -345,27 +345,30 @@ extension State: ServiceAccounts {
         layer[serviceAccount: index] = account
     }
 
-    public mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data32, value: Data?) {
+    public mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data32, value: Data?) async throws {
         // update footprint
-        let oldValue = layer[serviceAccount: index, storageKey: key]
-        let oldAccount = layer[serviceAccount: index]
+        let oldValue = try await get(serviceAccount: index, storageKey: key)
+        guard var oldAccount = try await get(serviceAccount: index) else {
+            fatalError("Failed to get account details")
+        }
         if let oldValue {
-            if let value, let oldAccount {
+            if let value {
                 // replace: update byte count difference
-                layer[serviceAccount: index]?.totalByteLength = oldAccount.totalByteLength - UInt64(oldValue.count) + UInt64(value.count)
+                oldAccount.totalByteLength = oldAccount.totalByteLength - UInt64(oldValue.count) + UInt64(value.count)
             } else {
                 // remove: decrease count and bytes
-                layer[serviceAccount: index]?.itemsCount = UInt32(max(0, Int(oldAccount?.itemsCount ?? 0) - 1))
-                layer[serviceAccount: index]?.totalByteLength =
-                    UInt64(max(0, Int(oldAccount?.totalByteLength ?? 0) - (32 + oldValue.count)))
+                oldAccount.itemsCount = UInt32(max(0, Int(oldAccount.itemsCount) - 1))
+                oldAccount.totalByteLength =
+                    UInt64(max(0, Int(oldAccount.totalByteLength) - (32 + oldValue.count)))
             }
         } else {
             if let value {
                 // add: increase count and bytes
-                layer[serviceAccount: index]?.itemsCount = (oldAccount?.itemsCount ?? 0) + 1
-                layer[serviceAccount: index]?.totalByteLength = (oldAccount?.totalByteLength ?? 0) + 32 + UInt64(value.count)
+                oldAccount.itemsCount = (oldAccount.itemsCount) + 1
+                oldAccount.totalByteLength = (oldAccount.totalByteLength) + 32 + UInt64(value.count)
             }
         }
+        layer[serviceAccount: index] = oldAccount
 
         // update value
         layer[serviceAccount: index, storageKey: key] = value
@@ -380,27 +383,30 @@ extension State: ServiceAccounts {
         preimageHash hash: Data32,
         length: UInt32,
         value: StateKeys.ServiceAccountPreimageInfoKey.Value?
-    ) {
+    ) async throws {
         // update footprint
         let oldValue = layer[serviceAccount: index, preimageHash: hash, length: length]
-        let oldAccount = layer[serviceAccount: index]
+        guard var oldAccount = try await get(serviceAccount: index) else {
+            fatalError("Failed to get account details")
+        }
         if let oldValue {
-            if let value, let oldAccount {
+            if let value {
                 // replace: update byte count difference
-                layer[serviceAccount: index]?.totalByteLength = oldAccount.totalByteLength - UInt64(oldValue.count) + UInt64(value.count)
+                oldAccount.totalByteLength = oldAccount.totalByteLength - UInt64(oldValue.count) + UInt64(value.count)
             } else {
                 // remove: decrease count and bytes
-                layer[serviceAccount: index]?.itemsCount = UInt32(max(0, Int(oldAccount?.itemsCount ?? 0) - 2))
-                layer[serviceAccount: index]?.totalByteLength =
-                    UInt64(max(0, Int(oldAccount?.totalByteLength ?? 0) - (81 + oldValue.count)))
+                oldAccount.itemsCount = UInt32(max(0, Int(oldAccount.itemsCount) - 2))
+                oldAccount.totalByteLength =
+                    UInt64(max(0, Int(oldAccount.totalByteLength) - (81 + oldValue.count)))
             }
         } else {
             if let value {
                 // add: increase count and bytes
-                layer[serviceAccount: index]?.itemsCount = (oldAccount?.itemsCount ?? 0) + 2
-                layer[serviceAccount: index]?.totalByteLength = (oldAccount?.totalByteLength ?? 0) + 81 + UInt64(value.count)
+                oldAccount.itemsCount = (oldAccount.itemsCount) + 2
+                oldAccount.totalByteLength = (oldAccount.totalByteLength) + 81 + UInt64(value.count)
             }
         }
+        layer[serviceAccount: index] = oldAccount
 
         // update value
         layer[serviceAccount: index, preimageHash: hash, length: length] = value
@@ -472,14 +478,14 @@ extension State: Authorization {
 extension State: ActivityStatistics {}
 
 extension State: Preimages {
-    public mutating func mergeWith(postState: PreimagesPostState) {
+    public mutating func mergeWith(postState: PreimagesPostState) async throws {
         for update in postState.updates {
             set(
                 serviceAccount: update.serviceIndex,
                 preimageHash: update.hash,
                 value: update.data
             )
-            set(
+            try await set(
                 serviceAccount: update.serviceIndex,
                 preimageHash: update.hash,
                 length: update.length,

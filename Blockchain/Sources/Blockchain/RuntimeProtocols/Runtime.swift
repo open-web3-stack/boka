@@ -294,6 +294,6 @@ public final class Runtime {
         let res = try await newState.updatePreimages(
             config: config, timeslot: newState.timeslot, preimages: block.extrinsic.preimages
         )
-        newState.mergeWith(postState: res)
+        try await newState.mergeWith(postState: res)
     }
 }

@@ -79,7 +79,7 @@ public struct AccumulationResult {
 public struct AccountChanges {
     public var newAccounts: [ServiceIndex: ServiceAccount]
     public var altered: Set<ServiceIndex>
-    public var alterations: [(ServiceAccountsMutRef) -> Void]
+    public var alterations: [(ServiceAccountsMutRef) async throws -> Void]
     public var removed: Set<ServiceIndex>
 
     public init() {
@@ -89,20 +89,20 @@ public struct AccountChanges {
         removed = []
     }
 
-    public mutating func addAlteration(index: ServiceIndex, _ alteration: @escaping (ServiceAccountsMutRef) -> Void) {
+    public mutating func addAlteration(index: ServiceIndex, _ alteration: @escaping (ServiceAccountsMutRef) async throws -> Void) {
         alterations.append(alteration)
         altered.insert(index)
     }
 
-    public func apply(to accounts: ServiceAccountsMutRef) {
+    public func apply(to accounts: ServiceAccountsMutRef) async throws {
         for (index, account) in newAccounts {
-            accounts.addNew(serviceAccount: index, account: account)
+            try await accounts.addNew(serviceAccount: index, account: account)
         }
         for index in removed {
             accounts.remove(serviceAccount: index)
         }
         for alteration in alterations {
-            alteration(accounts)
+            try await alteration(accounts)
         }
     }
 
@@ -376,7 +376,12 @@ extension Accumulation {
             }
 
             if preimageInfo.isEmpty {
-                accounts.set(serviceAccount: serviceIndex, preimageHash: preimageHash, length: UInt32(preimage.count), value: [timeslot])
+                try await accounts.set(
+                    serviceAccount: serviceIndex,
+                    preimageHash: preimageHash,
+                    length: UInt32(preimage.count),
+                    value: [timeslot]
+                )
                 accounts.set(serviceAccount: serviceIndex, preimageHash: preimageHash, value: preimage)
             }
         }

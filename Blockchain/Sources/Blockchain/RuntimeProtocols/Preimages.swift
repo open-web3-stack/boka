@@ -37,7 +37,7 @@ public protocol Preimages {
     func get(serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32) async throws
         -> LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>?
 
-    mutating func mergeWith(postState: PreimagesPostState)
+    mutating func mergeWith(postState: PreimagesPostState) async throws
 }
 
 extension Preimages {

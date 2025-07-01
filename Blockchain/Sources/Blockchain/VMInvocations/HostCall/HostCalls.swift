@@ -80,6 +80,8 @@ public class Fetch: HostCall {
         let reg11: UInt64 = state.readRegister(Registers.Index(raw: 11))
         let reg12: UInt64 = state.readRegister(Registers.Index(raw: 12))
 
+        logger.debug("reg10: \(reg10), reg11: \(reg11), reg12: \(reg12)")
+
         var value: Data?
         switch reg10 {
         case 0:
@@ -208,7 +210,7 @@ public class Lookup: HostCall {
 
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         let reg7: UInt64 = state.readRegister(Registers.Index(raw: 7))
-        let service: ServiceIndex? = if reg7 == serviceIndex || reg7 == Int64.max {
+        let service: ServiceIndex? = if reg7 == serviceIndex || reg7 == UInt64.max {
             serviceIndex
         } else if try await serviceAccounts.value.get(serviceAccount: ServiceIndex(truncatingIfNeeded: reg7)) != nil {
             ServiceIndex(truncatingIfNeeded: reg7)
@@ -261,7 +263,7 @@ public class Read: HostCall {
 
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         let reg7: UInt64 = state.readRegister(Registers.Index(raw: 7))
-        let serviceX = reg7 == Int64.max ? serviceIndex : ServiceIndex(truncatingIfNeeded: reg7)
+        let serviceX = reg7 == UInt64.max ? serviceIndex : ServiceIndex(truncatingIfNeeded: reg7)
 
         let service: ServiceIndex? = if serviceX == serviceIndex {
             serviceIndex
@@ -340,17 +342,19 @@ public class Write: HostCall {
             HostCallResultCode.NONE.rawValue
         }
 
+        logger.debug("len: \(len)")
+
         let accountDetails = try await serviceAccounts.value.get(serviceAccount: serviceIndex)
         if let accountDetails, accountDetails.thresholdBalance(config: config) > accountDetails.balance {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), len)
             if regs[3] == 0 {
-                serviceAccounts.set(serviceAccount: serviceIndex, storageKey: key!, value: nil)
+                try await serviceAccounts.set(serviceAccount: serviceIndex, storageKey: key!, value: nil)
             } else {
                 let value = try state.readMemory(address: regs[2], length: Int(regs[3]))
                 logger.debug("val: \(value.toDebugHexString()), len: \(value.count)")
-                serviceAccounts.set(
+                try await serviceAccounts.set(
                     serviceAccount: serviceIndex,
                     storageKey: key!,
                     value: value
@@ -372,10 +376,20 @@ public class Info: HostCall {
         serviceAccounts = accounts
     }
 
+    struct CompactAccount: Codable {
+        var codeHash: Data32
+        @CodingAs<Compact<Balance>> var balance: Balance
+        @CodingAs<Compact<Gas>> var minAccumlateGas: Gas
+        @CodingAs<Compact<Gas>> var minOnTransferGas: Gas
+        @CodingAs<Compact<UInt64>> var totalByteLength: UInt64
+        @CodingAs<Compact<UInt32>> var itemsCount: UInt32
+        @CodingAs<Compact<Balance>> var thresholdBalance: Balance
+    }
+
     public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
         var service: ServiceIndex
         let reg: UInt64 = state.readRegister(Registers.Index(raw: 7))
-        if reg == Int64.max {
+        if reg == UInt64.max {
             service = serviceIndex
         } else {
             service = ServiceIndex(truncatingIfNeeded: reg)
@@ -386,17 +400,16 @@ public class Info: HostCall {
         let m: Data?
         let account = try await serviceAccounts.value.get(serviceAccount: service)
         if let account {
-            // codeHash, balance, thresholdBalance, minAccumlateGas, minOnTransferGas, totalByteLength, itemsCount
-            let capacity = 32 + 8 * 5 + 4
-            let encoder = JamEncoder(capacity: capacity)
-            try encoder.encode(account.codeHash)
-            try encoder.encode(account.balance)
-            try encoder.encode(account.thresholdBalance(config: config))
-            try encoder.encode(account.minAccumlateGas)
-            try encoder.encode(account.minOnTransferGas)
-            try encoder.encode(account.totalByteLength)
-            try encoder.encode(account.itemsCount)
-            m = encoder.data
+            let compactAccount = CompactAccount(
+                codeHash: account.codeHash,
+                balance: account.balance,
+                minAccumlateGas: account.minAccumlateGas,
+                minOnTransferGas: account.minOnTransferGas,
+                totalByteLength: account.totalByteLength,
+                itemsCount: account.itemsCount,
+                thresholdBalance: account.thresholdBalance(config: config)
+            )
+            m = try JamEncoder.encode(compactAccount)
         } else {
             m = nil
         }
@@ -600,7 +613,7 @@ public class New: HostCall {
             x.state.accounts.set(serviceAccount: x.serviceIndex, account: account)
 
             // add the new account
-            x.state.accounts.addNew(serviceAccount: x.nextAccountIndex, account: newAccount)
+            try await x.state.accounts.addNew(serviceAccount: x.nextAccountIndex, account: newAccount)
 
             // update nextAccountIndex
             x.nextAccountIndex = try await AccumulateContext.check(
@@ -822,10 +835,10 @@ public class Solicit: HostCall {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
         } else {
             if notRequestedYet {
-                x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: [])
+                try await x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: [])
             } else if isPreviouslyAvailable, var preimageInfo {
                 try preimageInfo.append(timeslot)
-                x.state.accounts.set(
+                try await x.state.accounts.set(
                     serviceAccount: x.serviceIndex,
                     preimageHash: Data32(hash!)!,
                     length: length,
@@ -873,11 +886,11 @@ public class Forget: HostCall {
             state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.HUH.rawValue)
         } else {
             if canExpunge {
-                x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: nil)
+                try await x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: nil)
                 x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, value: nil)
             } else if isAvailable1, var preimageInfo {
                 try preimageInfo.append(timeslot)
-                x.state.accounts.set(
+                try await x.state.accounts.set(
                     serviceAccount: x.serviceIndex,
                     preimageHash: Data32(hash!)!,
                     length: length,
@@ -885,7 +898,7 @@ public class Forget: HostCall {
                 )
             } else if isAvailable3, var preimageInfo {
                 preimageInfo = [preimageInfo[2], timeslot]
-                x.state.accounts.set(
+                try await x.state.accounts.set(
                     serviceAccount: x.serviceIndex,
                     preimageHash: Data32(hash!)!,
                     length: length,
@@ -989,7 +1002,7 @@ public class HistoricalLookup: HostCall {
 
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         let reg7: UInt64 = state.readRegister(Registers.Index(raw: 7))
-        let service: ServiceIndex? = if reg7 == Int64.max, try await serviceAccounts.value.get(serviceAccount: serviceIndex) != nil {
+        let service: ServiceIndex? = if reg7 == UInt64.max, try await serviceAccounts.value.get(serviceAccount: serviceIndex) != nil {
             serviceIndex
         } else if try await serviceAccounts.value.get(serviceAccount: UInt32(truncatingIfNeeded: reg7)) != nil {
             UInt32(truncatingIfNeeded: reg7)
