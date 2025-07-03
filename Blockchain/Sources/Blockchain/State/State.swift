@@ -166,6 +166,50 @@ public struct State: Sendable {
         }
     }
 
+    // δ: The (prior) state of the service accounts.
+    public subscript(serviceAccount index: ServiceIndex) -> StateKeys.ServiceAccountKey.Value? {
+        get {
+            layer[serviceAccount: index]
+        }
+        set {
+            layer[serviceAccount: index] = newValue
+        }
+    }
+
+    // s
+    public subscript(serviceAccount index: ServiceIndex, storageKey key: Data32) -> StateKeys.ServiceAccountStorageKey.Value? {
+        get {
+            layer[serviceAccount: index, storageKey: key]
+        }
+        set {
+            layer[serviceAccount: index, storageKey: key] = newValue
+        }
+    }
+
+    // p
+    public subscript(
+        serviceAccount index: ServiceIndex, preimageHash hash: Data32
+    ) -> StateKeys.ServiceAccountPreimagesKey.Value? {
+        get {
+            layer[serviceAccount: index, preimageHash: hash]
+        }
+        set {
+            layer[serviceAccount: index, preimageHash: hash] = newValue
+        }
+    }
+
+    // l
+    public subscript(
+        serviceAccount index: ServiceIndex, preimageHash hash: Data32, length length: UInt32
+    ) -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
+        get {
+            layer[serviceAccount: index, preimageHash: hash, length: length]
+        }
+        set {
+            layer[serviceAccount: index, preimageHash: hash, length: length] = newValue
+        }
+    }
+
     public mutating func load(keys: [any StateKey]) async throws {
         let pairs = try await backend.batchRead(keys)
         for (key, value) in pairs {
@@ -358,8 +402,7 @@ extension State: ServiceAccounts {
             } else {
                 // remove: decrease count and bytes
                 oldAccount.itemsCount = UInt32(max(0, Int(oldAccount.itemsCount) - 1))
-                oldAccount.totalByteLength =
-                    UInt64(max(0, Int(oldAccount.totalByteLength) - (32 + oldValue.count)))
+                oldAccount.totalByteLength = UInt64(max(0, Int(oldAccount.totalByteLength) - (32 + oldValue.count)))
             }
         } else {
             if let value {
@@ -385,25 +428,22 @@ extension State: ServiceAccounts {
         value: StateKeys.ServiceAccountPreimageInfoKey.Value?
     ) async throws {
         // update footprint
-        let oldValue = layer[serviceAccount: index, preimageHash: hash, length: length]
+        let oldValue = try await get(serviceAccount: index, preimageHash: hash, length: length)
         guard var oldAccount = try await get(serviceAccount: index) else {
             fatalError("Failed to get account details")
         }
-        if let oldValue {
-            if let value {
-                // replace: update byte count difference
-                oldAccount.totalByteLength = oldAccount.totalByteLength - UInt64(oldValue.count) + UInt64(value.count)
-            } else {
-                // remove: decrease count and bytes
+        if oldValue != nil {
+            // replace: no change on footprint
+            // remove: decrease count and bytes
+            if value == nil {
                 oldAccount.itemsCount = UInt32(max(0, Int(oldAccount.itemsCount) - 2))
-                oldAccount.totalByteLength =
-                    UInt64(max(0, Int(oldAccount.totalByteLength) - (81 + oldValue.count)))
+                oldAccount.totalByteLength = UInt64(max(0, Int(oldAccount.totalByteLength) - (81 + Int(length))))
             }
         } else {
-            if let value {
+            if value != nil {
                 // add: increase count and bytes
                 oldAccount.itemsCount = (oldAccount.itemsCount) + 2
-                oldAccount.totalByteLength = (oldAccount.totalByteLength) + 81 + UInt64(value.count)
+                oldAccount.totalByteLength = (oldAccount.totalByteLength) + 81 + UInt64(length)
             }
         }
         layer[serviceAccount: index] = oldAccount
@@ -480,17 +520,10 @@ extension State: ActivityStatistics {}
 extension State: Preimages {
     public mutating func mergeWith(postState: PreimagesPostState) async throws {
         for update in postState.updates {
-            set(
-                serviceAccount: update.serviceIndex,
-                preimageHash: update.hash,
-                value: update.data
-            )
-            try await set(
-                serviceAccount: update.serviceIndex,
-                preimageHash: update.hash,
-                length: update.length,
-                value: StateKeys.ServiceAccountPreimageInfoKey.Value([update.timeslot])
-            )
+            // TODO: may need to use set method so account footprint is updated
+            self[serviceAccount: update.serviceIndex, preimageHash: update.hash] = update.data
+            self[serviceAccount: update.serviceIndex, preimageHash: update.hash, length: update.length] =
+                LimitedSizeArray([update.timeslot])
         }
     }
 }

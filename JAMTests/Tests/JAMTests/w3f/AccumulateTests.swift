@@ -167,26 +167,23 @@ private struct FullAccumulateState: Accumulation {
     mutating func set(
         serviceAccount index: ServiceIndex,
         preimageHash hash: Data32,
-        length _: UInt32,
+        length: UInt32,
         value: StateKeys.ServiceAccountPreimageInfoKey.Value?
     ) {
         // update footprint
         let oldValue = preimageInfo[index]?[hash]
         let oldAccount = accounts[index]
-        if let oldValue {
-            if let value, let oldAccount {
-                // replace: update byte count difference
-                accounts[index]?.totalByteLength = oldAccount.totalByteLength - UInt64(oldValue.count) + UInt64(value.count)
-            } else {
+        if oldValue != nil {
+            if value == nil {
                 // remove: decrease count and bytes
                 accounts[index]?.itemsCount = UInt32(max(0, Int(oldAccount?.itemsCount ?? 0) - 2))
-                accounts[index]?.totalByteLength = UInt64(max(0, Int(oldAccount?.totalByteLength ?? 0) - (81 + oldValue.count)))
+                accounts[index]?.totalByteLength = UInt64(max(0, Int(oldAccount?.totalByteLength ?? 0) - (81 + Int(length))))
             }
         } else {
-            if let value {
+            if value != nil {
                 // add: increase count and bytes
                 accounts[index]?.itemsCount = (oldAccount?.itemsCount ?? 0) + 2
-                accounts[index]?.totalByteLength = (oldAccount?.totalByteLength ?? 0) + 81 + UInt64(value.count)
+                accounts[index]?.totalByteLength = (oldAccount?.totalByteLength ?? 0) + 81 + UInt64(length)
             }
         }
         logger.debug("preimage footprint update: \(accounts[index]?.itemsCount ?? 0) items, \(accounts[index]?.totalByteLength ?? 0) bytes")
