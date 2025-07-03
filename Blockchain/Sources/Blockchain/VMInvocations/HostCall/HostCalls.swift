@@ -326,7 +326,7 @@ public class Write: HostCall {
     public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
         let regs: [UInt32] = state.readRegisters(in: 7 ..< 11)
 
-        logger.debug("regs: \(regs)")
+        logger.debug("regs: \(regs), service: \(serviceIndex))")
 
         let key = try? Blake2b256.hash(serviceIndex.encode(), state.readMemory(address: regs[0], length: Int(regs[1])))
 
@@ -336,29 +336,26 @@ public class Write: HostCall {
 
         logger.debug("key: \(key?.debugDescription ?? "nil")")
 
-        let len = if let key, let value = try await serviceAccounts.value.get(serviceAccount: serviceIndex, storageKey: key) {
+        let l = if let key, let value = try await serviceAccounts.value.get(serviceAccount: serviceIndex, storageKey: key) {
             UInt64(value.count)
         } else {
             HostCallResultCode.NONE.rawValue
         }
 
-        logger.debug("len: \(len)")
+        logger.debug("l: \(l), is none: \(l == HostCallResultCode.NONE.rawValue)")
 
         let accountDetails = try await serviceAccounts.value.get(serviceAccount: serviceIndex)
         if let accountDetails, accountDetails.thresholdBalance(config: config) > accountDetails.balance {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
         } else {
-            state.writeRegister(Registers.Index(raw: 7), len)
+            state.writeRegister(Registers.Index(raw: 7), l)
             if regs[3] == 0 {
+                logger.debug("deleting key: \(key?.debugDescription ?? "nil")")
                 try await serviceAccounts.set(serviceAccount: serviceIndex, storageKey: key!, value: nil)
             } else {
                 let value = try state.readMemory(address: regs[2], length: Int(regs[3]))
-                logger.debug("val: \(value.toDebugHexString()), len: \(value.count)")
-                try await serviceAccounts.set(
-                    serviceAccount: serviceIndex,
-                    storageKey: key!,
-                    value: value
-                )
+                logger.debug("writing key: \(key?.debugDescription ?? "nil"), val: \(value.toDebugHexString()), len: \(value.count)")
+                try await serviceAccounts.set(serviceAccount: serviceIndex, storageKey: key!, value: value)
             }
         }
     }
@@ -777,33 +774,33 @@ public class Query: HostCall {
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         let (startAddr, length): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
         let preimageHash = try? state.readMemory(address: startAddr, length: 32)
-        if preimageHash == nil {
+        guard let preimageHash else {
             throw VMInvocationsError.panic
         }
 
         let preimageInfo = try await x.state.accounts.value.get(
             serviceAccount: x.serviceIndex,
-            preimageHash: Data32(preimageHash!)!,
+            preimageHash: Data32(preimageHash)!,
             length: length
         )
-        if preimageInfo == nil {
+        guard let preimageInfo else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
             state.writeRegister(Registers.Index(raw: 8), 0)
             return
         }
 
-        if preimageInfo!.isEmpty {
+        if preimageInfo.isEmpty {
             state.writeRegister(Registers.Index(raw: 7), 0)
             state.writeRegister(Registers.Index(raw: 8), 0)
-        } else if preimageInfo!.count == 1 {
-            state.writeRegister(Registers.Index(raw: 7), 1 + (1 << 32) * preimageInfo![0])
+        } else if preimageInfo.count == 1 {
+            state.writeRegister(Registers.Index(raw: 7), 1 + (1 << 32) * UInt64(preimageInfo[0]))
             state.writeRegister(Registers.Index(raw: 8), 0)
-        } else if preimageInfo!.count == 2 {
-            state.writeRegister(Registers.Index(raw: 7), 2 + (1 << 32) * preimageInfo![0])
-            state.writeRegister(Registers.Index(raw: 8), preimageInfo![1])
-        } else if preimageInfo!.count == 3 {
-            state.writeRegister(Registers.Index(raw: 7), 3 + (1 << 32) * preimageInfo![0])
-            state.writeRegister(Registers.Index(raw: 8), preimageInfo![1] + (1 << 32) * preimageInfo![2])
+        } else if preimageInfo.count == 2 {
+            state.writeRegister(Registers.Index(raw: 7), 2 + (1 << 32) * UInt64(preimageInfo[0]))
+            state.writeRegister(Registers.Index(raw: 8), UInt64(preimageInfo[1]))
+        } else if preimageInfo.count == 3 {
+            state.writeRegister(Registers.Index(raw: 7), 3 + (1 << 32) * UInt64(preimageInfo[0]))
+            state.writeRegister(Registers.Index(raw: 8), UInt64(preimageInfo[1]) + (1 << 32) * UInt64(preimageInfo[2]))
         }
     }
 }
@@ -822,11 +819,16 @@ public class Solicit: HostCall {
 
     public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
         let (startAddr, length): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
-        let hash = try? state.readMemory(address: startAddr, length: 32)
+        let hashData = try? state.readMemory(address: startAddr, length: 32)
+        let hash = Data32(hashData ?? Data())
+
+        guard let hash else {
+            throw VMInvocationsError.panic
+        }
 
         let preimageInfo = try await x.state.accounts.value.get(
             serviceAccount: x.serviceIndex,
-            preimageHash: Data32(hash!)!,
+            preimageHash: hash,
             length: length
         )
         let notRequestedYet = preimageInfo == nil
@@ -835,20 +837,19 @@ public class Solicit: HostCall {
 
         let acc = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex)
 
-        if hash == nil {
-            throw VMInvocationsError.panic
-        } else if !canSolicit {
+        if !canSolicit {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
         } else if let acc, acc.balance < acc.thresholdBalance(config: config) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
         } else {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
             if notRequestedYet {
-                try await x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: [])
+                try await x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: hash, length: length, value: [])
             } else if isPreviouslyAvailable, var preimageInfo {
                 try preimageInfo.append(timeslot)
                 try await x.state.accounts.set(
                     serviceAccount: x.serviceIndex,
-                    preimageHash: Data32(hash!)!,
+                    preimageHash: hash,
                     length: length,
                     value: preimageInfo
                 )
@@ -871,12 +872,18 @@ public class Forget: HostCall {
 
     public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
         let (startAddr, length): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
-        let hash = try? state.readMemory(address: startAddr, length: 32)
-        let minHoldPeriod = TimeslotIndex(config.value.preimagePurgePeriod)
+        let hashData = try? state.readMemory(address: startAddr, length: 32)
+        let hash = Data32(hashData ?? Data())
+
+        guard let hash else {
+            throw VMInvocationsError.panic
+        }
+
+        let minHoldPeriod = UInt32(config.value.preimagePurgePeriod)
 
         let preimageInfo = try await x.state.accounts.value.get(
             serviceAccount: x.serviceIndex,
-            preimageHash: Data32(hash!)!,
+            preimageHash: hash,
             length: length
         )
         let historyCount = preimageInfo?.count
@@ -888,19 +895,18 @@ public class Forget: HostCall {
         let isAvailable3 = historyCount == 3 && (preimageInfo![1] < minHoldSlot)
         let canForget = canExpunge || isAvailable1 || isAvailable3
 
-        if hash == nil {
-            throw VMInvocationsError.panic
-        } else if !canForget {
-            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.HUH.rawValue)
+        if !canForget {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
         } else {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
             if canExpunge {
-                try await x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, length: length, value: nil)
-                x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: Data32(hash!)!, value: nil)
+                try await x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: hash, length: length, value: nil)
+                x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: hash, value: nil)
             } else if isAvailable1, var preimageInfo {
                 try preimageInfo.append(timeslot)
                 try await x.state.accounts.set(
                     serviceAccount: x.serviceIndex,
-                    preimageHash: Data32(hash!)!,
+                    preimageHash: hash,
                     length: length,
                     value: preimageInfo
                 )
@@ -908,7 +914,7 @@ public class Forget: HostCall {
                 preimageInfo = [preimageInfo[2], timeslot]
                 try await x.state.accounts.set(
                     serviceAccount: x.serviceIndex,
-                    preimageHash: Data32(hash!)!,
+                    preimageHash: hash,
                     length: length,
                     value: preimageInfo
                 )
