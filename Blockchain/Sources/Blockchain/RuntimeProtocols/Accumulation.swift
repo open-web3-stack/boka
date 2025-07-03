@@ -39,7 +39,7 @@ public struct AccumulationOutput {
     public var state: AccumulateState
     public var transfers: [DeferredTransfers]
     public var commitments: Set<Commitment>
-    public var gasUsed: [(seriveIndex: ServiceIndex, gas: Gas)]
+    public var gasUsed: [(serviceIndex: ServiceIndex, gas: Gas)]
 }
 
 /// parallelized accumulation function ∆* output
@@ -47,7 +47,7 @@ public struct ParallelAccumulationOutput {
     public var state: AccumulateState
     public var transfers: [DeferredTransfers]
     public var commitments: Set<Commitment>
-    public var gasUsed: [(seriveIndex: ServiceIndex, gas: Gas)]
+    public var gasUsed: [(serviceIndex: ServiceIndex, gas: Gas)]
 }
 
 /// single-service accumulation function ∆1 output
@@ -203,7 +203,7 @@ extension Accumulation {
         timeslot: TimeslotIndex
     ) async throws -> ParallelAccumulationOutput {
         var services = [ServiceIndex]()
-        var gasUsed: [(seriveIndex: ServiceIndex, gas: Gas)] = []
+        var gasUsed: [(serviceIndex: ServiceIndex, gas: Gas)] = []
         var transfers: [DeferredTransfers] = []
         var commitments = Set<Commitment>()
         var newPrivilegedServices: PrivilegedServices?
@@ -575,14 +575,13 @@ extension Accumulation {
         for (service, _) in accumulateOutput.gasUsed {
             if accumulateStats[service] != nil { continue }
 
-            let num = accumulated.filter { report in
-                report.digests.contains { $0.serviceIndex == service }
-            }.count
+            let digests = accumulated.compactMap(\.digests).flatMap { $0 }
+            let num = digests.filter { $0.serviceIndex == service }.count
 
             if num == 0 { continue }
 
             let gasUsed = accumulateOutput.gasUsed
-                .filter { $0.seriveIndex == service }
+                .filter { $0.serviceIndex == service }
                 .reduce(Gas(0)) { $0 + $1.gas }
 
             accumulateStats[service] = (gasUsed, UInt32(num))
