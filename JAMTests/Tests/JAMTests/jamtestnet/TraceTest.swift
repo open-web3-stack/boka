@@ -1,3 +1,5 @@
+import Blockchain
+import Codec
 import Foundation
 import Testing
 import TracingUtils
@@ -38,6 +40,16 @@ enum TraceTest {
             #expect(stateRef.value.activityStatistics == expectedState.activityStatistics)
             #expect(stateRef.value.accumulationQueue == expectedState.accumulationQueue)
             #expect(stateRef.value.accumulationHistory == expectedState.accumulationHistory)
+
+            // compare kv as well (so accounts are compared)
+            let expectedStateDict = testcase.postState.toDict()
+            for (key, value) in expectedStateDict {
+                let ourVal = try await stateRef.value.read(key: key)
+                #expect(
+                    ourVal == value,
+                    "kv mismatch for key: \(key), expected: \(value.toHexString()), got: \(ourVal?.toHexString() ?? "nil")"
+                )
+            }
 
             // root
             async #expect(stateRef.value.stateRoot == testcase.postState.root)
