@@ -285,7 +285,10 @@ public actor StateTrie {
     }
 
     private func delete(hash: Data32, key: Data31, depth: UInt8) async throws -> Data32 {
-        let node = try await get(hash: hash).unwrap(orError: StateTrieError.invalidParent)
+        let node = try await get(hash: hash)
+        guard let node else {
+            return Data32()
+        }
 
         if node.isBranch {
             removeNode(hash: hash)

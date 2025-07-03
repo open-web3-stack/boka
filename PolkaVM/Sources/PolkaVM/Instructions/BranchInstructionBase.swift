@@ -1,7 +1,7 @@
 import Foundation
 import TracingUtils
 
-private let logger = Logger(label: "Branch  ")
+private let logger = Logger(label: "Branch")
 
 protocol Branch: Instruction {
     var offset: UInt32 { get }

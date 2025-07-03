@@ -47,7 +47,7 @@ struct AuthorizationsTestcase: Codable {
 
 struct AuthorizationsTests {
     static func loadTests(variant: TestVariants) throws -> [Testcase] {
-        try TestLoader.getTestcases(path: "authorizations/\(variant)", extension: "bin")
+        try TestLoader.getTestcases(path: "stf/authorizations/\(variant)", extension: "bin")
     }
 
     func authorizationsTests(_ testcase: Testcase, variant: TestVariants) throws {

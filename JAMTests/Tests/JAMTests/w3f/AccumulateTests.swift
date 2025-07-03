@@ -7,6 +7,8 @@ import Utils
 
 @testable import JAMTests
 
+private let logger = Logger(label: "AccumulateTests")
+
 private struct AccumulateInput: Codable {
     var timeslot: TimeslotIndex
     var reports: [WorkReport]
@@ -17,8 +19,14 @@ private struct PreimageMapEntry: Codable, Equatable {
     var blob: Data
 }
 
+private struct StorageMapEntry: Codable, Equatable {
+    var key: Data
+    var value: Data
+}
+
 private struct Account: Codable, Equatable {
     var service: ServiceAccountDetails
+    var storage: [StorageMapEntry]
     var preimages: [PreimageMapEntry]
 }
 
@@ -44,8 +52,8 @@ private struct AccumulateState: Equatable, Codable {
         ProtocolConfig.EpochLength
     >
     var privilegedServices: PrivilegedServices
-    var accounts: [AccountsMapEntry]
     var serviceStatistics: [ServiceStatisticsMapEntry]
+    var accounts: [AccountsMapEntry]
 }
 
 private enum Output: Codable {
@@ -127,6 +135,28 @@ private struct FullAccumulateState: Accumulation {
     }
 
     mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data32, value: Data?) {
+        // update footprint
+        let oldValue = storages[index]?[key]
+        let oldAccount = accounts[index]
+        if let oldValue {
+            if let value, let oldAccount {
+                // replace: update byte count difference
+                accounts[index]?.totalByteLength = oldAccount.totalByteLength - UInt64(oldValue.count) + UInt64(value.count)
+            } else {
+                // remove: decrease count and bytes
+                accounts[index]?.itemsCount = UInt32(max(0, Int(oldAccount?.itemsCount ?? 0) - 1))
+                accounts[index]?.totalByteLength = UInt64(max(0, Int(oldAccount?.totalByteLength ?? 0) - (32 + oldValue.count)))
+            }
+        } else {
+            if let value {
+                // add: increase count and bytes
+                accounts[index]?.itemsCount = (oldAccount?.itemsCount ?? 0) + 1
+                accounts[index]?.totalByteLength = (oldAccount?.totalByteLength ?? 0) + 32 + UInt64(value.count)
+            }
+        }
+        logger.debug("storage footprint update: \(accounts[index]?.itemsCount ?? 0) items, \(accounts[index]?.totalByteLength ?? 0) bytes")
+
+        // update value
         storages[index, default: [:]][key] = value
     }
 
@@ -137,23 +167,40 @@ private struct FullAccumulateState: Accumulation {
     mutating func set(
         serviceAccount index: ServiceIndex,
         preimageHash hash: Data32,
-        length _: UInt32,
+        length: UInt32,
         value: StateKeys.ServiceAccountPreimageInfoKey.Value?
     ) {
+        // update footprint
+        let oldValue = preimageInfo[index]?[hash]
+        let oldAccount = accounts[index]
+        if oldValue != nil {
+            if value == nil {
+                // remove: decrease count and bytes
+                accounts[index]?.itemsCount = UInt32(max(0, Int(oldAccount?.itemsCount ?? 0) - 2))
+                accounts[index]?.totalByteLength = UInt64(max(0, Int(oldAccount?.totalByteLength ?? 0) - (81 + Int(length))))
+            }
+        } else {
+            if value != nil {
+                // add: increase count and bytes
+                accounts[index]?.itemsCount = (oldAccount?.itemsCount ?? 0) + 2
+                accounts[index]?.totalByteLength = (oldAccount?.totalByteLength ?? 0) + 81 + UInt64(length)
+            }
+        }
+        logger.debug("preimage footprint update: \(accounts[index]?.itemsCount ?? 0) items, \(accounts[index]?.totalByteLength ?? 0) bytes")
+
+        // update value
         preimageInfo[index, default: [:]][hash] = value
     }
 }
 
 struct AccumulateTests {
-    // init() {
-    //     setupTestLogger()
-    // }
-
     static func loadTests(variant: TestVariants) throws -> [Testcase] {
-        try TestLoader.getTestcases(path: "accumulate/\(variant)", extension: "bin")
+        try TestLoader.getTestcases(path: "stf/accumulate/\(variant)", extension: "bin")
     }
 
     func accumulateTests(_ testcase: Testcase, variant: TestVariants) async throws {
+        // setupTestLogger()
+
         let config = variant.config
         let decoder = JamDecoder(data: testcase.data, config: config)
         let testcase = try decoder.decode(AccumulateTestcase.self)
@@ -170,6 +217,10 @@ struct AccumulateTests {
 
         for entry in testcase.preState.accounts {
             fullState.accounts[entry.index] = entry.data.service
+            for storage in entry.data.storage {
+                let storageKey = Blake2b256.hash(entry.index.encode(), storage.key)
+                fullState.storages[entry.index, default: [:]][storageKey] = storage.value
+            }
             for preimage in entry.data.preimages {
                 fullState.preimages[entry.index, default: [:]][preimage.hash] = preimage.blob
             }
@@ -190,15 +241,18 @@ struct AccumulateTests {
             switch testcase.output {
             case let .ok(expectedRoot):
                 // NOTE: timeslot and entropy are not changed by accumulate
-                #expect(content.root == expectedRoot, "root mismatch")
+                #expect(content.root == expectedRoot, "accumulate root mismatch")
                 #expect(fullState.accumulationQueue == testcase.postState.accumulationQueue, "AccumulationQueue mismatch")
                 #expect(fullState.accumulationHistory == testcase.postState.accumulationHistory, "AccumulationHistory mismatch")
                 #expect(fullState.privilegedServices == testcase.postState.privilegedServices, "PrivilegedServices mismatch")
-
                 #expect(fullState.accounts.count == testcase.postState.accounts.count, "Accounts count mismatch")
                 for entry in testcase.postState.accounts {
                     let account = fullState.accounts[entry.index]!
                     #expect(account == entry.data.service, "ServiceAccountDetail mismatch")
+                    for storage in entry.data.storage {
+                        let key = Blake2b256.hash(entry.index.encode(), storage.key)
+                        #expect(fullState.storages[entry.index]?[key] == storage.value, "Storage mismatch")
+                    }
                     for preimage in entry.data.preimages {
                         #expect(fullState.preimages[entry.index]?[preimage.hash] == preimage.blob, "Preimage mismatch")
                     }
@@ -219,15 +273,11 @@ struct AccumulateTests {
 
     @Test(arguments: try AccumulateTests.loadTests(variant: .tiny))
     func tinyTests(_ testcase: Testcase) async throws {
-        await withKnownIssue("TODO: debug", isIntermittent: true) {
-            try await accumulateTests(testcase, variant: .tiny)
-        }
+        try await accumulateTests(testcase, variant: .tiny)
     }
 
     @Test(arguments: try AccumulateTests.loadTests(variant: .full))
     func fullTests(_ testcase: Testcase) async throws {
-        await withKnownIssue("TODO: debug", isIntermittent: true) {
-            try await accumulateTests(testcase, variant: .full)
-        }
+        try await accumulateTests(testcase, variant: .full)
     }
 }

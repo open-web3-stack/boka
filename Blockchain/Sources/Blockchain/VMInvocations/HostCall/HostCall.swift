@@ -22,7 +22,6 @@ extension HostCall {
 
         do {
             try await _callImpl(config: config, state: state)
-            logger.debug("w7: \(HostCallResultCode(rawValue: state.readRegister(Registers.Index(raw: 7))) ?? .OK)")
             return .continued
         } catch let e as MemoryError {
             logger.error("memory error: \(e)")

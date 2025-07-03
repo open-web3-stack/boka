@@ -5,12 +5,18 @@ public protocol DataInput {
     /// throw when no more data
     mutating func read(length: Int) throws -> Data
 
+    mutating func readAll() throws -> Data
+
     var isEmpty: Bool { get }
 }
 
 extension DataInput {
     public mutating func read() throws -> UInt8 {
         try read(length: 1).first!
+    }
+
+    public mutating func readAll() throws -> Data {
+        try readAll()
     }
 
     public mutating func decodeUInt64() throws -> UInt64 {
@@ -40,6 +46,12 @@ extension Data: DataInput {
         }
         let res = self[startIndex ..< startIndex + length]
         self = self[startIndex + length ..< endIndex]
+        return res
+    }
+
+    public mutating func readAll() throws -> Data {
+        let res = self
+        self = Data()
         return res
     }
 }

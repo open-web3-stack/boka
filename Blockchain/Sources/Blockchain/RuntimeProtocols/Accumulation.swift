@@ -39,7 +39,7 @@ public struct AccumulationOutput {
     public var state: AccumulateState
     public var transfers: [DeferredTransfers]
     public var commitments: Set<Commitment>
-    public var gasUsed: [(seriveIndex: ServiceIndex, gas: Gas)]
+    public var gasUsed: [(serviceIndex: ServiceIndex, gas: Gas)]
 }
 
 /// parallelized accumulation function ∆* output
@@ -47,7 +47,7 @@ public struct ParallelAccumulationOutput {
     public var state: AccumulateState
     public var transfers: [DeferredTransfers]
     public var commitments: Set<Commitment>
-    public var gasUsed: [(seriveIndex: ServiceIndex, gas: Gas)]
+    public var gasUsed: [(serviceIndex: ServiceIndex, gas: Gas)]
 }
 
 /// single-service accumulation function ∆1 output
@@ -79,7 +79,7 @@ public struct AccumulationResult {
 public struct AccountChanges {
     public var newAccounts: [ServiceIndex: ServiceAccount]
     public var altered: Set<ServiceIndex>
-    public var alterations: [(ServiceAccountsMutRef) -> Void]
+    public var alterations: [(ServiceAccountsMutRef) async throws -> Void]
     public var removed: Set<ServiceIndex>
 
     public init() {
@@ -89,20 +89,20 @@ public struct AccountChanges {
         removed = []
     }
 
-    public mutating func addAlteration(index: ServiceIndex, _ alteration: @escaping (ServiceAccountsMutRef) -> Void) {
+    public mutating func addAlteration(index: ServiceIndex, _ alteration: @escaping (ServiceAccountsMutRef) async throws -> Void) {
         alterations.append(alteration)
         altered.insert(index)
     }
 
-    public func apply(to accounts: ServiceAccountsMutRef) {
+    public func apply(to accounts: ServiceAccountsMutRef) async throws {
         for (index, account) in newAccounts {
-            accounts.addNew(serviceAccount: index, account: account)
+            try await accounts.addNew(serviceAccount: index, account: account)
         }
         for index in removed {
             accounts.remove(serviceAccount: index)
         }
         for alteration in alterations {
-            alteration(accounts)
+            try await alteration(accounts)
         }
     }
 
@@ -112,7 +112,7 @@ public struct AccountChanges {
             throw .duplicatedNewService
         }
         guard altered.isDisjoint(with: other.altered) else {
-            logger.debug("altered accounts have duplicates, self: \(altered), other: \(other.altered)")
+            logger.debug("same service being altered in parallel, self: \(altered), other: \(other.altered)")
             throw .duplicatedContributionToService
         }
         guard removed.isDisjoint(with: other.removed) else {
@@ -170,10 +170,10 @@ extension Accumulation {
                     packageHash: report.packageSpecification.workPackageHash,
                     segmentRoot: report.packageSpecification.segmentRoot,
                     authorizerHash: report.authorizerHash,
-                    authorizerTrace: report.authorizerTrace,
                     payloadHash: digest.payloadHash,
                     gasLimit: digest.gasLimit,
                     workResult: digest.result,
+                    authorizerTrace: report.authorizerTrace,
                 ))
             }
         }
@@ -203,7 +203,7 @@ extension Accumulation {
         timeslot: TimeslotIndex
     ) async throws -> ParallelAccumulationOutput {
         var services = [ServiceIndex]()
-        var gasUsed: [(seriveIndex: ServiceIndex, gas: Gas)] = []
+        var gasUsed: [(serviceIndex: ServiceIndex, gas: Gas)] = []
         var transfers: [DeferredTransfers] = []
         var commitments = Set<Commitment>()
         var newPrivilegedServices: PrivilegedServices?
@@ -234,7 +234,7 @@ extension Accumulation {
         var accountsRef = ServiceAccountsMutRef(state.accounts.value)
         var servicePreimageSet = Set<ServicePreimagePair>()
 
-        for service in services {
+        for service in Set(services) {
             let singleOutput = try await singleAccumulate(
                 config: config,
                 state: AccumulateState(
@@ -376,7 +376,12 @@ extension Accumulation {
             }
 
             if preimageInfo.isEmpty {
-                accounts.set(serviceAccount: serviceIndex, preimageHash: preimageHash, length: UInt32(preimage.count), value: [timeslot])
+                try await accounts.set(
+                    serviceAccount: serviceIndex,
+                    preimageHash: preimageHash,
+                    length: UInt32(preimage.count),
+                    value: [timeslot]
+                )
                 accounts.set(serviceAccount: serviceIndex, preimageHash: preimageHash, value: preimage)
             }
         }
@@ -527,7 +532,7 @@ extension Accumulation {
             transfersStats[service] = (count, gasUsed)
         }
 
-        self = accountsMutRef.value as! Self
+        self = accumulateOutput.state.accounts.value as! Self
 
         // update accumulation history
         let accumulated = accumulatableReports[0 ..< accumulateOutput.numAccumulated]
@@ -570,14 +575,13 @@ extension Accumulation {
         for (service, _) in accumulateOutput.gasUsed {
             if accumulateStats[service] != nil { continue }
 
-            let num = accumulated.filter { report in
-                report.digests.contains { $0.serviceIndex == service }
-            }.count
+            let digests = accumulated.compactMap(\.digests).flatMap { $0 }
+            let num = digests.filter { $0.serviceIndex == service }.count
 
             if num == 0 { continue }
 
             let gasUsed = accumulateOutput.gasUsed
-                .filter { $0.seriveIndex == service }
+                .filter { $0.serviceIndex == service }
                 .reduce(Gas(0)) { $0 + $1.gas }
 
             accumulateStats[service] = (gasUsed, UInt32(num))

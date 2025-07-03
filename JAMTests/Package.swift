@@ -35,7 +35,6 @@ let package = Package(
                 .copy("../../jamtestvectors"),
                 .copy("../../jamduna"),
                 .copy("../../javajam"),
-                .copy("../../jamixir"),
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),

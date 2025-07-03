@@ -51,17 +51,20 @@ extension RecentHistory: Dummy {
 }
 
 extension RecentHistory {
-    public mutating func update(
-        headerHash: Data32,
+    public mutating func updatePartial(
         parentStateRoot: Data32,
-        accumulateRoot: Data32,
-        lookup: [Data32: Data32]
     ) {
         if items.count > 0 { // if this is not block #0
             // write the state root of last block
             items[items.endIndex - 1].stateRoot = parentStateRoot
         }
+    }
 
+    public mutating func update(
+        headerHash: Data32,
+        accumulateRoot: Data32,
+        lookup: [Data32: Data32]
+    ) {
         var mmr = items.last?.mmr ?? .init([])
 
         mmr.append(accumulateRoot, hasher: Keccak.self)

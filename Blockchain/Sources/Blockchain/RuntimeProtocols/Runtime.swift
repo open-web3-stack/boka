@@ -172,7 +172,7 @@ public final class Runtime {
             try updateDisputes(block: block, state: &newState)
 
             // depends on Safrole and Disputes
-            let availableReports = try updateReports(block: block, state: &newState)
+            let availableReports = try await updateAssurances(block: block, state: &newState)
 
             // accumulate
             let (accumulateRoot, accumulateStats, transfersStats) = try await newState.update(
@@ -183,6 +183,14 @@ public final class Runtime {
                 entropy: newState.entropyPool.t0
             )
 
+            newState.recentHistory.updatePartial(parentStateRoot: block.header.priorStateRoot)
+
+            try await updateGuarantees(block: block, state: &newState)
+
+            // after reports as it need old recent history
+            try updateRecentHistory(block: block, state: &newState, accumulateRoot: accumulateRoot)
+
+            // update authorization pool and queue
             do {
                 let authorizationResult = try newState.update(
                     config: config,
@@ -206,9 +214,6 @@ public final class Runtime {
                 transfersStats: transfersStats
             )
 
-            // after reports as it need old recent history
-            try updateRecentHistory(block: block, state: &newState, accumulateRoot: accumulateRoot)
-
             try await newState.save()
         } catch let error as Error {
             throw error
@@ -230,7 +235,6 @@ public final class Runtime {
         ) })
         newState.recentHistory.update(
             headerHash: block.hash,
-            parentStateRoot: block.header.priorStateRoot,
             accumulateRoot: accumulateRoot,
             lookup: lookup
         )
@@ -265,7 +269,7 @@ public final class Runtime {
     }
 
     // returns available reports
-    public func updateReports(block: BlockRef, state newState: inout State) throws -> [WorkReport] {
+    public func updateAssurances(block: BlockRef, state newState: inout State) async throws -> [WorkReport] {
         let (
             newReports: newReports, availableReports: availableReports
         ) = try newState.update(
@@ -276,19 +280,20 @@ public final class Runtime {
         )
 
         newState.reports = newReports
-        let result = try newState.update(
+        return availableReports
+    }
+
+    public func updateGuarantees(block: BlockRef, state newState: inout State) async throws {
+        let result = try await newState.update(
             config: config, timeslot: newState.timeslot, extrinsic: block.extrinsic.reports
         )
-
         newState.reports = result.newReports
-
-        return availableReports
     }
 
     public func updatePreimages(block: BlockRef, state newState: inout State) async throws {
         let res = try await newState.updatePreimages(
             config: config, timeslot: newState.timeslot, preimages: block.extrinsic.preimages
         )
-        newState.mergeWith(postState: res)
+        try await newState.mergeWith(postState: res)
     }
 }

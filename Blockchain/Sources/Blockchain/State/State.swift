@@ -389,7 +389,31 @@ extension State: ServiceAccounts {
         layer[serviceAccount: index] = account
     }
 
-    public mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data32, value: Data?) {
+    public mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data32, value: Data?) async throws {
+        // update footprint
+        let oldValue = try await get(serviceAccount: index, storageKey: key)
+        guard var oldAccount = try await get(serviceAccount: index) else {
+            fatalError("Failed to get account details")
+        }
+        if let oldValue {
+            if let value {
+                // replace: update byte count difference
+                oldAccount.totalByteLength = oldAccount.totalByteLength - UInt64(oldValue.count) + UInt64(value.count)
+            } else {
+                // remove: decrease count and bytes
+                oldAccount.itemsCount = UInt32(max(0, Int(oldAccount.itemsCount) - 1))
+                oldAccount.totalByteLength = UInt64(max(0, Int(oldAccount.totalByteLength) - (32 + oldValue.count)))
+            }
+        } else {
+            if let value {
+                // add: increase count and bytes
+                oldAccount.itemsCount = (oldAccount.itemsCount) + 1
+                oldAccount.totalByteLength = (oldAccount.totalByteLength) + 32 + UInt64(value.count)
+            }
+        }
+        layer[serviceAccount: index] = oldAccount
+
+        // update value
         layer[serviceAccount: index, storageKey: key] = value
     }
 
@@ -402,7 +426,29 @@ extension State: ServiceAccounts {
         preimageHash hash: Data32,
         length: UInt32,
         value: StateKeys.ServiceAccountPreimageInfoKey.Value?
-    ) {
+    ) async throws {
+        // update footprint
+        let oldValue = try await get(serviceAccount: index, preimageHash: hash, length: length)
+        guard var oldAccount = try await get(serviceAccount: index) else {
+            fatalError("Failed to get account details")
+        }
+        if oldValue != nil {
+            // replace: no change on footprint
+            // remove: decrease count and bytes
+            if value == nil {
+                oldAccount.itemsCount = UInt32(max(0, Int(oldAccount.itemsCount) - 2))
+                oldAccount.totalByteLength = UInt64(max(0, Int(oldAccount.totalByteLength) - (81 + Int(length))))
+            }
+        } else {
+            if value != nil {
+                // add: increase count and bytes
+                oldAccount.itemsCount = (oldAccount.itemsCount) + 2
+                oldAccount.totalByteLength = (oldAccount.totalByteLength) + 81 + UInt64(length)
+            }
+        }
+        layer[serviceAccount: index] = oldAccount
+
+        // update value
         layer[serviceAccount: index, preimageHash: hash, length: length] = value
     }
 }
@@ -458,8 +504,8 @@ extension State: Guaranteeing {
         judgements.punishSet
     }
 
-    public func serviceAccount(index: ServiceIndex) -> ServiceAccountDetails? {
-        self[serviceAccount: index] ?? nil
+    public func serviceAccount(index: ServiceIndex) async throws -> ServiceAccountDetails? {
+        try await get(serviceAccount: index)
     }
 }
 
@@ -472,8 +518,9 @@ extension State: Authorization {
 extension State: ActivityStatistics {}
 
 extension State: Preimages {
-    public mutating func mergeWith(postState: PreimagesPostState) {
+    public mutating func mergeWith(postState: PreimagesPostState) async throws {
         for update in postState.updates {
+            // TODO: may need to use set method so account footprint is updated
             self[serviceAccount: update.serviceIndex, preimageHash: update.hash] = update.data
             self[serviceAccount: update.serviceIndex, preimageHash: update.hash, length: update.length] =
                 LimitedSizeArray([update.timeslot])

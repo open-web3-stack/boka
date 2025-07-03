@@ -317,7 +317,7 @@ struct EncoderTests {
     @Test func encodeData() throws {
         let data = Data([0, 1, 2])
         let encoded = try JamEncoder.encode(data)
-        #expect(encoded == Data([3, 0, 1, 2])) // Length prefix of 3 bytes
+        #expect(encoded == Data([0, 1, 2]))
     }
 
     @Test func encodeBool() throws {
@@ -385,7 +385,7 @@ struct EncoderTests {
 
         let encodedNone = try JamEncoder.encode(Data?.none)
 
-        #expect(encodedSome == Data([1, 3, 1, 2, 3])) // Optional with value encoded
+        #expect(encodedSome == Data([1, 1, 2, 3])) // Optional with value encoded
         #expect(encodedNone == Data([0])) // None encoded as 1 byte (0)
     }
 

@@ -47,7 +47,7 @@ extension Instruction {
     }
 
     public func gasCost() -> Gas {
-        Gas(0)
+        Gas(1)
     }
 
     public func updatePC(context: ExecutionContext, skip: UInt32) -> ExecOutcome {
