@@ -8,7 +8,7 @@ public func isAuthorized(
     package: WorkPackage,
     coreIndex: CoreIndex
 ) async throws -> (Result<Data, WorkResultError>, Gas) {
-    let args = try JamEncoder.encode(package, coreIndex)
+    let args = try JamEncoder.encode(coreIndex)
     let codeBlob = try await package.authorizationCode(serviceAccounts: serviceAccounts)
     guard let codeBlob else {
         return (.failure(.invalidCode), Gas(0))

@@ -2,7 +2,7 @@ import Foundation
 import TracingUtils
 import Utils
 
-private let logger = Logger(label: "Insts   ")
+private let logger = Logger(label: "Insts ")
 
 public let BASIC_BLOCK_INSTRUCTIONS: Set<UInt8> = [
     Instructions.Trap.opcode,

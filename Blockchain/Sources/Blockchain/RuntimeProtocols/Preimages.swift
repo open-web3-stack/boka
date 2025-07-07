@@ -5,7 +5,8 @@ public enum PreimagesError: Error {
     case preimagesNotSorted
     case duplicatedPreimage
     case invalidServiceIndex
-    case preimageNotUsed
+    case preimageNotSolicited
+    case preimageIsProvided
 }
 
 public struct PreimageUpdate: Sendable, Equatable {
@@ -37,7 +38,7 @@ public protocol Preimages {
     func get(serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32) async throws
         -> LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>?
 
-    mutating func mergeWith(postState: PreimagesPostState)
+    mutating func mergeWith(postState: PreimagesPostState) async throws
 }
 
 extension Preimages {
@@ -65,9 +66,13 @@ extension Preimages {
                 throw PreimagesError.duplicatedPreimage
             }
 
-            let isRequested = try? await get(serviceAccount: preimage.serviceIndex, preimageHash: hash, length: UInt32(preimage.data.count))
-            guard isRequested != nil else {
-                throw PreimagesError.preimageNotUsed
+            let requested = try? await get(serviceAccount: preimage.serviceIndex, preimageHash: hash, length: UInt32(preimage.data.count))
+            guard let requested else {
+                throw PreimagesError.preimageNotSolicited
+            }
+
+            guard requested.isEmpty else {
+                throw PreimagesError.preimageIsProvided
             }
 
             updates.append(PreimageUpdate(
