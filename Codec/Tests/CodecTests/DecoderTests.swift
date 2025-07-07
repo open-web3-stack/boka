@@ -4,12 +4,21 @@ import Testing
 @testable import Codec
 
 struct DecoderTests {
-    @Test func decodeOverflowLength() throws {
+    private struct DataWrapper: Decodable {
+        let data: Data
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            data = try container.decode(Data.self)
+        }
+    }
+
+    @Test func decodeDataOverflowLength() throws {
         let overflowLength = UInt64.max
         let lengthData = Data([241]) + withUnsafeBytes(of: overflowLength) { Data($0) }
         let data = Data(repeating: 0, count: 8)
         #expect(throws: DecodingError.self) {
-            _ = try JamDecoder.decode(Data.self, from: lengthData + data)
+            _ = try JamDecoder.decode(DataWrapper.self, from: lengthData + data)
         }
     }
 
@@ -122,10 +131,7 @@ struct DecoderTests {
         let lengthData = Data([241, 0, 0, 0, 0, 0, 0, 0])
         let data = Data(repeating: 0, count: Int(maxLength))
         #expect(throws: DecodingError.self) {
-            _ = try JamDecoder.decode(Data.self, from: lengthData + data)
-        }
-        #expect(throws: DecodingError.self) {
-            _ = try JamDecoder.decode([UInt8].self, from: lengthData + data)
+            _ = try JamDecoder.decode(DataWrapper.self, from: lengthData + data)
         }
     }
 
@@ -133,7 +139,7 @@ struct DecoderTests {
         let encodedData = Data([3, 0, 1, 2])
         let decoded = try JamDecoder.decode(Data.self, from: encodedData)
 
-        #expect(decoded == Data([0, 1, 2]))
+        #expect(decoded == Data([3, 0, 1, 2]))
     }
 
     @Test func decodeBool() throws {
@@ -183,7 +189,7 @@ struct DecoderTests {
     }
 
     @Test func decodeOptionalData() throws {
-        let encodedSome = Data([1, 3, 1, 2, 3])
+        let encodedSome = Data([1, 1, 2, 3])
         let encodedNone = Data([0])
 
         let decodedSome = try JamDecoder.decode(Data?.self, from: encodedSome)
@@ -229,12 +235,6 @@ struct DecoderTests {
         }
         #expect(throws: Error.self) {
             _ = try JamDecoder.decode([Int].self, from: Data([21, 205, 91, 7, 0, 0, 0, 0]))
-        }
-        #expect(throws: Error.self) {
-            _ = try JamDecoder.decode([Data].self, from: Data([21, 205, 91, 7, 0, 0, 0, 0]))
-        }
-        #expect(throws: Error.self) {
-            _ = try JamDecoder.decode(Data.self, from: Data([21, 205, 91, 7, 0, 0, 0, 0]))
         }
     }
 

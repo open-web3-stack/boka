@@ -19,6 +19,13 @@ private enum StateLayerValue: Sendable {
         }
         return nil
     }
+
+    var isDeleted: Bool {
+        if case .deleted = self {
+            return true
+        }
+        return false
+    }
 }
 
 public struct StateLayer: Sendable {
@@ -272,5 +279,21 @@ extension StateLayer {
         set {
             changes[key] = .init(newValue)
         }
+    }
+
+    public func isDeleted(serviceAccount index: ServiceIndex) -> Bool {
+        changes[StateKeys.ServiceAccountKey(index: index).encode()]?.isDeleted ?? false
+    }
+
+    public func isDeleted(serviceAccount index: ServiceIndex, storageKey key: Data32) -> Bool {
+        changes[StateKeys.ServiceAccountStorageKey(index: index, key: key).encode()]?.isDeleted ?? false
+    }
+
+    public func isDeleted(serviceAccount index: ServiceIndex, preimageHash hash: Data32) -> Bool {
+        changes[StateKeys.ServiceAccountPreimagesKey(index: index, hash: hash).encode()]?.isDeleted ?? false
+    }
+
+    public func isDeleted(serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32) -> Bool {
+        changes[StateKeys.ServiceAccountPreimageInfoKey(index: index, hash: hash, length: length).encode()]?.isDeleted ?? false
     }
 }

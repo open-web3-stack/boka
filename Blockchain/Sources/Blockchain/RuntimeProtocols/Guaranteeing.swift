@@ -49,7 +49,7 @@ public protocol Guaranteeing {
         ProtocolConfig.EpochLength
     > { get }
 
-    func serviceAccount(index: ServiceIndex) -> ServiceAccountDetails?
+    func serviceAccount(index: ServiceIndex) async throws -> ServiceAccountDetails?
 }
 
 extension Guaranteeing {
@@ -89,7 +89,7 @@ extension Guaranteeing {
         config: ProtocolConfigRef,
         timeslot: TimeslotIndex,
         extrinsic: ExtrinsicGuarantees
-    ) throws(GuaranteeingError) -> (
+    ) async throws(GuaranteeingError) -> (
         newReports: ConfigFixedSizeArray<
             ReportItem?,
             ProtocolConfig.TotalNumberOfCores
@@ -109,9 +109,9 @@ extension Guaranteeing {
         let previousCoreAssignment = getCoreAssignment(
             config: config,
             randomness: previousRandomness,
-            timeslot: timeslot - coreAssignmentRotationPeriod
+            timeslot: UInt32(max(0, Int(timeslot) - Int(coreAssignmentRotationPeriod)))
         )
-        let pareviousCoreKeys = withoutOffenders(keys: previousValidators.map(\.ed25519))
+        let previousCoreKeys = withoutOffenders(keys: previousValidators.map(\.ed25519))
 
         var workPackageHashes = Set<Data32>()
 
@@ -131,12 +131,12 @@ extension Guaranteeing {
 
             for credential in guarantee.credential {
                 let isCurrent = (guarantee.timeslot / coreAssignmentRotationPeriod) == (timeslot / coreAssignmentRotationPeriod)
-                let keys = isCurrent ? currentCoreKeys : pareviousCoreKeys
+                let keys = isCurrent ? currentCoreKeys : previousCoreKeys
                 let key = keys[Int(credential.index)]
                 let reportHash = report.hash()
                 workPackageHashes.insert(report.packageSpecification.workPackageHash)
                 let payload = SigningContext.guarantee + reportHash.data
-                let pubkey = try Result { try Ed25519.PublicKey(from: key) }
+                let pubkey = try Result(catching: { try Ed25519.PublicKey(from: key) })
                     .mapError { _ in GuaranteeingError.invalidPublicKey }
                     .get()
                 guard pubkey.verify(signature: credential.signature, message: payload) else {
@@ -164,7 +164,7 @@ extension Guaranteeing {
             }
 
             for digest in report.digests {
-                guard let acc = serviceAccount(index: digest.serviceIndex) else {
+                guard let acc = try? await serviceAccount(index: digest.serviceIndex) else {
                     throw .invalidServiceIndex
                 }
 

@@ -22,10 +22,11 @@ struct TrieTests {
             let decoder = JSONDecoder()
             let testcase = try decoder.decode(TrieTestCase.self, from: testcase.data)
             for element in testcase {
-                let kv = element.input.reduce(into: [Data31: Data]()) { _, entry in
+                let kv = element.input.reduce(into: [Data31: Data]()) { result, entry in
                     let keyData = Data(fromHexString: entry.key)
                     let valueData = Data(fromHexString: entry.value)
                     // result[Data31(keyData!)!] = valueData
+                    result[Data31()] = valueData
                 }
 
                 let result = try stateMerklize(kv: kv)

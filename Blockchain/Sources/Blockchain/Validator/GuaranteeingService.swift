@@ -440,7 +440,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         let state = try await dataProvider.getState(hash: head.hash)
 
         // Verify the service account exists
-        guard let serviceAccount = state.value.serviceAccount(index: workPackage.authorizationServiceIndex) else {
+        guard let serviceAccount = try? await state.value.serviceAccount(index: workPackage.authorizationServiceIndex) else {
             logger.debug("Service account does not exist",
                          metadata: ["serviceIndex": "\(workPackage.authorizationServiceIndex)"])
             throw GuaranteeingServiceError.serviceAccountNotFound

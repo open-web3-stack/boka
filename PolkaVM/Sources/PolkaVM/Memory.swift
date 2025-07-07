@@ -123,6 +123,9 @@ public class PageMap {
     ///
     /// If the pages are not readable, return (false, faultPageIndex).
     public func isReadable(pageStart: UInt32, pages: Int) -> (result: Bool, page: UInt32) {
+        if pages == 0 {
+            return (pageTable[pageStart]?.isReadable() ?? false, pageStart)
+        }
         let pageRange = pageStart ..< pageStart + UInt32(pages)
         let cacheValue = isReadableCache.value(forKey: pageRange)
         if let cacheValue {
@@ -157,6 +160,9 @@ public class PageMap {
     ///
     /// If the pages are not writable, return (false, faultPageIndex).
     public func isWritable(pageStart: UInt32, pages: Int) -> (result: Bool, page: UInt32) {
+        if pages == 0 {
+            return (pageTable[pageStart]?.isWritable() ?? false, pageStart)
+        }
         let pageRange = pageStart ..< pageStart + UInt32(pages)
         let cacheValue = isWritableCache.value(forKey: pageRange)
         if let cacheValue {
@@ -201,6 +207,10 @@ public class PageMap {
     }
 
     public func update(pageIndex: UInt32, pages: Int, access: PageAccess) {
+        if pages == 0 {
+            pageTable[pageIndex] = access
+            return
+        }
         for i in pageIndex ..< pageIndex + UInt32(pages) {
             pageTable[i] = access
         }
@@ -221,6 +231,10 @@ public class PageMap {
     }
 
     public func removeAccess(pageIndex: UInt32, pages: Int) {
+        if pages == 0 {
+            pageTable.removeValue(forKey: pageIndex)
+            return
+        }
         for i in pageIndex ..< pageIndex + UInt32(pages) {
             pageTable.removeValue(forKey: i)
         }
@@ -557,13 +571,25 @@ public class StandardMemory: Memory {
     }
 
     public func sbrk(_ size: UInt32) throws(MemoryError) -> UInt32 {
+        // NOTE: sbrk will be removed from GP
+        // NOTE: this impl aligns with w3f traces test vector README
+
         let prevHeapEnd = heap.endAddress
-        let sizeAlignToPageSize = StandardProgram.alignToPageSize(size: size, config: config)
-        guard prevHeapEnd + sizeAlignToPageSize < stack.startAddress else {
-            throw .outOfMemory(prevHeapEnd)
+        if size == 0 {
+            return prevHeapEnd
         }
-        pageMap.update(address: prevHeapEnd, length: Int(sizeAlignToPageSize), access: .readWrite)
-        try heap.incrementEnd(size: sizeAlignToPageSize)
+
+        let nextPageBoundary = StandardProgram.alignToPageSize(size: prevHeapEnd, config: config)
+        try heap.incrementEnd(size: size)
+
+        if heap.endAddress > nextPageBoundary {
+            let finalBoundary = heap.endAddress
+            let start = nextPageBoundary / UInt32(config.pvmMemoryPageSize)
+            let end = finalBoundary / UInt32(config.pvmMemoryPageSize)
+            let count = Int(end - start)
+            pageMap.update(pageIndex: start, pages: count, access: .readWrite)
+        }
+
         return prevHeapEnd
     }
 }
@@ -632,7 +658,8 @@ public class GeneralMemory: Memory {
 
 extension Memory {
     public func isReadable(address: UInt32, length: Int) -> Bool {
-        pageMap.isReadable(address: address, length: length).result
+        if length == 0 { return true }
+        return pageMap.isReadable(address: address, length: length).result
     }
 
     public func isReadable(pageStart: UInt32, pages: Int) -> Bool {
@@ -647,7 +674,8 @@ extension Memory {
     }
 
     public func isWritable(address: UInt32, length: Int) -> Bool {
-        pageMap.isWritable(address: address, length: length).result
+        if length == 0 { return true }
+        return pageMap.isWritable(address: address, length: length).result
     }
 
     public func isWritable(pageStart: UInt32, pages: Int) -> Bool {

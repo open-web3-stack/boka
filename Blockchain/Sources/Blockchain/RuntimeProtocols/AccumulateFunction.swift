@@ -1,3 +1,4 @@
+import Codec
 import Foundation
 import Utils
 
@@ -9,14 +10,14 @@ public struct OperandTuple: Codable {
     public var segmentRoot: Data32
     /// a
     public var authorizerHash: Data32
-    /// o
-    public var authorizerTrace: Data
     /// y
     public var payloadHash: Data32
     /// g
-    public var gasLimit: Gas
+    @CodingAs<Compact<Gas>> public var gasLimit: Gas
     /// d
     public var workResult: WorkResult
+    /// o
+    public var authorizerTrace: Data
 }
 
 public struct DeferredTransfers: Codable {
