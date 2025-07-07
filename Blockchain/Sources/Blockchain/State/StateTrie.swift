@@ -312,8 +312,13 @@ public actor StateTrie {
             saveNode(node: newBranch)
             return newBranch.hash
         } else {
-            // leaf
-            return Data32()
+            // leaf - only remove if the leaf matches the key we're deleting
+            if node.isLeaf(key: key) {
+                removeNode(hash: hash)
+                return Data32()
+            } else {
+                return hash
+            }
         }
     }
 

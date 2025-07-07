@@ -291,22 +291,27 @@ public class Read: HostCall {
             nil
         }
 
-        logger.debug("raw val: \(value?.toDebugHexString() ?? "nil")")
+        guard let value else {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
+            return
+        }
+
+        logger.debug("raw val: \(value.toDebugHexString())")
 
         let reg11: UInt64 = state.readRegister(Registers.Index(raw: 11))
         let reg12: UInt64 = state.readRegister(Registers.Index(raw: 12))
 
-        let first = min(Int(reg11), value?.count ?? 0)
-        let len = min(Int(reg12), (value?.count ?? 0) - first)
+        let first = min(Int(reg11), value.count)
+        let len = min(Int(reg12), (value.count) - first)
+
+        logger.debug("first: \(first), len: \(len)")
 
         if !state.isMemoryWritable(address: regs[2], length: len) {
             throw VMInvocationsError.panic
-        } else if value == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
         } else {
-            state.writeRegister(Registers.Index(raw: 7), value!.count)
-            logger.debug("val: \(value![relative: first ..< (first + len)].toDebugHexString())")
-            try state.writeMemory(address: regs[2], values: value![relative: first ..< (first + len)])
+            state.writeRegister(Registers.Index(raw: 7), value.count)
+            logger.debug("val: \(value[relative: first ..< (first + len)].toDebugHexString())")
+            try state.writeMemory(address: regs[2], values: value[relative: first ..< (first + len)])
         }
     }
 }
@@ -326,7 +331,7 @@ public class Write: HostCall {
     public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
         let regs: [UInt32] = state.readRegisters(in: 7 ..< 11)
 
-        logger.debug("regs: \(regs), service: \(serviceIndex))")
+        logger.debug("regs: \(regs), service: \(serviceIndex)")
 
         let key = try? Blake2b256.hash(serviceIndex.encode(), state.readMemory(address: regs[0], length: Int(regs[1])))
 
@@ -336,18 +341,16 @@ public class Write: HostCall {
 
         logger.debug("key: \(key?.debugDescription ?? "nil")")
 
-        let l = if let key, let value = try await serviceAccounts.value.get(serviceAccount: serviceIndex, storageKey: key) {
-            UInt64(value.count)
-        } else {
-            HostCallResultCode.NONE.rawValue
-        }
-
-        logger.debug("l: \(l), is none: \(l == HostCallResultCode.NONE.rawValue)")
-
         let accountDetails = try await serviceAccounts.value.get(serviceAccount: serviceIndex)
         if let accountDetails, accountDetails.thresholdBalance(config: config) > accountDetails.balance {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
         } else {
+            let l = if let key, let value = try await serviceAccounts.value.get(serviceAccount: serviceIndex, storageKey: key) {
+                UInt64(value.count)
+            } else {
+                HostCallResultCode.NONE.rawValue
+            }
+            logger.debug("l: \(l), is none: \(l == HostCallResultCode.NONE.rawValue)")
             state.writeRegister(Registers.Index(raw: 7), l)
             if regs[3] == 0 {
                 logger.debug("deleting key: \(key?.debugDescription ?? "nil")")

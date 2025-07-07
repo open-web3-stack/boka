@@ -333,6 +333,9 @@ extension State: Dummy {
 
 extension State: ServiceAccounts {
     public func get(serviceAccount index: ServiceIndex) async throws -> ServiceAccountDetails? {
+        if layer.isDeleted(serviceAccount: index) {
+            return nil
+        }
         if let res = layer[serviceAccount: index] {
             return res
         }
@@ -340,6 +343,9 @@ extension State: ServiceAccounts {
     }
 
     public func get(serviceAccount index: ServiceIndex, storageKey key: Data32) async throws -> Data? {
+        if layer.isDeleted(serviceAccount: index, storageKey: key) {
+            return nil
+        }
         if let res = layer[serviceAccount: index, storageKey: key] {
             return res
         }
@@ -347,6 +353,9 @@ extension State: ServiceAccounts {
     }
 
     public func get(serviceAccount index: ServiceIndex, preimageHash hash: Data32) async throws -> Data? {
+        if layer.isDeleted(serviceAccount: index, preimageHash: hash) {
+            return nil
+        }
         if let res = layer[serviceAccount: index, preimageHash: hash] {
             return res
         }
@@ -356,6 +365,9 @@ extension State: ServiceAccounts {
     public func get(
         serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32
     ) async throws -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
+        if layer.isDeleted(serviceAccount: index, preimageHash: hash, length: length) {
+            return nil
+        }
         if let res = layer[serviceAccount: index, preimageHash: hash, length: length] {
             return res
         }
