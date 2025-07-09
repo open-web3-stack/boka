@@ -91,58 +91,13 @@ public enum ErasureCoding {
     }
 
     /// join k data of length n into one data of length k * n
-    static func join(arr: [Data], n: Int) -> Data {
-        var result = Data(capacity: arr.count * n)
+    static func join(arr: [Data]) -> Data {
+        var result = Data(capacity: arr.count * arr[0].count)
 
-        for var d in arr {
-            if d.count < n {
-                d.append(Data(repeating: 0, count: n - d.count))
-            } else if d.count > n {
-                d = d.prefix(n)
-            }
+        for d in arr {
             result.append(d)
         }
 
-        return result
-    }
-
-    /// unzip data of length k * n into k data of length n
-    static func unzip(data: Data, n: Int) -> [Data] {
-        guard n > 0 else { return [] }
-
-        var padded = data
-        let total = padded.count
-        let remainder = total % n
-        if remainder != 0 {
-            padded.append(Data(repeating: 0, count: n - remainder))
-        }
-
-        let k = padded.count / n
-        var result = Array(repeating: Data(), count: k)
-
-        for i in 0 ..< k {
-            for j in 0 ..< n {
-                result[i].append(padded[i + j * k])
-            }
-        }
-
-        return result
-    }
-
-    /// lace k data of length n into one data of length k * n
-    static func lace(arr: [Data], n: Int) -> Data {
-        let k = arr.count
-        var result = Data(capacity: k * n)
-
-        for j in 0 ..< n {
-            for i in 0 ..< k {
-                if j < arr[i].count {
-                    result.append(arr[i][j])
-                } else {
-                    result.append(0)
-                }
-            }
-        }
         return result
     }
 
@@ -270,58 +225,53 @@ public enum ErasureCoding {
         return recoveredShards
     }
 
-    /// C_k: erasure-code chunking function (eq H.6)
+    /// C_k: erasure-code chunking function (eq H.4)
     /// - Parameters:
     ///   - data: the original data
-    ///   - basicSize: ≈ 2 * number of cores; 684 for full config. Note that `k` will be `|data| / basicSize`
+    ///   - basicSize: ≈ 2 * number of cores; W_E (erasureCodedPieceSize), 684 for full config
     ///   - recoveryCount: ≈ number of validators; 1023 for full config
     /// - Returns: the list of smaller data chunks
     public static func chunk(data: Data, basicSize: Int, recoveryCount: Int) throws -> [Data] {
-        var result: [Data] = []
-
         guard basicSize % 2 == 0 else { throw Error.invalidBasicSize(basicSize) }
 
-        let unzipped = unzip(data: data, n: basicSize)
+        let k = data.count / basicSize
 
-        var matrix: [[Data]] = []
+        let splitted = split(data: data, n: 2 * k)
 
-        for original in unzipped {
-            let originalShards = split(data: original, n: Constants.INNER_SHARD_SIZE)
-            let recoveryShards = try encode(original: originalShards, recoveryCount: recoveryCount)
-            matrix.append(recoveryShards)
+        let splitted2 = splitted.map { split(data: $0, n: Constants.INNER_SHARD_SIZE) }
+
+        let originalShards = transpose(splitted2)
+
+        var result2d: [[Data]] = []
+
+        for original in originalShards {
+            let recoveryShards = try encode(original: original, recoveryCount: recoveryCount)
+            result2d.append(recoveryShards)
         }
 
-        let transposed = transpose(matrix)
+        let transposed = transpose(result2d)
 
-        for row in transposed {
-            let joined = join(arr: row, n: Constants.INNER_SHARD_SIZE)
-            result.append(joined)
-        }
-
-        return result
+        return transposed.map { join(arr: $0) }
     }
 
-    /// R_k: erasure-code reconstruction function (eq H.7)
+    /// R_k: erasure-code reconstruction function (eq H.5)
     /// - Parameters:
     ///   - shards: the shards to reconstruct the original data, should be ordered
-    ///   - basicSize: ≈ 2 * number of cores; 684 for full config. Note that `k` will be `|data| / basicSize`
+    ///   - basicSize: ≈ 2 * number of cores; 684 for full config
     ///   - originalCount: the total number of original items
     ///   - recoveryCount: the total number of recovery items
     /// - Returns: the reconstructed original data
     public static func reconstruct(shards: [Shard], basicSize: Int, originalCount: Int, recoveryCount: Int) throws -> Data {
-        if shards.isEmpty { return Data() }
-
+        guard !shards.isEmpty else { return Data() }
         guard basicSize % 2 == 0 else { throw Error.invalidBasicSize(basicSize) }
-        guard shards.count >= originalCount else {
-            throw Error.invalidShardsCount
-        }
+        guard shards.count >= originalCount else { throw Error.invalidShardsCount }
 
         let shardSize = shards[0].data.count
         let k = (shardSize + Constants.INNER_SHARD_SIZE - 1) / Constants.INNER_SHARD_SIZE
 
         let splitted = shards.map { split(data: $0.data, n: Constants.INNER_SHARD_SIZE) }
 
-        var result = [Data](repeating: Data(), count: k)
+        var result2d: [[Data]] = []
 
         for p in 0 ..< k {
             var recoveryShards: [InnerShard] = []
@@ -337,11 +287,11 @@ public enum ErasureCoding {
                 shardSize: Constants.INNER_SHARD_SIZE
             )
 
-            let originalData = join(arr: originalShards, n: Constants.INNER_SHARD_SIZE)
-
-            result[p] = originalData
+            result2d.append(originalShards)
         }
 
-        return lace(arr: result, n: basicSize)
+        let transposed = transpose(result2d)
+
+        return join(arr: transposed.map { join(arr: $0) })
     }
 }

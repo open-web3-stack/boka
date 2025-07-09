@@ -99,7 +99,7 @@ func createShards(from data: Data, count: Int) -> [Data] {
         let n = 4
 
         let split = ErasureCoding.split(data: testData, n: n)
-        let joined = ErasureCoding.join(arr: split, n: n)
+        let joined = ErasureCoding.join(arr: split)
 
         var paddedData = testData
         let remainder = paddedData.count % n
@@ -108,22 +108,6 @@ func createShards(from data: Data, count: Int) -> [Data] {
         }
 
         #expect(joined == paddedData)
-    }
-
-    @Test func testUnzipLace() throws {
-        let testData = Data("hello world, this is a test".utf8)
-        let n = 4
-
-        let unzipped = ErasureCoding.unzip(data: testData, n: n)
-        let laced = ErasureCoding.lace(arr: unzipped, n: n)
-
-        var lacedPadded = testData
-        let remainder = lacedPadded.count % n
-        if remainder != 0 {
-            lacedPadded.append(Data(repeating: 0, count: n - remainder))
-        }
-
-        #expect(laced == lacedPadded)
     }
 
     @Test func testTranspose() throws {
@@ -165,79 +149,12 @@ func createShards(from data: Data, count: Int) -> [Data] {
         #expect(recovery.count == recoveryCount)
 
         var partialRecovery = [ErasureCoding.Shard]()
-
         for i in recoveryCount - originalCount ..< recoveryCount {
             partialRecovery.append(.init(data: recovery[i], index: UInt32(i)))
         }
-
-        let recovered = try ErasureCoding.reconstruct(
+        let recovered2 = try ErasureCoding.reconstruct(
             shards: partialRecovery, basicSize: basicSize, originalCount: originalCount, recoveryCount: recoveryCount
         )
-
-        #expect(recovered == originalData)
+        #expect(recovered2 == originalData)
     }
-}
-
-@Suite struct ErasureCodingWithTestData {
-    struct ECTestCase: Codable {
-        let data: String
-        let segment: ECSegment
-    }
-
-    struct ECSegment: Codable {
-        let segments: [SegmentElement]
-    }
-
-    struct SegmentElement: Codable {
-        let segmentEc: [String]
-
-        enum CodingKeys: String, CodingKey {
-            case segmentEc = "segment_ec"
-        }
-    }
-
-    enum TestLoader {
-        static func getTestFiles(path: String, extension ext: String) throws -> [(path: String, description: String)] {
-            let prefix = Bundle.module.resourcePath! + "/TestData/\(path)"
-            let files = try FileManager.default.contentsOfDirectory(atPath: prefix)
-            var filtered = files.filter { $0.hasSuffix(".\(ext)") }
-            filtered.sort()
-            return filtered.map { (path: prefix + "/" + $0, description: $0) }
-        }
-    }
-
-    static func loadTests() throws -> [ECTestCase] {
-        let tests = try TestLoader.getTestFiles(path: "ec", extension: "json")
-        return try tests.map {
-            let data = try Data(contentsOf: URL(fileURLWithPath: $0.path))
-            let decoder = JSONDecoder()
-            return try decoder.decode(ECTestCase.self, from: data)
-        }
-    }
-
-    // TODO: figure out how to reconstruct test data
-
-    // @Test(arguments: try loadTests())
-    // func testReconstruct(testCase: ECTestCase) throws {
-    //     let data = Data(fromHexString: testCase.data)!
-    //     let recovery = testCase.segment.segments.map(\.segmentEc)[0].map { Data(fromHexString: $0)! }
-    //     let originalCount = 342
-    //     let recoveryCount = 1026
-    //     let basicSize = 684
-    //     // let k = 1
-    //     var partialRecovery = [ErasureCoding.Shard]()
-
-    //     for i in recoveryCount - originalCount ..< recoveryCount {
-    //         partialRecovery.append(.init(data: recovery[i], index: UInt32(i)))
-    //     }
-
-    //     let recovered = try ErasureCoding.reconstruct(
-    //         shards: partialRecovery,
-    //         basicSize: basicSize,
-    //         originalCount: originalCount,
-    //         recoveryCount: recoveryCount
-    //     )
-
-    //     #expect(recovered == data)
-    // }
 }
