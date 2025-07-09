@@ -1,28 +1,8 @@
+import CppHelper
 import Foundation
 
 public struct Registers: Equatable {
-    public struct Index: Equatable, CustomStringConvertible {
-        public var value: UInt8
-        public init(r1: UInt8) {
-            value = min(r1 & 0b1111, 12)
-        }
-
-        public init(r2: UInt8) {
-            value = min(r2 >> 4, 12)
-        }
-
-        public init(r3: UInt8) {
-            value = min(r3, 12)
-        }
-
-        public init(raw: UInt8) {
-            value = raw
-        }
-
-        public var description: String {
-            "w\(value)"
-        }
-    }
+    public typealias Index = CppHelper.RegisterIndex
 
     public var reg1: UInt64 = 0
     public var reg2: UInt64 = 0
@@ -130,6 +110,32 @@ public struct Registers: Equatable {
                 fatalError("unreachable: index out of bounds \(index.value)")
             }
         }
+    }
+}
+
+extension CppHelper.RegisterIndex: @retroactive Equatable, @retroactive CustomStringConvertible {
+    public init(r1: UInt8) {
+        self.init(value: min(r1 & 0b1111, 12))
+    }
+
+    public init(r2: UInt8) {
+        self.init(value: min(r2 >> 4, 12))
+    }
+
+    public init(r3: UInt8) {
+        self.init(value: min(r3, 12))
+    }
+
+    public init(raw: UInt8) {
+        self.init(value: raw)
+    }
+
+    public var description: String {
+        "w\(value)"
+    }
+
+    public static func == (lhs: RegisterIndex, rhs: RegisterIndex) -> Bool {
+        lhs.value == rhs.value
     }
 }
 
