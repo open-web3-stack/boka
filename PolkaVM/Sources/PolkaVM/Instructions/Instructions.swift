@@ -1,3 +1,4 @@
+import CppHelper
 import Foundation
 import TracingUtils
 import Utils
@@ -29,2520 +30,2187 @@ public let BASIC_BLOCK_INSTRUCTIONS: Set<UInt8> = [
     Instructions.BranchGtSImm.opcode,
 ]
 
+extension CppHelper.Instructions.Trap: Instruction {
+    public init(data _: Data) throws {
+        self.init()
+    }
+
+    public func _executeImpl(context _: ExecutionContext) -> ExecOutcome {
+        .exit(.panic(.trap))
+    }
+}
+
+extension CppHelper.Instructions.Fallthrough: Instruction {
+    public init(data _: Data) throws {
+        self.init()
+    }
+
+    public func _executeImpl(context _: ExecutionContext) -> ExecOutcome { .continued }
+}
+
+extension CppHelper.Instructions.Ecalli: Instruction {
+    public init(data: Data) throws {
+        self.init(callIndex: Instructions.decodeImmediate(data))
+    }
+
+    public func _executeImpl(context _: ExecutionContext) -> ExecOutcome {
+        .exit(.hostCall(callIndex))
+    }
+}
+
+extension CppHelper.Instructions.LoadImm64: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let value = try data.at(relative: 1 ..< 9).decode(UInt64.self)
+        self.init(reg: .init(value: register.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        context.state.writeRegister(Registers.Index(raw: reg.value), value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.StoreImmU8: Instruction {
+    public init(data: Data) throws {
+        let (address, value): (UInt32, UInt8) = try Instructions.decodeImmediate2(data)
+        self.init(address: address, value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        try context.state.writeMemory(address: address, value: value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.StoreImmU16: Instruction {
+    public init(data: Data) throws {
+        let (address, value): (UInt32, UInt16) = try Instructions.decodeImmediate2(data)
+        self.init(address: address, value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(2)))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.StoreImmU32: Instruction {
+    public init(data: Data) throws {
+        let (address, value): (UInt32, UInt32) = try Instructions.decodeImmediate2(data)
+        self.init(address: address, value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(4)))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.StoreImmU64: Instruction {
+    public init(data: Data) throws {
+        let (address, value): (UInt32, UInt64) = try Instructions.decodeImmediate2(data)
+        self.init(address: address, value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(8)))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.Jump: Instruction {
+    public init(data: Data) throws {
+        self.init(offset: Instructions.decodeImmediate(data))
+    }
+
+    public func _executeImpl(context _: ExecutionContext) -> ExecOutcome { .continued }
+
+    public func updatePC(context: ExecutionContext, skip _: UInt32) -> ExecOutcome {
+        guard Instructions.isBranchValid(context: context, offset: offset) else {
+            return .exit(.panic(.invalidBranch))
+        }
+        context.state.increasePC(offset)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.JumpInd: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(reg: .init(value: register.value), offset: offset)
+    }
+
+    public func _executeImpl(context _: ExecutionContext) -> ExecOutcome { .continued }
+
+    public func updatePC(context: ExecutionContext, skip _: UInt32) -> ExecOutcome {
+        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: reg.value))
+        return Instructions.djump(context: context, target: regVal &+ offset)
+    }
+}
+
+extension CppHelper.Instructions.LoadImm: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(reg: .init(value: register.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        context.state.writeRegister(Registers.Index(raw: reg.value), Int32(bitPattern: value))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.LoadU8: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(reg: .init(value: register.value), address: address)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let value = try context.state.readMemory(address: address)
+        context.state.writeRegister(Registers.Index(raw: reg.value), value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.LoadI8: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(reg: .init(value: register.value), address: address)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let value = try context.state.readMemory(address: address)
+        context.state.writeRegister(Registers.Index(raw: reg.value), Int8(bitPattern: value))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.LoadU16: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(reg: .init(value: register.value), address: address)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let data = try context.state.readMemory(address: address, length: 2)
+        let value = data.decode(UInt16.self)
+        context.state.writeRegister(Registers.Index(raw: reg.value), value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.LoadI16: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(reg: .init(value: register.value), address: address)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let data = try context.state.readMemory(address: address, length: 2)
+        let value = data.decode(UInt16.self)
+        context.state.writeRegister(Registers.Index(raw: reg.value), Int16(bitPattern: value))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.LoadU32: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(reg: .init(value: register.value), address: address)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let data = try context.state.readMemory(address: address, length: 4)
+        let value = data.decode(UInt32.self)
+        context.state.writeRegister(Registers.Index(raw: reg.value), value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.LoadI32: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(reg: .init(value: register.value), address: address)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let data = try context.state.readMemory(address: address, length: 4)
+        let value = data.decode(UInt32.self)
+        context.state.writeRegister(Registers.Index(raw: reg.value), Int32(bitPattern: value))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.LoadU64: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(reg: .init(value: register.value), address: address)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let data = try context.state.readMemory(address: address, length: 8)
+        let value = data.decode(UInt64.self)
+        context.state.writeRegister(Registers.Index(raw: reg.value), value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.StoreU8: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(reg: .init(value: register.value), address: address)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let value: UInt8 = context.state.readRegister(Registers.Index(raw: reg.value))
+        try context.state.writeMemory(address: address, value: value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.StoreU16: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(reg: .init(value: register.value), address: address)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let value: UInt16 = context.state.readRegister(Registers.Index(raw: reg.value))
+        try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(2)))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.StoreU32: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(reg: .init(value: register.value), address: address)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let value: UInt32 = context.state.readRegister(Registers.Index(raw: reg.value))
+        try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(4)))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.StoreU64: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(reg: .init(value: register.value), address: address)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let value: UInt64 = context.state.readRegister(Registers.Index(raw: reg.value))
+        try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(8)))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.StoreImmIndU8: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let (address, value): (UInt32, UInt8) = try Instructions.decodeImmediate2(data, divideBy: 16)
+        self.init(reg: .init(value: register.value), address: address, value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        try context.state.writeMemory(address: context.state.readRegister(Registers.Index(raw: reg.value)) &+ address, value: value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.StoreImmIndU16: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let (address, value): (UInt32, UInt16) = try Instructions.decodeImmediate2(data, divideBy: 16)
+        self.init(reg: .init(value: register.value), address: address, value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        try context.state.writeMemory(
+            address: context.state.readRegister(Registers.Index(raw: reg.value)) &+ address,
+            values: value.encode(method: .fixedWidth(2))
+        )
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.StoreImmIndU32: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let (address, value): (UInt32, UInt32) = try Instructions.decodeImmediate2(data, divideBy: 16)
+        self.init(reg: .init(value: register.value), address: address, value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        try context.state.writeMemory(
+            address: context.state.readRegister(Registers.Index(raw: reg.value)) &+ address,
+            values: value.encode(method: .fixedWidth(4))
+        )
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.StoreImmIndU64: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let (address, value): (UInt32, UInt64) = try Instructions.decodeImmediate2(data, divideBy: 16)
+        self.init(reg: .init(value: register.value), address: address, value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        try context.state.writeMemory(
+            address: context.state.readRegister(Registers.Index(raw: reg.value)) &+ address,
+            values: value.encode(method: .fixedWidth(8))
+        )
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.LoadImmJump: Instruction {
+    public init(data: Data) throws {
+        let register = try Registers.Index(r1: data.at(relative: 0))
+        let (value, offset): (UInt32, UInt32) = try Instructions.decodeImmediate2(data, divideBy: 16)
+        self.init(reg: .init(value: register.value), value: value, offset: offset)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        context.state.writeRegister(Registers.Index(raw: reg.value), value)
+        return .continued
+    }
+
+    public func updatePC(context: ExecutionContext, skip _: UInt32) -> ExecOutcome {
+        guard Instructions.isBranchValid(context: context, offset: offset) else {
+            return .exit(.panic(.invalidBranch))
+        }
+        context.state.increasePC(offset)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.BranchEqImm: BranchInstructionBase {
+    public var register: Registers.Index {
+        get {
+            .init(raw: reg.value)
+        }
+        set {
+            reg.value = newValue.value
+        }
+    }
+
+    typealias Compare = CompareEq
+    public init(data: Data) throws {
+        let (register, value, offset) = try Self.parse(data: data)
+        self.init(reg: .init(value: register.value), value: value, offset: offset)
+    }
+}
+
+extension CppHelper.Instructions.BranchNeImm: BranchInstructionBase {
+    public var register: Registers.Index {
+        get { .init(raw: reg.value) }
+        set { reg.value = newValue.value }
+    }
+
+    typealias Compare = CompareNe
+    public init(data: Data) throws {
+        let (register, value, offset) = try Self.parse(data: data)
+        self.init(reg: .init(value: register.value), value: value, offset: offset)
+    }
+}
+
+extension CppHelper.Instructions.BranchLtUImm: BranchInstructionBase {
+    public var register: Registers.Index {
+        get { .init(raw: reg.value) }
+        set { reg.value = newValue.value }
+    }
+
+    typealias Compare = CompareLtU
+    public init(data: Data) throws {
+        let (register, value, offset) = try Self.parse(data: data)
+        self.init(reg: .init(value: register.value), value: value, offset: offset)
+    }
+}
+
+extension CppHelper.Instructions.BranchLeUImm: BranchInstructionBase {
+    public var register: Registers.Index {
+        get { .init(raw: reg.value) }
+        set { reg.value = newValue.value }
+    }
+
+    typealias Compare = CompareLeU
+    public init(data: Data) throws {
+        let (register, value, offset) = try Self.parse(data: data)
+        self.init(reg: .init(value: register.value), value: value, offset: offset)
+    }
+}
+
+extension CppHelper.Instructions.BranchGeUImm: BranchInstructionBase {
+    public var register: Registers.Index {
+        get { .init(raw: reg.value) }
+        set { reg.value = newValue.value }
+    }
+
+    typealias Compare = CompareGeU
+    public init(data: Data) throws {
+        let (register, value, offset) = try Self.parse(data: data)
+        self.init(reg: .init(value: register.value), value: value, offset: offset)
+    }
+}
+
+extension CppHelper.Instructions.BranchGtUImm: BranchInstructionBase {
+    public var register: Registers.Index {
+        get { .init(raw: reg.value) }
+        set { reg.value = newValue.value }
+    }
+
+    typealias Compare = CompareGtU
+    public init(data: Data) throws {
+        let (register, value, offset) = try Self.parse(data: data)
+        self.init(reg: .init(value: register.value), value: value, offset: offset)
+    }
+}
+
+extension CppHelper.Instructions.BranchLtSImm: BranchInstructionBase {
+    public var register: Registers.Index {
+        get { .init(raw: reg.value) }
+        set { reg.value = newValue.value }
+    }
+
+    typealias Compare = CompareLtS
+    public init(data: Data) throws {
+        let (register, value, offset) = try Self.parse(data: data)
+        self.init(reg: .init(value: register.value), value: value, offset: offset)
+    }
+}
+
+extension CppHelper.Instructions.BranchLeSImm: BranchInstructionBase {
+    public var register: Registers.Index {
+        get { .init(raw: reg.value) }
+        set { reg.value = newValue.value }
+    }
+
+    typealias Compare = CompareLeS
+    public init(data: Data) throws {
+        let (register, value, offset) = try Self.parse(data: data)
+        self.init(reg: .init(value: register.value), value: value, offset: offset)
+    }
+}
+
+extension CppHelper.Instructions.BranchGeSImm: BranchInstructionBase {
+    public var register: Registers.Index {
+        get { .init(raw: reg.value) }
+        set { reg.value = newValue.value }
+    }
+
+    typealias Compare = CompareGeS
+    public init(data: Data) throws {
+        let (register, value, offset) = try Self.parse(data: data)
+        self.init(reg: .init(value: register.value), value: value, offset: offset)
+    }
+}
+
+extension CppHelper.Instructions.BranchGtSImm: BranchInstructionBase {
+    public var register: Registers.Index {
+        get { .init(raw: reg.value) }
+        set { reg.value = newValue.value }
+    }
+
+    typealias Compare = CompareGtS
+    public init(data: Data) throws {
+        let (register, value, offset) = try Self.parse(data: data)
+        self.init(reg: .init(value: register.value), value: value, offset: offset)
+    }
+}
+
+extension CppHelper.Instructions.MoveReg: Instruction {
+    public init(data: Data) throws {
+        let (dest, src) = try Instructions.deocdeRegisters(data)
+        self.init(src: .init(value: src.value), dest: .init(value: dest.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        context.state.writeRegister(Registers.Index(raw: dest.value), context.state.readRegister(Registers.Index(raw: src.value)) as UInt64)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.Sbrk: Instruction {
+    public init(data: Data) throws {
+        let (dest, src) = try Instructions.deocdeRegisters(data)
+        self.init(src: .init(value: src.value), dest: .init(value: dest.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let increment: UInt32 = context.state.readRegister(Registers.Index(raw: src.value))
+        let startAddr = try context.state.sbrk(increment)
+        context.state.writeRegister(Registers.Index(raw: dest.value), startAddr)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.CountSetBits64: Instruction {
+    public init(data: Data) throws {
+        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: ra.value))
+        context.state.writeRegister(Registers.Index(raw: dest.value), regVal.nonzeroBitCount)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.CountSetBits32: Instruction {
+    public init(data: Data) throws {
+        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: ra.value))
+        context.state.writeRegister(Registers.Index(raw: dest.value), regVal.nonzeroBitCount)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.LeadingZeroBits64: Instruction {
+    public init(data: Data) throws {
+        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: ra.value))
+        context.state.writeRegister(Registers.Index(raw: dest.value), regVal.leadingZeroBitCount)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.LeadingZeroBits32: Instruction {
+    public init(data: Data) throws {
+        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: ra.value))
+        context.state.writeRegister(Registers.Index(raw: dest.value), regVal.leadingZeroBitCount)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.TrailingZeroBits64: Instruction {
+    public init(data: Data) throws {
+        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: ra.value))
+        context.state.writeRegister(Registers.Index(raw: dest.value), regVal.trailingZeroBitCount)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.TrailingZeroBits32: Instruction {
+    public init(data: Data) throws {
+        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: ra.value))
+        context.state.writeRegister(Registers.Index(raw: dest.value), regVal.trailingZeroBitCount)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.SignExtend8: Instruction {
+    public init(data: Data) throws {
+        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let regVal: UInt8 = context.state.readRegister(Registers.Index(raw: ra.value))
+        context.state.writeRegister(Registers.Index(raw: dest.value), Int8(bitPattern: regVal))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.SignExtend16: Instruction {
+    public init(data: Data) throws {
+        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let regVal: UInt16 = context.state.readRegister(Registers.Index(raw: ra.value))
+        context.state.writeRegister(Registers.Index(raw: dest.value), Int16(bitPattern: regVal))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.ZeroExtend16: Instruction {
+    public init(data: Data) throws {
+        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let regVal: UInt16 = context.state.readRegister(Registers.Index(raw: ra.value))
+        context.state.writeRegister(Registers.Index(raw: dest.value), regVal)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.ReverseBytes: Instruction {
+    public init(data: Data) throws {
+        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: ra.value))
+        context.state.writeRegister(Registers.Index(raw: dest.value), regVal.byteSwapped)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.StoreIndU8: Instruction {
+    public init(data: Data) throws {
+        let (src, dest) = try Instructions.deocdeRegisters(data)
+        let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(src: .init(value: src.value), dest: .init(value: dest.value), offset: offset)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let value: UInt8 = context.state.readRegister(Registers.Index(raw: src.value))
+        try context.state.writeMemory(address: context.state.readRegister(Registers.Index(raw: dest.value)) &+ offset, value: value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.StoreIndU16: Instruction {
+    public init(data: Data) throws {
+        let (src, dest) = try Instructions.deocdeRegisters(data)
+        let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(src: .init(value: src.value), dest: .init(value: dest.value), offset: offset)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let value: UInt16 = context.state.readRegister(Registers.Index(raw: src.value))
+        try context.state.writeMemory(
+            address: context.state.readRegister(Registers.Index(raw: dest.value)) &+ offset,
+            values: value.encode(method: .fixedWidth(2))
+        )
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.StoreIndU32: Instruction {
+    public init(data: Data) throws {
+        let (src, dest) = try Instructions.deocdeRegisters(data)
+        let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(src: .init(value: src.value), dest: .init(value: dest.value), offset: offset)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let value: UInt32 = context.state.readRegister(Registers.Index(raw: src.value))
+        try context.state.writeMemory(
+            address: context.state.readRegister(Registers.Index(raw: dest.value)) &+ offset,
+            values: value.encode(method: .fixedWidth(4))
+        )
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.StoreIndU64: Instruction {
+    public init(data: Data) throws {
+        let (src, dest) = try Instructions.deocdeRegisters(data)
+        let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(src: .init(value: src.value), dest: .init(value: dest.value), offset: offset)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let value: UInt64 = context.state.readRegister(Registers.Index(raw: src.value))
+        try context.state.writeMemory(
+            address: context.state.readRegister(Registers.Index(raw: dest.value)) &+ offset,
+            values: value.encode(method: .fixedWidth(8))
+        )
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.LoadIndU8: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), offset: offset)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let value = try context.state.readMemory(address: context.state.readRegister(Registers.Index(raw: rb.value)) &+ offset)
+        context.state.writeRegister(Registers.Index(raw: ra.value), value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.LoadIndI8: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), offset: offset)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let value = try context.state.readMemory(address: context.state.readRegister(Registers.Index(raw: rb.value)) &+ offset)
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int8(bitPattern: value))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.LoadIndU16: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), offset: offset)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let data = try context.state.readMemory(address: context.state.readRegister(Registers.Index(raw: rb.value)) &+ offset, length: 2)
+        let value = data.decode(UInt16.self)
+        context.state.writeRegister(Registers.Index(raw: ra.value), value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.LoadIndI16: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), offset: offset)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let data = try context.state.readMemory(address: context.state.readRegister(Registers.Index(raw: rb.value)) &+ offset, length: 2)
+        let value = data.decode(UInt16.self)
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int16(bitPattern: value))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.LoadIndU32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), offset: offset)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let data = try context.state.readMemory(address: context.state.readRegister(Registers.Index(raw: rb.value)) &+ offset, length: 4)
+        let value = data.decode(UInt32.self)
+        context.state.writeRegister(Registers.Index(raw: ra.value), value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.LoadIndI32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), offset: offset)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let data = try context.state.readMemory(address: context.state.readRegister(Registers.Index(raw: rb.value)) &+ offset, length: 4)
+        let value = data.decode(UInt32.self)
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: value))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.LoadIndU64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), offset: offset)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        let data = try context.state.readMemory(address: context.state.readRegister(Registers.Index(raw: rb.value)) &+ offset, length: 8)
+        let value = data.decode(UInt64.self)
+        context.state.writeRegister(Registers.Index(raw: ra.value), value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.AddImm32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: regVal &+ value))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.AndImm: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), regVal & value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.XorImm: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), regVal ^ value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.OrImm: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), regVal | value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.MulImm32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: regVal &* value))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.SetLtUImm: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), regVal < value ? 1 : 0)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.SetLtSImm: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int64(bitPattern: regVal) < Int64(bitPattern: value) ? 1 : 0)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.ShloLImm32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let shift = value & 0x1F
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: regVal << shift))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.ShloRImm32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let shift = value & 0x1F
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: regVal >> shift))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.SharRImm32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let shift = value & 0x1F
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: regVal) >> shift)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.NegAddImm32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: value &- regVal))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.SetGtUImm: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), regVal > value ? 1 : 0)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.SetGtSImm: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int64(bitPattern: regVal) > Int64(bitPattern: value) ? 1 : 0)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.ShloLImmAlt32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let shift = regVal & 0x1F
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: value << shift))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.ShloRImmAlt32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let shift = regVal & 0x1F
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: value >> shift))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.SharRImmAlt32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let shift = regVal & 0x1F
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: value) >> shift)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.CmovIzImm: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let rbVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        if rbVal == 0 {
+            context.state.writeRegister(Registers.Index(raw: ra.value), value)
+        }
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.CmovNzImm: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), regVal != 0 ? value : regVal)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.AddImm64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), regVal &+ value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.MulImm64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), regVal &* value)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.ShloLImm64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let shift = value & 0x3F
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int64(bitPattern: regVal << shift))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.ShloRImm64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let shift = value & 0x3F
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int64(bitPattern: regVal >> shift))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.SharRImm64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let shift = value & 0x3F
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int64(bitPattern: regVal) >> shift)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.NegAddImm64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), value &- regVal)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.ShloLImmAlt64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let shift = regVal & 0x3F
+        context.state.writeRegister(Registers.Index(raw: ra.value), UInt64(truncatingIfNeeded: value << shift))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.ShloRImmAlt64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let shift = regVal & 0x3F
+        context.state.writeRegister(Registers.Index(raw: ra.value), value >> shift)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.SharRImmAlt64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let shift = regVal & 0x3F
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int64(bitPattern: value) >> shift)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.RotR64Imm: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let rbVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), rbVal.rotated(right: value))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.RotR64ImmAlt: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let rbVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), value.rotated(right: rbVal))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.RotR32Imm: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let rbVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: rbVal.rotated(right: value)))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.RotR32ImmAlt: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let rbVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: value.rotated(right: rbVal)))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.BranchEq: BranchInstructionBase2 {
+    public var r1: Registers.Index {
+        get { .init(raw: reg1.value) }
+        set { reg1.value = newValue.value }
+    }
+
+    public var r2: Registers.Index {
+        get { .init(raw: reg2.value) }
+        set { reg2.value = newValue.value }
+    }
+
+    typealias Compare = CompareEq
+    public init(data: Data) throws {
+        let (r1, r2, offset) = try Self.parse(data: data)
+        self.init(reg1: .init(value: r1.value), reg2: .init(value: r2.value), offset: offset)
+    }
+}
+
+extension CppHelper.Instructions.BranchNe: BranchInstructionBase2 {
+    public var r1: Registers.Index {
+        get { .init(raw: reg1.value) }
+        set { reg1.value = newValue.value }
+    }
+
+    public var r2: Registers.Index {
+        get { .init(raw: reg2.value) }
+        set { reg2.value = newValue.value }
+    }
+
+    typealias Compare = CompareNe
+    public init(data: Data) throws {
+        let (r1, r2, offset) = try Self.parse(data: data)
+        self.init(reg1: .init(value: r1.value), reg2: .init(value: r2.value), offset: offset)
+    }
+}
+
+extension CppHelper.Instructions.BranchLtU: BranchInstructionBase2 {
+    public var r1: Registers.Index {
+        get { .init(raw: reg1.value) }
+        set { reg1.value = newValue.value }
+    }
+
+    public var r2: Registers.Index {
+        get { .init(raw: reg2.value) }
+        set { reg2.value = newValue.value }
+    }
+
+    typealias Compare = CompareLtU
+    public init(data: Data) throws {
+        let (r1, r2, offset) = try Self.parse(data: data)
+        self.init(reg1: .init(value: r1.value), reg2: .init(value: r2.value), offset: offset)
+    }
+}
+
+extension CppHelper.Instructions.BranchLtS: BranchInstructionBase2 {
+    public var r1: Registers.Index {
+        get { .init(raw: reg1.value) }
+        set { reg1.value = newValue.value }
+    }
+
+    public var r2: Registers.Index {
+        get { .init(raw: reg2.value) }
+        set { reg2.value = newValue.value }
+    }
+
+    typealias Compare = CompareLtS
+    public init(data: Data) throws {
+        let (r1, r2, offset) = try Self.parse(data: data)
+        self.init(reg1: .init(value: r1.value), reg2: .init(value: r2.value), offset: offset)
+    }
+}
+
+extension CppHelper.Instructions.BranchGeU: BranchInstructionBase2 {
+    public var r1: Registers.Index {
+        get { .init(raw: reg1.value) }
+        set { reg1.value = newValue.value }
+    }
+
+    public var r2: Registers.Index {
+        get { .init(raw: reg2.value) }
+        set { reg2.value = newValue.value }
+    }
+
+    typealias Compare = CompareGeU
+    public init(data: Data) throws {
+        let (r1, r2, offset) = try Self.parse(data: data)
+        self.init(reg1: .init(value: r1.value), reg2: .init(value: r2.value), offset: offset)
+    }
+}
+
+extension CppHelper.Instructions.BranchGeS: BranchInstructionBase2 {
+    public var r1: Registers.Index {
+        get { .init(raw: reg1.value) }
+        set { reg1.value = newValue.value }
+    }
+
+    public var r2: Registers.Index {
+        get { .init(raw: reg2.value) }
+        set { reg2.value = newValue.value }
+    }
+
+    typealias Compare = CompareGeS
+    public init(data: Data) throws {
+        let (r1, r2, offset) = try Self.parse(data: data)
+        self.init(reg1: .init(value: r1.value), reg2: .init(value: r2.value), offset: offset)
+    }
+}
+
+extension CppHelper.Instructions.LoadImmJumpInd: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (value, offset): (UInt32, UInt32) = try Instructions.decodeImmediate2(data, minus: 2, startIdx: 1)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value, offset: offset)
+    }
+
+    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        // need to read rb value first in case ra and rb are the same
+        let rbVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+
+        context.state.writeRegister(Registers.Index(raw: ra.value), value)
+
+        return Instructions.djump(context: context, target: rbVal &+ offset)
+    }
+
+    public func updatePC(context _: ExecutionContext, skip _: UInt32) -> ExecOutcome {
+        .continued
+    }
+}
+
+extension CppHelper.Instructions.Add32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal &+ rbVal))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.Sub32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal &- rbVal))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.Mul32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal &* rbVal))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.DivU32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        if rbVal == 0 {
+            context.state.writeRegister(Registers.Index(raw: rd.value), UInt64.max)
+        } else {
+            context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal / rbVal))
+        }
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.DivS32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let a = Int32(bitPattern: raVal)
+        let b = Int32(bitPattern: rbVal)
+        if rbVal == 0 {
+            context.state.writeRegister(Registers.Index(raw: rd.value), UInt64.max)
+        } else if a == Int32.min, b == -1 {
+            context.state.writeRegister(Registers.Index(raw: rd.value), a)
+        } else {
+            context.state.writeRegister(Registers.Index(raw: rd.value), Int64(a / b))
+        }
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.RemU32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        if rbVal == 0 {
+            context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal))
+        } else {
+            context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal % rbVal))
+        }
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.RemS32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let a = Int32(bitPattern: raVal)
+        let b = Int32(bitPattern: rbVal)
+        if rbVal == 0 {
+            context.state.writeRegister(Registers.Index(raw: rd.value), a)
+        } else if a == Int32.min, b == -1 {
+            context.state.writeRegister(Registers.Index(raw: rd.value), 0)
+        } else {
+            context.state.writeRegister(Registers.Index(raw: rd.value), Int64(a % b))
+        }
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.ShloL32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let shift = rbVal & 0x1F
+        context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal << shift))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.ShloR32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let shift = rbVal & 0x1F
+        context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal >> shift))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.SharR32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let shift = rbVal & 0x1F
+        context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal) >> shift)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.Add64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), raVal &+ rbVal)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.Sub64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), raVal &- rbVal)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.Mul64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), raVal &* rbVal)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.DivU64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        if rbVal == 0 {
+            context.state.writeRegister(Registers.Index(raw: rd.value), UInt64.max)
+        } else {
+            context.state.writeRegister(Registers.Index(raw: rd.value), raVal / rbVal)
+        }
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.DivS64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let a = Int64(bitPattern: raVal)
+        let b = Int64(bitPattern: rbVal)
+        if rbVal == 0 {
+            context.state.writeRegister(Registers.Index(raw: rd.value), UInt64.max)
+        } else if a == Int64.min, b == -1 {
+            context.state.writeRegister(Registers.Index(raw: rd.value), a)
+        } else {
+            context.state.writeRegister(Registers.Index(raw: rd.value), Int64(a / b))
+        }
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.RemU64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        if rbVal == 0 {
+            context.state.writeRegister(Registers.Index(raw: rd.value), raVal)
+        } else {
+            context.state.writeRegister(Registers.Index(raw: rd.value), raVal % rbVal)
+        }
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.RemS64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let a = Int64(bitPattern: raVal)
+        let b = Int64(bitPattern: rbVal)
+        if rbVal == 0 {
+            context.state.writeRegister(Registers.Index(raw: rd.value), raVal)
+        } else if a == Int64.min, b == -1 {
+            context.state.writeRegister(Registers.Index(raw: rd.value), 0)
+        } else {
+            context.state.writeRegister(Registers.Index(raw: rd.value), UInt64(bitPattern: a % b))
+        }
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.ShloL64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let shift = rbVal & 0x3F
+        context.state.writeRegister(Registers.Index(raw: rd.value), UInt64(truncatingIfNeeded: raVal << shift))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.ShloR64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let shift = rbVal & 0x3F
+        context.state.writeRegister(Registers.Index(raw: rd.value), raVal >> shift)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.SharR64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let shift = rbVal & 0x3F
+        context.state.writeRegister(Registers.Index(raw: rd.value), Int64(bitPattern: raVal) >> shift)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.And: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), raVal & rbVal)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.Xor: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), raVal ^ rbVal)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.Or: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), raVal | rbVal)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.MulUpperSS: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let a = Int128(Int64(bitPattern: raVal))
+        let b = Int128(Int64(bitPattern: rbVal))
+        context.state.writeRegister(Registers.Index(raw: rd.value), Int64(truncatingIfNeeded: (a * b) >> 64))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.MulUpperUU: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), (UInt128(raVal) * UInt128(rbVal)) >> 64)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.MulUpperSU: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let a = Int128(Int64(bitPattern: raVal))
+        let b = Int128(rbVal)
+        context.state.writeRegister(Registers.Index(raw: rd.value), Int64(truncatingIfNeeded: (a * b) >> 64))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.SetLtU: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), raVal < rbVal ? 1 : 0)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.SetLtS: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), Int64(bitPattern: raVal) < Int64(bitPattern: rbVal) ? 1 : 0)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.CmovIz: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        if rbVal == 0 {
+            context.state.writeRegister(Registers.Index(raw: rd.value), raVal)
+        }
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.CmovNz: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        if rbVal != 0 {
+            context.state.writeRegister(Registers.Index(raw: rd.value), raVal)
+        }
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.RotL64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), raVal.rotated(left: rbVal))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.RotL32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal.rotated(left: rbVal)))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.RotR64: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), raVal.rotated(right: rbVal))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.RotR32: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal.rotated(right: rbVal)))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.AndInv: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), raVal & ~rbVal)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.OrInv: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), raVal | ~rbVal)
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.Xnor: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), ~(raVal ^ rbVal))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.Max: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), max(Int64(bitPattern: raVal), Int64(bitPattern: rbVal)))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.MaxU: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), max(raVal, rbVal))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.Min: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), min(Int64(bitPattern: raVal), Int64(bitPattern: rbVal)))
+        return .continued
+    }
+}
+
+extension CppHelper.Instructions.MinU: Instruction {
+    public init(data: Data) throws {
+        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+    }
+
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        context.state.writeRegister(Registers.Index(raw: rd.value), min(raVal, rbVal))
+        return .continued
+    }
+}
+
 public enum Instructions {
     // MARK: Instructions without Arguments (5.1)
 
-    public struct Trap: Instruction {
-        public static var opcode: UInt8 { 0 }
+    public typealias Trap = CppHelper.Instructions.Trap
 
-        public init(data _: Data = .init()) {}
-
-        public func _executeImpl(context _: ExecutionContext) -> ExecOutcome {
-            .exit(.panic(.trap))
-        }
-    }
-
-    public struct Fallthrough: Instruction {
-        public static var opcode: UInt8 { 1 }
-
-        public init(data _: Data) {}
-
-        public func _executeImpl(context _: ExecutionContext) -> ExecOutcome { .continued }
-    }
+    public typealias Fallthrough = CppHelper.Instructions.Fallthrough
 
     // MARK: Instructions with Arguments of One Immediate (5.2)
 
-    public struct Ecalli: Instruction {
-        public static var opcode: UInt8 { 10 }
-
-        public let callIndex: UInt32
-
-        public init(data: Data) {
-            callIndex = Instructions.decodeImmediate(data)
-        }
-
-        public func _executeImpl(context _: ExecutionContext) -> ExecOutcome {
-            .exit(.hostCall(callIndex))
-        }
-    }
+    public typealias Ecalli = CppHelper.Instructions.Ecalli
 
     // MARK: Instructions with Arguments of One Register and One Extended Width Immediate (5.3)
 
-    public struct LoadImm64: Instruction {
-        public static var opcode: UInt8 { 20 }
-
-        public let register: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            value = try data.at(relative: 1 ..< 9).decode(UInt64.self)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            context.state.writeRegister(register, value)
-            return .continued
-        }
-    }
+    public typealias LoadImm64 = CppHelper.Instructions.LoadImm64
 
     // MARK: Instructions with Arguments of Two Immediates (5.4)
 
-    public struct StoreImmU8: Instruction {
-        public static var opcode: UInt8 { 30 }
-
-        public let address: UInt32
-        public let value: UInt8
-
-        public init(data: Data) throws {
-            (address, value) = try Instructions.decodeImmediate2(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            try context.state.writeMemory(address: address, value: value)
-            return .continued
-        }
-    }
-
-    public struct StoreImmU16: Instruction {
-        public static var opcode: UInt8 { 31 }
-
-        public let address: UInt32
-        public let value: UInt16
-
-        public init(data: Data) throws {
-            (address, value) = try Instructions.decodeImmediate2(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(2)))
-            return .continued
-        }
-    }
-
-    public struct StoreImmU32: Instruction {
-        public static var opcode: UInt8 { 32 }
-
-        public let address: UInt32
-        public let value: UInt32
-
-        public init(data: Data) throws {
-            (address, value) = try Instructions.decodeImmediate2(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(4)))
-            return .continued
-        }
-    }
-
-    public struct StoreImmU64: Instruction {
-        public static var opcode: UInt8 { 33 }
-
-        public let address: UInt32
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (address, value) = try Instructions.decodeImmediate2(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(8)))
-            return .continued
-        }
-    }
+    public typealias StoreImmU8 = CppHelper.Instructions.StoreImmU8
+    public typealias StoreImmU16 = CppHelper.Instructions.StoreImmU16
+    public typealias StoreImmU32 = CppHelper.Instructions.StoreImmU32
+    public typealias StoreImmU64 = CppHelper.Instructions.StoreImmU64
 
     // MARK: Instructions with Arguments of One Offset (5.5)
 
-    public struct Jump: Instruction {
-        public static var opcode: UInt8 { 40 }
-
-        public let offset: UInt32
-
-        public init(data: Data) {
-            // this should be a signed value
-            // but because we use wrapped addition, it will work as expected
-            offset = Instructions.decodeImmediate(data)
-        }
-
-        public func _executeImpl(context _: ExecutionContext) -> ExecOutcome { .continued }
-
-        public func updatePC(context: ExecutionContext, skip _: UInt32) -> ExecOutcome {
-            guard Instructions.isBranchValid(context: context, offset: offset) else {
-                return .exit(.panic(.invalidBranch))
-            }
-            context.state.increasePC(offset)
-            return .continued
-        }
-    }
+    public typealias Jump = CppHelper.Instructions.Jump
 
     // MARK: Instructions with Arguments of One Register & One Immediate (5.6)
 
-    public struct JumpInd: Instruction {
-        public static var opcode: UInt8 { 50 }
-
-        public let register: Registers.Index
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context _: ExecutionContext) -> ExecOutcome { .continued }
-
-        public func updatePC(context: ExecutionContext, skip _: UInt32) -> ExecOutcome {
-            let regVal: UInt32 = context.state.readRegister(register)
-            return Instructions.djump(context: context, target: regVal &+ offset)
-        }
-    }
-
-    public struct LoadImm: Instruction {
-        public static var opcode: UInt8 { 51 }
-
-        public let register: Registers.Index
-        public let value: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            context.state.writeRegister(register, Int32(bitPattern: value))
-            return .continued
-        }
-    }
-
-    public struct LoadU8: Instruction {
-        public static var opcode: UInt8 { 52 }
-
-        public let register: Registers.Index
-        public let address: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let value = try context.state.readMemory(address: address)
-            context.state.writeRegister(register, value)
-            return .continued
-        }
-    }
-
-    public struct LoadI8: Instruction {
-        public static var opcode: UInt8 { 53 }
-
-        public let register: Registers.Index
-        public let address: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let value = try context.state.readMemory(address: address)
-            context.state.writeRegister(register, Int8(bitPattern: value))
-            return .continued
-        }
-    }
-
-    public struct LoadU16: Instruction {
-        public static var opcode: UInt8 { 54 }
-
-        public let register: Registers.Index
-        public let address: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let data = try context.state.readMemory(address: address, length: 2)
-            let value = data.decode(UInt16.self)
-            context.state.writeRegister(register, value)
-            return .continued
-        }
-    }
-
-    public struct LoadI16: Instruction {
-        public static var opcode: UInt8 { 55 }
-
-        public let register: Registers.Index
-        public let address: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let data = try context.state.readMemory(address: address, length: 2)
-            let value = data.decode(UInt16.self)
-            context.state.writeRegister(register, Int16(bitPattern: value))
-            return .continued
-        }
-    }
-
-    public struct LoadU32: Instruction {
-        public static var opcode: UInt8 { 56 }
-
-        public let register: Registers.Index
-        public let address: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let data = try context.state.readMemory(address: address, length: 4)
-            let value = data.decode(UInt32.self)
-            context.state.writeRegister(register, value)
-            return .continued
-        }
-    }
-
-    public struct LoadI32: Instruction {
-        public static var opcode: UInt8 { 57 }
-
-        public let register: Registers.Index
-        public let address: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let data = try context.state.readMemory(address: address, length: 4)
-            let value = data.decode(UInt32.self)
-            context.state.writeRegister(register, Int32(bitPattern: value))
-            return .continued
-        }
-    }
-
-    public struct LoadU64: Instruction {
-        public static var opcode: UInt8 { 58 }
-
-        public let register: Registers.Index
-        public let address: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let data = try context.state.readMemory(address: address, length: 8)
-            let value = data.decode(UInt64.self)
-            context.state.writeRegister(register, value)
-            return .continued
-        }
-    }
-
-    public struct StoreU8: Instruction {
-        public static var opcode: UInt8 { 59 }
-
-        public let register: Registers.Index
-        public let address: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let value: UInt8 = context.state.readRegister(register)
-            try context.state.writeMemory(address: address, value: value)
-            return .continued
-        }
-    }
-
-    public struct StoreU16: Instruction {
-        public static var opcode: UInt8 { 60 }
-
-        public let register: Registers.Index
-        public let address: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let value: UInt16 = context.state.readRegister(register)
-            try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(2)))
-            return .continued
-        }
-    }
-
-    public struct StoreU32: Instruction {
-        public static var opcode: UInt8 { 61 }
-
-        public let register: Registers.Index
-        public let address: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let value: UInt32 = context.state.readRegister(register)
-            try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(4)))
-            return .continued
-        }
-    }
-
-    public struct StoreU64: Instruction {
-        public static var opcode: UInt8 { 62 }
-
-        public let register: Registers.Index
-        public let address: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            address = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let value: UInt64 = context.state.readRegister(register)
-            try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(8)))
-            return .continued
-        }
-    }
+    public typealias JumpInd = CppHelper.Instructions.JumpInd
+    public typealias LoadImm = CppHelper.Instructions.LoadImm
+    public typealias LoadU8 = CppHelper.Instructions.LoadU8
+    public typealias LoadI8 = CppHelper.Instructions.LoadI8
+    public typealias LoadU16 = CppHelper.Instructions.LoadU16
+    public typealias LoadI16 = CppHelper.Instructions.LoadI16
+    public typealias LoadU32 = CppHelper.Instructions.LoadU32
+    public typealias LoadI32 = CppHelper.Instructions.LoadI32
+    public typealias LoadU64 = CppHelper.Instructions.LoadU64
+    public typealias StoreU8 = CppHelper.Instructions.StoreU8
+    public typealias StoreU16 = CppHelper.Instructions.StoreU16
+    public typealias StoreU32 = CppHelper.Instructions.StoreU32
+    public typealias StoreU64 = CppHelper.Instructions.StoreU64
 
     // MARK: Instructions with Arguments of One Register & Two Immediates (5.7)
 
-    public struct StoreImmIndU8: Instruction {
-        public static var opcode: UInt8 { 70 }
-
-        public let register: Registers.Index
-        public let address: UInt32
-        public let value: UInt8
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            (address, value) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            try context.state.writeMemory(address: context.state.readRegister(register) &+ address, value: value)
-            return .continued
-        }
-    }
-
-    public struct StoreImmIndU16: Instruction {
-        public static var opcode: UInt8 { 71 }
-
-        public let register: Registers.Index
-        public let address: UInt32
-        public let value: UInt16
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            (address, value) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            try context.state.writeMemory(
-                address: context.state.readRegister(register) &+ address,
-                values: value.encode(method: .fixedWidth(2))
-            )
-            return .continued
-        }
-    }
-
-    public struct StoreImmIndU32: Instruction {
-        public static var opcode: UInt8 { 72 }
-
-        public let register: Registers.Index
-        public let address: UInt32
-        public let value: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            (address, value) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            try context.state.writeMemory(
-                address: context.state.readRegister(register) &+ address,
-                values: value.encode(method: .fixedWidth(4))
-            )
-            return .continued
-        }
-    }
-
-    public struct StoreImmIndU64: Instruction {
-        public static var opcode: UInt8 { 73 }
-
-        public let register: Registers.Index
-        public let address: UInt32
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            (address, value) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            try context.state.writeMemory(
-                address: context.state.readRegister(register) &+ address,
-                values: value.encode(method: .fixedWidth(8))
-            )
-            return .continued
-        }
-    }
+    public typealias StoreImmIndU8 = CppHelper.Instructions.StoreImmIndU8
+    public typealias StoreImmIndU16 = CppHelper.Instructions.StoreImmIndU16
+    public typealias StoreImmIndU32 = CppHelper.Instructions.StoreImmIndU32
+    public typealias StoreImmIndU64 = CppHelper.Instructions.StoreImmIndU64
 
     // MARK: Instructions with Arguments of One Register, One Immediate and One Offset (5.8)
 
-    public struct LoadImmJump: Instruction {
-        public static var opcode: UInt8 { 80 }
-
-        public let register: Registers.Index
-        public let value: UInt32
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            register = try Registers.Index(r1: data.at(relative: 0))
-            (value, offset) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            context.state.writeRegister(register, value)
-            return .continued
-        }
-
-        public func updatePC(context: ExecutionContext, skip _: UInt32) -> ExecOutcome {
-            guard Instructions.isBranchValid(context: context, offset: offset) else {
-                return .exit(.panic(.invalidBranch))
-            }
-            context.state.increasePC(offset)
-            return .continued
-        }
-    }
-
-    public struct BranchEqImm: BranchInstructionBase {
-        public static var opcode: UInt8 { 81 }
-        typealias Compare = CompareEq
-
-        var register: Registers.Index
-        var value: UInt64
-        var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
-    }
-
-    public struct BranchNeImm: BranchInstructionBase {
-        public static var opcode: UInt8 { 82 }
-        typealias Compare = CompareNe
-
-        var register: Registers.Index
-        var value: UInt64
-        var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
-    }
-
-    public struct BranchLtUImm: BranchInstructionBase {
-        public static var opcode: UInt8 { 83 }
-        typealias Compare = CompareLtU
-
-        var register: Registers.Index
-        var value: UInt64
-        var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
-    }
-
-    public struct BranchLeUImm: BranchInstructionBase {
-        public static var opcode: UInt8 { 84 }
-        typealias Compare = CompareLeU
-
-        var register: Registers.Index
-        var value: UInt64
-        var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
-    }
-
-    public struct BranchGeUImm: BranchInstructionBase {
-        public static var opcode: UInt8 { 85 }
-        typealias Compare = CompareGeU
-
-        var register: Registers.Index
-        var value: UInt64
-        var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
-    }
-
-    public struct BranchGtUImm: BranchInstructionBase {
-        public static var opcode: UInt8 { 86 }
-        typealias Compare = CompareGtU
-
-        var register: Registers.Index
-        var value: UInt64
-        var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
-    }
-
-    public struct BranchLtSImm: BranchInstructionBase {
-        public static var opcode: UInt8 { 87 }
-        typealias Compare = CompareLtS
-
-        var register: Registers.Index
-        var value: UInt64
-        var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
-    }
-
-    public struct BranchLeSImm: BranchInstructionBase {
-        public static var opcode: UInt8 { 88 }
-        typealias Compare = CompareLeS
-
-        var register: Registers.Index
-        var value: UInt64
-        var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
-    }
-
-    public struct BranchGeSImm: BranchInstructionBase {
-        public static var opcode: UInt8 { 89 }
-        typealias Compare = CompareGeS
-
-        var register: Registers.Index
-        var value: UInt64
-        var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
-    }
-
-    public struct BranchGtSImm: BranchInstructionBase {
-        public static var opcode: UInt8 { 90 }
-        typealias Compare = CompareGtS
-
-        var register: Registers.Index
-        var value: UInt64
-        var offset: UInt32
-        public init(data: Data) throws { (register, value, offset) = try Self.parse(data: data) }
-    }
+    public typealias LoadImmJump = CppHelper.Instructions.LoadImmJump
+    public typealias BranchEqImm = CppHelper.Instructions.BranchEqImm
+    public typealias BranchNeImm = CppHelper.Instructions.BranchNeImm
+    public typealias BranchLtUImm = CppHelper.Instructions.BranchLtUImm
+    public typealias BranchLeUImm = CppHelper.Instructions.BranchLeUImm
+    public typealias BranchGeUImm = CppHelper.Instructions.BranchGeUImm
+    public typealias BranchGtUImm = CppHelper.Instructions.BranchGtUImm
+    public typealias BranchLtSImm = CppHelper.Instructions.BranchLtSImm
+    public typealias BranchLeSImm = CppHelper.Instructions.BranchLeSImm
+    public typealias BranchGeSImm = CppHelper.Instructions.BranchGeSImm
+    public typealias BranchGtSImm = CppHelper.Instructions.BranchGtSImm
 
     // MARK: Instructions with Arguments of Two Registers (5.9)
 
-    public struct MoveReg: Instruction {
-        public static var opcode: UInt8 { 100 }
-
-        public let src: Registers.Index
-        public let dest: Registers.Index
-
-        public init(data: Data) throws {
-            (dest, src) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            context.state.writeRegister(dest, context.state.readRegister(src) as UInt64)
-            return .continued
-        }
-    }
-
-    public struct Sbrk: Instruction {
-        public static var opcode: UInt8 { 101 }
-
-        public let src: Registers.Index
-        public let dest: Registers.Index
-
-        public init(data: Data) throws {
-            (dest, src) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let increment: UInt32 = context.state.readRegister(src)
-            let startAddr = try context.state.sbrk(increment)
-            context.state.writeRegister(dest, startAddr)
-
-            return .continued
-        }
-    }
-
-    public struct CountSetBits64: Instruction {
-        public static var opcode: UInt8 { 102 }
-
-        public let ra: Registers.Index
-        public let dest: Registers.Index
-
-        public init(data: Data) throws {
-            (dest, ra) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(ra)
-            context.state.writeRegister(dest, regVal.nonzeroBitCount)
-            return .continued
-        }
-    }
-
-    public struct CountSetBits32: Instruction {
-        public static var opcode: UInt8 { 103 }
-
-        public let ra: Registers.Index
-        public let dest: Registers.Index
-
-        public init(data: Data) throws {
-            (dest, ra) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let regVal: UInt32 = context.state.readRegister(ra)
-            context.state.writeRegister(dest, regVal.nonzeroBitCount)
-            return .continued
-        }
-    }
-
-    public struct LeadingZeroBits64: Instruction {
-        public static var opcode: UInt8 { 104 }
-
-        public let ra: Registers.Index
-        public let dest: Registers.Index
-
-        public init(data: Data) throws {
-            (dest, ra) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(ra)
-            context.state.writeRegister(dest, regVal.leadingZeroBitCount)
-            return .continued
-        }
-    }
-
-    public struct LeadingZeroBits32: Instruction {
-        public static var opcode: UInt8 { 105 }
-
-        public let ra: Registers.Index
-        public let dest: Registers.Index
-
-        public init(data: Data) throws {
-            (dest, ra) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let regVal: UInt32 = context.state.readRegister(ra)
-            context.state.writeRegister(dest, regVal.leadingZeroBitCount)
-            return .continued
-        }
-    }
-
-    public struct TrailingZeroBits64: Instruction {
-        public static var opcode: UInt8 { 106 }
-
-        public let ra: Registers.Index
-        public let dest: Registers.Index
-
-        public init(data: Data) throws {
-            (dest, ra) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(ra)
-            context.state.writeRegister(dest, regVal.trailingZeroBitCount)
-            return .continued
-        }
-    }
-
-    public struct TrailingZeroBits32: Instruction {
-        public static var opcode: UInt8 { 107 }
-
-        public let ra: Registers.Index
-        public let dest: Registers.Index
-
-        public init(data: Data) throws {
-            (dest, ra) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let regVal: UInt32 = context.state.readRegister(ra)
-            context.state.writeRegister(dest, regVal.trailingZeroBitCount)
-            return .continued
-        }
-    }
-
-    public struct SignExtend8: Instruction {
-        public static var opcode: UInt8 { 108 }
-
-        public let ra: Registers.Index
-        public let dest: Registers.Index
-
-        public init(data: Data) throws {
-            (dest, ra) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let regVal: UInt8 = context.state.readRegister(ra)
-            context.state.writeRegister(dest, Int8(bitPattern: regVal))
-            return .continued
-        }
-    }
-
-    public struct SignExtend16: Instruction {
-        public static var opcode: UInt8 { 109 }
-
-        public let ra: Registers.Index
-        public let dest: Registers.Index
-
-        public init(data: Data) throws {
-            (dest, ra) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let regVal: UInt16 = context.state.readRegister(ra)
-            context.state.writeRegister(dest, Int16(bitPattern: regVal))
-            return .continued
-        }
-    }
-
-    public struct ZeroExtend16: Instruction {
-        public static var opcode: UInt8 { 110 }
-
-        public let ra: Registers.Index
-        public let dest: Registers.Index
-
-        public init(data: Data) throws {
-            (dest, ra) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let regVal: UInt16 = context.state.readRegister(ra)
-            context.state.writeRegister(dest, regVal)
-            return .continued
-        }
-    }
-
-    public struct ReverseBytes: Instruction {
-        public static var opcode: UInt8 { 111 }
-
-        public let ra: Registers.Index
-        public let dest: Registers.Index
-
-        public init(data: Data) throws {
-            (dest, ra) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(ra)
-            context.state.writeRegister(dest, regVal.byteSwapped)
-            return .continued
-        }
-    }
+    public typealias MoveReg = CppHelper.Instructions.MoveReg
+    public typealias Sbrk = CppHelper.Instructions.Sbrk
+    public typealias CountSetBits64 = CppHelper.Instructions.CountSetBits64
+    public typealias CountSetBits32 = CppHelper.Instructions.CountSetBits32
+    public typealias LeadingZeroBits64 = CppHelper.Instructions.LeadingZeroBits64
+    public typealias LeadingZeroBits32 = CppHelper.Instructions.LeadingZeroBits32
+    public typealias TrailingZeroBits64 = CppHelper.Instructions.TrailingZeroBits64
+    public typealias TrailingZeroBits32 = CppHelper.Instructions.TrailingZeroBits32
+    public typealias SignExtend8 = CppHelper.Instructions.SignExtend8
+    public typealias SignExtend16 = CppHelper.Instructions.SignExtend16
+    public typealias ZeroExtend16 = CppHelper.Instructions.ZeroExtend16
+    public typealias ReverseBytes = CppHelper.Instructions.ReverseBytes
 
     // MARK: Instructions with Arguments of Two Registers & One Immediate (5.10)
 
-    public struct StoreIndU8: Instruction {
-        public static var opcode: UInt8 { 120 }
-
-        public let src: Registers.Index
-        public let dest: Registers.Index
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            (src, dest) = try Instructions.deocdeRegisters(data)
-            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let value: UInt8 = context.state.readRegister(src)
-            try context.state.writeMemory(address: context.state.readRegister(dest) &+ offset, value: value)
-            return .continued
-        }
-    }
-
-    public struct StoreIndU16: Instruction {
-        public static var opcode: UInt8 { 121 }
-
-        public let src: Registers.Index
-        public let dest: Registers.Index
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            (src, dest) = try Instructions.deocdeRegisters(data)
-            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let value: UInt16 = context.state.readRegister(src)
-            try context.state.writeMemory(address: context.state.readRegister(dest) &+ offset, values: value.encode(method: .fixedWidth(2)))
-            return .continued
-        }
-    }
-
-    public struct StoreIndU32: Instruction {
-        public static var opcode: UInt8 { 122 }
-
-        public let src: Registers.Index
-        public let dest: Registers.Index
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            (src, dest) = try Instructions.deocdeRegisters(data)
-            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let value: UInt32 = context.state.readRegister(src)
-            try context.state.writeMemory(address: context.state.readRegister(dest) &+ offset, values: value.encode(method: .fixedWidth(4)))
-            return .continued
-        }
-    }
-
-    public struct StoreIndU64: Instruction {
-        public static var opcode: UInt8 { 123 }
-
-        public let src: Registers.Index
-        public let dest: Registers.Index
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            (src, dest) = try Instructions.deocdeRegisters(data)
-            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let value: UInt64 = context.state.readRegister(src)
-            try context.state.writeMemory(address: context.state.readRegister(dest) &+ offset, values: value.encode(method: .fixedWidth(8)))
-            return .continued
-        }
-    }
-
-    public struct LoadIndU8: Instruction {
-        public static var opcode: UInt8 { 124 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let value = try context.state.readMemory(address: context.state.readRegister(rb) &+ offset)
-            context.state.writeRegister(ra, value)
-            return .continued
-        }
-    }
-
-    public struct LoadIndI8: Instruction {
-        public static var opcode: UInt8 { 125 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let value = try context.state.readMemory(address: context.state.readRegister(rb) &+ offset)
-            context.state.writeRegister(ra, Int8(bitPattern: value))
-            return .continued
-        }
-    }
-
-    public struct LoadIndU16: Instruction {
-        public static var opcode: UInt8 { 126 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let data = try context.state.readMemory(address: context.state.readRegister(rb) &+ offset, length: 2)
-            let value = data.decode(UInt16.self)
-            context.state.writeRegister(ra, value)
-            return .continued
-        }
-    }
-
-    public struct LoadIndI16: Instruction {
-        public static var opcode: UInt8 { 127 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let data = try context.state.readMemory(address: context.state.readRegister(rb) &+ offset, length: 2)
-            let value = data.decode(UInt16.self)
-            context.state.writeRegister(ra, Int16(bitPattern: value))
-            return .continued
-        }
-    }
-
-    public struct LoadIndU32: Instruction {
-        public static var opcode: UInt8 { 128 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let data = try context.state.readMemory(address: context.state.readRegister(rb) &+ offset, length: 4)
-            let value = data.decode(UInt32.self)
-            context.state.writeRegister(ra, value)
-            return .continued
-        }
-    }
-
-    public struct LoadIndI32: Instruction {
-        public static var opcode: UInt8 { 129 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let data = try context.state.readMemory(address: context.state.readRegister(rb) &+ offset, length: 4)
-            let value = data.decode(UInt32.self)
-            context.state.writeRegister(ra, Int32(bitPattern: value))
-            return .continued
-        }
-    }
-
-    public struct LoadIndU64: Instruction {
-        public static var opcode: UInt8 { 130 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            offset = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            let data = try context.state.readMemory(address: context.state.readRegister(rb) &+ offset, length: 8)
-            let value = data.decode(UInt64.self)
-            context.state.writeRegister(ra, value)
-            return .continued
-        }
-    }
-
-    public struct AddImm32: Instruction {
-        public static var opcode: UInt8 { 131 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt32 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, Int32(bitPattern: regVal &+ value))
-            return .continued
-        }
-    }
-
-    public struct AndImm: Instruction {
-        public static var opcode: UInt8 { 132 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, regVal & value)
-            return .continued
-        }
-    }
-
-    public struct XorImm: Instruction {
-        public static var opcode: UInt8 { 133 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, regVal ^ value)
-            return .continued
-        }
-    }
-
-    public struct OrImm: Instruction {
-        public static var opcode: UInt8 { 134 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, regVal | value)
-            return .continued
-        }
-    }
-
-    public struct MulImm32: Instruction {
-        public static var opcode: UInt8 { 135 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt32 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, Int32(bitPattern: regVal &* value))
-            return .continued
-        }
-    }
-
-    public struct SetLtUImm: Instruction {
-        public static var opcode: UInt8 { 136 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, regVal < value ? 1 : 0)
-            return .continued
-        }
-    }
-
-    public struct SetLtSImm: Instruction {
-        public static var opcode: UInt8 { 137 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, Int64(bitPattern: regVal) < Int64(bitPattern: value) ? 1 : 0)
-            return .continued
-        }
-    }
-
-    public struct ShloLImm32: Instruction {
-        public static var opcode: UInt8 { 138 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt32 = context.state.readRegister(rb)
-            let shift = value & 0x1F
-            context.state.writeRegister(ra, Int32(bitPattern: regVal << shift))
-            return .continued
-        }
-    }
-
-    public struct ShloRImm32: Instruction {
-        public static var opcode: UInt8 { 139 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt32 = context.state.readRegister(rb)
-            let shift = value & 0x1F
-            context.state.writeRegister(ra, Int32(bitPattern: regVal >> shift))
-            return .continued
-        }
-    }
-
-    public struct SharRImm32: Instruction {
-        public static var opcode: UInt8 { 140 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt32 = context.state.readRegister(rb)
-            let shift = value & 0x1F
-            context.state.writeRegister(ra, Int32(bitPattern: regVal) >> shift)
-            return .continued
-        }
-    }
-
-    public struct NegAddImm32: Instruction {
-        public static var opcode: UInt8 { 141 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt32 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, Int32(bitPattern: value &- regVal))
-            return .continued
-        }
-    }
-
-    public struct SetGtUImm: Instruction {
-        public static var opcode: UInt8 { 142 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, regVal > value ? 1 : 0)
-            return .continued
-        }
-    }
-
-    public struct SetGtSImm: Instruction {
-        public static var opcode: UInt8 { 143 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, Int64(bitPattern: regVal) > Int64(bitPattern: value) ? 1 : 0)
-            return .continued
-        }
-    }
-
-    public struct ShloLImmAlt32: Instruction {
-        public static var opcode: UInt8 { 144 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt32 = context.state.readRegister(rb)
-            let shift = regVal & 0x1F
-            context.state.writeRegister(ra, Int32(bitPattern: value << shift))
-            return .continued
-        }
-    }
-
-    public struct ShloRImmAlt32: Instruction {
-        public static var opcode: UInt8 { 145 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt32 = context.state.readRegister(rb)
-            let shift = regVal & 0x1F
-            context.state.writeRegister(ra, Int32(bitPattern: value >> shift))
-            return .continued
-        }
-    }
-
-    public struct SharRImmAlt32: Instruction {
-        public static var opcode: UInt8 { 146 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt32 = context.state.readRegister(rb)
-            let shift = regVal & 0x1F
-            context.state.writeRegister(ra, Int32(bitPattern: value) >> shift)
-            return .continued
-        }
-    }
-
-    public struct CmovIzImm: Instruction {
-        public static var opcode: UInt8 { 147 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let rbVal: UInt64 = context.state.readRegister(rb)
-            if rbVal == 0 {
-                context.state.writeRegister(ra, value)
-            }
-            return .continued
-        }
-    }
-
-    public struct CmovNzImm: Instruction {
-        public static var opcode: UInt8 { 148 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, regVal != 0 ? value : regVal)
-            return .continued
-        }
-    }
-
-    public struct AddImm64: Instruction {
-        public static var opcode: UInt8 { 149 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, regVal &+ value)
-            return .continued
-        }
-    }
-
-    public struct MulImm64: Instruction {
-        public static var opcode: UInt8 { 150 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, regVal &* value)
-            return .continued
-        }
-    }
-
-    public struct ShloLImm64: Instruction {
-        public static var opcode: UInt8 { 151 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(rb)
-            let shift = value & 0x3F
-            context.state.writeRegister(ra, Int64(bitPattern: regVal << shift))
-            return .continued
-        }
-    }
-
-    public struct ShloRImm64: Instruction {
-        public static var opcode: UInt8 { 152 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(rb)
-            let shift = value & 0x3F
-            context.state.writeRegister(ra, Int64(bitPattern: regVal >> shift))
-            return .continued
-        }
-    }
-
-    public struct SharRImm64: Instruction {
-        public static var opcode: UInt8 { 153 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(rb)
-            let shift = value & 0x3F
-            context.state.writeRegister(ra, Int64(bitPattern: regVal) >> shift)
-            return .continued
-        }
-    }
-
-    public struct NegAddImm64: Instruction {
-        public static var opcode: UInt8 { 154 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, value &- regVal)
-            return .continued
-        }
-    }
-
-    public struct ShloLImmAlt64: Instruction {
-        public static var opcode: UInt8 { 155 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(rb)
-            let shift = regVal & 0x3F
-            context.state.writeRegister(ra, UInt64(truncatingIfNeeded: value << shift))
-            return .continued
-        }
-    }
-
-    public struct ShloRImmAlt64: Instruction {
-        public static var opcode: UInt8 { 156 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(rb)
-            let shift = regVal & 0x3F
-            context.state.writeRegister(ra, value >> shift)
-            return .continued
-        }
-    }
-
-    public struct SharRImmAlt64: Instruction {
-        public static var opcode: UInt8 { 157 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let regVal: UInt64 = context.state.readRegister(rb)
-            let shift = regVal & 0x3F
-            context.state.writeRegister(ra, Int64(bitPattern: value) >> shift)
-            return .continued
-        }
-    }
-
-    public struct RotR64Imm: Instruction {
-        public static var opcode: UInt8 { 158 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let rbVal: UInt64 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, rbVal.rotated(right: value))
-            return .continued
-        }
-    }
-
-    public struct RotR64ImmAlt: Instruction {
-        public static var opcode: UInt8 { 159 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt64
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let rbVal: UInt64 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, value.rotated(right: rbVal))
-            return .continued
-        }
-    }
-
-    public struct RotR32Imm: Instruction {
-        public static var opcode: UInt8 { 160 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let rbVal: UInt32 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, Int32(bitPattern: rbVal.rotated(right: value)))
-            return .continued
-        }
-    }
-
-    public struct RotR32ImmAlt: Instruction {
-        public static var opcode: UInt8 { 161 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            value = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let rbVal: UInt32 = context.state.readRegister(rb)
-            context.state.writeRegister(ra, Int32(bitPattern: value.rotated(right: rbVal)))
-            return .continued
-        }
-    }
+    public typealias StoreIndU8 = CppHelper.Instructions.StoreIndU8
+    public typealias StoreIndU16 = CppHelper.Instructions.StoreIndU16
+    public typealias StoreIndU32 = CppHelper.Instructions.StoreIndU32
+    public typealias StoreIndU64 = CppHelper.Instructions.StoreIndU64
+    public typealias LoadIndU8 = CppHelper.Instructions.LoadIndU8
+    public typealias LoadIndI8 = CppHelper.Instructions.LoadIndI8
+    public typealias LoadIndU16 = CppHelper.Instructions.LoadIndU16
+    public typealias LoadIndI16 = CppHelper.Instructions.LoadIndI16
+    public typealias LoadIndU32 = CppHelper.Instructions.LoadIndU32
+    public typealias LoadIndI32 = CppHelper.Instructions.LoadIndI32
+    public typealias LoadIndU64 = CppHelper.Instructions.LoadIndU64
+    public typealias AddImm32 = CppHelper.Instructions.AddImm32
+    public typealias AndImm = CppHelper.Instructions.AndImm
+    public typealias XorImm = CppHelper.Instructions.XorImm
+    public typealias OrImm = CppHelper.Instructions.OrImm
+    public typealias MulImm32 = CppHelper.Instructions.MulImm32
+    public typealias SetLtUImm = CppHelper.Instructions.SetLtUImm
+    public typealias SetLtSImm = CppHelper.Instructions.SetLtSImm
+    public typealias ShloLImm32 = CppHelper.Instructions.ShloLImm32
+    public typealias ShloRImm32 = CppHelper.Instructions.ShloRImm32
+    public typealias SharRImm32 = CppHelper.Instructions.SharRImm32
+    public typealias NegAddImm32 = CppHelper.Instructions.NegAddImm32
+    public typealias SetGtUImm = CppHelper.Instructions.SetGtUImm
+    public typealias SetGtSImm = CppHelper.Instructions.SetGtSImm
+    public typealias ShloLImmAlt32 = CppHelper.Instructions.ShloLImmAlt32
+    public typealias ShloRImmAlt32 = CppHelper.Instructions.ShloRImmAlt32
+    public typealias SharRImmAlt32 = CppHelper.Instructions.SharRImmAlt32
+    public typealias CmovIzImm = CppHelper.Instructions.CmovIzImm
+    public typealias CmovNzImm = CppHelper.Instructions.CmovNzImm
+    public typealias AddImm64 = CppHelper.Instructions.AddImm64
+    public typealias MulImm64 = CppHelper.Instructions.MulImm64
+    public typealias ShloLImm64 = CppHelper.Instructions.ShloLImm64
+    public typealias ShloRImm64 = CppHelper.Instructions.ShloRImm64
+    public typealias SharRImm64 = CppHelper.Instructions.SharRImm64
+    public typealias NegAddImm64 = CppHelper.Instructions.NegAddImm64
+    public typealias ShloLImmAlt64 = CppHelper.Instructions.ShloLImmAlt64
+    public typealias ShloRImmAlt64 = CppHelper.Instructions.ShloRImmAlt64
+    public typealias SharRImmAlt64 = CppHelper.Instructions.SharRImmAlt64
+    public typealias RotR64Imm = CppHelper.Instructions.RotR64Imm
+    public typealias RotR64ImmAlt = CppHelper.Instructions.RotR64ImmAlt
+    public typealias RotR32Imm = CppHelper.Instructions.RotR32Imm
+    public typealias RotR32ImmAlt = CppHelper.Instructions.RotR32ImmAlt
 
     // MARK: Instructions with Arguments of Two Registers & One Offset (5.11)
 
-    public struct BranchEq: BranchInstructionBase2 {
-        public static var opcode: UInt8 { 170 }
-        typealias Compare = CompareEq
-
-        var r1: Registers.Index
-        var r2: Registers.Index
-        var offset: UInt32
-        public init(data: Data) throws { (r1, r2, offset) = try Self.parse(data: data) }
-    }
-
-    public struct BranchNe: BranchInstructionBase2 {
-        public static var opcode: UInt8 { 171 }
-        typealias Compare = CompareNe
-
-        var r1: Registers.Index
-        var r2: Registers.Index
-        var offset: UInt32
-        public init(data: Data) throws { (r1, r2, offset) = try Self.parse(data: data) }
-    }
-
-    public struct BranchLtU: BranchInstructionBase2 {
-        public static var opcode: UInt8 { 172 }
-        typealias Compare = CompareLtU
-
-        var r1: Registers.Index
-        var r2: Registers.Index
-        var offset: UInt32
-        public init(data: Data) throws { (r1, r2, offset) = try Self.parse(data: data) }
-    }
-
-    public struct BranchLtS: BranchInstructionBase2 {
-        public static var opcode: UInt8 { 173 }
-        typealias Compare = CompareLtS
-
-        var r1: Registers.Index
-        var r2: Registers.Index
-        var offset: UInt32
-        public init(data: Data) throws { (r1, r2, offset) = try Self.parse(data: data) }
-    }
-
-    public struct BranchGeU: BranchInstructionBase2 {
-        public static var opcode: UInt8 { 174 }
-        typealias Compare = CompareGeU
-
-        var r1: Registers.Index
-        var r2: Registers.Index
-        var offset: UInt32
-        public init(data: Data) throws { (r1, r2, offset) = try Self.parse(data: data) }
-    }
-
-    public struct BranchGeS: BranchInstructionBase2 {
-        public static var opcode: UInt8 { 175 }
-        typealias Compare = CompareGeS
-
-        var r1: Registers.Index
-        var r2: Registers.Index
-        var offset: UInt32
-        public init(data: Data) throws { (r1, r2, offset) = try Self.parse(data: data) }
-    }
+    public typealias BranchEq = CppHelper.Instructions.BranchEq
+    public typealias BranchNe = CppHelper.Instructions.BranchNe
+    public typealias BranchLtU = CppHelper.Instructions.BranchLtU
+    public typealias BranchLtS = CppHelper.Instructions.BranchLtS
+    public typealias BranchGeU = CppHelper.Instructions.BranchGeU
+    public typealias BranchGeS = CppHelper.Instructions.BranchGeS
 
     // MARK: Instruction with Arguments of Two Registers and Two Immediates (5.12)
 
-    public struct LoadImmJumpInd: Instruction {
-        public static var opcode: UInt8 { 180 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let value: UInt32
-        public let offset: UInt32
-
-        public init(data: Data) throws {
-            (ra, rb) = try Instructions.deocdeRegisters(data)
-            (value, offset) = try Instructions.decodeImmediate2(data, minus: 2, startIdx: 1)
-        }
-
-        public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-            // need to read rb value first in case ra and rb are the same
-            let rbVal: UInt32 = context.state.readRegister(rb)
-
-            context.state.writeRegister(ra, value)
-
-            return Instructions.djump(context: context, target: rbVal &+ offset)
-        }
-
-        public func updatePC(context _: ExecutionContext, skip _: UInt32) -> ExecOutcome {
-            .continued
-        }
-    }
+    public typealias LoadImmJumpInd = CppHelper.Instructions.LoadImmJumpInd
 
     // MARK: Instructions with Arguments of Three Registers (5.13)
 
-    public struct Add32: Instruction {
-        public static var opcode: UInt8 { 190 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, Int32(bitPattern: raVal &+ rbVal))
-            return .continued
-        }
-    }
-
-    public struct Sub32: Instruction {
-        public static var opcode: UInt8 { 191 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, Int32(bitPattern: raVal &- rbVal))
-            return .continued
-        }
-    }
-
-    public struct Mul32: Instruction {
-        public static var opcode: UInt8 { 192 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, Int32(bitPattern: raVal &* rbVal))
-            return .continued
-        }
-    }
-
-    public struct DivU32: Instruction {
-        public static var opcode: UInt8 { 193 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
-            if rbVal == 0 {
-                context.state.writeRegister(rd, UInt64.max)
-            } else {
-                context.state.writeRegister(rd, Int32(bitPattern: raVal / rbVal))
-            }
-            return .continued
-        }
-    }
-
-    public struct DivS32: Instruction {
-        public static var opcode: UInt8 { 194 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
-            let a = Int32(bitPattern: raVal)
-            let b = Int32(bitPattern: rbVal)
-            if rbVal == 0 {
-                context.state.writeRegister(rd, UInt64.max)
-            } else if a == Int32.min, b == -1 {
-                context.state.writeRegister(rd, a)
-            } else {
-                context.state.writeRegister(rd, Int64(a / b))
-            }
-            return .continued
-        }
-    }
-
-    public struct RemU32: Instruction {
-        public static var opcode: UInt8 { 195 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
-            if rbVal == 0 {
-                context.state.writeRegister(rd, Int32(bitPattern: raVal))
-            } else {
-                context.state.writeRegister(rd, Int32(bitPattern: raVal % rbVal))
-            }
-            return .continued
-        }
-    }
-
-    public struct RemS32: Instruction {
-        public static var opcode: UInt8 { 196 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
-            let a = Int32(bitPattern: raVal)
-            let b = Int32(bitPattern: rbVal)
-            if rbVal == 0 {
-                context.state.writeRegister(rd, a)
-            } else if a == Int32.min, b == -1 {
-                context.state.writeRegister(rd, 0)
-            } else {
-                context.state.writeRegister(rd, Int64(a % b))
-            }
-            return .continued
-        }
-    }
-
-    public struct ShloL32: Instruction {
-        public static var opcode: UInt8 { 197 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
-            let shift = rbVal & 0x1F
-            context.state.writeRegister(rd, Int32(bitPattern: raVal << shift))
-            return .continued
-        }
-    }
-
-    public struct ShloR32: Instruction {
-        public static var opcode: UInt8 { 198 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
-            let shift = rbVal & 0x1F
-            context.state.writeRegister(rd, Int32(bitPattern: raVal >> shift))
-            return .continued
-        }
-    }
-
-    public struct SharR32: Instruction {
-        public static var opcode: UInt8 { 199 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
-            let shift = rbVal & 0x1F
-            context.state.writeRegister(rd, Int32(bitPattern: raVal) >> shift)
-            return .continued
-        }
-    }
-
-    public struct Add64: Instruction {
-        public static var opcode: UInt8 { 200 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, raVal &+ rbVal)
-            return .continued
-        }
-    }
-
-    public struct Sub64: Instruction {
-        public static var opcode: UInt8 { 201 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, raVal &- rbVal)
-            return .continued
-        }
-    }
-
-    public struct Mul64: Instruction {
-        public static var opcode: UInt8 { 202 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, raVal &* rbVal)
-            return .continued
-        }
-    }
-
-    public struct DivU64: Instruction {
-        public static var opcode: UInt8 { 203 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            if rbVal == 0 {
-                context.state.writeRegister(rd, UInt64.max)
-            } else {
-                context.state.writeRegister(rd, raVal / rbVal)
-            }
-            return .continued
-        }
-    }
-
-    public struct DivS64: Instruction {
-        public static var opcode: UInt8 { 204 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            let a = Int64(bitPattern: raVal)
-            let b = Int64(bitPattern: rbVal)
-            if rbVal == 0 {
-                context.state.writeRegister(rd, UInt64.max)
-            } else if a == Int64.min, b == -1 {
-                context.state.writeRegister(rd, a)
-            } else {
-                context.state.writeRegister(rd, Int64(a / b))
-            }
-            return .continued
-        }
-    }
-
-    public struct RemU64: Instruction {
-        public static var opcode: UInt8 { 205 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            if rbVal == 0 {
-                context.state.writeRegister(rd, raVal)
-            } else {
-                context.state.writeRegister(rd, raVal % rbVal)
-            }
-            return .continued
-        }
-    }
-
-    public struct RemS64: Instruction {
-        public static var opcode: UInt8 { 206 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            let a = Int64(bitPattern: raVal)
-            let b = Int64(bitPattern: rbVal)
-            if rbVal == 0 {
-                context.state.writeRegister(rd, raVal)
-            } else if a == Int64.min, b == -1 {
-                context.state.writeRegister(rd, 0)
-            } else {
-                context.state.writeRegister(rd, UInt64(bitPattern: a % b))
-            }
-            return .continued
-        }
-    }
-
-    public struct ShloL64: Instruction {
-        public static var opcode: UInt8 { 207 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            let shift = rbVal & 0x3F
-            context.state.writeRegister(rd, UInt64(truncatingIfNeeded: raVal << shift))
-            return .continued
-        }
-    }
-
-    public struct ShloR64: Instruction {
-        public static var opcode: UInt8 { 208 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            let shift = rbVal & 0x3F
-            context.state.writeRegister(rd, raVal >> shift)
-            return .continued
-        }
-    }
-
-    public struct SharR64: Instruction {
-        public static var opcode: UInt8 { 209 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            let shift = rbVal & 0x3F
-            context.state.writeRegister(rd, Int64(bitPattern: raVal) >> shift)
-            return .continued
-        }
-    }
-
-    public struct And: Instruction {
-        public static var opcode: UInt8 { 210 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, raVal & rbVal)
-            return .continued
-        }
-    }
-
-    public struct Xor: Instruction {
-        public static var opcode: UInt8 { 211 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, raVal ^ rbVal)
-            return .continued
-        }
-    }
-
-    public struct Or: Instruction {
-        public static var opcode: UInt8 { 212 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, raVal | rbVal)
-            return .continued
-        }
-    }
-
-    public struct MulUpperSS: Instruction {
-        public static var opcode: UInt8 { 213 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            let a = Int128(Int64(bitPattern: raVal))
-            let b = Int128(Int64(bitPattern: rbVal))
-            context.state.writeRegister(rd, Int64(truncatingIfNeeded: (a * b) >> 64))
-            return .continued
-        }
-    }
-
-    public struct MulUpperUU: Instruction {
-        public static var opcode: UInt8 { 214 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, (UInt128(raVal) * UInt128(rbVal)) >> 64)
-            return .continued
-        }
-    }
-
-    public struct MulUpperSU: Instruction {
-        public static var opcode: UInt8 { 215 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            let a = Int128(Int64(bitPattern: raVal))
-            let b = Int128(rbVal)
-            context.state.writeRegister(rd, Int64(truncatingIfNeeded: (a * b) >> 64))
-            return .continued
-        }
-    }
-
-    public struct SetLtU: Instruction {
-        public static var opcode: UInt8 { 216 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, raVal < rbVal ? 1 : 0)
-            return .continued
-        }
-    }
-
-    public struct SetLtS: Instruction {
-        public static var opcode: UInt8 { 217 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, Int64(bitPattern: raVal) < Int64(bitPattern: rbVal) ? 1 : 0)
-            return .continued
-        }
-    }
-
-    public struct CmovIz: Instruction {
-        public static var opcode: UInt8 { 218 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            if rbVal == 0 {
-                context.state.writeRegister(rd, raVal)
-            }
-            return .continued
-        }
-    }
-
-    public struct CmovNz: Instruction {
-        public static var opcode: UInt8 { 219 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            if rbVal != 0 {
-                context.state.writeRegister(rd, raVal)
-            }
-            return .continued
-        }
-    }
-
-    public struct RotL64: Instruction {
-        public static var opcode: UInt8 { 220 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, raVal.rotated(left: rbVal))
-            return .continued
-        }
-    }
-
-    public struct RotL32: Instruction {
-        public static var opcode: UInt8 { 221 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, Int32(bitPattern: raVal.rotated(left: rbVal)))
-            return .continued
-        }
-    }
-
-    public struct RotR64: Instruction {
-        public static var opcode: UInt8 { 222 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, raVal.rotated(right: rbVal))
-            return .continued
-        }
-    }
-
-    public struct RotR32: Instruction {
-        public static var opcode: UInt8 { 223 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, Int32(bitPattern: raVal.rotated(right: rbVal)))
-            return .continued
-        }
-    }
-
-    public struct AndInv: Instruction {
-        public static var opcode: UInt8 { 224 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, raVal & ~rbVal)
-            return .continued
-        }
-    }
-
-    public struct OrInv: Instruction {
-        public static var opcode: UInt8 { 225 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, raVal | ~rbVal)
-            return .continued
-        }
-    }
-
-    public struct Xnor: Instruction {
-        public static var opcode: UInt8 { 226 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, ~(raVal ^ rbVal))
-            return .continued
-        }
-    }
-
-    public struct Max: Instruction {
-        public static var opcode: UInt8 { 227 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, max(Int64(bitPattern: raVal), Int64(bitPattern: rbVal)))
-            return .continued
-        }
-    }
-
-    public struct MaxU: Instruction {
-        public static var opcode: UInt8 { 228 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, max(raVal, rbVal))
-            return .continued
-        }
-    }
-
-    public struct Min: Instruction {
-        public static var opcode: UInt8 { 229 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, min(Int64(bitPattern: raVal), Int64(bitPattern: rbVal)))
-            return .continued
-        }
-    }
-
-    public struct MinU: Instruction {
-        public static var opcode: UInt8 { 230 }
-
-        public let ra: Registers.Index
-        public let rb: Registers.Index
-        public let rd: Registers.Index
-
-        public init(data: Data) throws {
-            (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        }
-
-        public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-            let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-            context.state.writeRegister(rd, min(raVal, rbVal))
-            return .continued
-        }
-    }
+    public typealias Add32 = CppHelper.Instructions.Add32
+    public typealias Sub32 = CppHelper.Instructions.Sub32
+    public typealias Mul32 = CppHelper.Instructions.Mul32
+    public typealias DivU32 = CppHelper.Instructions.DivU32
+    public typealias DivS32 = CppHelper.Instructions.DivS32
+    public typealias RemU32 = CppHelper.Instructions.RemU32
+    public typealias RemS32 = CppHelper.Instructions.RemS32
+    public typealias ShloL32 = CppHelper.Instructions.ShloL32
+    public typealias ShloR32 = CppHelper.Instructions.ShloR32
+    public typealias SharR32 = CppHelper.Instructions.SharR32
+    public typealias Add64 = CppHelper.Instructions.Add64
+    public typealias Sub64 = CppHelper.Instructions.Sub64
+    public typealias Mul64 = CppHelper.Instructions.Mul64
+    public typealias DivU64 = CppHelper.Instructions.DivU64
+    public typealias DivS64 = CppHelper.Instructions.DivS64
+    public typealias RemU64 = CppHelper.Instructions.RemU64
+    public typealias RemS64 = CppHelper.Instructions.RemS64
+    public typealias ShloL64 = CppHelper.Instructions.ShloL64
+    public typealias ShloR64 = CppHelper.Instructions.ShloR64
+    public typealias SharR64 = CppHelper.Instructions.SharR64
+    public typealias And = CppHelper.Instructions.And
+    public typealias Xor = CppHelper.Instructions.Xor
+    public typealias Or = CppHelper.Instructions.Or
+    public typealias MulUpperSS = CppHelper.Instructions.MulUpperSS
+    public typealias MulUpperUU = CppHelper.Instructions.MulUpperUU
+    public typealias MulUpperSU = CppHelper.Instructions.MulUpperSU
+    public typealias SetLtU = CppHelper.Instructions.SetLtU
+    public typealias SetLtS = CppHelper.Instructions.SetLtS
+    public typealias CmovIz = CppHelper.Instructions.CmovIz
+    public typealias CmovNz = CppHelper.Instructions.CmovNz
+    public typealias RotL64 = CppHelper.Instructions.RotL64
+    public typealias RotL32 = CppHelper.Instructions.RotL32
+    public typealias RotR64 = CppHelper.Instructions.RotR64
+    public typealias RotR32 = CppHelper.Instructions.RotR32
+    public typealias AndInv = CppHelper.Instructions.AndInv
+    public typealias OrInv = CppHelper.Instructions.OrInv
+    public typealias Xnor = CppHelper.Instructions.Xnor
+    public typealias Max = CppHelper.Instructions.Max
+    public typealias MaxU = CppHelper.Instructions.MaxU
+    public typealias Min = CppHelper.Instructions.Min
+    public typealias MinU = CppHelper.Instructions.MinU
 }
