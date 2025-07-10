@@ -2,8 +2,6 @@
 
 #include <cstdint>
 
-// No inline constructors otherwise Swift will get confused and result duplicated implementations
-
 struct RegisterIndex {
     uint8_t value;
 };
