@@ -62,11 +62,11 @@ extension CppHelper.Instructions.LoadImm64: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let value = try data.at(relative: 1 ..< 9).decode(UInt64.self)
-        self.init(reg: .init(value: register.value), value: value)
+        self.init(reg: register, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        context.state.writeRegister(Registers.Index(raw: reg.value), value)
+        context.state.writeRegister(reg, value)
         return .continued
     }
 }
@@ -139,13 +139,13 @@ extension CppHelper.Instructions.JumpInd: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(reg: .init(value: register.value), offset: offset)
+        self.init(reg: register, offset: offset)
     }
 
     public func _executeImpl(context _: ExecutionContext) -> ExecOutcome { .continued }
 
     public func updatePC(context: ExecutionContext, skip _: UInt32) -> ExecOutcome {
-        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: reg.value))
+        let regVal: UInt32 = context.state.readRegister(reg)
         return Instructions.djump(context: context, target: regVal &+ offset)
     }
 }
@@ -154,11 +154,11 @@ extension CppHelper.Instructions.LoadImm: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(reg: .init(value: register.value), value: value)
+        self.init(reg: register, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        context.state.writeRegister(Registers.Index(raw: reg.value), Int32(bitPattern: value))
+        context.state.writeRegister(reg, Int32(bitPattern: value))
         return .continued
     }
 }
@@ -167,12 +167,12 @@ extension CppHelper.Instructions.LoadU8: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(reg: .init(value: register.value), address: address)
+        self.init(reg: register, address: address)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         let value = try context.state.readMemory(address: address)
-        context.state.writeRegister(Registers.Index(raw: reg.value), value)
+        context.state.writeRegister(reg, value)
         return .continued
     }
 }
@@ -181,12 +181,12 @@ extension CppHelper.Instructions.LoadI8: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(reg: .init(value: register.value), address: address)
+        self.init(reg: register, address: address)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         let value = try context.state.readMemory(address: address)
-        context.state.writeRegister(Registers.Index(raw: reg.value), Int8(bitPattern: value))
+        context.state.writeRegister(reg, Int8(bitPattern: value))
         return .continued
     }
 }
@@ -195,13 +195,13 @@ extension CppHelper.Instructions.LoadU16: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(reg: .init(value: register.value), address: address)
+        self.init(reg: register, address: address)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         let data = try context.state.readMemory(address: address, length: 2)
         let value = data.decode(UInt16.self)
-        context.state.writeRegister(Registers.Index(raw: reg.value), value)
+        context.state.writeRegister(reg, value)
         return .continued
     }
 }
@@ -210,13 +210,13 @@ extension CppHelper.Instructions.LoadI16: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(reg: .init(value: register.value), address: address)
+        self.init(reg: register, address: address)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         let data = try context.state.readMemory(address: address, length: 2)
         let value = data.decode(UInt16.self)
-        context.state.writeRegister(Registers.Index(raw: reg.value), Int16(bitPattern: value))
+        context.state.writeRegister(reg, Int16(bitPattern: value))
         return .continued
     }
 }
@@ -225,13 +225,13 @@ extension CppHelper.Instructions.LoadU32: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(reg: .init(value: register.value), address: address)
+        self.init(reg: register, address: address)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         let data = try context.state.readMemory(address: address, length: 4)
         let value = data.decode(UInt32.self)
-        context.state.writeRegister(Registers.Index(raw: reg.value), value)
+        context.state.writeRegister(reg, value)
         return .continued
     }
 }
@@ -240,13 +240,13 @@ extension CppHelper.Instructions.LoadI32: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(reg: .init(value: register.value), address: address)
+        self.init(reg: register, address: address)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         let data = try context.state.readMemory(address: address, length: 4)
         let value = data.decode(UInt32.self)
-        context.state.writeRegister(Registers.Index(raw: reg.value), Int32(bitPattern: value))
+        context.state.writeRegister(reg, Int32(bitPattern: value))
         return .continued
     }
 }
@@ -255,13 +255,13 @@ extension CppHelper.Instructions.LoadU64: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(reg: .init(value: register.value), address: address)
+        self.init(reg: register, address: address)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         let data = try context.state.readMemory(address: address, length: 8)
         let value = data.decode(UInt64.self)
-        context.state.writeRegister(Registers.Index(raw: reg.value), value)
+        context.state.writeRegister(reg, value)
         return .continued
     }
 }
@@ -270,11 +270,11 @@ extension CppHelper.Instructions.StoreU8: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(reg: .init(value: register.value), address: address)
+        self.init(reg: register, address: address)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let value: UInt8 = context.state.readRegister(Registers.Index(raw: reg.value))
+        let value: UInt8 = context.state.readRegister(reg)
         try context.state.writeMemory(address: address, value: value)
         return .continued
     }
@@ -284,11 +284,11 @@ extension CppHelper.Instructions.StoreU16: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(reg: .init(value: register.value), address: address)
+        self.init(reg: register, address: address)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let value: UInt16 = context.state.readRegister(Registers.Index(raw: reg.value))
+        let value: UInt16 = context.state.readRegister(reg)
         try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(2)))
         return .continued
     }
@@ -298,11 +298,11 @@ extension CppHelper.Instructions.StoreU32: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(reg: .init(value: register.value), address: address)
+        self.init(reg: register, address: address)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let value: UInt32 = context.state.readRegister(Registers.Index(raw: reg.value))
+        let value: UInt32 = context.state.readRegister(reg)
         try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(4)))
         return .continued
     }
@@ -312,11 +312,11 @@ extension CppHelper.Instructions.StoreU64: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let address: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(reg: .init(value: register.value), address: address)
+        self.init(reg: register, address: address)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let value: UInt64 = context.state.readRegister(Registers.Index(raw: reg.value))
+        let value: UInt64 = context.state.readRegister(reg)
         try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(8)))
         return .continued
     }
@@ -326,11 +326,11 @@ extension CppHelper.Instructions.StoreImmIndU8: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let (address, value): (UInt32, UInt8) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        self.init(reg: .init(value: register.value), address: address, value: value)
+        self.init(reg: register, address: address, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        try context.state.writeMemory(address: context.state.readRegister(Registers.Index(raw: reg.value)) &+ address, value: value)
+        try context.state.writeMemory(address: context.state.readRegister(reg) &+ address, value: value)
         return .continued
     }
 }
@@ -339,12 +339,12 @@ extension CppHelper.Instructions.StoreImmIndU16: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let (address, value): (UInt32, UInt16) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        self.init(reg: .init(value: register.value), address: address, value: value)
+        self.init(reg: register, address: address, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         try context.state.writeMemory(
-            address: context.state.readRegister(Registers.Index(raw: reg.value)) &+ address,
+            address: context.state.readRegister(reg) &+ address,
             values: value.encode(method: .fixedWidth(2))
         )
         return .continued
@@ -355,12 +355,12 @@ extension CppHelper.Instructions.StoreImmIndU32: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let (address, value): (UInt32, UInt32) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        self.init(reg: .init(value: register.value), address: address, value: value)
+        self.init(reg: register, address: address, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         try context.state.writeMemory(
-            address: context.state.readRegister(Registers.Index(raw: reg.value)) &+ address,
+            address: context.state.readRegister(reg) &+ address,
             values: value.encode(method: .fixedWidth(4))
         )
         return .continued
@@ -371,12 +371,12 @@ extension CppHelper.Instructions.StoreImmIndU64: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let (address, value): (UInt32, UInt64) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        self.init(reg: .init(value: register.value), address: address, value: value)
+        self.init(reg: register, address: address, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         try context.state.writeMemory(
-            address: context.state.readRegister(Registers.Index(raw: reg.value)) &+ address,
+            address: context.state.readRegister(reg) &+ address,
             values: value.encode(method: .fixedWidth(8))
         )
         return .continued
@@ -387,11 +387,11 @@ extension CppHelper.Instructions.LoadImmJump: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let (value, offset): (UInt32, UInt32) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        self.init(reg: .init(value: register.value), value: value, offset: offset)
+        self.init(reg: register, value: value, offset: offset)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        context.state.writeRegister(Registers.Index(raw: reg.value), value)
+        context.state.writeRegister(reg, value)
         return .continued
     }
 
@@ -407,145 +407,145 @@ extension CppHelper.Instructions.LoadImmJump: Instruction {
 extension CppHelper.Instructions.BranchEqImm: BranchInstructionBase {
     public var register: Registers.Index {
         get {
-            .init(raw: reg.value)
+            reg
         }
         set {
-            reg.value = newValue.value
+            reg = newValue
         }
     }
 
     typealias Compare = CompareEq
     public init(data: Data) throws {
         let (register, value, offset) = try Self.parse(data: data)
-        self.init(reg: .init(value: register.value), value: value, offset: offset)
+        self.init(reg: register, value: value, offset: offset)
     }
 }
 
 extension CppHelper.Instructions.BranchNeImm: BranchInstructionBase {
     public var register: Registers.Index {
-        get { .init(raw: reg.value) }
-        set { reg.value = newValue.value }
+        get { reg }
+        set { reg = newValue }
     }
 
     typealias Compare = CompareNe
     public init(data: Data) throws {
         let (register, value, offset) = try Self.parse(data: data)
-        self.init(reg: .init(value: register.value), value: value, offset: offset)
+        self.init(reg: register, value: value, offset: offset)
     }
 }
 
 extension CppHelper.Instructions.BranchLtUImm: BranchInstructionBase {
     public var register: Registers.Index {
-        get { .init(raw: reg.value) }
-        set { reg.value = newValue.value }
+        get { reg }
+        set { reg = newValue }
     }
 
     typealias Compare = CompareLtU
     public init(data: Data) throws {
         let (register, value, offset) = try Self.parse(data: data)
-        self.init(reg: .init(value: register.value), value: value, offset: offset)
+        self.init(reg: register, value: value, offset: offset)
     }
 }
 
 extension CppHelper.Instructions.BranchLeUImm: BranchInstructionBase {
     public var register: Registers.Index {
-        get { .init(raw: reg.value) }
-        set { reg.value = newValue.value }
+        get { reg }
+        set { reg = newValue }
     }
 
     typealias Compare = CompareLeU
     public init(data: Data) throws {
         let (register, value, offset) = try Self.parse(data: data)
-        self.init(reg: .init(value: register.value), value: value, offset: offset)
+        self.init(reg: register, value: value, offset: offset)
     }
 }
 
 extension CppHelper.Instructions.BranchGeUImm: BranchInstructionBase {
     public var register: Registers.Index {
-        get { .init(raw: reg.value) }
-        set { reg.value = newValue.value }
+        get { reg }
+        set { reg = newValue }
     }
 
     typealias Compare = CompareGeU
     public init(data: Data) throws {
         let (register, value, offset) = try Self.parse(data: data)
-        self.init(reg: .init(value: register.value), value: value, offset: offset)
+        self.init(reg: register, value: value, offset: offset)
     }
 }
 
 extension CppHelper.Instructions.BranchGtUImm: BranchInstructionBase {
     public var register: Registers.Index {
-        get { .init(raw: reg.value) }
-        set { reg.value = newValue.value }
+        get { reg }
+        set { reg = newValue }
     }
 
     typealias Compare = CompareGtU
     public init(data: Data) throws {
         let (register, value, offset) = try Self.parse(data: data)
-        self.init(reg: .init(value: register.value), value: value, offset: offset)
+        self.init(reg: register, value: value, offset: offset)
     }
 }
 
 extension CppHelper.Instructions.BranchLtSImm: BranchInstructionBase {
     public var register: Registers.Index {
-        get { .init(raw: reg.value) }
-        set { reg.value = newValue.value }
+        get { reg }
+        set { reg = newValue }
     }
 
     typealias Compare = CompareLtS
     public init(data: Data) throws {
         let (register, value, offset) = try Self.parse(data: data)
-        self.init(reg: .init(value: register.value), value: value, offset: offset)
+        self.init(reg: register, value: value, offset: offset)
     }
 }
 
 extension CppHelper.Instructions.BranchLeSImm: BranchInstructionBase {
     public var register: Registers.Index {
-        get { .init(raw: reg.value) }
-        set { reg.value = newValue.value }
+        get { reg }
+        set { reg = newValue }
     }
 
     typealias Compare = CompareLeS
     public init(data: Data) throws {
         let (register, value, offset) = try Self.parse(data: data)
-        self.init(reg: .init(value: register.value), value: value, offset: offset)
+        self.init(reg: register, value: value, offset: offset)
     }
 }
 
 extension CppHelper.Instructions.BranchGeSImm: BranchInstructionBase {
     public var register: Registers.Index {
-        get { .init(raw: reg.value) }
-        set { reg.value = newValue.value }
+        get { reg }
+        set { reg = newValue }
     }
 
     typealias Compare = CompareGeS
     public init(data: Data) throws {
         let (register, value, offset) = try Self.parse(data: data)
-        self.init(reg: .init(value: register.value), value: value, offset: offset)
+        self.init(reg: register, value: value, offset: offset)
     }
 }
 
 extension CppHelper.Instructions.BranchGtSImm: BranchInstructionBase {
     public var register: Registers.Index {
-        get { .init(raw: reg.value) }
-        set { reg.value = newValue.value }
+        get { reg }
+        set { reg = newValue }
     }
 
     typealias Compare = CompareGtS
     public init(data: Data) throws {
         let (register, value, offset) = try Self.parse(data: data)
-        self.init(reg: .init(value: register.value), value: value, offset: offset)
+        self.init(reg: register, value: value, offset: offset)
     }
 }
 
 extension CppHelper.Instructions.MoveReg: Instruction {
     public init(data: Data) throws {
         let (dest, src) = try Instructions.deocdeRegisters(data)
-        self.init(src: .init(value: src.value), dest: .init(value: dest.value))
+        self.init(src: src, dest: dest)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        context.state.writeRegister(Registers.Index(raw: dest.value), context.state.readRegister(Registers.Index(raw: src.value)) as UInt64)
+        context.state.writeRegister(dest, context.state.readRegister(src) as UInt64)
         return .continued
     }
 }
@@ -553,13 +553,13 @@ extension CppHelper.Instructions.MoveReg: Instruction {
 extension CppHelper.Instructions.Sbrk: Instruction {
     public init(data: Data) throws {
         let (dest, src) = try Instructions.deocdeRegisters(data)
-        self.init(src: .init(value: src.value), dest: .init(value: dest.value))
+        self.init(src: src, dest: dest)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let increment: UInt32 = context.state.readRegister(Registers.Index(raw: src.value))
+        let increment: UInt32 = context.state.readRegister(src)
         let startAddr = try context.state.sbrk(increment)
-        context.state.writeRegister(Registers.Index(raw: dest.value), startAddr)
+        context.state.writeRegister(dest, startAddr)
         return .continued
     }
 }
@@ -567,12 +567,12 @@ extension CppHelper.Instructions.Sbrk: Instruction {
 extension CppHelper.Instructions.CountSetBits64: Instruction {
     public init(data: Data) throws {
         let (dest, ra) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+        self.init(ra: ra, dest: dest)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: ra.value))
-        context.state.writeRegister(Registers.Index(raw: dest.value), regVal.nonzeroBitCount)
+        let regVal: UInt64 = context.state.readRegister(ra)
+        context.state.writeRegister(dest, regVal.nonzeroBitCount)
         return .continued
     }
 }
@@ -580,12 +580,12 @@ extension CppHelper.Instructions.CountSetBits64: Instruction {
 extension CppHelper.Instructions.CountSetBits32: Instruction {
     public init(data: Data) throws {
         let (dest, ra) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+        self.init(ra: ra, dest: dest)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: ra.value))
-        context.state.writeRegister(Registers.Index(raw: dest.value), regVal.nonzeroBitCount)
+        let regVal: UInt32 = context.state.readRegister(ra)
+        context.state.writeRegister(dest, regVal.nonzeroBitCount)
         return .continued
     }
 }
@@ -593,12 +593,12 @@ extension CppHelper.Instructions.CountSetBits32: Instruction {
 extension CppHelper.Instructions.LeadingZeroBits64: Instruction {
     public init(data: Data) throws {
         let (dest, ra) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+        self.init(ra: ra, dest: dest)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: ra.value))
-        context.state.writeRegister(Registers.Index(raw: dest.value), regVal.leadingZeroBitCount)
+        let regVal: UInt64 = context.state.readRegister(ra)
+        context.state.writeRegister(dest, regVal.leadingZeroBitCount)
         return .continued
     }
 }
@@ -606,12 +606,12 @@ extension CppHelper.Instructions.LeadingZeroBits64: Instruction {
 extension CppHelper.Instructions.LeadingZeroBits32: Instruction {
     public init(data: Data) throws {
         let (dest, ra) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+        self.init(ra: ra, dest: dest)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: ra.value))
-        context.state.writeRegister(Registers.Index(raw: dest.value), regVal.leadingZeroBitCount)
+        let regVal: UInt32 = context.state.readRegister(ra)
+        context.state.writeRegister(dest, regVal.leadingZeroBitCount)
         return .continued
     }
 }
@@ -619,12 +619,12 @@ extension CppHelper.Instructions.LeadingZeroBits32: Instruction {
 extension CppHelper.Instructions.TrailingZeroBits64: Instruction {
     public init(data: Data) throws {
         let (dest, ra) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+        self.init(ra: ra, dest: dest)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: ra.value))
-        context.state.writeRegister(Registers.Index(raw: dest.value), regVal.trailingZeroBitCount)
+        let regVal: UInt64 = context.state.readRegister(ra)
+        context.state.writeRegister(dest, regVal.trailingZeroBitCount)
         return .continued
     }
 }
@@ -632,12 +632,12 @@ extension CppHelper.Instructions.TrailingZeroBits64: Instruction {
 extension CppHelper.Instructions.TrailingZeroBits32: Instruction {
     public init(data: Data) throws {
         let (dest, ra) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+        self.init(ra: ra, dest: dest)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: ra.value))
-        context.state.writeRegister(Registers.Index(raw: dest.value), regVal.trailingZeroBitCount)
+        let regVal: UInt32 = context.state.readRegister(ra)
+        context.state.writeRegister(dest, regVal.trailingZeroBitCount)
         return .continued
     }
 }
@@ -645,12 +645,12 @@ extension CppHelper.Instructions.TrailingZeroBits32: Instruction {
 extension CppHelper.Instructions.SignExtend8: Instruction {
     public init(data: Data) throws {
         let (dest, ra) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+        self.init(ra: ra, dest: dest)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let regVal: UInt8 = context.state.readRegister(Registers.Index(raw: ra.value))
-        context.state.writeRegister(Registers.Index(raw: dest.value), Int8(bitPattern: regVal))
+        let regVal: UInt8 = context.state.readRegister(ra)
+        context.state.writeRegister(dest, Int8(bitPattern: regVal))
         return .continued
     }
 }
@@ -658,12 +658,12 @@ extension CppHelper.Instructions.SignExtend8: Instruction {
 extension CppHelper.Instructions.SignExtend16: Instruction {
     public init(data: Data) throws {
         let (dest, ra) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+        self.init(ra: ra, dest: dest)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let regVal: UInt16 = context.state.readRegister(Registers.Index(raw: ra.value))
-        context.state.writeRegister(Registers.Index(raw: dest.value), Int16(bitPattern: regVal))
+        let regVal: UInt16 = context.state.readRegister(ra)
+        context.state.writeRegister(dest, Int16(bitPattern: regVal))
         return .continued
     }
 }
@@ -671,12 +671,12 @@ extension CppHelper.Instructions.SignExtend16: Instruction {
 extension CppHelper.Instructions.ZeroExtend16: Instruction {
     public init(data: Data) throws {
         let (dest, ra) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+        self.init(ra: ra, dest: dest)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let regVal: UInt16 = context.state.readRegister(Registers.Index(raw: ra.value))
-        context.state.writeRegister(Registers.Index(raw: dest.value), regVal)
+        let regVal: UInt16 = context.state.readRegister(ra)
+        context.state.writeRegister(dest, regVal)
         return .continued
     }
 }
@@ -684,12 +684,12 @@ extension CppHelper.Instructions.ZeroExtend16: Instruction {
 extension CppHelper.Instructions.ReverseBytes: Instruction {
     public init(data: Data) throws {
         let (dest, ra) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), dest: .init(value: dest.value))
+        self.init(ra: ra, dest: dest)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: ra.value))
-        context.state.writeRegister(Registers.Index(raw: dest.value), regVal.byteSwapped)
+        let regVal: UInt64 = context.state.readRegister(ra)
+        context.state.writeRegister(dest, regVal.byteSwapped)
         return .continued
     }
 }
@@ -698,12 +698,12 @@ extension CppHelper.Instructions.StoreIndU8: Instruction {
     public init(data: Data) throws {
         let (src, dest) = try Instructions.deocdeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(src: .init(value: src.value), dest: .init(value: dest.value), offset: offset)
+        self.init(src: src, dest: dest, offset: offset)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let value: UInt8 = context.state.readRegister(Registers.Index(raw: src.value))
-        try context.state.writeMemory(address: context.state.readRegister(Registers.Index(raw: dest.value)) &+ offset, value: value)
+        let value: UInt8 = context.state.readRegister(src)
+        try context.state.writeMemory(address: context.state.readRegister(dest) &+ offset, value: value)
         return .continued
     }
 }
@@ -712,13 +712,13 @@ extension CppHelper.Instructions.StoreIndU16: Instruction {
     public init(data: Data) throws {
         let (src, dest) = try Instructions.deocdeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(src: .init(value: src.value), dest: .init(value: dest.value), offset: offset)
+        self.init(src: src, dest: dest, offset: offset)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let value: UInt16 = context.state.readRegister(Registers.Index(raw: src.value))
+        let value: UInt16 = context.state.readRegister(src)
         try context.state.writeMemory(
-            address: context.state.readRegister(Registers.Index(raw: dest.value)) &+ offset,
+            address: context.state.readRegister(dest) &+ offset,
             values: value.encode(method: .fixedWidth(2))
         )
         return .continued
@@ -729,13 +729,13 @@ extension CppHelper.Instructions.StoreIndU32: Instruction {
     public init(data: Data) throws {
         let (src, dest) = try Instructions.deocdeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(src: .init(value: src.value), dest: .init(value: dest.value), offset: offset)
+        self.init(src: src, dest: dest, offset: offset)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let value: UInt32 = context.state.readRegister(Registers.Index(raw: src.value))
+        let value: UInt32 = context.state.readRegister(src)
         try context.state.writeMemory(
-            address: context.state.readRegister(Registers.Index(raw: dest.value)) &+ offset,
+            address: context.state.readRegister(dest) &+ offset,
             values: value.encode(method: .fixedWidth(4))
         )
         return .continued
@@ -746,13 +746,13 @@ extension CppHelper.Instructions.StoreIndU64: Instruction {
     public init(data: Data) throws {
         let (src, dest) = try Instructions.deocdeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(src: .init(value: src.value), dest: .init(value: dest.value), offset: offset)
+        self.init(src: src, dest: dest, offset: offset)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let value: UInt64 = context.state.readRegister(Registers.Index(raw: src.value))
+        let value: UInt64 = context.state.readRegister(src)
         try context.state.writeMemory(
-            address: context.state.readRegister(Registers.Index(raw: dest.value)) &+ offset,
+            address: context.state.readRegister(dest) &+ offset,
             values: value.encode(method: .fixedWidth(8))
         )
         return .continued
@@ -763,12 +763,12 @@ extension CppHelper.Instructions.LoadIndU8: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), offset: offset)
+        self.init(ra: ra, rb: rb, offset: offset)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let value = try context.state.readMemory(address: context.state.readRegister(Registers.Index(raw: rb.value)) &+ offset)
-        context.state.writeRegister(Registers.Index(raw: ra.value), value)
+        let value = try context.state.readMemory(address: context.state.readRegister(rb) &+ offset)
+        context.state.writeRegister(ra, value)
         return .continued
     }
 }
@@ -777,12 +777,12 @@ extension CppHelper.Instructions.LoadIndI8: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), offset: offset)
+        self.init(ra: ra, rb: rb, offset: offset)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let value = try context.state.readMemory(address: context.state.readRegister(Registers.Index(raw: rb.value)) &+ offset)
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int8(bitPattern: value))
+        let value = try context.state.readMemory(address: context.state.readRegister(rb) &+ offset)
+        context.state.writeRegister(ra, Int8(bitPattern: value))
         return .continued
     }
 }
@@ -791,13 +791,13 @@ extension CppHelper.Instructions.LoadIndU16: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), offset: offset)
+        self.init(ra: ra, rb: rb, offset: offset)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let data = try context.state.readMemory(address: context.state.readRegister(Registers.Index(raw: rb.value)) &+ offset, length: 2)
+        let data = try context.state.readMemory(address: context.state.readRegister(rb) &+ offset, length: 2)
         let value = data.decode(UInt16.self)
-        context.state.writeRegister(Registers.Index(raw: ra.value), value)
+        context.state.writeRegister(ra, value)
         return .continued
     }
 }
@@ -806,13 +806,13 @@ extension CppHelper.Instructions.LoadIndI16: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), offset: offset)
+        self.init(ra: ra, rb: rb, offset: offset)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let data = try context.state.readMemory(address: context.state.readRegister(Registers.Index(raw: rb.value)) &+ offset, length: 2)
+        let data = try context.state.readMemory(address: context.state.readRegister(rb) &+ offset, length: 2)
         let value = data.decode(UInt16.self)
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int16(bitPattern: value))
+        context.state.writeRegister(ra, Int16(bitPattern: value))
         return .continued
     }
 }
@@ -821,13 +821,13 @@ extension CppHelper.Instructions.LoadIndU32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), offset: offset)
+        self.init(ra: ra, rb: rb, offset: offset)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let data = try context.state.readMemory(address: context.state.readRegister(Registers.Index(raw: rb.value)) &+ offset, length: 4)
+        let data = try context.state.readMemory(address: context.state.readRegister(rb) &+ offset, length: 4)
         let value = data.decode(UInt32.self)
-        context.state.writeRegister(Registers.Index(raw: ra.value), value)
+        context.state.writeRegister(ra, value)
         return .continued
     }
 }
@@ -836,13 +836,13 @@ extension CppHelper.Instructions.LoadIndI32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), offset: offset)
+        self.init(ra: ra, rb: rb, offset: offset)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let data = try context.state.readMemory(address: context.state.readRegister(Registers.Index(raw: rb.value)) &+ offset, length: 4)
+        let data = try context.state.readMemory(address: context.state.readRegister(rb) &+ offset, length: 4)
         let value = data.decode(UInt32.self)
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: value))
+        context.state.writeRegister(ra, Int32(bitPattern: value))
         return .continued
     }
 }
@@ -851,13 +851,13 @@ extension CppHelper.Instructions.LoadIndU64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), offset: offset)
+        self.init(ra: ra, rb: rb, offset: offset)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let data = try context.state.readMemory(address: context.state.readRegister(Registers.Index(raw: rb.value)) &+ offset, length: 8)
+        let data = try context.state.readMemory(address: context.state.readRegister(rb) &+ offset, length: 8)
         let value = data.decode(UInt64.self)
-        context.state.writeRegister(Registers.Index(raw: ra.value), value)
+        context.state.writeRegister(ra, value)
         return .continued
     }
 }
@@ -866,12 +866,12 @@ extension CppHelper.Instructions.AddImm32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: regVal &+ value))
+        let regVal: UInt32 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, Int32(bitPattern: regVal &+ value))
         return .continued
     }
 }
@@ -880,12 +880,12 @@ extension CppHelper.Instructions.AndImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), regVal & value)
+        let regVal: UInt64 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, regVal & value)
         return .continued
     }
 }
@@ -894,12 +894,12 @@ extension CppHelper.Instructions.XorImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), regVal ^ value)
+        let regVal: UInt64 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, regVal ^ value)
         return .continued
     }
 }
@@ -908,12 +908,12 @@ extension CppHelper.Instructions.OrImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), regVal | value)
+        let regVal: UInt64 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, regVal | value)
         return .continued
     }
 }
@@ -922,12 +922,12 @@ extension CppHelper.Instructions.MulImm32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: regVal &* value))
+        let regVal: UInt32 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, Int32(bitPattern: regVal &* value))
         return .continued
     }
 }
@@ -936,12 +936,12 @@ extension CppHelper.Instructions.SetLtUImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), regVal < value ? 1 : 0)
+        let regVal: UInt64 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, regVal < value ? 1 : 0)
         return .continued
     }
 }
@@ -950,12 +950,12 @@ extension CppHelper.Instructions.SetLtSImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int64(bitPattern: regVal) < Int64(bitPattern: value) ? 1 : 0)
+        let regVal: UInt64 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, Int64(bitPattern: regVal) < Int64(bitPattern: value) ? 1 : 0)
         return .continued
     }
 }
@@ -964,13 +964,13 @@ extension CppHelper.Instructions.ShloLImm32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let regVal: UInt32 = context.state.readRegister(rb)
         let shift = value & 0x1F
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: regVal << shift))
+        context.state.writeRegister(ra, Int32(bitPattern: regVal << shift))
         return .continued
     }
 }
@@ -979,13 +979,13 @@ extension CppHelper.Instructions.ShloRImm32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let regVal: UInt32 = context.state.readRegister(rb)
         let shift = value & 0x1F
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: regVal >> shift))
+        context.state.writeRegister(ra, Int32(bitPattern: regVal >> shift))
         return .continued
     }
 }
@@ -994,13 +994,13 @@ extension CppHelper.Instructions.SharRImm32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let regVal: UInt32 = context.state.readRegister(rb)
         let shift = value & 0x1F
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: regVal) >> shift)
+        context.state.writeRegister(ra, Int32(bitPattern: regVal) >> shift)
         return .continued
     }
 }
@@ -1009,12 +1009,12 @@ extension CppHelper.Instructions.NegAddImm32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: value &- regVal))
+        let regVal: UInt32 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, Int32(bitPattern: value &- regVal))
         return .continued
     }
 }
@@ -1023,12 +1023,12 @@ extension CppHelper.Instructions.SetGtUImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), regVal > value ? 1 : 0)
+        let regVal: UInt64 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, regVal > value ? 1 : 0)
         return .continued
     }
 }
@@ -1037,12 +1037,12 @@ extension CppHelper.Instructions.SetGtSImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int64(bitPattern: regVal) > Int64(bitPattern: value) ? 1 : 0)
+        let regVal: UInt64 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, Int64(bitPattern: regVal) > Int64(bitPattern: value) ? 1 : 0)
         return .continued
     }
 }
@@ -1051,13 +1051,13 @@ extension CppHelper.Instructions.ShloLImmAlt32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let regVal: UInt32 = context.state.readRegister(rb)
         let shift = regVal & 0x1F
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: value << shift))
+        context.state.writeRegister(ra, Int32(bitPattern: value << shift))
         return .continued
     }
 }
@@ -1066,13 +1066,13 @@ extension CppHelper.Instructions.ShloRImmAlt32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let regVal: UInt32 = context.state.readRegister(rb)
         let shift = regVal & 0x1F
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: value >> shift))
+        context.state.writeRegister(ra, Int32(bitPattern: value >> shift))
         return .continued
     }
 }
@@ -1081,13 +1081,13 @@ extension CppHelper.Instructions.SharRImmAlt32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let regVal: UInt32 = context.state.readRegister(rb)
         let shift = regVal & 0x1F
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: value) >> shift)
+        context.state.writeRegister(ra, Int32(bitPattern: value) >> shift)
         return .continued
     }
 }
@@ -1096,13 +1096,13 @@ extension CppHelper.Instructions.CmovIzImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let rbVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let rbVal: UInt64 = context.state.readRegister(rb)
         if rbVal == 0 {
-            context.state.writeRegister(Registers.Index(raw: ra.value), value)
+            context.state.writeRegister(ra, value)
         }
         return .continued
     }
@@ -1112,12 +1112,12 @@ extension CppHelper.Instructions.CmovNzImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), regVal != 0 ? value : regVal)
+        let regVal: UInt64 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, regVal != 0 ? value : regVal)
         return .continued
     }
 }
@@ -1126,12 +1126,12 @@ extension CppHelper.Instructions.AddImm64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), regVal &+ value)
+        let regVal: UInt64 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, regVal &+ value)
         return .continued
     }
 }
@@ -1140,12 +1140,12 @@ extension CppHelper.Instructions.MulImm64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), regVal &* value)
+        let regVal: UInt64 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, regVal &* value)
         return .continued
     }
 }
@@ -1154,13 +1154,13 @@ extension CppHelper.Instructions.ShloLImm64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let regVal: UInt64 = context.state.readRegister(rb)
         let shift = value & 0x3F
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int64(bitPattern: regVal << shift))
+        context.state.writeRegister(ra, Int64(bitPattern: regVal << shift))
         return .continued
     }
 }
@@ -1169,13 +1169,13 @@ extension CppHelper.Instructions.ShloRImm64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let regVal: UInt64 = context.state.readRegister(rb)
         let shift = value & 0x3F
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int64(bitPattern: regVal >> shift))
+        context.state.writeRegister(ra, Int64(bitPattern: regVal >> shift))
         return .continued
     }
 }
@@ -1184,13 +1184,13 @@ extension CppHelper.Instructions.SharRImm64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let regVal: UInt64 = context.state.readRegister(rb)
         let shift = value & 0x3F
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int64(bitPattern: regVal) >> shift)
+        context.state.writeRegister(ra, Int64(bitPattern: regVal) >> shift)
         return .continued
     }
 }
@@ -1199,12 +1199,12 @@ extension CppHelper.Instructions.NegAddImm64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), value &- regVal)
+        let regVal: UInt64 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, value &- regVal)
         return .continued
     }
 }
@@ -1213,13 +1213,13 @@ extension CppHelper.Instructions.ShloLImmAlt64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let regVal: UInt64 = context.state.readRegister(rb)
         let shift = regVal & 0x3F
-        context.state.writeRegister(Registers.Index(raw: ra.value), UInt64(truncatingIfNeeded: value << shift))
+        context.state.writeRegister(ra, UInt64(truncatingIfNeeded: value << shift))
         return .continued
     }
 }
@@ -1228,13 +1228,13 @@ extension CppHelper.Instructions.ShloRImmAlt64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let regVal: UInt64 = context.state.readRegister(rb)
         let shift = regVal & 0x3F
-        context.state.writeRegister(Registers.Index(raw: ra.value), value >> shift)
+        context.state.writeRegister(ra, value >> shift)
         return .continued
     }
 }
@@ -1243,13 +1243,13 @@ extension CppHelper.Instructions.SharRImmAlt64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let regVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let regVal: UInt64 = context.state.readRegister(rb)
         let shift = regVal & 0x3F
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int64(bitPattern: value) >> shift)
+        context.state.writeRegister(ra, Int64(bitPattern: value) >> shift)
         return .continued
     }
 }
@@ -1258,12 +1258,12 @@ extension CppHelper.Instructions.RotR64Imm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let rbVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), rbVal.rotated(right: value))
+        let rbVal: UInt64 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, rbVal.rotated(right: value))
         return .continued
     }
 }
@@ -1272,12 +1272,12 @@ extension CppHelper.Instructions.RotR64ImmAlt: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt64 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let rbVal: UInt64 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), value.rotated(right: rbVal))
+        let rbVal: UInt64 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, value.rotated(right: rbVal))
         return .continued
     }
 }
@@ -1286,12 +1286,12 @@ extension CppHelper.Instructions.RotR32Imm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let rbVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: rbVal.rotated(right: value)))
+        let rbVal: UInt32 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, Int32(bitPattern: rbVal.rotated(right: value)))
         return .continued
     }
 }
@@ -1300,121 +1300,121 @@ extension CppHelper.Instructions.RotR32ImmAlt: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let value: UInt32 = Instructions.decodeImmediate((try? data.at(relative: 1...)) ?? Data())
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value)
+        self.init(ra: ra, rb: rb, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let rbVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: ra.value), Int32(bitPattern: value.rotated(right: rbVal)))
+        let rbVal: UInt32 = context.state.readRegister(rb)
+        context.state.writeRegister(ra, Int32(bitPattern: value.rotated(right: rbVal)))
         return .continued
     }
 }
 
 extension CppHelper.Instructions.BranchEq: BranchInstructionBase2 {
     public var r1: Registers.Index {
-        get { .init(raw: reg1.value) }
-        set { reg1.value = newValue.value }
+        get { reg1 }
+        set { reg1 = newValue }
     }
 
     public var r2: Registers.Index {
-        get { .init(raw: reg2.value) }
-        set { reg2.value = newValue.value }
+        get { reg2 }
+        set { reg2 = newValue }
     }
 
     typealias Compare = CompareEq
     public init(data: Data) throws {
         let (r1, r2, offset) = try Self.parse(data: data)
-        self.init(reg1: .init(value: r1.value), reg2: .init(value: r2.value), offset: offset)
+        self.init(reg1: r1, reg2: r2, offset: offset)
     }
 }
 
 extension CppHelper.Instructions.BranchNe: BranchInstructionBase2 {
     public var r1: Registers.Index {
-        get { .init(raw: reg1.value) }
-        set { reg1.value = newValue.value }
+        get { reg1 }
+        set { reg1 = newValue }
     }
 
     public var r2: Registers.Index {
-        get { .init(raw: reg2.value) }
-        set { reg2.value = newValue.value }
+        get { reg2 }
+        set { reg2 = newValue }
     }
 
     typealias Compare = CompareNe
     public init(data: Data) throws {
         let (r1, r2, offset) = try Self.parse(data: data)
-        self.init(reg1: .init(value: r1.value), reg2: .init(value: r2.value), offset: offset)
+        self.init(reg1: r1, reg2: r2, offset: offset)
     }
 }
 
 extension CppHelper.Instructions.BranchLtU: BranchInstructionBase2 {
     public var r1: Registers.Index {
-        get { .init(raw: reg1.value) }
-        set { reg1.value = newValue.value }
+        get { reg1 }
+        set { reg1 = newValue }
     }
 
     public var r2: Registers.Index {
-        get { .init(raw: reg2.value) }
-        set { reg2.value = newValue.value }
+        get { reg2 }
+        set { reg2 = newValue }
     }
 
     typealias Compare = CompareLtU
     public init(data: Data) throws {
         let (r1, r2, offset) = try Self.parse(data: data)
-        self.init(reg1: .init(value: r1.value), reg2: .init(value: r2.value), offset: offset)
+        self.init(reg1: r1, reg2: r2, offset: offset)
     }
 }
 
 extension CppHelper.Instructions.BranchLtS: BranchInstructionBase2 {
     public var r1: Registers.Index {
-        get { .init(raw: reg1.value) }
-        set { reg1.value = newValue.value }
+        get { reg1 }
+        set { reg1 = newValue }
     }
 
     public var r2: Registers.Index {
-        get { .init(raw: reg2.value) }
-        set { reg2.value = newValue.value }
+        get { reg2 }
+        set { reg2 = newValue }
     }
 
     typealias Compare = CompareLtS
     public init(data: Data) throws {
         let (r1, r2, offset) = try Self.parse(data: data)
-        self.init(reg1: .init(value: r1.value), reg2: .init(value: r2.value), offset: offset)
+        self.init(reg1: r1, reg2: r2, offset: offset)
     }
 }
 
 extension CppHelper.Instructions.BranchGeU: BranchInstructionBase2 {
     public var r1: Registers.Index {
-        get { .init(raw: reg1.value) }
-        set { reg1.value = newValue.value }
+        get { reg1 }
+        set { reg1 = newValue }
     }
 
     public var r2: Registers.Index {
-        get { .init(raw: reg2.value) }
-        set { reg2.value = newValue.value }
+        get { reg2 }
+        set { reg2 = newValue }
     }
 
     typealias Compare = CompareGeU
     public init(data: Data) throws {
         let (r1, r2, offset) = try Self.parse(data: data)
-        self.init(reg1: .init(value: r1.value), reg2: .init(value: r2.value), offset: offset)
+        self.init(reg1: r1, reg2: r2, offset: offset)
     }
 }
 
 extension CppHelper.Instructions.BranchGeS: BranchInstructionBase2 {
     public var r1: Registers.Index {
-        get { .init(raw: reg1.value) }
-        set { reg1.value = newValue.value }
+        get { reg1 }
+        set { reg1 = newValue }
     }
 
     public var r2: Registers.Index {
-        get { .init(raw: reg2.value) }
-        set { reg2.value = newValue.value }
+        get { reg2 }
+        set { reg2 = newValue }
     }
 
     typealias Compare = CompareGeS
     public init(data: Data) throws {
         let (r1, r2, offset) = try Self.parse(data: data)
-        self.init(reg1: .init(value: r1.value), reg2: .init(value: r2.value), offset: offset)
+        self.init(reg1: r1, reg2: r2, offset: offset)
     }
 }
 
@@ -1422,14 +1422,14 @@ extension CppHelper.Instructions.LoadImmJumpInd: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.deocdeRegisters(data)
         let (value, offset): (UInt32, UInt32) = try Instructions.decodeImmediate2(data, minus: 2, startIdx: 1)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), value: value, offset: offset)
+        self.init(ra: ra, rb: rb, value: value, offset: offset)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         // need to read rb value first in case ra and rb are the same
-        let rbVal: UInt32 = context.state.readRegister(Registers.Index(raw: rb.value))
+        let rbVal: UInt32 = context.state.readRegister(rb)
 
-        context.state.writeRegister(Registers.Index(raw: ra.value), value)
+        context.state.writeRegister(ra, value)
 
         return Instructions.djump(context: context, target: rbVal &+ offset)
     }
@@ -1442,12 +1442,12 @@ extension CppHelper.Instructions.LoadImmJumpInd: Instruction {
 extension CppHelper.Instructions.Add32: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal &+ rbVal))
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, Int32(bitPattern: raVal &+ rbVal))
         return .continued
     }
 }
@@ -1455,12 +1455,12 @@ extension CppHelper.Instructions.Add32: Instruction {
 extension CppHelper.Instructions.Sub32: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal &- rbVal))
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, Int32(bitPattern: raVal &- rbVal))
         return .continued
     }
 }
@@ -1468,12 +1468,12 @@ extension CppHelper.Instructions.Sub32: Instruction {
 extension CppHelper.Instructions.Mul32: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal &* rbVal))
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, Int32(bitPattern: raVal &* rbVal))
         return .continued
     }
 }
@@ -1481,15 +1481,15 @@ extension CppHelper.Instructions.Mul32: Instruction {
 extension CppHelper.Instructions.DivU32: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
         if rbVal == 0 {
-            context.state.writeRegister(Registers.Index(raw: rd.value), UInt64.max)
+            context.state.writeRegister(rd, UInt64.max)
         } else {
-            context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal / rbVal))
+            context.state.writeRegister(rd, Int32(bitPattern: raVal / rbVal))
         }
         return .continued
     }
@@ -1498,19 +1498,19 @@ extension CppHelper.Instructions.DivU32: Instruction {
 extension CppHelper.Instructions.DivS32: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
         let a = Int32(bitPattern: raVal)
         let b = Int32(bitPattern: rbVal)
         if rbVal == 0 {
-            context.state.writeRegister(Registers.Index(raw: rd.value), UInt64.max)
+            context.state.writeRegister(rd, UInt64.max)
         } else if a == Int32.min, b == -1 {
-            context.state.writeRegister(Registers.Index(raw: rd.value), a)
+            context.state.writeRegister(rd, a)
         } else {
-            context.state.writeRegister(Registers.Index(raw: rd.value), Int64(a / b))
+            context.state.writeRegister(rd, Int64(a / b))
         }
         return .continued
     }
@@ -1519,15 +1519,15 @@ extension CppHelper.Instructions.DivS32: Instruction {
 extension CppHelper.Instructions.RemU32: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
         if rbVal == 0 {
-            context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal))
+            context.state.writeRegister(rd, Int32(bitPattern: raVal))
         } else {
-            context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal % rbVal))
+            context.state.writeRegister(rd, Int32(bitPattern: raVal % rbVal))
         }
         return .continued
     }
@@ -1536,19 +1536,19 @@ extension CppHelper.Instructions.RemU32: Instruction {
 extension CppHelper.Instructions.RemS32: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
         let a = Int32(bitPattern: raVal)
         let b = Int32(bitPattern: rbVal)
         if rbVal == 0 {
-            context.state.writeRegister(Registers.Index(raw: rd.value), a)
+            context.state.writeRegister(rd, a)
         } else if a == Int32.min, b == -1 {
-            context.state.writeRegister(Registers.Index(raw: rd.value), 0)
+            context.state.writeRegister(rd, 0)
         } else {
-            context.state.writeRegister(Registers.Index(raw: rd.value), Int64(a % b))
+            context.state.writeRegister(rd, Int64(a % b))
         }
         return .continued
     }
@@ -1557,13 +1557,13 @@ extension CppHelper.Instructions.RemS32: Instruction {
 extension CppHelper.Instructions.ShloL32: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
         let shift = rbVal & 0x1F
-        context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal << shift))
+        context.state.writeRegister(rd, Int32(bitPattern: raVal << shift))
         return .continued
     }
 }
@@ -1571,13 +1571,13 @@ extension CppHelper.Instructions.ShloL32: Instruction {
 extension CppHelper.Instructions.ShloR32: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
         let shift = rbVal & 0x1F
-        context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal >> shift))
+        context.state.writeRegister(rd, Int32(bitPattern: raVal >> shift))
         return .continued
     }
 }
@@ -1585,13 +1585,13 @@ extension CppHelper.Instructions.ShloR32: Instruction {
 extension CppHelper.Instructions.SharR32: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
         let shift = rbVal & 0x1F
-        context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal) >> shift)
+        context.state.writeRegister(rd, Int32(bitPattern: raVal) >> shift)
         return .continued
     }
 }
@@ -1599,12 +1599,12 @@ extension CppHelper.Instructions.SharR32: Instruction {
 extension CppHelper.Instructions.Add64: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), raVal &+ rbVal)
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, raVal &+ rbVal)
         return .continued
     }
 }
@@ -1612,12 +1612,12 @@ extension CppHelper.Instructions.Add64: Instruction {
 extension CppHelper.Instructions.Sub64: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), raVal &- rbVal)
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, raVal &- rbVal)
         return .continued
     }
 }
@@ -1625,12 +1625,12 @@ extension CppHelper.Instructions.Sub64: Instruction {
 extension CppHelper.Instructions.Mul64: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), raVal &* rbVal)
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, raVal &* rbVal)
         return .continued
     }
 }
@@ -1638,15 +1638,15 @@ extension CppHelper.Instructions.Mul64: Instruction {
 extension CppHelper.Instructions.DivU64: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
         if rbVal == 0 {
-            context.state.writeRegister(Registers.Index(raw: rd.value), UInt64.max)
+            context.state.writeRegister(rd, UInt64.max)
         } else {
-            context.state.writeRegister(Registers.Index(raw: rd.value), raVal / rbVal)
+            context.state.writeRegister(rd, raVal / rbVal)
         }
         return .continued
     }
@@ -1655,19 +1655,19 @@ extension CppHelper.Instructions.DivU64: Instruction {
 extension CppHelper.Instructions.DivS64: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
         let a = Int64(bitPattern: raVal)
         let b = Int64(bitPattern: rbVal)
         if rbVal == 0 {
-            context.state.writeRegister(Registers.Index(raw: rd.value), UInt64.max)
+            context.state.writeRegister(rd, UInt64.max)
         } else if a == Int64.min, b == -1 {
-            context.state.writeRegister(Registers.Index(raw: rd.value), a)
+            context.state.writeRegister(rd, a)
         } else {
-            context.state.writeRegister(Registers.Index(raw: rd.value), Int64(a / b))
+            context.state.writeRegister(rd, Int64(a / b))
         }
         return .continued
     }
@@ -1676,15 +1676,15 @@ extension CppHelper.Instructions.DivS64: Instruction {
 extension CppHelper.Instructions.RemU64: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
         if rbVal == 0 {
-            context.state.writeRegister(Registers.Index(raw: rd.value), raVal)
+            context.state.writeRegister(rd, raVal)
         } else {
-            context.state.writeRegister(Registers.Index(raw: rd.value), raVal % rbVal)
+            context.state.writeRegister(rd, raVal % rbVal)
         }
         return .continued
     }
@@ -1693,19 +1693,19 @@ extension CppHelper.Instructions.RemU64: Instruction {
 extension CppHelper.Instructions.RemS64: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
         let a = Int64(bitPattern: raVal)
         let b = Int64(bitPattern: rbVal)
         if rbVal == 0 {
-            context.state.writeRegister(Registers.Index(raw: rd.value), raVal)
+            context.state.writeRegister(rd, raVal)
         } else if a == Int64.min, b == -1 {
-            context.state.writeRegister(Registers.Index(raw: rd.value), 0)
+            context.state.writeRegister(rd, 0)
         } else {
-            context.state.writeRegister(Registers.Index(raw: rd.value), UInt64(bitPattern: a % b))
+            context.state.writeRegister(rd, UInt64(bitPattern: a % b))
         }
         return .continued
     }
@@ -1714,13 +1714,13 @@ extension CppHelper.Instructions.RemS64: Instruction {
 extension CppHelper.Instructions.ShloL64: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
         let shift = rbVal & 0x3F
-        context.state.writeRegister(Registers.Index(raw: rd.value), UInt64(truncatingIfNeeded: raVal << shift))
+        context.state.writeRegister(rd, UInt64(truncatingIfNeeded: raVal << shift))
         return .continued
     }
 }
@@ -1728,13 +1728,13 @@ extension CppHelper.Instructions.ShloL64: Instruction {
 extension CppHelper.Instructions.ShloR64: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
         let shift = rbVal & 0x3F
-        context.state.writeRegister(Registers.Index(raw: rd.value), raVal >> shift)
+        context.state.writeRegister(rd, raVal >> shift)
         return .continued
     }
 }
@@ -1742,13 +1742,13 @@ extension CppHelper.Instructions.ShloR64: Instruction {
 extension CppHelper.Instructions.SharR64: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
         let shift = rbVal & 0x3F
-        context.state.writeRegister(Registers.Index(raw: rd.value), Int64(bitPattern: raVal) >> shift)
+        context.state.writeRegister(rd, Int64(bitPattern: raVal) >> shift)
         return .continued
     }
 }
@@ -1756,12 +1756,12 @@ extension CppHelper.Instructions.SharR64: Instruction {
 extension CppHelper.Instructions.And: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), raVal & rbVal)
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, raVal & rbVal)
         return .continued
     }
 }
@@ -1769,12 +1769,12 @@ extension CppHelper.Instructions.And: Instruction {
 extension CppHelper.Instructions.Xor: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), raVal ^ rbVal)
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, raVal ^ rbVal)
         return .continued
     }
 }
@@ -1782,12 +1782,12 @@ extension CppHelper.Instructions.Xor: Instruction {
 extension CppHelper.Instructions.Or: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), raVal | rbVal)
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, raVal | rbVal)
         return .continued
     }
 }
@@ -1795,14 +1795,14 @@ extension CppHelper.Instructions.Or: Instruction {
 extension CppHelper.Instructions.MulUpperSS: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
         let a = Int128(Int64(bitPattern: raVal))
         let b = Int128(Int64(bitPattern: rbVal))
-        context.state.writeRegister(Registers.Index(raw: rd.value), Int64(truncatingIfNeeded: (a * b) >> 64))
+        context.state.writeRegister(rd, Int64(truncatingIfNeeded: (a * b) >> 64))
         return .continued
     }
 }
@@ -1810,12 +1810,12 @@ extension CppHelper.Instructions.MulUpperSS: Instruction {
 extension CppHelper.Instructions.MulUpperUU: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), (UInt128(raVal) * UInt128(rbVal)) >> 64)
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, (UInt128(raVal) * UInt128(rbVal)) >> 64)
         return .continued
     }
 }
@@ -1823,14 +1823,14 @@ extension CppHelper.Instructions.MulUpperUU: Instruction {
 extension CppHelper.Instructions.MulUpperSU: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
         let a = Int128(Int64(bitPattern: raVal))
         let b = Int128(rbVal)
-        context.state.writeRegister(Registers.Index(raw: rd.value), Int64(truncatingIfNeeded: (a * b) >> 64))
+        context.state.writeRegister(rd, Int64(truncatingIfNeeded: (a * b) >> 64))
         return .continued
     }
 }
@@ -1838,12 +1838,12 @@ extension CppHelper.Instructions.MulUpperSU: Instruction {
 extension CppHelper.Instructions.SetLtU: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), raVal < rbVal ? 1 : 0)
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, raVal < rbVal ? 1 : 0)
         return .continued
     }
 }
@@ -1851,12 +1851,12 @@ extension CppHelper.Instructions.SetLtU: Instruction {
 extension CppHelper.Instructions.SetLtS: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), Int64(bitPattern: raVal) < Int64(bitPattern: rbVal) ? 1 : 0)
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, Int64(bitPattern: raVal) < Int64(bitPattern: rbVal) ? 1 : 0)
         return .continued
     }
 }
@@ -1864,13 +1864,13 @@ extension CppHelper.Instructions.SetLtS: Instruction {
 extension CppHelper.Instructions.CmovIz: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
         if rbVal == 0 {
-            context.state.writeRegister(Registers.Index(raw: rd.value), raVal)
+            context.state.writeRegister(rd, raVal)
         }
         return .continued
     }
@@ -1879,13 +1879,13 @@ extension CppHelper.Instructions.CmovIz: Instruction {
 extension CppHelper.Instructions.CmovNz: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
         if rbVal != 0 {
-            context.state.writeRegister(Registers.Index(raw: rd.value), raVal)
+            context.state.writeRegister(rd, raVal)
         }
         return .continued
     }
@@ -1894,12 +1894,12 @@ extension CppHelper.Instructions.CmovNz: Instruction {
 extension CppHelper.Instructions.RotL64: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), raVal.rotated(left: rbVal))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, raVal.rotated(left: rbVal))
         return .continued
     }
 }
@@ -1907,12 +1907,12 @@ extension CppHelper.Instructions.RotL64: Instruction {
 extension CppHelper.Instructions.RotL32: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal.rotated(left: rbVal)))
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, Int32(bitPattern: raVal.rotated(left: rbVal)))
         return .continued
     }
 }
@@ -1920,12 +1920,12 @@ extension CppHelper.Instructions.RotL32: Instruction {
 extension CppHelper.Instructions.RotR64: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), raVal.rotated(right: rbVal))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, raVal.rotated(right: rbVal))
         return .continued
     }
 }
@@ -1933,12 +1933,12 @@ extension CppHelper.Instructions.RotR64: Instruction {
 extension CppHelper.Instructions.RotR32: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), Int32(bitPattern: raVal.rotated(right: rbVal)))
+        let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, Int32(bitPattern: raVal.rotated(right: rbVal)))
         return .continued
     }
 }
@@ -1946,12 +1946,12 @@ extension CppHelper.Instructions.RotR32: Instruction {
 extension CppHelper.Instructions.AndInv: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), raVal & ~rbVal)
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, raVal & ~rbVal)
         return .continued
     }
 }
@@ -1959,12 +1959,12 @@ extension CppHelper.Instructions.AndInv: Instruction {
 extension CppHelper.Instructions.OrInv: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), raVal | ~rbVal)
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, raVal | ~rbVal)
         return .continued
     }
 }
@@ -1972,12 +1972,12 @@ extension CppHelper.Instructions.OrInv: Instruction {
 extension CppHelper.Instructions.Xnor: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), ~(raVal ^ rbVal))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, ~(raVal ^ rbVal))
         return .continued
     }
 }
@@ -1985,12 +1985,12 @@ extension CppHelper.Instructions.Xnor: Instruction {
 extension CppHelper.Instructions.Max: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), max(Int64(bitPattern: raVal), Int64(bitPattern: rbVal)))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, max(Int64(bitPattern: raVal), Int64(bitPattern: rbVal)))
         return .continued
     }
 }
@@ -1998,12 +1998,12 @@ extension CppHelper.Instructions.Max: Instruction {
 extension CppHelper.Instructions.MaxU: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), max(raVal, rbVal))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, max(raVal, rbVal))
         return .continued
     }
 }
@@ -2011,12 +2011,12 @@ extension CppHelper.Instructions.MaxU: Instruction {
 extension CppHelper.Instructions.Min: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), min(Int64(bitPattern: raVal), Int64(bitPattern: rbVal)))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, min(Int64(bitPattern: raVal), Int64(bitPattern: rbVal)))
         return .continued
     }
 }
@@ -2024,12 +2024,12 @@ extension CppHelper.Instructions.Min: Instruction {
 extension CppHelper.Instructions.MinU: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        self.init(ra: .init(value: ra.value), rb: .init(value: rb.value), rd: .init(value: rd.value))
+        self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(Registers.Index(raw: ra.value), Registers.Index(raw: rb.value))
-        context.state.writeRegister(Registers.Index(raw: rd.value), min(raVal, rbVal))
+        let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
+        context.state.writeRegister(rd, min(raVal, rbVal))
         return .continued
     }
 }
