@@ -1,0 +1,16 @@
+scripts:
+  check: swift build
+excludeFiles:
+  - "*.xcodeproj"
+  - Package.resolved
+  - .swiftpm
+rules:
+  - use Swift Testing. DO NOT use XCTest
+  - NEVER use NSError
+  - Avoid having comment that describe the code blatantly
+  - TODO comment is good and should be used
+  - asmjit can only be used in CppHelper
+  - Swift can invoke C++ code defined in CppHelper directly
+  - Keep comments minimal
+  - in C++ code, use _Nullable and _Nonnull to specify pointers nullability
+  - With Swift 6.1 native C++ interoperability is available. This means Swift code can directly call C++ code. Including C++ classes and functions.
