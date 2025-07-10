@@ -2,7 +2,6 @@
 #include "helper.hh"
 #include <stdio.h>
 #include <cstring>
-#include <functional>
 
 using namespace asmjit;
 
