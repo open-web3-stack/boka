@@ -69,7 +69,6 @@ let package = Package(
                 "Utils",
                 .product(name: "Testing", package: "swift-testing"),
             ],
-            resources: [.copy("TestData")]
         ),
     ],
     swiftLanguageModes: [.version("6")]

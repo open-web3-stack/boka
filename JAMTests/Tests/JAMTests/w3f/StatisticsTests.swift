@@ -6,36 +6,52 @@ import Utils
 
 @testable import JAMTests
 
-struct StatisticsState: Equatable, Codable, ActivityStatistics {
-    var activityStatistics: Statistics
+// NOTE: the statistics tests only test the validator stats
+struct TestStatsState: Equatable, Codable {
+    var current: ConfigFixedSizeArray<Statistics.Validator, ProtocolConfig.TotalNumberOfValidators>
+    var previous: ConfigFixedSizeArray<Statistics.Validator, ProtocolConfig.TotalNumberOfValidators>
     var timeslot: TimeslotIndex
     var currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
 }
 
-struct StatisticsInput: Codable {
+struct StatsInput: Codable {
     var timeslot: TimeslotIndex
     var author: ValidatorIndex
     var extrinsic: Extrinsic
 }
 
-struct StatisticsTestcase: Codable {
-    var input: StatisticsInput
-    var preState: StatisticsState
-    var postState: StatisticsState
+struct StatsTestcase: Codable {
+    var input: StatsInput
+    var preState: TestStatsState
+    var postState: TestStatsState
+}
+
+struct StatsState: ActivityStatistics {
+    var activityStatistics: Statistics
+    var timeslot: TimeslotIndex
+    var currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
 }
 
 struct StatisticsTests {
     static func loadTests(variant: TestVariants) throws -> [Testcase] {
-        try TestLoader.getTestcases(path: "statistics/\(variant)", extension: "bin")
+        try TestLoader.getTestcases(path: "stf/statistics/\(variant)", extension: "bin")
     }
 
     func statisticsTests(_ testcase: Testcase, variant: TestVariants) throws {
         let config = variant.config
         let decoder = JamDecoder(data: testcase.data, config: config)
-        let testcase = try decoder.decode(StatisticsTestcase.self)
+        let testcase = try decoder.decode(StatsTestcase.self)
 
-        var state = testcase.preState
-        let result = try state.update(
+        var testStatsState = testcase.preState
+        var activityStatistics = Statistics.dummy(config: config)
+        activityStatistics.accumulator = testStatsState.current
+        activityStatistics.previous = testStatsState.previous
+        let fullStatsState = StatsState(
+            activityStatistics: activityStatistics,
+            timeslot: testStatsState.timeslot,
+            currentValidators: testStatsState.currentValidators
+        )
+        let result = try fullStatsState.update(
             config: config,
             newTimeslot: testcase.input.timeslot,
             extrinsic: testcase.input.extrinsic,
@@ -44,22 +60,19 @@ struct StatisticsTests {
             accumulateStats: [:],
             transfersStats: [:]
         )
-        state.activityStatistics = result
+        testStatsState.current = result.accumulator
+        testStatsState.previous = result.previous
 
-        #expect(state == testcase.postState)
+        #expect(testStatsState == testcase.postState)
     }
 
     @Test(arguments: try StatisticsTests.loadTests(variant: .tiny))
     func tinyTests(_ testcase: Testcase) throws {
-        withKnownIssue("https://github.com/w3f/jamtestvectors/pull/28#issuecomment-2762410106", isIntermittent: true) {
-            try statisticsTests(testcase, variant: .tiny)
-        }
+        try statisticsTests(testcase, variant: .tiny)
     }
 
     @Test(arguments: try StatisticsTests.loadTests(variant: .full))
     func fullTests(_ testcase: Testcase) throws {
-        withKnownIssue("https://github.com/w3f/jamtestvectors/pull/28#issuecomment-2762410106", isIntermittent: true) {
-            try statisticsTests(testcase, variant: .full)
-        }
+        try statisticsTests(testcase, variant: .full)
     }
 }

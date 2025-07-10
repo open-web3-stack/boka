@@ -8,7 +8,7 @@ import Utils
 struct JavajamTests {
     @Test(arguments: try JamTestnet.loadTests(path: "stf/state_transitions", src: .javajam))
     func stfTests(_ input: Testcase) async throws {
-        try await STFTests.test(input)
+        try await TraceTest.test(input)
     }
 
     @Test(arguments: try JamTestnet.loadTests(path: "erasure_coding", src: .javajam, ext: "json"))
@@ -24,19 +24,23 @@ struct JavajamTests {
         let decoder = JSONDecoder()
         let testCase = try decoder.decode(ECTestCase.self, from: input.data)
 
-        let originalData = Data(fromHexString: testCase.data)!
+        let originalData = if testCase.data.hasPrefix("0x") {
+            Data(fromHexString: String(testCase.data.dropFirst(2)))!
+        } else {
+            Data(fromHexString: testCase.data)!
+        }
 
         let recoveryShards = testCase.shards.enumerated().map { index, hexString -> ErasureCoding.Shard in
             return .init(data: Data(fromHexString: hexString)!, index: UInt32(index))
         }
 
-        let originalCount = config.value.totalNumberOfCores
         let basicSize = config.value.erasureCodedPieceSize
+        let originalCount = basicSize / 2
         let recoveryCount = config.value.totalNumberOfValidators
 
         #expect(recoveryShards.count == recoveryCount)
 
-        withKnownIssue("does not match", isIntermittent: true) {
+        withKnownIssue("TODO: does not match GP", isIntermittent: true) {
             let recoveredData = try ErasureCoding.reconstruct(
                 shards: recoveryShards,
                 basicSize: basicSize,

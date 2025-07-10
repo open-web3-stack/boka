@@ -1,8 +1,5 @@
 import Foundation
-import TracingUtils
 import Utils
-
-private let logger = Logger(label: "VMState ")
 
 public class VMStateInterpreter: VMState {
     public let program: ProgramCode
@@ -68,14 +65,12 @@ public class VMStateInterpreter: VMState {
     public func readMemory(address: some FixedWidthInteger) throws -> UInt8 {
         try validateAddress(address)
         let res = try memory.read(address: UInt32(truncatingIfNeeded: address))
-        logger.trace("read  \(address) (\(res))")
         return res
     }
 
     public func readMemory(address: some FixedWidthInteger, length: Int) throws -> Data {
         try validateAddress(address)
         let res = try memory.read(address: UInt32(truncatingIfNeeded: address), length: length)
-        logger.trace("read  \(address)..+\(length) (\(res))")
         return res
     }
 
@@ -85,14 +80,14 @@ public class VMStateInterpreter: VMState {
 
     public func writeMemory(address: some FixedWidthInteger, value: UInt8) throws {
         try validateAddress(address)
-        logger.trace("write \(address) (\(value))")
         try memory.write(address: UInt32(truncatingIfNeeded: address), value: value)
     }
 
     public func writeMemory(address: some FixedWidthInteger, values: some Sequence<UInt8>) throws {
+        let data = Data(values)
+        guard !data.isEmpty else { return }
         try validateAddress(address)
-        logger.trace("write \(address) (\(values))")
-        try memory.write(address: UInt32(truncatingIfNeeded: address), values: Data(values))
+        try memory.write(address: UInt32(truncatingIfNeeded: address), values: data)
     }
 
     public func sbrk(_ increment: UInt32) throws -> UInt32 {
@@ -101,38 +96,31 @@ public class VMStateInterpreter: VMState {
 
     public func consumeGas(_ amount: Gas) {
         gas -= GasInt(amount)
-        logger.trace("gas   -  \(amount) => \(gas)")
     }
 
     public func increasePC(_ amount: UInt32) {
         // using wrapped add
         // so that it can also be used for jumps which are negative
         pc &+= amount
-        logger.trace("pc    &+ \(amount) => \(pc)")
     }
 
     public func updatePC(_ newPC: UInt32) {
         pc = newPC
-        logger.trace("pc    => \(pc)")
     }
 
     public func readRegister<T: FixedWidthInteger>(_ index: Registers.Index) -> T {
-        logger.trace("read  w\(index.value) (\(registers[index]))")
-        return T(truncatingIfNeeded: registers[index])
+        T(truncatingIfNeeded: registers[index])
     }
 
     public func readRegister<T: FixedWidthInteger>(_ index: Registers.Index, _ index2: Registers.Index) -> (T, T) {
-        logger.trace("read  w\(index.value) (\(registers[index]))  w\(index2.value) (\(registers[index2]))")
-        return (T(truncatingIfNeeded: registers[index]), T(truncatingIfNeeded: registers[index2]))
+        (T(truncatingIfNeeded: registers[index]), T(truncatingIfNeeded: registers[index2]))
     }
 
     public func readRegisters<T: FixedWidthInteger>(in range: Range<UInt8>) -> [T] {
-        _ = range.map { logger.trace("read  w\($0) (\(T(truncatingIfNeeded: registers[Registers.Index(raw: $0)])))") }
-        return range.map { T(truncatingIfNeeded: registers[Registers.Index(raw: $0)]) }
+        range.map { T(truncatingIfNeeded: registers[Registers.Index(raw: $0)]) }
     }
 
     public func writeRegister(_ index: Registers.Index, _ value: some FixedWidthInteger) {
-        logger.trace("write w\(index.value) (\(value))")
         registers[index] = UInt64(truncatingIfNeeded: value)
     }
 

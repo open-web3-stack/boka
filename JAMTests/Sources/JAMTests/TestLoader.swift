@@ -16,9 +16,13 @@ enum TestVariants: String, CaseIterable {
     var config: ProtocolConfigRef {
         switch self {
         case .tiny:
-            ProtocolConfigRef.tiny
+            var tiny = ProtocolConfigRef.tiny
+            tiny = tiny.mutate {
+                $0.preimagePurgePeriod = 32
+            }
+            return tiny
         case .full:
-            ProtocolConfigRef.mainnet
+            return ProtocolConfigRef.mainnet
         }
     }
 }

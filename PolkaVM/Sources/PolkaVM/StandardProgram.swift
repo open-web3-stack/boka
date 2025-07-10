@@ -21,6 +21,7 @@ public class StandardProgram {
 
     public init(blob: Data, argumentData: Data?) throws {
         var slice = Slice(base: blob, bounds: blob.startIndex ..< blob.endIndex)
+
         guard let readOnlyLen: UInt32 = slice.decode(length: 3) else { throw Error.invalidReadOnlyLength }
         guard let readWriteLen: UInt32 = slice.decode(length: 3) else { throw Error.invalidReadWriteLength }
         guard let heapPages: UInt16 = slice.decode(length: 2) else { throw Error.invalidHeapPages }
@@ -51,7 +52,7 @@ public class StandardProgram {
         let stackAlignedSize = Int(Q(stackSize, config))
 
         let totalSize = 5 * ZZ + readOnlyAlignedSize + readWriteAlignedSize + stackAlignedSize + ZI
-        guard totalSize <= Int32.max else {
+        guard totalSize <= UInt32.max else {
             throw Error.invalidTotalMemorySize
         }
         code = try ProgramCode(blob[slice.startIndex ..< slice.startIndex + Int(codeLength)])
