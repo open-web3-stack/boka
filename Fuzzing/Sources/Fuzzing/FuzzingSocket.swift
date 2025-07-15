@@ -8,11 +8,13 @@ import TracingUtils
 
     private let platformClose = Darwin.close
     private let platformConnect = Darwin.connect
+    private let platformSockStream = SOCK_STREAM
 #elseif canImport(Glibc)
     import Glibc
 
     private let platformClose = Glibc.close
     private let platformConnect = Glibc.connect
+    private let platformSockStream = Int32(SOCK_STREAM.rawValue)
 #else
     #error("Unsupported platform")
 #endif
@@ -51,7 +53,8 @@ public class FuzzingSocket {
     /// Create a Unix domain socket and bind it to the specified path
     public func create() throws {
         // Create Unix domain socket
-        socketFd = socket(AF_UNIX, SOCK_STREAM, 0)
+        socketFd = socket(AF_UNIX, platformSockStream, 0)
+
         guard socketFd >= 0 else {
             throw FuzzingSocketError.socketCreationFailed
         }
@@ -104,7 +107,8 @@ public class FuzzingSocket {
 
     /// Connect to socket
     public func connect() throws -> FuzzingSocketConnection {
-        socketFd = socket(AF_UNIX, SOCK_STREAM, 0)
+        socketFd = socket(AF_UNIX, platformSockStream, 0)
+
         guard socketFd >= 0 else {
             throw FuzzingSocketError.socketCreationFailed
         }
