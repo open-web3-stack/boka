@@ -38,8 +38,35 @@ public final class StateBackend: Sendable {
         throw StateBackendError.missingState(key: key)
     }
 
-    public func getKeys(_ prefix: Data31, _ startKey: Data31?, _ limit: UInt32?) async throws -> [(key: Data, value: Data)] {
-        try await impl.readAll(prefix: prefix.data, startKey: startKey?.data, limit: limit)
+    public func getKeys(_ prefix: Data31?, _ startKey: Data31?, _ limit: UInt32?) async throws -> [(key: Data, value: Data)] {
+        let prefixData = prefix?.data ?? Data()
+        let allTrieNodes = try await impl.readAll(prefix: prefixData, startKey: startKey?.data, limit: nil)
+
+        var stateKeyValues: [(key: Data, value: Data)] = []
+
+        for (_, trieNodeData) in allTrieNodes {
+            if let limit, stateKeyValues.count >= Int(limit) {
+                break
+            }
+
+            // check if it's a leaf node
+            guard trieNodeData.count == 64 else { continue }
+            let firstByte = trieNodeData[0]
+            let isLeaf = (firstByte & 0b1100_0000) == 0b1000_0000 || (firstByte & 0b1100_0000) == 0b1100_0000
+
+            if isLeaf {
+                // extract the state key (skip first byte flags)
+                let stateKey = Data(trieNodeData[1 ..< 32])
+                // check if this state key matches input prefix
+                if prefixData.isEmpty || stateKey.starts(with: prefixData) {
+                    if let value = try await trie.read(key: Data31(stateKey)!) {
+                        stateKeyValues.append((key: stateKey, value: value))
+                    }
+                }
+            }
+        }
+
+        return stateKeyValues
     }
 
     public func batchRead(_ keys: [any StateKey]) async throws -> [(key: any StateKey, value: (Codable & Sendable)?)] {
