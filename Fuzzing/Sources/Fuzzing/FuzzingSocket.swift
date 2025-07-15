@@ -3,6 +3,20 @@ import Codec
 import Foundation
 import TracingUtils
 
+#if canImport(Darwin)
+    import Darwin
+
+    private let platformClose = Darwin.close
+    private let platformConnect = Darwin.connect
+#elseif canImport(Glibc)
+    import Glibc
+
+    private let platformClose = Glibc.close
+    private let platformConnect = Glibc.connect
+#else
+    #error("Unsupported platform")
+#endif
+
 private let logger = Logger(label: "FuzzingSocket")
 
 public enum FuzzingSocketError: Error {
@@ -28,7 +42,7 @@ public class FuzzingSocket {
 
     deinit {
         if socketFd >= 0 {
-            close(socketFd)
+            _ = platformClose(socketFd)
             socketFd = -1
         }
         unlink(socketPath)
@@ -63,13 +77,13 @@ public class FuzzingSocket {
         }
 
         guard bindResult == 0 else {
-            Darwin.close(socketFd)
+            _ = platformClose(socketFd)
             throw FuzzingSocketError.socketBindFailed
         }
 
         // Listen for connections
         guard listen(socketFd, 1) == 0 else {
-            Darwin.close(socketFd)
+            _ = platformClose(socketFd)
             throw FuzzingSocketError.socketListenFailed
         }
     }
@@ -107,12 +121,12 @@ public class FuzzingSocket {
 
         let result = withUnsafePointer(to: addr) { ptr in
             ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockPtr in
-                Darwin.connect(socketFd, sockPtr, socklen_t(MemoryLayout<sockaddr_un>.size))
+                platformConnect(socketFd, sockPtr, socklen_t(MemoryLayout<sockaddr_un>.size))
             }
         }
 
         guard result == 0 else {
-            Darwin.close(socketFd)
+            _ = platformClose(socketFd)
             throw FuzzingSocketError.socketConnectFailed
         }
 
@@ -209,6 +223,6 @@ public class FuzzingSocketConnection {
 
     public func close() {
         guard fd >= 0 else { return }
-        Darwin.close(fd)
+        _ = platformClose(fd)
     }
 }
