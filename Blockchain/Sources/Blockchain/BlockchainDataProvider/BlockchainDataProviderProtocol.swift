@@ -20,7 +20,7 @@ public protocol BlockchainDataProviderProtocol: Sendable {
 
     func getHeads() async throws -> Set<Data32>
 
-    func getKeys(prefix: Data31, count: UInt32, startKey: Data31?, blockHash: Data32?) async throws -> [String]
+    func getKeys(prefix: Data, count: UInt32, startKey: Data31?, blockHash: Data32?) async throws -> [String]
 
     func getStorage(key: Data31, blockHash: Data32?) async throws -> [String]
 

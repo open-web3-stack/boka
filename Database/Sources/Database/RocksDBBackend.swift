@@ -86,7 +86,7 @@ extension RocksDBBackend: BlockchainDataProviderProtocol {
         try guaranteedWorkReports.put(key: hash, value: guaranteedWorkReport)
     }
 
-    public func getKeys(prefix: Data31, count: UInt32, startKey: Data31?, blockHash: Data32?) async throws -> [String] {
+    public func getKeys(prefix: Data, count: UInt32, startKey: Data31?, blockHash: Data32?) async throws -> [String] {
         logger.trace("""
         getKeys() prefix: \(prefix), count: \(count),
         startKey: \(String(describing: startKey)), blockHash: \(String(describing: blockHash))
