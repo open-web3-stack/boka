@@ -47,6 +47,10 @@ public final class StateBackend: Sendable {
         var stateKeyValues: [(key: Data, value: Data)] = []
         let maxCount = limit ?? UInt32.max
 
+        if let limit {
+            stateKeyValues.reserveCapacity(Int(limit))
+        }
+
         while stateKeyValues.count < maxCount, let (_, trieNodeData) = try await iterator.next() {
             guard trieNodeData.count == 64 else {
                 continue

@@ -35,6 +35,11 @@ public actor InMemoryBackend: StateBackendProtocol {
 
     public func readAll(prefix: Data, startKey: Data?, limit: UInt32?) async throws -> [(key: Data, value: Data)] {
         var resp = [(key: Data, value: Data)]()
+
+        if let limit {
+            resp.reserveCapacity(Int(limit))
+        }
+
         let startKey = startKey ?? prefix
         let startIndex = store.insertIndex(KVPair(key: startKey, value: Data()))
         for i in startIndex ..< store.array.count {
