@@ -14,6 +14,11 @@ extension Boka {
 }
 
 extension Boka.Fuzz {
+    enum JamConfig: String, CaseIterable, ExpressibleByArgument {
+        case tiny
+        case full
+    }
+
     struct Target: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
             abstract: "Run fuzzing target - waits for fuzzer connections"
@@ -22,8 +27,8 @@ extension Boka.Fuzz {
         @Option(help: "Unix socket path for fuzzing protocol")
         var socketPath: String = "/tmp/jam_conformance.sock"
 
-        @Option(help: "JAM Protocol configuration preset, tiny or full")
-        var config: String = "tiny"
+        @Option(help: "JAM Protocol configuration preset")
+        var config: JamConfig = .tiny
 
         func run() async throws {
             let env = ProcessInfo.processInfo.environment
@@ -35,7 +40,7 @@ extension Boka.Fuzz {
 
             let fuzzTarget = try FuzzingTarget(
                 socketPath: socketPath,
-                config: config
+                config: config.rawValue
             )
 
             try await fuzzTarget.run()
@@ -51,7 +56,7 @@ extension Boka.Fuzz {
         var socketPath: String = "/tmp/jam_conformance.sock"
 
         @Option(help: "JAM Protocol configuration preset.")
-        var config: String = "tiny"
+        var config: JamConfig = .tiny
 
         @Option(name: .long, help: "Random seed for deterministic testing. Default is random")
         var seed: UInt64 = .random(in: 0 ... UInt64.max)
@@ -69,7 +74,7 @@ extension Boka.Fuzz {
 
             let fuzzer = try FuzzingClient(
                 socketPath: socketPath,
-                config: config,
+                config: config.rawValue,
                 seed: seed,
                 blockCount: blocks
             )
