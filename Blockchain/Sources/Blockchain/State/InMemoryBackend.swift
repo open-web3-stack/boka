@@ -104,4 +104,27 @@ public actor InMemoryBackend: StateBackendProtocol {
             logger.info("ref count: \(refCount)")
         }
     }
+
+    public func createIterator(prefix: Data, startKey: Data?) async throws -> StateBackendIterator {
+        InMemoryStateIterator(store: store, prefix: prefix, startKey: startKey)
+    }
+}
+
+public final class InMemoryStateIterator: StateBackendIterator, @unchecked Sendable {
+    private var iterator: Array<(key: Data, value: Data)>.Iterator
+
+    init(store: SortedArray<InMemoryBackend.KVPair>, prefix: Data, startKey: Data?) {
+        let searchKey = startKey ?? prefix
+        let startIndex = store.insertIndex(InMemoryBackend.KVPair(key: searchKey, value: Data()))
+
+        let matchingItems = Array(store.array[startIndex...].prefix { item in
+            item.key.starts(with: prefix)
+        }.map { (key: $0.key, value: $0.value) })
+
+        iterator = matchingItems.makeIterator()
+    }
+
+    public func next() async throws -> (key: Data, value: Data)? {
+        iterator.next()
+    }
 }

@@ -305,4 +305,50 @@ extension RocksDBBackend: StateBackendProtocol {
 
         // TODO: implement
     }
+
+    public func createIterator(prefix: Data, startKey: Data?) async throws -> StateBackendIterator {
+        RocksDBStateIterator(db: db, prefix: prefix, startKey: startKey)
+    }
+}
+
+public final class RocksDBStateIterator: StateBackendIterator, @unchecked Sendable {
+    private let iterator: Iterator
+    private let prefix: Data
+    private var isFirstRead = true
+    private let triePrefix = Data([0])
+
+    init(db: RocksDB<StoreId>, prefix: Data, startKey: Data?) {
+        let snapshot = db.createSnapshot()
+        let readOptions = ReadOptions()
+        readOptions.setSnapshot(snapshot)
+
+        iterator = db.createIterator(column: .state, readOptions: readOptions)
+        self.prefix = triePrefix + prefix
+
+        if let startKey {
+            iterator.seek(to: triePrefix + startKey)
+        } else if !prefix.isEmpty {
+            iterator.seek(to: triePrefix + prefix)
+        } else {
+            iterator.seek(to: triePrefix)
+        }
+    }
+
+    public func next() async throws -> (key: Data, value: Data)? {
+        if !isFirstRead {
+            iterator.next()
+        }
+        isFirstRead = false
+
+        guard let (key, value) = iterator.read() else {
+            return nil
+        }
+
+        guard key.starts(with: prefix) else {
+            return nil
+        }
+
+        let stateKey = Data(key.dropFirst(triePrefix.count))
+        return (stateKey, value)
+    }
 }

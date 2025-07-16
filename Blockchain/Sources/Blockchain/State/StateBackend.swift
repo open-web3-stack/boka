@@ -42,81 +42,36 @@ public final class StateBackend: Sendable {
         let prefixData = prefix ?? Data()
         let startKeyData = startKey?.data
 
+        let iterator = try await impl.createIterator(prefix: Data(), startKey: startKeyData)
+
         var stateKeyValues: [(key: Data, value: Data)] = []
-        var currentStartKey: Data? = nil
-        let batchSize: UInt32 = 1000
+        let maxCount = limit ?? UInt32.max
 
-        while true {
-            let batch = try await impl.readAll(prefix: Data(), startKey: currentStartKey, limit: batchSize)
-
-            if batch.isEmpty {
-                break
+        while stateKeyValues.count < maxCount, let (_, trieNodeData) = try await iterator.next() {
+            guard trieNodeData.count == 64 else {
+                continue
             }
 
-            var lastProcessedKey: Data?
+            let firstByte = trieNodeData[relative: 0]
+            let isLeaf = (firstByte & 0b1100_0000) == 0b1000_0000 || (firstByte & 0b1100_0000) == 0b1100_0000
 
-            for (nodeKey, trieNodeData) in batch {
-                if let limit, stateKeyValues.count >= Int(limit) {
-                    return stateKeyValues
-                }
-
-                guard trieNodeData.count == 64 else {
-                    lastProcessedKey = nodeKey
-                    continue
-                }
-
-                let firstByte = trieNodeData[relative: 0]
-                let isLeaf = (firstByte & 0b1100_0000) == 0b1000_0000 || (firstByte & 0b1100_0000) == 0b1100_0000
-
-                if isLeaf {
-                    let stateKey = Data(trieNodeData[relative: 1 ..< 32])
-
-                    if !prefixData.isEmpty, !stateKey.starts(with: prefixData) {
-                        lastProcessedKey = nodeKey
-                        continue
-                    }
-
-                    if let startKeyData, stateKey.lexicographicallyPrecedes(startKeyData) {
-                        lastProcessedKey = nodeKey
-                        continue
-                    }
-
-                    if let value = try await trie.read(key: Data31(stateKey)!) {
-                        stateKeyValues.append((key: stateKey, value: value))
-                    }
-                }
-
-                lastProcessedKey = nodeKey
+            guard isLeaf else {
+                continue
             }
 
-            if batch.count < Int(batchSize) {
-                break
+            let stateKey = Data(trieNodeData[relative: 1 ..< 32])
+
+            if !prefixData.isEmpty, !stateKey.starts(with: prefixData) {
+                continue
             }
 
-            if let lastKey = lastProcessedKey {
-                // Increment key for next batch
-                // TODO: maybe add a nextKey method to impl
-                var result = lastKey
-                var shouldContinue = false
-                for i in (0 ..< result.count).reversed() {
-                    if result[i] < 255 {
-                        result[i] += 1
-                        shouldContinue = true
-                        break
-                    }
-                    result[i] = 0
-                }
-                currentStartKey = shouldContinue ? result : nil
-                if !shouldContinue {
-                    break
-                }
-            } else {
-                break
+            if let startKeyData, stateKey.lexicographicallyPrecedes(startKeyData) {
+                continue
             }
-        }
 
-        if let limit, stateKeyValues.count > Int(limit) {
-            stateKeyValues = Array(stateKeyValues.prefix(Int(limit)))
+            if let value = try await trie.read(key: Data31(stateKey)!) {
+                stateKeyValues.append((key: stateKey, value: value))
+            }
         }
 
         return stateKeyValues

@@ -8,6 +8,10 @@ public enum StateBackendOperation: Sendable {
     case refDecrement(key: Data)
 }
 
+public protocol StateBackendIterator: Sendable {
+    func next() async throws -> (key: Data, value: Data)?
+}
+
 /// key: trie node hash (31 bytes)
 /// value: trie node data (64 bytes)
 /// ref counting requirements:
@@ -20,6 +24,7 @@ public enum StateBackendOperation: Sendable {
 public protocol StateBackendProtocol: Sendable {
     func read(key: Data) async throws -> Data?
     func readAll(prefix: Data, startKey: Data?, limit: UInt32?) async throws -> [(key: Data, value: Data)]
+    func createIterator(prefix: Data, startKey: Data?) async throws -> StateBackendIterator
     func batchUpdate(_ ops: [StateBackendOperation]) async throws
 
     // hash is the blake2b256 hash of the value
