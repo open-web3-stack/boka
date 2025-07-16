@@ -9,25 +9,44 @@ import Utils
 enum BackendType: String, CaseIterable {
     case inMemory = "InMemoryBackend"
     case rocksDB = "RocksDBBackend"
+}
 
-    func createBackend() async throws -> StateBackendProtocol {
-        switch self {
+final class StateBackendTests {
+    let basePath = {
+        let tmpDir = FileManager.default.temporaryDirectory
+        return tmpDir.appendingPathComponent("\(UUID().uuidString)")
+    }()
+
+    let config: ProtocolConfigRef = .dev
+    let genesisBlock: BlockRef
+
+    init() async throws {
+        genesisBlock = BlockRef.dummy(config: config)
+    }
+
+    deinit {
+        try? FileManager.default.removeItem(at: basePath)
+    }
+
+    func createBackend(_ backendType: BackendType, testIndex: Int = 0) async throws -> StateBackendProtocol {
+        switch backendType {
         case .inMemory:
             return InMemoryBackend()
         case .rocksDB:
-            let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-            let config = ProtocolConfigRef.dev
-            let genesisBlock = BlockRef.dummy(config: config)
-            return try await RocksDBBackend(path: tempDir, config: config, genesisBlock: genesisBlock, genesisStateData: [:])
+            let testPath = basePath.appendingPathComponent("test_\(testIndex)")
+            return try await RocksDBBackend(
+                path: testPath,
+                config: config,
+                genesisBlock: genesisBlock,
+                genesisStateData: [:]
+            )
         }
     }
-}
 
-struct StateBackendTests {
     @Test(arguments: BackendType.allCases)
     func testGetKeysBasic(backendType: BackendType) async throws {
-        let backend = try await backendType.createBackend()
-        let stateBackend = StateBackend(backend, config: ProtocolConfigRef.dev, rootHash: Data32())
+        let backend = try await createBackend(backendType, testIndex: 1)
+        let stateBackend = StateBackend(backend, config: config, rootHash: Data32())
 
         let prefixA = Data([0xAA])
         let prefixB = Data([0xBB])
@@ -104,8 +123,8 @@ struct StateBackendTests {
 
     @Test(arguments: BackendType.allCases)
     func testGetKeysLargeBatch(backendType: BackendType) async throws {
-        let backend = try await backendType.createBackend()
-        let stateBackend = StateBackend(backend, config: ProtocolConfigRef.dev, rootHash: Data32())
+        let backend = try await createBackend(backendType, testIndex: 2)
+        let stateBackend = StateBackend(backend, config: config, rootHash: Data32())
 
         let keyCount = 1500
         var expectedKeys: Set<Data> = []
