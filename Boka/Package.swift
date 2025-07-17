@@ -11,6 +11,7 @@ let package = Package(
     dependencies: [
         .package(path: "../Node"),
         .package(path: "../TracingUtils"),
+        .package(path: "../Fuzzing"),
         .package(url: "https://github.com/slashmo/swift-otel.git", from: "0.9.0"),
         .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.6.0"),
         .package(url: "https://github.com/vapor/console-kit.git", from: "4.15.0"),
@@ -25,6 +26,7 @@ let package = Package(
             dependencies: [
                 "Node",
                 "TracingUtils",
+                "Fuzzing",
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
                 .product(name: "OTel", package: "swift-otel"),
                 .product(name: "OTLPGRPC", package: "swift-otel"),

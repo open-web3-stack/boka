@@ -38,8 +38,50 @@ public final class StateBackend: Sendable {
         throw StateBackendError.missingState(key: key)
     }
 
-    public func getKeys(_ prefix: Data31, _ startKey: Data31?, _ limit: UInt32?) async throws -> [(key: Data, value: Data)] {
-        try await impl.readAll(prefix: prefix.data, startKey: startKey?.data, limit: limit)
+    public func getKeys(_ prefix: Data?, _ startKey: Data31?, _ limit: UInt32?) async throws -> [(key: Data, value: Data)] {
+        let prefixData = prefix ?? Data()
+        let startKeyData = startKey?.data
+
+        let iterator = try await impl.createIterator(prefix: Data(), startKey: startKeyData)
+
+        var stateKeyValues: [(key: Data, value: Data)] = []
+
+        if let limit {
+            stateKeyValues.reserveCapacity(Int(limit))
+        }
+
+        while let (_, trieNodeData) = try await iterator.next() {
+            if let limit, stateKeyValues.count >= limit {
+                break
+            }
+
+            guard trieNodeData.count == 64 else {
+                continue
+            }
+
+            let firstByte = trieNodeData[relative: 0]
+            let isLeaf = (firstByte & 0b1100_0000) == 0b1000_0000 || (firstByte & 0b1100_0000) == 0b1100_0000
+
+            guard isLeaf else {
+                continue
+            }
+
+            let stateKey = Data(trieNodeData[relative: 1 ..< 32])
+
+            if !prefixData.isEmpty, !stateKey.starts(with: prefixData) {
+                continue
+            }
+
+            if let startKeyData, stateKey.lexicographicallyPrecedes(startKeyData) {
+                continue
+            }
+
+            if let value = try await trie.read(key: Data31(stateKey)!) {
+                stateKeyValues.append((key: stateKey, value: value))
+            }
+        }
+
+        return stateKeyValues
     }
 
     public func batchRead(_ keys: [any StateKey]) async throws -> [(key: any StateKey, value: (Codable & Sendable)?)] {
