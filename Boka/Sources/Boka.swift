@@ -52,7 +52,7 @@ struct Boka: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "JAM built with Swift",
         version: "0.0.1",
-        subcommands: [Generate.self]
+        subcommands: [Generate.self, Fuzz.self]
     )
 
     @Option(name: .shortAndLong, help: "Base path to database files.")

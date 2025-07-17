@@ -16,7 +16,7 @@ public final class DummyNodeDataSource: Sendable {
 }
 
 extension DummyNodeDataSource: ChainDataSource {
-    public func getKeys(prefix _: Data31, count _: UInt32, startKey _: Data31?, blockHash _: Data32?) async throws
+    public func getKeys(prefix _: Data, count _: UInt32, startKey _: Data31?, blockHash _: Data32?) async throws
         -> [String]
     {
         ["key1", "key2", "key3"]

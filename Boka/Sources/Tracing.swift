@@ -40,7 +40,7 @@ public func parse(from: String) -> (
     )
 }
 
-private func parseLevel(_ level: String) -> Logger.Level? {
+public func parseLevel(_ level: String) -> Logger.Level? {
     switch level.lowercased().trimmingCharacters(in: .whitespaces) {
     case "trace": .trace
     case "debug": .debug
