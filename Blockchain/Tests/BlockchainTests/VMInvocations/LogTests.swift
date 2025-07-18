@@ -11,7 +11,7 @@ struct LogTests {
             level: .error,
             target: Data("target".utf8),
             message: Data("message".utf8),
-            core: nil,
+            core: 12,
             service: 1
         )
         let json = logDetials.json
@@ -20,7 +20,7 @@ struct LogTests {
         #expect(json["target"]?.string == "target")
         #expect(json["message"]?.string == "message")
         #expect(json["service"]?.string == "1")
-        #expect(json["core"] == .null)
+        #expect(json["core"]?.string == "12")
     }
 
     @Test func testLogDetailString() async throws {
@@ -29,11 +29,11 @@ struct LogTests {
             level: .trace,
             target: Data("target".utf8),
             message: Data("message".utf8),
-            core: nil,
-            service: nil
+            core: 1,
+            service: 2
         )
         let str = logDetials.str
-        #expect(str == "2023-04-01 12:00:00 TRACE target message")
+        #expect(str == "2023-04-01 12:00:00 TRACE@1#2 target message")
     }
 
     @Test func testLogDetailInvalidString() async throws {
