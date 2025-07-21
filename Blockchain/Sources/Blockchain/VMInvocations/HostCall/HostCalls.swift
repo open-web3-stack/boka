@@ -1350,17 +1350,17 @@ public class Log: HostCall {
 
     public enum Level: UInt32, Codable {
         case error = 0
-        case debug = 1
+        case warn = 1
         case info = 2
-        case warn = 3
+        case debug = 3
         case trace = 4
 
         var description: String {
             switch self {
             case .error: "ERROR"
-            case .debug: "DEBUG"
-            case .info: "INFO"
             case .warn: "WARN"
+            case .info: "INFO"
+            case .debug: "DEBUG"
             case .trace: "TRACE"
             }
         }
@@ -1388,10 +1388,10 @@ public class Log: HostCall {
         public var str: String {
             var result = time + " \(level.description)"
             if let core {
-                result += " @\(core)"
+                result += "@\(core)"
             }
             if let service {
-                result += " #\(service)"
+                result += "#\(service)"
             }
             if let target {
                 result += " \(String(data: target, encoding: .utf8) ?? "invalid string")"
@@ -1417,7 +1417,7 @@ public class Log: HostCall {
         let message = try? state.readMemory(address: regs[3], length: Int(regs[4]))
 
         let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd HH-mm-ss"
+        dateFormatter.dateFormat = "yyyy/MM/dd HH:mm:ss"
         let time = dateFormatter.string(from: Date())
 
         let details = Details(
