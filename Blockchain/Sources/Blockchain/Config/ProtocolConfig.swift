@@ -749,4 +749,89 @@ extension ProtocolConfig {
             UInt32(ticketSubmissionEndSlot),
         )
     }
+
+    /// Decode ProtocolConfig from encoded parameters.
+    public static func decode(protocolParameters: Data) throws -> ProtocolConfig {
+        let decoder = JamDecoder(data: protocolParameters, config: ProtocolConfigRef.minimal)
+
+        let additionalMinBalancePerStateItem = try decoder.decode(UInt64.self)
+        let additionalMinBalancePerStateByte = try decoder.decode(UInt64.self)
+        let serviceMinBalance = try decoder.decode(UInt64.self)
+        let totalNumberOfCores = try decoder.decode(UInt16.self)
+        let preimagePurgePeriod = try decoder.decode(UInt32.self)
+        let epochLength = try decoder.decode(UInt32.self)
+        let workReportAccumulationGas = try decoder.decode(Gas.self)
+        let workPackageIsAuthorizedGas = try decoder.decode(Gas.self)
+        let workPackageRefineGas = try decoder.decode(Gas.self)
+        let totalAccumulationGas = try decoder.decode(Gas.self)
+        let recentHistorySize = try decoder.decode(UInt16.self)
+        let maxWorkItems = try decoder.decode(UInt16.self)
+        let maxDepsInWorkReport = try decoder.decode(UInt16.self)
+        let maxTicketsPerExtrinsic = try decoder.decode(UInt16.self)
+        let maxLookupAnchorAge = try decoder.decode(UInt32.self)
+        let ticketEntriesPerValidator = try decoder.decode(UInt16.self)
+        let maxAuthorizationsPoolItems = try decoder.decode(UInt16.self)
+        let slotPeriodSeconds = try decoder.decode(UInt16.self)
+        let maxAuthorizationsQueueItems = try decoder.decode(UInt16.self)
+        let coreAssignmentRotationPeriod = try decoder.decode(UInt16.self)
+        let maxWorkPackageExtrinsics = try decoder.decode(UInt16.self)
+        let preimageReplacementPeriod = try decoder.decode(UInt16.self)
+        let totalNumberOfValidators = try decoder.decode(UInt16.self)
+        let maxIsAuthorizedCodeSize = try decoder.decode(UInt32.self)
+        let maxEncodedWorkPackageSize = try decoder.decode(UInt32.self)
+        let maxServiceCodeSize = try decoder.decode(UInt32.self)
+        let erasureCodedPieceSize = try decoder.decode(UInt32.self)
+        let maxWorkPackageImports = try decoder.decode(UInt32.self)
+        let erasureCodedSegmentSize = try decoder.decode(UInt32.self)
+        let maxWorkReportBlobSize = try decoder.decode(UInt32.self)
+        let transferMemoSize = try decoder.decode(UInt32.self)
+        let maxWorkPackageExports = try decoder.decode(UInt32.self)
+        let ticketSubmissionEndSlot = try decoder.decode(UInt32.self)
+
+        let protocolConfig = ProtocolConfig(
+            auditTranchePeriod: 8, // A = 8
+            additionalMinBalancePerStateItem: Int(additionalMinBalancePerStateItem),
+            additionalMinBalancePerStateByte: Int(additionalMinBalancePerStateByte),
+            serviceMinBalance: Int(serviceMinBalance),
+            totalNumberOfCores: Int(totalNumberOfCores),
+            preimagePurgePeriod: Int(preimagePurgePeriod),
+            epochLength: Int(epochLength),
+            auditBiasFactor: 2, // F = 2
+            workReportAccumulationGas: workReportAccumulationGas,
+            workPackageIsAuthorizedGas: workPackageIsAuthorizedGas,
+            workPackageRefineGas: workPackageRefineGas,
+            totalAccumulationGas: totalAccumulationGas,
+            recentHistorySize: Int(recentHistorySize),
+            maxWorkItems: Int(maxWorkItems),
+            maxDepsInWorkReport: Int(maxDepsInWorkReport),
+            maxTicketsPerExtrinsic: Int(maxTicketsPerExtrinsic),
+            maxLookupAnchorAge: Int(maxLookupAnchorAge),
+            transferMemoSize: Int(transferMemoSize),
+            ticketEntriesPerValidator: Int(ticketEntriesPerValidator),
+            maxAuthorizationsPoolItems: Int(maxAuthorizationsPoolItems),
+            slotPeriodSeconds: Int(slotPeriodSeconds),
+            maxAuthorizationsQueueItems: Int(maxAuthorizationsQueueItems),
+            coreAssignmentRotationPeriod: Int(coreAssignmentRotationPeriod),
+            maxAccumulationQueueItems: 1024, // S = 1024
+            maxWorkPackageExtrinsics: Int(maxWorkPackageExtrinsics),
+            maxIsAuthorizedCodeSize: Int(maxIsAuthorizedCodeSize),
+            maxServiceCodeSize: Int(maxServiceCodeSize),
+            preimageReplacementPeriod: Int(preimageReplacementPeriod),
+            totalNumberOfValidators: Int(totalNumberOfValidators),
+            erasureCodedPieceSize: Int(erasureCodedPieceSize),
+            maxWorkPackageImports: Int(maxWorkPackageImports),
+            maxWorkPackageExports: Int(maxWorkPackageExports),
+            maxEncodedWorkPackageSize: Int(maxEncodedWorkPackageSize),
+            segmentSize: 4104, // WG = WP*WE = 4104
+            maxWorkReportBlobSize: Int(maxWorkReportBlobSize),
+            erasureCodedSegmentSize: Int(erasureCodedSegmentSize),
+            ticketSubmissionEndSlot: Int(ticketSubmissionEndSlot),
+            pvmDynamicAddressAlignmentFactor: 2, // ZA = 2
+            pvmProgramInitInputDataSize: 1 << 24, // ZI = 2^24
+            pvmProgramInitZoneSize: 1 << 16, // ZZ = 2^16
+            pvmMemoryPageSize: 1 << 12 // ZP = 2^12
+        )
+
+        return protocolConfig
+    }
 }

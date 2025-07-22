@@ -3,89 +3,60 @@ import Codec
 import Foundation
 import Utils
 
-extension KeyedDecodingContainer {
-    func decode(_: ProtocolConfig.Type, forKey key: K, required: Bool = true) throws -> ProtocolConfig {
-        let nestedDecoder = try superDecoder(forKey: key)
-        return try ProtocolConfig(from: nestedDecoder, required)
-    }
-
-    func decodeIfPresent(_: ProtocolConfig.Type, forKey key: K, required: Bool = false) throws -> ProtocolConfig? {
-        guard contains(key) else { return nil }
-        let nestedDecoder = try superDecoder(forKey: key)
-        return try ProtocolConfig(from: nestedDecoder, required)
-    }
-}
-
-private func mergeConfig(preset: GenesisPreset?, config: ProtocolConfig?) throws -> ProtocolConfigRef {
-    if let preset {
-        let ret = preset.config.value
-        if let genesisConfig = config {
-            return Ref(ret.merged(with: genesisConfig))
-        }
-        return Ref(ret)
-    }
-    if let config {
-        return Ref(config)
-    }
-    throw GenesisError.invalidFormat("One of 'preset' or 'config' is required")
-}
-
 public struct ChainSpec: Codable, Equatable {
-    public var name: String
     public var id: String
-    public var bootnodes: [String]
-    public var preset: GenesisPreset?
-    public var config: ProtocolConfig?
-    public var block: Data
-    public var state: [String: Data]
+    public var bootnodes: [String]?
+    public var genesisHeader: Data
+    public var genesisState: [String: Data]
+    public var protocolParameters: Data
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case bootnodes
+        case genesisHeader = "genesis_header"
+        case genesisState = "genesis_state"
+        case protocolParameters = "protocol_parameters"
+    }
 
     public init(
-        name: String,
         id: String,
-        bootnodes: [String],
-        preset: GenesisPreset?,
-        config: ProtocolConfig?,
-        block: Data,
-        state: [String: Data]
+        bootnodes: [String]? = nil,
+        genesisHeader: Data,
+        genesisState: [String: Data],
+        protocolParameters: Data
     ) {
-        self.name = name
         self.id = id
         self.bootnodes = bootnodes
-        self.preset = preset
-        self.config = config
-        self.block = block
-        self.state = state
+        self.genesisHeader = genesisHeader
+        self.genesisState = genesisState
+        self.protocolParameters = protocolParameters
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        name = try container.decode(String.self, forKey: .name)
         id = try container.decode(String.self, forKey: .id)
-        bootnodes = try container.decode([String].self, forKey: .bootnodes)
-        preset = try container.decodeIfPresent(GenesisPreset.self, forKey: .preset)
-        if preset == nil {
-            config = try container.decode(ProtocolConfig.self, forKey: .config, required: true)
-        } else {
-            config = try container.decodeIfPresent(ProtocolConfig.self, forKey: .config, required: false)
-        }
+        bootnodes = try container.decodeIfPresent([String].self, forKey: .bootnodes)
+        genesisHeader = try container.decode(Data.self, forKey: .genesisHeader)
+        genesisState = try container.decode(Dictionary<String, Data>.self, forKey: .genesisState)
+        protocolParameters = try container.decode(Data.self, forKey: .protocolParameters)
 
-        try decoder.setConfig(mergeConfig(preset: preset, config: config))
-
-        block = try container.decode(Data.self, forKey: .block)
-        state = try container.decode(Dictionary<String, Data>.self, forKey: .state)
+        try decoder.setConfig(getConfig())
     }
 
     public func getConfig() throws -> ProtocolConfigRef {
-        try mergeConfig(preset: preset, config: config)
+        let config = try ProtocolConfig.decode(protocolParameters: protocolParameters)
+        return Ref(config)
     }
 
     public func getBlock() throws -> BlockRef {
-        try JamDecoder.decode(BlockRef.self, from: block, withConfig: getConfig())
+        let config = try getConfig()
+        let header = try JamDecoder.decode(Header.self, from: genesisHeader, withConfig: config)
+        return BlockRef(Block(header: header, extrinsic: .dummy(config: config)))
     }
 
     public func getState() throws -> [Data31: Data] {
         var output: [Data31: Data] = [:]
-        for (key, value) in state {
+        for (key, value) in genesisState {
             try output[Data31(fromHexString: key).unwrap()] = value
         }
         return output
@@ -110,15 +81,77 @@ public struct ChainSpec: Codable, Equatable {
     }
 
     private func validate() throws {
-        // Validate required fields
-        if name.isEmpty {
-            throw GenesisError.invalidFormat("Missing 'name'")
-        }
         if id.isEmpty {
             throw GenesisError.invalidFormat("Missing 'id'")
         }
-        if preset == nil, config == nil {
-            throw GenesisError.invalidFormat("One of 'preset' or 'config' is required")
+
+        for key in genesisState.keys {
+            guard key.count == 62 else {
+                throw GenesisError.invalidFormat("Invalid genesisState key length: \(key) (expected 62 characters)")
+            }
+            guard Data(fromHexString: key) != nil else {
+                throw GenesisError.invalidFormat("Invalid genesisState key format: \(key) (not valid hex)")
+            }
+        }
+
+        if let bootnodes {
+            for bootnode in bootnodes {
+                try validateBootnodeFormat(bootnode)
+            }
         }
     }
+
+    private func validateBootnodeFormat(_ bootnode: String) throws {
+        // Format: <name>@<ip>:<port>
+        // <name> is 53-character DNS name starting with 'e' followed by base-32 encoded Ed25519 public key
+        let components = bootnode.split(separator: "@")
+        guard components.count == 2 else {
+            throw GenesisError.invalidFormat("Invalid bootnode format: \(bootnode) (expected name@ip:port)")
+        }
+
+        let name = String(components[0])
+        let addressPort = String(components[1])
+
+        // Validate name: 53 characters, starts with 'e'
+        guard name.count == 53, name.hasPrefix("e") else {
+            throw GenesisError.invalidFormat("Invalid bootnode name: \(name) (expected 53 characters starting with 'e')")
+        }
+
+        // Validate base-32 encoding (check for allowed characters)
+        let base32Alphabet = "abcdefghijklmnopqrstuvwxyz234567"
+        let nameWithoutPrefix = String(name.dropFirst())
+        guard nameWithoutPrefix.allSatisfy({ base32Alphabet.contains($0) }) else {
+            throw GenesisError.invalidFormat("Invalid bootnode name encoding: \(name) (not valid base-32)")
+        }
+
+        // Validate ip:port format
+        let addressComponents = addressPort.split(separator: ":")
+        guard addressComponents.count == 2 else {
+            throw GenesisError.invalidFormat("Invalid bootnode address: \(addressPort) (expected ip:port)")
+        }
+
+        // Validate IP address format
+        guard String(addressComponents[0]).isIpAddress() else {
+            throw GenesisError.invalidFormat("Invalid bootnode IP address: \(addressComponents[0]) (not a valid IP address)")
+        }
+
+        // Validate port is a number
+        guard Int(addressComponents[1]) != nil else {
+            throw GenesisError.invalidFormat("Invalid bootnode port: \(addressComponents[1]) (not a number)")
+        }
+    }
+}
+
+extension String {
+    func isIPv4() -> Bool {
+        var sin = sockaddr_in()
+        return withCString { cstring in inet_pton(AF_INET, cstring, &sin.sin_addr) } == 1
+    }
+
+    func isIPv6() -> Bool {
+        var sin6 = sockaddr_in6()
+        return withCString { cstring in inet_pton(AF_INET6, cstring, &sin6.sin6_addr) } == 1
+    }
+
+    func isIpAddress() -> Bool { isIPv6() || isIPv4() }
 }
