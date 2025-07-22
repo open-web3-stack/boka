@@ -32,6 +32,33 @@ struct ChainSpecTests {
         }
     }
 
+    @Test func testChainSpecFiles() async throws {
+        // Test the JIP-4 compliant chainspec files
+        let testCases = [
+            ("spec-minimal.json", GenesisPreset.minimal),
+            ("spec-dev.json", GenesisPreset.dev),
+            ("spec-tiny.json", GenesisPreset.tiny),
+        ]
+
+        for (filename, expectedPreset) in testCases {
+            let specPath = ResourceLoader.loadResource(named: filename)!.path()
+            let genesis: Genesis = .file(path: specPath)
+            let chainspec = try await genesis.load()
+
+            #expect(chainspec.id == expectedPreset.rawValue)
+
+            let config = try chainspec.getConfig()
+            #expect(config == expectedPreset.config)
+
+            let block = try chainspec.getBlock()
+            #expect(block.extrinsic.tickets.tickets.isEmpty)
+            #expect(block.extrinsic.disputes.verdicts.isEmpty)
+
+            let state = try chainspec.getState()
+            #expect(!state.isEmpty)
+        }
+    }
+
     @Test func encodeDecodeChainSpec() async throws {
         let genesis = Genesis.preset(.minimal)
         let chainspec = try await genesis.load()
@@ -41,32 +68,20 @@ struct ChainSpecTests {
         #expect(decoded == chainspec)
     }
 
-    @Test func commandWithAllConfig() async throws {
-        let sepc = ResourceLoader.loadResource(named: "devnet_allconfig_spec.json")!.path()
-        let genesis: Genesis = .file(path: sepc)
-        let chainspec = try await genesis.load()
-        let protocolConfig = try chainspec.getConfig()
-        #expect(protocolConfig.value.maxWorkItems == 2)
-        #expect(protocolConfig.value.serviceMinBalance == 100)
-    }
+    @Test func testProtocolParametersDecoding() async throws {
+        let testCases = [
+            ("spec-minimal.json", 3), // minimal has 3 validators
+            ("spec-dev.json", 6), // dev has 6 validators
+            ("spec-tiny.json", 6), // tiny has 6 validators
+        ]
 
-    @Test func commandWithSomeConfig() async throws {
-        let sepc = ResourceLoader.loadResource(named: "mainnet_someconfig_spec.json")!.path()
-        let genesis: Genesis = .file(path: sepc)
-        let config = ProtocolConfigRef.mainnet.value
-        let chainspec = try await genesis.load()
-        let protocolConfig = try chainspec.getConfig()
-        #expect(protocolConfig.value.auditTranchePeriod == 100)
-        #expect(protocolConfig.value.slotPeriodSeconds == config.slotPeriodSeconds)
-    }
+        for (filename, expectedValidators) in testCases {
+            let specPath = ResourceLoader.loadResource(named: filename)!.path()
+            let genesis: Genesis = .file(path: specPath)
+            let chainspec = try await genesis.load()
+            let config = try chainspec.getConfig()
 
-    @Test func commandWithNoConfig() async throws {
-        let sepc = ResourceLoader.loadResource(named: "devnet_noconfig_spec.json")!.path()
-        let genesis: Genesis = .file(path: sepc)
-        let config = ProtocolConfigRef.dev.value
-        let chainspec = try await genesis.load()
-        let protocolConfig = try chainspec.getConfig()
-        #expect(protocolConfig.value.maxWorkItems == config.maxWorkItems)
-        #expect(protocolConfig.value.serviceMinBalance == config.serviceMinBalance)
+            #expect(config.value.totalNumberOfValidators == expectedValidators)
+        }
     }
 }
