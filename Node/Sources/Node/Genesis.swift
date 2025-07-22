@@ -6,6 +6,7 @@ import Utils
 public enum GenesisPreset: String, Codable, CaseIterable {
     case minimal
     case dev
+    case tiny
     case mainnet
 
     public var config: ProtocolConfigRef {
@@ -14,6 +15,8 @@ public enum GenesisPreset: String, Codable, CaseIterable {
             ProtocolConfigRef.minimal
         case .dev:
             ProtocolConfigRef.dev
+        case .tiny:
+            ProtocolConfigRef.tiny
         case .mainnet:
             ProtocolConfigRef.mainnet
         }
@@ -51,13 +54,11 @@ extension Genesis {
                 }
             }
             return try ChainSpec(
-                name: preset.rawValue,
                 id: preset.rawValue,
                 bootnodes: [],
-                preset: preset,
-                config: config.value,
-                block: JamEncoder.encode(block.value),
-                state: kv
+                genesisHeader: JamEncoder.encode(block.value.header),
+                genesisState: kv,
+                protocolParameters: config.value.encoded
             )
         case let .file(path):
             let data = try readFile(from: path)
