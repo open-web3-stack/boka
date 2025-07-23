@@ -14,10 +14,13 @@ public struct KeySet: Codable, Sendable {
 }
 
 extension KeyStore {
-    public func generateKeys() async throws -> KeySet {
-        let bandersnatch = try await generate(Bandersnatch.self)
-        let ed25519 = try await generate(Ed25519.self)
-        let bls = try await generate(BLS.self)
+    public func generateKeys(from seed: Data32) async throws -> KeySet {
+        let derivedSeeds = JIP5SeedDerive.deriveKeySeeds(from: seed)
+
+        let bandersnatch = try await add(Bandersnatch.self, seed: derivedSeeds.bandersnatch)
+        let ed25519 = try await add(Ed25519.self, seed: derivedSeeds.ed25519)
+        let bls = try await add(BLS.self, seed: seed)
+
         return KeySet(bandersnatch: bandersnatch.publicKey, ed25519: ed25519.publicKey, bls: bls.publicKey)
     }
 
