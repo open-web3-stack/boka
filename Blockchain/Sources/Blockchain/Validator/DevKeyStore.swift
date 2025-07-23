@@ -32,15 +32,12 @@ public final class DevKeyStore: KeyStore {
     }
 
     public static func getDevKey(seed: UInt32) throws -> KeySet {
-        var seedData = Data(repeating: 0, count: 32)
-        let seedByte = seed.encode()
-        for i in 0 ..< 8 {
-            seedData[i * 4 ..< (i + 1) * 4] = seedByte
-        }
-        let seedData32 = Data32(seedData)!
-        let bandersnatch = try Bandersnatch.SecretKey(from: seedData32)
-        let ed25519 = try Ed25519.SecretKey(from: seedData32)
-        let bls = try BLS.SecretKey(from: seedData32)
+        let trivialSeed = JIP5SeedDerive.trivialSeed(seed)
+        let derivedSeeds = JIP5SeedDerive.deriveKeySeeds(from: trivialSeed)
+
+        let bandersnatch = try Bandersnatch.SecretKey(from: derivedSeeds.bandersnatch)
+        let ed25519 = try Ed25519.SecretKey(from: derivedSeeds.ed25519)
+        let bls = try BLS.SecretKey(from: trivialSeed)
         return KeySet(bandersnatch: bandersnatch.publicKey, ed25519: ed25519.publicKey, bls: bls.publicKey)
     }
 }
@@ -48,15 +45,7 @@ public final class DevKeyStore: KeyStore {
 extension KeyStore {
     @discardableResult
     public func addDevKeys(seed: UInt32) async throws -> KeySet {
-        var seedData = Data(repeating: 0, count: 32)
-        let seedByte = seed.encode()
-        for i in 0 ..< 8 {
-            seedData[i * 4 ..< (i + 1) * 4] = seedByte
-        }
-        let seedData32 = Data32(seedData)!
-        let bandersnatch = try await add(Bandersnatch.self, seed: seedData32)
-        let ed25519 = try await add(Ed25519.self, seed: seedData32)
-        let bls = try await add(BLS.self, seed: seedData32)
-        return KeySet(bandersnatch: bandersnatch.publicKey, ed25519: ed25519.publicKey, bls: bls.publicKey)
+        let trivialSeed = JIP5SeedDerive.trivialSeed(seed)
+        return try await generateKeys(from: trivialSeed)
     }
 }
