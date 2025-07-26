@@ -155,13 +155,13 @@ extension Accumulation {
         state: AccumulateState,
         workReports: [WorkReport],
         service: ServiceIndex,
-        privilegedGas: [ServiceIndex: Gas],
+        alwaysAcc: [ServiceIndex: Gas],
         timeslot: TimeslotIndex
     ) async throws -> SingleAccumulationOutput {
         var gas = Gas(0)
         var arguments: [OperandTuple] = []
 
-        gas += privilegedGas[service] ?? Gas(0)
+        gas += alwaysAcc[service] ?? Gas(0)
 
         for report in workReports {
             for digest in report.digests where digest.serviceIndex == service {
@@ -199,25 +199,21 @@ extension Accumulation {
         config: ProtocolConfigRef,
         state: AccumulateState,
         workReports: [WorkReport],
-        privilegedGas: [ServiceIndex: Gas],
+        alwaysAcc: [ServiceIndex: Gas],
         timeslot: TimeslotIndex
     ) async throws -> ParallelAccumulationOutput {
         var services = [ServiceIndex]()
         var gasUsed: [(serviceIndex: ServiceIndex, gas: Gas)] = []
         var transfers: [DeferredTransfers] = []
         var commitments = Set<Commitment>()
-        var newPrivilegedServices: PrivilegedServices?
         var newValidatorQueue: ConfigFixedSizeArray<
             ValidatorKey, ProtocolConfig.TotalNumberOfValidators
         >?
-        var newAuthorizationQueue: ConfigFixedSizeArray<
-            ConfigFixedSizeArray<
-                Data32,
-                ProtocolConfig.MaxAuthorizationsQueueItems
-            >,
-            ProtocolConfig.TotalNumberOfCores
-        >?
+        var newAuthorizationQueue = authorizationQueue
         var overallAccountChanges = AccountChanges()
+        var tempPrivilegedServices: PrivilegedServices?
+        var newDelegator = privilegedServices.delegator
+        var newAssigners = privilegedServices.assigners
 
         for report in workReports {
             for digest in report.digests {
@@ -225,7 +221,7 @@ extension Accumulation {
             }
         }
 
-        for service in privilegedGas.keys {
+        for service in alwaysAcc.keys {
             services.append(service)
         }
 
@@ -241,12 +237,15 @@ extension Accumulation {
                     accounts: accountsRef,
                     validatorQueue: state.validatorQueue,
                     authorizationQueue: state.authorizationQueue,
-                    privilegedServices: state.privilegedServices,
+                    manager: state.manager,
+                    assigners: state.assigners,
+                    delegator: state.delegator,
+                    alwaysAcc: state.alwaysAcc,
                     entropy: state.entropy
                 ),
                 workReports: workReports,
                 service: service,
-                privilegedGas: privilegedGas,
+                alwaysAcc: alwaysAcc,
                 timeslot: timeslot
             )
             gasUsed.append((service, singleOutput.gasUsed))
@@ -262,14 +261,34 @@ extension Accumulation {
             servicePreimageSet.formUnion(singleOutput.provide)
 
             switch service {
-            case privilegedServices.blessed:
-                newPrivilegedServices = singleOutput.state.privilegedServices
-            case privilegedServices.assign:
-                newAuthorizationQueue = singleOutput.state.authorizationQueue
-            case privilegedServices.designate:
+            // m'
+            case privilegedServices.manager:
+                tempPrivilegedServices = PrivilegedServices(
+                    manager: singleOutput.state.manager,
+                    assigners: singleOutput.state.assigners,
+                    delegator: singleOutput.state.delegator,
+                    alwaysAcc: singleOutput.state.alwaysAcc
+                )
+            // i'
+            case privilegedServices.delegator:
                 newValidatorQueue = singleOutput.state.validatorQueue
             default:
                 break
+            }
+
+            // v'
+            if service == tempPrivilegedServices?.delegator {
+                newDelegator = singleOutput.state.delegator
+            }
+
+            // q'
+            if let index = privilegedServices.assigners.firstIndex(of: service) {
+                newAuthorizationQueue[index] = singleOutput.state.authorizationQueue[index]
+            }
+
+            // a'
+            if let index = tempPrivilegedServices?.assigners.firstIndex(of: service) {
+                newAssigners[index] = singleOutput.state.assigners[index]
             }
 
             accountsRef = singleOutput.state.accounts
@@ -287,8 +306,11 @@ extension Accumulation {
             state: AccumulateState(
                 accounts: accountsRef,
                 validatorQueue: newValidatorQueue ?? validatorQueue,
-                authorizationQueue: newAuthorizationQueue ?? authorizationQueue,
-                privilegedServices: newPrivilegedServices ?? privilegedServices,
+                authorizationQueue: newAuthorizationQueue,
+                manager: tempPrivilegedServices?.manager ?? privilegedServices.manager,
+                assigners: newAssigners,
+                delegator: newDelegator,
+                alwaysAcc: tempPrivilegedServices?.alwaysAcc ?? privilegedServices.alwaysAcc,
                 entropy: state.entropy
             ),
             transfers: transfers,
@@ -302,7 +324,7 @@ extension Accumulation {
         config: ProtocolConfigRef,
         state: AccumulateState,
         workReports: [WorkReport],
-        privilegedGas: [ServiceIndex: Gas],
+        alwaysAcc: [ServiceIndex: Gas],
         gasLimit: Gas,
         timeslot: TimeslotIndex
     ) async throws -> AccumulationOutput {
@@ -336,14 +358,14 @@ extension Accumulation {
                 config: config,
                 state: state,
                 workReports: Array(workReports[0 ..< i]),
-                privilegedGas: privilegedGas,
+                alwaysAcc: alwaysAcc,
                 timeslot: timeslot
             )
             let outerOutput = try await outerAccumulate(
                 config: config,
                 state: parallelOutput.state,
                 workReports: Array(workReports[i ..< workReports.count]),
-                privilegedGas: [:],
+                alwaysAcc: [:],
                 gasLimit: gasLimit - parallelOutput.gasUsed.reduce(Gas(0)) { $0 + $1.gas },
                 timeslot: timeslot
             )
@@ -456,7 +478,7 @@ extension Accumulation {
         state: AccumulateState,
         timeslot: TimeslotIndex
     ) async throws -> AccumulationOutput {
-        let sumPrevilegedGas = privilegedServices.basicGas.values.reduce(Gas(0)) { $0 + $1.value }
+        let sumPrevilegedGas = privilegedServices.alwaysAcc.values.reduce(Gas(0)) { $0 + $1.value }
         let minTotalGas = config.value.workReportAccumulationGas * Gas(config.value.totalNumberOfCores) + sumPrevilegedGas
         let gasLimit = max(config.value.totalAccumulationGas, minTotalGas)
 
@@ -464,7 +486,7 @@ extension Accumulation {
             config: config,
             state: state,
             workReports: workReports,
-            privilegedGas: privilegedServices.basicGas,
+            alwaysAcc: privilegedServices.alwaysAcc,
             gasLimit: gasLimit,
             timeslot: timeslot
         )
@@ -497,7 +519,10 @@ extension Accumulation {
             accounts: accountsMutRef,
             validatorQueue: validatorQueue,
             authorizationQueue: authorizationQueue,
-            privilegedServices: privilegedServices,
+            manager: privilegedServices.manager,
+            assigners: privilegedServices.assigners,
+            delegator: privilegedServices.delegator,
+            alwaysAcc: privilegedServices.alwaysAcc,
             entropy: entropy
         )
 
@@ -510,7 +535,12 @@ extension Accumulation {
 
         authorizationQueue = accumulateOutput.state.authorizationQueue
         validatorQueue = accumulateOutput.state.validatorQueue
-        privilegedServices = accumulateOutput.state.privilegedServices
+        privilegedServices = PrivilegedServices(
+            manager: accumulateOutput.state.manager,
+            assigners: accumulateOutput.state.assigners,
+            delegator: accumulateOutput.state.delegator,
+            alwaysAcc: accumulateOutput.state.alwaysAcc
+        )
 
         // transfers execution + transfers statistics
         var transferGroups = [ServiceIndex: [DeferredTransfers]]()

@@ -17,8 +17,20 @@ public struct ServiceAccountDetails: Sendable, Equatable, Codable {
     // o: the total number of octets used in storage
     public var totalByteLength: UInt64
 
+    // f
+    public var gratisStorage: Balance
+
     // i: number of items in storage
     public var itemsCount: UInt32
+
+    // r
+    public var createdAt: TimeslotIndex
+
+    // a
+    public var lastAccAt: TimeslotIndex
+
+    // p
+    public var parentService: ServiceIndex
 
     // t: the minimum, or threshold, balance needed for any given service account in terms of its storage footprint
     public func thresholdBalance(config: ProtocolConfigRef) -> Balance {
@@ -53,6 +65,18 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
     // m
     public var minOnTransferGas: Gas
 
+    // f
+    public var gratisStorage: Balance
+
+    // r
+    public var createdAt: TimeslotIndex
+
+    // a
+    public var lastAccAt: TimeslotIndex
+
+    // p
+    public var parentService: ServiceIndex
+
     public init(
         storage: [Data32: Data],
         preimages: [Data32: Data],
@@ -60,7 +84,11 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
         codeHash: Data32,
         balance: Balance,
         minAccumlateGas: Gas,
-        minOnTransferGas: Gas
+        minOnTransferGas: Gas,
+        gratisStorage: Balance,
+        createdAt: TimeslotIndex,
+        lastAccAt: TimeslotIndex,
+        parentService: ServiceIndex
     ) {
         self.storage = storage
         self.preimages = preimages
@@ -69,6 +97,10 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
         self.balance = balance
         self.minAccumlateGas = minAccumlateGas
         self.minOnTransferGas = minOnTransferGas
+        self.gratisStorage = gratisStorage
+        self.createdAt = createdAt
+        self.lastAccAt = lastAccAt
+        self.parentService = parentService
     }
 
     public func toDetails() -> ServiceAccountDetails {
@@ -78,7 +110,11 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
             minAccumlateGas: minAccumlateGas,
             minOnTransferGas: minOnTransferGas,
             totalByteLength: totalByteLength,
-            itemsCount: itemsCount
+            gratisStorage: gratisStorage,
+            itemsCount: itemsCount,
+            createdAt: createdAt,
+            lastAccAt: lastAccAt,
+            parentService: parentService
         )
     }
 }
@@ -93,7 +129,11 @@ extension ServiceAccount: Dummy {
             codeHash: Data32(),
             balance: Balance(0),
             minAccumlateGas: Gas(0),
-            minOnTransferGas: Gas(0)
+            minOnTransferGas: Gas(0),
+            gratisStorage: Balance(0),
+            createdAt: TimeslotIndex(0),
+            lastAccAt: TimeslotIndex(0),
+            parentService: ServiceIndex(0)
         )
     }
 }

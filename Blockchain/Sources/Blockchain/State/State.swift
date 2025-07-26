@@ -283,10 +283,10 @@ extension State: Dummy {
         let authorizationQueue: StateKeys.AuthorizationQueueKey.Value =
             try! ConfigFixedSizeArray(config: config, defaultValue: ConfigFixedSizeArray(config: config, defaultValue: Data32()))
         let privilegedServices: StateKeys.PrivilegedServicesKey.Value = PrivilegedServices(
-            blessed: ServiceIndex(),
-            assign: ServiceIndex(),
-            designate: ServiceIndex(),
-            basicGas: [:]
+            manager: ServiceIndex(),
+            assigners: try! ConfigFixedSizeArray(config: config, defaultValue: ServiceIndex()),
+            delegator: ServiceIndex(),
+            alwaysAcc: [:]
         )
         let judgements: StateKeys.JudgementsKey.Value = JudgementsState.dummy(config: config)
         let activityStatistics: StateKeys.ActivityStatisticsKey.Value = Statistics.dummy(config: config)

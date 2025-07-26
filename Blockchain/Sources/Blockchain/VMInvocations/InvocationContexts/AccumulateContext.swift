@@ -60,7 +60,7 @@ public final class AccumulateContext: InvocationContext {
         case Checkpoint.identifier:
             return await Checkpoint(x: context.x, y: context.y).call(config: config, state: state)
         case New.identifier:
-            return await New(x: context.x).call(config: config, state: state)
+            return await New(x: context.x, timeslot: timeslot).call(config: config, state: state)
         case Upgrade.identifier:
             return await Upgrade(x: context.x).call(config: config, state: state)
         case Transfer.identifier:

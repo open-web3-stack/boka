@@ -179,7 +179,7 @@ public actor StateTrie {
                 continue
             }
             if node.isBranch {
-                // assign -1 to not worry about duplicates
+                // assigners -1 to not worry about duplicates
                 refChanges[node.hash.data.suffix(31)] = -1
                 refChanges[node.left.data.suffix(31)] = -1
                 refChanges[node.right.data.suffix(31)] = -1

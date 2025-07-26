@@ -444,31 +444,39 @@ public class Bless: HostCall {
         self.x = x
     }
 
-    public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
+    public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
         let regs: [UInt32] = state.readRegisters(in: 7 ..< 12)
 
-        var basicGas: [ServiceIndex: Gas]?
+        var assigners: ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>?
+        if state.isMemoryReadable(address: regs[1], length: 4 * config.value.totalNumberOfCores) {
+            assigners = try JamDecoder.decode(
+                ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>.self,
+                from: state.readMemory(address: regs[1], length: 4 * config.value.totalNumberOfCores)
+            )
+        }
+
+        var alwaysAcc: [ServiceIndex: Gas]?
         let length = 12 * Int(regs[4])
         if state.isMemoryReadable(address: regs[3], length: length) {
-            basicGas = [:]
+            alwaysAcc = [:]
             let data = try state.readMemory(address: regs[3], length: length)
             for i in stride(from: 0, to: length, by: 12) {
                 let serviceIndex = ServiceIndex(data[i ..< i + 4].decode(UInt32.self))
                 let gas = Gas(data[i + 4 ..< i + 12].decode(UInt64.self))
-                basicGas![serviceIndex] = gas
+                alwaysAcc![serviceIndex] = gas
             }
         }
 
-        if basicGas == nil {
+        if alwaysAcc == nil, assigners == nil {
             throw VMInvocationsError.panic
         } else if !regs[0 ..< 3].allSatisfy({ $0 >= 0 && $0 <= Int(UInt32.max) }) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
-            x.state.privilegedServices.blessed = regs[0]
-            x.state.privilegedServices.assign = regs[1]
-            x.state.privilegedServices.designate = regs[2]
-            x.state.privilegedServices.basicGas = basicGas!
+            x.state.manager = regs[0]
+            x.state.assigners = assigners!
+            x.state.delegator = regs[2]
+            x.state.alwaysAcc = alwaysAcc!
         }
     }
 }
@@ -569,9 +577,11 @@ public class New: HostCall {
     public static var identifier: UInt8 { 9 }
 
     public let x: AccumlateResultContext
+    public let timeslot: TimeslotIndex
 
-    public init(x: AccumlateResultContext) {
+    public init(x: AccumlateResultContext, timeslot: TimeslotIndex) {
         self.x = x
+        self.timeslot = timeslot
     }
 
     private func bump(i: ServiceIndex) -> ServiceIndex {
@@ -579,7 +589,7 @@ public class New: HostCall {
     }
 
     public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
-        let regs: [UInt64] = state.readRegisters(in: 7 ..< 11)
+        let regs: [UInt64] = state.readRegisters(in: 7 ..< 12)
 
         let codeHash: Data32? = try? Data32(state.readMemory(address: regs[0], length: 32))
         logger.debug("codeHash: \(codeHash?.description ?? "nil")")
@@ -587,6 +597,7 @@ public class New: HostCall {
 
         let minAccumlateGas = Gas(regs[2])
         let minOnTransferGas = Gas(regs[3])
+        let gratisStorage = Balance(regs[4])
 
         var newAccount: ServiceAccount?
         if let codeHash {
@@ -597,7 +608,11 @@ public class New: HostCall {
                 codeHash: codeHash,
                 balance: Balance(0),
                 minAccumlateGas: minAccumlateGas,
-                minOnTransferGas: minOnTransferGas
+                minOnTransferGas: minOnTransferGas,
+                gratisStorage: gratisStorage,
+                createdAt: timeslot,
+                lastAccAt: 0,
+                parentService: x.serviceIndex,
             )
             newAccount!.balance = newAccount!.thresholdBalance(config: config)
         }
