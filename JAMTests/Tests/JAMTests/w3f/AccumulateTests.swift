@@ -104,7 +104,7 @@ private struct FullAccumulateState: Accumulation {
     var accumulationHistory: StateKeys.AccumulationHistoryKey.Value
 
     var accounts: [ServiceIndex: ServiceAccountDetails] = [:]
-    var storages: [ServiceIndex: [Data32: Data]] = [:]
+    var storages: [ServiceIndex: [Data: Data]] = [:]
     var preimages: [ServiceIndex: [Data32: Data]] = [:]
     var preimageInfo: [ServiceIndex: [Data32: StateKeys.ServiceAccountPreimageInfoKey.Value]] = [:]
 
@@ -112,7 +112,7 @@ private struct FullAccumulateState: Accumulation {
         accounts[index]
     }
 
-    func get(serviceAccount index: ServiceIndex, storageKey key: Data32) async throws -> Data? {
+    func get(serviceAccount index: ServiceIndex, storageKey key: Data) async throws -> Data? {
         storages[index]?[key]
     }
 
@@ -134,7 +134,7 @@ private struct FullAccumulateState: Accumulation {
         accounts[index] = account
     }
 
-    mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data32, value: Data?) {
+    mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data, value: Data?) {
         // update footprint
         let oldValue = storages[index]?[key]
         let oldAccount = accounts[index]
@@ -145,13 +145,13 @@ private struct FullAccumulateState: Accumulation {
             } else {
                 // remove: decrease count and bytes
                 accounts[index]?.itemsCount = UInt32(max(0, Int(oldAccount?.itemsCount ?? 0) - 1))
-                accounts[index]?.totalByteLength = UInt64(max(0, Int(oldAccount?.totalByteLength ?? 0) - (32 + oldValue.count)))
+                accounts[index]?.totalByteLength = UInt64(max(0, Int(oldAccount?.totalByteLength ?? 0) - (34 + oldValue.count + key.count)))
             }
         } else {
             if let value {
                 // add: increase count and bytes
                 accounts[index]?.itemsCount = (oldAccount?.itemsCount ?? 0) + 1
-                accounts[index]?.totalByteLength = (oldAccount?.totalByteLength ?? 0) + 32 + UInt64(value.count)
+                accounts[index]?.totalByteLength = (oldAccount?.totalByteLength ?? 0) + 34 + UInt64(value.count) + UInt64(key.count)
             }
         }
         logger.debug("storage footprint update: \(accounts[index]?.itemsCount ?? 0) items, \(accounts[index]?.totalByteLength ?? 0) bytes")
@@ -218,8 +218,7 @@ struct AccumulateTests {
         for entry in testcase.preState.accounts {
             fullState.accounts[entry.index] = entry.data.service
             for storage in entry.data.storage {
-                let storageKey = Blake2b256.hash(entry.index.encode(), storage.key)
-                fullState.storages[entry.index, default: [:]][storageKey] = storage.value
+                fullState.storages[entry.index, default: [:]][storage.key] = storage.value
             }
             for preimage in entry.data.preimages {
                 fullState.preimages[entry.index, default: [:]][preimage.hash] = preimage.blob
@@ -250,8 +249,7 @@ struct AccumulateTests {
                     let account = fullState.accounts[entry.index]!
                     #expect(account == entry.data.service, "ServiceAccountDetail mismatch")
                     for storage in entry.data.storage {
-                        let key = Blake2b256.hash(entry.index.encode(), storage.key)
-                        #expect(fullState.storages[entry.index]?[key] == storage.value, "Storage mismatch")
+                        #expect(fullState.storages[entry.index]?[storage.key] == storage.value, "Storage mismatch")
                     }
                     for preimage in entry.data.preimages {
                         #expect(fullState.preimages[entry.index]?[preimage.hash] == preimage.blob, "Preimage mismatch")

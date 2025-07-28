@@ -37,13 +37,13 @@ public struct ServiceAccountDetails: Sendable, Equatable, Codable {
         let base = Balance(config.value.serviceMinBalance)
         let items = Balance(config.value.additionalMinBalancePerStateItem) * Balance(itemsCount)
         let bytes = Balance(config.value.additionalMinBalancePerStateByte) * Balance(totalByteLength)
-        return base + items + bytes
+        return max(Balance(0), base + items + bytes - gratisStorage)
     }
 }
 
 public struct ServiceAccount: Sendable, Equatable, Codable {
     // s
-    public var storage: [Data32: Data]
+    public var storage: [Data: Data]
 
     // p
     public var preimages: [Data32: Data]
@@ -78,7 +78,7 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
     public var parentService: ServiceIndex
 
     public init(
-        storage: [Data32: Data],
+        storage: [Data: Data],
         preimages: [Data32: Data],
         preimageInfos: [HashAndLength: LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>],
         codeHash: Data32,
@@ -147,7 +147,7 @@ extension ServiceAccount {
     // o: the total number of octets used in storage
     public var totalByteLength: UInt64 {
         let preimageInfosBytes = preimageInfos.keys.reduce(into: 0) { $0 += 81 + $1.length }
-        let storageBytes = storage.values.reduce(into: 0) { $0 += 32 + $1.count }
+        let storageBytes = storage.enumerated().reduce(into: 0) { $0 += 34 + $1.element.key.count + $1.element.value.count }
         return UInt64(preimageInfosBytes) + UInt64(storageBytes)
     }
 
@@ -156,6 +156,6 @@ extension ServiceAccount {
         let base = Balance(config.value.serviceMinBalance)
         let items = Balance(config.value.additionalMinBalancePerStateItem) * Balance(itemsCount)
         let bytes = Balance(config.value.additionalMinBalancePerStateByte) * Balance(totalByteLength)
-        return base + items + bytes
+        return max(Balance(0), base + items + bytes - gratisStorage)
     }
 }

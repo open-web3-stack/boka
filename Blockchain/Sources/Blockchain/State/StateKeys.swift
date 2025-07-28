@@ -36,19 +36,22 @@ private func constructKey(_ idx: UInt8, _ service: ServiceIndex) -> Data31 {
 private func constructKey(_ service: ServiceIndex, _ val: UInt32, _ data: Data) -> Data31 {
     var stateKey = Data(capacity: 31)
 
+    let valEncoded = val.encode()
+    let a = (valEncoded + data).blake2b256hash().data[relative: 0 ..< 27]
+
     withUnsafeBytes(of: service) { servicePtr in
-        withUnsafeBytes(of: val) { valPtr in
+        withUnsafeBytes(of: a) { aPtr in
             stateKey.append(servicePtr.load(as: UInt8.self))
-            stateKey.append(valPtr.load(as: UInt8.self))
+            stateKey.append(aPtr.load(as: UInt8.self))
             stateKey.append(servicePtr.load(fromByteOffset: 1, as: UInt8.self))
-            stateKey.append(valPtr.load(fromByteOffset: 1, as: UInt8.self))
+            stateKey.append(aPtr.load(fromByteOffset: 1, as: UInt8.self))
             stateKey.append(servicePtr.load(fromByteOffset: 2, as: UInt8.self))
-            stateKey.append(valPtr.load(fromByteOffset: 2, as: UInt8.self))
+            stateKey.append(aPtr.load(fromByteOffset: 2, as: UInt8.self))
             stateKey.append(servicePtr.load(fromByteOffset: 3, as: UInt8.self))
-            stateKey.append(valPtr.load(fromByteOffset: 3, as: UInt8.self))
+            stateKey.append(aPtr.load(fromByteOffset: 3, as: UInt8.self))
         }
     }
-    stateKey.append(contentsOf: data[relative: 0 ..< 23])
+    stateKey.append(contentsOf: a[relative: 4 ..< 27])
     return Data31(stateKey)!
 }
 
@@ -69,6 +72,7 @@ public enum StateKeys {
         ActivityStatisticsKey(),
         AccumulationQueueKey(),
         AccumulationHistoryKey(),
+        LastAccumulationOutputsKey(),
     ]
 
     public struct CoreAuthorizationPoolKey: StateKey {
@@ -252,6 +256,16 @@ public enum StateKeys {
         }
     }
 
+    public struct LastAccumulationOutputsKey: StateKey {
+        public typealias Value = [Commitment]
+
+        public init() {}
+
+        public func encode() -> Data31 {
+            constructKey(16)
+        }
+    }
+
     public struct ServiceAccountKey: StateKey {
         public typealias Value = ServiceAccountDetails
         public static var optional: Bool { true }
@@ -272,15 +286,15 @@ public enum StateKeys {
         public static var optional: Bool { true }
 
         public var index: ServiceIndex
-        public var key: Data32
+        public var key: Data
 
-        public init(index: ServiceIndex, key: Data32) {
+        public init(index: ServiceIndex, key: Data) {
             self.index = index
             self.key = key
         }
 
         public func encode() -> Data31 {
-            constructKey(index, UInt32.max, key.data)
+            constructKey(index, UInt32.max, key)
         }
     }
 
@@ -297,7 +311,7 @@ public enum StateKeys {
         }
 
         public func encode() -> Data31 {
-            constructKey(index, UInt32.max - 1, hash.data[relative: 1...])
+            constructKey(index, UInt32.max - 1, hash.data)
         }
     }
 
@@ -316,7 +330,7 @@ public enum StateKeys {
         }
 
         public func encode() -> Data31 {
-            constructKey(index, length, hash.blake2b256hash().data[2...])
+            constructKey(index, length, hash.data)
         }
     }
 }

@@ -22,7 +22,7 @@ public struct AccumulationQueueItem: Sendable, Equatable, Codable {
 }
 
 // accumulation output pairing
-public struct Commitment: Hashable {
+public struct Commitment: Hashable, Sendable, Equatable, Codable {
     public var serviceIndex: ServiceIndex
     public var hash: Data32
 

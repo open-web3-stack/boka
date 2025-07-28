@@ -195,6 +195,16 @@ public struct StateLayer: Sendable {
         }
     }
 
+    // θ: The most recent Accumulation outputs
+    public var lastAccumulationOutputs: StateKeys.LastAccumulationOutputsKey.Value {
+        get {
+            changes[StateKeys.LastAccumulationOutputsKey().encode()]!.value()!
+        }
+        set {
+            changes[StateKeys.LastAccumulationOutputsKey().encode()] = .init(newValue)
+        }
+    }
+
     // δ: The (prior) state of the service accounts.
     public subscript(serviceAccount index: ServiceIndex) -> StateKeys.ServiceAccountKey.Value? {
         get {
@@ -206,7 +216,7 @@ public struct StateLayer: Sendable {
     }
 
     // s
-    public subscript(serviceAccount index: ServiceIndex, storageKey key: Data32) -> StateKeys.ServiceAccountStorageKey.Value? {
+    public subscript(serviceAccount index: ServiceIndex, storageKey key: Data) -> StateKeys.ServiceAccountStorageKey.Value? {
         get {
             changes[StateKeys.ServiceAccountStorageKey(index: index, key: key).encode()]?.value()
         }
@@ -285,7 +295,7 @@ extension StateLayer {
         changes[StateKeys.ServiceAccountKey(index: index).encode()]?.isDeleted ?? false
     }
 
-    public func isDeleted(serviceAccount index: ServiceIndex, storageKey key: Data32) -> Bool {
+    public func isDeleted(serviceAccount index: ServiceIndex, storageKey key: Data) -> Bool {
         changes[StateKeys.ServiceAccountStorageKey(index: index, key: key).encode()]?.isDeleted ?? false
     }
 
