@@ -275,7 +275,7 @@ extension State: Dummy {
         if let block {
             recentHistory.items.safeAppend(RecentHistory.HistoryItem(
                 headerHash: block.hash,
-                mmr: MMR([]),
+                superPeak: Data32(),
                 stateRoot: Data32(),
                 lookup: [Data32: Data32]()
             ))

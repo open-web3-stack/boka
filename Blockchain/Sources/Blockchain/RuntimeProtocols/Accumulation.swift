@@ -501,7 +501,7 @@ extension Accumulation {
         timeslot: TimeslotIndex,
         prevTimeslot: TimeslotIndex,
         entropy: Data32
-    ) async throws -> (root: Data32, AccumulationStats, TransfersStats) {
+    ) async throws -> (root: Data32, [Commitment], AccumulationStats, TransfersStats) {
         let index = Int(timeslot) %% config.value.epochLength
 
         logger.debug("available reports (\(availableReports.count)): \(availableReports.map(\.packageSpecification.workPackageHash))")
@@ -588,18 +588,6 @@ extension Accumulation {
             }
         }
 
-        let commitmentsSorted = accumulateOutput.commitments.sorted { $0.serviceIndex < $1.serviceIndex }
-        logger.debug("accumulation commitments sorted: \(commitmentsSorted)")
-
-        // get accumulate root
-        let nodes = try commitmentsSorted.map { try JamEncoder.encode($0.serviceIndex) + JamEncoder.encode($0.hash) }
-
-        logger.debug("accumulation commitments encoded: \(nodes.map { $0.toHexString() })")
-
-        let root = Merklization.binaryMerklize(nodes, hasher: Keccak.self)
-
-        logger.debug("accumulation root: \(root)")
-
         // get accumulation statistics
         var accumulateStats = AccumulationStats()
         for (service, _) in accumulateOutput.gasUsed {
@@ -617,6 +605,18 @@ extension Accumulation {
             accumulateStats[service] = (gasUsed, UInt32(num))
         }
 
-        return (root, accumulateStats, transfersStats)
+        let commitmentsSorted = accumulateOutput.commitments.sorted { $0.serviceIndex < $1.serviceIndex }
+        logger.debug("accumulation commitments sorted: \(commitmentsSorted)")
+
+        // get accumulate root
+        let nodes = try commitmentsSorted.map { try JamEncoder.encode($0.serviceIndex) + JamEncoder.encode($0.hash) }
+
+        logger.debug("accumulation commitments encoded: \(nodes.map { $0.toHexString() })")
+
+        let root = Merklization.binaryMerklize(nodes, hasher: Keccak.self)
+
+        logger.debug("accumulation root: \(root)")
+
+        return (root, commitmentsSorted, accumulateStats, transfersStats)
     }
 }
