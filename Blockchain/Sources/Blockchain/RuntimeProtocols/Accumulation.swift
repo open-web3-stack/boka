@@ -605,6 +605,15 @@ extension Accumulation {
             accumulateStats[service] = (gasUsed, UInt32(num))
         }
 
+        // update lastAccAt
+        for (service, _) in accumulateStats {
+            if var account = try await get(serviceAccount: service) {
+                account.lastAccAt = timeslot
+                set(serviceAccount: service, account: account)
+            }
+        }
+
+        // commitments (accumulation output log)
         let commitmentsSorted = accumulateOutput.commitments.sorted { $0.serviceIndex < $1.serviceIndex }
         logger.debug("accumulation commitments sorted: \(commitmentsSorted)")
 
