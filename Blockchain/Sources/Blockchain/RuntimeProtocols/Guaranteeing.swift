@@ -209,7 +209,7 @@ extension Guaranteeing {
             guard context.anchor.stateRoot == history.stateRoot else {
                 throw .invalidContext
             }
-            guard context.anchor.beefyRoot == history.mmr.superPeak() else {
+            guard context.anchor.beefyRoot == history.superPeak else {
                 throw .invalidContext
             }
             guard context.lookupAnchor.timeslot >= Int64(timeslot) - Int64(config.value.maxLookupAnchorAge) else {

@@ -10,8 +10,8 @@ public struct RecentHistory: Sendable, Equatable, Codable {
         // h
         public var headerHash: Data32
 
-        // b: accumulation-result mmr
-        public var mmr: MMR
+        // b
+        public var superPeak: Data32
 
         // s
         public var stateRoot: Data32
@@ -21,32 +21,39 @@ public struct RecentHistory: Sendable, Equatable, Codable {
 
         public init(
             headerHash: Data32,
-            mmr: MMR,
+            superPeak: Data32,
             stateRoot: Data32,
             lookup: [Data32: Data32]
         ) {
             self.headerHash = headerHash
-            self.mmr = mmr
+            self.superPeak = superPeak
             self.stateRoot = stateRoot
             self.lookup = lookup
         }
     }
 
+    // H
     public var items: ConfigLimitedSizeArray<HistoryItem, ProtocolConfig.Int0, ProtocolConfig.RecentHistorySize>
+
+    // B: Accumulation Output Log
+    public var mmr: MMR
 }
 
 extension RecentHistory: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> RecentHistory {
-        RecentHistory(items: try! ConfigLimitedSizeArray(
-            config: config,
-            array: [HistoryItem(
-                headerHash: Data32(),
-                mmr: MMR([]),
-                stateRoot: Data32(),
-                lookup: [Data32: Data32]()
-            )]
-        ))
+        RecentHistory(
+            items: try! ConfigLimitedSizeArray(
+                config: config,
+                array: [HistoryItem(
+                    headerHash: Data32(),
+                    superPeak: Data32(),
+                    stateRoot: Data32(),
+                    lookup: [Data32: Data32]()
+                )]
+            ),
+            mmr: MMR([])
+        )
     }
 }
 
@@ -65,15 +72,13 @@ extension RecentHistory {
         accumulateRoot: Data32,
         lookup: [Data32: Data32]
     ) {
-        var mmr = items.last?.mmr ?? .init([])
-
         mmr.append(accumulateRoot, hasher: Keccak.self)
 
         logger.debug("recent history new item mmr: \(mmr)")
 
         let newItem = RecentHistory.HistoryItem(
             headerHash: headerHash,
-            mmr: mmr,
+            superPeak: mmr.superPeak(),
             stateRoot: Data32(), // empty and will be updated upon next block
             lookup: lookup
         )

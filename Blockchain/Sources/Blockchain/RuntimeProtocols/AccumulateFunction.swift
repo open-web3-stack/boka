@@ -41,8 +41,8 @@ public struct DeferredTransfers: Codable {
     }
 }
 
-/// U: a characterization (i.e. values capable of representing) of state components
-///    which are both needed and mutable by the accumulation process.
+/// Characterization (i.e. values capable of representing) of state components
+/// which are both needed and mutable by the accumulation process.
 public struct AccumulateState {
     /// d (all service accounts)
     public var accounts: ServiceAccountsMutRef
@@ -58,8 +58,14 @@ public struct AccumulateState {
         >,
         ProtocolConfig.TotalNumberOfCores
     >
-    /// x
-    public var privilegedServices: PrivilegedServices
+    // m
+    public var manager: ServiceIndex
+    // a
+    public var assigners: ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>
+    // v
+    public var delegator: ServiceIndex
+    // z
+    public var alwaysAcc: [ServiceIndex: Gas]
 
     public var entropy: Data32 // eta'_0
 
@@ -68,7 +74,10 @@ public struct AccumulateState {
             accounts: ServiceAccountsMutRef(accounts.value),
             validatorQueue: validatorQueue,
             authorizationQueue: authorizationQueue,
-            privilegedServices: privilegedServices,
+            manager: manager,
+            assigners: assigners,
+            delegator: delegator,
+            alwaysAcc: alwaysAcc,
             entropy: entropy
         )
     }

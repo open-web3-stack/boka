@@ -175,13 +175,15 @@ public final class Runtime {
             let availableReports = try await updateAssurances(block: block, state: &newState)
 
             // accumulate
-            let (accumulateRoot, accumulateStats, transfersStats) = try await newState.update(
+            let (accumulateRoot, commitments, accumulateStats, transfersStats) = try await newState.update(
                 config: config,
                 availableReports: availableReports,
                 timeslot: block.header.timeslot,
                 prevTimeslot: prevState.value.timeslot,
                 entropy: newState.entropyPool.t0
             )
+
+            newState.lastAccumulationOutputs = commitments
 
             newState.recentHistory.updatePartial(parentStateRoot: block.header.priorStateRoot)
 
