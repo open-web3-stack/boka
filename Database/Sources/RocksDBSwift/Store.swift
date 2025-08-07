@@ -42,7 +42,7 @@ public final class Store<CFKey: ColumnFamilyKey, Coder: StoreCoder>: Sendable {
 
     public func exists(key: Coder.Key) throws -> Bool {
         let encodedKey = try coder.encode(key: key)
-        // it seems like
+        // it seems like there is no way to check if a key exists so we just try to get it
         return try db.get(column: column, key: encodedKey) != nil
     }
 

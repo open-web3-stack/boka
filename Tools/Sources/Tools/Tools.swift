@@ -4,7 +4,7 @@ import TracingUtils
 import Utils
 
 @main
-struct Boka: AsyncParsableCommand {
+struct Tools: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Boka Tools",
         version: "0.0.1",

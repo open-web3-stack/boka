@@ -57,7 +57,10 @@ public struct ChainSpec: Codable, Equatable {
     public func getState() throws -> [Data31: Data] {
         var output: [Data31: Data] = [:]
         for (key, value) in genesisState {
-            try output[Data31(fromHexString: key).unwrap()] = value
+            guard let dataKey = Data31(fromHexString: key) else {
+                throw GenesisError.invalidFormat("Invalid genesisState key format: \(key) (not valid hex)")
+            }
+            output[dataKey] = value
         }
         return output
     }
