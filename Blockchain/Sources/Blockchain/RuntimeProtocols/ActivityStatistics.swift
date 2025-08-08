@@ -16,6 +16,7 @@ extension ActivityStatistics {
         config: ProtocolConfigRef,
         newTimeslot: TimeslotIndex,
         extrinsic: Extrinsic,
+        reporters: [Ed25519PublicKey],
         authorIndex: ValidatorIndex,
         availableReports: [WorkReport],
         accumulateStats: AccumulationStats,
@@ -41,9 +42,9 @@ extension ActivityStatistics {
         item.preimagesBytes += UInt32(extrinsic.preimages.preimages.reduce(into: 0) { $0 += $1.data.count })
         acc[authorIndex] = item
 
-        for report in extrinsic.reports.guarantees {
-            for cred in report.credential {
-                acc[cred.index].guarantees += 1
+        for reporter in reporters {
+            if let index = currentValidators.firstIndex(where: { $0.ed25519 == reporter }) {
+                acc[index].guarantees += 1
             }
         }
 

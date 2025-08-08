@@ -224,7 +224,7 @@ public class Lookup: HostCall {
             throw VMInvocationsError.panic
         }
 
-        let preimageHash = try? Blake2b256.hash(state.readMemory(address: regs[0], length: 32))
+        let preimageHash = try Data32(state.readMemory(address: regs[0], length: 32))
 
         let value: Data? = if let service, let preimageHash {
             try await serviceAccounts.value.get(serviceAccount: service, preimageHash: preimageHash)
@@ -411,10 +411,10 @@ public class Info: HostCall {
             value = nil
         }
 
-        let reg11: UInt64 = state.readRegister(Registers.Index(raw: 11))
-        let reg12: UInt64 = state.readRegister(Registers.Index(raw: 12))
-        let first = min(Int(reg11), value?.count ?? 0)
-        let len = min(Int(reg12), (value?.count ?? 0) - first)
+        let reg9: UInt64 = state.readRegister(Registers.Index(raw: 9))
+        let reg10: UInt64 = state.readRegister(Registers.Index(raw: 10))
+        let first = min(Int(reg9), value?.count ?? 0)
+        let len = min(Int(reg10), (value?.count ?? 0) - first)
 
         let isWritable = value != nil && state.isMemoryWritable(address: o, length: len)
 
@@ -833,10 +833,10 @@ public class Assign: HostCall {
 
         if authorizationQueue == nil {
             throw VMInvocationsError.panic
-        } else if x.serviceIndex != x.state.assigners[targetCoreIndex] {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
         } else if targetCoreIndex >= config.value.totalNumberOfCores {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.CORE.rawValue)
+        } else if x.serviceIndex != x.state.assigners[targetCoreIndex] {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
             // update authorizationQueue
@@ -1233,20 +1233,18 @@ public class Forget: HostCall {
             throw VMInvocationsError.panic
         }
 
-        let minHoldPeriod = UInt32(config.value.preimagePurgePeriod)
-
         let preimageInfo = try await x.state.accounts.value.get(
             serviceAccount: x.serviceIndex,
             preimageHash: hash,
             length: length
         )
         let historyCount = preimageInfo?.count
-
-        let minHoldSlot = max(0, Int(timeslot) - Int(minHoldPeriod))
+        let minHoldSlot = max(0, Int(timeslot) - config.value.preimagePurgePeriod)
 
         let canExpunge = historyCount == 0 || (historyCount == 2 && preimageInfo![1] < minHoldSlot)
         let isAvailable1 = historyCount == 1
         let isAvailable3 = historyCount == 3 && (preimageInfo![1] < minHoldSlot)
+
         let canForget = canExpunge || isAvailable1 || isAvailable3
 
         if !canForget {

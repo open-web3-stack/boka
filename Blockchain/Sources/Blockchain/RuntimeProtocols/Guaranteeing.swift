@@ -117,7 +117,7 @@ extension Guaranteeing {
 
         var oldLookups = [Data32: Data32]()
 
-        var reporters = [Ed25519PublicKey]()
+        var reporters = Set<Ed25519PublicKey>()
 
         for guarantee in extrinsic.guarantees {
             var totalGasUsage = Gas(0)
@@ -148,7 +148,7 @@ extension Guaranteeing {
                     throw .invalidGuaranteeCore
                 }
 
-                reporters.append(key)
+                reporters.insert(key)
             }
 
             let coreIndex = Int(report.coreIndex)
@@ -245,8 +245,8 @@ extension Guaranteeing {
         }
 
         reported.sort { $0.packageSpecification.workPackageHash < $1.packageSpecification.workPackageHash }
-        reporters.sort()
+        let reportersArr = Array(reporters).sorted()
 
-        return (newReports, reported, reporters)
+        return (newReports, reported, reportersArr)
     }
 }

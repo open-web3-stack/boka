@@ -187,7 +187,7 @@ public final class Runtime {
 
             newState.recentHistory.updatePartial(parentStateRoot: block.header.priorStateRoot)
 
-            try await updateGuarantees(block: block, state: &newState)
+            let reporters = try await updateGuarantees(block: block, state: &newState)
 
             // after reports as it need old recent history
             try updateRecentHistory(block: block, state: &newState, accumulateRoot: accumulateRoot)
@@ -210,6 +210,7 @@ public final class Runtime {
                 config: config,
                 newTimeslot: block.header.timeslot,
                 extrinsic: block.extrinsic,
+                reporters: reporters,
                 authorIndex: block.header.authorIndex,
                 availableReports: availableReports,
                 accumulateStats: accumulateStats,
@@ -285,11 +286,12 @@ public final class Runtime {
         return availableReports
     }
 
-    public func updateGuarantees(block: BlockRef, state newState: inout State) async throws {
+    public func updateGuarantees(block: BlockRef, state newState: inout State) async throws -> [Ed25519PublicKey] {
         let result = try await newState.update(
             config: config, timeslot: newState.timeslot, extrinsic: block.extrinsic.reports
         )
         newState.reports = result.newReports
+        return result.reporters
     }
 
     public func updatePreimages(block: BlockRef, state newState: inout State) async throws {

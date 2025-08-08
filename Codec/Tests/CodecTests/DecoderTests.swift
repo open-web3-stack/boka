@@ -244,4 +244,16 @@ struct DecoderTests {
             _ = try JamDecoder.decode(String.self, from: invalidEncodedData)
         }
     }
+
+    @Test func decodeArrayOfNil() throws {
+        let encoded = Data([3, 0, 0, 0])
+        let decoded = try JamDecoder.decode([UInt8?].self, from: encoded)
+        #expect(decoded == [nil, nil, nil])
+    }
+
+    @Test func decodeEmptyArray() throws {
+        let encoded = Data([0])
+        let decoded = try JamDecoder.decode([UInt8?].self, from: encoded)
+        #expect(decoded == [])
+    }
 }

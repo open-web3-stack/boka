@@ -37,10 +37,11 @@ private func constructKey(_ service: ServiceIndex, _ val: UInt32, _ data: Data) 
     var stateKey = Data(capacity: 31)
 
     let valEncoded = val.encode()
-    let a = (valEncoded + data).blake2b256hash().data[relative: 0 ..< 27]
+    let h = valEncoded + data
+    let a = h.blake2b256hash().data[relative: 0 ..< 27]
 
     withUnsafeBytes(of: service) { servicePtr in
-        withUnsafeBytes(of: a) { aPtr in
+        a.withUnsafeBytes { aPtr in
             stateKey.append(servicePtr.load(as: UInt8.self))
             stateKey.append(aPtr.load(as: UInt8.self))
             stateKey.append(servicePtr.load(fromByteOffset: 1, as: UInt8.self))

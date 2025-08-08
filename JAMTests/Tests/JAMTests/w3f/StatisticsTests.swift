@@ -55,6 +55,7 @@ struct StatisticsTests {
             config: config,
             newTimeslot: testcase.input.timeslot,
             extrinsic: testcase.input.extrinsic,
+            reporters: [],
             authorIndex: testcase.input.author,
             availableReports: [],
             accumulateStats: [:],

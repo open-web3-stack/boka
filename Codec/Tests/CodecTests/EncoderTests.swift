@@ -439,4 +439,16 @@ struct EncoderTests {
         #expect(encodedUInt16 == Data([255, 255]))
         try #expect(JamDecoder.decode(UInt16.self, from: encodedUInt16) == uint16Value)
     }
+
+    @Test func encodeArrayOfNils() throws {
+        let arrayOfNils: [UInt8?] = [nil, nil, nil]
+        let encoded = try JamEncoder.encode(arrayOfNils)
+        #expect(encoded == Data([3, 0, 0, 0]))
+    }
+
+    @Test func encodeEmptyArray() throws {
+        let emptyArray: [Int] = []
+        let encoded = try JamEncoder.encode(emptyArray)
+        #expect(encoded == Data([0]))
+    }
 }
