@@ -1,3 +1,5 @@
+#pragma once
+
 #include <fcntl.h>
 
 /**
@@ -12,6 +14,5 @@
  * Returns the number of bytes of machine code emitted.
  */
  int emitAddExample(void *codePtr);
-
 
 int ctools_shm_open(const char *name, int oflag, mode_t mode);
