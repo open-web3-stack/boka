@@ -61,7 +61,7 @@ struct SafroleServiceTests {
             $0.timeslot = newBlock.header.timeslot
             try $0.recentHistory.items.append(RecentHistory.HistoryItem(
                 headerHash: newBlock.hash,
-                mmr: MMR([]),
+                superPeak: Data32(),
                 stateRoot: Data32(),
                 lookup: .init()
             ))
@@ -90,7 +90,7 @@ struct SafroleServiceTests {
             $0.timeslot = newBlock.header.timeslot
             try $0.recentHistory.items.append(RecentHistory.HistoryItem(
                 headerHash: newBlock.hash,
-                mmr: MMR([]),
+                superPeak: Data32(),
                 stateRoot: Data32(),
                 lookup: .init()
             ))

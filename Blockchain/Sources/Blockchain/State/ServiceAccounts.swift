@@ -3,7 +3,7 @@ import Utils
 
 public protocol ServiceAccounts: Sendable {
     func get(serviceAccount index: ServiceIndex) async throws -> ServiceAccountDetails?
-    func get(serviceAccount index: ServiceIndex, storageKey key: Data32) async throws -> Data?
+    func get(serviceAccount index: ServiceIndex, storageKey key: Data) async throws -> Data?
     func get(serviceAccount index: ServiceIndex, preimageHash hash: Data32) async throws -> Data?
     func get(
         serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32
@@ -12,7 +12,7 @@ public protocol ServiceAccounts: Sendable {
     func historicalLookup(serviceAccount index: ServiceIndex, timeslot: TimeslotIndex, preimageHash hash: Data32) async throws -> Data?
 
     mutating func set(serviceAccount index: ServiceIndex, account: ServiceAccountDetails?)
-    mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data32, value: Data?) async throws
+    mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data, value: Data?) async throws
     mutating func set(serviceAccount index: ServiceIndex, preimageHash hash: Data32, value: Data?)
     mutating func set(
         serviceAccount index: ServiceIndex,
@@ -44,7 +44,7 @@ public class ServiceAccountsMutRef {
         changes.addAlteration(index: index) { $0.set(serviceAccount: index, account: account) }
     }
 
-    public func set(serviceAccount index: ServiceIndex, storageKey key: Data32, value: Data?) async throws {
+    public func set(serviceAccount index: ServiceIndex, storageKey key: Data, value: Data?) async throws {
         try await ref.value.set(serviceAccount: index, storageKey: key, value: value)
         changes.addAlteration(index: index) { try await $0.set(serviceAccount: index, storageKey: key, value: value) }
     }

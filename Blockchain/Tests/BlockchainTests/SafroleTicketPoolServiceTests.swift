@@ -213,7 +213,7 @@ struct SafroleTicketPoolServiceTests {
             $0.timeslot = nextTimeslot
             try $0.recentHistory.items.append(RecentHistory.HistoryItem(
                 headerHash: newBlock.hash,
-                mmr: MMR([]),
+                superPeak: Data32(),
                 stateRoot: Data32(),
                 lookup: .init()
             ))

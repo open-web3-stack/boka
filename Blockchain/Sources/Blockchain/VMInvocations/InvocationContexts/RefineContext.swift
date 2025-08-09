@@ -88,12 +88,10 @@ public final class RefineContext: InvocationContext {
             return await Machine(context: context).call(config: config, state: state)
         case Peek.identifier:
             return await Peek(context: context).call(config: config, state: state)
-        case Zero.identifier:
-            return await Zero(context: context).call(config: config, state: state)
         case Poke.identifier:
             return await Poke(context: context).call(config: config, state: state)
-        case VoidFn.identifier:
-            return await VoidFn(context: context).call(config: config, state: state)
+        case Pages.identifier:
+            return await Pages(context: context).call(config: config, state: state)
         case Invoke.identifier:
             return await Invoke(context: context).call(config: config, state: state)
         case Expunge.identifier:

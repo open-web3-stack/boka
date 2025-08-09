@@ -216,7 +216,7 @@ private class DecodeContext: Decoder {
     }
 
     fileprivate func decode<T: Decodable>(_ type: T.Type, key: CodingKey?) throws -> T {
-        // optional hanlding must be first to avoid type coercion
+        // optional handling must be first to avoid type coercion
         if let type = type as? any OptionalWrapper.Type {
             try decodeOptional(type.wrappedType, key: key) as! T
         } else if type == Data.self {

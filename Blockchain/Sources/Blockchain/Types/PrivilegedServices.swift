@@ -3,42 +3,47 @@ import Utils
 
 public struct PrivilegedServices: Sendable, Equatable, Codable {
     // m
-    public var blessed: ServiceIndex
+    public var manager: ServiceIndex
     // a
-    public var assign: ServiceIndex
+    public var assigners: ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>
     // v
-    public var designate: ServiceIndex
-    // g
-    public var basicGas: [ServiceIndex: Gas]
+    public var delegator: ServiceIndex
+    // g or z
+    public var alwaysAcc: [ServiceIndex: Gas]
 
-    public init(blessed: ServiceIndex, assign: ServiceIndex, designate: ServiceIndex, basicGas: [ServiceIndex: Gas]) {
-        self.blessed = blessed
-        self.assign = assign
-        self.designate = designate
-        self.basicGas = basicGas
+    public init(
+        manager: ServiceIndex,
+        assigners: ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>,
+        delegator: ServiceIndex,
+        alwaysAcc: [ServiceIndex: Gas]
+    ) {
+        self.manager = manager
+        self.assigners = assigners
+        self.delegator = delegator
+        self.alwaysAcc = alwaysAcc
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        blessed = try container.decode(ServiceIndex.self, forKey: .blessed)
-        assign = try container.decode(ServiceIndex.self, forKey: .assign)
-        designate = try container.decode(ServiceIndex.self, forKey: .designate)
+        manager = try container.decode(ServiceIndex.self, forKey: .manager)
+        assigners = try container.decode(ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>.self, forKey: .assigners)
+        delegator = try container.decode(ServiceIndex.self, forKey: .delegator)
 
-        let compactGas = try container.decode(SortedKeyValues<ServiceIndex, Compact<Gas>>.self, forKey: .basicGas)
-        basicGas = compactGas.alias.mapValues { $0.alias }
+        let compactGas = try container.decode(SortedKeyValues<ServiceIndex, Compact<Gas>>.self, forKey: .alwaysAcc)
+        alwaysAcc = compactGas.alias.mapValues { $0.alias }
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(blessed, forKey: .blessed)
-        try container.encode(assign, forKey: .assign)
-        try container.encode(designate, forKey: .designate)
+        try container.encode(manager, forKey: .manager)
+        try container.encode(assigners, forKey: .assigners)
+        try container.encode(delegator, forKey: .delegator)
 
-        let compactGas = SortedKeyValues(alias: basicGas.mapValues { Compact(alias: $0) })
-        try container.encode(compactGas, forKey: .basicGas)
+        let compactGas = SortedKeyValues(alias: alwaysAcc.mapValues { Compact(alias: $0) })
+        try container.encode(compactGas, forKey: .alwaysAcc)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case blessed, assign, designate, basicGas
+        case manager, assigners, delegator, alwaysAcc
     }
 }
