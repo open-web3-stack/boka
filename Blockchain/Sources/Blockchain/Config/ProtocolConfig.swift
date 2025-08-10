@@ -86,7 +86,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     /// WA = 64,000: The maximum size of is-authorized code in octets.
     public var maxIsAuthorizedCodeSize: Int
 
-    /// WB = 12 * 2^20: The maximum size of an encoded work-package together with its extrinsic data and import implications, in octets.
+    /// WB = 13,794,305: The maximum size of an encoded work-package together with its extrinsic data and import implications, in octets.
     public var maxEncodedWorkPackageSize: Int
 
     /// WC = 4,000,000: The maximum size of service code in octets.

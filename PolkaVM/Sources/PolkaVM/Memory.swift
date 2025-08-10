@@ -412,14 +412,6 @@ public class MemoryZone {
             data: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize))
         )
     }
-
-    // TODO: check if this will change to remove data
-    public func void(pageIndex: UInt32, pages: Int) throws {
-        _ = try insertOrUpdate(
-            address: pageIndex * UInt32(config.pvmMemoryPageSize),
-            data: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize))
-        )
-    }
 }
 
 public class MemoryChunk {
@@ -637,14 +629,18 @@ public class GeneralMemory: Memory {
         try zone.write(address: address, values: values)
     }
 
-    public func zero(pageIndex: UInt32, pages: Int) throws {
-        try zone.zero(pageIndex: pageIndex, pages: pages)
-        pageMap.update(pageIndex: pageIndex, pages: pages, access: .readWrite)
-    }
+    public func pages(pageIndex: UInt32, pages: Int, variant: UInt64) throws {
+        if variant == 0 {
+            pageMap.removeAccess(pageIndex: pageIndex, pages: pages)
+        } else if variant == 1 || variant == 3 {
+            pageMap.update(pageIndex: pageIndex, pages: pages, access: .readOnly)
+        } else if variant == 2 || variant == 4 {
+            pageMap.update(pageIndex: pageIndex, pages: pages, access: .readWrite)
+        }
 
-    public func void(pageIndex: UInt32, pages: Int) throws {
-        try zone.void(pageIndex: pageIndex, pages: pages)
-        pageMap.removeAccess(pageIndex: pageIndex, pages: pages)
+        if variant < 3 {
+            try zone.zero(pageIndex: pageIndex, pages: pages)
+        }
     }
 
     public func sbrk(_ size: UInt32) throws(MemoryError) -> UInt32 {

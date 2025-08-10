@@ -182,17 +182,6 @@ enum MemoryTests {
             try zone.zero(pageIndex: 0, pages: 1)
             #expect(try zone.read(address: 0, length: 4096) == Data(repeating: 0, count: 4096))
         }
-
-        @Test func void() throws {
-            let zone = try MemoryZone(startAddress: 0, endAddress: 4096, chunks: [
-                MemoryChunk(startAddress: 0, data: Data([0, 0])),
-                MemoryChunk(startAddress: 5, data: Data([0, 1])),
-                MemoryChunk(startAddress: 8, data: Data([2])),
-            ])
-
-            try zone.void(pageIndex: 0, pages: 1)
-            #expect(try zone.read(address: 0, length: 4096) == Data(repeating: 0, count: 4096))
-        }
     }
 
     @Suite struct StandardMemoryTests {
@@ -349,25 +338,26 @@ enum MemoryTests {
             #expect(try memory.read(address: oldEnd - 1, length: 5) == Data([0, 1, 2, 3, 0]))
         }
 
-        @Test func zero() throws {
+        @Test func pages() throws {
+            // Test zero with read-write access (variant = 2)
             #expect(try memory.read(address: 4096, length: 3) == Data([1, 2, 3]))
-            try memory.zero(pageIndex: 1, pages: 1)
+            try memory.pages(pageIndex: 1, pages: 1, variant: 2)
             #expect(try memory.read(address: 4096, length: 3) == Data([0, 0, 0]))
 
+            // Test zero with read-only access (variant = 1)
             #expect(memory.isReadable(address: 4096 * 2, length: 3) == false)
-            try memory.zero(pageIndex: 2, pages: 1)
+            try memory.pages(pageIndex: 2, pages: 1, variant: 1)
             #expect(memory.isReadable(address: 4096 * 2, length: 4096) == true)
-            #expect(memory.isWritable(address: 4096 * 2, length: 4096) == true)
-        }
+            #expect(memory.isWritable(address: 4096 * 2, length: 4096) == false)
 
-        @Test func void() throws {
-            #expect(try memory.read(address: 4096, length: 3) == Data([1, 2, 3]))
-            try memory.void(pageIndex: 1, pages: 1)
+            // Test void (remove access, variant = 0)
+            #expect(try memory.read(address: 4096, length: 3) == Data([0, 0, 0]))
+            try memory.pages(pageIndex: 1, pages: 1, variant: 0)
             #expect(memory.isReadable(address: 4096, length: 4096) == false)
 
             #expect(memory.isReadable(address: 4096 * 4, length: 3) == true)
             #expect(memory.isWritable(address: 4096 * 4, length: 3) == true)
-            try memory.void(pageIndex: 4, pages: 1)
+            try memory.pages(pageIndex: 4, pages: 1, variant: 0)
             #expect(memory.isReadable(address: 4096 * 4, length: 4096) == false)
             #expect(memory.isWritable(address: 4096 * 4, length: 4096) == false)
         }

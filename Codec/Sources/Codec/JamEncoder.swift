@@ -121,13 +121,13 @@ private class EncodeContext: Encoder {
     }
 
     fileprivate func encode(_ value: some Encodable, key: CodingKey? = nil) throws {
-        // optional hanlding must be first to avoid type coercion
+        // optional handling must be first to avoid type coercion
         if let value = value as? OptionalWrapper {
             try encodeOptional(value, key: key)
         } else if let value = value as? Data {
             encodeData(value, codingPath: codingPath)
-        } else if let value = value as? [UInt8] {
-            encodeData(value, codingPath: codingPath)
+        } else if type(of: value) == [UInt8].self || type(of: value) == Array<UInt8>.self {
+            encodeData(value as! [UInt8], codingPath: codingPath)
         } else if let value = value as? any FixedLengthData {
             data.append(value.data)
         } else if let value = value as? [Encodable] {

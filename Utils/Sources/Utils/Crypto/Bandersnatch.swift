@@ -9,7 +9,8 @@ public enum Bandersnatch: KeyType {
         case createRingContextFailed(Int)
         case ringVRFSignFailed(Int)
         case ietfVRFSignFailed(Int)
-        case createRingCommitmentFailed(Int)
+        case createRingCommitmentFromRingFailed(Int)
+        case createRingCommitmentFromDataFailed(Int)
         case serializeRingCommitmentFailed(Int)
         case ringVRFVerifyFailed(Int)
         case ietfVRFVerifyFailed(Int)
@@ -251,7 +252,7 @@ public enum Bandersnatch: KeyType {
                 }
 
             } onErr: { err throws(Error) in
-                throw .createRingCommitmentFailed(err)
+                throw .createRingCommitmentFromRingFailed(err)
             }
 
             var out = Data(repeating: 0, count: 144)
@@ -270,7 +271,7 @@ public enum Bandersnatch: KeyType {
             try FFIUtils.call(data.data) { ptrs in
                 ring_commitment_new_from_data(ptrs[0].ptr, ptrs[0].count, &ptr)
             } onErr: { err throws(Error) in
-                throw .createRingCommitmentFailed(err)
+                throw .createRingCommitmentFromDataFailed(err)
             }
             self.ptr = ptr.asSendable
             self.data = data
