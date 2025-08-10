@@ -15,8 +15,8 @@ public enum HostCallResultCode: UInt64 {
     case CASH = 0xFFFF_FFFF_FFFF_FFF9
     /// LOW = 2^64 − 8: Gas limit too low.
     case LOW = 0xFFFF_FFFF_FFFF_FFF8
-    /// HUH = 2^64 − 10: The item is already solicited or cannot be forgotten.
-    case HUH = 0xFFFF_FFFF_FFFF_FFF6
+    /// HUH = 2^64 − 9: The item is already solicited or cannot be forgotten.
+    case HUH = 0xFFFF_FFFF_FFFF_FFF7
     /// OK = 0: The return value indicating general success.
     case OK = 0
 }

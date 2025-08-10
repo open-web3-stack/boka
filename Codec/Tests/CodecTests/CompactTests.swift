@@ -110,35 +110,35 @@ struct CompactTests {
     }
 
     struct TestPrivilegedServices: Codable {
-        var blessed: UInt32
-        var assign: UInt32
-        var designate: UInt32
-        @CodingAs<SortedKeyValues<UInt32, Compact<UInt64>>> var basicGas: [UInt32: Compact<UInt64>]
+        var manager: UInt32
+        var assigners: [UInt32]
+        var delegator: UInt32
+        @CodingAs<SortedKeyValues<UInt32, Compact<UInt64>>> var alwaysAcc: [UInt32: Compact<UInt64>]
 
-        init(blessed: UInt32, assign: UInt32, designate: UInt32, basicGas: [UInt32: UInt64]) {
-            self.blessed = blessed
-            self.assign = assign
-            self.designate = designate
-            self.basicGas = basicGas.mapValues { Compact(alias: $0) }
+        init(manager: UInt32, assigners: [UInt32], delegator: UInt32, alwaysAcc: [UInt32: UInt64]) {
+            self.manager = manager
+            self.assigners = assigners
+            self.delegator = delegator
+            self.alwaysAcc = alwaysAcc.mapValues { Compact(alias: $0) }
         }
     }
 
     @Test
     func testCodingAsPropertyWrapper() throws {
         let original = TestPrivilegedServices(
-            blessed: 1,
-            assign: 2,
-            designate: 3,
-            basicGas: [1: 1000, 2: 2000, 3: 3000]
+            manager: 1,
+            assigners: [2, 3, 4],
+            delegator: 5,
+            alwaysAcc: [1: 1000, 2: 2000, 3: 3000]
         )
 
         let encoded = try JamEncoder.encode(original)
         let decoded = try JamDecoder.decode(TestPrivilegedServices.self, from: encoded)
 
-        #expect(decoded.blessed == original.blessed)
-        #expect(decoded.assign == original.assign)
-        #expect(decoded.designate == original.designate)
-        #expect(decoded.basicGas.mapValues { $0.alias } == [1: 1000, 2: 2000, 3: 3000])
+        #expect(decoded.manager == original.manager)
+        #expect(decoded.assigners == original.assigners)
+        #expect(decoded.delegator == original.delegator)
+        #expect(decoded.alwaysAcc.mapValues { $0.alias } == [1: 1000, 2: 2000, 3: 3000])
     }
 
     @Test

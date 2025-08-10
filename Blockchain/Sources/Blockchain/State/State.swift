@@ -166,6 +166,16 @@ public struct State: Sendable {
         }
     }
 
+    // θ: The most recent Accumulation outputs
+    public var lastAccumulationOutputs: StateKeys.LastAccumulationOutputsKey.Value {
+        get {
+            layer.lastAccumulationOutputs
+        }
+        set {
+            layer.lastAccumulationOutputs = newValue
+        }
+    }
+
     // δ: The (prior) state of the service accounts.
     public subscript(serviceAccount index: ServiceIndex) -> StateKeys.ServiceAccountKey.Value? {
         get {
@@ -177,7 +187,7 @@ public struct State: Sendable {
     }
 
     // s
-    public subscript(serviceAccount index: ServiceIndex, storageKey key: Data32) -> StateKeys.ServiceAccountStorageKey.Value? {
+    public subscript(serviceAccount index: ServiceIndex, storageKey key: Data) -> StateKeys.ServiceAccountStorageKey.Value? {
         get {
             layer[serviceAccount: index, storageKey: key]
         }
@@ -265,7 +275,7 @@ extension State: Dummy {
         if let block {
             recentHistory.items.safeAppend(RecentHistory.HistoryItem(
                 headerHash: block.hash,
-                mmr: MMR([]),
+                superPeak: Data32(),
                 stateRoot: Data32(),
                 lookup: [Data32: Data32]()
             ))
@@ -283,10 +293,10 @@ extension State: Dummy {
         let authorizationQueue: StateKeys.AuthorizationQueueKey.Value =
             try! ConfigFixedSizeArray(config: config, defaultValue: ConfigFixedSizeArray(config: config, defaultValue: Data32()))
         let privilegedServices: StateKeys.PrivilegedServicesKey.Value = PrivilegedServices(
-            blessed: ServiceIndex(),
-            assign: ServiceIndex(),
-            designate: ServiceIndex(),
-            basicGas: [:]
+            manager: ServiceIndex(),
+            assigners: try! ConfigFixedSizeArray(config: config, defaultValue: ServiceIndex()),
+            delegator: ServiceIndex(),
+            alwaysAcc: [:]
         )
         let judgements: StateKeys.JudgementsKey.Value = JudgementsState.dummy(config: config)
         let activityStatistics: StateKeys.ActivityStatisticsKey.Value = Statistics.dummy(config: config)
@@ -298,6 +308,7 @@ extension State: Dummy {
             config: config,
             defaultValue: .init()
         )
+        let lastAccumulationOutputs: StateKeys.LastAccumulationOutputsKey.Value = []
 
         let kv: [(any StateKey, Codable & Sendable)] = [
             (StateKeys.CoreAuthorizationPoolKey(), coreAuthorizationPool),
@@ -315,6 +326,7 @@ extension State: Dummy {
             (StateKeys.ActivityStatisticsKey(), activityStatistics),
             (StateKeys.AccumulationQueueKey(), accumulationQueue),
             (StateKeys.AccumulationHistoryKey(), accumulationHistory),
+            (StateKeys.LastAccumulationOutputsKey(), lastAccumulationOutputs),
         ]
 
         var store: [Data31: Data] = [:]
@@ -342,7 +354,7 @@ extension State: ServiceAccounts {
         return try await backend.read(StateKeys.ServiceAccountKey(index: index))
     }
 
-    public func get(serviceAccount index: ServiceIndex, storageKey key: Data32) async throws -> Data? {
+    public func get(serviceAccount index: ServiceIndex, storageKey key: Data) async throws -> Data? {
         if layer.isDeleted(serviceAccount: index, storageKey: key) {
             return nil
         }
@@ -401,7 +413,7 @@ extension State: ServiceAccounts {
         layer[serviceAccount: index] = account
     }
 
-    public mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data32, value: Data?) async throws {
+    public mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data, value: Data?) async throws {
         // update footprint
         let oldValue = try await get(serviceAccount: index, storageKey: key)
         guard var oldAccount = try await get(serviceAccount: index) else {
@@ -414,13 +426,13 @@ extension State: ServiceAccounts {
             } else {
                 // remove: decrease count and bytes
                 oldAccount.itemsCount = UInt32(max(0, Int(oldAccount.itemsCount) - 1))
-                oldAccount.totalByteLength = UInt64(max(0, Int(oldAccount.totalByteLength) - (32 + oldValue.count)))
+                oldAccount.totalByteLength = UInt64(max(0, Int(oldAccount.totalByteLength) - (34 + oldValue.count + key.count)))
             }
         } else {
             if let value {
                 // add: increase count and bytes
                 oldAccount.itemsCount = (oldAccount.itemsCount) + 1
-                oldAccount.totalByteLength = (oldAccount.totalByteLength) + 32 + UInt64(value.count)
+                oldAccount.totalByteLength = (oldAccount.totalByteLength) + 34 + UInt64(value.count) + UInt64(key.count)
             }
         }
         layer[serviceAccount: index] = oldAccount

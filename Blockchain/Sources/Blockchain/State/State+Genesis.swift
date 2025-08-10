@@ -38,7 +38,7 @@ extension State {
         let block = BlockRef(Block.dummy(config: config))
         try state.recentHistory.items.append(RecentHistory.HistoryItem(
             headerHash: block.hash,
-            mmr: MMR([]),
+            superPeak: Data32(),
             stateRoot: Data32(),
             lookup: [Data32: Data32]()
         ))

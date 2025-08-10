@@ -27,7 +27,7 @@ enum TraceTest {
             // compare details
             #expect(stateRef.value.coreAuthorizationPool == expectedState.coreAuthorizationPool)
             #expect(stateRef.value.authorizationQueue == expectedState.authorizationQueue)
-            #expect(stateRef.value.recentHistory.items == expectedState.recentHistory.items)
+            #expect(stateRef.value.recentHistory == expectedState.recentHistory)
             #expect(stateRef.value.safroleState == expectedState.safroleState)
             #expect(stateRef.value.judgements == expectedState.judgements)
             #expect(stateRef.value.entropyPool == expectedState.entropyPool)
@@ -40,6 +40,7 @@ enum TraceTest {
             #expect(stateRef.value.activityStatistics == expectedState.activityStatistics)
             #expect(stateRef.value.accumulationQueue == expectedState.accumulationQueue)
             #expect(stateRef.value.accumulationHistory == expectedState.accumulationHistory)
+            #expect(stateRef.value.lastAccumulationOutputs == expectedState.lastAccumulationOutputs)
 
             // compare kv as well (so accounts are compared)
             let expectedStateDict = testcase.postState.toDict()
