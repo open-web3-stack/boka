@@ -1,0 +1,201 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release'
+        required: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-linux-x64:
+    name: Build Linux x64
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 60
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - run: sudo apt-get update
+    - uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-region: us-east-2
+    - name: Cache SPM
+      uses: runs-on/cache@v4
+      with:
+        path: '**/.build'
+        key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+        restore-keys: |
+          ${{ runner.os }}-spm-
+      env:
+        RUNS_ON_S3_BUCKET_CACHE: laminar-gh-action-cache
+    - name: Cache Cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - name: Cache bandersnatch_vrfs static lib
+      uses: actions/cache@v4
+      with:
+        path: .lib/libbandersnatch_vrfs.a
+        key: ${{ runner.os }}-libs-libbandersnatch-${{ hashFiles('Utils/Sources/bandersnatch/**') }}
+        restore-keys: |
+            ${{ runner.os }}-libs-libbandersnatch
+    - name: Cache bls static lib
+      uses: actions/cache@v4
+      with:
+        path: .lib/libbls.a
+        key: ${{ runner.os }}-libs-libbls-${{ hashFiles('Utils/Sources/bls/**') }}
+        restore-keys: |
+            ${{ runner.os }}-libs-libbls
+    - name: Cache erasure-coding static lib
+      uses: actions/cache@v4
+      with:
+        path: .lib/libec.a
+        key: ${{ runner.os }}-libs-libec-${{ hashFiles('Utils/Sources/erasure-coding/**') }}
+        restore-keys: |
+            ${{ runner.os }}-libs-libec
+    - name: Setup Swift
+      uses: SwiftyLab/setup-swift@latest
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@nightly
+    - name: Build External Libraries
+      run: ./scripts/build-external-libs.sh
+    - name: Build Dependencies
+      run: make deps
+    - name: Build Release Binary
+      run: |
+        cd Boka
+        swift build -c release
+        cp $(swift build -c release --show-bin-path)/Boka boka-linux-x64
+        strip boka-linux-x64
+    - name: Upload Binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: boka-linux-x64
+        path: Boka/boka-linux-x64
+        retention-days: 7
+
+  build-macos-aarch64:
+    name: Build macOS aarch64
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - name: Setup Swift
+      uses: SwiftyLab/setup-swift@latest
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@nightly
+    - name: Install Dependencies
+      run: |
+        brew update
+        brew install rocksdb openssl
+    - name: Build External Libraries
+      run: ./scripts/build-external-libs.sh
+    - name: Build Dependencies
+      run: make deps
+    - name: Build Release Binary
+      run: |
+        cd Boka
+        swift build -c release
+        cp $(swift build -c release --show-bin-path)/Boka boka-macos-aarch64
+        strip boka-macos-aarch64
+    - name: Upload Binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: boka-macos-aarch64
+        path: Boka/boka-macos-aarch64
+        retention-days: 7
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-linux-x64, build-macos-aarch64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: binaries
+    - name: Create checksums
+      run: |
+        cd binaries
+        for dir in */; do
+          cd "$dir"
+          sha256sum * > checksums.txt
+          cd ..
+        done
+        find . -name "boka-*" -type f -exec sha256sum {} \; > checksums-all.txt
+    - name: Get release tag
+      id: get_tag
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+        else
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.get_tag.outputs.tag }}
+        name: "Boka ${{ steps.get_tag.outputs.tag }}"
+        body: |
+          ## Boka Binary Release ${{ steps.get_tag.outputs.tag }}
+
+          Standalone binaries for multiple platforms. Download the appropriate binary for your system:
+
+          ### Linux
+          - **x64**: `boka-linux-x64` - For Intel/AMD 64-bit Linux systems
+
+          ### macOS
+          - **aarch64**: `boka-macos-aarch64` - For Apple Silicon Macs (M1/M2/M3)
+
+          ### Usage
+          ```bash
+          # Download and make executable
+          chmod +x boka-*
+
+          # Run the binary
+          ./boka-linux-x64 --help
+          ./boka-macos-aarch64 generate --help
+          ./boka-macos-aarch64 fuzz --help
+          ```
+
+          ### Verification
+          Verify binary integrity using the provided checksums:
+          ```bash
+          sha256sum -c checksums-all.txt
+          ```
+
+          ### Docker Alternative
+          If you prefer Docker: `docker run --rm acala/boka:latest --help`
+        files: |
+          binaries/boka-linux-x64/boka-linux-x64
+          binaries/boka-macos-aarch64/boka-macos-aarch64
+          binaries/checksums-all.txt
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
