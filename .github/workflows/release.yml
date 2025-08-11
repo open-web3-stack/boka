@@ -107,7 +107,6 @@ jobs:
       uses: dtolnay/rust-toolchain@nightly
     - name: Install Dependencies
       run: |
-        brew update
         brew install rocksdb openssl
     - name: Build External Libraries
       run: ./scripts/build-external-libs.sh
@@ -142,12 +141,7 @@ jobs:
     - name: Create checksums
       run: |
         cd binaries
-        for dir in */; do
-          cd "$dir"
-          sha256sum * > checksums.txt
-          cd ..
-        done
-        find . -name "boka-*" -type f -exec sha256sum {} \; > checksums-all.txt
+        find . -name "boka-*" -type f -exec sha256sum {} + > checksums-all.txt
     - name: Get release tag
       id: get_tag
       run: |
