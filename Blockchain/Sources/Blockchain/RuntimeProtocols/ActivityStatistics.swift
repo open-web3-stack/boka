@@ -1,10 +1,6 @@
 import Foundation
 import Utils
 
-enum ActivityStatisticsError: Error {
-    case invalidAuthorKey
-}
-
 public protocol ActivityStatistics {
     var activityStatistics: Statistics { get }
     var timeslot: TimeslotIndex { get }
