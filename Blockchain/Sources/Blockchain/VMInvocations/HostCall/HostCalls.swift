@@ -919,7 +919,7 @@ public class New: HostCall {
     }
 
     private func bump(i: ServiceIndex) -> ServiceIndex {
-        256 + ((i - 256 + 42) & (serviceIndexModValue - 1))
+        256 + ((i - 256 + 42) % serviceIndexModValue)
     }
 
     public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
