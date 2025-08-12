@@ -1,1 +1,1 @@
-public let serviceIndexModValue = UInt32((1 << 32) - (1 << 9))
+public let serviceIndexModValue = UInt32(UInt64(1) << 32 - (1 << 9))
