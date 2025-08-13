@@ -798,9 +798,10 @@ public class Bless: HostCall {
         } else if ![regs[0], regs[2]].allSatisfy({ $0 >= 0 && $0 <= Int(UInt32.max) }) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
         } else {
-            logger.debug(
-                "setting manager: \(regs[0]), assigners: \(String(describing: assigners)), delegator: \(regs[2]), alwaysAcc: \(String(describing: alwaysAcc))"
-            )
+            logger.debug("manager: \(regs[0])")
+            logger.debug("assigners: \(String(describing: assigners))")
+            logger.debug("delegator: \(regs[2])")
+            logger.debug("alwaysAcc: \(String(describing: alwaysAcc))")
 
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
             x.state.manager = regs[0]
