@@ -774,7 +774,8 @@ public class Bless: HostCall {
         if state.isMemoryReadable(address: regs[1], length: 4 * config.value.totalNumberOfCores) {
             assigners = try JamDecoder.decode(
                 ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>.self,
-                from: state.readMemory(address: regs[1], length: 4 * config.value.totalNumberOfCores)
+                from: state.readMemory(address: regs[1], length: 4 * config.value.totalNumberOfCores),
+                withConfig: config
             )
         }
 
@@ -797,6 +798,10 @@ public class Bless: HostCall {
         } else if ![regs[0], regs[2]].allSatisfy({ $0 >= 0 && $0 <= Int(UInt32.max) }) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
         } else {
+            logger.debug(
+                "setting manager: \(regs[0]), assigners: \(String(describing: assigners)), delegator: \(regs[2]), alwaysAcc: \(String(describing: alwaysAcc))"
+            )
+
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
             x.state.manager = regs[0]
             x.state.assigners = assigners!

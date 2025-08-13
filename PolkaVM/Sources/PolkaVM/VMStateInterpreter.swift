@@ -69,6 +69,7 @@ public class VMStateInterpreter: VMState {
     }
 
     public func readMemory(address: some FixedWidthInteger, length: Int) throws -> Data {
+        if length == 0 { return Data() }
         try validateAddress(address)
         let res = try memory.read(address: UInt32(truncatingIfNeeded: address), length: length)
         return res
