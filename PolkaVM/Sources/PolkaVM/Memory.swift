@@ -578,7 +578,7 @@ public class StandardMemory: Memory {
             let finalBoundary = heap.endAddress
             let start = nextPageBoundary / UInt32(config.pvmMemoryPageSize)
             let end = finalBoundary / UInt32(config.pvmMemoryPageSize)
-            let count = Int(end - start)
+            let count = Int(end - start) + 1
             pageMap.update(pageIndex: start, pages: count, access: .readWrite)
         }
 

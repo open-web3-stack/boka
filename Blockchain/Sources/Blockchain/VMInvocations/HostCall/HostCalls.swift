@@ -225,12 +225,15 @@ public class Lookup: HostCall {
         }
 
         let preimageHash = try Data32(state.readMemory(address: regs[0], length: 32))
+        logger.debug("preimageHash: \(String(describing: preimageHash))")
 
         let value: Data? = if let service, let preimageHash {
             try await serviceAccounts.value.get(serviceAccount: service, preimageHash: preimageHash)
         } else {
             nil
         }
+
+        logger.debug("value: \(String(describing: value))")
 
         let reg10: UInt64 = state.readRegister(Registers.Index(raw: 10))
         let reg11: UInt64 = state.readRegister(Registers.Index(raw: 11))
@@ -774,7 +777,8 @@ public class Bless: HostCall {
         if state.isMemoryReadable(address: regs[1], length: 4 * config.value.totalNumberOfCores) {
             assigners = try JamDecoder.decode(
                 ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>.self,
-                from: state.readMemory(address: regs[1], length: 4 * config.value.totalNumberOfCores)
+                from: state.readMemory(address: regs[1], length: 4 * config.value.totalNumberOfCores),
+                withConfig: config
             )
         }
 
@@ -797,6 +801,11 @@ public class Bless: HostCall {
         } else if ![regs[0], regs[2]].allSatisfy({ $0 >= 0 && $0 <= Int(UInt32.max) }) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
         } else {
+            logger.debug("manager: \(regs[0])")
+            logger.debug("assigners: \(String(describing: assigners))")
+            logger.debug("delegator: \(regs[2])")
+            logger.debug("alwaysAcc: \(String(describing: alwaysAcc))")
+
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
             x.state.manager = regs[0]
             x.state.assigners = assigners!
@@ -919,7 +928,7 @@ public class New: HostCall {
     }
 
     private func bump(i: ServiceIndex) -> ServiceIndex {
-        256 + ((i - 256 + 42) & (serviceIndexModValue - 1))
+        256 + ((i - 256 + 42) % serviceIndexModValue)
     }
 
     public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {

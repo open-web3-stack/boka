@@ -32,6 +32,7 @@ enum TestsSource: String {
     case jamduna
     case javajam
     case jamixir
+    case other
 }
 
 enum TestLoader {

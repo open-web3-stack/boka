@@ -212,8 +212,8 @@ extension Accumulation {
         var newAuthorizationQueue = authorizationQueue
         var overallAccountChanges = AccountChanges()
         var tempPrivilegedServices: PrivilegedServices?
-        var newDelegator = privilegedServices.delegator
-        var newAssigners = privilegedServices.assigners
+        var newDelegator: ServiceIndex?
+        var newAssigners: ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>?
 
         for report in workReports {
             for digest in report.digests {
@@ -260,20 +260,19 @@ extension Accumulation {
 
             servicePreimageSet.formUnion(singleOutput.provide)
 
-            switch service {
             // m'
-            case privilegedServices.manager:
+            if service == privilegedServices.manager {
                 tempPrivilegedServices = PrivilegedServices(
                     manager: singleOutput.state.manager,
                     assigners: singleOutput.state.assigners,
                     delegator: singleOutput.state.delegator,
                     alwaysAcc: singleOutput.state.alwaysAcc
                 )
+            }
+
             // i'
-            case privilegedServices.delegator:
+            if service == privilegedServices.delegator {
                 newValidatorQueue = singleOutput.state.validatorQueue
-            default:
-                break
             }
 
             // v'
@@ -288,7 +287,10 @@ extension Accumulation {
 
             // a'
             if let index = tempPrivilegedServices?.assigners.firstIndex(of: service) {
-                newAssigners[index] = singleOutput.state.assigners[index]
+                if newAssigners == nil {
+                    newAssigners = tempPrivilegedServices?.assigners
+                }
+                newAssigners![index] = singleOutput.state.assigners[index]
             }
 
             accountsRef = singleOutput.state.accounts
@@ -308,8 +310,8 @@ extension Accumulation {
                 validatorQueue: newValidatorQueue ?? validatorQueue,
                 authorizationQueue: newAuthorizationQueue,
                 manager: tempPrivilegedServices?.manager ?? privilegedServices.manager,
-                assigners: newAssigners,
-                delegator: newDelegator,
+                assigners: newAssigners ?? tempPrivilegedServices?.assigners ?? privilegedServices.assigners,
+                delegator: newDelegator ?? tempPrivilegedServices?.delegator ?? privilegedServices.delegator,
                 alwaysAcc: tempPrivilegedServices?.alwaysAcc ?? privilegedServices.alwaysAcc,
                 entropy: state.entropy
             ),
@@ -533,15 +535,6 @@ extension Accumulation {
             timeslot: timeslot
         )
 
-        authorizationQueue = accumulateOutput.state.authorizationQueue
-        validatorQueue = accumulateOutput.state.validatorQueue
-        privilegedServices = PrivilegedServices(
-            manager: accumulateOutput.state.manager,
-            assigners: accumulateOutput.state.assigners,
-            delegator: accumulateOutput.state.delegator,
-            alwaysAcc: accumulateOutput.state.alwaysAcc
-        )
-
         // transfers execution + transfers statistics
         var transferGroups = [ServiceIndex: [DeferredTransfers]]()
         var transfersStats = TransfersStats()
@@ -552,7 +545,7 @@ extension Accumulation {
             let gasUsed = try await onTransfer(
                 config: config,
                 serviceIndex: service,
-                serviceAccounts: accountsMutRef,
+                serviceAccounts: accumulateOutput.state.accounts,
                 timeslot: timeslot,
                 entropy: entropy,
                 transfers: transfers
@@ -563,6 +556,16 @@ extension Accumulation {
         }
 
         self = accumulateOutput.state.accounts.value as! Self
+
+        // update non-accounts state after accounts updated
+        authorizationQueue = accumulateOutput.state.authorizationQueue
+        validatorQueue = accumulateOutput.state.validatorQueue
+        privilegedServices = PrivilegedServices(
+            manager: accumulateOutput.state.manager,
+            assigners: accumulateOutput.state.assigners,
+            delegator: accumulateOutput.state.delegator,
+            alwaysAcc: accumulateOutput.state.alwaysAcc
+        )
 
         // update accumulation history
         let accumulated = accumulatableReports[0 ..< accumulateOutput.numAccumulated]

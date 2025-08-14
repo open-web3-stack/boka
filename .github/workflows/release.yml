@@ -27,7 +27,7 @@ jobs:
     - run: sudo apt-get update
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
+        packages: curl build-essential cmake librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
     - uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-region: us-east-2

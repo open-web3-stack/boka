@@ -12,9 +12,15 @@ public func onTransfer(
     transfers: [DeferredTransfers]
 ) async throws -> Gas {
     guard var account = try await serviceAccounts.value.get(serviceAccount: serviceIndex),
-          let preimage = try await serviceAccounts.value.get(serviceAccount: serviceIndex, preimageHash: account.codeHash),
           !transfers.isEmpty
     else {
+        return Gas(0)
+    }
+
+    account.balance += transfers.reduce(Balance(0)) { $0 + $1.amount }
+    serviceAccounts.set(serviceAccount: serviceIndex, account: account)
+
+    guard let preimage = try await serviceAccounts.value.get(serviceAccount: serviceIndex, preimageHash: account.codeHash) else {
         return Gas(0)
     }
 
@@ -23,10 +29,6 @@ public func onTransfer(
     guard codeBlob.count <= config.value.maxServiceCodeSize else {
         return Gas(0)
     }
-
-    account.balance += transfers.reduce(Balance(0)) { $0 + $1.amount }
-
-    serviceAccounts.set(serviceAccount: serviceIndex, account: account)
 
     let contextContent = OnTransferContext.ContextType(serviceIndex: serviceIndex, accounts: serviceAccounts)
     let ctx = OnTransferContext(context: contextContent, config: config, entropy: entropy, transfers: transfers)

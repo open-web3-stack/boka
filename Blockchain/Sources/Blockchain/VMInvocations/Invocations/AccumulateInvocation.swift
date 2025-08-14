@@ -31,9 +31,9 @@ public func accumulate(
         return .init(state: state, transfers: [], commitment: nil, gasUsed: Gas(0), provide: [])
     }
 
-    let initialIndex = try Blake2b256.hash(JamEncoder.encode(UInt(serviceIndex), state.entropy, UInt(timeslot))).data.decode(UInt32.self)
+    let initialIndex = try Blake2b256.hash(JamEncoder.encode(serviceIndex, state.entropy, timeslot)).data.decode(UInt32.self)
     let nextAccountIndex = try await AccumulateContext.check(
-        i: initialIndex % serviceIndexModValue + 256,
+        i: (initialIndex % serviceIndexModValue) + 256,
         accounts: state.accounts.toRef()
     )
 
