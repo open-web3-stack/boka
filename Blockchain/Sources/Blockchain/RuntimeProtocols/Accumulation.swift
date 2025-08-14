@@ -260,20 +260,19 @@ extension Accumulation {
 
             servicePreimageSet.formUnion(singleOutput.provide)
 
-            switch service {
             // m'
-            case privilegedServices.manager:
+            if service == privilegedServices.manager {
                 tempPrivilegedServices = PrivilegedServices(
                     manager: singleOutput.state.manager,
                     assigners: singleOutput.state.assigners,
                     delegator: singleOutput.state.delegator,
                     alwaysAcc: singleOutput.state.alwaysAcc
                 )
+            }
+
             // i'
-            case privilegedServices.delegator:
+            if service == privilegedServices.delegator {
                 newValidatorQueue = singleOutput.state.validatorQueue
-            default:
-                break
             }
 
             // v'

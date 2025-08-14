@@ -225,12 +225,15 @@ public class Lookup: HostCall {
         }
 
         let preimageHash = try Data32(state.readMemory(address: regs[0], length: 32))
+        logger.debug("preimageHash: \(String(describing: preimageHash))")
 
         let value: Data? = if let service, let preimageHash {
             try await serviceAccounts.value.get(serviceAccount: service, preimageHash: preimageHash)
         } else {
             nil
         }
+
+        logger.debug("value: \(String(describing: value))")
 
         let reg10: UInt64 = state.readRegister(Registers.Index(raw: 10))
         let reg11: UInt64 = state.readRegister(Registers.Index(raw: 11))
