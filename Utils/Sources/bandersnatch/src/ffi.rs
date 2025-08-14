@@ -92,7 +92,7 @@ pub extern "C" fn public_new_from_data(
         return 1;
     }
     let data_slice = unsafe { std::slice::from_raw_parts(data, len) };
-    let public = match Public::deserialize_compressed(data_slice) {
+    let public = match Public::deserialize_compressed_unchecked(data_slice) {
         Ok(public) => Box::new(public),
         Err(_) => return 2,
     };
@@ -276,7 +276,7 @@ pub extern "C" fn ring_commitment_new_from_data(
         return 1;
     }
     let data_slice = unsafe { std::slice::from_raw_parts(data, len) };
-    let commitment = match RingCommitment::deserialize_compressed(data_slice) {
+    let commitment = match RingCommitment::deserialize_compressed_unchecked(data_slice) {
         Ok(commitment) => Box::new(commitment),
         Err(_) => return 2,
     };
@@ -423,7 +423,7 @@ pub extern "C" fn get_ietf_signature_output(
     }
 
     let input_slice = unsafe { std::slice::from_raw_parts(input, input_len) };
-    let signature = match IetfVrfSignature::deserialize_compressed(input_slice) {
+    let signature = match IetfVrfSignature::deserialize_compressed_unchecked(input_slice) {
         Ok(signature) => Box::new(signature),
         Err(_) => return 4,
     };

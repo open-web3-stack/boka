@@ -4,7 +4,7 @@ enum TestLogger {
     static let setupOnce: () = {
         LoggingSystem.bootstrap { label in
             var handler = StreamLogHandler.standardOutput(label: label)
-            handler.logLevel = .trace
+            handler.logLevel = .debug
             return handler
         }
     }()

@@ -65,7 +65,12 @@ public class ServiceAccountsMutRef {
     }
 
     public func addNew(serviceAccount index: ServiceIndex, account: ServiceAccount) async throws {
-        ref.value.set(serviceAccount: index, account: account.toDetails())
+        // set new account details with zero footprint initially
+        var accountDetails = account.toDetails()
+        accountDetails.itemsCount = 0
+        accountDetails.totalByteLength = 0
+        ref.value.set(serviceAccount: index, account: accountDetails)
+
         for (key, value) in account.storage {
             try await ref.value.set(serviceAccount: index, storageKey: key, value: value)
         }

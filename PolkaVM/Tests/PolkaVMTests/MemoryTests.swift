@@ -280,6 +280,33 @@ enum MemoryTests {
             #expect(memory.isReadable(address: argumentEnd, length: Int(UInt32.max - argumentEnd)) == false)
             #expect(throws: MemoryError.notWritable(argumentStart)) { try memory.write(address: argumentStart, value: 4) }
         }
+
+        @Test func sbrk() throws {
+            let pageSize = UInt32(config.pvmMemoryPageSize)
+
+            let initialHeapEnd = try memory.sbrk(0)
+
+            let allocSize: UInt32 = pageSize + (pageSize / 4) // 1.25 pages worth
+            let newHeapEnd = try memory.sbrk(allocSize)
+
+            #expect(newHeapEnd == initialHeapEnd)
+
+            let finalBoundary = initialHeapEnd + allocSize
+            let start = initialHeapEnd / pageSize
+            let end = (finalBoundary + pageSize - 1) / pageSize
+            let pages = end - start
+
+            #expect(memory.isWritable(address: initialHeapEnd, length: Int(allocSize)) == true)
+
+            let lastPageStart = (end - 1) * pageSize
+            #expect(memory.isWritable(address: lastPageStart, length: Int(pageSize)) == true)
+
+            try memory.write(address: initialHeapEnd, value: 42)
+            try memory.write(address: finalBoundary - 1, value: 43)
+
+            #expect(try memory.read(address: initialHeapEnd) == 42)
+            #expect(try memory.read(address: finalBoundary - 1) == 43)
+        }
     }
 
     @Suite struct GeneralMemoryTests {
