@@ -884,6 +884,7 @@ public class Designate: HostCall {
         if validatorQueue == nil {
             throw VMInvocationsError.panic
         } else if x.serviceIndex != x.state.delegator {
+            logger.debug("Designate HUH: \(x.serviceIndex) != \(x.state.delegator)")
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
         } else {
             x.state.validatorQueue = try ConfigFixedSizeArray(config: config, array: validatorQueue!)
