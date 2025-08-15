@@ -14,7 +14,7 @@ struct FuzzTests {
     static let ignore: [(String, String)] = [
         ("0.6.7/1754725568", "00000004"), // many mismatch (from javajam reports)
         ("0.6.7/1754754058", "00000004"), // many mismatch (from javajam reports)
-        ("0.6.7/1754982630", "00000008"), // NOTE: seems this should fail on .invalidResultCodeHash
+        ("0.6.7/1754982630", "00000008"), // seems this should fail on .invalidResultCodeHash
         ("0.6.7/1755150526", "00000013"), // designate HUH
         ("0.6.7/1755155383", "00000015"), // .invalidResultCodeHash
         ("0.6.7/1755155383", "00000016"), // .invalidResultCodeHash
