@@ -1,4 +1,4 @@
-name: Release Binaries
+name: Release
 
 on:
   push:
@@ -15,83 +15,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-linux-x64:
-    name: Build Linux x64
-    runs-on: [self-hosted, linux]
-    timeout-minutes: 60
-    steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-    - run: sudo apt-get update
-    - uses: awalsh128/cache-apt-pkgs-action@latest
-      with:
-        packages: curl build-essential cmake librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
-    - uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-region: us-east-2
-    - name: Cache SPM
-      uses: runs-on/cache@v4
-      with:
-        path: '**/.build'
-        key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
-        restore-keys: |
-          ${{ runner.os }}-spm-
-      env:
-        RUNS_ON_S3_BUCKET_CACHE: laminar-gh-action-cache
-    - name: Cache Cargo
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-    - name: Cache bandersnatch_vrfs static lib
-      uses: actions/cache@v4
-      with:
-        path: .lib/libbandersnatch_vrfs.a
-        key: ${{ runner.os }}-libs-libbandersnatch-${{ hashFiles('Utils/Sources/bandersnatch/**') }}
-        restore-keys: |
-            ${{ runner.os }}-libs-libbandersnatch
-    - name: Cache bls static lib
-      uses: actions/cache@v4
-      with:
-        path: .lib/libbls.a
-        key: ${{ runner.os }}-libs-libbls-${{ hashFiles('Utils/Sources/bls/**') }}
-        restore-keys: |
-            ${{ runner.os }}-libs-libbls
-    - name: Cache erasure-coding static lib
-      uses: actions/cache@v4
-      with:
-        path: .lib/libec.a
-        key: ${{ runner.os }}-libs-libec-${{ hashFiles('Utils/Sources/erasure-coding/**') }}
-        restore-keys: |
-            ${{ runner.os }}-libs-libec
-    - name: Setup Swift
-      uses: SwiftyLab/setup-swift@latest
-    - name: Setup Rust
-      uses: dtolnay/rust-toolchain@nightly
-    - name: Build External Libraries
-      run: ./scripts/build-external-libs.sh
-    - name: Build Dependencies
-      run: make deps
-    - name: Build Release Binary
-      run: |
-        cd Boka
-        swift build -c release
-        cp $(swift build -c release --show-bin-path)/Boka boka-linux-x64
-        strip boka-linux-x64
-    - name: Upload Binary
-      uses: actions/upload-artifact@v4
-      with:
-        name: boka-linux-x64
-        path: Boka/boka-linux-x64
-        retention-days: 7
-
   build-macos-aarch64:
     name: Build macOS aarch64
     runs-on: macos-15
@@ -107,7 +30,7 @@ jobs:
       uses: dtolnay/rust-toolchain@nightly
     - name: Install Dependencies
       run: |
-        brew install rocksdb openssl
+        brew install openssl snappy
     - name: Build External Libraries
       run: ./scripts/build-external-libs.sh
     - name: Build Dependencies
@@ -115,19 +38,71 @@ jobs:
     - name: Build Release Binary
       run: |
         cd Boka
-        swift build -c release
-        cp $(swift build -c release --show-bin-path)/Boka boka-macos-aarch64
-        strip boka-macos-aarch64
+        export MACOSX_DEPLOYMENT_TARGET=15.0
+
+        # Create a local build directory for static libraries
+        mkdir -p ../static-libs
+        STATIC_LIB_DIR="$(pwd)/../static-libs"
+        cd ../static-libs
+
+        # Build LZ4 static from source
+        git clone --depth=1 https://github.com/lz4/lz4.git
+        cd lz4/lib
+        make clean
+        make liblz4.a
+        mkdir -p "$STATIC_LIB_DIR/lib" "$STATIC_LIB_DIR/include"
+        cp liblz4.a "$STATIC_LIB_DIR/lib/"
+        cp lz4.h lz4hc.h lz4frame.h "$STATIC_LIB_DIR/include/"
+        cd ../..
+
+        # Build Zstd static from source
+        git clone --depth=1 https://github.com/facebook/zstd.git
+        cd zstd/lib
+        make clean
+        make libzstd.a
+        mkdir -p "$STATIC_LIB_DIR/lib" "$STATIC_LIB_DIR/include"
+        cp libzstd.a "$STATIC_LIB_DIR/lib/"
+        cp zstd.h zdict.h zstd_errors.h "$STATIC_LIB_DIR/include/"
+        cd ../..
+
+        # Build RocksDB static with our static compression libs
+        git clone --depth=1 https://github.com/facebook/rocksdb.git
+        cd rocksdb
+        make clean
+        PORTABLE=1 make static_lib \
+          LDFLAGS="-L$STATIC_LIB_DIR/lib" \
+          EXTRA_CXXFLAGS="-I$STATIC_LIB_DIR/include -Wno-unused-parameter" \
+          USE_RTTI=1
+        cp librocksdb.a "$STATIC_LIB_DIR/lib/"
+        cp -r include/rocksdb "$STATIC_LIB_DIR/include/"
+        cd ../../Boka
+
+        # Build Swift release binary with our static libraries
+        swift build -c release \
+          -Xlinker "$STATIC_LIB_DIR/lib/librocksdb.a" \
+          -Xlinker "$STATIC_LIB_DIR/lib/liblz4.a" \
+          -Xlinker "$STATIC_LIB_DIR/lib/libzstd.a" \
+          -Xlinker $(brew --prefix snappy)/lib/libsnappy.a \
+          -Xlinker $(brew --prefix openssl)/lib/libssl.a \
+          -Xlinker $(brew --prefix openssl)/lib/libcrypto.a \
+          -Xlinker -lc++ \
+          -Xlinker -lz \
+          -Xlinker -lbz2
+        cp $(swift build -c release --show-bin-path)/Boka ../boka-macos-aarch64
+        strip ../boka-macos-aarch64
+
+        # Verify dependencies
+        otool -L ../boka-macos-aarch64
     - name: Upload Binary
       uses: actions/upload-artifact@v4
       with:
         name: boka-macos-aarch64
-        path: Boka/boka-macos-aarch64
+        path: ./boka-macos-aarch64
         retention-days: 7
 
   create-release:
     name: Create GitHub Release
-    needs: [build-linux-x64, build-macos-aarch64]
+    needs: [build-macos-aarch64]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -158,35 +133,24 @@ jobs:
         body: |
           ## Boka Binary Release ${{ steps.get_tag.outputs.tag }}
 
-          Standalone binaries for multiple platforms. Download the appropriate binary for your system:
-
-          ### Linux
-          - **x64**: `boka-linux-x64` - For Intel/AMD 64-bit Linux systems
-
-          ### macOS
-          - **aarch64**: `boka-macos-aarch64` - For Apple Silicon Macs (M1/M2/M3)
+          Download binaries for your platform:
 
           ### Usage
           ```bash
-          # Download and make executable
-          chmod +x boka-*
+          # macOS: Download and make executable
+          chmod +x boka-macos-aarch64
+          ./boka-macos-aarch64 --help
 
-          # Run the binary
-          ./boka-linux-x64 --help
-          ./boka-macos-aarch64 generate --help
-          ./boka-macos-aarch64 fuzz --help
+          # Linux: Use Docker
+          docker run --rm acala/boka:${{ steps.get_tag.outputs.tag }} fuzz target --help
           ```
 
           ### Verification
-          Verify binary integrity using the provided checksums:
+          Verify macOS binary integrity:
           ```bash
           sha256sum -c checksums-all.txt
           ```
-
-          ### Docker Alternative
-          If you prefer Docker: `docker run --rm acala/boka:latest --help`
         files: |
-          binaries/boka-linux-x64/boka-linux-x64
           binaries/boka-macos-aarch64/boka-macos-aarch64
           binaries/checksums-all.txt
         draft: false
