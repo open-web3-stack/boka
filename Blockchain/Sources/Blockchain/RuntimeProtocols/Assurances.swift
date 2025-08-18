@@ -31,6 +31,14 @@ extension Assurances {
             guard assurance.parentHash == parentHash else {
                 throw AssurancesError.invalidAssuranceParentHash
             }
+
+            let hash = Blake2b256.hash(assurance.parentHash, assurance.assurance)
+            let payload = SigningContext.available + hash.data
+            let validatorKey = try currentValidators.at(Int(assurance.validatorIndex))
+            let pubkey = try Ed25519.PublicKey(from: validatorKey.ed25519)
+            guard pubkey.verify(signature: assurance.signature, message: payload) else {
+                throw AssurancesError.invalidAssuranceSignature
+            }
         }
     }
 
@@ -52,16 +60,6 @@ extension Assurances {
                 if (report.timeslot + UInt32(config.value.preimageReplacementPeriod)) <= timeslot {
                     newReports[i] = nil
                 }
-            }
-        }
-
-        for assurance in extrinsic.assurances {
-            let hash = Blake2b256.hash(assurance.parentHash, assurance.assurance)
-            let payload = SigningContext.available + hash.data
-            let validatorKey = try currentValidators.at(Int(assurance.validatorIndex))
-            let pubkey = try Ed25519.PublicKey(from: validatorKey.ed25519)
-            guard pubkey.verify(signature: assurance.signature, message: payload) else {
-                throw AssurancesError.invalidAssuranceSignature
             }
         }
 

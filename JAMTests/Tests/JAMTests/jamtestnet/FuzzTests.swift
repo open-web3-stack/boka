@@ -59,8 +59,7 @@ struct FuzzTests {
             ("0.6.7/1755252727", "00000011"), // .invalidHeaderWinningTickets
         ],
         ignore: [
-            ("0.6.7/1754982087", "000000"), // bad test, should be removed
-            ("0.6.7/1755248769", "00000015"), // .invalidAssuranceSignature (to be checked, see jamduna issue)
+            ("0.6.7/1754982087", "000000"), // bad test
         ]
     ))
     func v067(_ input: TestInput) async throws {
