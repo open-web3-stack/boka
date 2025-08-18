@@ -36,3 +36,15 @@ extension ExtrinsicPreimages.PreimageItem: Comparable {
         return lhs.data.lexicographicallyPrecedes(rhs.data)
     }
 }
+
+extension ExtrinsicPreimages: Validate {
+    public enum Error: Swift.Error {
+        case preimagesNotSorted
+    }
+
+    public func validate(config _: Config) throws {
+        guard preimages.isSortedAndUnique() else {
+            throw Error.preimagesNotSorted
+        }
+    }
+}

@@ -1008,6 +1008,8 @@ public class Upgrade: HostCall {
 
         let codeHash: Data32? = try? Data32(state.readMemory(address: regs[0], length: 32))
 
+        logger.debug("new codeHash: \(codeHash?.description ?? "nil")")
+
         if let codeHash, var acc = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex) {
             acc.codeHash = codeHash
             acc.minAccumlateGas = Gas(regs[1])

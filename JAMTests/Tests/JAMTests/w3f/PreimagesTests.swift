@@ -89,7 +89,8 @@ struct PreimagesTests {
 
         var state = testcase.preState
         let result = await Result {
-            try await state.updatePreimages(
+            try testcase.input.preimages.validate(config: config)
+            return try await state.updatePreimages(
                 config: config,
                 timeslot: testcase.input.slot,
                 preimages: testcase.input.preimages

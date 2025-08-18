@@ -203,6 +203,26 @@ func withoutOffenders(
 }
 
 extension Safrole {
+    public func validateTickets(
+        config: ProtocolConfigRef,
+        slot: TimeslotIndex,
+        extrinsics: ExtrinsicTickets,
+    ) throws(SafroleError) {
+        guard slot > timeslot else {
+            throw .invalidTimeslot
+        }
+
+        if (slot % UInt32(config.value.epochLength)) < UInt32(config.value.ticketSubmissionEndSlot) {
+            guard extrinsics.tickets.count <= config.value.maxTicketsPerExtrinsic else {
+                throw .tooManyExtrinsics
+            }
+        } else {
+            guard extrinsics.tickets.isEmpty else {
+                throw .extrinsicsNotAllowed
+            }
+        }
+    }
+
     public func updateSafrole(
         config: ProtocolConfigRef,
         slot: TimeslotIndex,
@@ -229,20 +249,6 @@ extension Safrole {
         // m'
         let newPhase = slot % epochLength
         let isEpochChange = currentEpoch != newEpoch
-
-        guard slot > timeslot else {
-            throw .invalidTimeslot
-        }
-
-        if newPhase < ticketSubmissionEndSlot {
-            guard extrinsics.tickets.count <= config.value.maxTicketsPerExtrinsic else {
-                throw .tooManyExtrinsics
-            }
-        } else {
-            guard extrinsics.tickets.isEmpty else {
-                throw .extrinsicsNotAllowed
-            }
-        }
 
         do {
             let ctx = try Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))

@@ -10,7 +10,7 @@ public final class Runtime {
     public enum Error: Swift.Error {
         case safroleError(SafroleError)
         case disputesError(DisputesError)
-        case invalidTimeslot(got: TimeslotIndex, context: TimeslotIndex)
+        case invalidTimeslot(got: TimeslotIndex, exp: TimeslotIndex)
         case authorizationError(AuthorizationError)
         case encodeError(any Swift.Error)
         case invalidExtrinsicHash
@@ -19,18 +19,13 @@ public final class Runtime {
         case invalidHeaderEpochMarker
         case invalidHeaderWinningTickets
         case invalidHeaderOffendersMarkers
-        case invalidAssuranceParentHash
-        case invalidAssuranceSignature
-        case assuranceForEmptyCore
-        case preimagesNotSorted
-        case invalidPreimageServiceIndex
-        case duplicatedPreimage
         case invalidAuthorTicket
         case invalidAuthorKey
         case invalidBlockSeal(any Swift.Error)
         case invalidVrfSignature
         case other(any Swift.Error)
         case validateError(any Swift.Error)
+        case headerTimeslotTooSmall
     }
 
     public struct ApplyContext {
@@ -65,7 +60,7 @@ public final class Runtime {
         }
 
         guard block.header.timeslot <= context.timeslot else {
-            throw Error.invalidTimeslot(got: block.header.timeslot, context: context.timeslot)
+            throw Error.invalidTimeslot(got: block.header.timeslot, exp: context.timeslot)
         }
 
         // epoch is validated at apply time by Safrole
@@ -126,27 +121,37 @@ public final class Runtime {
         }.mapError { _ in Error.invalidVrfSignature }.get()
     }
 
-    public func validate(block: Validated<BlockRef>, state: StateRef, context: ApplyContext) throws(Error) {
+    public func validate(block: Validated<BlockRef>, state: StateRef, context: ApplyContext) async throws(Error) {
         try validateHeader(block: block, state: state, context: context)
 
         let block = block.value
+        let extrinsic = block.extrinsic
 
-        for ext in block.extrinsic.availability.assurances {
-            guard ext.parentHash == block.header.parentHash else {
-                throw Error.invalidAssuranceParentHash
-            }
+        // NOTE: extrinsic validations not related to header or state are not here, but in their own Validate impl
+        do {
+            // tickets
+            try state.value.validateTickets(config: config, slot: block.header.timeslot, extrinsics: extrinsic.tickets)
+            // assurances
+            try state.value.validateAssurances(extrinsics: extrinsic.availability, parentHash: block.header.parentHash)
+            // guarantees
+            try await state.value.validateGuarantees(config: config, extrinsic: extrinsic.reports)
+        } catch {
+            throw Error.validateError(error)
         }
-
-        // TODO: abstract input validation logic from Safrole state update function and call it here
-        // TODO: validate other things
     }
 
-    public func apply(block: BlockRef, state prevState: StateRef, context: ApplyContext) async throws(Error) -> StateRef {
+    public func apply(block: BlockRef, state prevState: StateRef, context: ApplyContext? = nil) async throws(Error) -> StateRef {
         let validatedBlock = try Result(catching: { try block.toValidated(config: config) })
             .mapError(Error.validateError)
             .get()
 
-        try validate(block: validatedBlock, state: prevState, context: context)
+        let prevStateRoot = await prevState.value.stateRoot
+
+        try await validate(
+            block: validatedBlock,
+            state: prevState,
+            context: context ?? .init(timeslot: block.value.header.timeslot, stateRoot: prevStateRoot)
+        )
 
         return try await apply(block: validatedBlock, state: prevState)
     }
@@ -187,9 +192,9 @@ public final class Runtime {
 
             newState.recentHistory.updatePartial(parentStateRoot: block.header.priorStateRoot)
 
-            let reporters = try await updateGuarantees(block: block, state: &newState)
+            let reporters = try await updateReports(block: block, state: &newState)
 
-            // after reports as it need old recent history
+            // after reports as reports need old recent history
             try updateRecentHistory(block: block, state: &newState, accumulateRoot: accumulateRoot)
 
             // update authorization pool and queue
@@ -279,14 +284,13 @@ public final class Runtime {
             config: config,
             timeslot: block.header.timeslot,
             extrinsic: block.extrinsic.availability,
-            parentHash: block.header.parentHash
         )
 
         newState.reports = newReports
         return availableReports
     }
 
-    public func updateGuarantees(block: BlockRef, state newState: inout State) async throws -> [Ed25519PublicKey] {
+    public func updateReports(block: BlockRef, state newState: inout State) async throws -> [Ed25519PublicKey] {
         let result = try await newState.update(
             config: config, timeslot: newState.timeslot, extrinsic: block.extrinsic.reports
         )
