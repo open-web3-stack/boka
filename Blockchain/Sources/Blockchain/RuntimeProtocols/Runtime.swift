@@ -59,14 +59,8 @@ public final class Runtime {
             throw Error.invalidExtrinsicHash
         }
 
-        // check timeslot is less than or equal to expected timeslot
         guard block.header.timeslot <= context.timeslot else {
             throw Error.invalidTimeslot(got: block.header.timeslot, exp: context.timeslot)
-        }
-
-        // check timeslot is greater than prev state timeslot
-        guard block.header.timeslot > state.value.timeslot else {
-            throw Error.headerTimeslotTooSmall
         }
 
         // epoch is validated at apply time by Safrole
