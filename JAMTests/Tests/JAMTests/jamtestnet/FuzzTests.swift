@@ -5,56 +5,65 @@ import Utils
 @testable import JAMTests
 
 struct FuzzTests {
-    // empty array means run all
-    static let testFilters: [(String, String)] = [
-        // example: ("0.6.7/1754982630", "00000004")
-    ]
+    struct TestInput {
+        let testcase: Testcase
+        let allowFailure: Bool
 
-    // ignore tests
-    static let ignore: [(String, String)] = [
-        ("0.6.7/1754982087", "00000005"), // bad test, B.10 issue
-        ("0.6.7/1754982630", "00000008"), // seems this should fail on .invalidResultCodeHash
-        ("0.6.7/1755155383", "00000015"), // .invalidResultCodeHash
-        ("0.6.7/1755155383", "00000016"), // .invalidResultCodeHash
-        ("0.6.7/1755186771", "00000029"), // .invalidResultCodeHash
-        ("0.6.7/1755248769", "00000015"), // .invalidAssuranceSignature
-        ("0.6.7/1755252727", "00000011"),
-        // .invalidHeaderWinningTickets (JavaJAM Fix: Added validation for ticket attempt numbers for tickets mark in the block header.)
-    ]
-
-    static func loadTests(version: String) throws -> [Testcase] {
-        let basePath = Bundle.module.resourcePath! + "/fuzz/" + version
-        var allTestcases: [Testcase] = []
-
-        for timestamp in try FileManager.default.contentsOfDirectory(atPath: basePath).sorted() {
-            guard !timestamp.starts(with: ".") else { continue }
-
-            let path = "\(version)/\(timestamp)"
-
-            let testcases = try JamTestnet.loadTests(path: path, src: .fuzz)
-
-            let testsExceptIgnore = testcases.filter { testcase in
-                for (ignorePath, prefix) in ignore where path == ignorePath && testcase.description.starts(with: prefix) {
-                    return false
-                }
-                return true
-            }
-
-            if testFilters.isEmpty {
-                allTestcases.append(contentsOf: testsExceptIgnore)
-            } else {
-                for (filterPath, filterPrefix) in testFilters where filterPath == path {
-                    let filtered = testsExceptIgnore.filter { $0.description.starts(with: filterPrefix) }
-                    allTestcases.append(contentsOf: filtered)
-                }
-            }
+        init(_ testcase: Testcase, allowFailure: Bool = false) {
+            self.testcase = testcase
+            self.allowFailure = allowFailure
         }
-
-        return allTestcases
     }
 
-    @Test(arguments: try loadTests(version: "0.6.7"))
-    func fuzzTestsv067(_ testcase: Testcase) async throws {
-        try await TraceTest.test(testcase)
+    static func loadTests(
+        version: String,
+        filters: [(String, String)],
+        expectFailure: [(String, String)],
+        ignore: [(String, String)]
+    ) throws -> [TestInput] {
+        let basePath = Bundle.module.resourcePath! + "/fuzz/" + version
+
+        return try FileManager.default.contentsOfDirectory(atPath: basePath)
+            .sorted()
+            .filter { !$0.starts(with: ".") }
+            .flatMap { timestamp -> [TestInput] in
+                let path = "\(version)/\(timestamp)"
+                let testcases = try JamTestnet.loadTests(path: path, src: .fuzz)
+                return testcases
+                    .filter { testcase in
+                        !ignore.contains { ignorePath, ignorePrefix in
+                            path == ignorePath && testcase.description.starts(with: ignorePrefix)
+                        }
+                    }
+                    .filter { testcase in
+                        filters.isEmpty || filters.contains { filterPath, filterPrefix in
+                            path == filterPath && testcase.description.starts(with: filterPrefix)
+                        }
+                    }
+                    .map { testcase in
+                        let allowFailure = expectFailure.contains { failurePath, failurePrefix in
+                            path == failurePath && testcase.description.starts(with: failurePrefix)
+                        }
+                        return TestInput(testcase, allowFailure: allowFailure)
+                    }
+            }
+    }
+
+    @Test(arguments: try loadTests(
+        version: "0.6.7",
+        filters: [
+            // empty to include all
+            // example: ("0.6.7/1754982630", "00000004")
+        ],
+        expectFailure: [
+            ("0.6.7/1755252727", "00000011"), // .invalidHeaderWinningTickets
+        ],
+        ignore: [
+            ("0.6.7/1754982087", "000000"), // bad test, should be removed
+            ("0.6.7/1755248769", "00000015"), // .invalidAssuranceSignature (to be checked, see jamduna issue)
+        ]
+    ))
+    func v067(_ input: TestInput) async throws {
+        try await TraceTest.test(input.testcase, allowFailure: input.allowFailure)
     }
 }

@@ -85,6 +85,36 @@ extension Guaranteeing {
             .map { StateKeys.ServiceAccountKey(index: $0.serviceIndex) }
     }
 
+    public func validateGuarantees(
+        config: ProtocolConfigRef,
+        extrinsic: ExtrinsicGuarantees
+    ) async throws(GuaranteeingError) {
+        for guarantee in extrinsic.guarantees {
+            var totalGasUsage = Gas(0)
+            let report = guarantee.workReport
+
+            for digest in report.digests {
+                guard let acc = try? await serviceAccount(index: digest.serviceIndex) else {
+                    throw .invalidServiceIndex
+                }
+
+                guard acc.codeHash == digest.codeHash else {
+                    throw .invalidResultCodeHash
+                }
+
+                guard digest.gasLimit >= acc.minAccumlateGas else {
+                    throw .invalidServiceGas
+                }
+
+                totalGasUsage += digest.gasLimit
+            }
+
+            guard totalGasUsage <= config.value.workReportAccumulationGas else {
+                throw .outOfGas
+            }
+        }
+    }
+
     public func update(
         config: ProtocolConfigRef,
         timeslot: TimeslotIndex,
@@ -120,7 +150,6 @@ extension Guaranteeing {
         var reporters = Set<Ed25519PublicKey>()
 
         for guarantee in extrinsic.guarantees {
-            var totalGasUsage = Gas(0)
             let report = guarantee.workReport
 
             guard guarantee.timeslot <= timeslot else {
@@ -161,26 +190,6 @@ extension Guaranteeing {
 
             guard coreAuthorizationPool[coreIndex].contains(report.authorizerHash) else {
                 throw .invalidReportAuthorizer
-            }
-
-            for digest in report.digests {
-                guard let acc = try? await serviceAccount(index: digest.serviceIndex) else {
-                    throw .invalidServiceIndex
-                }
-
-                guard acc.codeHash == digest.codeHash else {
-                    throw .invalidResultCodeHash
-                }
-
-                guard digest.gasLimit >= acc.minAccumlateGas else {
-                    throw .invalidServiceGas
-                }
-
-                totalGasUsage += digest.gasLimit
-            }
-
-            guard totalGasUsage <= config.value.workReportAccumulationGas else {
-                throw .outOfGas
             }
         }
 

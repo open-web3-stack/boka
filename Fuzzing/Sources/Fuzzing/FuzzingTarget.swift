@@ -91,8 +91,7 @@ public class FuzzingTarget {
         do {
             guard let stateRef = currentStateRef else { throw FuzzingTargetError.stateNotSet }
 
-            let blockRef = try block.asRef().toValidated(config: config)
-            let newStateRef = try await runtime.apply(block: blockRef, state: stateRef)
+            let newStateRef = try await runtime.apply(block: block.asRef(), state: stateRef)
 
             currentStateRef = newStateRef
 

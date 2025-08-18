@@ -50,10 +50,6 @@ extension Preimages {
         let preimages = preimages.preimages
         var updates: [PreimageUpdate] = []
 
-        guard preimages.isSortedAndUnique() else {
-            throw PreimagesError.preimagesNotSorted
-        }
-
         for preimage in preimages {
             let hash = preimage.data.blake2b256hash()
 

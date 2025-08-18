@@ -66,12 +66,11 @@ enum JamTestnet {
         config: ProtocolConfigRef = TestVariants.tiny.config
     ) async throws -> Result<StateRef, Error> {
         let runtime = Runtime(config: config)
+        let blockRef = testcase.block.asRef()
+        let stateRef = try await testcase.preState.toState(config: config).asRef()
 
         let result = await Result {
-            // NOTE: skip block validate first, some tests does not ensure this
-            let blockRef = try testcase.block.asRef().toValidated(config: config)
-            let stateRef = try await testcase.preState.toState(config: config).asRef()
-            return try await runtime.apply(block: blockRef, state: stateRef)
+            try await runtime.apply(block: blockRef, state: stateRef)
         }
 
         return result

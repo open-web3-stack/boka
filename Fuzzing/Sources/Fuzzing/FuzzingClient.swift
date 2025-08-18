@@ -120,7 +120,7 @@ public class FuzzingClient {
             )
 
             // import block locally
-            currentStateRef = try await runtime.apply(block: blockRef.toValidated(config: config), state: currentStateRef!)
+            currentStateRef = try await runtime.apply(block: blockRef, state: currentStateRef!)
             let currentStateRoot = await currentStateRef!.value.stateRoot
 
             // import block on target
