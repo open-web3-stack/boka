@@ -95,6 +95,11 @@ struct SafroleTests {
 
         let result = Result {
             try testcase.input.extrinsics.validate(config: config)
+            try testcase.preState.validateTickets(
+                config: config,
+                slot: testcase.input.slot,
+                extrinsics: testcase.input.extrinsics
+            )
             return try testcase.preState.updateSafrole(
                 config: config,
                 slot: testcase.input.slot,

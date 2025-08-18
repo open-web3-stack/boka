@@ -99,6 +99,7 @@ struct ReportsTests {
         )
         let result = await Result {
             try testcase.input.reports.validate(config: config)
+            try await state.validateGuarantees(config: config, extrinsic: testcase.input.reports)
             return try await state.update(
                 config: config,
                 timeslot: testcase.input.timeslot,

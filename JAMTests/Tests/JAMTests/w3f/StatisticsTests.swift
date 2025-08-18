@@ -69,14 +69,14 @@ struct StatisticsTests {
 
     @Test(arguments: try StatisticsTests.loadTests(variant: .tiny))
     func tinyTests(_ testcase: Testcase) throws {
-        withKnownIssue("outdated testcase", isIntermittent: true) {
+        withKnownIssue("outdated testcase, missing reporters", isIntermittent: true) {
             try statisticsTests(testcase, variant: .tiny)
         }
     }
 
     @Test(arguments: try StatisticsTests.loadTests(variant: .full))
     func fullTests(_ testcase: Testcase) throws {
-        withKnownIssue("outdated testcase", isIntermittent: true) {
+        withKnownIssue("outdated testcase, missing reporters", isIntermittent: true) {
             try statisticsTests(testcase, variant: .full)
         }
     }

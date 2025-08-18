@@ -23,11 +23,29 @@ public protocol Assurances {
 }
 
 extension Assurances {
+    public func validateAssurances(
+        extrinsics: ExtrinsicAvailability,
+        parentHash: Data32
+    ) throws {
+        for assurance in extrinsics.assurances {
+            guard assurance.parentHash == parentHash else {
+                throw AssurancesError.invalidAssuranceParentHash
+            }
+
+            let hash = Blake2b256.hash(assurance.parentHash, assurance.assurance)
+            let payload = SigningContext.available + hash.data
+            let validatorKey = try currentValidators.at(Int(assurance.validatorIndex))
+            let pubkey = try Ed25519.PublicKey(from: validatorKey.ed25519)
+            guard pubkey.verify(signature: assurance.signature, message: payload) else {
+                throw AssurancesError.invalidAssuranceSignature
+            }
+        }
+    }
+
     public func update(
         config: ProtocolConfigRef,
         timeslot: TimeslotIndex,
         extrinsic: ExtrinsicAvailability,
-        parentHash: Data32
     ) throws -> (
         newReports: ConfigFixedSizeArray<
             ReportItem?,
@@ -42,20 +60,6 @@ extension Assurances {
                 if (report.timeslot + UInt32(config.value.preimageReplacementPeriod)) <= timeslot {
                     newReports[i] = nil
                 }
-            }
-        }
-
-        for assurance in extrinsic.assurances {
-            guard assurance.parentHash == parentHash else {
-                throw AssurancesError.invalidAssuranceParentHash
-            }
-
-            let hash = Blake2b256.hash(assurance.parentHash, assurance.assurance)
-            let payload = SigningContext.available + hash.data
-            let validatorKey = try currentValidators.at(Int(assurance.validatorIndex))
-            let pubkey = try Ed25519.PublicKey(from: validatorKey.ed25519)
-            guard pubkey.verify(signature: assurance.signature, message: payload) else {
-                throw AssurancesError.invalidAssuranceSignature
             }
         }
 

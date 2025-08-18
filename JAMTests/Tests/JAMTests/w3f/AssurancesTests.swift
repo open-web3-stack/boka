@@ -38,10 +38,13 @@ struct AssurancesTests {
         var state = testcase.preState
         let result = Result {
             try testcase.input.assurances.validate(config: config)
+            try state.validateAssurances(
+                extrinsics: testcase.input.assurances,
+                parentHash: testcase.input.parentHash
+            )
             return try state.update(
                 config: config, timeslot: testcase.input.timeslot,
                 extrinsic: testcase.input.assurances,
-                parentHash: testcase.input.parentHash
             )
         }
         switch result {

@@ -7,8 +7,10 @@ import Utils
 
 @testable import JAMTests
 
+private let logger = Logger(label: "TraceTest")
+
 enum TraceTest {
-    static func test(_ input: Testcase) async throws {
+    static func test(_ input: Testcase, allowFailure: Bool = false) async throws {
         // setupTestLogger()
 
         let testcase = try JamTestnet.decodeTestcase(input)
@@ -55,7 +57,12 @@ enum TraceTest {
             // root
             async #expect(stateRef.value.stateRoot == testcase.postState.root)
         case .failure:
-            Issue.record("Expected success, got \(result)")
+            if !allowFailure {
+                Issue.record("Expected success, got \(result)")
+            } else {
+                logger.debug("STF failed with expected error: \(result)")
+                #expect(testcase.preState.root == testcase.postState.root)
+            }
         }
     }
 }
