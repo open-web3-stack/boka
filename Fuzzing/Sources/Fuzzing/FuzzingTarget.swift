@@ -38,12 +38,21 @@ public class FuzzingTarget {
     public func run() async throws {
         try socket.create()
 
-        let connection = try socket.acceptConnection()
+        logger.info("Fuzzing target listening for connections")
 
-        try await handleFuzzer(connection: connection)
+        while true {
+            do {
+                logger.info("Waiting for new connection")
+                let connection = try socket.acceptConnection()
 
-        connection.close()
-        logger.info("Connection closed")
+                try await handleFuzzer(connection: connection)
+
+                connection.close()
+                logger.info("Connection closed, waiting for next connection")
+            } catch {
+                logger.error("Error handling connection: \(error)")
+            }
+        }
     }
 
     private func handleFuzzer(connection: FuzzingSocketConnection) async throws {
