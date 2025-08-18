@@ -19,12 +19,6 @@ public final class Runtime {
         case invalidHeaderEpochMarker
         case invalidHeaderWinningTickets
         case invalidHeaderOffendersMarkers
-        case invalidAssuranceParentHash
-        case invalidAssuranceSignature
-        case assuranceForEmptyCore
-        case preimagesNotSorted
-        case invalidPreimageServiceIndex
-        case duplicatedPreimage
         case invalidAuthorTicket
         case invalidAuthorKey
         case invalidBlockSeal(any Swift.Error)
