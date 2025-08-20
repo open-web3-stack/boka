@@ -4,16 +4,21 @@ import Foundation
 // somehow without this the GH Actions CI fails
 extension Foundation.Bundle: @unchecked @retroactive Sendable {}
 
-struct Testcase: CustomStringConvertible {
-    var description: String
-    var data: Data
+public struct Testcase: CustomStringConvertible, Sendable {
+    public var description: String
+    public var data: Data
+
+    public init(description: String, data: Data) {
+        self.description = description
+        self.data = data
+    }
 }
 
-enum TestVariants: String, CaseIterable {
+public enum TestVariants: String, CaseIterable {
     case tiny
     case full
 
-    var config: ProtocolConfigRef {
+    public var config: ProtocolConfigRef {
         switch self {
         case .tiny:
             var tiny = ProtocolConfigRef.tiny

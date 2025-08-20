@@ -29,6 +29,7 @@ public class FuzzingClient {
         config: String,
         seed: UInt64,
         blockCount: Int,
+        tracesDir: String?,
     ) throws {
         switch config {
         case "tiny":
@@ -42,7 +43,11 @@ public class FuzzingClient {
 
         socket = FuzzingSocket(socketPath: socketPath, config: self.config)
 
-        fuzzGenerator = FuzzGeneratorRandom(seed: seed, config: self.config)
+        if let tracesDir {
+            fuzzGenerator = try FuzzGeneratorTraces(tracesDir: tracesDir)
+        } else {
+            fuzzGenerator = FuzzGeneratorRandom(seed: seed, config: self.config)
+        }
 
         devKey = try DevKeyStore.getDevKey(seed: UInt32(seed % UInt64(UInt32.max)))
         self.blockCount = blockCount
@@ -120,7 +125,12 @@ public class FuzzingClient {
             )
 
             // import block locally
-            currentStateRef = try await runtime.apply(block: blockRef, state: currentStateRef!)
+            do {
+                currentStateRef = try await runtime.apply(block: blockRef, state: currentStateRef!)
+            } catch {
+                logger.error("❌ Failed to import block locally: \(error)")
+                // state remains unchanged, continue with current state
+            }
             let currentStateRoot = await currentStateRef!.value.stateRoot
 
             // import block on target

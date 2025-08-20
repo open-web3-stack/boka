@@ -58,11 +58,14 @@ extension Boka.Fuzz {
         @Option(help: "JAM Protocol configuration preset.")
         var config: JamConfig = .tiny
 
-        @Option(name: .long, help: "Random seed for deterministic testing. Default is random")
+        @Option(name: .long, help: "Random seed for deterministic testing. Default is random.")
         var seed: UInt64 = .random(in: 0 ... UInt64.max)
 
         @Option(name: .long, help: "Number of blocks to process.")
         var blocks: Int = 100
+
+        @Option(name: .long, help: "Directory containing traces test vectors to run.")
+        var tracesDir: String?
 
         func run() async throws {
             let env = ProcessInfo.processInfo.environment
@@ -76,9 +79,9 @@ extension Boka.Fuzz {
                 socketPath: socketPath,
                 config: config.rawValue,
                 seed: seed,
-                blockCount: blocks
+                blockCount: blocks,
+                tracesDir: tracesDir
             )
-
             try await fuzzer.run()
         }
     }
