@@ -36,6 +36,7 @@ public class FuzzingSocket {
     private let socketPath: String
     private var socketFd: Int32 = -1
     private let config: ProtocolConfigRef
+    private var isServer: Bool = false
 
     public init(socketPath: String, config: ProtocolConfigRef) {
         self.socketPath = socketPath
@@ -47,11 +48,15 @@ public class FuzzingSocket {
             _ = platformClose(socketFd)
             socketFd = -1
         }
-        unlink(socketPath)
+        if isServer {
+            unlink(socketPath)
+        }
     }
 
     /// Create a Unix domain socket and bind it to the specified path
     public func create() throws {
+        isServer = true
+
         // Create Unix domain socket
         socketFd = socket(AF_UNIX, platformSockStream, 0)
 

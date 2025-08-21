@@ -18,6 +18,7 @@ let package = Package(
         .package(path: "../Codec"),
         .package(path: "../TracingUtils"),
         .package(path: "../Utils"),
+        .package(path: "../JAMTests"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "6.0.0"),
     ],
     targets: [
@@ -28,6 +29,7 @@ let package = Package(
                 "Codec",
                 "TracingUtils",
                 "Utils",
+                "JAMTests",
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),

@@ -3,10 +3,10 @@ import Codec
 import Foundation
 import Utils
 
-struct JamTestnetTestcase: Codable {
-    var preState: TestState
-    var block: Block
-    var postState: TestState
+public struct JamTestnetTestcase: Codable {
+    public var preState: TestState
+    public var block: Block
+    public var postState: TestState
 }
 
 extension ProtocolConfig {
@@ -18,16 +18,16 @@ extension ProtocolConfig {
     }
 }
 
-struct KeyVal: Codable {
-    var key: Data31
-    var value: Data
+public struct KeyVal: Codable {
+    public var key: Data31
+    public var value: Data
 }
 
-struct TestState: Codable {
-    var root: Data32
-    var keyvals: [KeyVal]
+public struct TestState: Codable {
+    public var root: Data32
+    public var keyvals: [KeyVal]
 
-    func toDict() -> [Data31: Data] {
+    public func toDict() -> [Data31: Data] {
         var dict: [Data31: Data] = [:]
         for arr in keyvals {
             dict[arr.key] = arr.value
@@ -35,7 +35,7 @@ struct TestState: Codable {
         return dict
     }
 
-    func toState(config: ProtocolConfigRef = TestVariants.tiny.config) async throws -> State {
+    public func toState(config: ProtocolConfigRef = TestVariants.tiny.config) async throws -> State {
         var raw: [(key: Data31, value: Data)] = []
 
         for keyval in keyvals {
@@ -50,13 +50,16 @@ struct TestState: Codable {
     }
 }
 
-enum JamTestnet {
+public enum JamTestnet {
     static func loadTests(path: String, src: TestsSource, ext: String = "bin") throws -> [Testcase] {
         // filter genesis which has no tests
         try TestLoader.getTestcases(path: path, extension: ext, src: src).filter { $0.description != "genesis.bin" }
     }
 
-    static func decodeTestcase(_ input: Testcase, config: ProtocolConfigRef = TestVariants.tiny.config) throws -> JamTestnetTestcase {
+    public static func decodeTestcase(
+        _ input: Testcase,
+        config: ProtocolConfigRef = TestVariants.tiny.config
+    ) throws -> JamTestnetTestcase {
         // NOTE: some tests have trailing bytes
         try JamDecoder.decode(JamTestnetTestcase.self, from: input.data, withConfig: config, allowTrailingBytes: true)
     }

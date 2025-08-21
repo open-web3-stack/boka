@@ -95,7 +95,7 @@ public class FuzzingTarget {
 
     private func handleImportBlock(block: Block, connection: FuzzingSocketConnection) async throws {
         logger.info("IMPORT BLOCK: \(block.header.hash().description)")
-        logger.info("Block number: \(block.header.timeslot)")
+        logger.info("Block slot: \(block.header.timeslot)")
 
         do {
             guard let stateRef = currentStateRef else { throw FuzzingTargetError.stateNotSet }
@@ -106,6 +106,7 @@ public class FuzzingTarget {
 
             logger.info("IMPORT BLOCK completed")
             let stateRoot = await currentStateRef?.value.stateRoot ?? Data32()
+            logger.info("State root: \(stateRoot)")
             let response = FuzzingMessage.stateRoot(stateRoot)
             try connection.sendMessage(response)
         } catch {
