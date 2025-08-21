@@ -62,7 +62,7 @@ extension Boka.Fuzz {
         var seed: UInt64 = .random(in: 0 ... UInt64.max)
 
         @Option(name: .long, help: "Number of blocks to process.")
-        var blocks: Int = 100
+        var blocks: Int = 200
 
         @Option(name: .long, help: "Directory containing traces test vectors to run.")
         var tracesDir: String?

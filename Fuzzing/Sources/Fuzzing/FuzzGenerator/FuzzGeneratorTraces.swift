@@ -9,7 +9,6 @@ private let logger = Logger(label: "FuzzGeneratorTraces")
 /// A fuzz generator that loads test cases from JAM conformance fuzz traces
 public class FuzzGeneratorTraces: FuzzGenerator {
     private let testCases: [JamTestnetTestcase]
-    private var currentIndex: Int = 0
 
     public init(tracesDir: String) throws {
         logger.info("Loading test vectors from directory: \(tracesDir)")
@@ -23,35 +22,57 @@ public class FuzzGeneratorTraces: FuzzGenerator {
         }
     }
 
-    public func generateState(timeslot _: TimeslotIndex, config _: ProtocolConfigRef) async throws -> [FuzzKeyValue] {
-        guard currentIndex < testCases.count else {
-            throw FuzzGeneratorError.stateGenerationFailed("No more test cases available")
+    public func generatePreState(
+        timeslot: TimeslotIndex,
+        config _: ProtocolConfigRef
+    ) async throws -> (stateRoot: Data32, keyValues: [FuzzKeyValue]) {
+        let testIndex = Int(timeslot)
+        guard testIndex >= 0, testIndex < testCases.count else {
+            throw FuzzGeneratorError.stateGenerationFailed("No test case available for timeslot \(timeslot) (index \(testIndex))")
         }
 
-        let testCase = testCases[currentIndex]
+        let testCase = testCases[testIndex]
 
-        logger.debug("Generating state for test case \(currentIndex + 1)/\(testCases.count)")
+        logger.debug("Generating pre-state for timeslot \(timeslot) (test case \(testIndex + 1)/\(testCases.count))")
 
-        let preStateDict = testCase.preState.toDict()
-        let keyValues = preStateDict.map { key, value in
-            FuzzKeyValue(key: key, value: value)
+        let keyValues = testCase.preState.keyvals.map { keyval in
+            FuzzKeyValue(key: keyval.key, value: keyval.value)
         }
 
-        return keyValues
+        return (stateRoot: testCase.preState.root, keyValues: keyValues)
     }
 
-    public func generateBlock(timeslot _: UInt32, currentStateRef _: StateRef, config _: ProtocolConfigRef) async throws -> BlockRef {
-        guard currentIndex < testCases.count else {
-            throw FuzzGeneratorError.blockGenerationFailed("No more test cases available")
+    public func generatePostState(
+        timeslot: TimeslotIndex,
+        config _: ProtocolConfigRef
+    ) async throws -> (stateRoot: Data32, keyValues: [FuzzKeyValue]) {
+        let testIndex = Int(timeslot)
+        guard testIndex >= 0, testIndex < testCases.count else {
+            throw FuzzGeneratorError.stateGenerationFailed("No test case available for timeslot \(timeslot) (index \(testIndex))")
         }
 
-        let testCase = testCases[currentIndex]
+        let testCase = testCases[testIndex]
 
-        logger.debug("Generating block for test case \(currentIndex + 1)/\(testCases.count)")
+        logger.debug("Generating expected post-state for timeslot \(timeslot) (test case \(testIndex + 1)/\(testCases.count))")
+
+        let keyValues = testCase.postState.keyvals.map { keyval in
+            FuzzKeyValue(key: keyval.key, value: keyval.value)
+        }
+
+        return (stateRoot: testCase.postState.root, keyValues: keyValues)
+    }
+
+    public func generateBlock(timeslot: UInt32, currentStateRef _: StateRef, config _: ProtocolConfigRef) async throws -> BlockRef {
+        let testIndex = Int(timeslot)
+        guard testIndex >= 0, testIndex < testCases.count else {
+            throw FuzzGeneratorError.blockGenerationFailed("No test case available for timeslot \(timeslot) (index \(testIndex))")
+        }
+
+        let testCase = testCases[testIndex]
+
+        logger.debug("Generating block for timeslot \(timeslot) (test case \(testIndex + 1)/\(testCases.count))")
 
         let block = testCase.block
-
-        currentIndex += 1
 
         return block.asRef()
     }
@@ -65,37 +86,49 @@ public class FuzzGeneratorTraces: FuzzGenerator {
             throw FuzzGeneratorError.invalidTestData("Directory does not exist: \(basePath)")
         }
 
-        let timestampDirs = try FileManager.default.contentsOfDirectory(atPath: basePath)
-            .sorted()
-            .filter { !$0.starts(with: ".") }
-
         var allDecodedTestCases: [JamTestnetTestcase] = []
 
-        for timestamp in timestampDirs {
-            let timestampPath = "\(basePath)/\(timestamp)"
+        // Find all .bin files with depth of 2
+        func findBinFiles(in path: String, currentDepth: Int = 0) throws -> [String] {
+            guard currentDepth <= 2 else { return [] }
 
-            guard FileManager.default.fileExists(atPath: timestampPath) else {
-                logger.warning("Timestamp directory does not exist: \(timestampPath)")
-                continue
+            var binFiles: [String] = []
+            let contents = try FileManager.default.contentsOfDirectory(atPath: path)
+
+            for item in contents {
+                guard !item.starts(with: ".") else { continue }
+
+                let itemPath = "\(path)/\(item)"
+                var isDirectory: ObjCBool = false
+
+                guard FileManager.default.fileExists(atPath: itemPath, isDirectory: &isDirectory) else {
+                    continue
+                }
+
+                if isDirectory.boolValue, currentDepth < 2 {
+                    // Recurse into subdirectory
+                    binFiles += try findBinFiles(in: itemPath, currentDepth: currentDepth + 1)
+                } else if !isDirectory.boolValue, item.hasSuffix(".bin") {
+                    // Found a .bin file
+                    binFiles.append(itemPath)
+                }
             }
 
-            let testFiles = try FileManager.default.contentsOfDirectory(atPath: timestampPath)
-                .filter { $0.hasSuffix(".bin") }
-                .sorted()
+            return binFiles.sorted()
+        }
 
-            for testFile in testFiles {
-                let testFilePath = "\(timestampPath)/\(testFile)"
+        let testFiles = try findBinFiles(in: basePath)
 
-                do {
-                    let testData = try Data(contentsOf: URL(fileURLWithPath: testFilePath))
-                    let rawTestCase = Testcase(description: testFile, data: testData)
+        for testFilePath in testFiles {
+            do {
+                let testData = try Data(contentsOf: URL(fileURLWithPath: testFilePath))
+                let rawTestCase = Testcase(description: URL(fileURLWithPath: testFilePath).lastPathComponent, data: testData)
 
-                    let decoded = try JamTestnet.decodeTestcase(rawTestCase)
-                    allDecodedTestCases.append(decoded)
-                    logger.debug("Successfully loaded test case: \(timestamp)/\(testFile)")
-                } catch {
-                    logger.warning("Failed to decode test case \(timestamp)/\(testFile): \(error)")
-                }
+                let decoded = try JamTestnet.decodeTestcase(rawTestCase)
+                allDecodedTestCases.append(decoded)
+                logger.debug("Successfully loaded test case: \(testFilePath)")
+            } catch {
+                logger.warning("Failed to decode test case \(testFilePath): \(error)")
             }
         }
 
