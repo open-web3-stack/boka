@@ -54,20 +54,11 @@ struct FuzzTests {
         filters: [
             // empty to include all
             // example: ("0.6.7/1754982630", "00000004")
-            ("0.6.7/1754984893", "00000010"), // state root
-            // ("0.6.7/1755083543", "000000"), // state root
-            // ("0.6.7/1755530397", "000000"), // state root
-            // ("0.6.7/1755531265", "000000"), // state root
         ],
         expectFailure: [
             ("0.6.7/1755252727", "00000011"), // .invalidHeaderWinningTickets
         ],
         ignore: [
-            ("0.6.7/1754982087", "000000"), // bad test
-            ("0.6.7/1755530535", "00000"), // stats
-            ("0.6.7/1755530728", "00000"), // stats
-            ("0.6.7/1755530896", "00000"), // stats
-            ("0.6.7/1755620371", "00000"), // stats
         ]
     ))
     func v067(_ input: TestInput) async throws {

@@ -66,10 +66,14 @@ public class Engine {
             return .exit(.panic(.invalidInstructionIndex))
         }
 
-        if context.state.program.basicBlockIndices.contains(pc) {
-            let blockGas = context.state.program.getBlockGasCosts(pc: pc)
-            context.state.consumeGas(blockGas)
-        }
+        // consume gas per instruction
+        context.state.consumeGas(inst.gasCost())
+
+        // TODO: Enable basic block based gas consumption when GP specifies it
+        // if context.state.program.basicBlockIndices.contains(pc) {
+        //     let blockGas = context.state.program.getBlockGasCosts(pc: pc)
+        //     context.state.consumeGas(blockGas)
+        // }
 
         logStep(pc: pc, instruction: inst, context: context)
 
