@@ -102,7 +102,7 @@ struct PVMTests {
             status = .halt
         case let .pageFault(addr):
             pageFaultAddress = addr
-            vmState.consumeGas(Gas(1)) // somehow need to add this
+            vmState.consumeGas(Gas(1)) // NOTE: somehow need to add this
             status = .pageFault
         default:
             status = .panic
