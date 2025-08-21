@@ -21,7 +21,6 @@ public class FuzzingClient {
     private let config: ProtocolConfigRef
     private let devKey: KeySet
     private let blockCount: Int
-    private let runtime: Runtime
     private var currentStateRef: StateRef?
 
     public init(
@@ -29,6 +28,7 @@ public class FuzzingClient {
         config: String,
         seed: UInt64,
         blockCount: Int,
+        tracesDir: String?,
     ) throws {
         switch config {
         case "tiny":
@@ -42,11 +42,14 @@ public class FuzzingClient {
 
         socket = FuzzingSocket(socketPath: socketPath, config: self.config)
 
-        fuzzGenerator = FuzzGeneratorRandom(seed: seed, config: self.config)
+        if let tracesDir {
+            fuzzGenerator = try FuzzGeneratorTraces(tracesDir: tracesDir)
+        } else {
+            fuzzGenerator = FuzzGeneratorRandom(seed: seed, config: self.config)
+        }
 
         devKey = try DevKeyStore.getDevKey(seed: UInt32(seed % UInt64(UInt32.max)))
         self.blockCount = blockCount
-        runtime = Runtime(config: self.config)
         currentStateRef = nil
 
         logger.info("Boka fuzzer initialized with socket: \(socketPath), seed: \(seed), blockCount: \(blockCount)")
@@ -96,11 +99,11 @@ public class FuzzingClient {
         }
 
         for blockIndex in 0 ..< blockCount {
-            let timeslot = UInt32(blockIndex + 1)
-            logger.info("📦 Processing block \(blockIndex + 1)/\(blockCount) for timeslot \(timeslot)")
+            let timeslot = UInt32(blockIndex)
+            logger.info("📦 Processing block \(blockIndex)/\(blockCount)")
 
-            // generate state
-            let kv = try await fuzzGenerator.generateState(timeslot: timeslot, config: config)
+            // generate pre-state
+            let (_, kv) = try await fuzzGenerator.generatePreState(timeslot: timeslot, config: config)
 
             // set state locally
             let rawKV = kv.map { (key: $0.key, value: $0.value) }
@@ -119,30 +122,31 @@ public class FuzzingClient {
                 config: config
             )
 
-            // import block locally
-            currentStateRef = try await runtime.apply(block: blockRef, state: currentStateRef!)
-            let currentStateRoot = await currentStateRef!.value.stateRoot
-
             // import block on target
             let targetStateRoot = try importBlock(block: blockRef.value, connection: connection)
 
-            if currentStateRoot == targetStateRoot {
-                logger.info("✅ State roots match for block \(blockIndex + 1)!")
+            // get expected post-state
+            let (expectedStateRoot, expectedPostState) = try await fuzzGenerator.generatePostState(timeslot: timeslot, config: config)
+
+            if targetStateRoot == expectedStateRoot {
+                logger.info("✅ Target state matches expected post-state for block \(blockIndex + 1)!")
             } else {
-                logger.error("❌ STATE ROOT MISMATCH for block \(blockIndex + 1):")
-                logger.error("   Fuzzer:  \(currentStateRoot.data.toHexString())")
-                logger.error("   Target:  \(targetStateRoot.data.toHexString())")
+                logger.error("❌ TARGET STATE MISMATCH (vs expected) for block \(blockIndex + 1):")
+                logger.error("   Target root:   \(targetStateRoot.data.toHexString())")
+                logger.error("   Expected root: \(expectedStateRoot.data.toHexString())")
 
                 let targetState = try getState(connection: connection)
 
                 try await generateMismatchReport(
                     blockIndex: blockIndex + 1,
                     targetState: targetState,
-                    localStateRef: currentStateRef!
+                    expectedState: expectedPostState
                 )
 
                 break
             }
+
+            logger.info("✅ Block \(blockIndex + 1) processed, target state root: \(targetStateRoot.data.toHexString())")
         }
 
         logger.info("🎯 Fuzzing session completed - processed \(blockCount) blocks")
@@ -193,38 +197,59 @@ public class FuzzingClient {
     private func generateMismatchReport(
         blockIndex: Int,
         targetState: [FuzzKeyValue],
-        localStateRef: StateRef,
+        expectedState: [FuzzKeyValue]
     ) async throws {
-        logger.info("📊 Generating mismatch report for block \(blockIndex)")
+        logger.info("📊 Generating mismatch report for block \(blockIndex) (target vs expected)")
 
-        let keyValuePairs = try await localStateRef.value.backend.getKeys(nil, nil, nil)
-        let localState: [FuzzKeyValue] = keyValuePairs.map { FuzzKeyValue(key: Data31($0.key)!, value: $0.value) }
+        var targetMap: [String: String] = [:]
+        var duplicateTargetKeys: [String] = []
+        for kv in targetState {
+            let keyHex = kv.key.data.toHexString()
+            let valueHex = kv.value.toHexString()
+            if targetMap[keyHex] != nil {
+                duplicateTargetKeys.append(keyHex)
+                logger.warning("Duplicate key in target state: \(keyHex)")
+            }
+            targetMap[keyHex] = valueHex
+        }
 
-        let targetMap = Dictionary(uniqueKeysWithValues: targetState.map { (kv: FuzzKeyValue) in
-            (kv.key.data.toHexString(), kv.value.toHexString())
-        })
-        let localMap = Dictionary(uniqueKeysWithValues: localState.map { (kv: FuzzKeyValue) in
-            (kv.key.data.toHexString(), kv.value.toHexString())
-        })
+        var expectedMap: [String: String] = [:]
+        var duplicateExpectedKeys: [String] = []
+        for kv in expectedState {
+            let keyHex = kv.key.data.toHexString()
+            let valueHex = kv.value.toHexString()
+            if expectedMap[keyHex] != nil {
+                duplicateExpectedKeys.append(keyHex)
+                logger.warning("Duplicate key in expected state: \(keyHex)")
+            }
+            expectedMap[keyHex] = valueHex
+        }
 
-        let allKeys = Set(targetMap.keys).union(Set(localMap.keys))
+        let allKeys = Set(targetMap.keys).union(Set(expectedMap.keys))
         var differences: [String] = []
 
         for key in allKeys.sorted() {
             let targetValue = targetMap[key]
-            let localValue = localMap[key]
+            let expectedValue = expectedMap[key]
 
-            if targetValue != localValue {
+            if targetValue != expectedValue {
                 let targetStr = targetValue ?? "<missing>"
-                let localStr = localValue ?? "<missing>"
-                differences.append("Key \(key):\n  Target: \(targetStr)\n  Local:  \(localStr)")
+                let expectedStr = expectedValue ?? "<missing>"
+                differences.append("Key \(key):\n  Target:   \(targetStr)\n  Expected: \(expectedStr)")
             }
         }
 
-        logger.error("📊 STATE DIFF REPORT (Block \(blockIndex)):")
+        logger.error("📊 STATE DIFF REPORT (Block \(blockIndex)) - Target vs Expected:")
         logger.error("   Total differences: \(differences.count)")
         logger.error("   Target state keys: \(targetMap.count)")
-        logger.error("   Local state keys: \(localMap.count)")
+        logger.error("   Expected state keys: \(expectedMap.count)")
+
+        if !duplicateTargetKeys.isEmpty {
+            logger.error("   Duplicate keys in target: \(duplicateTargetKeys.count)")
+        }
+        if !duplicateExpectedKeys.isEmpty {
+            logger.error("   Duplicate keys in expected: \(duplicateExpectedKeys.count)")
+        }
 
         for diff in differences {
             logger.error("   \(diff)")

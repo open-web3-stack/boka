@@ -54,8 +54,8 @@ enum TraceTest {
                 )
             }
 
-            // root
-            async #expect(stateRef.value.stateRoot == testcase.postState.root)
+            let stateRoot = await stateRef.value.stateRoot
+            #expect(stateRoot == testcase.postState.root)
         case .failure:
             if !allowFailure {
                 Issue.record("Expected success, got \(result)")

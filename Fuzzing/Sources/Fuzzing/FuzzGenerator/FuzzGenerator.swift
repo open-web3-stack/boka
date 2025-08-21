@@ -5,12 +5,21 @@ import Utils
 
 /// Protocol for generating fuzzing test data
 public protocol FuzzGenerator {
-    /// Generate initial state for fuzzing
+    /// Generate initial pre-state for fuzzing
     /// - Parameters:
     ///   - timeslot: The timeslot for which to generate the state
     ///   - config: Protocol configuration
-    /// - Returns: Array of fuzz key-value pairs representing the state
-    func generateState(timeslot: TimeslotIndex, config: ProtocolConfigRef) async throws -> [FuzzKeyValue]
+    /// - Returns: Tuple containing state root and array of fuzz key-value pairs representing the pre-state
+    func generatePreState(timeslot: TimeslotIndex, config: ProtocolConfigRef) async throws
+        -> (stateRoot: Data32, keyValues: [FuzzKeyValue])
+
+    /// Generate expected post-state after block execution
+    /// - Parameters:
+    ///   - timeslot: The timeslot for which to generate the state
+    ///   - config: Protocol configuration
+    /// - Returns: Tuple containing state root and array of fuzz key-value pairs representing the expected post-state
+    func generatePostState(timeslot: TimeslotIndex, config: ProtocolConfigRef) async throws
+        -> (stateRoot: Data32, keyValues: [FuzzKeyValue])
 
     /// Generate a block for the given timeslot and state
     /// - Parameters:

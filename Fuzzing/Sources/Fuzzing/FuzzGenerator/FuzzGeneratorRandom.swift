@@ -48,8 +48,19 @@ public class FuzzGeneratorRandom: FuzzGenerator {
         dataProvider = nil
     }
 
-    // TODO: Implement state generation logic
-    public func generateState(timeslot _: TimeslotIndex, config _: ProtocolConfigRef) async throws -> [FuzzKeyValue] {
+    // TODO: Implement pre-state generation logic
+    public func generatePreState(
+        timeslot _: TimeslotIndex,
+        config _: ProtocolConfigRef
+    ) async throws -> (stateRoot: Data32, keyValues: [FuzzKeyValue]) {
+        fatalError("not implemented")
+    }
+
+    // TODO: Implement post-state generation logic
+    public func generatePostState(
+        timeslot _: TimeslotIndex,
+        config _: ProtocolConfigRef
+    ) async throws -> (stateRoot: Data32, keyValues: [FuzzKeyValue]) {
         fatalError("not implemented")
     }
 
