@@ -2,8 +2,8 @@ FROM swift:6.1-noble AS builder
 WORKDIR /boka
 
 RUN apt-get update && \
-	apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" && \
-	apt-get install -y curl build-essential cmake librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
+    apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" && \
+    apt-get install -y curl build-essential cmake librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
 
 # install rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -17,7 +17,7 @@ RUN make deps
 
 WORKDIR /boka/Boka
 
-RUN swift build -c release
+RUN swift build -c release -Xswiftc -Onone -Xswiftc -whole-module-optimization -Xswiftc -package-cmo -Xswiftc -unavailable-decl-optimization=complete
 
 RUN cp $(swift build --show-bin-path -c release)/Boka /boka/boka-bin
 
@@ -50,7 +50,7 @@ RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true && ap
     pkg-config \
     tzdata \
     zlib1g-dev \
-	librocksdb-dev \
+    librocksdb-dev \
     && rm -r /var/lib/apt/lists/*
 
 # Everything up to here should cache nicely between Swift versions, assuming dev dependencies change little
@@ -105,7 +105,7 @@ COPY --from=builder /boka/boka-bin /usr/local/bin/boka
 
 # checks
 RUN ldd /usr/local/bin/boka && \
-	/usr/local/bin/boka --help
+    /usr/local/bin/boka --help
 
 USER boka
 
