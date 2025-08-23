@@ -25,7 +25,7 @@ jobs:
   test:
     name: Build and Test (${{ matrix.config }})
     runs-on: [self-hosted, linux]
-    timeout-minutes: 45
+    timeout-minutes: 40
     strategy:
       matrix:
         config: [debug, release]
@@ -93,6 +93,7 @@ jobs:
     - name: Build
       run: |
         if [ "${{ matrix.config }}" = "release" ]; then
+          make .lib/libmsquic.a
           ./scripts/run.sh build -c release
         else
           make build
@@ -100,13 +101,7 @@ jobs:
     - name: Test
       run: |
         if [ "${{ matrix.config }}" = "release" ]; then
-          # Run release tests for all packages except Boka (test discovery issues)
-          for file in **/Tests; do
-            package_dir="$(dirname "$file")"
-            if [[ "$package_dir" != "Boka" ]]; then
-              swift test -c release -Xswiftc -enable-testing --package-path "$package_dir"
-            fi
-          done
+          ./scripts/runTests.sh test -c release -Xswiftc -Onone -Xswiftc -whole-module-optimization -Xswiftc -package-cmo -Xswiftc -unavailable-decl-optimization=complete
         else
           make test-all
         fi
