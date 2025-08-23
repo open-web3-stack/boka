@@ -17,7 +17,7 @@ RUN make deps
 
 WORKDIR /boka/Boka
 
-RUN swift build -c release
+RUN swift build -c release -Xswiftc -Onone -Xswiftc -whole-module-optimization -Xswiftc -package-cmo -Xswiftc -unavailable-decl-optimization=complete
 
 RUN cp $(swift build --show-bin-path -c release)/Boka /boka/boka-bin
 
@@ -74,13 +74,13 @@ RUN set -e; \
     ARCH_NAME="$(dpkg --print-architecture)"; \
     url=; \
     case "${ARCH_NAME##*-}" in \
-    'amd64') \
-    OS_ARCH_SUFFIX=''; \
-    ;; \
-    'arm64') \
-    OS_ARCH_SUFFIX='-aarch64'; \
-    ;; \
-    *) echo >&2 "error: unsupported architecture: '$ARCH_NAME'"; exit 1 ;; \
+        'amd64') \
+            OS_ARCH_SUFFIX=''; \
+            ;; \
+        'arm64') \
+            OS_ARCH_SUFFIX='-aarch64'; \
+            ;; \
+        *) echo >&2 "error: unsupported architecture: '$ARCH_NAME'"; exit 1 ;; \
     esac; \
     SWIFT_WEBDIR="$SWIFT_WEBROOT/$SWIFT_BRANCH/$(echo $SWIFT_PLATFORM | tr -d .)$OS_ARCH_SUFFIX" \
     && SWIFT_BIN_URL="$SWIFT_WEBDIR/$SWIFT_VERSION/$SWIFT_VERSION-$SWIFT_PLATFORM$OS_ARCH_SUFFIX.tar.gz" \
