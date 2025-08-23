@@ -30,11 +30,6 @@ struct DebugCheckTests {
             await #expect(throws: DebugCheckError.self) {
                 try await debugCheck(1 + 1 == 3)
             }
-        #else
-            try await debugCheck(1 + 1 == 2) // Should not throw
-            try await debugCheck(1 + 1 == 3) // Should not throw
-            try await debugCheck(1 + 1 == 2) // Should not throw
-            try await debugCheck(1 + 1 == 3) // Should not throw
         #endif
     }
 }

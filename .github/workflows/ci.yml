@@ -94,14 +94,14 @@ jobs:
       run: |
         if [ "${{ matrix.config }}" = "release" ]; then
           make deps
-          ./scripts/run.sh build -c release
+          ./scripts/run.sh build -c release -Xswiftc -enable-testing -Xswiftc -Onone -Xswiftc -whole-module-optimization -Xswiftc -package-cmo -Xswiftc -unavailable-decl-optimization=complete
         else
           make build
         fi
     - name: Test
       run: |
         if [ "${{ matrix.config }}" = "release" ]; then
-          ./scripts/runTests.sh test -c release -Xswiftc -Onone -Xswiftc -whole-module-optimization -Xswiftc -package-cmo -Xswiftc -unavailable-decl-optimization=complete
+          ./scripts/runTests.sh test -c release -Xswiftc -enable-testing -Xswiftc -Onone -Xswiftc -whole-module-optimization -Xswiftc -package-cmo -Xswiftc -unavailable-decl-optimization=complete
         else
           make test-all
         fi
