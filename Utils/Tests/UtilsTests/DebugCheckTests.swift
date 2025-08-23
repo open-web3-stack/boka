@@ -16,18 +16,25 @@ struct DebugCheckTests {
 
     @Test
     func testDebugCheck() async throws {
-        try #expect(doesThrow {
-            try debugCheck(1 + 1 == 2)
-        } == true)
-        #expect(throws: DebugCheckError.self) {
-            try debugCheck(1 + 1 == 3)
-        }
-        try await #expect(awaitThrow {
-            try await debugCheck(1 + 1 == 2)
-        } == true)
+        #if DEBUG_ASSERT
+            try #expect(doesThrow {
+                try debugCheck(1 + 1 == 2)
+            } == true)
+            #expect(throws: DebugCheckError.self) {
+                try debugCheck(1 + 1 == 3)
+            }
+            try await #expect(awaitThrow {
+                try await debugCheck(1 + 1 == 2)
+            } == true)
 
-        await #expect(throws: DebugCheckError.self) {
-            try await debugCheck(1 + 1 == 3)
-        }
+            await #expect(throws: DebugCheckError.self) {
+                try await debugCheck(1 + 1 == 3)
+            }
+        #else
+            try await debugCheck(1 + 1 == 2) // Should not throw
+            try await debugCheck(1 + 1 == 3) // Should not throw
+            try await debugCheck(1 + 1 == 2) // Should not throw
+            try await debugCheck(1 + 1 == 3) // Should not throw
+        #endif
     }
 }
