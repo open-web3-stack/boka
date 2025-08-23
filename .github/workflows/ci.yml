@@ -93,7 +93,7 @@ jobs:
     - name: Build
       run: |
         if [ "${{ matrix.config }}" = "release" ]; then
-          make .lib/libmsquic.a
+          make deps
           ./scripts/run.sh build -c release
         else
           make build
