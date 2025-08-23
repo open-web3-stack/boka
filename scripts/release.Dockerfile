@@ -17,7 +17,7 @@ RUN make deps
 
 WORKDIR /boka/Boka
 
-RUN swift build -c release -Xswiftc -Onone -Xswiftc -whole-module-optimization -Xswiftc -package-cmo -Xswiftc -unavailable-decl-optimization=complete
+RUN swift build -c release
 
 RUN cp $(swift build --show-bin-path -c release)/Boka /boka/boka-bin
 
