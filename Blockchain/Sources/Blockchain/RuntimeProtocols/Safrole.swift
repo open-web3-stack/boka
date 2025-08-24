@@ -257,10 +257,8 @@ extension Safrole {
             let validatorQueueWithoutOffenders = withoutOffenders(offenders: offenders, validators: validatorQueue)
 
             let newCommitment = {
-                try Bandersnatch.RingCommitment(
-                    ring: validatorQueueWithoutOffenders.map { try? Bandersnatch.PublicKey(data: $0.bandersnatch) },
-                    ctx: ctx
-                ).data
+                let ring = validatorQueueWithoutOffenders.map { try? Bandersnatch.PublicKey(data: $0.bandersnatch) }
+                return try withExtendedLifetime(ring) { try Bandersnatch.RingCommitment(ring: ring, ctx: ctx).data }
             }
             let verifier = Bandersnatch.Verifier(ctx: ctx, commitment: commitment)
 

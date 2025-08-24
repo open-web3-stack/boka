@@ -23,9 +23,12 @@ jobs:
         args: --config .swiftlint.yml --strict
 
   test:
-    name: Build and Test
+    name: Build and Test (${{ matrix.config }})
     runs-on: [self-hosted, linux]
-    timeout-minutes: 30
+    timeout-minutes: 40
+    strategy:
+      matrix:
+        config: [debug, release]
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
@@ -42,8 +45,9 @@ jobs:
       uses: runs-on/cache@v4
       with:
         path: '**/.build'
-        key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+        key: ${{ runner.os }}-spm-${{ matrix.config }}-${{ hashFiles('**/Package.resolved') }}
         restore-keys: |
+          ${{ runner.os }}-spm-${{ matrix.config }}-
           ${{ runner.os }}-spm-
       env:
         RUNS_ON_S3_BUCKET_CACHE: laminar-gh-action-cache
@@ -87,6 +91,17 @@ jobs:
     - name: Check rust format
       run: cargo +nightly fmt --all -- --check
     - name: Build
-      run: make build
+      run: |
+        if [ "${{ matrix.config }}" = "release" ]; then
+          make deps
+          ./scripts/run.sh build -c release -Xswiftc -enable-testing -Xswiftc -Onone -Xswiftc -whole-module-optimization -Xswiftc -package-cmo -Xswiftc -unavailable-decl-optimization=complete
+        else
+          make build
+        fi
     - name: Test
-      run: make test-all
+      run: |
+        if [ "${{ matrix.config }}" = "release" ]; then
+          ./scripts/runTests.sh test -c release -Xswiftc -enable-testing -Xswiftc -Onone -Xswiftc -whole-module-optimization -Xswiftc -package-cmo -Xswiftc -unavailable-decl-optimization=complete
+        else
+          make test-all
+        fi
