@@ -39,6 +39,46 @@ public struct ServiceAccountDetails: Sendable, Equatable, Codable {
         let bytes = Balance(config.value.additionalMinBalancePerStateByte) * Balance(totalByteLength)
         return max(Balance(0), base + items + bytes - gratisStorage)
     }
+
+    public mutating func updateFootprintStorage(key: Data, oldValue: Data?, newValue: Data?) {
+        if let oldValue {
+            if let newValue {
+                // replace: update byte count difference
+                totalByteLength = totalByteLength - UInt64(oldValue.count) + UInt64(newValue.count)
+            } else {
+                // remove: decrease count and bytes
+                itemsCount = UInt32(max(0, Int(itemsCount) - 1))
+                totalByteLength = UInt64(max(0, Int(totalByteLength) - (34 + oldValue.count + key.count)))
+            }
+        } else {
+            if let newValue {
+                // add: increase count and bytes
+                itemsCount = itemsCount + 1
+                totalByteLength = totalByteLength + 34 + UInt64(newValue.count) + UInt64(key.count)
+            }
+        }
+    }
+
+    public mutating func updateFootprintPreimage(
+        oldValue: StateKeys.ServiceAccountPreimageInfoKey.Value?,
+        newValue: StateKeys.ServiceAccountPreimageInfoKey.Value?,
+        length: UInt32
+    ) {
+        if oldValue != nil {
+            // replace: no change on footprint
+            // remove: decrease count and bytes
+            if newValue == nil {
+                itemsCount = UInt32(max(0, Int(itemsCount) - 2))
+                totalByteLength = UInt64(max(0, Int(totalByteLength) - (81 + Int(length))))
+            }
+        } else {
+            if newValue != nil {
+                // add: increase count and bytes
+                itemsCount = itemsCount + 2
+                totalByteLength = totalByteLength + 81 + UInt64(length)
+            }
+        }
+    }
 }
 
 public struct ServiceAccount: Sendable, Equatable, Codable {

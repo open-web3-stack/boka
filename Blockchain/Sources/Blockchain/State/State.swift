@@ -431,22 +431,8 @@ extension State: ServiceAccounts {
         guard var oldAccount = try await get(serviceAccount: index) else {
             fatalError("Failed to get account details")
         }
-        if let oldValue {
-            if let value {
-                // replace: update byte count difference
-                oldAccount.totalByteLength = oldAccount.totalByteLength - UInt64(oldValue.count) + UInt64(value.count)
-            } else {
-                // remove: decrease count and bytes
-                oldAccount.itemsCount = UInt32(max(0, Int(oldAccount.itemsCount) - 1))
-                oldAccount.totalByteLength = UInt64(max(0, Int(oldAccount.totalByteLength) - (34 + oldValue.count + key.count)))
-            }
-        } else {
-            if let value {
-                // add: increase count and bytes
-                oldAccount.itemsCount = (oldAccount.itemsCount) + 1
-                oldAccount.totalByteLength = (oldAccount.totalByteLength) + 34 + UInt64(value.count) + UInt64(key.count)
-            }
-        }
+
+        oldAccount.updateFootprintStorage(key: key, oldValue: oldValue, newValue: value)
         layer[serviceAccount: index] = oldAccount
 
         // update value
@@ -468,20 +454,8 @@ extension State: ServiceAccounts {
         guard var oldAccount = try await get(serviceAccount: index) else {
             fatalError("Failed to get account details")
         }
-        if oldValue != nil {
-            // replace: no change on footprint
-            // remove: decrease count and bytes
-            if value == nil {
-                oldAccount.itemsCount = UInt32(max(0, Int(oldAccount.itemsCount) - 2))
-                oldAccount.totalByteLength = UInt64(max(0, Int(oldAccount.totalByteLength) - (81 + Int(length))))
-            }
-        } else {
-            if value != nil {
-                // add: increase count and bytes
-                oldAccount.itemsCount = (oldAccount.itemsCount) + 2
-                oldAccount.totalByteLength = (oldAccount.totalByteLength) + 81 + UInt64(length)
-            }
-        }
+
+        oldAccount.updateFootprintPreimage(oldValue: oldValue, newValue: value, length: length)
         layer[serviceAccount: index] = oldAccount
 
         // update value
