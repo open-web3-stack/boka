@@ -187,11 +187,11 @@ public class Fetch: HostCall {
 
         if !isWritable {
             throw VMInvocationsError.panic
-        } else if value == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
+        } else if let value {
+            state.writeRegister(Registers.Index(raw: 7), value.count)
+            try state.writeMemory(address: writeAddr, values: value[relative: first ..< (first + len)])
         } else {
-            state.writeRegister(Registers.Index(raw: 7), value!.count)
-            try state.writeMemory(address: writeAddr, values: value![relative: first ..< (first + len)])
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
         }
     }
 }
@@ -243,11 +243,11 @@ public class Lookup: HostCall {
 
         if !state.isMemoryWritable(address: regs[1], length: len) {
             throw VMInvocationsError.panic
-        } else if value == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
+        } else if let value {
+            state.writeRegister(Registers.Index(raw: 7), value.count)
+            try state.writeMemory(address: regs[1], values: value[relative: first ..< (first + len)])
         } else {
-            state.writeRegister(Registers.Index(raw: 7), value!.count)
-            try state.writeMemory(address: regs[1], values: value![relative: first ..< (first + len)])
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
         }
     }
 }
@@ -440,12 +440,12 @@ public class Info: HostCall {
 
         if !isWritable {
             throw VMInvocationsError.panic
-        } else if value == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
+        } else if let value {
+            state.writeRegister(Registers.Index(raw: 7), value.count)
+            logger.debug("writing addr: \(o), len: \(len), val: \(value[relative: first ..< (first + len)].toHexString())")
+            try state.writeMemory(address: o, values: value[relative: first ..< (first + len)])
         } else {
-            state.writeRegister(Registers.Index(raw: 7), value!.count)
-            logger.debug("writing addr: \(o), len: \(len), val: \(value![relative: first ..< (first + len)].toHexString())")
-            try state.writeMemory(address: o, values: value![relative: first ..< (first + len)])
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
         }
     }
 }
@@ -509,11 +509,11 @@ public class HistoricalLookup: HostCall {
 
         if !isWritable {
             throw VMInvocationsError.panic
-        } else if preimage == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
+        } else if let preimage {
+            state.writeRegister(Registers.Index(raw: 7), preimage.count)
+            try state.writeMemory(address: regs[1], values: preimage[relative: first ..< (first + len)])
         } else {
-            state.writeRegister(Registers.Index(raw: 7), preimage!.count)
-            try state.writeMemory(address: regs[1], values: preimage![relative: first ..< (first + len)])
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
         }
     }
 }
@@ -1316,11 +1316,11 @@ public class Yield: HostCall {
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         let startAddr: UInt32 = state.readRegister(Registers.Index(raw: 7))
         let hash = try? state.readMemory(address: startAddr, length: 32)
-        if hash == nil {
-            throw VMInvocationsError.panic
-        } else {
+        if let hash {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
-            x.yield = Data32(hash!)!
+            x.yield = Data32(hash)!
+        } else {
+            throw VMInvocationsError.panic
         }
     }
 }
