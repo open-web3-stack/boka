@@ -137,23 +137,9 @@ private struct FullAccumulateState: Accumulation {
     mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data, value: Data?) {
         // update footprint
         let oldValue = storages[index]?[key]
-        let oldAccount = accounts[index]
-        if let oldValue {
-            if let value, let oldAccount {
-                // replace: update byte count difference
-                accounts[index]?.totalByteLength = oldAccount.totalByteLength - UInt64(oldValue.count) + UInt64(value.count)
-            } else {
-                // remove: decrease count and bytes
-                accounts[index]?.itemsCount = UInt32(max(0, Int(oldAccount?.itemsCount ?? 0) - 1))
-                accounts[index]?.totalByteLength = UInt64(max(0, Int(oldAccount?.totalByteLength ?? 0) - (34 + oldValue.count + key.count)))
-            }
-        } else {
-            if let value {
-                // add: increase count and bytes
-                accounts[index]?.itemsCount = (oldAccount?.itemsCount ?? 0) + 1
-                accounts[index]?.totalByteLength = (oldAccount?.totalByteLength ?? 0) + 34 + UInt64(value.count) + UInt64(key.count)
-            }
-        }
+        var oldAccount = accounts[index]
+        oldAccount?.updateFootprintStorage(key: key, oldValue: oldValue, newValue: value)
+        accounts[index] = oldAccount
         logger.debug("storage footprint update: \(accounts[index]?.itemsCount ?? 0) items, \(accounts[index]?.totalByteLength ?? 0) bytes")
 
         // update value
@@ -172,20 +158,9 @@ private struct FullAccumulateState: Accumulation {
     ) {
         // update footprint
         let oldValue = preimageInfo[index]?[hash]
-        let oldAccount = accounts[index]
-        if oldValue != nil {
-            if value == nil {
-                // remove: decrease count and bytes
-                accounts[index]?.itemsCount = UInt32(max(0, Int(oldAccount?.itemsCount ?? 0) - 2))
-                accounts[index]?.totalByteLength = UInt64(max(0, Int(oldAccount?.totalByteLength ?? 0) - (81 + Int(length))))
-            }
-        } else {
-            if value != nil {
-                // add: increase count and bytes
-                accounts[index]?.itemsCount = (oldAccount?.itemsCount ?? 0) + 2
-                accounts[index]?.totalByteLength = (oldAccount?.totalByteLength ?? 0) + 81 + UInt64(length)
-            }
-        }
+        var oldAccount = accounts[index]
+        oldAccount?.updateFootprintPreimage(oldValue: oldValue, newValue: value, length: length)
+        accounts[index] = oldAccount
         logger.debug("preimage footprint update: \(accounts[index]?.itemsCount ?? 0) items, \(accounts[index]?.totalByteLength ?? 0) bytes")
 
         // update value
