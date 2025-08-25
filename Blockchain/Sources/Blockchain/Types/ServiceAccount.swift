@@ -53,7 +53,7 @@ public struct ServiceAccountDetails: Sendable, Equatable, Codable {
         } else {
             if let newValue {
                 // add: increase count and bytes
-                itemsCount = itemsCount + 1
+                itemsCount += 1
                 totalByteLength = totalByteLength + 34 + UInt64(newValue.count) + UInt64(key.count)
             }
         }
@@ -74,7 +74,7 @@ public struct ServiceAccountDetails: Sendable, Equatable, Codable {
         } else {
             if newValue != nil {
                 // add: increase count and bytes
-                itemsCount = itemsCount + 2
+                itemsCount += 2
                 totalByteLength = totalByteLength + 81 + UInt64(length)
             }
         }
