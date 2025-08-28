@@ -29,10 +29,8 @@ extension State {
         state.safroleState.ticketsOrKeys = try .right(ConfigFixedSizeArray(config: config, array: epochKeys))
 
         let ctx = try Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
-        let commitment = try Bandersnatch.RingCommitment(
-            ring: devKeys.map { try Bandersnatch.PublicKey(data: $0.bandersnatch) },
-            ctx: ctx
-        )
+        let ring = try devKeys.map { try Bandersnatch.PublicKey(data: $0.bandersnatch) }
+        let commitment = try withExtendedLifetime(ring) { try Bandersnatch.RingCommitment(ring: ring, ctx: ctx) }
         state.safroleState.ticketsVerifier = commitment.data
 
         let block = BlockRef(Block.dummy(config: config))
