@@ -34,14 +34,14 @@ public struct Header: Sendable, Equatable {
                 ProtocolConfig.EpochLength
             >?
 
-        // Ho: The offenders markers must contain exactly the sequence of keys of all new offenders.
-        public var offendersMarkers: [Ed25519PublicKey]
-
         // Hi: block author index
         public var authorIndex: ValidatorIndex
 
         // Hv: the entropy-yielding vrf signature
         public var vrfSignature: BandersnatchSignature
+
+        // Ho: The offenders markers must contain exactly the sequence of keys of all new offenders.
+        public var offendersMarkers: [Ed25519PublicKey]
 
         public init(
             parentHash: Data32,
@@ -53,9 +53,9 @@ public struct Header: Sendable, Equatable {
                 Ticket,
                 ProtocolConfig.EpochLength
             >?,
-            offendersMarkers: [Ed25519PublicKey],
             authorIndex: ValidatorIndex,
-            vrfSignature: BandersnatchSignature
+            vrfSignature: BandersnatchSignature,
+            offendersMarkers: [Ed25519PublicKey]
         ) {
             self.parentHash = parentHash
             self.priorStateRoot = priorStateRoot
@@ -107,9 +107,9 @@ extension Header: Codable {
                     ConfigFixedSizeArray<Ticket, ProtocolConfig.EpochLength>.self,
                     forKey: .winningTickets
                 ),
-                offendersMarkers: container.decode([Ed25519PublicKey].self, forKey: .offendersMarkers),
                 authorIndex: container.decode(ValidatorIndex.self, forKey: .authorIndex),
-                vrfSignature: container.decode(BandersnatchSignature.self, forKey: .vrfSignature)
+                vrfSignature: container.decode(BandersnatchSignature.self, forKey: .vrfSignature),
+                offendersMarkers: container.decode([Ed25519PublicKey].self, forKey: .offendersMarkers),
             ),
             seal: container.decode(BandersnatchSignature.self, forKey: .seal)
         )
@@ -123,9 +123,9 @@ extension Header: Codable {
         try container.encode(unsigned.timeslot, forKey: .timeslot)
         try container.encodeIfPresent(unsigned.epoch, forKey: .epoch)
         try container.encodeIfPresent(unsigned.winningTickets, forKey: .winningTickets)
-        try container.encode(unsigned.offendersMarkers, forKey: .offendersMarkers)
         try container.encode(unsigned.authorIndex, forKey: .authorIndex)
         try container.encode(unsigned.vrfSignature, forKey: .vrfSignature)
+        try container.encode(unsigned.offendersMarkers, forKey: .offendersMarkers)
         try container.encode(seal, forKey: .seal)
     }
 }
@@ -157,9 +157,9 @@ extension Header.Unsigned: Dummy {
             timeslot: 0,
             epoch: EpochMarker.dummy(config: config),
             winningTickets: nil,
-            offendersMarkers: [],
             authorIndex: 0,
-            vrfSignature: BandersnatchSignature()
+            vrfSignature: BandersnatchSignature(),
+            offendersMarkers: []
         )
     }
 }

@@ -4,20 +4,20 @@ import Utils
 
 // P
 public struct WorkPackage: Comparable, Sendable, Equatable, Codable, Hashable {
-    // j
-    public var authorizationToken: Data
-
     // h
     public var authorizationServiceIndex: ServiceIndex
 
     // u
     public var authorizationCodeHash: Data32
 
-    // p
-    public var configurationBlob: Data
-
-    // x
+    // c
     public var context: RefinementContext
+
+    // j
+    public var authorizationToken: Data
+
+    // f
+    public var configurationBlob: Data
 
     // w
     public var workItems: ConfigLimitedSizeArray<

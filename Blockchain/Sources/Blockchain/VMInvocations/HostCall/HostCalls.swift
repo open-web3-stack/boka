@@ -95,7 +95,7 @@ public class Fetch: HostCall {
                 value = authorizerTrace
             }
         case 3:
-            if let workPackage, let serviceAccounts, reg11 < workPackage.workItems.count {
+            if let workPackage, let serviceAccounts, !workPackage.workItems.isEmpty, reg11 < workPackage.workItems.count {
                 let item = workPackage.workItems[Int(reg11)]
                 let outputs = item.outputs
                 if reg12 < outputs.count {
@@ -103,7 +103,7 @@ public class Fetch: HostCall {
                 }
             }
         case 4:
-            if let workItemIndex, let workPackage, let serviceAccounts {
+            if let workItemIndex, let workPackage, let serviceAccounts, !workPackage.workItems.isEmpty {
                 let item = workPackage.workItems[workItemIndex]
                 let outputs = item.outputs
                 if reg11 < outputs.count {
@@ -111,11 +111,11 @@ public class Fetch: HostCall {
                 }
             }
         case 5:
-            if let importSegments, reg11 < importSegments.count, reg12 < importSegments[Int(reg11)].count {
+            if let importSegments, !importSegments.isEmpty, reg11 < importSegments.count, reg12 < importSegments[Int(reg11)].count {
                 value = importSegments[Int(reg11)][Int(reg12)].data
             }
         case 6:
-            if let workItemIndex, let importSegments, reg11 < importSegments[workItemIndex].count {
+            if let workItemIndex, let importSegments, !importSegments.isEmpty, reg11 < importSegments[workItemIndex].count {
                 value = importSegments[workItemIndex][Int(reg11)].data
             }
         case 7:
