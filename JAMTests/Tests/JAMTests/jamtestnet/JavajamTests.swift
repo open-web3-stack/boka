@@ -7,10 +7,10 @@ import Utils
 
 struct JavajamTests {
     @Test(arguments: try JamTestnet.loadTests(path: "stf/state_transitions", src: .javajam))
-    func stfTests(_: Testcase) async throws {
-        // await withKnownIssue("Invalid bandersnatch", isIntermittent: true) {
-        //     try await TraceTest.test(input)
-        // }
+    func stfTests(_ input: Testcase) async throws {
+        if input.description.starts(with: "3373062") { return } // problematic initial recent history
+
+        try await TraceTest.test(input)
     }
 
     @Test(arguments: try JamTestnet.loadTests(path: "erasure_coding", src: .javajam, ext: "json"))

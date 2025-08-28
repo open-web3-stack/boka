@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   handle:
-    timeout-minutes: 10
+    timeout-minutes: 40
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -37,6 +37,7 @@ jobs:
         with:
           pr_number: ${{ github.event.inputs.pr_number || github.event.number }}
           review: true
+          verbose: 2
         env:
           POLKA_API_PROVIDER: google-vertex
           POLKA_MODEL: gemini-2.5-pro

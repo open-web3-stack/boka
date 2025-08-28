@@ -121,10 +121,10 @@ struct CodecTests {
         }
         if value is WorkDigest {
             return [
-                "code_hash": json["codeHash"]!,
-                "accumulate_gas": json["gasLimit"]!,
-                "payload_hash": json["payloadHash"]!,
                 "service_id": json["serviceIndex"]!,
+                "code_hash": json["codeHash"]!,
+                "payload_hash": json["payloadHash"]!,
+                "accumulate_gas": json["gasLimit"]!,
                 "result": json["result"]!["success"] == nil ? json["result"]! : [
                     "ok": json["result"]!["success"]!,
                 ].json,
@@ -141,9 +141,10 @@ struct CodecTests {
             return [
                 "service": json["serviceIndex"]!,
                 "code_hash": json["codeHash"]!,
-                "payload": json["payloadBlob"]!,
                 "refine_gas_limit": json["refineGasLimit"]!,
                 "accumulate_gas_limit": json["accumulateGasLimit"]!,
+                "export_count": json["exportsCount"]!,
+                "payload": json["payloadBlob"]!,
                 "import_segments": json["inputs"]!.array!.map { item in
                     [
                         "tree_root": item["root"]!,
@@ -156,18 +157,15 @@ struct CodecTests {
                         "len": item["length"]!,
                     ].json
                 }.json,
-                "export_count": json["exportsCount"]!,
             ].json
         }
         if let value = value as? WorkPackage {
             return [
-                "authorization": json["authorizationToken"]!,
                 "auth_code_host": json["authorizationServiceIndex"]!,
-                "authorizer": [
-                    "code_hash": json["authorizationCodeHash"]!,
-                    "params": json["configurationBlob"]!,
-                ].json,
+                "auth_code_hash": json["authorizationCodeHash"]!,
                 "context": transform(json["context"]!, value: value.context),
+                "authorization": json["authorizationToken"]!,
+                "authorizer_config": json["configurationBlob"]!,
                 "items": transform(json["workItems"]!, value: value.workItems),
             ].json
         }
@@ -223,9 +221,9 @@ struct CodecTests {
                 "slot": json["timeslot"]!,
                 "epoch_mark": transform(json["epoch"] ?? .null, value: value.epoch as Any),
                 "tickets_mark": transform(json["winningTickets"] ?? .null, value: value.winningTickets as Any),
-                "offenders_mark": transform(json["offendersMarkers"]!, value: value.offendersMarkers),
                 "author_index": json["authorIndex"]!,
                 "entropy_source": json["vrfSignature"]!,
+                "offenders_mark": transform(json["offendersMarkers"]!, value: value.offendersMarkers),
                 "seal": json["seal"]!,
             ].json
         }

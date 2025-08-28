@@ -6,7 +6,7 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
     // s: package specification
     public var packageSpecification: AvailabilitySpecifications
 
-    // x: refinement context
+    // **c**: refinement context
     public var refinementContext: RefinementContext
 
     // c: the core-index
@@ -15,21 +15,21 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
     // a: authorizer hash
     public var authorizerHash: Data32
 
-    // o: authorizer trace
+    // g
+    public var authGasUsed: UInt
+
+    // t: authorizer trace
     public var authorizerTrace: Data
 
     // l: segment-root lookup dictionary
     @CodingAs<SortedKeyValues<Data32, Data32>> public var lookup: [Data32: Data32]
 
-    // r: the results of the evaluation of each of the items in the package
+    // d: the results of the evaluation of each of the items in the package
     public var digests: ConfigLimitedSizeArray<
         WorkDigest,
         ProtocolConfig.Int1,
         ProtocolConfig.MaxWorkItems
     >
-
-    // g
-    public var authGasUsed: UInt
 
     public init(
         authorizerHash: Data32,
