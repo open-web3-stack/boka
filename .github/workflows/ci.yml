@@ -25,7 +25,7 @@ jobs:
   test:
     name: Build and Test (${{ matrix.config }})
     runs-on: [self-hosted, linux]
-    timeout-minutes: 45
+    timeout-minutes: 60
     strategy:
       matrix:
         config: [debug, release]
@@ -99,4 +99,4 @@ jobs:
       if: matrix.config == 'release'
       run: |
         make deps
-        ./scripts/runTests.sh --skip=Boka test -c release -Xswiftc -enable-testing
+        ./scripts/runTests.sh --skip=Boka test -c release
