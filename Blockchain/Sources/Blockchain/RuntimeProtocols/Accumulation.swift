@@ -64,11 +64,11 @@ public struct ServicePreimagePair: Hashable {
 }
 
 public struct AccumulationResult {
-    // o
+    // e
     public var state: AccumulateState
     // t
     public var transfers: [DeferredTransfers]
-    // b
+    // y
     public var commitment: Data32?
     // u
     public var gasUsed: Gas

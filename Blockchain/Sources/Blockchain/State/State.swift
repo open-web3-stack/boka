@@ -26,7 +26,7 @@ public struct State: Sendable {
         }
     }
 
-    // φ: The authorization queue.
+    // ϕ: The authorization queue.
     public var authorizationQueue: StateKeys.AuthorizationQueueKey.Value {
         get {
             layer.authorizationQueue
@@ -146,7 +146,7 @@ public struct State: Sendable {
         }
     }
 
-    // ϑ: The accumulation queue.
+    // ω: The accumulation queue.
     public var accumulationQueue: StateKeys.AccumulationQueueKey.Value {
         get {
             layer.accumulationQueue

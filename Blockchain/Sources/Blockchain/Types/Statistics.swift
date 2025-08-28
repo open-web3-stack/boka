@@ -43,14 +43,14 @@ public struct Statistics: Sendable, Equatable, Codable {
         // i: total number of segments imported from the Segments DA
         public var importsCount: UInt
 
-        // e: total number of segments exported into the Segments DA
-        public var exportsCount: UInt
+        // x: total number of the extrinsics used in computing the workload
+        public var extrinsicsCount: UInt
 
         // z: total size in octets of the extrinsics used in computing the workload
         public var extrinsicsSize: UInt
 
-        // x: total number of the extrinsics used in computing the workload
-        public var extrinsicsCount: UInt
+        // e: total number of segments exported into the Segments DA
+        public var exportsCount: UInt
 
         // b: total package data length
         public var packageSize: UInt
@@ -79,14 +79,14 @@ public struct Statistics: Sendable, Equatable, Codable {
         // i: total number of segments imported from the Segments DA
         public var importsCount: UInt
 
-        // e: total number of segments exported into the Segments DA
-        public var exportsCount: UInt
+        // x: total number of the extrinsics used in computing the workload
+        public var extrinsicsCount: UInt
 
         // z: total size in octets of the extrinsics used in computing the workload
         public var extrinsicsSize: UInt
 
-        // x: total number of the extrinsics used in computing the workload
-        public var extrinsicsCount: UInt
+        // e: total number of segments exported into the Segments DA
+        public var exportsCount: UInt
 
         // a: accumulate count and gas used
         public var accumulates: CountAndGas
@@ -145,9 +145,9 @@ extension Statistics.Core: Dummy {
             dataSize: 0,
             assuranceCount: 0,
             importsCount: 0,
-            exportsCount: 0,
-            extrinsicsSize: 0,
             extrinsicsCount: 0,
+            extrinsicsSize: 0,
+            exportsCount: 0,
             packageSize: 0,
             gasUsed: 0
         )
@@ -161,9 +161,9 @@ extension Statistics.Service: Dummy {
             preimages: .init(count: 0, size: 0),
             refines: .init(count: 0, gasUsed: 0),
             importsCount: 0,
-            exportsCount: 0,
-            extrinsicsSize: 0,
             extrinsicsCount: 0,
+            extrinsicsSize: 0,
+            exportsCount: 0,
             accumulates: .init(count: 0, gasUsed: 0),
             transfers: .init(count: 0, gasUsed: 0)
         )
