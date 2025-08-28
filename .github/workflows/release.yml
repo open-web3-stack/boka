@@ -78,7 +78,7 @@ jobs:
         cd ../../Boka
 
         # Build Swift release binary with our static libraries
-        swift build -c release -Xswiftc -Onone -Xswiftc -whole-module-optimization -Xswiftc -package-cmo -Xswiftc -unavailable-decl-optimization=complete \
+        swift build -c release \
           -Xlinker "$STATIC_LIB_DIR/lib/librocksdb.a" \
           -Xlinker "$STATIC_LIB_DIR/lib/liblz4.a" \
           -Xlinker "$STATIC_LIB_DIR/lib/libzstd.a" \

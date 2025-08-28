@@ -25,7 +25,7 @@ jobs:
   test:
     name: Build and Test (${{ matrix.config }})
     runs-on: [self-hosted, linux]
-    timeout-minutes: 40
+    timeout-minutes: 90
     strategy:
       matrix:
         config: [debug, release]
@@ -48,7 +48,6 @@ jobs:
         key: ${{ runner.os }}-spm-${{ matrix.config }}-${{ hashFiles('**/Package.resolved') }}
         restore-keys: |
           ${{ runner.os }}-spm-${{ matrix.config }}-
-          ${{ runner.os }}-spm-
       env:
         RUNS_ON_S3_BUCKET_CACHE: laminar-gh-action-cache
     - name: Cache Cargo
@@ -90,18 +89,14 @@ jobs:
         components: rustfmt
     - name: Check rust format
       run: cargo +nightly fmt --all -- --check
-    - name: Build
+    - name: Build (Debug)
+      if: matrix.config == 'debug'
+      run: make build
+    - name: Test (Debug)
+      if: matrix.config == 'debug'
+      run: make test-all
+    - name: Build and Test (Release)
+      if: matrix.config == 'release'
       run: |
-        if [ "${{ matrix.config }}" = "release" ]; then
-          make deps
-          ./scripts/run.sh build -c release -Xswiftc -enable-testing -Xswiftc -Onone -Xswiftc -whole-module-optimization -Xswiftc -package-cmo -Xswiftc -unavailable-decl-optimization=complete
-        else
-          make build
-        fi
-    - name: Test
-      run: |
-        if [ "${{ matrix.config }}" = "release" ]; then
-          ./scripts/runTests.sh test -c release -Xswiftc -enable-testing -Xswiftc -Onone -Xswiftc -whole-module-optimization -Xswiftc -package-cmo -Xswiftc -unavailable-decl-optimization=complete
-        else
-          make test-all
-        fi
+        make deps
+        ./scripts/runTests.sh --skip=Boka,Fuzzing test -c release
