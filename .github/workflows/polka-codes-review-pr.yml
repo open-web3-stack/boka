@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   handle:
-    timeout-minutes: 20
+    timeout-minutes: 40
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
