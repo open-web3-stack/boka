@@ -25,7 +25,7 @@ jobs:
   test:
     name: Build and Test (${{ matrix.config }})
     runs-on: [self-hosted, linux]
-    timeout-minutes: 80
+    timeout-minutes: 90
     strategy:
       matrix:
         config: [debug, release]
