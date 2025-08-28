@@ -1,0 +1,20 @@
+scripts:
+  check: make build
+excludeFiles:
+  - "*.xcodeproj"
+  - JAMTests
+  - scripts
+  - Package.resolved
+  - .swiftpm
+  - Utils/Sources/bandersnatch
+  - Utils/Sources/bls
+  - Utils/Sources/erasure-coding
+  - Utils/Sources/SHA3IUF
+  - Networking/Sources/include/
+rules:
+  - use Swift Testing. DO NOT use XCTest
+  - NEVER use NSError
+  - you must refer to spec/ to understand the graypaper (GP)
+  - comment should reference to GP if applicable
+  - Avoid having comment that describe the code blatantly
+  - TODO comment is good and should be used
