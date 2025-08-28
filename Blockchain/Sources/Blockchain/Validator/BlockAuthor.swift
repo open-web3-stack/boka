@@ -113,9 +113,9 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable, OnBeforeEpoch
             timeslot: timeslot,
             epoch: safroleResult.epochMark,
             winningTickets: safroleResult.ticketsMark,
-            offendersMarkers: [], // TODO:
             authorIndex: ValidatorIndex(authorIndex),
-            vrfSignature: vrfSignature
+            vrfSignature: vrfSignature,
+            offendersMarkers: [] // TODO:
         )
 
         let encodedHeader = try JamEncoder.encode(unsignedHeader)

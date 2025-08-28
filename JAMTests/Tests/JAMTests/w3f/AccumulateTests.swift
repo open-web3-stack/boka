@@ -137,10 +137,9 @@ private struct FullAccumulateState: Accumulation {
     mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data, value: Data?) {
         // update footprint
         let oldValue = storages[index]?[key]
-        var oldAccount = accounts[index]
-        oldAccount?.updateFootprintStorage(key: key, oldValue: oldValue, newValue: value)
-        accounts[index] = oldAccount
-        logger.debug("storage footprint update: \(accounts[index]?.itemsCount ?? 0) items, \(accounts[index]?.totalByteLength ?? 0) bytes")
+        logger.debug("storage footprint before: \(accounts[index]?.itemsCount ?? 0) items, \(accounts[index]?.totalByteLength ?? 0) bytes")
+        accounts[index]?.updateFootprintStorage(key: key, oldValue: oldValue, newValue: value)
+        logger.debug("storage footprint after: \(accounts[index]?.itemsCount ?? 0) items, \(accounts[index]?.totalByteLength ?? 0) bytes")
 
         // update value
         storages[index, default: [:]][key] = value
@@ -158,10 +157,9 @@ private struct FullAccumulateState: Accumulation {
     ) {
         // update footprint
         let oldValue = preimageInfo[index]?[hash]
-        var oldAccount = accounts[index]
-        oldAccount?.updateFootprintPreimage(oldValue: oldValue, newValue: value, length: length)
-        accounts[index] = oldAccount
-        logger.debug("preimage footprint update: \(accounts[index]?.itemsCount ?? 0) items, \(accounts[index]?.totalByteLength ?? 0) bytes")
+        logger.debug("preimage footprint before: \(accounts[index]?.itemsCount ?? 0) items, \(accounts[index]?.totalByteLength ?? 0) bytes")
+        accounts[index]?.updateFootprintPreimage(oldValue: oldValue, newValue: value, length: length)
+        logger.debug("preimage footprint after: \(accounts[index]?.itemsCount ?? 0) items, \(accounts[index]?.totalByteLength ?? 0) bytes")
 
         // update value
         preimageInfo[index, default: [:]][hash] = value

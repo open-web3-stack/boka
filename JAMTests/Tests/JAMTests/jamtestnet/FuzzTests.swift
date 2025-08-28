@@ -50,18 +50,17 @@ struct FuzzTests {
     }
 
     @Test(arguments: try loadTests(
-        version: "0.6.7",
+        version: "0.7.0",
         filters: [
             // empty to include all
-            // example: ("0.6.7/1754982630", "00000004")
+            // example: ("0.7.0/1754982630", "00000004")
         ],
         expectFailure: [
-            ("0.6.7/1755252727", "00000011"), // .invalidHeaderWinningTickets
         ],
         ignore: [
         ]
     ))
-    func v067(_ input: TestInput) async throws {
+    func v070(_ input: TestInput) async throws {
         try await TraceTest.test(input.testcase, allowFailure: input.allowFailure)
     }
 }

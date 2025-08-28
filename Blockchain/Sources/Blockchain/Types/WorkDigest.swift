@@ -2,7 +2,6 @@ import Codec
 import Foundation
 import Utils
 
-// L
 public struct WorkDigest: Sendable, Equatable, Codable {
     // s: the index of the service whose state is to be altered and thus whose refine code was already executed
     public var serviceIndex: ServiceIndex
@@ -16,7 +15,7 @@ public struct WorkDigest: Sendable, Equatable, Codable {
     // g: the gas limit for executing this item's accumulate
     public var gasLimit: Gas
 
-    // d: the work result
+    // l: the work result
     public var result: WorkResult
 
     // u: the actual amount of gas used during refinement

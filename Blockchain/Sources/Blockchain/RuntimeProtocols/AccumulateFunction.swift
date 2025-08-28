@@ -4,7 +4,7 @@ import Utils
 
 // wrangled operand tuple
 public struct OperandTuple: Codable {
-    /// h
+    /// p
     public var packageHash: Data32
     /// e
     public var segmentRoot: Data32
@@ -14,9 +14,9 @@ public struct OperandTuple: Codable {
     public var payloadHash: Data32
     /// g
     @CodingAs<Compact<Gas>> public var gasLimit: Gas
-    /// d
+    /// l
     public var workResult: WorkResult
-    /// o
+    /// t
     public var authorizerTrace: Data
 }
 
@@ -83,7 +83,6 @@ public struct AccumulateState {
     }
 }
 
-/// X
 public class AccumlateResultContext {
     /// s: the accumulating service account index
     public var serviceIndex: ServiceIndex

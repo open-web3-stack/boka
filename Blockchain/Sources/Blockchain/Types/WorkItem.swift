@@ -1,7 +1,6 @@
 import Foundation
 import Utils
 
-// I
 public struct WorkItem: Sendable, Equatable, Codable, Hashable {
     public struct ImportedDataSegment: Sendable, Equatable, Codable, Hashable {
         public enum DataSegmentRootKind: Sendable, Equatable, Hashable {
@@ -66,11 +65,8 @@ public struct WorkItem: Sendable, Equatable, Codable, Hashable {
     // s
     public var serviceIndex: ServiceIndex
 
-    // h
+    // c
     public var codeHash: Data32
-
-    // y
-    public var payloadBlob: Data
 
     // g
     public var refineGasLimit: Gas
@@ -78,14 +74,17 @@ public struct WorkItem: Sendable, Equatable, Codable, Hashable {
     // a
     public var accumulateGasLimit: Gas
 
+    // e: the number of data segments exported by this work item
+    public var exportsCount: UInt16
+
+    // y
+    public var payloadBlob: Data
+
     // i: a sequence of imported data segments which identify a prior exported segment through an index
     public var inputs: [ImportedDataSegment]
 
     // x: a sequence of hashed of blob hashes and lengths to be introduced in this block
     public var outputs: [HashAndLength]
-
-    // e: the number of data segments exported by this work item
-    public var exportsCount: UInt16
 
     public init(
         serviceIndex: ServiceIndex,
