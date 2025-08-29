@@ -20,7 +20,7 @@ public struct OperandTuple: Codable {
     public var authorizerTrace: Data
 }
 
-public struct DeferredTransfers: Codable {
+public struct DeferredTransfers: Codable, Sendable {
     // s
     public var sender: ServiceIndex
     // d
@@ -43,7 +43,7 @@ public struct DeferredTransfers: Codable {
 
 /// Characterization (i.e. values capable of representing) of state components
 /// which are both needed and mutable by the accumulation process.
-public struct AccumulateState {
+public struct AccumulateState: Sendable {
     /// d (all service accounts)
     public var accounts: ServiceAccountsMutRef
     /// i
