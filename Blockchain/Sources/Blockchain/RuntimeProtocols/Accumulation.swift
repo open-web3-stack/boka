@@ -269,6 +269,8 @@ extension Accumulation {
         var currentState = state
         var servicePreimageSet = Set<ServicePreimagePair>()
 
+        var overallAccountChanges = AccountChanges()
+
         for report in workReports {
             for digest in report.digests {
                 services.append(digest.serviceIndex)
@@ -318,6 +320,7 @@ extension Accumulation {
             try await mergeParallelBatchResults(
                 batchResults: batchResults,
                 currentState: &currentState,
+                overallAccountChanges: &overallAccountChanges,
                 gasUsed: &gasUsed,
                 commitments: &commitments,
                 transfers: &transfers,
@@ -377,12 +380,13 @@ extension Accumulation {
     private mutating func mergeParallelBatchResults(
         batchResults: [(ServiceIndex, AccumulationResult)],
         currentState: inout AccumulateState,
+        overallAccountChanges: inout AccountChanges,
         gasUsed: inout [(serviceIndex: ServiceIndex, gas: Gas)],
         commitments: inout Set<Commitment>,
         transfers: inout [DeferredTransfers],
         servicePreimageSet: inout Set<ServicePreimagePair>
     ) async throws {
-        var accountChanges = AccountChanges()
+        var batchAccountChanges = AccountChanges()
 
         for (service, singleOutput) in batchResults {
             gasUsed.append((service, singleOutput.gasUsed))
@@ -397,7 +401,8 @@ extension Accumulation {
 
             servicePreimageSet.formUnion(singleOutput.provide)
 
-            try accountChanges.checkAndMerge(with: singleOutput.state.accounts.changes)
+            try batchAccountChanges.checkAndMerge(with: singleOutput.state.accounts.changes)
+            try overallAccountChanges.checkAndMerge(with: singleOutput.state.accounts.changes)
 
             // m' - Manager service establishes new privileged services
             if service == privilegedServices.manager {
@@ -428,7 +433,7 @@ extension Accumulation {
             }
         }
 
-        try await accountChanges.apply(to: currentState.accounts)
+        try await batchAccountChanges.apply(to: currentState.accounts)
     }
 
     /// outer accumulate function ∆+
@@ -605,8 +610,6 @@ extension Accumulation {
     }
 
     /// Accumulate execution, state integration and deferred transfers
-    ///
-    /// Return accumulation-result merkle tree root
     public mutating func update(
         config: ProtocolConfigRef,
         availableReports: [WorkReport],
