@@ -355,11 +355,11 @@ extension Accumulation {
             dependentServices.append(privilegedServices.delegator)
             remainingServices.remove(privilegedServices.delegator)
         }
-        for assigner in privilegedServices.assigners {
-            if remainingServices.contains(assigner) {
-                dependentServices.append(assigner)
-                remainingServices.remove(assigner)
-            }
+        for assigner in privilegedServices.assigners
+            where remainingServices.contains(assigner)
+        {
+            dependentServices.append(assigner)
+            remainingServices.remove(assigner)
         }
 
         if !dependentServices.isEmpty {
