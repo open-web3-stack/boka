@@ -24,7 +24,7 @@ public protocol ServiceAccounts: Sendable {
 
 public class ServiceAccountsRef: Ref<ServiceAccounts>, @unchecked Sendable {}
 
-public class ServiceAccountsMutRef {
+public class ServiceAccountsMutRef: @unchecked Sendable {
     public let ref: RefMut<ServiceAccounts>
     public private(set) var changes: AccountChanges
 
@@ -41,17 +41,17 @@ public class ServiceAccountsMutRef {
 
     public func set(serviceAccount index: ServiceIndex, account: ServiceAccountDetails) {
         ref.value.set(serviceAccount: index, account: account)
-        changes.addAlteration(index: index) { $0.set(serviceAccount: index, account: account) }
+        changes.addAccountUpdate(index: index, account: account)
     }
 
     public func set(serviceAccount index: ServiceIndex, storageKey key: Data, value: Data?) async throws {
         try await ref.value.set(serviceAccount: index, storageKey: key, value: value)
-        changes.addAlteration(index: index) { try await $0.set(serviceAccount: index, storageKey: key, value: value) }
+        changes.addStorageUpdate(index: index, key: key, value: value)
     }
 
     public func set(serviceAccount index: ServiceIndex, preimageHash hash: Data32, value: Data?) {
         ref.value.set(serviceAccount: index, preimageHash: hash, value: value)
-        changes.addAlteration(index: index) { $0.set(serviceAccount: index, preimageHash: hash, value: value) }
+        changes.addPreimageUpdate(index: index, hash: hash, value: value)
     }
 
     public func set(
@@ -61,7 +61,7 @@ public class ServiceAccountsMutRef {
         value: LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>?
     ) async throws {
         try await ref.value.set(serviceAccount: index, preimageHash: hash, length: length, value: value)
-        changes.addAlteration(index: index) { try await $0.set(serviceAccount: index, preimageHash: hash, length: length, value: value) }
+        changes.addPreimageInfoUpdate(index: index, hash: hash, length: length, value: value)
     }
 
     public func addNew(serviceAccount index: ServiceIndex, account: ServiceAccount) async throws {
