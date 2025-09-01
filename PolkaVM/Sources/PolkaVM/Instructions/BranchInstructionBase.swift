@@ -42,7 +42,9 @@ extension BranchInstructionBase {
 
     public func condition(state: VMState) -> Bool {
         let regVal: UInt64 = state.readRegister(register)
-        logger.trace("🔀    \(Compare.self) a(\(regVal)) b(\(value)) => \(Compare.compare(a: regVal, b: value))")
+        #if DEBUG
+            logger.trace("🔀    \(Compare.self) a(\(regVal)) b(\(value)) => \(Compare.compare(a: regVal, b: value))")
+        #endif
         return Compare.compare(a: regVal, b: value)
     }
 }
@@ -66,7 +68,9 @@ extension BranchInstructionBase2 {
 
     public func condition(state: VMState) -> Bool {
         let (r1Val, r2Val): (UInt64, UInt64) = (state.readRegister(r1), state.readRegister(r2))
-        logger.trace("🔀    \(Compare.self) a(\(r1Val)) b(\(r2Val)) => \(Compare.compare(a: r1Val, b: r2Val))")
+        #if DEBUG
+            logger.trace("🔀    \(Compare.self) a(\(r1Val)) b(\(r2Val)) => \(Compare.compare(a: r1Val, b: r2Val))")
+        #endif
         return Compare.compare(a: r1Val, b: r2Val)
     }
 }
