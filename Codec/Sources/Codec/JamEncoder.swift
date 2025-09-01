@@ -116,7 +116,12 @@ private class EncodeContext: Encoder {
             data.append(UInt8(1)) // Encode presence flag
             try encode(value, key: key)
         } else {
-            data.append(UInt8(0)) // Encode absence flag
+            if key == nil, codingPath.isEmpty {
+                // top-level nil encoding: do nothing (empty data)
+                return
+            } else {
+                data.append(UInt8(0)) // Encode absence flag
+            }
         }
     }
 

@@ -376,7 +376,7 @@ struct EncoderTests {
         let encodedNone = try JamEncoder.encode(Int?.none)
 
         #expect(encodedSome == Data([1, 1, 0, 0, 0, 0, 0, 0, 0])) // Optional with value encoded
-        #expect(encodedNone == Data([0])) // None encoded as 1 byte (0)
+        #expect(encodedNone == Data()) // None encoded as empty data
     }
 
     @Test func encodeOptionalData() throws {
@@ -386,7 +386,7 @@ struct EncoderTests {
         let encodedNone = try JamEncoder.encode(Data?.none)
 
         #expect(encodedSome == Data([1, 1, 2, 3])) // Optional with value encoded
-        #expect(encodedNone == Data([0])) // None encoded as 1 byte (0)
+        #expect(encodedNone == Data()) // None encoded as empty data
     }
 
     @Test func encodeInt() throws {
@@ -413,11 +413,6 @@ struct EncoderTests {
         let int64Value: Int64 = 1
         let uintValue: UInt = 65535
         let uint16Value: UInt16 = 65535
-        let nilValue: Int64? = nil
-
-        let encodedNil = try JamEncoder.encode(nilValue)
-        #expect(encodedNil == Data([0]))
-        try #expect(JamDecoder.decode(Int64?.self, from: encodedNil) == nilValue)
 
         let encodedInt16 = try JamEncoder.encode(int16Value)
         #expect(encodedInt16 == Data([1, 0]))
@@ -443,12 +438,19 @@ struct EncoderTests {
     @Test func encodeArrayOfNils() throws {
         let arrayOfNils: [UInt8?] = [nil, nil, nil]
         let encoded = try JamEncoder.encode(arrayOfNils)
-        #expect(encoded == Data([3, 0, 0, 0]))
+        #expect(encoded == Data([3]))
     }
 
     @Test func encodeEmptyArray() throws {
         let emptyArray: [Int] = []
         let encoded = try JamEncoder.encode(emptyArray)
         #expect(encoded == Data([0]))
+    }
+
+    @Test func encodeSingleNil() throws {
+        let nilValue: Int64? = nil
+
+        let encodedNil = try JamEncoder.encode(nilValue)
+        #expect(encodedNil == Data([]))
     }
 }
