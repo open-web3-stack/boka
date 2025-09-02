@@ -294,14 +294,10 @@ public class Read: HostCall {
             nil
         }
 
-        logger.debug("value: \(value?.toDebugHexString() ?? "nil")")
-
         guard let value else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
             return
         }
-
-        logger.debug("raw val: \(value.toDebugHexString())")
 
         let reg11: UInt64 = state.readRegister(Registers.Index(raw: 11))
         let reg12: UInt64 = state.readRegister(Registers.Index(raw: 12))
@@ -1073,7 +1069,7 @@ public class Transfer: HostCall {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
         } else if gasLimit < destAccount!.minOnTransferGas {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.LOW.rawValue)
-        } else if let srcAccount, amount < srcAccount.thresholdBalance(config: config) {
+        } else if let srcAccount, srcAccount.balance - amount < srcAccount.thresholdBalance(config: config) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.CASH.rawValue)
         } else if var srcAccount {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
