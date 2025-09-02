@@ -1073,7 +1073,7 @@ public class Transfer: HostCall {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
         } else if gasLimit < destAccount!.minOnTransferGas {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.LOW.rawValue)
-        } else if let srcAccount, srcAccount.balance - amount < srcAccount.thresholdBalance(config: config) {
+        } else if let srcAccount, amount < srcAccount.thresholdBalance(config: config) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.CASH.rawValue)
         } else if var srcAccount {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
