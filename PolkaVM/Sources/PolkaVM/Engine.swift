@@ -10,10 +10,10 @@ public class Engine {
     private var stepCounter: Int = 0
     private let enableStepLogging: Bool
 
-    public init(config: PvmConfig, invocationContext: (any InvocationContext)? = nil) {
+    public init(config: PvmConfig, invocationContext: (any InvocationContext)? = nil, enableStepLogging: Bool = false) {
         self.config = config
         self.invocationContext = invocationContext
-        enableStepLogging = ProcessInfo.processInfo.environment["PVM_STEP_LOGGING"] != nil
+        self.enableStepLogging = enableStepLogging
     }
 
     public func execute(state: any VMState) async -> ExitReason {
@@ -77,9 +77,11 @@ public class Engine {
         //     context.state.consumeGas(blockGas)
         // }
 
-        if enableStepLogging {
-            logStep(pc: pc, instruction: inst, context: context)
-        }
+        #if DEBUG
+            if enableStepLogging {
+                logStep(pc: pc, instruction: inst, context: context)
+            }
+        #endif
 
         return inst.execute(context: context, skip: skip)
     }

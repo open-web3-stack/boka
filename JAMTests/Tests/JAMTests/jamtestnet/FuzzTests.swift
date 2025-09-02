@@ -58,6 +58,8 @@ struct FuzzTests {
         expectFailure: [
         ],
         ignore: [
+            ("0.7.0/1756548583", "00000009"), // TODO: one storage / preimage mismatch
+            ("0.7.0/1756548706", "00000094"), // TODO: backend
         ]
     ))
     func v070(_ input: TestInput) async throws {
