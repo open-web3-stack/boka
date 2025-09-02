@@ -1,3 +1,4 @@
+import CppHelper
 import Foundation
 import Utils
 
@@ -77,24 +78,22 @@ public class ProgramCode {
         }
         bitmask = bitmaskData
 
-        try parseCode(code: code, bitmask: bitmask)
+        try buildMetadata()
     }
 
-    /// traverse the program code, collect basic block indices, cache skips and gas costs
-    private func parseCode(code: Data, bitmask: Data) throws(Error) {
+    private func buildMetadata() throws(Error) {
         var i = UInt32(0)
         basicBlockIndices.insert(0)
         var currentBlockStart = i
         var currentBlockGasCost = Gas(0)
+
         while i < code.count {
             let skip = ProgramCode.skip(start: i, bitmask: bitmask)
             skipCache[i] = skip
 
-            let inst = try parseInstruction(startIndex: code.startIndex + Int(i), skip: skip)
-            instCache[i] = inst
-            currentBlockGasCost += inst.gasCost()
-
             let opcode = code[relative: Int(i)]
+            currentBlockGasCost += gasFromOpcode(opcode)
+
             if BASIC_BLOCK_INSTRUCTIONS.contains(opcode) {
                 // block end
                 blockGasCosts[currentBlockStart] = currentBlockGasCost
@@ -105,10 +104,13 @@ public class ProgramCode {
             }
             i += skip + 1
         }
-        // assume a trap at the end
-        blockGasCosts[currentBlockStart] = currentBlockGasCost + Instructions.Trap().gasCost()
-        instCache[i] = Instructions.Trap()
+        blockGasCosts[currentBlockStart] = currentBlockGasCost + Gas(1)
         basicBlockIndices.insert(i)
+    }
+
+    private func gasFromOpcode(_: UInt8) -> Gas {
+        // TODO: use a switch opcode later
+        Gas(1)
     }
 
     private func parseInstruction(startIndex: Int, skip: UInt32) throws(Error) -> Instruction {
@@ -125,7 +127,24 @@ public class ProgramCode {
     }
 
     public func getInstructionAt(pc: UInt32) -> Instruction? {
-        instCache[pc]
+        if let cached = instCache[pc] {
+            return cached
+        }
+
+        guard Int(pc) < code.count else {
+            let trapInst = CppHelper.Instructions.Trap()
+            instCache[pc] = trapInst
+            return trapInst
+        }
+
+        do {
+            let skip = skip(pc)
+            let inst = try parseInstruction(startIndex: code.startIndex + Int(pc), skip: skip)
+            instCache[pc] = inst
+            return inst
+        } catch {
+            return nil
+        }
     }
 
     public func getBlockGasCosts(pc: UInt32) -> Gas {
@@ -133,7 +152,13 @@ public class ProgramCode {
     }
 
     public func skip(_ pc: UInt32) -> UInt32 {
-        skipCache[pc] ?? 0
+        if let cached = skipCache[pc] {
+            return cached
+        }
+
+        let skip = ProgramCode.skip(start: pc, bitmask: bitmask)
+        skipCache[pc] = skip
+        return skip
     }
 
     public static func skip(start: UInt32, bitmask: Data) -> UInt32 {

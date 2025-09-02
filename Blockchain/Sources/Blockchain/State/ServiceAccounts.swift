@@ -80,12 +80,12 @@ public class ServiceAccountsMutRef: @unchecked Sendable {
         for (key, value) in account.preimageInfos {
             try await ref.value.set(serviceAccount: index, preimageHash: key.hash, length: key.length, value: value)
         }
-        changes.newAccounts[index] = account
+        changes.addNewAccount(index: index, account: account)
     }
 
     public func remove(serviceAccount index: ServiceIndex) {
         ref.value.set(serviceAccount: index, account: nil)
-        changes.removed.insert(index)
+        changes.addRemovedAccount(index: index)
     }
 
     public func clearRecordedChanges() {

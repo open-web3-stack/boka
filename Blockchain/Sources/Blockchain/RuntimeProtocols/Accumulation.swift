@@ -77,37 +77,53 @@ public struct AccumulationResult: Sendable {
 }
 
 public struct AccountChanges: Sendable {
+    public enum UpdateKind: Sendable {
+        case newAccount(ServiceIndex, ServiceAccount)
+        case removeAccount(ServiceIndex)
+        case updateAccount(ServiceIndex, ServiceAccountDetails)
+        case updateStorage(ServiceIndex, Data, Data?)
+        case updatePreimage(ServiceIndex, Data32, Data?)
+        case updatePreimageInfo(ServiceIndex, Data32, UInt32, StateKeys.ServiceAccountPreimageInfoKey.Value?)
+    }
+
+    // records for checking conflicts
     public var newAccounts: [ServiceIndex: ServiceAccount]
     public var altered: Set<ServiceIndex>
-    public var accountUpdates: [ServiceIndex: ServiceAccountDetails]
-    public var storageUpdates: [ServiceIndex: [Data: Data?]]
-    public var preimageUpdates: [ServiceIndex: [Data32: Data?]]
-    public var preimageInfoUpdates: [ServiceIndex: [Data32: (UInt32, StateKeys.ServiceAccountPreimageInfoKey.Value?)]]
     public var removed: Set<ServiceIndex>
+
+    // array for apply sequential updates
+    public var updates: [UpdateKind]
 
     public init() {
         newAccounts = [:]
         altered = []
-        accountUpdates = [:]
-        storageUpdates = [:]
-        preimageUpdates = [:]
-        preimageInfoUpdates = [:]
         removed = []
+        updates = []
+    }
+
+    public mutating func addNewAccount(index: ServiceIndex, account: ServiceAccount) {
+        newAccounts[index] = account
+        updates.append(.newAccount(index, account))
+    }
+
+    public mutating func addRemovedAccount(index: ServiceIndex) {
+        removed.insert(index)
+        updates.append(.removeAccount(index))
     }
 
     public mutating func addAccountUpdate(index: ServiceIndex, account: ServiceAccountDetails) {
-        accountUpdates[index] = account
         altered.insert(index)
+        updates.append(.updateAccount(index, account))
     }
 
     public mutating func addStorageUpdate(index: ServiceIndex, key: Data, value: Data?) {
-        storageUpdates[index, default: [:]][key] = value
         altered.insert(index)
+        updates.append(.updateStorage(index, key, value))
     }
 
     public mutating func addPreimageUpdate(index: ServiceIndex, hash: Data32, value: Data?) {
-        preimageUpdates[index, default: [:]][hash] = value
         altered.insert(index)
+        updates.append(.updatePreimage(index, hash, value))
     }
 
     public mutating func addPreimageInfoUpdate(
@@ -116,32 +132,24 @@ public struct AccountChanges: Sendable {
         length: UInt32,
         value: StateKeys.ServiceAccountPreimageInfoKey.Value?
     ) {
-        preimageInfoUpdates[index, default: [:]][hash] = (length, value)
         altered.insert(index)
+        updates.append(.updatePreimageInfo(index, hash, length, value))
     }
 
     public func apply(to accounts: ServiceAccountsMutRef) async throws {
-        for (index, account) in newAccounts {
-            try await accounts.addNew(serviceAccount: index, account: account)
-        }
-        for index in removed {
-            accounts.remove(serviceAccount: index)
-        }
-        for (index, account) in accountUpdates {
-            accounts.set(serviceAccount: index, account: account)
-        }
-        for (index, storage) in storageUpdates {
-            for (key, value) in storage {
+        for update in updates {
+            switch update {
+            case let .newAccount(index, account):
+                try await accounts.addNew(serviceAccount: index, account: account)
+            case let .removeAccount(index):
+                accounts.remove(serviceAccount: index)
+            case let .updateAccount(index, account):
+                accounts.set(serviceAccount: index, account: account)
+            case let .updateStorage(index, key, value):
                 try await accounts.set(serviceAccount: index, storageKey: key, value: value)
-            }
-        }
-        for (index, preimages) in preimageUpdates {
-            for (hash, value) in preimages {
+            case let .updatePreimage(index, hash, value):
                 accounts.set(serviceAccount: index, preimageHash: hash, value: value)
-            }
-        }
-        for (index, preimageInfos) in preimageInfoUpdates {
-            for (hash, (length, value)) in preimageInfos {
+            case let .updatePreimageInfo(index, hash, length, value):
                 try await accounts.set(serviceAccount: index, preimageHash: hash, length: length, value: value)
             }
         }
@@ -166,25 +174,7 @@ public struct AccountChanges: Sendable {
         }
         altered.formUnion(other.altered)
         removed.formUnion(other.removed)
-
-        for (index, account) in other.accountUpdates {
-            accountUpdates[index] = account
-        }
-        for (index, storage) in other.storageUpdates {
-            for (key, value) in storage {
-                storageUpdates[index, default: [:]][key] = value
-            }
-        }
-        for (index, preimages) in other.preimageUpdates {
-            for (hash, value) in preimages {
-                preimageUpdates[index, default: [:]][hash] = value
-            }
-        }
-        for (index, preimageInfos) in other.preimageInfoUpdates {
-            for (hash, info) in preimageInfos {
-                preimageInfoUpdates[index, default: [:]][hash] = info
-            }
-        }
+        updates.append(contentsOf: other.updates)
     }
 }
 
@@ -255,7 +245,7 @@ extension Accumulation {
     }
 
     /// parallelized accumulate function ∆*
-    private mutating func parallelizedAccumulate(
+    private func parallelizedAccumulate(
         config: ProtocolConfigRef,
         state: AccumulateState,
         workReports: [WorkReport],
@@ -297,11 +287,9 @@ extension Accumulation {
             ) { group in
                 for service in serviceBatch {
                     group.addTask { [batchState] in
-                        let parallelState = batchState.copy()
-
                         return try await Self.singleAccumulate(
                             config: config,
-                            state: parallelState,
+                            state: batchState.copy(),
                             workReports: workReports,
                             service: service,
                             alwaysAcc: alwaysAcc,
@@ -377,7 +365,7 @@ extension Accumulation {
         return batches
     }
 
-    private mutating func mergeParallelBatchResults(
+    private func mergeParallelBatchResults(
         batchResults: [(ServiceIndex, AccumulationResult)],
         currentState: inout AccumulateState,
         overallAccountChanges: inout AccountChanges,
@@ -437,7 +425,7 @@ extension Accumulation {
     }
 
     /// outer accumulate function ∆+
-    private mutating func outerAccumulate(
+    private func outerAccumulate(
         config: ProtocolConfigRef,
         state: AccumulateState,
         workReports: [WorkReport],
@@ -589,7 +577,7 @@ extension Accumulation {
     }
 
     // accumulate execution
-    private mutating func execution(
+    private func execution(
         config: ProtocolConfigRef,
         workReports: [WorkReport],
         state: AccumulateState,

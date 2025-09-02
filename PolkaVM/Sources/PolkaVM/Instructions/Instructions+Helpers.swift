@@ -61,14 +61,19 @@ extension Instructions {
         let end = start + entrySize
         let jumpTable = context.state.program.jumpTable
 
-        logger.trace("djump start (\(start)) end (\(end))")
+        #if DEBUG
+            logger.trace("djump start (\(start)) end (\(end))")
+        #endif
 
         guard jumpTable.count >= (end - start), jumpTable.startIndex + end <= jumpTable.endIndex else {
             return .exit(.panic(.invalidDynamicJump))
         }
 
         var targetAlignedData = jumpTable[relative: start ..< end]
-        logger.trace("djump target data (\(targetAlignedData.map(\.self)))")
+
+        #if DEBUG
+            logger.trace("djump target data (\(targetAlignedData.map(\.self)))")
+        #endif
 
         var targetAligned: any UnsignedInteger
 
@@ -101,7 +106,9 @@ extension Instructions {
             return .exit(.panic(.invalidDynamicJump))
         }
 
-        logger.trace("djump target decoded (\(targetAligned))")
+        #if DEBUG
+            logger.trace("djump target decoded (\(targetAligned))")
+        #endif
 
         guard context.state.program.basicBlockIndices.contains(UInt32(targetAligned)) else {
             return .exit(.panic(.invalidDynamicJump))
