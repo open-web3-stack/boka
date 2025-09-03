@@ -20,6 +20,8 @@ public protocol ServiceAccounts: Sendable {
         length: UInt32,
         value: StateKeys.ServiceAccountPreimageInfoKey.Value?
     ) async throws
+
+    mutating func remove(serviceAccount index: ServiceIndex) async throws
 }
 
 public class ServiceAccountsRef: Ref<ServiceAccounts>, @unchecked Sendable {}
@@ -83,8 +85,8 @@ public class ServiceAccountsMutRef: @unchecked Sendable {
         changes.addNewAccount(index: index, account: account)
     }
 
-    public func remove(serviceAccount index: ServiceIndex) {
-        ref.value.set(serviceAccount: index, account: nil)
+    public func remove(serviceAccount index: ServiceIndex) async throws {
+        try await ref.value.remove(serviceAccount: index)
         changes.addRemovedAccount(index: index)
     }
 

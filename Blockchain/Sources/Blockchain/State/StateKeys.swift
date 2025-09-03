@@ -335,3 +335,24 @@ public enum StateKeys {
         }
     }
 }
+
+extension StateKeys {
+    public static func isServiceKey(_ key: Data31, serviceIndex: ServiceIndex) -> Bool {
+        let keyData = key.data
+        let serviceBytes = withUnsafeBytes(of: serviceIndex) { Data($0) }
+
+        // service details
+        if keyData[relative: 0] == 255 {
+            return keyData[relative: 1] == serviceBytes[relative: 0] &&
+                keyData[relative: 3] == serviceBytes[relative: 1] &&
+                keyData[relative: 5] == serviceBytes[relative: 2] &&
+                keyData[relative: 7] == serviceBytes[relative: 3]
+        }
+
+        // other service keys
+        return keyData[relative: 0] == serviceBytes[relative: 0] &&
+            keyData[relative: 2] == serviceBytes[relative: 1] &&
+            keyData[relative: 4] == serviceBytes[relative: 2] &&
+            keyData[relative: 6] == serviceBytes[relative: 3]
+    }
+}
