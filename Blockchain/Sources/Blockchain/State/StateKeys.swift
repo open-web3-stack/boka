@@ -24,7 +24,7 @@ private func constructKey(_ idx: UInt8) -> Data31 {
 private func constructKey(_ idx: UInt8, _ service: ServiceIndex) -> Data31 {
     var data = Data(repeating: 0, count: 31)
     data[0] = idx
-    withUnsafeBytes(of: service) { ptr in
+    withUnsafeBytes(of: service.littleEndian) { ptr in
         data[1] = ptr.load(as: UInt8.self)
         data[3] = ptr.load(fromByteOffset: 1, as: UInt8.self)
         data[5] = ptr.load(fromByteOffset: 2, as: UInt8.self)
@@ -40,7 +40,7 @@ private func constructKey(_ service: ServiceIndex, _ val: UInt32, _ data: Data) 
     let h = valEncoded + data
     let a = h.blake2b256hash().data[relative: 0 ..< 27]
 
-    withUnsafeBytes(of: service) { servicePtr in
+    withUnsafeBytes(of: service.littleEndian) { servicePtr in
         a.withUnsafeBytes { aPtr in
             stateKey.append(servicePtr.load(as: UInt8.self))
             stateKey.append(aPtr.load(as: UInt8.self))
@@ -339,7 +339,7 @@ public enum StateKeys {
 extension StateKeys {
     public static func isServiceKey(_ key: Data31, serviceIndex: ServiceIndex) -> Bool {
         let keyData = key.data
-        let serviceBytes = withUnsafeBytes(of: serviceIndex) { Data($0) }
+        let serviceBytes = withUnsafeBytes(of: serviceIndex.littleEndian) { Data($0) }
 
         // service details
         if keyData[relative: 0] == 255 {
