@@ -164,6 +164,13 @@ private struct FullAccumulateState: Accumulation {
         // update value
         preimageInfo[index, default: [:]][hash] = value
     }
+
+    mutating func remove(serviceAccount index: ServiceIndex) async throws {
+        accounts[index] = nil
+        storages[index] = nil
+        preimages[index] = nil
+        preimageInfo[index] = nil
+    }
 }
 
 struct AccumulateTests {
