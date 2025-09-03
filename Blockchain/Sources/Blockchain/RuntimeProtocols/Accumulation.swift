@@ -142,7 +142,7 @@ public struct AccountChanges: Sendable {
             case let .newAccount(index, account):
                 try await accounts.addNew(serviceAccount: index, account: account)
             case let .removeAccount(index):
-                accounts.remove(serviceAccount: index)
+                try await accounts.remove(serviceAccount: index)
             case let .updateAccount(index, account):
                 accounts.set(serviceAccount: index, account: account)
             case let .updateStorage(index, key, value):
