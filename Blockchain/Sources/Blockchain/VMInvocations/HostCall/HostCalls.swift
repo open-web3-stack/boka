@@ -1130,7 +1130,7 @@ public class Eject: HostCall {
             // accumulating service definitely exist
             var destAccount = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex)!
             destAccount.balance += ejectAccount!.balance
-            x.state.accounts.remove(serviceAccount: ejectIndex)
+            try await x.state.accounts.remove(serviceAccount: ejectIndex)
             x.state.accounts.set(serviceAccount: x.serviceIndex, account: destAccount)
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         } else {
