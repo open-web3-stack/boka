@@ -30,6 +30,7 @@ public protocol VMState {
     func readMemory(address: some FixedWidthInteger, length: Int) throws -> Data
     func writeMemory(address: some FixedWidthInteger, value: UInt8) throws
     func writeMemory(address: some FixedWidthInteger, values: some Sequence<UInt8>) throws
+    func writeMemory(address: some FixedWidthInteger, values: Data) throws
     func sbrk(_ increment: UInt32) throws -> UInt32
 
     // VM State Control
