@@ -1,5 +1,5 @@
 {
-  "originHash" : "b24bc350cefbc4a11375aec1aa77c5f0b7f73e4db0612fec8566457591c3980d",
+  "originHash" : "da3a4145b71c3b5b1f41471cd34bba166de8cf00f6f7ec67b36e3b0a8ed35d34",
   "pins" : [
     {
       "identity" : "async-channels",
@@ -53,15 +53,6 @@
       "state" : {
         "revision" : "6a90b7e77e29f9bda6c2b3a4165a40d6c02cfda1",
         "version" : "1.23.0"
-      }
-    },
-    {
-      "identity" : "lrucache",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/nicklockwood/LRUCache.git",
-      "state" : {
-        "revision" : "542f0449556327415409ededc9c43a4bd0a397dc",
-        "version" : "1.0.7"
       }
     },
     {
