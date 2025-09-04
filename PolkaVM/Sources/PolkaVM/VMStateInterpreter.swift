@@ -63,16 +63,16 @@ public class VMStateInterpreter: VMState {
     }
 
     public func readMemory(address: some FixedWidthInteger) throws -> UInt8 {
-        try validateAddress(address)
-        let res = try memory.read(address: UInt32(truncatingIfNeeded: address))
-        return res
+        let addr = UInt32(truncatingIfNeeded: address)
+        try validateAddress(addr)
+        return try memory.read(address: addr)
     }
 
     public func readMemory(address: some FixedWidthInteger, length: Int) throws -> Data {
         if length == 0 { return Data() }
-        try validateAddress(address)
-        let res = try memory.read(address: UInt32(truncatingIfNeeded: address), length: length)
-        return res
+        let addr = UInt32(truncatingIfNeeded: address)
+        try validateAddress(addr)
+        return try memory.read(address: addr, length: length)
     }
 
     public func isMemoryWritable(address: some FixedWidthInteger, length: Int) -> Bool {
@@ -80,15 +80,17 @@ public class VMStateInterpreter: VMState {
     }
 
     public func writeMemory(address: some FixedWidthInteger, value: UInt8) throws {
-        try validateAddress(address)
-        try memory.write(address: UInt32(truncatingIfNeeded: address), value: value)
+        let addr = UInt32(truncatingIfNeeded: address)
+        try validateAddress(addr)
+        try memory.write(address: addr, value: value)
     }
 
     public func writeMemory(address: some FixedWidthInteger, values: some Sequence<UInt8>) throws {
         let data = Data(values)
         guard !data.isEmpty else { return }
-        try validateAddress(address)
-        try memory.write(address: UInt32(truncatingIfNeeded: address), values: data)
+        let addr = UInt32(truncatingIfNeeded: address)
+        try validateAddress(addr)
+        try memory.write(address: addr, values: data)
     }
 
     public func sbrk(_ increment: UInt32) throws -> UInt32 {

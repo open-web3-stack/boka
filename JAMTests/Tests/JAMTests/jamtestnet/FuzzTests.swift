@@ -62,7 +62,7 @@ struct FuzzTests {
             ("0.7.0/1756792661", "00000027"),
         ],
         ignore: [
-            ("0.7.0/1756548583", "00000009"), // TODO: hard
+            ("0.7.0/1756548583", "00000009"), // TODO: find root cause
         ]
     ))
     func v070(_ input: TestInput) async throws {

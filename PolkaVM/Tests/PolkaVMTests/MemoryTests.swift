@@ -219,13 +219,14 @@ enum MemoryTests {
         }
 
         @Test func read() throws {
-            // readonly
-            #expect(throws: MemoryError.notReadable(0)) { try memory.read(address: 0) }
-            #expect(throws: MemoryError.notReadable(readOnlyStart - 4096)) { try memory.read(address: readOnlyStart - 1) }
+            #expect(throws: MemoryError.zoneNotFound(0)) { try memory.read(address: 0) }
+            #expect(throws: MemoryError.zoneNotFound(readOnlyStart - 1)) { try memory.read(address: readOnlyStart - 1) }
             #expect(memory.isReadable(address: 0, length: config.pvmProgramInitZoneSize) == false)
+
+            // readonly zone
             #expect(try memory.read(address: readOnlyStart, length: 4) == Data([1, 2, 3, 0]))
             #expect(try memory.read(address: readOnlyStart, length: 4) == Data([1, 2, 3, 0]))
-            #expect(throws: MemoryError.notReadable(readOnlyEnd)) { try memory.read(
+            #expect(throws: MemoryError.zoneNotFound(readOnlyEnd)) { try memory.read(
                 address: readOnlyEnd,
                 length: Int(heapStart - readOnlyEnd)
             ) }
@@ -247,14 +248,15 @@ enum MemoryTests {
             #expect(memory.isReadable(address: argumentStart, length: Int(argumentEnd - argumentStart)) == true)
             #expect(try memory.read(address: argumentStart, length: 4) == Data([7, 8, 9, 0]))
             #expect(try memory.read(address: argumentEnd - 3, length: 3) == Data([0, 0, 0]))
-            #expect(throws: MemoryError.notReadable(argumentEnd)) { try memory.read(address: argumentEnd, length: 1) }
+            #expect(throws: MemoryError.zoneNotFound(argumentEnd)) { try memory.read(address: argumentEnd, length: 1) }
         }
 
         @Test func write() throws {
-            // readonly
-            #expect(throws: MemoryError.notWritable(0)) { try memory.write(address: 0, value: 0) }
-            #expect(throws: MemoryError.notWritable(readOnlyStart - 4096)) { try memory.write(address: readOnlyStart - 1, value: 0) }
+            #expect(throws: MemoryError.zoneNotFound(0)) { try memory.write(address: 0, value: 0) }
+            #expect(throws: MemoryError.zoneNotFound(readOnlyStart - 1)) { try memory.write(address: readOnlyStart - 1, value: 0) }
             #expect(memory.isWritable(address: 0, length: config.pvmProgramInitZoneSize) == false)
+
+            // readonly zone
             #expect(throws: MemoryError.notWritable(readOnlyStart)) { try memory.write(address: readOnlyStart, value: 4) }
             #expect(try memory.read(address: readOnlyStart, length: 4) == Data([1, 2, 3, 0]))
 
@@ -292,9 +294,7 @@ enum MemoryTests {
             #expect(newHeapEnd == initialHeapEnd)
 
             let finalBoundary = initialHeapEnd + allocSize
-            let start = initialHeapEnd / pageSize
             let end = (finalBoundary + pageSize - 1) / pageSize
-            let pages = end - start
 
             #expect(memory.isWritable(address: initialHeapEnd, length: Int(allocSize)) == true)
 
