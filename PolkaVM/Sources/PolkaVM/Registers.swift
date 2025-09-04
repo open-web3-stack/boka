@@ -4,37 +4,41 @@ import Foundation
 public struct Registers: Equatable {
     public typealias Index = CppHelper.RegisterIndex
 
-    public var reg1: UInt64 = 0
-    public var reg2: UInt64 = 0
-    public var reg3: UInt64 = 0
-    public var reg4: UInt64 = 0
-    public var reg5: UInt64 = 0
-    public var reg6: UInt64 = 0
-    public var reg7: UInt64 = 0
-    public var reg8: UInt64 = 0
-    public var reg9: UInt64 = 0
-    public var reg10: UInt64 = 0
-    public var reg11: UInt64 = 0
-    public var reg12: UInt64 = 0
-    public var reg13: UInt64 = 0
+    private var regs: (UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64) = (
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+    )
 
     public init() {}
 
     public init(_ values: [UInt64]) {
         assert(values.count == 13)
-        reg1 = values[0]
-        reg2 = values[1]
-        reg3 = values[2]
-        reg4 = values[3]
-        reg5 = values[4]
-        reg6 = values[5]
-        reg7 = values[6]
-        reg8 = values[7]
-        reg9 = values[8]
-        reg10 = values[9]
-        reg11 = values[10]
-        reg12 = values[11]
-        reg13 = values[12]
+        regs = (
+            values[0],
+            values[1],
+            values[2],
+            values[3],
+            values[4],
+            values[5],
+            values[6],
+            values[7],
+            values[8],
+            values[9],
+            values[10],
+            values[11],
+            values[12]
+        )
     }
 
     /// standard program init registers
@@ -45,71 +49,38 @@ public struct Registers: Equatable {
         self[Index(raw: 8)] = UInt64(argumentData?.count ?? 0)
     }
 
+    @inline(__always)
     public subscript(index: Index) -> UInt64 {
         get {
-            switch index.value {
-            case 0:
-                reg1
-            case 1:
-                reg2
-            case 2:
-                reg3
-            case 3:
-                reg4
-            case 4:
-                reg5
-            case 5:
-                reg6
-            case 6:
-                reg7
-            case 7:
-                reg8
-            case 8:
-                reg9
-            case 9:
-                reg10
-            case 10:
-                reg11
-            case 11:
-                reg12
-            case 12:
-                reg13
-            default:
-                fatalError("unreachable: index out of bounds \(index.value)")
+            withUnsafePointer(to: regs) { ptr in
+                ptr.withMemoryRebound(to: UInt64.self, capacity: 13) { arrayPtr in
+                    arrayPtr[Int(index.value)]
+                }
             }
         }
         set {
-            switch index.value {
-            case 0:
-                reg1 = newValue
-            case 1:
-                reg2 = newValue
-            case 2:
-                reg3 = newValue
-            case 3:
-                reg4 = newValue
-            case 4:
-                reg5 = newValue
-            case 5:
-                reg6 = newValue
-            case 6:
-                reg7 = newValue
-            case 7:
-                reg8 = newValue
-            case 8:
-                reg9 = newValue
-            case 9:
-                reg10 = newValue
-            case 10:
-                reg11 = newValue
-            case 11:
-                reg12 = newValue
-            case 12:
-                reg13 = newValue
-            default:
-                fatalError("unreachable: index out of bounds \(index.value)")
+            withUnsafeMutablePointer(to: &regs) { ptr in
+                ptr.withMemoryRebound(to: UInt64.self, capacity: 13) { arrayPtr in
+                    arrayPtr[Int(index.value)] = newValue
+                }
             }
         }
+    }
+
+    public static func == (lhs: Registers, rhs: Registers) -> Bool {
+        lhs.regs.0 == rhs.regs.0 &&
+            lhs.regs.1 == rhs.regs.1 &&
+            lhs.regs.2 == rhs.regs.2 &&
+            lhs.regs.3 == rhs.regs.3 &&
+            lhs.regs.4 == rhs.regs.4 &&
+            lhs.regs.5 == rhs.regs.5 &&
+            lhs.regs.6 == rhs.regs.6 &&
+            lhs.regs.7 == rhs.regs.7 &&
+            lhs.regs.8 == rhs.regs.8 &&
+            lhs.regs.9 == rhs.regs.9 &&
+            lhs.regs.10 == rhs.regs.10 &&
+            lhs.regs.11 == rhs.regs.11 &&
+            lhs.regs.12 == rhs.regs.12
     }
 }
 
@@ -187,37 +158,10 @@ extension Registers {
     public mutating func withUnsafeMutableRegistersPointer<R>(
         _ body: (UnsafeMutablePointer<UInt64>) throws -> R
     ) rethrows -> R {
-        // Create a temporary array to hold register values
-        var tempRegisters: [UInt64] = [
-            reg1, reg2, reg3, reg4,
-            reg5, reg6, reg7, reg8,
-            reg9, reg10, reg11, reg12,
-            reg13,
-        ]
-
-        let result = try tempRegisters.withUnsafeMutableBufferPointer { bufferPointer -> R in
-            guard let baseAddress = bufferPointer.baseAddress else {
-                // This should ideally not happen with a non-empty array
-                fatalError("Could not get base address of temporary register buffer. This indicates a critical issue.")
+        try withUnsafeMutablePointer(to: &regs) { ptr in
+            try ptr.withMemoryRebound(to: UInt64.self, capacity: 13) { arrayPtr in
+                try body(arrayPtr)
             }
-            return try body(baseAddress)
         }
-
-        // Copy values back from the temporary array
-        reg1 = tempRegisters[0]
-        reg2 = tempRegisters[1]
-        reg3 = tempRegisters[2]
-        reg4 = tempRegisters[3]
-        reg5 = tempRegisters[4]
-        reg6 = tempRegisters[5]
-        reg7 = tempRegisters[6]
-        reg8 = tempRegisters[7]
-        reg9 = tempRegisters[8]
-        reg10 = tempRegisters[9]
-        reg11 = tempRegisters[10]
-        reg12 = tempRegisters[11]
-        reg13 = tempRegisters[12]
-
-        return result
     }
 }
