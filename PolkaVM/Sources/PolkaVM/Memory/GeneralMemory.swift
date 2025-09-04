@@ -103,11 +103,7 @@ final class MemoryZone {
             // replacing exactly one chunk
             chunks[firstIndex] = newChunk
         } else {
-            // replacing multiple chunks with one
-            // remove old chunks in reverse order to avoid shifting
-            for i in stride(from: lastIndex - 1, through: firstIndex + 1, by: -1) {
-                chunks.remove(at: i)
-            }
+            chunks.replaceSubrange(firstIndex ..< lastIndex, with: [newChunk])
             chunks[firstIndex] = newChunk
         }
     }
