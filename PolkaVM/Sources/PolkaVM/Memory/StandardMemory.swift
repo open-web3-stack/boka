@@ -143,14 +143,20 @@ public final class StandardMemory: Memory {
         let zone = try getZone(for: address)
         let offset = zone.offset(for: address)
 
-        return zone.data.withUnsafeBytes { bytes in
-            let sourcePtr = bytes.baseAddress!.advanced(by: offset)
-            var result = Data(count: length)
-            _ = result.withUnsafeMutableBytes { resultBytes in
-                memcpy(resultBytes.baseAddress!, sourcePtr, length)
+        var result = Data(count: length)
+        let availableBytes = max(0, zone.data.count - offset)
+        let bytesToCopy = min(length, availableBytes)
+
+        if bytesToCopy > 0 {
+            result.withUnsafeMutableBytes { resultBytes in
+                zone.data.withUnsafeBytes { zoneBytes in
+                    let sourcePtr = zoneBytes.baseAddress!.advanced(by: offset)
+                    memcpy(resultBytes.baseAddress!, sourcePtr, bytesToCopy)
+                }
             }
-            return result
         }
+
+        return result
     }
 
     public func write(address: UInt32, value: UInt8) throws {
