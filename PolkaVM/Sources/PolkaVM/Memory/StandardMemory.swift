@@ -1,7 +1,7 @@
 import Foundation
 
 /// Standard Program Memory
-public class StandardMemory: Memory {
+public final class StandardMemory: Memory {
     public let pageMap: PageMap
     private let config: PvmConfig
 

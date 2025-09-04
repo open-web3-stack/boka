@@ -1,7 +1,7 @@
 import Foundation
 
 /// MemoryZone is an isolated memory area, used for stack, heap, arguments, etc.
-class MemoryZone {
+final class MemoryZone {
     private let config: PvmConfig
     public let startAddress: UInt32
     public private(set) var endAddress: UInt32
@@ -190,7 +190,7 @@ class MemoryZone {
     }
 }
 
-class MemoryChunk {
+final class MemoryChunk {
     public private(set) var startAddress: UInt32
     public var endAddress: UInt32 {
         startAddress + UInt32(data.count)
@@ -255,7 +255,7 @@ class MemoryChunk {
 }
 
 /// General Program Memory
-public class GeneralMemory: Memory {
+public final class GeneralMemory: Memory {
     private let config: PvmConfig
     public let pageMap: PageMap
 
