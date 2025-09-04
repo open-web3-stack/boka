@@ -26,7 +26,6 @@ public class ProgramCode {
 
     // parsed stuff
     public private(set) var basicBlockIndices: Set<UInt32> = []
-    private var skipCache: [UInt32: UInt32] = [:]
     private var instCache: [UInt32: Instruction] = [:]
     private var blockGasCosts: [UInt32: Gas] = [:]
 
@@ -89,7 +88,6 @@ public class ProgramCode {
 
         while i < code.count {
             let skip = ProgramCode.skip(start: i, bitmask: bitmask)
-            skipCache[i] = skip
 
             let opcode = code[relative: Int(i)]
             currentBlockGasCost += gasFromOpcode(opcode)
@@ -152,13 +150,7 @@ public class ProgramCode {
     }
 
     public func skip(_ pc: UInt32) -> UInt32 {
-        if let cached = skipCache[pc] {
-            return cached
-        }
-
-        let skip = ProgramCode.skip(start: pc, bitmask: bitmask)
-        skipCache[pc] = skip
-        return skip
+        ProgramCode.skip(start: pc, bitmask: bitmask)
     }
 
     public static func skip(start: UInt32, bitmask: Data) -> UInt32 {
