@@ -32,7 +32,7 @@ jobs:
         with:
           credentials_json: ${{ secrets.GOOGLE_CREDENTIALS }}
 
-      - name: Review PR
+      - name: Review PR With Gemini 2.5 Pro
         uses: polka-codes/action@master
         with:
           pr_number: ${{ github.event.inputs.pr_number || github.event.number }}
@@ -44,7 +44,7 @@ jobs:
           GOOGLE_VERTEX_LOCATION: us-central1
           GOOGLE_VERTEX_PROJECT: ${{ secrets.GOOGLE_VERTEX_PROJECT }}
 
-      - name: Process PR
+      - name: Review PR With GPT-5
         uses: polka-codes/action@master
         with:
           pr_number: ${{ github.event.inputs.pr_number || github.event.number }}
