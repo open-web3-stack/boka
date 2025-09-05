@@ -68,19 +68,16 @@ public struct Registers: Equatable {
     }
 
     public static func == (lhs: Registers, rhs: Registers) -> Bool {
-        lhs.regs.0 == rhs.regs.0 &&
-            lhs.regs.1 == rhs.regs.1 &&
-            lhs.regs.2 == rhs.regs.2 &&
-            lhs.regs.3 == rhs.regs.3 &&
-            lhs.regs.4 == rhs.regs.4 &&
-            lhs.regs.5 == rhs.regs.5 &&
-            lhs.regs.6 == rhs.regs.6 &&
-            lhs.regs.7 == rhs.regs.7 &&
-            lhs.regs.8 == rhs.regs.8 &&
-            lhs.regs.9 == rhs.regs.9 &&
-            lhs.regs.10 == rhs.regs.10 &&
-            lhs.regs.11 == rhs.regs.11 &&
-            lhs.regs.12 == rhs.regs.12
+        withUnsafePointer(to: lhs.regs) { lhsPtr in
+            withUnsafePointer(to: rhs.regs) { rhsPtr in
+                memcmp(
+                    lhsPtr,
+                    rhsPtr,
+                    MemoryLayout<(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64)>
+                        .size
+                ) == 0
+            }
+        }
     }
 }
 
