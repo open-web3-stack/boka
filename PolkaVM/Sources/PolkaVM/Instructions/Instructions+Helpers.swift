@@ -75,34 +75,7 @@ extension Instructions {
             logger.trace("djump target data (\(targetAlignedData.map(\.self)))")
         #endif
 
-        var targetAligned: any UnsignedInteger
-
-        switch entrySize {
-        case 1:
-            let u8: UInt8? = targetAlignedData.decode(length: entrySize)
-            guard let u8 else {
-                return .exit(.panic(.invalidDynamicJump))
-            }
-            targetAligned = u8
-        case 2:
-            let u16: UInt16? = targetAlignedData.decode(length: entrySize)
-            guard let u16 else {
-                return .exit(.panic(.invalidDynamicJump))
-            }
-            targetAligned = u16
-        case 3:
-            let u32: UInt32? = targetAlignedData.decode(length: entrySize)
-            guard let u32 else {
-                return .exit(.panic(.invalidDynamicJump))
-            }
-            targetAligned = u32
-        case 4:
-            let u32: UInt32? = targetAlignedData.decode(length: entrySize)
-            guard let u32 else {
-                return .exit(.panic(.invalidDynamicJump))
-            }
-            targetAligned = u32
-        default:
+        guard let targetAligned: UInt32 = targetAlignedData.decode(length: entrySize) else {
             return .exit(.panic(.invalidDynamicJump))
         }
 
@@ -110,11 +83,11 @@ extension Instructions {
             logger.trace("djump target decoded (\(targetAligned))")
         #endif
 
-        guard context.state.program.basicBlockIndices.contains(UInt32(targetAligned)) else {
+        guard context.state.program.basicBlockIndices.contains(targetAligned) else {
             return .exit(.panic(.invalidDynamicJump))
         }
 
-        context.state.updatePC(UInt32(targetAligned))
+        context.state.updatePC(targetAligned)
         return .continued
     }
 

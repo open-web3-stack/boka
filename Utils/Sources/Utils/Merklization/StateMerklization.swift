@@ -41,10 +41,11 @@ public func stateMerklize(kv: [Data31: Data], i: Int = 0) throws(MerklizeError) 
 
     /// bit at i, returns true if it is 1
     func bit(_ data: Data, _ i: Int) throws(MerklizeError) -> Bool {
-        guard data.indices.contains(data.startIndex + (i / 8)) else {
+        let byteIndex = i / 8
+        guard byteIndex < data.count else {
             throw MerklizeError.invalidIndex
         }
-        let byte = data[relative: i / 8]
+        let byte = data[data.startIndex + byteIndex]
         return (byte & (1 << (7 - (i % 8)))) != 0
     }
 
@@ -58,6 +59,9 @@ public func stateMerklize(kv: [Data31: Data], i: Int = 0) throws(MerklizeError) 
 
     var l: [Data31: Data] = [:]
     var r: [Data31: Data] = [:]
+    l.reserveCapacity(kv.count / 2 + 1)
+    r.reserveCapacity(kv.count / 2 + 1)
+
     for (k, v) in kv {
         if try bit(k.data, i) {
             r[k] = v

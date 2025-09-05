@@ -1373,6 +1373,12 @@ public class Provide: HostCall {
 public class Log: HostCall {
     public static var identifier: UInt8 { 100 }
 
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy/MM/dd HH:mm:ss"
+        return formatter
+    }()
+
     public func gasCost(state _: VMState) -> Gas {
         Gas(0)
     }
@@ -1445,9 +1451,7 @@ public class Log: HostCall {
         let target = regs[1] == 0 && regs[2] == 0 ? nil : try? state.readMemory(address: regs[1], length: Int(regs[2]))
         let message = try? state.readMemory(address: regs[3], length: Int(regs[4]))
 
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy/MM/dd HH:mm:ss"
-        let time = dateFormatter.string(from: Date())
+        let time = Self.dateFormatter.string(from: Date())
 
         let details = Details(
             time: time,

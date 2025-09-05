@@ -90,7 +90,7 @@ extension CppHelper.Instructions.StoreImmU16: Instruction {
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(2)))
+        try context.state.writeMemory(address: address, values: value.encode())
         return .continued
     }
 }
@@ -102,7 +102,7 @@ extension CppHelper.Instructions.StoreImmU32: Instruction {
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(4)))
+        try context.state.writeMemory(address: address, values: value.encode())
         return .continued
     }
 }
@@ -114,7 +114,7 @@ extension CppHelper.Instructions.StoreImmU64: Instruction {
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(8)))
+        try context.state.writeMemory(address: address, values: value.encode())
         return .continued
     }
 }
@@ -289,7 +289,7 @@ extension CppHelper.Instructions.StoreU16: Instruction {
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         let value: UInt16 = context.state.readRegister(reg)
-        try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(2)))
+        try context.state.writeMemory(address: address, values: value.encode())
         return .continued
     }
 }
@@ -303,7 +303,7 @@ extension CppHelper.Instructions.StoreU32: Instruction {
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         let value: UInt32 = context.state.readRegister(reg)
-        try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(4)))
+        try context.state.writeMemory(address: address, values: value.encode())
         return .continued
     }
 }
@@ -317,7 +317,7 @@ extension CppHelper.Instructions.StoreU64: Instruction {
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         let value: UInt64 = context.state.readRegister(reg)
-        try context.state.writeMemory(address: address, values: value.encode(method: .fixedWidth(8)))
+        try context.state.writeMemory(address: address, values: value.encode())
         return .continued
     }
 }
@@ -345,7 +345,7 @@ extension CppHelper.Instructions.StoreImmIndU16: Instruction {
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         try context.state.writeMemory(
             address: context.state.readRegister(reg) &+ address,
-            values: value.encode(method: .fixedWidth(2))
+            values: value.encode()
         )
         return .continued
     }
@@ -361,7 +361,7 @@ extension CppHelper.Instructions.StoreImmIndU32: Instruction {
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         try context.state.writeMemory(
             address: context.state.readRegister(reg) &+ address,
-            values: value.encode(method: .fixedWidth(4))
+            values: value.encode()
         )
         return .continued
     }
@@ -377,7 +377,7 @@ extension CppHelper.Instructions.StoreImmIndU64: Instruction {
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         try context.state.writeMemory(
             address: context.state.readRegister(reg) &+ address,
-            values: value.encode(method: .fixedWidth(8))
+            values: value.encode()
         )
         return .continued
     }
@@ -719,7 +719,7 @@ extension CppHelper.Instructions.StoreIndU16: Instruction {
         let value: UInt16 = context.state.readRegister(src)
         try context.state.writeMemory(
             address: context.state.readRegister(dest) &+ offset,
-            values: value.encode(method: .fixedWidth(2))
+            values: value.encode()
         )
         return .continued
     }
@@ -736,7 +736,7 @@ extension CppHelper.Instructions.StoreIndU32: Instruction {
         let value: UInt32 = context.state.readRegister(src)
         try context.state.writeMemory(
             address: context.state.readRegister(dest) &+ offset,
-            values: value.encode(method: .fixedWidth(4))
+            values: value.encode()
         )
         return .continued
     }
@@ -753,7 +753,7 @@ extension CppHelper.Instructions.StoreIndU64: Instruction {
         let value: UInt64 = context.state.readRegister(src)
         try context.state.writeMemory(
             address: context.state.readRegister(dest) &+ offset,
-            values: value.encode(method: .fixedWidth(8))
+            values: value.encode()
         )
         return .continued
     }

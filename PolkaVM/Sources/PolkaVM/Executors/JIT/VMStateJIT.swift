@@ -186,6 +186,17 @@ final class VMStateJIT: VMState, @unchecked Sendable {
         }
     }
 
+    func writeMemory(address: some FixedWidthInteger, values: Data) throws {
+        let addr = UInt32(truncatingIfNeeded: address)
+        guard isMemoryWritable(address: addr, length: values.count) else {
+            throw VMError.invalidInstructionMemoryAccess
+        }
+        values.withUnsafeBytes { bytes in
+            let sourcePtr = bytes.bindMemory(to: UInt8.self).baseAddress!
+            memcpy(jitMemoryBasePtr.advanced(by: Int(addr)), sourcePtr, values.count)
+        }
+    }
+
     func sbrk(_: UInt32) throws -> UInt32 {
         // In JIT mode, memory allocation would need to be handled by the JIT runtime
         // This would require coordination with the memory sandbox mechanism
