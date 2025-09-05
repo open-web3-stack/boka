@@ -219,10 +219,13 @@ enum MemoryTests {
         }
 
         @Test func read() throws {
-            // readonly
             #expect(throws: MemoryError.notReadable(0)) { try memory.read(address: 0) }
-            #expect(throws: MemoryError.notReadable(readOnlyStart - 4096)) { try memory.read(address: readOnlyStart - 1) }
+            #expect(throws: MemoryError.notReadable(readOnlyStart - UInt32(config.pvmMemoryPageSize))) {
+                try memory.read(address: readOnlyStart - 1)
+            }
             #expect(memory.isReadable(address: 0, length: config.pvmProgramInitZoneSize) == false)
+
+            // readonly zone
             #expect(try memory.read(address: readOnlyStart, length: 4) == Data([1, 2, 3, 0]))
             #expect(try memory.read(address: readOnlyStart, length: 4) == Data([1, 2, 3, 0]))
             #expect(throws: MemoryError.notReadable(readOnlyEnd)) { try memory.read(
@@ -251,10 +254,14 @@ enum MemoryTests {
         }
 
         @Test func write() throws {
-            // readonly
             #expect(throws: MemoryError.notWritable(0)) { try memory.write(address: 0, value: 0) }
-            #expect(throws: MemoryError.notWritable(readOnlyStart - 4096)) { try memory.write(address: readOnlyStart - 1, value: 0) }
+            #expect(throws: MemoryError.notWritable(readOnlyStart - UInt32(config.pvmMemoryPageSize))) { try memory.write(
+                address: readOnlyStart - 1,
+                value: 0
+            ) }
             #expect(memory.isWritable(address: 0, length: config.pvmProgramInitZoneSize) == false)
+
+            // readonly zone
             #expect(throws: MemoryError.notWritable(readOnlyStart)) { try memory.write(address: readOnlyStart, value: 4) }
             #expect(try memory.read(address: readOnlyStart, length: 4) == Data([1, 2, 3, 0]))
 
@@ -292,9 +299,7 @@ enum MemoryTests {
             #expect(newHeapEnd == initialHeapEnd)
 
             let finalBoundary = initialHeapEnd + allocSize
-            let start = initialHeapEnd / pageSize
             let end = (finalBoundary + pageSize - 1) / pageSize
-            let pages = end - start
 
             #expect(memory.isWritable(address: initialHeapEnd, length: Int(allocSize)) == true)
 
@@ -357,9 +362,9 @@ enum MemoryTests {
         @Test func sbrk() throws {
             let oldEnd = try memory.sbrk(512)
 
-            #expect(oldEnd == UInt32(config.pvmMemoryPageSize))
+            #expect(oldEnd == UInt32(config.pvmMemoryPageSize) * 2)
             #expect(memory.isWritable(address: oldEnd, length: config.pvmMemoryPageSize) == true)
-            #expect(memory.isWritable(address: 0, length: Int(oldEnd)) == true)
+            #expect(memory.isWritable(address: UInt32(config.pvmMemoryPageSize), length: Int(oldEnd)) == false)
 
             try memory.write(address: oldEnd, values: Data([1, 2, 3]))
             #expect(try memory.read(address: oldEnd - 1, length: 5) == Data([0, 1, 2, 3, 0]))

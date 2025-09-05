@@ -26,8 +26,16 @@ public class ProgramCode {
 
     // parsed stuff
     public private(set) var basicBlockIndices: Set<UInt32> = []
-    private var skipCache: [UInt32: UInt32] = [:]
-    private var instCache: [UInt32: Instruction] = [:]
+
+    private final class InstRef {
+        let instruction: Instruction
+        init(_ instruction: Instruction) {
+            self.instruction = instruction
+        }
+    }
+
+    private var instCache: [InstRef?] = []
+
     private var blockGasCosts: [UInt32: Gas] = [:]
 
     public init(_ blob: Data) throws(Error) {
@@ -89,7 +97,6 @@ public class ProgramCode {
 
         while i < code.count {
             let skip = ProgramCode.skip(start: i, bitmask: bitmask)
-            skipCache[i] = skip
 
             let opcode = code[relative: Int(i)]
             currentBlockGasCost += gasFromOpcode(opcode)
@@ -127,20 +134,26 @@ public class ProgramCode {
     }
 
     public func getInstructionAt(pc: UInt32) -> Instruction? {
-        if let cached = instCache[pc] {
-            return cached
+        let pcIndex = Int(pc)
+
+        if instCache.count <= pcIndex {
+            instCache.append(contentsOf: Array(repeating: nil, count: pcIndex - instCache.count + 1))
+        }
+
+        if let cached = instCache[pcIndex] {
+            return cached.instruction
         }
 
         guard Int(pc) < code.count else {
             let trapInst = CppHelper.Instructions.Trap()
-            instCache[pc] = trapInst
+            instCache[pcIndex] = InstRef(trapInst)
             return trapInst
         }
 
         do {
             let skip = skip(pc)
             let inst = try parseInstruction(startIndex: code.startIndex + Int(pc), skip: skip)
-            instCache[pc] = inst
+            instCache[pcIndex] = InstRef(inst)
             return inst
         } catch {
             return nil
@@ -152,13 +165,7 @@ public class ProgramCode {
     }
 
     public func skip(_ pc: UInt32) -> UInt32 {
-        if let cached = skipCache[pc] {
-            return cached
-        }
-
-        let skip = ProgramCode.skip(start: pc, bitmask: bitmask)
-        skipCache[pc] = skip
-        return skip
+        ProgramCode.skip(start: pc, bitmask: bitmask)
     }
 
     public static func skip(start: UInt32, bitmask: Data) -> UInt32 {
