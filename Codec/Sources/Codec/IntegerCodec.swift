@@ -12,28 +12,39 @@ extension Collection<UInt8> where SubSequence == Self {
         IntegerCodec.decode { self.next() }
     }
 
-    // this is pretty inefficient
-    // so need to ensure the usage of this is minimal
     public mutating func decode<T: UnsignedInteger>(length: Int) -> T? {
-        IntegerCodec.decode(length: length) { self.next() }
+        guard length > 0, length <= count else { return nil }
+
+        // fast path for Data
+        if let data = self as? Data {
+            let result: T? = data.withUnsafeBytes { buffer in
+                guard length <= buffer.count else { return nil }
+                let ptr = buffer.bindMemory(to: UInt8.self)
+
+                var result: T = 0
+                for i in 0 ..< length {
+                    let byte = T(ptr[i])
+                    result |= byte << (8 * i)
+                }
+                return result
+            }
+            self = dropFirst(length)
+            return result
+        }
+
+        // fallback
+        var result: T = 0
+        for i in 0 ..< length {
+            let index = index(startIndex, offsetBy: i)
+            let byte = T(self[index])
+            result |= byte << (8 * i)
+        }
+        self = dropFirst(length)
+        return result
     }
 }
 
 public enum IntegerCodec {
-    public static func decode<T: UnsignedInteger>(length: Int, next: () throws -> UInt8?) rethrows -> T? {
-        guard length > 0 else {
-            return nil
-        }
-        var res: T = 0
-        for l in 0 ..< length {
-            guard let byte = try next() else {
-                return nil
-            }
-            res = res | T(byte) << (8 * l)
-        }
-        return res
-    }
-
     public static func decode(next: () throws -> UInt8?) rethrows -> UInt64? {
         guard let firstByte = try next() else {
             return nil
@@ -45,10 +56,12 @@ public enum IntegerCodec {
         let byteLength = (~firstByte).leadingZeroBitCount
         var res: UInt64 = 0
         if byteLength > 0 {
-            guard let rest: UInt64 = try decode(length: byteLength, next: next) else {
-                return nil
+            for i in 0 ..< byteLength {
+                guard let byte = try next() else {
+                    return nil
+                }
+                res |= UInt64(byte) << (8 * i)
             }
-            res = rest
         }
 
         let mask = UInt8(UInt(1) << (8 - byteLength) - 1)
