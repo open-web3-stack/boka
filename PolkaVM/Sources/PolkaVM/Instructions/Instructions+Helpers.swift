@@ -75,24 +75,7 @@ extension Instructions {
             logger.trace("djump target data (\(targetAlignedData.map(\.self)))")
         #endif
 
-        let targetAligned: UInt32
-        switch entrySize {
-        case 1:
-            guard let decoded: UInt8 = targetAlignedData.decode(length: entrySize) else {
-                return .exit(.panic(.invalidDynamicJump))
-            }
-            targetAligned = UInt32(decoded)
-        case 2:
-            guard let decoded: UInt16 = targetAlignedData.decode(length: entrySize) else {
-                return .exit(.panic(.invalidDynamicJump))
-            }
-            targetAligned = UInt32(decoded)
-        case 3, 4:
-            guard let decoded: UInt32 = targetAlignedData.decode(length: entrySize) else {
-                return .exit(.panic(.invalidDynamicJump))
-            }
-            targetAligned = decoded
-        default:
+        guard let targetAligned: UInt32 = targetAlignedData.decode(length: entrySize) else {
             return .exit(.panic(.invalidDynamicJump))
         }
 
