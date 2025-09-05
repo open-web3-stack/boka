@@ -104,7 +104,6 @@ final class MemoryZone {
             chunks[firstIndex] = newChunk
         } else {
             chunks.replaceSubrange(firstIndex ..< lastIndex, with: [newChunk])
-            chunks[firstIndex] = newChunk
         }
     }
 
