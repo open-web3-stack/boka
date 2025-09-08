@@ -10,6 +10,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  BENCHMARK_DISABLE_JEMALLOC: true
+
 jobs:
   lint:
     name: Swift Lint
