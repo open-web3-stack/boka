@@ -5,18 +5,8 @@ import Foundation
 import JAMTests
 import Utils
 
-@inline(__always) private func w3f(_ path: String, ext: String = "bin") -> [Testcase] {
+private func w3f(_ path: String, ext: String = "bin") -> [Testcase] {
     (try? JAMBenchSupport.w3fTestcases(at: path, ext: ext)) ?? []
-}
-
-// Simple sync runner for async operations (Swift 6-safe)
-private final class _UnsafeBox<T>: @unchecked Sendable { var value: T? }
-@inline(__always) private func blockOn<T>(_ work: @escaping @Sendable () async -> T) -> T {
-    let g = DispatchGroup(); g.enter()
-    let box = _UnsafeBox<T>()
-    Task.detached { box.value = await work(); g.leave() }
-    g.wait()
-    return box.value!
 }
 
 let benchmarks: @Sendable () -> Void = {
@@ -68,12 +58,10 @@ let benchmarks: @Sendable () -> Void = {
                 for c in traces {
                     let tc = try! JamTestnet.decodeTestcase(c, config: TestVariants.full.config)
                     // Run full STF apply and touch resulting state root
-                    let result = blockOn {
-                        await (try? JamTestnet.runSTF(tc, config: TestVariants.full.config))
-                    }
+                    let result = try? await JamTestnet.runSTF(tc, config: TestVariants.full.config)
                     switch result {
                     case let .success(stateRef):
-                        let root = blockOn { await stateRef.value.stateRoot }
+                        let root = await stateRef.value.stateRoot
                         blackHole(root)
                     default:
                         blackHole(c.description)
