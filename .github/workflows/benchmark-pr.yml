@@ -148,12 +148,9 @@ jobs:
             echo "The following results will become the baseline for future comparisons:" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
 
-            # Show the actual benchmark results even without comparison
-            swift package benchmark baseline check pull_request pull_request --format markdown >> $GITHUB_STEP_SUMMARY 2>&1 || {
-              # Fallback: show raw benchmark results if comparison fails
-              echo "### Raw Benchmark Results:" >> $GITHUB_STEP_SUMMARY
-              swift package benchmark --format markdown >> $GITHUB_STEP_SUMMARY 2>&1 || true
-            }
+            # Run benchmarks to generate results for first time
+            echo "### Benchmark Results:" >> $GITHUB_STEP_SUMMARY
+            swift package benchmark --format markdown >> $GITHUB_STEP_SUMMARY 2>&1 || true
             echo "exitStatus=0" >> $GITHUB_ENV
           fi
         continue-on-error: true
