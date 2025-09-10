@@ -1,17 +1,11 @@
-name: Benchmark PR vs Master
+name: Benchmark PR
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches:
-      - '**'
-  workflow_dispatch:
   pull_request:
     branches: ["master"]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: benchmark-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -22,9 +16,6 @@ jobs:
     name: Benchmark Comparison
     runs-on: [self-hosted, linux]
     timeout-minutes: 60
-    continue-on-error: true
-    # Only run if CI passed or if manually triggered or on pull request
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' }}
 
     steps:
     - name: Checkout Code
@@ -32,9 +23,7 @@ jobs:
       with:
         fetch-depth: 0
         submodules: recursive
-        # For workflow_run: checkout the branch CI ran on (PR branch)
-        # For pull_request: checkout the PR branch
-        ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+        ref: ${{ github.head_ref }}
 
     - run: sudo apt-get update
     - uses: awalsh128/cache-apt-pkgs-action@latest
@@ -119,7 +108,7 @@ jobs:
     - name: Switch to master branch
       if: steps.check_benchmarks.outputs.hasBenchmarks == 'true'
       run: |
-        git stash push -m "benchmark-pr-changes" --include-untracked 2>/dev/null || true
+        git stash
         git checkout master
 
     - name: Run benchmarks for master branch
@@ -131,7 +120,7 @@ jobs:
     - name: Switch back to PR branch
       if: steps.check_benchmarks.outputs.hasBenchmarks == 'true'
       run: |
-        git checkout ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+        git checkout ${{ github.head_ref }}
         git stash pop 2>/dev/null || true
 
     - name: Compare benchmarks with master
@@ -139,64 +128,30 @@ jobs:
       id: benchmark_comparison
       run: |
         cd JAMTests
-        echo "## Benchmark Comparison" >> $GITHUB_STEP_SUMMARY
-        echo "Comparing pull_request with master" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "$(date)" >> $GITHUB_STEP_SUMMARY
 
         # Check if master baseline exists
         if [ -f ".benchmarkBaselines/master.json" ]; then
-          # Capture the comparison output
-          if swift package benchmark baseline check master pull_request --format markdown > comparison.md 2>&1; then
-            echo "status=success" >> $GITHUB_OUTPUT
-            cat comparison.md >> $GITHUB_STEP_SUMMARY
-            # Save for PR comment (escape for GitHub Actions)
-            {
-              echo 'markdown<<EOF'
-              cat comparison.md
-              echo EOF
-            } >> $GITHUB_OUTPUT
+          # Run comparison and append directly to step summary
+          if swift package benchmark baseline check master pull_request --format markdown >> $GITHUB_STEP_SUMMARY 2>&1; then
+            echo "status=✅ PASSED" >> $GITHUB_OUTPUT
+            echo "::notice title=Benchmark Status::No performance regressions detected - click Details to view full results"
           else
-            echo "status=failure" >> $GITHUB_OUTPUT
-            cat comparison.md >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "Benchmark comparison failed" >> $GITHUB_STEP_SUMMARY
-            # Save for PR comment even on failure
-            {
-              echo 'markdown<<EOF'
-              cat comparison.md 2>/dev/null || echo "Benchmark comparison failed - check workflow logs for details"
-              echo EOF
-            } >> $GITHUB_OUTPUT
+            echo "status=⚠️ REGRESSIONS" >> $GITHUB_OUTPUT
+            echo "::notice title=Benchmark Status::Performance regressions detected - click Details to view full results"
           fi
         else
-          echo "Master baseline not found - this might be the first benchmark run" >> $GITHUB_STEP_SUMMARY
-          echo "status=no-baseline" >> $GITHUB_OUTPUT
-          {
-            echo 'markdown<<EOF'
-            echo "⚠️ Master baseline not found. This appears to be the first benchmark run for this repository."
-            echo "Future PRs will show performance comparisons against this baseline."
-            echo EOF
-          } >> $GITHUB_OUTPUT
+          echo "⚠️ Master baseline not found. This appears to be the first benchmark run." >> $GITHUB_STEP_SUMMARY
+          echo "status=ℹ️ NO BASELINE" >> $GITHUB_OUTPUT
+          echo "::notice title=Benchmark Status::Establishing baseline (first run) - click Details to view results"
         fi
       continue-on-error: true
-
-    - name: Comment on PR with results
-      if: steps.check_benchmarks.outputs.hasBenchmarks == 'true' && (github.event_name == 'workflow_run' || github.event_name == 'pull_request')
-      uses: thollander/actions-comment-pull-request@v1
-      with:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        message: |
-          📊 **Benchmark Results**
-
-          [View detailed results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
-          **Comparison: `pull_request` vs `master`**
-
-          ${{ steps.benchmark_comparison.outputs.markdown }}
-        comment_includes: "Benchmark Results"
 
     - name: Upload benchmark results
       if: steps.check_benchmarks.outputs.hasBenchmarks == 'true'
       uses: actions/upload-artifact@v4
       with:
-        name: benchmark-results-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+        name: benchmark-results-${{ github.head_ref }}
         path: |
           JAMTests/.benchmarkBaselines/
           JAMTests/BenchmarkResults/
