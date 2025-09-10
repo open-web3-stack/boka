@@ -51,7 +51,7 @@ public struct TestState: Codable, Sendable {
 }
 
 public enum JamTestnet {
-    static func loadTests(path: String, src: TestsSource, ext: String = "bin") throws -> [Testcase] {
+    public static func loadTests(path: String, src: TestsSource, ext: String = "bin") throws -> [Testcase] {
         // filter genesis which has no tests
         try TestLoader.getTestcases(path: path, extension: ext, src: src).filter { $0.description != "genesis.bin" }
     }
