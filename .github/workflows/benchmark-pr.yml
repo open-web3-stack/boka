@@ -130,27 +130,27 @@ jobs:
         id: benchmark
         run: |
           cd JAMTests
-          echo "# 📊 Benchmark Results" >> $GITHUB_STEP_SUMMARY
-          echo "Generated on: $(date)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# 📊 Benchmark Results"
+          echo "Generated on: $(date)"
+          echo ""
           echo "exitStatus=1" >> $GITHUB_ENV
 
           # Check if master baseline exists for comparison
           if [ -f ".benchmarkBaselines/master.json" ]; then
-            echo "## 🔄 Comparison with Master Branch" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            swift package benchmark baseline check master pull_request --format markdown >> $GITHUB_STEP_SUMMARY
+            echo "## 🔄 Comparison with Master Branch"
+            echo ""
+            swift package benchmark baseline check master pull_request --format markdown
             echo "exitStatus=0" >> $GITHUB_ENV
           else
-            echo "## 🆕 First Benchmark Run" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "⚠️ Master baseline not found. This appears to be the first benchmark run." >> $GITHUB_STEP_SUMMARY
-            echo "The following results will become the baseline for future comparisons:" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## 🆕 First Benchmark Run"
+            echo ""
+            echo "⚠️ Master baseline not found. This appears to be the first benchmark run."
+            echo "The following results will become the baseline for future comparisons:"
+            echo ""
 
             # Run benchmarks to generate results for first time
-            echo "### Benchmark Results:" >> $GITHUB_STEP_SUMMARY
-            swift package benchmark --format markdown >> $GITHUB_STEP_SUMMARY 2>&1 || true
+            echo "### Benchmark Results:"
+            swift package benchmark --format markdown 2>&1 || true
             echo "exitStatus=0" >> $GITHUB_ENV
           fi
         continue-on-error: true
