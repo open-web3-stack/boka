@@ -1,11 +1,12 @@
 name: Benchmark PR
 
 on:
+  workflow_dispatch:
   pull_request:
-    branches: ["master"]
+    branches: [ master ]
 
 concurrency:
-  group: benchmark-${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -13,146 +14,162 @@ env:
 
 jobs:
   benchmark-delta:
-    name: Benchmark Comparison
+    name: Comparison
     runs-on: [self-hosted, linux]
+    continue-on-error: true
     timeout-minutes: 60
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        submodules: recursive
-        ref: ${{ github.head_ref }}
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
 
-    - run: sudo apt-get update
-    - uses: awalsh128/cache-apt-pkgs-action@latest
-      with:
-        packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
+      - run: sudo apt-get update
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
 
-    - uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-region: us-east-2
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-2
 
-    - name: Cache SPM
-      uses: runs-on/cache@v4
-      with:
-        path: '**/.build'
-        key: ${{ runner.os }}-spm-release-${{ hashFiles('**/Package.resolved') }}
-        restore-keys: |
-          ${{ runner.os }}-spm-release-
-      env:
-        RUNS_ON_S3_BUCKET_CACHE: laminar-gh-action-cache
+      - name: Cache SPM
+        uses: runs-on/cache@v4
+        with:
+          path: '**/.build'
+          key: ${{ runner.os }}-spm-release-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-release-
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: laminar-gh-action-cache
 
-    - name: Cache Cargo
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Cache bandersnatch_vrfs static lib
-      uses: actions/cache@v4
-      with:
-        path: .lib/libbandersnatch_vrfs.a
-        key: ${{ runner.os }}-libs-libbandersnatch-${{ hashFiles('Utils/Sources/bandersnatch/**') }}
-        restore-keys: |
-            ${{ runner.os }}-libs-libbandersnatch
+      - name: Cache bandersnatch_vrfs static lib
+        uses: actions/cache@v4
+        with:
+          path: .lib/libbandersnatch_vrfs.a
+          key: ${{ runner.os }}-libs-libbandersnatch-${{ hashFiles('Utils/Sources/bandersnatch/**') }}
+          restore-keys: |
+              ${{ runner.os }}-libs-libbandersnatch
 
-    - name: Cache bls static lib
-      uses: actions/cache@v4
-      with:
-        path: .lib/libbls.a
-        key: ${{ runner.os }}-libs-libbls-${{ hashFiles('Utils/Sources/bls/**') }}
-        restore-keys: |
-            ${{ runner.os }}-libs-libbls
+      - name: Cache bls static lib
+        uses: actions/cache@v4
+        with:
+          path: .lib/libbls.a
+          key: ${{ runner.os }}-libs-libbls-${{ hashFiles('Utils/Sources/bls/**') }}
+          restore-keys: |
+              ${{ runner.os }}-libs-libbls
 
-    - name: Cache erasure-coding static lib
-      uses: actions/cache@v4
-      with:
-        path: .lib/libec.a
-        key: ${{ runner.os }}-libs-libec-${{ hashFiles('Utils/Sources/erasure-coding/**') }}
-        restore-keys: |
-            ${{ runner.os }}-libs-libec
+      - name: Cache erasure-coding static lib
+        uses: actions/cache@v4
+        with:
+          path: .lib/libec.a
+          key: ${{ runner.os }}-libs-libec-${{ hashFiles('Utils/Sources/erasure-coding/**') }}
+          restore-keys: |
+              ${{ runner.os }}-libs-libec
 
-    - name: Setup Swift
-      uses: SwiftyLab/setup-swift@latest
+      - name: Setup Swift
+        uses: SwiftyLab/setup-swift@latest
 
-    - name: Setup Rust
-      uses: dtolnay/rust-toolchain@nightly
-      with:
-        components: rustfmt
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
 
-    - name: Build dependencies
-      run: make deps
+      - name: Build dependencies
+        run: make deps
 
-    - name: Check if benchmarks exist
-      id: check_benchmarks
-      run: |
-        if [ -d "JAMTests/Benchmarks" ]; then
-          echo "hasBenchmarks=true" >> $GITHUB_OUTPUT
-        else
-          echo "hasBenchmarks=false" >> $GITHUB_OUTPUT
-        fi
+      - name: Check if benchmarks exist and setup environment
+        run: |
+          [ -d "JAMTests/Benchmarks" ] && echo "hasBenchmark=1" >> $GITHUB_ENV
 
-    - name: Run benchmarks for PR branch
-      if: steps.check_benchmarks.outputs.hasBenchmarks == 'true'
-      run: |
-        cd JAMTests
-        swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update pull_request --no-progress --quiet
+      - name: Run benchmarks for branch
+        if: ${{ env.hasBenchmark == '1' }}
+        run: |
+          cd JAMTests
+          swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update pull_request --no-progress --quiet
 
-    - name: Switch to master branch
-      if: steps.check_benchmarks.outputs.hasBenchmarks == 'true'
-      run: |
-        git stash
-        git checkout master
+      - name: Switch to branch 'master'
+        if: ${{ env.hasBenchmark == '1' }}
+        run: |
+          git stash push -m "benchmark-workflow-stash" 2>/dev/null || true
+          git checkout master
 
-    - name: Run benchmarks for master branch
-      if: steps.check_benchmarks.outputs.hasBenchmarks == 'true'
-      run: |
-        cd JAMTests
-        swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update master --no-progress --quiet
-
-    - name: Switch back to PR branch
-      if: steps.check_benchmarks.outputs.hasBenchmarks == 'true'
-      run: |
-        git checkout ${{ github.head_ref }}
-        git stash pop 2>/dev/null || true
-
-    - name: Compare benchmarks with master
-      if: steps.check_benchmarks.outputs.hasBenchmarks == 'true'
-      id: benchmark_comparison
-      run: |
-        cd JAMTests
-        echo "$(date)" >> $GITHUB_STEP_SUMMARY
-
-        # Check if master baseline exists
-        if [ -f ".benchmarkBaselines/master.json" ]; then
-          # Run comparison and append directly to step summary
-          if swift package benchmark baseline check master pull_request --format markdown >> $GITHUB_STEP_SUMMARY 2>&1; then
-            echo "status=✅ PASSED" >> $GITHUB_OUTPUT
-            echo "::notice title=Benchmark Status::No performance regressions detected - click Details to view full results"
+      - name: Run benchmarks for branch 'master'
+        if: ${{ env.hasBenchmark == '1' }}
+        run: |
+          cd JAMTests
+          # Check if benchmarks exist on master and if the benchmark plugin is available
+          if [ -d "Benchmarks" ] && swift package plugin --list 2>/dev/null | grep -q benchmark; then
+            swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update master --no-progress --quiet
           else
-            echo "status=⚠️ REGRESSIONS" >> $GITHUB_OUTPUT
-            echo "::notice title=Benchmark Status::Performance regressions detected - click Details to view full results"
+            echo "Benchmarks don't exist on master branch yet or benchmark plugin not available - skipping master baseline"
           fi
-        else
-          echo "⚠️ Master baseline not found. This appears to be the first benchmark run." >> $GITHUB_STEP_SUMMARY
-          echo "status=ℹ️ NO BASELINE" >> $GITHUB_OUTPUT
-          echo "::notice title=Benchmark Status::Establishing baseline (first run) - click Details to view results"
-        fi
-      continue-on-error: true
 
-    - name: Upload benchmark results
-      if: steps.check_benchmarks.outputs.hasBenchmarks == 'true'
-      uses: actions/upload-artifact@v4
-      with:
-        name: benchmark-results-${{ github.head_ref }}
-        path: |
-          JAMTests/.benchmarkBaselines/
-          JAMTests/BenchmarkResults/
-        retention-days: 30
+      - name: Switch back to PR branch
+        if: ${{ env.hasBenchmark == '1' }}
+        run: |
+          git checkout ${{ github.head_ref }}
+          # Restore stashed changes if any exist
+          git stash list | grep -q "benchmark-workflow-stash" && git stash pop stash@{0} 2>/dev/null || true
+
+      - name: Compare PR and master
+        if: ${{ env.hasBenchmark == '1' }}
+        id: benchmark
+        run: |
+          cd JAMTests
+          echo "# 📊 Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "Generated on: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "exitStatus=1" >> $GITHUB_ENV
+
+          # Check if master baseline exists for comparison
+          if [ -f ".benchmarkBaselines/master.json" ]; then
+            echo "## 🔄 Comparison with Master Branch" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            swift package benchmark baseline check master pull_request --format markdown >> $GITHUB_STEP_SUMMARY
+            echo "exitStatus=0" >> $GITHUB_ENV
+          else
+            echo "## 🆕 First Benchmark Run" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ Master baseline not found. This appears to be the first benchmark run." >> $GITHUB_STEP_SUMMARY
+            echo "The following results will become the baseline for future comparisons:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Show the actual benchmark results even without comparison
+            swift package benchmark baseline check pull_request pull_request --format markdown >> $GITHUB_STEP_SUMMARY 2>&1 || {
+              # Fallback: show raw benchmark results if comparison fails
+              echo "### Raw Benchmark Results:" >> $GITHUB_STEP_SUMMARY
+              swift package benchmark --format markdown >> $GITHUB_STEP_SUMMARY 2>&1 || true
+            }
+            echo "exitStatus=0" >> $GITHUB_ENV
+          fi
+        continue-on-error: true
+
+      - name: Upload benchmark results
+        if: ${{ env.hasBenchmark == '1' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.event.pull_request.number }}-${{ github.head_ref }}
+          path: |
+            JAMTests/.benchmarkBaselines/
+            JAMTests/BenchmarkResults/
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Exit with correct status
+        if: ${{ env.hasBenchmark == '1' }}
+        run: |
+          exit ${{ env.exitStatus }}

@@ -5,6 +5,8 @@ import JAMTests
 import Utils
 
 let benchmarks: @Sendable () -> Void = {
+    Benchmark.defaultConfiguration.timeUnits = BenchmarkTimeUnits.milliseconds
+
     // W3F Erasure (full): encode + reconstruct
     struct ErasureCodingTestcase: Codable { let data: Data; let shards: [Data] }
     let erasureCases = (try? TestLoader.getTestcases(path: "erasure/full", extension: "bin")) ?? []

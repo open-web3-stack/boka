@@ -77,18 +77,18 @@
 			"request": "launch",
 			"args": [],
 			"cwd": "${workspaceFolder:boka}/JAMTests",
-			"name": "Debug JAMBenchmarks (JAMTests)",
-			"program": "${workspaceFolder:boka}/JAMTests/.build/debug/JAMBenchmarks",
-			"preLaunchTask": "swift: Build Debug JAMBenchmarks (JAMTests)"
+			"name": "Debug BenchmarkTestVectors (JAMTests)",
+			"program": "${workspaceFolder:boka}/JAMTests/.build/debug/BenchmarkTestVectors",
+			"preLaunchTask": "swift: Build Debug BenchmarkTestVectors (JAMTests)"
 		},
 		{
 			"type": "swift",
 			"request": "launch",
 			"args": [],
 			"cwd": "${workspaceFolder:boka}/JAMTests",
-			"name": "Release JAMBenchmarks (JAMTests)",
-			"program": "${workspaceFolder:boka}/JAMTests/.build/release/JAMBenchmarks",
-			"preLaunchTask": "swift: Build Release JAMBenchmarks (JAMTests)"
+			"name": "Release BenchmarkTestVectors (JAMTests)",
+			"program": "${workspaceFolder:boka}/JAMTests/.build/release/BenchmarkTestVectors",
+			"preLaunchTask": "swift: Build Release BenchmarkTestVectors (JAMTests)"
 		}
 	]
 }
