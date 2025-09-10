@@ -95,16 +95,9 @@ jobs:
         run: |
           [ -d "JAMTests/Benchmarks" ] && echo "hasBenchmark=1" >> $GITHUB_ENV
 
-      - name: Run benchmarks for branch
-        if: ${{ env.hasBenchmark == '1' }}
-        run: |
-          cd JAMTests
-          swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update pull_request --no-progress --quiet
-
       - name: Switch to branch 'master'
         if: ${{ env.hasBenchmark == '1' }}
         run: |
-          git stash push -m "benchmark-workflow-stash" 2>/dev/null || true
           git checkout master
 
       - name: Run benchmarks for branch 'master'
@@ -118,12 +111,16 @@ jobs:
             echo "Benchmarks don't exist on master branch yet or benchmark plugin not available - skipping master baseline"
           fi
 
-      - name: Switch back to PR branch
+      - name: Switch to PR branch
         if: ${{ env.hasBenchmark == '1' }}
         run: |
           git checkout ${{ github.head_ref }}
-          # Restore stashed changes if any exist
-          git stash list | grep -q "benchmark-workflow-stash" && git stash pop stash@{0} 2>/dev/null || true
+
+      - name: Run benchmarks for PR branch
+        if: ${{ env.hasBenchmark == '1' }}
+        run: |
+          cd JAMTests
+          swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update pull_request --no-progress --quiet
 
       - name: Compare PR and master
         if: ${{ env.hasBenchmark == '1' }}
@@ -136,7 +133,7 @@ jobs:
           echo "exitStatus=1" >> $GITHUB_ENV
 
           # Check if master baseline exists for comparison
-          if [ -f ".benchmarkBaselines/master.json" ]; then
+          if [ -f ".benchmarkBaselines/BenchmarkTestVectors/master/results.json" ]; then
             echo "## 🔄 Comparison with Master Branch"
             echo ""
             swift package benchmark baseline check master pull_request --format markdown
@@ -154,17 +151,6 @@ jobs:
             echo "exitStatus=0" >> $GITHUB_ENV
           fi
         continue-on-error: true
-
-      - name: Upload benchmark results
-        if: ${{ env.hasBenchmark == '1' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: benchmark-results-${{ github.event.pull_request.number }}-${{ github.head_ref }}
-          path: |
-            JAMTests/.benchmarkBaselines/
-            JAMTests/BenchmarkResults/
-          retention-days: 30
-          if-no-files-found: warn
 
       - name: Exit with correct status
         if: ${{ env.hasBenchmark == '1' }}
