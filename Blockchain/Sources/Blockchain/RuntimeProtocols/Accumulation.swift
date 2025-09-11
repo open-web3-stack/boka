@@ -569,7 +569,7 @@ extension Accumulation {
 
         let rightQueueItems = accumulationQueue.array[index...]
         let leftQueueItems = accumulationQueue.array[0 ..< index]
-        var allQueueItems = rightQueueItems.flatMap { $0 } + leftQueueItems.flatMap { $0 } + newQueueItems
+        var allQueueItems = rightQueueItems.flatMap(\.self) + leftQueueItems.flatMap(\.self) + newQueueItems
 
         editQueue(items: &allQueueItems, accumulatedPackages: Set(zeroPrereqReports.map(\.packageSpecification.workPackageHash)))
 
@@ -697,7 +697,7 @@ extension Accumulation {
         for (service, _) in accumulateOutput.gasUsed {
             if accumulateStats[service] != nil { continue }
 
-            let digests = accumulated.compactMap(\.digests).flatMap { $0 }
+            let digests = accumulated.compactMap(\.digests).flatMap(\.self)
             let num = digests.filter { $0.serviceIndex == service }.count
 
             if num == 0 { continue }

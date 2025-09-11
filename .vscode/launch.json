@@ -71,6 +71,24 @@
 			"name": "Release BokaFuzzer (Fuzzing)",
 			"program": "${workspaceFolder:boka}/Fuzzing/.build/release/BokaFuzzer",
 			"preLaunchTask": "swift: Build Release BokaFuzzer (Fuzzing)"
+		},
+		{
+			"type": "swift",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:boka}/JAMTests",
+			"name": "Debug BenchmarkTestVectors (JAMTests)",
+			"program": "${workspaceFolder:boka}/JAMTests/.build/debug/BenchmarkTestVectors",
+			"preLaunchTask": "swift: Build Debug BenchmarkTestVectors (JAMTests)"
+		},
+		{
+			"type": "swift",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:boka}/JAMTests",
+			"name": "Release BenchmarkTestVectors (JAMTests)",
+			"program": "${workspaceFolder:boka}/JAMTests/.build/release/BenchmarkTestVectors",
+			"preLaunchTask": "swift: Build Release BenchmarkTestVectors (JAMTests)"
 		}
 	]
 }
