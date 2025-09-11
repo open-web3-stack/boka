@@ -22,6 +22,7 @@ let package = Package(
         .package(path: "../Blockchain"),
         .package(path: "../PolkaVM"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "6.0.0"),
+        .package(url: "https://github.com/ordo-one/package-benchmark.git", .upToNextMajor(from: "1.29.4")),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -55,6 +56,25 @@ let package = Package(
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
             ]
+        ),
+        .executableTarget(
+            name: "BenchmarkTestVectors",
+            dependencies: [
+                .product(name: "Benchmark", package: "package-benchmark"),
+                "JAMTests",
+                "Utils",
+                "Codec",
+            ],
+            path: "Benchmarks/TestVectors",
+            cxxSettings: [
+                .unsafeFlags(["-Wno-incomplete-umbrella"]),
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
+            ],
+            plugins: [
+                .plugin(name: "BenchmarkPlugin", package: "package-benchmark"),
+            ],
         ),
     ],
     swiftLanguageModes: [.version("6")]

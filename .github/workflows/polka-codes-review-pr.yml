@@ -19,7 +19,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  handle:
+  review_gemini:
+    name: Review With Gemini 2.5 Pro
     timeout-minutes: 40
     runs-on: ubuntu-latest
     steps:
@@ -28,11 +29,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: google-github-actions/auth@v2
+      - name: Google Auth
+        uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GOOGLE_CREDENTIALS }}
 
-      - name: Review PR With Gemini 2.5 Pro
+      - name: Run Polka Codes (Gemini)
         uses: polka-codes/action@master
         with:
           pr_number: ${{ github.event.inputs.pr_number || github.event.number }}
@@ -44,7 +46,17 @@ jobs:
           GOOGLE_VERTEX_LOCATION: us-central1
           GOOGLE_VERTEX_PROJECT: ${{ secrets.GOOGLE_VERTEX_PROJECT }}
 
-      - name: Review PR With GPT-5
+  review_gpt5:
+    name: Review With GPT-5
+    timeout-minutes: 40
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Polka Codes (GPT-5)
         uses: polka-codes/action@master
         with:
           pr_number: ${{ github.event.inputs.pr_number || github.event.number }}

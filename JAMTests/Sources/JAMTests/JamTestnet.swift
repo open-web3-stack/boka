@@ -3,7 +3,7 @@ import Codec
 import Foundation
 import Utils
 
-public struct JamTestnetTestcase: Codable {
+public struct JamTestnetTestcase: Codable, Sendable {
     public var preState: TestState
     public var block: Block
     public var postState: TestState
@@ -18,12 +18,12 @@ extension ProtocolConfig {
     }
 }
 
-public struct KeyVal: Codable {
+public struct KeyVal: Codable, Sendable {
     public var key: Data31
     public var value: Data
 }
 
-public struct TestState: Codable {
+public struct TestState: Codable, Sendable {
     public var root: Data32
     public var keyvals: [KeyVal]
 
@@ -51,7 +51,7 @@ public struct TestState: Codable {
 }
 
 public enum JamTestnet {
-    static func loadTests(path: String, src: TestsSource, ext: String = "bin") throws -> [Testcase] {
+    public static func loadTests(path: String, src: TestsSource, ext: String = "bin") throws -> [Testcase] {
         // filter genesis which has no tests
         try TestLoader.getTestcases(path: path, extension: ext, src: src).filter { $0.description != "genesis.bin" }
     }
@@ -64,7 +64,7 @@ public enum JamTestnet {
         try JamDecoder.decode(JamTestnetTestcase.self, from: input.data, withConfig: config, allowTrailingBytes: true)
     }
 
-    static func runSTF(
+    public static func runSTF(
         _ testcase: JamTestnetTestcase,
         config: ProtocolConfigRef = TestVariants.tiny.config
     ) async throws -> Result<StateRef, Error> {
