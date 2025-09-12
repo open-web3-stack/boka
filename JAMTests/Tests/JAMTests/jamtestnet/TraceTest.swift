@@ -10,10 +10,11 @@ import Utils
 private let logger = Logger(label: "TraceTest")
 
 enum TraceTest {
-    static func test(_ input: Testcase, allowFailure: Bool = false) async throws {
+    static func test(_ input: Testcase) async throws {
         // setupTestLogger()
 
         let testcase = try JamTestnet.decodeTestcase(input)
+        let expectFailure = testcase.preState.root == testcase.postState.root
 
         // test state merklize
         let preKv = testcase.preState.toDict()
@@ -64,7 +65,7 @@ enum TraceTest {
             let stateRoot = await stateRef.value.stateRoot
             #expect(stateRoot == testcase.postState.root)
         case .failure:
-            if !allowFailure {
+            if !expectFailure {
                 Issue.record("Expected success, got \(result)")
             } else {
                 logger.debug("STF failed with expected error: \(result)")
