@@ -55,18 +55,18 @@ public final class StateBackend: Sendable {
                 break
             }
 
-            guard trieNodeData.count == 64 else {
+            guard trieNodeData.count == 65 else {
                 continue
             }
 
             let firstByte = trieNodeData[relative: 0]
-            let isLeaf = (firstByte & 0b1100_0000) == 0b1000_0000 || (firstByte & 0b1100_0000) == 0b1100_0000
+            let isLeaf = firstByte == 1 || firstByte == 2
 
             guard isLeaf else {
                 continue
             }
 
-            let stateKey = Data(trieNodeData[relative: 1 ..< 32])
+            let stateKey = Data(trieNodeData[relative: 2 ..< 33])
 
             if !prefixData.isEmpty, !stateKey.starts(with: prefixData) {
                 continue
@@ -94,7 +94,8 @@ public final class StateBackend: Sendable {
     }
 
     public func write(_ values: any Sequence<(key: Data31, value: (Codable & Sendable)?)>) async throws {
-        try await trie.update(values.map { try (key: $0.key, value: $0.value.map { try JamEncoder.encode($0) }) })
+        let updates: [(key: Data31, value: Data?)] = try values.map { try (key: $0.key, value: $0.value.map { try JamEncoder.encode($0) }) }
+        try await trie.update(updates)
         try await trie.save()
     }
 
@@ -109,13 +110,13 @@ public final class StateBackend: Sendable {
 
     public func gc() async throws {
         try await impl.gc { data in
-            guard data.count == 64 else {
+            guard data.count == 65 else {
                 // unexpected data size
                 return nil
             }
-            let isRegularLeaf = data[0] & 0b1100_0000 == 0b1100_0000
+            let isRegularLeaf = data[0] == 2 // type byte for regularLeaf
             if isRegularLeaf {
-                return Data32(data.suffix(from: 32))!
+                return Data32(data.suffix(from: 33))! // right child starts at byte 33
             }
             return nil
         }

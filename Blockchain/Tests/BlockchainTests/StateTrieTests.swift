@@ -301,5 +301,98 @@ struct StateTrieTests {
         }
     }
 
-    // TODO: test for gc, ref counting & pruning, raw value ref counting & cleaning
+    @Test
+    func testNodeDeletion() async throws {
+        let trie = StateTrie(rootHash: Data32(), backend: backend)
+
+        // Create a scenario that will cause node deletion and tree restructuring
+        let keys = [
+            Data31(Data([0x00] + Data(repeating: 0, count: 30)))!, // 00000000...
+            Data31(Data([0x40] + Data(repeating: 0, count: 30)))!, // 01000000...
+            Data31(Data([0x80] + Data(repeating: 0, count: 30)))!, // 10000000...
+            Data31(Data([0xC0] + Data(repeating: 0, count: 30)))!, // 11000000...
+        ]
+        let values = [Data([0x01]), Data([0x02]), Data([0x03]), Data([0x04])]
+
+        // Insert all keys
+        try await trie.update(Array(zip(keys, values.map { $0 as Data? })))
+        try await trie.save()
+
+        // Verify all are readable
+        for (i, (key, expectedValue)) in zip(keys, values).enumerated() {
+            let readValue = try await trie.read(key: key)
+            #expect(readValue == expectedValue, "Key \(i) should be readable after batch insert")
+        }
+
+        // Delete some keys to trigger tree restructuring
+        try await trie.update([
+            (key: keys[1], value: nil), // Delete 01000000...
+            (key: keys[3], value: nil), // Delete 11000000...
+        ])
+        try await trie.save()
+
+        // Verify remaining keys are still readable and deleted keys return nil
+        let remainingKeys = [keys[0], keys[2]]
+        let remainingValues = [values[0], values[2]]
+
+        for (i, (key, expectedValue)) in zip(remainingKeys, remainingValues).enumerated() {
+            let readValue = try await trie.read(key: key)
+            #expect(readValue == expectedValue, "Remaining key \(i) should still be readable after deletions")
+        }
+
+        let deletedValue1 = try await trie.read(key: keys[1])
+        let deletedValue3 = try await trie.read(key: keys[3])
+        #expect(deletedValue1 == nil, "Deleted key should return nil")
+        #expect(deletedValue3 == nil, "Deleted key should return nil")
+
+        // Test re-adding a deleted key
+        try await trie.update([(key: keys[1], value: Data([0xFF]))])
+        try await trie.save()
+
+        let readdedValue = try await trie.read(key: keys[1])
+        #expect(readdedValue == Data([0xFF]), "Re-added key should be readable")
+
+        // Ensure other keys are still intact
+        for (i, (key, expectedValue)) in zip(remainingKeys, remainingValues).enumerated() {
+            let readValue = try await trie.read(key: key)
+            #expect(readValue == expectedValue, "Key \(i) should remain readable after re-adding deleted key")
+        }
+    }
+
+    @Test
+    func testConsecutiveSaveAndLoad() async throws {
+        let trie = StateTrie(rootHash: Data32(), backend: backend)
+
+        let key = Data31.random()
+        let value1 = Data("value1".utf8)
+        let value2 = Data("value2".utf8)
+
+        // Insert, save, read
+        try await trie.update([(key: key, value: value1)])
+        try await trie.save()
+
+        let read1 = try await trie.read(key: key)
+        #expect(read1 == value1, "Value should be readable after first save")
+
+        // Update same key, save, read
+        try await trie.update([(key: key, value: value2)])
+        try await trie.save()
+
+        let read2 = try await trie.read(key: key)
+        #expect(read2 == value2, "Updated value should be readable after second save")
+
+        // Multiple saves shouldn't change anything
+        try await trie.save()
+        try await trie.save()
+
+        let read3 = try await trie.read(key: key)
+        #expect(read3 == value2, "Value should remain after multiple saves")
+
+        let rootHash1 = await trie.rootHash
+
+        // Another save shouldn't change root hash
+        try await trie.save()
+        let rootHash2 = await trie.rootHash
+        #expect(rootHash1 == rootHash2, "Root hash should be stable across saves")
+    }
 }

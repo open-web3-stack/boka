@@ -13,7 +13,7 @@ public protocol StateBackendIterator: Sendable {
 }
 
 /// key: trie node hash (31 bytes)
-/// value: trie node data (64 bytes)
+/// value: trie node data (65 bytes - includes node type + original child data)
 /// ref counting requirements:
 ///   - write do not increment ref count, only explicit ref increment do
 ///   - lazy prune is used. e.g. when ref count is reduced to zero, the value will only be removed

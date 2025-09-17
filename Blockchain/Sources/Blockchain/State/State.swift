@@ -238,19 +238,7 @@ public struct State: Sendable {
 
     public var stateRoot: Data32 {
         get async {
-            // TODO: should use backend.rootHash after StateTrie is fixed
-            do {
-                let allKeys = try await backend.getKeys(nil, nil, nil)
-                var kv: [Data31: Data] = [:]
-                for (key, value) in allKeys {
-                    if let key31 = Data31(key) {
-                        kv[key31] = value
-                    }
-                }
-                return try stateMerklize(kv: kv)
-            } catch {
-                return await backend.rootHash
-            }
+            await backend.rootHash
         }
     }
 
