@@ -188,13 +188,14 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     // We need to convert the async operation to sync
                     // Create a placeholder synchronization mechanism
                     let semaphore = DispatchSemaphore(value: 0)
-                    var asyncResult: ExecOutcome?
+                    // FIXME: `nonisolated(unsafe)` due to swift 6.2 check, figure out a better way to handle this
+                    nonisolated(unsafe) var asyncResult: ExecOutcome?
 
                     // TODO: consider make InvocationContext Sendable
                     let boxedCtx = UncheckedSendableBox(invocationContext)
 
                     // Kick off the async operation but wait for it to complete
-                    Task {
+                    Task { @Sendable in
                         asyncResult = await boxedCtx.value.dispatch(index: hostCallIndex, state: vmState)
                         semaphore.signal()
                     }
