@@ -95,6 +95,7 @@ public final class StateBackend: Sendable {
 
     public func write(_ values: any Sequence<(key: Data31, value: (Codable & Sendable)?)>) async throws {
         let updates: [(key: Data31, value: Data?)] = try values.map { try (key: $0.key, value: $0.value.map { try JamEncoder.encode($0) }) }
+
         try await trie.update(updates)
         try await trie.save()
     }

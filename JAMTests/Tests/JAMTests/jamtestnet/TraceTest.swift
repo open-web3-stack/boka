@@ -57,9 +57,12 @@ enum TraceTest {
 
             // make sure we don't have extra keys
             let allKeys = try await stateRef.value.backend.getKeys(nil, nil, nil)
-            for (key, _) in allKeys {
+            for (key, value) in allKeys {
                 let data31 = Data31(key)!
-                #expect(expectedStateDict[data31] != nil, "extra key in boka post state: \(data31.toHexString())")
+                #expect(
+                    expectedStateDict[data31] != nil,
+                    "extra key in boka post state: \(data31.toHexString()), value len: \(value.count)"
+                )
             }
 
             let stateRoot = await stateRef.value.stateRoot

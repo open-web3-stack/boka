@@ -925,6 +925,7 @@ public class Checkpoint: HostCall {
         y.nextAccountIndex = x.nextAccountIndex
         y.transfers = x.transfers
         y.yield = x.yield
+        y.provide = x.provide
     }
 }
 
