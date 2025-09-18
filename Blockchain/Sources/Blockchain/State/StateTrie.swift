@@ -12,39 +12,77 @@ private enum TrieNodeType {
 
 private struct TrieNode {
     let hash: Data32
-    let left: Data32
-    let right: Data32
+    let left: Data32 // Original child hash/data
+    let right: Data32 // Original child hash/data
     let type: TrieNodeType
     let isNew: Bool
     let rawValue: Data?
 
-    init(hash: Data32, data: Data64, isNew: Bool = false) {
+    // Constructor for loading from storage (65-byte format: [type][left-32][right-32])
+    init(hash: Data32, data: Data, isNew: Bool = false) {
         self.hash = hash
-        left = Data32(data.data.prefix(32))!
-        right = Data32(data.data.suffix(32))!
         self.isNew = isNew
         rawValue = nil
-        switch data.data.first! & 0b1100_0000 {
-        case 0b1000_0000:
+
+        let typeByte = data[relative: 0]
+        switch typeByte {
+        case 0:
+            type = .branch
+        case 1:
             type = .embeddedLeaf
-        case 0b1100_0000:
+        case 2:
             type = .regularLeaf
         default:
             type = .branch
         }
+
+        left = Data32(data[relative: 1 ..< 33])! // bytes 1-32
+        right = Data32(data[relative: 33 ..< 65])! // bytes 33-64
     }
 
+    // Constructor for pure trie operations
     private init(left: Data32, right: Data32, type: TrieNodeType, isNew: Bool, rawValue: Data?) {
-        hash = Blake2b256.hash(left.data, right.data)
-        self.left = left
-        self.right = right
+        hash = Self.calculateHash(left: left, right: right, type: type)
+        self.left = left // Store original data
+        self.right = right // Store original data
         self.type = type
         self.isNew = isNew
         self.rawValue = rawValue
     }
 
-    var encodedData: Data64 {
-        Data64(left.data + right.data)!
+    // JAM spec compliant hash calculation
+    private static func calculateHash(left: Data32, right: Data32, type: TrieNodeType) -> Data32 {
+        switch type {
+        case .branch:
+            var leftForHashing = left.data
+            leftForHashing[leftForHashing.startIndex] = leftForHashing[leftForHashing.startIndex] & 0b0111_1111
+            return Blake2b256.hash(leftForHashing, right.data)
+        case .embeddedLeaf:
+            var leftForHashing = left.data
+            let valueLength = leftForHashing[leftForHashing.startIndex]
+            leftForHashing[leftForHashing.startIndex] = 0b1000_0000 | valueLength
+            return Blake2b256.hash(leftForHashing, right.data)
+        case .regularLeaf:
+            var leftForHashing = left.data
+            leftForHashing[leftForHashing.startIndex] = 0b1100_0000
+            return Blake2b256.hash(leftForHashing, right.data)
+        }
+    }
+
+    // New 65-byte storage format: [type:1][left:32][right:32]
+    var storageData: Data {
+        var data = Data(capacity: 65)
+
+        switch type {
+        case .branch: data.append(0)
+        case .embeddedLeaf: data.append(1)
+        case .regularLeaf: data.append(2)
+        }
+
+        data.append(left.data)
+        data.append(right.data)
+
+        return data
     }
 
     var isBranch: Bool {
@@ -66,27 +104,30 @@ private struct TrieNode {
         guard type == .embeddedLeaf else {
             return nil
         }
-        let len = left.data.first! & 0b0011_1111
+        // For embedded leaves: length is stored in first byte
+        let len = left.data[relative: 0]
         return right.data[relative: 0 ..< Int(len)]
     }
 
     static func leaf(key: Data31, value: Data) -> TrieNode {
-        var newKey = Data(capacity: 32)
         if value.count <= 32 {
-            newKey.append(0b1000_0000 | UInt8(value.count))
-            newKey += key.data
-            let newValue = value + Data(repeating: 0, count: 32 - value.count)
-            return .init(left: Data32(newKey)!, right: Data32(newValue)!, type: .embeddedLeaf, isNew: true, rawValue: value)
+            // Embedded leaf: store length + key, padded value
+            var keyData = Data(capacity: 32)
+            keyData.append(UInt8(value.count)) // Store length in first byte
+            keyData += key.data
+            let paddedValue = value + Data(repeating: 0, count: 32 - value.count)
+            return .init(left: Data32(keyData)!, right: Data32(paddedValue)!, type: .embeddedLeaf, isNew: true, rawValue: value)
+        } else {
+            // Regular leaf: store key, value hash
+            var keyData = Data(capacity: 32)
+            keyData.append(0x00) // Placeholder for first byte
+            keyData += key.data
+            return .init(left: Data32(keyData)!, right: value.blake2b256hash(), type: .regularLeaf, isNew: true, rawValue: value)
         }
-        newKey.append(0b1100_0000)
-        newKey += key.data
-        return .init(left: Data32(newKey)!, right: value.blake2b256hash(), type: .regularLeaf, isNew: true, rawValue: value)
     }
 
     static func branch(left: Data32, right: Data32) -> TrieNode {
-        var left = left.data
-        left[left.startIndex] = left[left.startIndex] & 0b0111_1111 // clear the highest bit
-        return .init(left: Data32(left)!, right: right, type: .branch, isNew: true, rawValue: nil)
+        .init(left: left, right: right, type: .branch, isNew: true, rawValue: nil)
     }
 }
 
@@ -148,12 +189,10 @@ public actor StateTrie {
         guard let data = try await backend.read(key: id) else {
             return nil
         }
-
-        guard let data64 = Data64(data) else {
+        guard data.count == 65 else {
             throw StateTrieError.invalidData
         }
-
-        let node = TrieNode(hash: hash, data: data64)
+        let node = TrieNode(hash: hash, data: data)
         saveNode(node: node)
         return node
     }
@@ -189,7 +228,7 @@ public actor StateTrie {
         deleted.removeAll()
 
         for node in nodes.values where node.isNew {
-            ops.append(.write(key: node.hash.data.suffix(31), value: node.encodedData.data))
+            ops.append(.write(key: node.hash.data.suffix(31), value: node.storageData))
             if node.type == .regularLeaf {
                 try ops.append(.writeRawValue(key: node.right, value: node.rawValue.unwrap()))
             }
@@ -256,7 +295,7 @@ public actor StateTrie {
             return newLeaf.hash
         }
 
-        let existingKeyBit = bitAt(existing.left.data[1...], position: depth)
+        let existingKeyBit = bitAt(existing.left.data[relative: 1...], position: depth)
         let newKeyBit = bitAt(newKey.data, position: depth)
 
         if existingKeyBit == newKeyBit {
@@ -306,6 +345,30 @@ public actor StateTrie {
             if left == Data32(), right == Data32() {
                 // this branch is empty
                 return Data32()
+            } else if left == Data32() {
+                // only right child remains - check if we can collapse
+                let rightNode = try await get(hash: right)
+                if let rightNode, rightNode.isLeaf {
+                    // Can collapse: right child is a leaf
+                    return right
+                } else {
+                    // Cannot collapse: right child is a branch that needs to maintain its depth
+                    let newBranch = TrieNode.branch(left: left, right: right)
+                    saveNode(node: newBranch)
+                    return newBranch.hash
+                }
+            } else if right == Data32() {
+                // only left child remains - check if we can collapse
+                let leftNode = try await get(hash: left)
+                if let leftNode, leftNode.isLeaf {
+                    // Can collapse: left child is a leaf
+                    return left
+                } else {
+                    // Cannot collapse: left child is a branch that needs to maintain its depth
+                    let newBranch = TrieNode.branch(left: left, right: right)
+                    saveNode(node: newBranch)
+                    return newBranch.hash
+                }
             }
 
             let newBranch = TrieNode.branch(left: left, right: right)
@@ -331,7 +394,7 @@ public actor StateTrie {
     private func saveNode(node: TrieNode) {
         let id = node.hash.data.suffix(31)
         nodes[id] = node
-        deleted.remove(id) // TODO: maybe this is not needed
+        deleted.remove(id)
     }
 
     public func debugPrint() async throws {

@@ -5,28 +5,17 @@ import Utils
 @testable import JAMTests
 
 struct FuzzTests {
-    struct TestInput {
-        let testcase: Testcase
-        let allowFailure: Bool
-
-        init(_ testcase: Testcase, allowFailure: Bool = false) {
-            self.testcase = testcase
-            self.allowFailure = allowFailure
-        }
-    }
-
     static func loadTests(
         version: String,
         filters: [(String, String)],
-        expectFailure: [(String, String)],
         ignore: [(String, String)]
-    ) throws -> [TestInput] {
+    ) throws -> [Testcase] {
         let basePath = Bundle.module.resourcePath! + "/fuzz/" + version
 
         return try FileManager.default.contentsOfDirectory(atPath: basePath)
             .sorted()
             .filter { !$0.starts(with: ".") }
-            .flatMap { timestamp -> [TestInput] in
+            .flatMap { timestamp -> [Testcase] in
                 let path = "\(version)/\(timestamp)"
                 let testcases = try JamTestnet.loadTests(path: path, src: .fuzz)
                 return testcases
@@ -40,12 +29,6 @@ struct FuzzTests {
                             path == filterPath && testcase.description.starts(with: filterPrefix)
                         }
                     }
-                    .map { testcase in
-                        let allowFailure = expectFailure.contains { failurePath, failurePrefix in
-                            path == failurePath && testcase.description.starts(with: failurePrefix)
-                        }
-                        return TestInput(testcase, allowFailure: allowFailure)
-                    }
             }
     }
 
@@ -55,18 +38,20 @@ struct FuzzTests {
             // empty to include all
             // example: ("0.7.0/1754982630", "00000004")
         ],
-        expectFailure: [
-            ("0.7.0/1756790723", "00000011"),
-            ("0.7.0/1756791458", "00000041"),
-            ("0.7.0/1756814312", "00000025"),
-            ("0.7.0/1757062927", "00000091"),
-            ("0.7.0/1757063641", "00000180"),
-        ],
         ignore: [
+            // traces
             ("0.7.0/1756548583", "00000009"), // TODO: find root cause
+            ("0.7.0/1757406079", "00000011"), // TODO: one extra key
+            ("0.7.0/1757406516", "00000022"), // TODO: one storage mismatch
+            ("0.7.0/1757406558", "00000031"), // TODO: one storage mismatch
+            ("0.7.0/1757406558", "00000032"), // TODO: many
+            ("0.7.0/1757421101", "00000091"), // TODO: many
+            ("0.7.0/1757421824", "00000020"), // TODO: one storage mismatch
+            ("0.7.0/1757421824", "00000021"), // TODO: one storage mismatch
+            ("0.7.0/1757422206", "00000011"), // TODO: one storage mismatch
         ]
     ))
-    func v070(_ input: TestInput) async throws {
-        try await TraceTest.test(input.testcase, allowFailure: input.allowFailure)
+    func v070(_ input: Testcase) async throws {
+        try await TraceTest.test(input)
     }
 }

@@ -184,7 +184,7 @@ public class FuzzingSocketConnection {
         let messageLength = lengthBuffer.withUnsafeBytes { $0.load(as: UInt32.self) }
 
         // Sanity check message length
-        guard messageLength > 0, messageLength < 1024 * 1024 else {
+        guard messageLength > 0 else {
             throw FuzzingSocketError.invalidMessageSize
         }
 
