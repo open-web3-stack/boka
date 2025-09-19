@@ -145,7 +145,7 @@ public final class StandardMemory: Memory {
         let zone = try getZone(for: address)
         let offset = zone.offset(for: address)
 
-        if offset + length <= zone.data.count {
+        if length <= zone.data.count - offset {
             return zone.data.subdata(in: zone.data.startIndex + offset ..< (zone.data.startIndex + offset + length))
         }
 
