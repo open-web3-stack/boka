@@ -40,7 +40,8 @@ extension Data {
     }
 
     public func decode<T: FixedWidthInteger>(_: T.Type) -> T {
-        withUnsafeBytes { ptr in
+        assert(MemoryLayout<T>.size <= count)
+        return withUnsafeBytes { ptr in
             ptr.loadUnaligned(as: T.self)
         }
     }
