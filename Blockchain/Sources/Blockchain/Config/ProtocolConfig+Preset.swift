@@ -121,7 +121,7 @@ extension Ref where T == ProtocolConfig {
         maxWorkItems: 16,
         maxDepsInWorkReport: 8,
         maxTicketsPerExtrinsic: 3,
-        maxLookupAnchorAge: 14400,
+        maxLookupAnchorAge: 24,
         transferMemoSize: 128,
         ticketEntriesPerValidator: 3,
         maxAuthorizationsPoolItems: 8,
