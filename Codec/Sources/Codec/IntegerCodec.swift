@@ -12,6 +12,7 @@ extension Collection<UInt8> where SubSequence == Self {
         IntegerCodec.decode { self.next() }
     }
 
+    // NOTE: for data, use decodeUInt* methods in Data+Utils.swift for better performance
     public mutating func decode<T: UnsignedInteger>(length: Int) -> T? {
         guard length > 0, length <= count else { return nil }
 
