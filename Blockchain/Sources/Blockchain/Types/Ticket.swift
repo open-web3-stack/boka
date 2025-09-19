@@ -1,10 +1,15 @@
+import Codec
 import Utils
 
-public struct Ticket: Sendable, Equatable, Codable {
+public struct Ticket: @unchecked Sendable, Equatable, Codable {
     // y
     public var id: Data32
     // r
-    public var attempt: TicketIndex
+    @CodingAs<Compact<TicketIndex>> public var attempt: TicketIndex
+
+    public static func == (lhs: Ticket, rhs: Ticket) -> Bool {
+        lhs.id == rhs.id && lhs.attempt == rhs.attempt
+    }
 }
 
 extension Ticket: Dummy {
