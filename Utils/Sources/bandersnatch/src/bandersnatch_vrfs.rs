@@ -26,21 +26,15 @@ pub struct RingVrfSignature {
 
 pub fn ring_context(size: usize) -> Option<RingProofParams> {
     use std::sync::OnceLock;
-    static RING_CONTEXT: OnceLock<(usize, Option<RingProofParams>)> = OnceLock::new();
+    static RING_CONTEXT: OnceLock<Option<RingProofParams>> = OnceLock::new();
 
     // size is number of validators, so it won't change
-    let (cached_size, cached_params) = RING_CONTEXT.get_or_init(|| {
-        let pcs_params = ring_context_params();
-        let params = RingProofParams::from_pcs_params(size, pcs_params.clone()).ok();
-        (size, params)
-    });
-
-    if *cached_size == size {
-        cached_params.clone()
-    } else {
-        let pcs_params = ring_context_params();
-        RingProofParams::from_pcs_params(size, pcs_params.clone()).ok()
-    }
+    RING_CONTEXT
+        .get_or_init(|| {
+            let pcs_params = ring_context_params();
+            RingProofParams::from_pcs_params(size, pcs_params.clone()).ok()
+        })
+        .clone()
 }
 
 fn ring_context_params() -> &'static PcsParams {
