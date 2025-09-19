@@ -5,10 +5,6 @@ on:
   pull_request:
     branches: [ master ]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 env:
   BENCHMARK_DISABLE_JEMALLOC: true
 
@@ -134,17 +130,16 @@ jobs:
 
           # Check if master baseline exists for comparison
           if [ -f ".benchmarkBaselines/BenchmarkTestVectors/master/results.json" ]; then
-            echo "## 🔄 Comparison with Master Branch"
-            echo ""
-            swift package benchmark baseline check master pull_request --format markdown
+            echo '## Summary' >> $GITHUB_STEP_SUMMARY
+            echo $(date) >> $GITHUB_STEP_SUMMARY
+            echo "exitStatus=1" >> $GITHUB_ENV
+            swift package benchmark baseline check master pull_request --format markdown >> $GITHUB_STEP_SUMMARY
+            echo '---' >> $GITHUB_STEP_SUMMARY
+            swift package benchmark baseline compare master pull_request --no-progress --quiet --format markdown >> $GITHUB_STEP_SUMMARY
             echo "exitStatus=0" >> $GITHUB_ENV
           else
-            echo "## 🆕 First Benchmark Run"
-            echo ""
             echo "⚠️ Master baseline not found. This appears to be the first benchmark run."
-            echo "The following results will become the baseline for future comparisons:"
             echo ""
-
             # Run benchmarks to generate results for first time
             echo "### Benchmark Results:"
             swift package benchmark --format markdown 2>&1 || true
