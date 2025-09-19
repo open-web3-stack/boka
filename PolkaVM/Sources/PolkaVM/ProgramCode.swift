@@ -38,6 +38,8 @@ public class ProgramCode {
 
     private var blockGasCosts: [UInt32: Gas] = [:]
 
+    private static let cachedTrapInst = CppHelper.Instructions.Trap()
+
     public init(_ blob: Data) throws(Error) {
         self.blob = blob
 
@@ -87,6 +89,8 @@ public class ProgramCode {
         bitmask = bitmaskData
 
         try buildMetadata()
+
+        instCache = Array(repeating: nil, count: code.count)
     }
 
     private func buildMetadata() throws(Error) {
@@ -136,8 +140,8 @@ public class ProgramCode {
     public func getInstructionAt(pc: UInt32) -> Instruction? {
         let pcIndex = Int(pc)
 
-        if instCache.count <= pcIndex {
-            instCache.append(contentsOf: Array(repeating: nil, count: pcIndex - instCache.count + 1))
+        if pcIndex >= instCache.count {
+            return Self.cachedTrapInst
         }
 
         if let cached = instCache[pcIndex] {
@@ -145,9 +149,7 @@ public class ProgramCode {
         }
 
         guard Int(pc) < code.count else {
-            let trapInst = CppHelper.Instructions.Trap()
-            instCache[pcIndex] = InstRef(trapInst)
-            return trapInst
+            return Self.cachedTrapInst
         }
 
         do {

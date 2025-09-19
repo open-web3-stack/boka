@@ -131,10 +131,12 @@ public final class StandardMemory: Memory {
         try ensureReadable(address: address, length: 1)
         let zone = try getZone(for: address)
         let offset = zone.offset(for: address)
-        if offset < zone.data.count {
-            return zone.data[relative: offset]
+
+        guard offset < zone.data.count else {
+            return 0
         }
-        return 0
+
+        return zone.data[relative: offset]
     }
 
     public func read(address: UInt32, length: Int) throws -> Data {
@@ -142,6 +144,10 @@ public final class StandardMemory: Memory {
         try ensureReadable(address: address, length: length)
         let zone = try getZone(for: address)
         let offset = zone.offset(for: address)
+
+        if length <= zone.data.count - offset {
+            return zone.data.subdata(in: zone.data.startIndex + offset ..< (zone.data.startIndex + offset + length))
+        }
 
         var result = Data(count: length)
         let availableBytes = max(0, zone.data.count - offset)

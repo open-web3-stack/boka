@@ -30,3 +30,5 @@ Tools/openrpc.json
 tmp
 
 *.pvm
+
+.benchmarkBaselines

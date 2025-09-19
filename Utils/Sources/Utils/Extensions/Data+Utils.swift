@@ -45,6 +45,37 @@ extension Data {
             ptr.loadUnaligned(as: T.self)
         }
     }
+
+    public func decodeUInt8() -> UInt8 {
+        assert(count >= 1)
+        return self[0]
+    }
+
+    public func decodeUInt16() -> UInt16 {
+        assert(count >= 2)
+        return withUnsafeBytes { ptr in
+            ptr.loadUnaligned(as: UInt16.self)
+        }
+    }
+
+    public func decodeUInt24() -> UInt32 {
+        assert(count >= 3)
+        return UInt32(self[0]) | (UInt32(self[1]) << 8) | (UInt32(self[2]) << 16)
+    }
+
+    public func decodeUInt32() -> UInt32 {
+        assert(count >= 4)
+        return withUnsafeBytes { ptr in
+            ptr.loadUnaligned(as: UInt32.self)
+        }
+    }
+
+    public func decodeUInt64() -> UInt64 {
+        assert(count >= 8)
+        return withUnsafeBytes { ptr in
+            ptr.loadUnaligned(as: UInt64.self)
+        }
+    }
 }
 
 extension FixedSizeData {

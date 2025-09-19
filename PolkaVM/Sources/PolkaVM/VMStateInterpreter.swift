@@ -4,7 +4,11 @@ import Utils
 public class VMStateInterpreter: VMState {
     public let program: ProgramCode
 
-    public private(set) var pc: UInt32
+    private var _pc: UInt32
+
+    public var pc: UInt32 {
+        _pc
+    }
 
     private var registers: Registers
     private var gas: GasInt
@@ -14,7 +18,7 @@ public class VMStateInterpreter: VMState {
 
     public init(program: ProgramCode, pc: UInt32, registers: Registers, gas: Gas, memory: Memory) {
         self.program = program
-        self.pc = pc
+        _pc = pc
         self.registers = registers
         self.gas = GasInt(gas)
         self.memory = memory
@@ -26,7 +30,7 @@ public class VMStateInterpreter: VMState {
         self.program = program.code
         registers = program.initialRegisters
         memory = program.initialMemory
-        self.pc = pc
+        _pc = pc
         self.gas = GasInt(gas)
     }
 
@@ -111,11 +115,11 @@ public class VMStateInterpreter: VMState {
     public func increasePC(_ amount: UInt32) {
         // using wrapped add
         // so that it can also be used for jumps which are negative
-        pc &+= amount
+        _pc &+= amount
     }
 
     public func updatePC(_ newPC: UInt32) {
-        pc = newPC
+        _pc = newPC
     }
 
     public func readRegister<T: FixedWidthInteger>(_ index: Registers.Index) -> T {
