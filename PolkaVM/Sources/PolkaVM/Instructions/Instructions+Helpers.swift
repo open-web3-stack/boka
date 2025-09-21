@@ -36,8 +36,8 @@ extension Instructions {
         let lY = min(4, max(0, data.count - Int(lX) - minus))
 
         let start = startIdx + 1
-        let vX: T = decodeImmediate((try? data.at(relative: start ..< (start + lX))) ?? Data())
-        let vY: U = decodeImmediate((try? data.at(relative: (start + lX) ..< (start + lX + lY))) ?? Data())
+        let vX: T = decodeImmediate(data.subdata(in: data.startIndex + start ..< data.startIndex + (start + lX)))
+        let vY: U = decodeImmediate(data.subdata(in: data.startIndex + (start + lX) ..< data.startIndex + (start + lX + lY)))
         return (vX, vY)
     }
 
@@ -69,14 +69,27 @@ extension Instructions {
             return .exit(.panic(.invalidDynamicJump))
         }
 
-        var targetAlignedData = jumpTable[relative: start ..< end]
+        var targetAlignedData = jumpTable.subdata(in: jumpTable.startIndex + start ..< jumpTable.startIndex + end)
 
         #if DEBUG
             logger.trace("djump target data (\(targetAlignedData.map(\.self)))")
         #endif
 
-        guard let targetAligned: UInt32 = targetAlignedData.decode(length: entrySize) else {
-            return .exit(.panic(.invalidDynamicJump))
+        let targetAligned: UInt32
+        switch entrySize {
+        case 1:
+            targetAligned = UInt32(targetAlignedData.decodeUInt8())
+        case 2:
+            targetAligned = UInt32(targetAlignedData.decodeUInt16())
+        case 3:
+            targetAligned = targetAlignedData.decodeUInt24()
+        case 4:
+            targetAligned = targetAlignedData.decodeUInt32()
+        default:
+            guard let decoded: UInt32 = targetAlignedData.decode(length: entrySize) else {
+                return .exit(.panic(.invalidDynamicJump))
+            }
+            targetAligned = decoded
         }
 
         #if DEBUG
