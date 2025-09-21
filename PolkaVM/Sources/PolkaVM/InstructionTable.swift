@@ -159,13 +159,16 @@ public class InstructionTable {
         guard data.count >= 1 else {
             return nil
         }
+
         let opcode = data[data.startIndex]
         // logger.trace("parsed opcode: \(opcode)")
+
         guard let instType = table[Int(opcode)] else {
             return nil
         }
-
         // logger.trace("initializing \(instType)")
-        return try? instType.init(data: data[relative: 1...])
+
+        let instructionData = data.subdata(in: (data.startIndex + 1) ..< data.endIndex)
+        return try? instType.init(data: instructionData)
     }
 }
