@@ -39,35 +39,41 @@ let benchmarks: @Sendable () -> Void = {
        !tests.isEmpty
     {
         Benchmark("w3f.shuffle") { _ in
-            for test in tests {
-                var input = Array(0 ..< test.input)
-                if let entropy = Data32(fromHexString: test.entropy) {
-                    input.shuffle(randomness: entropy)
-                    blackHole(input)
+            for _ in 0 ..< 10 { // 10 iterations
+                for test in tests {
+                    var input = Array(0 ..< test.input)
+                    if let entropy = Data32(fromHexString: test.entropy) {
+                        input.shuffle(randomness: entropy)
+                        blackHole(input)
+                    }
                 }
             }
         }
     }
 
     // Traces
-    let tracePaths = ["traces/fallback", "traces/safrole", "traces/storage", "traces/preimages"]
-    for path in tracePaths {
+    let tracePaths = [("traces/fallback", 15), ("traces/safrole", 10), ("traces/storage", 5), ("traces/preimages", 5)]
+    for (path, iterations) in tracePaths {
         let traces = try! JamTestnet.loadTests(path: path, src: .w3f)
-        Benchmark("w3f.traces.\(path.components(separatedBy: "/").last!)") { benchmark in
-            for trace in traces {
-                let testcase = try! JamTestnet.decodeTestcase(trace)
-                benchmark.startMeasurement()
-                let result = try? await JamTestnet.runSTF(testcase)
-                switch result {
-                case let .success(stateRef):
-                    let root = await stateRef.value.stateRoot
-                    blackHole(root)
-                case .failure:
-                    blackHole(trace.description)
-                case .none:
-                    blackHole(trace.description)
+        Benchmark(
+            "w3f.traces.\(path.components(separatedBy: "/").last!)",
+        ) { benchmark in
+            for _ in 0 ..< iterations {
+                for trace in traces {
+                    let testcase = try! JamTestnet.decodeTestcase(trace)
+                    benchmark.startMeasurement()
+                    let result = try? await JamTestnet.runSTF(testcase)
+                    switch result {
+                    case let .success(stateRef):
+                        let root = await stateRef.value.stateRoot
+                        blackHole(root)
+                    case .failure:
+                        blackHole(trace.description)
+                    case .none:
+                        blackHole(trace.description)
+                    }
+                    benchmark.stopMeasurement()
                 }
-                benchmark.stopMeasurement()
             }
         }
     }
