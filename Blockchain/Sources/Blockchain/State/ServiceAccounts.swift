@@ -37,6 +37,12 @@ public class ServiceAccountsMutRef: @unchecked Sendable {
         changes = AccountChanges()
     }
 
+    public init(copying other: ServiceAccountsMutRef) {
+        let state = other.ref.value as! State
+        ref = RefMut(State(copying: state))
+        changes = other.changes
+    }
+
     public func toRef() -> ServiceAccountsRef {
         ServiceAccountsRef(ref.value)
     }

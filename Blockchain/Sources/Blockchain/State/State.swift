@@ -16,6 +16,12 @@ public struct State: Sendable {
         self.layer = layer
     }
 
+    public init(copying other: State) {
+        // backend can be shared as it's read-only until end of stf
+        backend = other.backend
+        layer = StateLayer(copying: other.layer)
+    }
+
     // α: The core αuthorizations pool.
     public var coreAuthorizationPool: StateKeys.CoreAuthorizationPoolKey.Value {
         get {

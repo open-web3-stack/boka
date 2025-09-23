@@ -275,6 +275,9 @@ extension Accumulation {
         logger.debug("[∆*] services to accumulate: \(Array(uniqueServices))")
 
         let serviceBatches = sortServicesToBatches(services: uniqueServices)
+        logger.debug("[∆*] service batches: \(serviceBatches)")
+
+        currentState.accounts.clearRecordedChanges()
 
         for serviceBatch in serviceBatches {
             logger.debug("[∆*] processing batch: \(serviceBatch)")

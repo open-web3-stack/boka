@@ -38,7 +38,7 @@ let benchmarks: @Sendable () -> Void = {
        let tests = try? JSONDecoder().decode([ShuffleTestCase].self, from: data),
        !tests.isEmpty
     {
-        Benchmark("w3f.shuffle") { _ in
+        Benchmark("w3f.shuffle", configuration: .init(timeUnits: .microseconds)) { _ in
             for _ in 0 ..< 10 { // 10 iterations
                 for test in tests {
                     var input = Array(0 ..< test.input)

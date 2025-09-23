@@ -81,7 +81,7 @@ public final class AccumulateContext: InvocationContext {
             return await Log(service: context.x.serviceIndex).call(config: config, state: state)
         default:
             state.consumeGas(Gas(10))
-            state.writeRegister(Registers.Index(raw: 0), HostCallResultCode.WHAT.rawValue)
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHAT.rawValue)
             return .continued
         }
     }
