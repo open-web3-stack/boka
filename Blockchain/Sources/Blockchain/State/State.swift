@@ -350,6 +350,10 @@ extension State: Dummy {
 }
 
 extension State: ServiceAccounts {
+    public func copy() -> ServiceAccounts {
+        State(copying: self)
+    }
+
     public func get(serviceAccount index: ServiceIndex) async throws -> ServiceAccountDetails? {
         if layer.isDeleted(serviceAccount: index) {
             return nil

@@ -108,6 +108,10 @@ private struct FullAccumulateState: Accumulation {
     var preimages: [ServiceIndex: [Data32: Data]] = [:]
     var preimageInfo: [ServiceIndex: [Data32: StateKeys.ServiceAccountPreimageInfoKey.Value]] = [:]
 
+    func copy() -> ServiceAccounts {
+        self
+    }
+
     func get(serviceAccount index: ServiceIndex) async throws -> ServiceAccountDetails? {
         accounts[index]
     }

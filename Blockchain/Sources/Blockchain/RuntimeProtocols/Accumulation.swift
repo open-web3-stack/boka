@@ -277,12 +277,12 @@ extension Accumulation {
         let serviceBatches = sortServicesToBatches(services: uniqueServices)
         logger.debug("[∆*] service batches: \(serviceBatches)")
 
-        currentState.accounts.clearRecordedChanges()
-
         for serviceBatch in serviceBatches {
             logger.debug("[∆*] processing batch: \(serviceBatch)")
 
             let batchState = currentState
+
+            batchState.accounts.clearRecordedChanges()
 
             let batchResults = try await withThrowingTaskGroup(
                 of: (ServiceIndex, AccumulationResult).self,

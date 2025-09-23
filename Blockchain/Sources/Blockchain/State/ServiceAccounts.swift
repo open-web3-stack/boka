@@ -2,6 +2,8 @@ import Foundation
 import Utils
 
 public protocol ServiceAccounts: Sendable {
+    func copy() -> ServiceAccounts
+
     func get(serviceAccount index: ServiceIndex) async throws -> ServiceAccountDetails?
     func get(serviceAccount index: ServiceIndex, storageKey key: Data) async throws -> Data?
     func get(serviceAccount index: ServiceIndex, preimageHash hash: Data32) async throws -> Data?
@@ -38,8 +40,7 @@ public class ServiceAccountsMutRef: @unchecked Sendable {
     }
 
     public init(copying other: ServiceAccountsMutRef) {
-        let state = other.ref.value as! State
-        ref = RefMut(State(copying: state))
+        ref = RefMut(other.ref.value.copy())
         changes = other.changes
     }
 
