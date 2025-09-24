@@ -801,8 +801,8 @@ public class Bless: HostCall {
             for i in stride(from: 0, to: length, by: 12) {
                 let serviceIndex = ServiceIndex(data[i ..< i + 4].decode(UInt32.self))
                 let gas = Gas(data[i + 4 ..< i + 12].decode(UInt64.self))
-                if var alwaysAcc {
-                    alwaysAcc[serviceIndex] = gas
+                if alwaysAcc != nil {
+                    alwaysAcc![serviceIndex] = gas
                 } else {
                     alwaysAcc = [serviceIndex: gas]
                 }
