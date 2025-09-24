@@ -61,7 +61,7 @@ enum TraceTest {
                 let data31 = Data31(key)!
                 #expect(
                     expectedStateDict[data31] != nil,
-                    "extra key in boka post state: \(data31.toHexString()), value len: \(value.count)"
+                    "extra key in boka post state: \(data31.toHexString()), value: \(value.toDebugHexString())"
                 )
             }
 

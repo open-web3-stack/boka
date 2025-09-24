@@ -3,6 +3,16 @@ import Foundation
 import TracingUtils
 import Utils
 
+public struct AncestryItem: Codable {
+    public let timeslot: TimeslotIndex
+    public let headerHash: Data32
+
+    public init(timeslot: TimeslotIndex, headerHash: Data32) {
+        self.timeslot = timeslot
+        self.headerHash = headerHash
+    }
+}
+
 private let logger = Logger(label: "Runtime")
 
 // the STF
@@ -40,8 +50,23 @@ public final class Runtime {
 
     public let config: ProtocolConfigRef
 
-    public init(config: ProtocolConfigRef) {
+    // nil means no ancestry tracking and checking
+    public var ancestry: ConfigLimitedSizeArray<AncestryItem, ProtocolConfig.Int0, ProtocolConfig.MaxLookupAnchorAge>?
+
+    public init(
+        config: ProtocolConfigRef,
+        ancestry: ConfigLimitedSizeArray<AncestryItem, ProtocolConfig.Int0, ProtocolConfig.MaxLookupAnchorAge>? = nil
+    ) {
         self.config = config
+        self.ancestry = ancestry
+    }
+
+    public func updateAncestry(with block: BlockRef) {
+        guard var currentAncestry = ancestry else { return }
+
+        let newItem = AncestryItem(timeslot: block.header.timeslot, headerHash: block.hash)
+        currentAncestry.safeAppend(newItem)
+        ancestry = currentAncestry
     }
 
     public func validateHeader(block: Validated<BlockRef>, state: StateRef, context: ApplyContext) throws(Error) {
@@ -233,6 +258,8 @@ public final class Runtime {
             throw .other(error)
         }
 
+        updateAncestry(with: block)
+
         return StateRef(newState)
     }
 
@@ -292,7 +319,7 @@ public final class Runtime {
 
     public func updateReports(block: BlockRef, state newState: inout State) async throws -> [Ed25519PublicKey] {
         let result = try await newState.update(
-            config: config, timeslot: newState.timeslot, extrinsic: block.extrinsic.reports
+            config: config, timeslot: newState.timeslot, extrinsic: block.extrinsic.reports, ancestry: ancestry
         )
         newState.reports = result.newReports
         return result.reporters

@@ -103,7 +103,8 @@ struct ReportsTests {
             return try await state.update(
                 config: config,
                 timeslot: testcase.input.timeslot,
-                extrinsic: testcase.input.reports
+                extrinsic: testcase.input.reports,
+                ancestry: nil
             )
         }
         switch result {

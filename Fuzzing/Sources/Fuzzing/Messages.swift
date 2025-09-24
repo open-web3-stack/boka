@@ -25,19 +25,28 @@ extension FuzzVersion: CustomStringConvertible {
     }
 }
 
+public let FEATURE_ANCESTRY: UInt32 = 1
+public let FEATURE_FORK: UInt32 = 2
+
 public struct FuzzPeerInfo: Codable {
-    public let name: String
-    public let appVersion: FuzzVersion
+    public let fuzzVersion: UInt8
+    public let fuzzFeatures: UInt32
     public let jamVersion: FuzzVersion
+    public let appVersion: FuzzVersion
+    public let appName: String
 
     public init(
         name: String,
         appVersion: FuzzVersion = FuzzVersion(major: 0, minor: 1, patch: 0),
-        jamVersion: FuzzVersion = FuzzVersion(major: 0, minor: 7, patch: 0)
+        jamVersion: FuzzVersion = FuzzVersion(major: 0, minor: 7, patch: 0),
+        fuzzVersion: UInt8 = 1,
+        fuzzFeatures: UInt32 = FEATURE_ANCESTRY | FEATURE_FORK
     ) {
-        self.name = name
+        appName = name
         self.appVersion = appVersion
         self.jamVersion = jamVersion
+        self.fuzzVersion = fuzzVersion
+        self.fuzzFeatures = fuzzFeatures
     }
 }
 
@@ -53,13 +62,15 @@ public struct FuzzKeyValue: Codable {
 
 public typealias FuzzState = [FuzzKeyValue]
 
-public struct FuzzSetState: Codable {
+public struct FuzzInitialize: Codable {
     public let header: Header
     public let state: FuzzState
+    public let ancestry: [AncestryItem]
 
-    public init(header: Header, state: FuzzState) {
+    public init(header: Header, state: FuzzState, ancestry: [AncestryItem]) {
         self.header = header
         self.state = state
+        self.ancestry = ancestry
     }
 }
 
@@ -68,11 +79,12 @@ public typealias FuzzStateRoot = Data32 // StateRootHash
 
 public enum FuzzingMessage: Codable {
     case peerInfo(FuzzPeerInfo)
+    case initialize(FuzzInitialize)
+    case stateRoot(FuzzStateRoot)
     case importBlock(Block)
-    case setState(FuzzSetState)
     case getState(FuzzGetState)
     case state(FuzzState)
-    case stateRoot(FuzzStateRoot)
+    case error(String)
 
     public init(from decoder: Decoder) throws {
         var container = try decoder.unkeyedContainer()
@@ -81,15 +93,17 @@ public enum FuzzingMessage: Codable {
         case 0:
             self = try .peerInfo(container.decode(FuzzPeerInfo.self))
         case 1:
-            self = try .importBlock(container.decode(Block.self))
+            self = try .initialize(container.decode(FuzzInitialize.self))
         case 2:
-            self = try .setState(container.decode(FuzzSetState.self))
-        case 3:
-            self = try .getState(container.decode(FuzzGetState.self))
-        case 4:
-            self = try .state(container.decode(FuzzState.self))
-        case 5:
             self = try .stateRoot(container.decode(FuzzStateRoot.self))
+        case 3:
+            self = try .importBlock(container.decode(Block.self))
+        case 4:
+            self = try .getState(container.decode(FuzzGetState.self))
+        case 5:
+            self = try .state(container.decode(FuzzState.self))
+        case 255:
+            self = try .error(container.decode(String.self))
         default:
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
@@ -106,20 +120,23 @@ public enum FuzzingMessage: Codable {
         case let .peerInfo(value):
             try container.encode(UInt8(0))
             try container.encode(value)
-        case let .importBlock(value):
+        case let .initialize(value):
             try container.encode(UInt8(1))
             try container.encode(value)
-        case let .setState(value):
+        case let .stateRoot(value):
             try container.encode(UInt8(2))
             try container.encode(value)
-        case let .getState(value):
+        case let .importBlock(value):
             try container.encode(UInt8(3))
             try container.encode(value)
-        case let .state(value):
+        case let .getState(value):
             try container.encode(UInt8(4))
             try container.encode(value)
-        case let .stateRoot(value):
+        case let .state(value):
             try container.encode(UInt8(5))
+            try container.encode(value)
+        case let .error(value):
+            try container.encode(UInt8(255))
             try container.encode(value)
         }
     }
