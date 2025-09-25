@@ -40,7 +40,7 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
         try await withSpan("importBlock") { span in
             span.attributes.blockHash = block.hash.description
 
-            let runtime = Runtime(config: config)
+            let runtime = try Runtime(config: config, ancestry: .init(config: config))
             let parent = try await dataProvider.getState(hash: block.header.parentHash)
             let stateRoot = await parent.value.stateRoot
             let timeslot = timeProvider.getTime().timeToTimeslot(config: config)

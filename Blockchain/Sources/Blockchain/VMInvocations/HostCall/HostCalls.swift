@@ -797,16 +797,19 @@ public class Bless: HostCall {
         var alwaysAcc: [ServiceIndex: Gas]?
         let length = 12 * Int(regs[4])
         if state.isMemoryReadable(address: regs[3], length: length) {
-            alwaysAcc = [:]
             let data = try state.readMemory(address: regs[3], length: length)
             for i in stride(from: 0, to: length, by: 12) {
                 let serviceIndex = ServiceIndex(data[i ..< i + 4].decode(UInt32.self))
                 let gas = Gas(data[i + 4 ..< i + 12].decode(UInt64.self))
-                alwaysAcc![serviceIndex] = gas
+                if alwaysAcc != nil {
+                    alwaysAcc![serviceIndex] = gas
+                } else {
+                    alwaysAcc = [serviceIndex: gas]
+                }
             }
         }
 
-        if alwaysAcc == nil, assigners == nil {
+        if alwaysAcc == nil || assigners == nil {
             throw VMInvocationsError.panic
         } else if x.serviceIndex != x.state.manager {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
@@ -845,9 +848,11 @@ public class Assign: HostCall {
         var authorizationQueue: [Data32]?
         let length = 32 * config.value.maxAuthorizationsQueueItems
         if state.isMemoryReadable(address: startAddr, length: length) {
-            authorizationQueue = [Data32]()
             let data = try state.readMemory(address: startAddr, length: length)
             for i in stride(from: 0, to: length, by: 32) {
+                if authorizationQueue == nil {
+                    authorizationQueue = [Data32]()
+                }
                 authorizationQueue!.append(Data32(data[i ..< i + 32])!)
             }
         }
@@ -886,9 +891,11 @@ public class Designate: HostCall {
         var validatorQueue: [ValidatorKey]?
         let length = 336 * config.value.totalNumberOfValidators
         if state.isMemoryReadable(address: startAddr, length: length) {
-            validatorQueue = [ValidatorKey]()
             let data = try state.readMemory(address: startAddr, length: length)
             for i in stride(from: 0, to: length, by: 336) {
+                if validatorQueue == nil {
+                    validatorQueue = [ValidatorKey]()
+                }
                 try validatorQueue!.append(ValidatorKey(data: Data(data[i ..< i + 336])))
             }
         }
@@ -921,7 +928,7 @@ public class Checkpoint: HostCall {
         state.writeRegister(Registers.Index(raw: 7), UInt64(bitPattern: state.getGas().value))
 
         y.serviceIndex = x.serviceIndex
-        y.state = x.state
+        y.state = x.state.copy()
         y.nextAccountIndex = x.nextAccountIndex
         y.transfers = x.transfers
         y.yield = x.yield

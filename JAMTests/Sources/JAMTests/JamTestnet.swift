@@ -68,7 +68,7 @@ public enum JamTestnet {
         _ testcase: JamTestnetTestcase,
         config: ProtocolConfigRef = TestVariants.tiny.config
     ) async throws -> Result<StateRef, Error> {
-        let runtime = Runtime(config: config)
+        let runtime = Runtime(config: config, ancestry: nil)
         let blockRef = testcase.block.asRef()
         let stateRef = try await testcase.preState.toState(config: config).asRef()
 

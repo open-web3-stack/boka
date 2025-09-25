@@ -16,6 +16,12 @@ public struct State: Sendable {
         self.layer = layer
     }
 
+    public init(copying other: State) {
+        // backend can be shared as it's read-only until end of stf
+        backend = other.backend
+        layer = StateLayer(copying: other.layer)
+    }
+
     // α: The core αuthorizations pool.
     public var coreAuthorizationPool: StateKeys.CoreAuthorizationPoolKey.Value {
         get {
@@ -344,6 +350,10 @@ extension State: Dummy {
 }
 
 extension State: ServiceAccounts {
+    public func copy() -> ServiceAccounts {
+        State(copying: self)
+    }
+
     public func get(serviceAccount index: ServiceIndex) async throws -> ServiceAccountDetails? {
         if layer.isDeleted(serviceAccount: index) {
             return nil

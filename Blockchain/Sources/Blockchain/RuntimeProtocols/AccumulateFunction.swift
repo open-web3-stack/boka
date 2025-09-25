@@ -71,7 +71,7 @@ public struct AccumulateState: Sendable {
 
     public func copy() -> AccumulateState {
         AccumulateState(
-            accounts: ServiceAccountsMutRef(accounts.value),
+            accounts: ServiceAccountsMutRef(copying: accounts),
             validatorQueue: validatorQueue,
             authorizationQueue: authorizationQueue,
             manager: manager,

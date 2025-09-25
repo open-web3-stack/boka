@@ -114,7 +114,7 @@ final class NodeTests {
             await nodeStoreMiddlware.wait()
 
             // Add a small delay to ensure block production completes before next advance
-            try await Task.sleep(for: .milliseconds(100))
+            try await Task.sleep(for: .milliseconds(150))
         }
 
         // Wait for sync

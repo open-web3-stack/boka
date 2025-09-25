@@ -45,6 +45,10 @@ public struct StateLayer: Sendable {
         }
     }
 
+    public init(copying other: StateLayer) {
+        changes = other.changes
+    }
+
     // α: The core αuthorizations pool.
     public var coreAuthorizationPool: StateKeys.CoreAuthorizationPoolKey.Value {
         get {
