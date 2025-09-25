@@ -83,11 +83,18 @@ public class FuzzingClient {
             throw FuzzingClientError.connectionFailed
         }
 
-        let message = FuzzingMessage.peerInfo(.init(name: "boka-fuzzing-fuzzer"))
+        let message = FuzzingMessage.peerInfo(.init(
+            name: "boka-fuzzing-fuzzer",
+            fuzzFeatures: 0
+        ))
         try connection.sendMessage(message)
 
         if let response = try connection.receiveMessage(), case let .peerInfo(info) = response {
-            logger.info("🤝 Handshake completed with \(info.name), app version: \(info.appVersion), jam version: \(info.jamVersion)")
+            logger.info("🤝 Handshake completed with \(info.appName), app version: \(info.appVersion), jam version: \(info.jamVersion)")
+            logger.info("   Fuzz version: \(info.fuzzVersion)")
+            let ancestryEnabled = (info.fuzzFeatures & FEATURE_ANCESTRY) != 0
+            let forkEnabled = (info.fuzzFeatures & FEATURE_FORK) != 0
+            logger.info("   Features: ANCESTRY=\(ancestryEnabled), FORK=\(forkEnabled)")
         } else {
             throw FuzzingClientError.targetNotResponding
         }
@@ -113,7 +120,7 @@ public class FuzzingClient {
             currentStateRef = state.asRef()
 
             // set state on target
-            try await setState(kv: kv, connection: connection)
+            try await initializeState(kv: kv, connection: connection)
 
             // generate a block
             let blockRef = try await fuzzGenerator.generateBlock(
@@ -122,8 +129,16 @@ public class FuzzingClient {
                 config: config
             )
 
+            // TODO: Implement fork feature
+
             // import block on target
             let targetStateRoot = try importBlock(block: blockRef.value, connection: connection)
+
+            // skip state comparison if import failed
+            guard let targetStateRoot else {
+                logger.warning("⚠️ Skipping block \(blockIndex + 1) due to import failure, continuing with next block")
+                continue
+            }
 
             // get expected post-state
             let (expectedStateRoot, expectedPostState) = try await fuzzGenerator.generatePostState(timeslot: timeslot, config: config)
@@ -152,29 +167,38 @@ public class FuzzingClient {
         logger.info("🎯 Fuzzing session completed - processed \(blockCount) blocks")
     }
 
-    private func setState(kv: [FuzzKeyValue], connection: FuzzingSocketConnection) async throws {
-        logger.info("🏗️ SET STATE")
+    private func initializeState(kv: [FuzzKeyValue], connection: FuzzingSocketConnection) async throws {
+        logger.info("🏗️ INITIALIZE STATE")
 
         let dummyHeader = Header.dummy(config: config)
-        let setStateMessage = FuzzingMessage.setState(FuzzSetState(header: dummyHeader, state: kv))
-        try connection.sendMessage(setStateMessage)
+        let ancestry: [AncestryItem] = []
+        let initializeMessage = FuzzingMessage.initialize(FuzzInitialize(header: dummyHeader, state: kv, ancestry: ancestry))
+        try connection.sendMessage(initializeMessage)
 
         if let response = try connection.receiveMessage(), case let .stateRoot(root) = response {
-            logger.info("🏗️ SET STATE success, root: \(root.data.toHexString())")
+            logger.info("🏗️ INITIALIZE STATE success, root: \(root.data.toHexString())")
         } else {
             throw FuzzingClientError.targetNotResponding
         }
     }
 
-    private func importBlock(block: Block, connection: FuzzingSocketConnection) throws -> Data32 {
+    private func importBlock(block: Block, connection: FuzzingSocketConnection) throws -> Data32? {
         logger.info("📦 IMPORT BLOCK")
 
         let importMessage = FuzzingMessage.importBlock(block)
         try connection.sendMessage(importMessage)
 
-        if let response = try connection.receiveMessage(), case let .stateRoot(root) = response {
-            logger.info("📦 IMPORT BLOCK success, new state root: \(root.data.toHexString())")
-            return root
+        if let response = try connection.receiveMessage() {
+            switch response {
+            case let .stateRoot(root):
+                logger.info("📦 IMPORT BLOCK success, new state root: \(root.data.toHexString())")
+                return root
+            case let .error(errorMsg):
+                logger.error("📦 IMPORT BLOCK failed: \(errorMsg)")
+                return nil
+            default:
+                throw FuzzingClientError.targetNotResponding
+            }
         } else {
             throw FuzzingClientError.targetNotResponding
         }

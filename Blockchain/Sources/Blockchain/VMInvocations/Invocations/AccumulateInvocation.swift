@@ -14,7 +14,7 @@ public func accumulate(
     arguments: [OperandTuple],
     timeslot: TimeslotIndex
 ) async throws -> AccumulationResult {
-    logger.debug("accumulating service index: \(serviceIndex)")
+    logger.debug("accumulating service index: \(serviceIndex), gas: \(gas)")
 
     guard let accumulatingAccountDetails = try await state.accounts.value.get(serviceAccount: serviceIndex),
           let preimage = try await state.accounts.value.get(

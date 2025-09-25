@@ -118,7 +118,8 @@ extension Guaranteeing {
     public func update(
         config: ProtocolConfigRef,
         timeslot: TimeslotIndex,
-        extrinsic: ExtrinsicGuarantees
+        extrinsic: ExtrinsicGuarantees,
+        ancestry: ConfigLimitedSizeArray<AncestryItem, ProtocolConfig.Int0, ProtocolConfig.MaxLookupAnchorAge>?
     ) async throws(GuaranteeingError) -> (
         newReports: ConfigFixedSizeArray<
             ReportItem?,
@@ -223,6 +224,17 @@ extension Guaranteeing {
             }
             guard context.lookupAnchor.timeslot >= Int64(timeslot) - Int64(config.value.maxLookupAnchorAge) else {
                 throw .invalidContext
+            }
+
+            if let ancestry {
+                let lookupTimeslot = UInt32(context.lookupAnchor.timeslot)
+                let lookupHeaderHash = context.lookupAnchor.headerHash
+
+                guard ancestry.array.contains(where: { item in
+                    item.timeslot == lookupTimeslot && item.headerHash == lookupHeaderHash
+                }) else {
+                    throw .invalidContext
+                }
             }
 
             for prerequisiteWorkPackage in context.prerequisiteWorkPackages.union(report.lookup.keys) {
