@@ -17,7 +17,8 @@ public func invokePVM(
         let state = try VMStateInterpreter(standardProgramBlob: blob, pc: pc, gas: gas, argumentData: argumentData)
         let engine = Engine(config: config, invocationContext: ctx)
         let exitReason = await engine.execute(state: state)
-        let gasUsed = gas - Gas(state.getGas())
+        let postGas = state.getGas()
+        let gasUsed = postGas >= GasInt(0) ? gas - Gas(postGas) : gas
 
         switch exitReason {
         case .outOfGas:

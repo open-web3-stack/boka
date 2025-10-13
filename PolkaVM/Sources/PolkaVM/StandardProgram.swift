@@ -52,7 +52,7 @@ public class StandardProgram {
         let stackAlignedSize = Int(Q(stackSize, config))
 
         let totalSize = 5 * ZZ + readOnlyAlignedSize + readWriteAlignedSize + stackAlignedSize + ZI
-        guard totalSize <= UInt32.max else {
+        guard totalSize - 1 <= UInt32.max else {
             throw Error.invalidTotalMemorySize
         }
         code = try ProgramCode(blob[slice.startIndex ..< slice.startIndex + Int(codeLength)])

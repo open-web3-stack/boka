@@ -18,6 +18,137 @@ enum MemoryTests {
             #expect(pageMap.isWritable(address: 1, length: 1).result == false)
         }
 
+        @Test func zeroLengthRange() {
+            // Zero-length ranges should always succeed (no pages to check)
+            let pageMap = PageMap(pageMap: [(address: 0, length: 1, access: .readOnly)], config: config)
+
+            // Zero-length at start of readable range
+            #expect(pageMap.isReadable(address: 0, length: 0).result == true)
+
+            // Zero-length in middle of readable range
+            #expect(pageMap.isReadable(address: 100, length: 0).result == true)
+
+            // Zero-length at end of readable range
+            #expect(pageMap.isReadable(address: UInt32(config.pvmMemoryPageSize) - 1, length: 0).result == true)
+
+            // Zero-length in non-readable area (should still succeed as no pages accessed)
+            #expect(pageMap.isReadable(address: UInt32(config.pvmMemoryPageSize), length: 0).result == true)
+            #expect(pageMap.isWritable(address: UInt32(config.pvmMemoryPageSize), length: 0).result == true)
+        }
+
+        @Test func pageBoundaryEdgeCases() {
+            let pageSize = UInt32(config.pvmMemoryPageSize)
+
+            // Set up: page 0 and page 2 readable, page 1 not accessible
+            let pageMap = PageMap(pageMap: [
+                (address: 0, length: pageSize, access: .readOnly),
+                (address: pageSize * 2, length: pageSize, access: .readOnly),
+            ], config: config)
+
+            // Last byte of page 0
+            #expect(pageMap.isReadable(address: pageSize - 1, length: 1).result == true)
+
+            // First byte of page 1 (not accessible)
+            #expect(pageMap.isReadable(address: pageSize, length: 1).result == false)
+
+            // Span from last byte of page 0 to first byte of page 1 (should fail - crosses into non-accessible)
+            #expect(pageMap.isReadable(address: pageSize - 1, length: 2).result == false)
+
+            // Last byte of page 1 (not accessible)
+            #expect(pageMap.isReadable(address: pageSize * 2 - 1, length: 1).result == false)
+
+            // First byte of page 2
+            #expect(pageMap.isReadable(address: pageSize * 2, length: 1).result == true)
+
+            // Last byte of page 2
+            #expect(pageMap.isReadable(address: pageSize * 3 - 1, length: 1).result == true)
+
+            // Entire page 0
+            #expect(pageMap.isReadable(address: 0, length: Int(pageSize)).result == true)
+
+            // Span from page 0 to page 1 (should fail)
+            #expect(pageMap.isReadable(address: 0, length: Int(pageSize + 1)).result == false)
+        }
+
+        @Test func partialPageRanges() {
+            let pageSize = UInt32(config.pvmMemoryPageSize)
+
+            // Set up single page readable
+            let pageMap = PageMap(pageMap: [(address: 100, length: 50, access: .readOnly)], config: config)
+
+            // The range [100, 150) falls within page 0 (assuming page size is 4096)
+            // So the entire page 0 should be readable
+            #expect(pageMap.isReadable(pageStart: 0, pages: 1).result == true)
+
+            // Ranges within the initialized area
+            #expect(pageMap.isReadable(address: 100, length: 50).result == true)
+            #expect(pageMap.isReadable(address: 100, length: 1).result == true)
+            #expect(pageMap.isReadable(address: 149, length: 1).result == true)
+
+            // Range extending beyond initialized area but within same page
+            #expect(pageMap.isReadable(address: 100, length: Int(pageSize - 100)).result == true)
+            #expect(pageMap.isReadable(address: 0, length: 1).result == true) // start of page 0
+            #expect(pageMap.isReadable(address: pageSize - 1, length: 1).result == true) // end of page 0
+
+            // Range crossing to next page (should fail)
+            #expect(pageMap.isReadable(address: pageSize - 1, length: 2).result == false)
+        }
+
+        @Test func multiPageSpan() {
+            let pageSize = UInt32(config.pvmMemoryPageSize)
+
+            // Set up 3 consecutive pages readable
+            let pageMap = PageMap(pageMap: [(address: 0, length: pageSize * 3, access: .readOnly)], config: config)
+
+            // Single page checks
+            #expect(pageMap.isReadable(pageStart: 0, pages: 1).result == true)
+            #expect(pageMap.isReadable(pageStart: 1, pages: 1).result == true)
+            #expect(pageMap.isReadable(pageStart: 2, pages: 1).result == true)
+            #expect(pageMap.isReadable(pageStart: 3, pages: 1).result == false)
+
+            // Multi-page address ranges
+            #expect(pageMap.isReadable(address: 0, length: Int(pageSize * 3)).result == true)
+            #expect(pageMap.isReadable(address: 0, length: Int(pageSize * 3 + 1)).result == false)
+
+            // Unaligned multi-page span (crosses 3 pages: 0, 1, 2)
+            #expect(pageMap.isReadable(address: 100, length: Int(pageSize * 2)).result == true)
+
+            // Unaligned multi-page span crossing into non-readable page
+            #expect(pageMap.isReadable(address: 100, length: Int(pageSize * 3)).result == false)
+
+            // Span from middle of page 1 to middle of page 2
+            #expect(pageMap.isReadable(address: pageSize + 100, length: Int(pageSize)).result == true)
+        }
+
+        @Test func unalignedAddresses() {
+            let pageSize = UInt32(config.pvmMemoryPageSize)
+
+            // Set up: page 1 and page 3 readable (not page 0, 2, or 4)
+            let pageMap = PageMap(pageMap: [
+                (address: pageSize, length: pageSize, access: .readOnly),
+                (address: pageSize * 3, length: pageSize, access: .readOnly),
+            ], config: config)
+
+            // Unaligned address in readable page
+            #expect(pageMap.isReadable(address: pageSize + 1, length: 100).result == true)
+            #expect(pageMap.isReadable(address: pageSize + 999, length: 100).result == true)
+
+            // Unaligned range crossing from readable to non-readable
+            #expect(pageMap.isReadable(address: pageSize * 2 - 10, length: 20).result == false)
+
+            // Unaligned range entirely in non-readable page
+            #expect(pageMap.isReadable(address: pageSize * 2 + 100, length: 200).result == false)
+
+            // Unaligned range crossing 2 readable pages with gap between them
+            #expect(pageMap.isReadable(address: pageSize + 100, length: Int(pageSize * 2)).result == false)
+
+            // Edge case: 1-byte range at last address of readable page
+            #expect(pageMap.isReadable(address: pageSize * 2 - 1, length: 1).result == true)
+
+            // Edge case: 1-byte range at first address of non-readable page
+            #expect(pageMap.isReadable(address: pageSize * 2, length: 1).result == false)
+        }
+
         @Test func initIncompletePage() {
             let pageMap = PageMap(pageMap: [(address: 0, length: 1, access: .readOnly)], config: config)
 

@@ -59,8 +59,6 @@ public final class RefineContext: InvocationContext {
     }
 
     public func dispatch(index: UInt32, state: VMState) async -> ExecOutcome {
-        logger.debug("dispatching host-call: \(index)")
-
         switch UInt8(index) {
         case GasFn.identifier:
             return await GasFn().call(config: config, state: state)

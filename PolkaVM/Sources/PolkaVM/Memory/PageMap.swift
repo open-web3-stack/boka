@@ -64,7 +64,7 @@ public class PageMap {
         singlePageChecker: (UInt32) -> Bool
     ) -> (result: Bool, page: UInt32) {
         if pages == 0 {
-            return (singlePageChecker(pageStart), pageStart)
+            return (true, pageStart)
         }
 
         let pageEnd = pageStart + UInt32(pages)
