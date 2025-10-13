@@ -77,7 +77,7 @@ struct FuzzTests {
             ("0.7.0/_new/1758622524", "00000039"), // used more gas
         ]
     ))
-    func new1(_ input: Testcase) async throws {
+    func v070new1(_ input: Testcase) async throws {
         try await TraceTest.test(input)
     }
 
@@ -107,7 +107,7 @@ struct FuzzTests {
             ("0.7.0/_new2/1758708840", "00000958"), // error (exp post state is empty)
         ]
     ))
-    func new2(_ input: Testcase) async throws {
+    func v070new2(_ input: Testcase) async throws {
         try await TraceTest.test(input)
     }
 }
