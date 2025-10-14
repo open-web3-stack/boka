@@ -11,7 +11,7 @@ public protocol CompactEncodable {
 
 /// A coding wrapper that converts CompactEncodable types to UInt for compact encoding/decoding.
 /// This supports both Swift's built-in integer types and custom types that conform to CompactEncodable.
-public struct Compact<T: CompactEncodable & Codable>: Codable, CodableAlias {
+public struct Compact<T: CompactEncodable & Codable & Sendable>: Codable, CodableAlias, Sendable {
     public typealias Alias = T
 
     public var alias: T

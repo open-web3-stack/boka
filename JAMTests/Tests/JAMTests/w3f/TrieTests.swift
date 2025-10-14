@@ -18,20 +18,17 @@ struct TrieTests {
 
     @Test(arguments: try loadTests())
     func trieTests(_ testcase: Testcase) throws {
-        withKnownIssue("TODO: outdated key type", isIntermittent: true) {
-            let decoder = JSONDecoder()
-            let testcase = try decoder.decode(TrieTestCase.self, from: testcase.data)
-            for element in testcase {
-                let kv = element.input.reduce(into: [Data31: Data]()) { result, entry in
-                    let keyData = Data(fromHexString: entry.key)
-                    let valueData = Data(fromHexString: entry.value)
-                    // result[Data31(keyData!)!] = valueData
-                    result[Data31()] = valueData
-                }
-
-                let result = try stateMerklize(kv: kv)
-                #expect(result.data.toHexString() == element.output)
+        let decoder = JSONDecoder()
+        let testcase = try decoder.decode(TrieTestCase.self, from: testcase.data)
+        for element in testcase {
+            let kv = element.input.reduce(into: [Data31: Data]()) { result, entry in
+                let keyData = Data(fromHexString: entry.key)
+                let valueData = Data(fromHexString: entry.value)
+                result[Data31(keyData![relative: 0 ..< 31])!] = valueData
             }
+
+            let result = try stateMerklize(kv: kv)
+            #expect(result.data.toHexString() == element.output)
         }
     }
 }

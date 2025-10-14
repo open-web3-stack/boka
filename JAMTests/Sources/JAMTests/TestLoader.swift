@@ -1,9 +1,6 @@
 import Blockchain
 import Foundation
 
-// somehow without this the GH Actions CI fails
-extension Foundation.Bundle: @unchecked @retroactive Sendable {}
-
 public struct Testcase: CustomStringConvertible, Sendable {
     public var description: String
     public var data: Data
@@ -21,13 +18,9 @@ public enum TestVariants: String, CaseIterable {
     public var config: ProtocolConfigRef {
         switch self {
         case .tiny:
-            var tiny = ProtocolConfigRef.tiny
-            tiny = tiny.mutate {
-                $0.preimagePurgePeriod = 32
-            }
-            return tiny
+            ProtocolConfigRef.tiny
         case .full:
-            return ProtocolConfigRef.mainnet
+            ProtocolConfigRef.mainnet
         }
     }
 }

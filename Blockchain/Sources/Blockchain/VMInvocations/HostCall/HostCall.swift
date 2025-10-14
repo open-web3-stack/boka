@@ -1,5 +1,6 @@
 import PolkaVM
 import TracingUtils
+import Utils
 
 private let logger = Logger(label: "HostCall ")
 
@@ -16,7 +17,7 @@ extension HostCall {
         state.consumeGas(gasCost(state: state))
         logger.debug("consumed \(gasCost(state: state)) gas, \(state.getGas()) left")
 
-        guard hasEnoughGas(state: state) else {
+        guard state.getGas() >= GasInt(0) else {
             logger.debug("not enough gas")
             return .exit(.outOfGas)
         }
@@ -42,9 +43,5 @@ extension HostCall {
     // TODO: host-calls will have different gas costs later on
     public func gasCost(state _: VMState) -> Gas {
         Gas(10)
-    }
-
-    func hasEnoughGas(state: VMState) -> Bool {
-        Gas(state.getGas()) >= gasCost(state: state)
     }
 }

@@ -43,7 +43,7 @@ public struct Registers: Equatable {
 
     /// standard program init registers
     public init(config: any PvmConfig, argumentData: Data?) {
-        self[Index(raw: 0)] = UInt64(config.pvmProgramInitRegister1Value)
+        self[Index(raw: 0)] = UInt64(config.pvmProgramInitRegister0Value)
         self[Index(raw: 1)] = UInt64(config.pvmProgramInitStackBaseAddress)
         self[Index(raw: 7)] = UInt64(config.pvmProgramInitInputStartAddress)
         self[Index(raw: 8)] = UInt64(argumentData?.count ?? 0)
