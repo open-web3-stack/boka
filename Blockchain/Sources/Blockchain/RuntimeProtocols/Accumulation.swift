@@ -645,6 +645,9 @@ extension Accumulation {
         for transfer in accumulateOutput.transfers {
             transferGroups[transfer.destination, default: []].append(transfer)
         }
+
+        logger.debug("transfer groups: \(transferGroups)")
+
         for (service, transfers) in transferGroups.sorted(by: { $0.key < $1.key }) {
             let gasUsed = try await onTransfer(
                 config: config,
@@ -656,6 +659,7 @@ extension Accumulation {
             )
             let count = UInt32(transfers.count)
             if count == 0 { continue }
+            logger.debug("transfer complete: service: \(service), transfers count: \(count), gasUsed: \(gasUsed)")
             transfersStats[service] = (count, gasUsed)
         }
 

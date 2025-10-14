@@ -294,6 +294,8 @@ public class Read: HostCall {
             nil
         }
 
+        logger.debug("value: \(value?.toHexString() ?? "nil")")
+
         guard let value else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
             return
@@ -311,7 +313,7 @@ public class Read: HostCall {
             throw VMInvocationsError.panic
         } else {
             state.writeRegister(Registers.Index(raw: 7), value.count)
-            logger.debug("val: \(value[relative: first ..< (first + len)].toDebugHexString())")
+            logger.debug("writing val: \(value[relative: first ..< (first + len)].toDebugHexString())")
             try state.writeMemory(address: regs[2], values: value[relative: first ..< (first + len)])
         }
     }
@@ -430,7 +432,7 @@ public class Info: HostCall {
         let first = min(Int(reg9), value?.count ?? 0)
         let len = min(Int(reg10), (value?.count ?? 0) - first)
 
-        let isWritable = value != nil && state.isMemoryWritable(address: o, length: len)
+        let isWritable = state.isMemoryWritable(address: o, length: len)
 
         logger.debug("value: \(value?.debugDescription ?? "nil"), isWritable: \(isWritable)")
 
@@ -797,15 +799,12 @@ public class Bless: HostCall {
         var alwaysAcc: [ServiceIndex: Gas]?
         let length = 12 * Int(regs[4])
         if state.isMemoryReadable(address: regs[3], length: length) {
+            alwaysAcc = [:]
             let data = try state.readMemory(address: regs[3], length: length)
             for i in stride(from: 0, to: length, by: 12) {
                 let serviceIndex = ServiceIndex(data[i ..< i + 4].decode(UInt32.self))
                 let gas = Gas(data[i + 4 ..< i + 12].decode(UInt64.self))
-                if alwaysAcc != nil {
-                    alwaysAcc![serviceIndex] = gas
-                } else {
-                    alwaysAcc = [serviceIndex: gas]
-                }
+                alwaysAcc![serviceIndex] = gas
             }
         }
 
@@ -848,11 +847,9 @@ public class Assign: HostCall {
         var authorizationQueue: [Data32]?
         let length = 32 * config.value.maxAuthorizationsQueueItems
         if state.isMemoryReadable(address: startAddr, length: length) {
+            authorizationQueue = []
             let data = try state.readMemory(address: startAddr, length: length)
             for i in stride(from: 0, to: length, by: 32) {
-                if authorizationQueue == nil {
-                    authorizationQueue = [Data32]()
-                }
                 authorizationQueue!.append(Data32(data[i ..< i + 32])!)
             }
         }
@@ -891,11 +888,9 @@ public class Designate: HostCall {
         var validatorQueue: [ValidatorKey]?
         let length = 336 * config.value.totalNumberOfValidators
         if state.isMemoryReadable(address: startAddr, length: length) {
+            validatorQueue = []
             let data = try state.readMemory(address: startAddr, length: length)
             for i in stride(from: 0, to: length, by: 336) {
-                if validatorQueue == nil {
-                    validatorQueue = [ValidatorKey]()
-                }
                 try validatorQueue!.append(ValidatorKey(data: Data(data[i ..< i + 336])))
             }
         }

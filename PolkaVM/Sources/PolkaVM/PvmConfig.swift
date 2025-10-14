@@ -21,7 +21,7 @@ extension PvmConfig {
     public var readOnlyDataSegment: Data? { nil }
     public var readWriteDataSegment: Data? { nil }
 
-    public var pvmProgramInitRegister1Value: Int { (1 << 32) - (1 << 16) }
+    public var pvmProgramInitRegister0Value: Int { (1 << 32) - (1 << 16) }
     public var pvmProgramInitStackBaseAddress: Int { (1 << 32) - (2 * pvmProgramInitZoneSize) - pvmProgramInitInputDataSize }
     public var pvmProgramInitInputStartAddress: Int { pvmProgramInitStackBaseAddress + pvmProgramInitZoneSize }
 }

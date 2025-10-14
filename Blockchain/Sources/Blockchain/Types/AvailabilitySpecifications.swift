@@ -2,7 +2,7 @@ import Codec
 import Utils
 
 public struct AvailabilitySpecifications: Sendable, Equatable, Codable {
-    // h
+    // p
     public var workPackageHash: Data32
 
     // l

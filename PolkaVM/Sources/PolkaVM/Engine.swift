@@ -98,7 +98,7 @@ public class Engine {
 
     private func getInstructionName(_ inst: any Instruction) -> String {
         let typeName = String(describing: type(of: inst))
-        let cleanName = typeName.replacingOccurrences(of: "Instructions.", with: "")
+        let cleanName = typeName.replacingOccurrences(of: "Instructions::", with: "")
         return cleanName.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1_$2", options: .regularExpression).uppercased()
     }
 }

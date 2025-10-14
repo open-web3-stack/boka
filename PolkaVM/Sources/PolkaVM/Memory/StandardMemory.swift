@@ -53,35 +53,16 @@ public final class StandardMemory: Memory {
             data: readOnlyData
         )
 
-        var heapData = readWriteData
-        let totalHeapSize = Int(heapDataPagesLen + heapEmptyPagesSize)
-        if heapData.count < totalHeapSize {
-            let oldSize = heapData.count
-            let additionalSize = totalHeapSize - oldSize
-
-            // Resize and zero-fill efficiently
-            heapData.count = totalHeapSize
-            heapData.withUnsafeMutableBytes { bytes in
-                let zeroPtr = bytes.baseAddress!.advanced(by: oldSize)
-                memset(zeroPtr, 0, additionalSize)
-            }
-        }
         heapZone = Zone(
             startAddress: heapStart,
             endAddress: heapStart + heapDataPagesLen + heapEmptyPagesSize,
-            data: heapData
+            data: readWriteData
         )
 
         stackZone = Zone(
             startAddress: stackStartAddr,
             endAddress: UInt32(config.pvmProgramInitStackBaseAddress),
-            data: {
-                var stackData = Data(count: Int(stackPageAlignedSize))
-                _ = stackData.withUnsafeMutableBytes { bytes in
-                    memset(bytes.baseAddress!, 0, Int(stackPageAlignedSize))
-                }
-                return stackData
-            }()
+            data: Data()
         )
 
         argumentZone = Zone(
