@@ -69,6 +69,8 @@ public struct Compact<T: CompactEncodable & Codable & Sendable>: Codable, Codabl
     }
 }
 
+extension Compact: Equatable where T: Equatable {}
+
 /// Extension to provide default implementation for unsigned integer types
 extension UnsignedInteger where Self: CompactEncodable {
     public func toUInt() throws -> UInt {

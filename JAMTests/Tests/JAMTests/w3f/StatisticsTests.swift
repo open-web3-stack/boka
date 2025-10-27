@@ -55,11 +55,10 @@ struct StatisticsTests {
             config: config,
             newTimeslot: testcase.input.timeslot,
             extrinsic: testcase.input.extrinsic,
-            reporters: [], // TODO: testcase should provide reporters set
+            reporters: [], // TODO: testcase should provide reporters set G (defined in GP) from guaranteeing result
             authorIndex: testcase.input.author,
             availableReports: [],
             accumulateStats: [:],
-            transfersStats: [:]
         )
         testStatsState.current = result.accumulator
         testStatsState.previous = result.previous

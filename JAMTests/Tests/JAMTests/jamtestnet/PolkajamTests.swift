@@ -33,4 +33,9 @@ struct PolkajamTests {
     func preimagesTests(_ input: Testcase) async throws {
         try await TraceTest.test(input)
     }
+
+    @Test(arguments: try JamTestnet.loadTests(path: "traces/fuzzy", src: .w3f))
+    func fuzzyTests(_ input: Testcase) async throws {
+        try await TraceTest.test(input)
+    }
 }

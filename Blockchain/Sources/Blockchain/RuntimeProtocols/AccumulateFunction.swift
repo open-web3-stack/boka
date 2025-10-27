@@ -2,8 +2,7 @@ import Codec
 import Foundation
 import Utils
 
-// wrangled operand tuple
-public struct OperandTuple: Codable {
+public struct OperandTuple: Codable, Sendable {
     /// p
     public var packageHash: Data32
     /// e
@@ -41,6 +40,61 @@ public struct DeferredTransfers: Codable, Sendable {
     }
 }
 
+public struct AccumulationInput: Sendable, Codable {
+    public enum InputType: Sendable, Equatable {
+        case operandTuple
+        case deferredTransfers
+    }
+
+    public var inputType: InputType
+    public var operandTuple: OperandTuple?
+    public var deferredTransfers: DeferredTransfers?
+
+    public init(operandTuple: OperandTuple) {
+        inputType = .operandTuple
+        self.operandTuple = operandTuple
+    }
+
+    public init(deferredTransfers: DeferredTransfers) {
+        inputType = .deferredTransfers
+        self.deferredTransfers = deferredTransfers
+    }
+
+    // Encodable
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.unkeyedContainer()
+        switch inputType {
+        case .operandTuple:
+            try container.encode(UInt(0))
+            try container.encode(operandTuple.unwrap())
+        case .deferredTransfers:
+            try container.encode(UInt(1))
+            try container.encode(deferredTransfers.unwrap())
+        }
+    }
+
+    // Decodable
+    public init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        let variant = try container.decode(UInt.self)
+        switch variant {
+        case 0:
+            let operandTuple = try container.decode(OperandTuple.self)
+            self.init(operandTuple: operandTuple)
+        case 1:
+            let deferredTransfers = try container.decode(DeferredTransfers.self)
+            self.init(deferredTransfers: deferredTransfers)
+        default:
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Invalid AccumulationInput variant: \(variant)"
+                )
+            )
+        }
+    }
+}
+
 /// Characterization (i.e. values capable of representing) of state components
 /// which are both needed and mutable by the accumulation process.
 public struct AccumulateState: Sendable {
@@ -64,6 +118,8 @@ public struct AccumulateState: Sendable {
     public var assigners: ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>
     // v
     public var delegator: ServiceIndex
+    // r
+    public var registrar: ServiceIndex
     // z
     public var alwaysAcc: [ServiceIndex: Gas]
 
@@ -77,13 +133,14 @@ public struct AccumulateState: Sendable {
             manager: manager,
             assigners: assigners,
             delegator: delegator,
+            registrar: registrar,
             alwaysAcc: alwaysAcc,
             entropy: entropy
         )
     }
 }
 
-public class AccumlateResultContext {
+public class AccumulateResultContext {
     /// s: the accumulating service account index
     public var serviceIndex: ServiceIndex
     /// u

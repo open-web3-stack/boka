@@ -1,4 +1,4 @@
-extension Result: Codable where Success: Codable, Failure: Codable {
+extension Result: @retroactive Codable where Success: Codable, Failure: Codable {
     private enum CodingKeys: String, CodingKey {
         case success, failure
     }

@@ -5,7 +5,7 @@ import Utils
 private let logger = Logger(label: "InstructionTable")
 
 public class InstructionTable {
-    public static let table: [Instruction.Type?] = {
+    public nonisolated(unsafe) static let table: [Instruction.Type?] = {
         let insts: [Instruction.Type] = [
             Instructions.Trap.self,
             Instructions.Fallthrough.self,

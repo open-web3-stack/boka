@@ -302,6 +302,7 @@ extension State: Dummy {
             manager: ServiceIndex(),
             assigners: try! ConfigFixedSizeArray(config: config, defaultValue: ServiceIndex()),
             delegator: ServiceIndex(),
+            registrar: ServiceIndex(),
             alwaysAcc: [:]
         )
         let judgements: StateKeys.JudgementsKey.Value = JudgementsState.dummy(config: config)
@@ -460,20 +461,16 @@ extension State: ServiceAccounts {
         layer[serviceAccount: index, preimageHash: hash, length: length] = value
     }
 
-    // TODO: consider if keeping track of service keys at backend level is better
     public mutating func remove(serviceAccount index: ServiceIndex) async throws {
         layer[serviceAccount: index] = nil
 
         let serviceByte = UInt8(index & 0xFF)
-        var startKeyData = Data(repeating: 0, count: 31)
-        startKeyData[0] = serviceByte
-        let startKey = Data31(startKeyData)!
 
-        let candidateKeys = try await backend.getKeys(Data([serviceByte]), startKey, nil)
-
-        for (keyData, _) in candidateKeys {
-            if let key = Data31(keyData), StateKeys.isServiceKey(key, serviceIndex: index) {
-                layer[key] = nil
+        let storageKeyValues = try await backend.getKeys(Data([serviceByte]), nil, nil)
+        for (key, _) in storageKeyValues {
+            guard let key31 = Data31(key) else { continue }
+            if StateKeys.isServiceKey(key31, serviceIndex: index) {
+                layer[key31] = nil
             }
         }
     }

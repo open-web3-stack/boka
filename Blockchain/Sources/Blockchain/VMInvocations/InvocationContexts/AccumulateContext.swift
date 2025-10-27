@@ -6,10 +6,10 @@ private let logger = Logger(label: "AccumulateContext")
 
 public final class AccumulateContext: InvocationContext {
     public class AccumulateContextType {
-        var x: AccumlateResultContext
-        var y: AccumlateResultContext // only set in checkpoint host-call
+        var x: AccumulateResultContext
+        var y: AccumulateResultContext // only set in checkpoint host-call
 
-        init(x: AccumlateResultContext, y: AccumlateResultContext) {
+        init(x: AccumulateResultContext, y: AccumulateResultContext) {
             self.x = x
             self.y = y
         }
@@ -22,13 +22,13 @@ public final class AccumulateContext: InvocationContext {
 
     // other info needed for dispatches
     public let timeslot: TimeslotIndex
-    public let operands: [OperandTuple]
+    public let inputs: [AccumulationInput]
 
-    public init(context: ContextType, config: ProtocolConfigRef, timeslot: TimeslotIndex, operands: [OperandTuple]) {
+    public init(context: ContextType, config: ProtocolConfigRef, timeslot: TimeslotIndex, inputs: [AccumulationInput]) {
         self.config = config
         self.context = context
         self.timeslot = timeslot
-        self.operands = operands
+        self.inputs = inputs
     }
 
     public func dispatch(index: UInt32, state: VMState) async -> ExecOutcome {
@@ -36,7 +36,7 @@ public final class AccumulateContext: InvocationContext {
         case GasFn.identifier:
             return await GasFn().call(config: config, state: state)
         case Fetch.identifier:
-            return await Fetch(entropy: context.x.state.entropy, operands: operands)
+            return await Fetch(entropy: context.x.state.entropy, inputs: inputs)
                 .call(config: config, state: state)
         case Read.identifier:
             return await Read(serviceIndex: context.x.serviceIndex, accounts: context.x.state.accounts.toRef())
@@ -89,12 +89,16 @@ public final class AccumulateContext: InvocationContext {
     // a check function to find the first such index in this sequence which does not already represent a service
     public static func check(
         i: ServiceIndex,
-        accounts: ServiceAccountsRef
+        accounts: ServiceAccountsRef,
+        config: ProtocolConfigRef
     ) async throws -> ServiceIndex {
         if try await accounts.value.get(serviceAccount: i) == nil {
             return i
         }
 
-        return try await check(i: (i - 255) % serviceIndexModValue + 256, accounts: accounts)
+        let S = UInt32(config.value.minPublicServiceIndex)
+        let left = i - S + 1
+        let right = UInt32.max - S - 255
+        return try await check(i: (left % right) + S, accounts: accounts, config: config)
     }
 }
