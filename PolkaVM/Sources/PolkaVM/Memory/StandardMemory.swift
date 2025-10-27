@@ -180,13 +180,15 @@ public final class StandardMemory: Memory {
         }
 
         let nextPageBoundary = StandardProgram.alignToPageSize(size: prevHeapEnd, config: config)
-        heapZone.endAddress += size
+        let newHeapEnd = heapZone.endAddress + size
+        heapZone.endAddress = newHeapEnd
 
-        if heapZone.endAddress > nextPageBoundary {
-            let finalBoundary = heapZone.endAddress
-            let start = nextPageBoundary / UInt32(config.pvmMemoryPageSize)
-            let end = finalBoundary / UInt32(config.pvmMemoryPageSize)
-            let count = Int(end - start + 1)
+        if newHeapEnd > nextPageBoundary {
+            let finalBoundary = StandardProgram.alignToPageSize(size: newHeapEnd, config: config)
+            let pageSize = UInt32(config.pvmMemoryPageSize)
+            let start = nextPageBoundary / pageSize
+            let end = finalBoundary / pageSize
+            let count = Int(end - start)
             pageMap.update(pageIndex: start, pages: count, access: .readWrite)
         }
 

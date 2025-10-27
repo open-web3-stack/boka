@@ -38,7 +38,7 @@ private func constructKey(_ service: ServiceIndex, _ val: UInt32, _ data: Data) 
 
     let valEncoded = val.encode()
     let h = valEncoded + data
-    let a = h.blake2b256hash().data[relative: 0 ..< 27]
+    let a = h.blake2b256hash().data
 
     withUnsafeBytes(of: service.littleEndian) { servicePtr in
         a.withUnsafeBytes { aPtr in

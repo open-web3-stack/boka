@@ -11,17 +11,29 @@ public func accumulate(
     state: AccumulateState,
     serviceIndex: ServiceIndex,
     gas: Gas,
-    arguments: [OperandTuple],
+    arguments: [AccumulationInput],
     timeslot: TimeslotIndex
 ) async throws -> AccumulationResult {
     logger.debug("accumulating service index: \(serviceIndex), gas: \(gas)")
 
-    guard let accumulatingAccountDetails = try await state.accounts.value.get(serviceAccount: serviceIndex),
-          let preimage = try await state.accounts.value.get(
-              serviceAccount: serviceIndex,
-              preimageHash: accumulatingAccountDetails.codeHash
-          )
-    else {
+    guard var accumulatingAccountDetails = try await state.accounts.value.get(serviceAccount: serviceIndex) else {
+        logger.error("service account not found for service index: \(serviceIndex)")
+        return .init(state: state, transfers: [], commitment: nil, gasUsed: Gas(0), provide: [])
+    }
+
+    let transfers = arguments.compactMap(\.deferredTransfers)
+    let transferAmount = transfers.reduce(Balance(0)) { $0 + $1.amount }
+    if transferAmount.value > 0 {
+        accumulatingAccountDetails.balance += transferAmount
+        logger.debug("updating balance for service \(serviceIndex): \(accumulatingAccountDetails.balance)")
+        state.accounts.set(serviceAccount: serviceIndex, account: accumulatingAccountDetails)
+    }
+
+    guard let preimage = try await state.accounts.value.get(
+        serviceAccount: serviceIndex,
+        preimageHash: accumulatingAccountDetails.codeHash
+    ) else {
+        logger.error("code preimage not found for service index: \(serviceIndex)")
         return .init(state: state, transfers: [], commitment: nil, gasUsed: Gas(0), provide: [])
     }
 
@@ -32,24 +44,27 @@ public func accumulate(
     }
 
     let initialIndex = try Blake2b256.hash(JamEncoder.encode(UInt(serviceIndex), state.entropy, UInt(timeslot))).data.decode(UInt32.self)
+    let S = UInt32(config.value.minPublicServiceIndex)
+    let modValue = UInt32.max - S - 255
     let nextAccountIndex = try await AccumulateContext.check(
-        i: (initialIndex % serviceIndexModValue) + 256,
-        accounts: state.accounts.toRef()
+        i: (initialIndex % modValue) + S,
+        accounts: state.accounts.toRef(),
+        config: config
     )
 
     let contextContent = AccumulateContext.ContextType(
-        x: AccumlateResultContext(
+        x: AccumulateResultContext(
             serviceIndex: serviceIndex,
             state: state,
             nextAccountIndex: nextAccountIndex
         ),
-        y: AccumlateResultContext(
+        y: AccumulateResultContext(
             serviceIndex: serviceIndex,
             state: state.copy(),
             nextAccountIndex: nextAccountIndex
         )
     )
-    let ctx = AccumulateContext(context: contextContent, config: config, timeslot: timeslot, operands: arguments)
+    let ctx = AccumulateContext(context: contextContent, config: config, timeslot: timeslot, inputs: arguments)
     let argumentData = try JamEncoder.encode(UInt(timeslot), UInt(serviceIndex), UInt(arguments.count))
 
     let (exitReason, gas, output) = await invokePVM(

@@ -38,50 +38,36 @@ public final class StateBackend: Sendable {
         throw StateBackendError.missingState(key: key)
     }
 
+    /// Get keys with optional prefix, startKey, and limit using trie traversal
+    /// - Parameters:
+    ///   - prefix: Optional prefix to filter keys. If provided, uses O(prefix_bits + K) trie traversal. If nil, scans all keys O(N).
+    ///   - startKey: Optional starting key for pagination. Returns keys >= startKey in lexicographic order.
+    ///   - limit: Optional maximum number of results to return.
+    /// - Returns: Array of (key, value) pairs in lexicographic order (guaranteed by trie structure)
     public func getKeys(_ prefix: Data?, _ startKey: Data31?, _ limit: UInt32?) async throws -> [(key: Data, value: Data)] {
-        let prefixData = prefix ?? Data()
-        let startKeyData = startKey?.data
+        // Step 1: Collect all matching keys with values using efficient trie traversal
+        // Note: Trie traversal visits left (0) before right (1), so results are already sorted
+        var keyValues: [(key: Data31, value: Data)]
 
-        let iterator = try await impl.createIterator(prefix: Data(), startKey: startKeyData)
+        if let prefix, !prefix.isEmpty {
+            let bitsCount = UInt8(prefix.count * 8)
+            keyValues = try await trie.getKeyValues(matchingPrefix: prefix, bitsCount: bitsCount)
+        } else {
+            keyValues = try await trie.getKeyValues(matchingPrefix: Data(), bitsCount: 0)
+        }
 
-        var stateKeyValues: [(key: Data, value: Data)] = []
+        // Step 2: Apply startKey filter
+        if let startKey {
+            keyValues = keyValues.filter { !$0.key.data.lexicographicallyPrecedes(startKey.data) }
+        }
 
+        // Step 3: Apply limit
         if let limit {
-            stateKeyValues.reserveCapacity(Int(limit))
+            keyValues = Array(keyValues.prefix(Int(limit)))
         }
 
-        while let (_, trieNodeData) = try await iterator.next() {
-            if let limit, stateKeyValues.count >= limit {
-                break
-            }
-
-            guard trieNodeData.count == 65 else {
-                continue
-            }
-
-            let firstByte = trieNodeData[relative: 0]
-            let isLeaf = firstByte == 1 || firstByte == 2
-
-            guard isLeaf else {
-                continue
-            }
-
-            let stateKey = Data(trieNodeData[relative: 2 ..< 33])
-
-            if !prefixData.isEmpty, !stateKey.starts(with: prefixData) {
-                continue
-            }
-
-            if let startKeyData, stateKey.lexicographicallyPrecedes(startKeyData) {
-                continue
-            }
-
-            if let value = try await trie.read(key: Data31(stateKey)!) {
-                stateKeyValues.append((key: stateKey, value: value))
-            }
-        }
-
-        return stateKeyValues
+        // Step 4: Convert to (Data, Data) format
+        return keyValues.map { (key: $0.key.data, value: $0.value) }
     }
 
     public func batchRead(_ keys: [any StateKey]) async throws -> [(key: any StateKey, value: (Codable & Sendable)?)] {

@@ -37,7 +37,6 @@ public struct AccumulationOutput {
     // number of work results accumulated
     public var numAccumulated: Int
     public var state: AccumulateState
-    public var transfers: [DeferredTransfers]
     public var commitments: Set<Commitment>
     public var gasUsed: [(serviceIndex: ServiceIndex, gas: Gas)]
 }
@@ -196,27 +195,34 @@ public protocol Accumulation: ServiceAccounts {
 }
 
 public typealias AccumulationStats = [ServiceIndex: (Gas, UInt32)]
-public typealias TransfersStats = [ServiceIndex: (UInt32, Gas)]
 
 extension Accumulation {
     /// single-service accumulate function ∆1
     private static func singleAccumulate(
         config: ProtocolConfigRef,
         state: AccumulateState,
+        transfers: [DeferredTransfers],
         workReports: [WorkReport],
         service: ServiceIndex,
         alwaysAcc: [ServiceIndex: Gas],
         timeslot: TimeslotIndex
     ) async throws -> (ServiceIndex, AccumulationResult) {
         var gas = Gas(0)
-        var arguments: [OperandTuple] = []
+        var arguments: [AccumulationInput] = []
 
         gas += alwaysAcc[service] ?? Gas(0)
+
+        for transfer in transfers where transfer.destination == service {
+            gas += transfer.gasLimit
+            // i_T
+            arguments.append(AccumulationInput(deferredTransfers: transfer))
+        }
 
         for report in workReports {
             for digest in report.digests where digest.serviceIndex == service {
                 gas += digest.gasLimit
-                arguments.append(OperandTuple(
+                // i_U
+                arguments.append(AccumulationInput(operandTuple: OperandTuple(
                     packageHash: report.packageSpecification.workPackageHash,
                     segmentRoot: report.packageSpecification.segmentRoot,
                     authorizerHash: report.authorizerHash,
@@ -224,7 +230,7 @@ extension Accumulation {
                     gasLimit: digest.gasLimit,
                     workResult: digest.result,
                     authorizerTrace: report.authorizerTrace,
-                ))
+                )))
             }
         }
 
@@ -248,77 +254,133 @@ extension Accumulation {
     private func parallelizedAccumulate(
         config: ProtocolConfigRef,
         state: AccumulateState,
+        transfers: [DeferredTransfers],
         workReports: [WorkReport],
         alwaysAcc: [ServiceIndex: Gas],
         timeslot: TimeslotIndex
     ) async throws -> ParallelAccumulationOutput {
         var services = [ServiceIndex]()
         var gasUsed: [(serviceIndex: ServiceIndex, gas: Gas)] = []
-        var transfers: [DeferredTransfers] = []
         var commitments = Set<Commitment>()
         var currentState = state
         var servicePreimageSet = Set<ServicePreimagePair>()
 
-        var overallAccountChanges = AccountChanges()
-
+        // get services to accumulate
         for report in workReports {
             for digest in report.digests {
                 services.append(digest.serviceIndex)
             }
         }
-
         for service in alwaysAcc.keys {
+            services.append(service)
+        }
+        for service in transfers.map(\.destination) {
             services.append(service)
         }
 
         let uniqueServices = Set(services)
         logger.debug("[∆*] services to accumulate: \(Array(uniqueServices))")
 
-        let serviceBatches = sortServicesToBatches(services: uniqueServices)
-        logger.debug("[∆*] service batches: \(serviceBatches)")
+        let batchState = currentState
 
-        for serviceBatch in serviceBatches {
-            logger.debug("[∆*] processing batch: \(serviceBatch)")
+        batchState.accounts.clearRecordedChanges()
 
-            let batchState = currentState
-
-            batchState.accounts.clearRecordedChanges()
-
-            let batchResults = try await withThrowingTaskGroup(
-                of: (ServiceIndex, AccumulationResult).self,
-                returning: [(ServiceIndex, AccumulationResult)].self
-            ) { group in
-                for service in serviceBatch {
-                    group.addTask { [batchState] in
-                        return try await Self.singleAccumulate(
-                            config: config,
-                            state: batchState.copy(),
-                            workReports: workReports,
-                            service: service,
-                            alwaysAcc: alwaysAcc,
-                            timeslot: timeslot
-                        )
-                    }
+        // parallel accumulate
+        let batchResults = try await withThrowingTaskGroup(
+            of: (ServiceIndex, AccumulationResult).self,
+            returning: [(ServiceIndex, AccumulationResult)].self
+        ) { group in
+            for service in uniqueServices {
+                group.addTask { [batchState] in
+                    return try await Self.singleAccumulate(
+                        config: config,
+                        state: batchState.copy(),
+                        transfers: transfers,
+                        workReports: workReports,
+                        service: service,
+                        alwaysAcc: alwaysAcc,
+                        timeslot: timeslot
+                    )
                 }
-
-                var results: [(ServiceIndex, AccumulationResult)] = []
-                for try await result in group {
-                    results.append(result)
-                }
-                return results
             }
 
-            try await mergeParallelBatchResults(
-                batchResults: batchResults,
-                currentState: &currentState,
-                overallAccountChanges: &overallAccountChanges,
-                gasUsed: &gasUsed,
-                commitments: &commitments,
-                transfers: &transfers,
-                servicePreimageSet: &servicePreimageSet
-            )
+            var results: [(ServiceIndex, AccumulationResult)] = []
+            for try await result in group {
+                results.append(result)
+            }
+            return results
         }
 
+        // parallel batch results merging
+        var batchAccountChanges = AccountChanges()
+        var newTransfers: [DeferredTransfers] = []
+        for (service, singleOutput) in batchResults {
+            // u
+            gasUsed.append((service, singleOutput.gasUsed))
+
+            // b
+            if let commitment = singleOutput.commitment {
+                commitments.insert(Commitment(service: service, hash: commitment))
+            }
+
+            // t'
+            for transfer in singleOutput.transfers {
+                newTransfers.append(transfer)
+            }
+
+            // collect preimages to integrate
+            servicePreimageSet.formUnion(singleOutput.provide)
+
+            // collect batch account changes
+            try batchAccountChanges.checkAndMerge(with: singleOutput.state.accounts.changes)
+
+            // a' - New assigners
+            if let index = currentState.assigners.firstIndex(of: service) {
+                var temp = currentState.assigners
+                temp[index] = singleOutput.state.assigners[index]
+                currentState.assigners = temp
+            }
+            // v' - New delegator
+            if service == currentState.delegator {
+                currentState.delegator = singleOutput.state.delegator
+            }
+            // r' - New registrar
+            if service == currentState.registrar {
+                currentState.registrar = singleOutput.state.registrar
+            }
+
+            // i' - Current delegator service can update validator queue
+            if service == privilegedServices.delegator {
+                currentState.validatorQueue = singleOutput.state.validatorQueue
+            }
+            // q' - Current assigners update authorization queue
+            if let index = privilegedServices.assigners.firstIndex(of: service) {
+                currentState.authorizationQueue[index] = singleOutput.state.authorizationQueue[index]
+            }
+        }
+
+        // manager can overwrite all if changed any
+        if let managerResult = batchResults.first(where: { $0.0 == privilegedServices.manager })?.1 {
+            // m'
+            currentState.manager = managerResult.state.manager
+            // z'
+            currentState.alwaysAcc = managerResult.state.alwaysAcc
+            // a'
+            if currentState.assigners != managerResult.state.assigners {
+                currentState.assigners = managerResult.state.assigners
+            }
+            // v'
+            if currentState.delegator != managerResult.state.delegator {
+                currentState.delegator = managerResult.state.delegator
+            }
+            // r'
+            if currentState.registrar != managerResult.state.registrar {
+                currentState.registrar = managerResult.state.registrar
+            }
+        }
+
+        // d'
+        try await batchAccountChanges.apply(to: currentState.accounts) // (d U n) ∖ m
         try await preimageIntegration(
             servicePreimageSet: servicePreimageSet,
             accounts: currentState.accounts,
@@ -327,110 +389,17 @@ extension Accumulation {
 
         return ParallelAccumulationOutput(
             state: currentState,
-            transfers: transfers,
+            transfers: newTransfers,
             commitments: commitments,
             gasUsed: gasUsed
         )
-    }
-
-    private func sortServicesToBatches(services: Set<ServiceIndex>) -> [[ServiceIndex]] {
-        var batches: [[ServiceIndex]] = []
-        var remainingServices = services
-
-        // Batch 1: Manager service (if present)
-        if remainingServices.contains(privilegedServices.manager) {
-            batches.append([privilegedServices.manager])
-            remainingServices.remove(privilegedServices.manager)
-        }
-
-        // Batch 2: Services that depend on a* and v*
-        var dependentServices: [ServiceIndex] = []
-        if remainingServices.contains(privilegedServices.delegator) {
-            dependentServices.append(privilegedServices.delegator)
-            remainingServices.remove(privilegedServices.delegator)
-        }
-        for assigner in privilegedServices.assigners
-            where remainingServices.contains(assigner)
-        {
-            dependentServices.append(assigner)
-            remainingServices.remove(assigner)
-        }
-
-        if !dependentServices.isEmpty {
-            batches.append(dependentServices)
-        }
-
-        // Batch 3: All remaining services
-        if !remainingServices.isEmpty {
-            batches.append(Array(remainingServices))
-        }
-
-        return batches
-    }
-
-    private func mergeParallelBatchResults(
-        batchResults: [(ServiceIndex, AccumulationResult)],
-        currentState: inout AccumulateState,
-        overallAccountChanges: inout AccountChanges,
-        gasUsed: inout [(serviceIndex: ServiceIndex, gas: Gas)],
-        commitments: inout Set<Commitment>,
-        transfers: inout [DeferredTransfers],
-        servicePreimageSet: inout Set<ServicePreimagePair>
-    ) async throws {
-        var batchAccountChanges = AccountChanges()
-
-        for (service, singleOutput) in batchResults {
-            gasUsed.append((service, singleOutput.gasUsed))
-
-            if let commitment = singleOutput.commitment {
-                commitments.insert(Commitment(service: service, hash: commitment))
-            }
-
-            for transfer in singleOutput.transfers {
-                transfers.append(transfer)
-            }
-
-            servicePreimageSet.formUnion(singleOutput.provide)
-
-            try batchAccountChanges.checkAndMerge(with: singleOutput.state.accounts.changes)
-            try overallAccountChanges.checkAndMerge(with: singleOutput.state.accounts.changes)
-
-            // m' - Manager service establishes new privileged services
-            if service == privilegedServices.manager {
-                currentState.manager = singleOutput.state.manager
-                currentState.assigners = singleOutput.state.assigners
-                currentState.delegator = singleOutput.state.delegator
-                currentState.alwaysAcc = singleOutput.state.alwaysAcc
-            }
-
-            // i' - Current delegator service can update validator queue
-            if service == privilegedServices.delegator {
-                currentState.validatorQueue = singleOutput.state.validatorQueue
-            }
-
-            // q' - Current assigners update authorization queue
-            if let index = privilegedServices.assigners.firstIndex(of: service) {
-                currentState.authorizationQueue[index] = singleOutput.state.authorizationQueue[index]
-            }
-
-            // v' - New delegator
-            if service == currentState.delegator {
-                currentState.delegator = singleOutput.state.delegator
-            }
-
-            // a' - New assigners
-            if let index = currentState.assigners.firstIndex(of: service) {
-                currentState.assigners[index] = singleOutput.state.assigners[index]
-            }
-        }
-
-        try await batchAccountChanges.apply(to: currentState.accounts)
     }
 
     /// outer accumulate function ∆+
     private func outerAccumulate(
         config: ProtocolConfigRef,
         state: AccumulateState,
+        transfers: [DeferredTransfers],
         workReports: [WorkReport],
         alwaysAcc: [ServiceIndex: Gas],
         gasLimit: Gas,
@@ -448,14 +417,19 @@ extension Accumulation {
                 }
                 sumGasRequired += digest.gasLimit
             }
-            i += canAccumulate ? 1 : 0
+            if canAccumulate {
+                i += 1
+            } else {
+                break
+            }
         }
 
-        if i == 0 {
+        let n = i + transfers.count + alwaysAcc.count
+
+        if n == 0 {
             return AccumulationOutput(
                 numAccumulated: 0,
                 state: state,
-                transfers: [],
                 commitments: Set(),
                 gasUsed: []
             )
@@ -465,22 +439,25 @@ extension Accumulation {
             let parallelOutput = try await parallelizedAccumulate(
                 config: config,
                 state: state,
+                transfers: transfers,
                 workReports: Array(workReports[0 ..< i]),
                 alwaysAcc: alwaysAcc,
                 timeslot: timeslot
             )
+            let parallelGasUsed = parallelOutput.gasUsed.reduce(Gas(0)) { $0 + $1.gas }
+            let transfersGas = transfers.reduce(Gas(0)) { $0 + $1.gasLimit }
             let outerOutput = try await outerAccumulate(
                 config: config,
                 state: parallelOutput.state,
+                transfers: parallelOutput.transfers,
                 workReports: Array(workReports[i ..< workReports.count]),
                 alwaysAcc: [:],
-                gasLimit: gasLimit - parallelOutput.gasUsed.reduce(Gas(0)) { $0 + $1.gas },
+                gasLimit: gasLimit + transfersGas - parallelGasUsed,
                 timeslot: timeslot
             )
             return AccumulationOutput(
                 numAccumulated: i + outerOutput.numAccumulated,
                 state: outerOutput.state,
-                transfers: parallelOutput.transfers + outerOutput.transfers,
                 commitments: parallelOutput.commitments.union(outerOutput.commitments),
                 gasUsed: parallelOutput.gasUsed + outerOutput.gasUsed
             )
@@ -586,13 +563,14 @@ extension Accumulation {
         state: AccumulateState,
         timeslot: TimeslotIndex
     ) async throws -> AccumulationOutput {
-        let sumPrevilegedGas = privilegedServices.alwaysAcc.values.reduce(Gas(0)) { $0 + $1.value }
-        let minTotalGas = config.value.workReportAccumulationGas * Gas(config.value.totalNumberOfCores) + sumPrevilegedGas
+        let sumPrivilegedGas = privilegedServices.alwaysAcc.values.reduce(Gas(0)) { $0 + $1.value }
+        let minTotalGas = config.value.workReportAccumulationGas * Gas(config.value.totalNumberOfCores) + sumPrivilegedGas
         let gasLimit = max(config.value.totalAccumulationGas, minTotalGas)
 
         return try await outerAccumulate(
             config: config,
             state: state,
+            transfers: [],
             workReports: workReports,
             alwaysAcc: privilegedServices.alwaysAcc,
             gasLimit: gasLimit,
@@ -607,7 +585,7 @@ extension Accumulation {
         timeslot: TimeslotIndex,
         prevTimeslot: TimeslotIndex,
         entropy: Data32
-    ) async throws -> (root: Data32, [Commitment], AccumulationStats, TransfersStats) {
+    ) async throws -> (root: Data32, [Commitment], AccumulationStats) {
         let index = Int(timeslot) %% config.value.epochLength
 
         logger.debug("available reports (\(availableReports.count)): \(availableReports.map(\.packageSpecification.workPackageHash))")
@@ -628,6 +606,7 @@ extension Accumulation {
             manager: privilegedServices.manager,
             assigners: privilegedServices.assigners,
             delegator: privilegedServices.delegator,
+            registrar: privilegedServices.registrar,
             alwaysAcc: privilegedServices.alwaysAcc,
             entropy: entropy
         )
@@ -639,30 +618,6 @@ extension Accumulation {
             timeslot: timeslot
         )
 
-        // transfers execution + transfers statistics
-        var transferGroups = [ServiceIndex: [DeferredTransfers]]()
-        var transfersStats = TransfersStats()
-        for transfer in accumulateOutput.transfers {
-            transferGroups[transfer.destination, default: []].append(transfer)
-        }
-
-        logger.debug("transfer groups: \(transferGroups)")
-
-        for (service, transfers) in transferGroups.sorted(by: { $0.key < $1.key }) {
-            let gasUsed = try await onTransfer(
-                config: config,
-                serviceIndex: service,
-                serviceAccounts: accumulateOutput.state.accounts,
-                timeslot: timeslot,
-                entropy: entropy,
-                transfers: transfers
-            )
-            let count = UInt32(transfers.count)
-            if count == 0 { continue }
-            logger.debug("transfer complete: service: \(service), transfers count: \(count), gasUsed: \(gasUsed)")
-            transfersStats[service] = (count, gasUsed)
-        }
-
         self = accumulateOutput.state.accounts.value as! Self
 
         // update non-accounts state after accounts updated
@@ -672,11 +627,12 @@ extension Accumulation {
             manager: accumulateOutput.state.manager,
             assigners: accumulateOutput.state.assigners,
             delegator: accumulateOutput.state.delegator,
+            registrar: accumulateOutput.state.registrar,
             alwaysAcc: accumulateOutput.state.alwaysAcc
         )
 
         // update accumulation history
-        let accumulated = accumulatableReports[0 ..< accumulateOutput.numAccumulated]
+        let accumulated: [WorkReport] = Array(accumulatableReports[0 ..< accumulateOutput.numAccumulated])
         let newHistoryItem = Set(accumulated.map(\.packageSpecification.workPackageHash))
         for i in 0 ..< config.value.epochLength {
             if i == config.value.epochLength - 1 {
@@ -725,7 +681,12 @@ extension Accumulation {
         }
 
         // commitments (accumulation output log)
-        let commitmentsSorted = accumulateOutput.commitments.sorted { $0.serviceIndex < $1.serviceIndex }
+        let commitmentsSorted = accumulateOutput.commitments.sorted {
+            if $0.serviceIndex == $1.serviceIndex {
+                return $0.hash < $1.hash
+            }
+            return $0.serviceIndex < $1.serviceIndex
+        }
         logger.debug("accumulation commitments sorted: \(commitmentsSorted)")
 
         // get accumulate root
@@ -737,6 +698,6 @@ extension Accumulation {
 
         logger.debug("accumulation root: \(root)")
 
-        return (root, commitmentsSorted, accumulateStats, transfersStats)
+        return (root, commitmentsSorted, accumulateStats)
     }
 }

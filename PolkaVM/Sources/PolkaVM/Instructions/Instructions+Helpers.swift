@@ -51,12 +51,13 @@ extension Instructions {
         }
 
         let za = context.config.pvmDynamicAddressAlignmentFactor
+        let entrySize = Int(context.state.program.jumpTableEntrySize)
+        let numEntries = context.state.program.jumpTable.count
 
-        if target == 0 || target > context.state.program.jumpTable.count * za || Int(target) % za != 0 {
+        if target == 0 || target > UInt32(numEntries * za) || Int(target) % za != 0 {
             return .exit(.panic(.invalidDynamicJump))
         }
 
-        let entrySize = Int(context.state.program.jumpTableEntrySize)
         let start = ((Int(target) / za) - 1) * entrySize
         let end = start + entrySize
         let jumpTable = context.state.program.jumpTable

@@ -685,6 +685,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                 serviceAccounts: state.value,
                 workItemIndex: i,
                 workPackage: workPackage.value,
+                coreIndex: coreIndex,
                 authorizerTrace: authorizerTrace,
                 importSegments: importSegments,
                 exportSegmentOffset: UInt64(exportSegmentOffset)

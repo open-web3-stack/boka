@@ -90,9 +90,6 @@ public struct Statistics: Sendable, Equatable, Codable {
 
         // a: accumulate count and gas used
         public var accumulates: CountAndGas
-
-        // t: tansfer count and gas used
-        public var transfers: CountAndGas
     }
 
     // validator activity statistics
@@ -165,7 +162,6 @@ extension Statistics.Service: Dummy {
             extrinsicsSize: 0,
             exportsCount: 0,
             accumulates: .init(count: 0, gasUsed: 0),
-            transfers: .init(count: 0, gasUsed: 0)
         )
     }
 }
