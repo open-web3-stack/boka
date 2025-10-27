@@ -38,7 +38,7 @@ public struct FuzzPeerInfo: Codable {
     public init(
         name: String,
         appVersion: FuzzVersion = FuzzVersion(major: 0, minor: 1, patch: 0),
-        jamVersion: FuzzVersion = FuzzVersion(major: 0, minor: 7, patch: 0),
+        jamVersion: FuzzVersion = FuzzVersion(major: 0, minor: 7, patch: 1),
         fuzzVersion: UInt8 = 1,
         fuzzFeatures: UInt32 = FEATURE_ANCESTRY | FEATURE_FORK
     ) {
