@@ -212,12 +212,10 @@ extension Accumulation {
 
         gas += alwaysAcc[service] ?? Gas(0)
 
-        for transfer in transfers {
-            if transfer.destination == service {
-                gas += transfer.gasLimit
-                // i_T
-                arguments.append(AccumulationInput(deferredTransfers: transfer))
-            }
+        for transfer in transfers where transfer.destination == service {
+            gas += transfer.gasLimit
+            // i_T
+            arguments.append(AccumulationInput(deferredTransfers: transfer))
         }
 
         for report in workReports {

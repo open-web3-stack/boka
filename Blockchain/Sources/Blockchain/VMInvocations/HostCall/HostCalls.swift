@@ -991,7 +991,7 @@ public class New: HostCall {
         {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.CASH.rawValue)
         } else if x.serviceIndex == x.state.registrar, regs[5] < config.value.minPublicServiceIndex {
-            if let _ = try await x.state.accounts.value.get(serviceAccount: ServiceIndex(truncatingIfNeeded: regs[5])) {
+            if try await x.state.accounts.value.get(serviceAccount: ServiceIndex(truncatingIfNeeded: regs[5])) != nil {
                 state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
             } else {
                 try await updateAccounts(newAccountIndex: ServiceIndex(truncatingIfNeeded: regs[5]))
