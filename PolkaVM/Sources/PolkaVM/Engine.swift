@@ -77,28 +77,30 @@ public class Engine {
         //     context.state.consumeGas(blockGas)
         // }
 
+        let result = inst.execute(context: context, skip: skip)
+
         #if DEBUG
             if enableStepLogging {
-                logStep(pc: pc, instruction: inst, context: context)
+                logStep(instruction: inst, context: context)
             }
         #endif
 
-        return inst.execute(context: context, skip: skip)
+        return result
     }
 
-    private func logStep(pc: UInt32, instruction: any Instruction, context: ExecutionContext) {
-        stepCounter += 1
-
+    private func logStep(instruction: any Instruction, context: ExecutionContext) {
         let gas = context.state.getGas()
         let regArray = (0 ..< 13).map { context.state.readRegister(Registers.Index(raw: $0)) as UInt64 }
-        let instructionName = getInstructionName(instruction).padding(toLength: 20, withPad: " ", startingAt: 0)
+        let instructionName = getInstructionName(instruction)
 
-        logger.trace("\(String(format: "%4d", stepCounter)): PC \(String(format: "%6d", pc)) \(instructionName) g=\(gas) reg=\(regArray)")
+        logger.trace("\(instructionName) \(stepCounter) \(context.state.pc) Gas: \(gas) Registers: \(regArray)")
+
+        stepCounter += 1
     }
 
     private func getInstructionName(_ inst: any Instruction) -> String {
         let typeName = String(describing: type(of: inst))
         let cleanName = typeName.replacingOccurrences(of: "Instructions::", with: "")
-        return cleanName.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1_$2", options: .regularExpression).uppercased()
+        return cleanName
     }
 }

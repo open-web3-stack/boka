@@ -1117,7 +1117,9 @@ extension CppHelper.Instructions.CmovNzImm: Instruction {
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
         let regVal: UInt64 = context.state.readRegister(rb)
-        context.state.writeRegister(ra, regVal != 0 ? value : regVal)
+        if regVal != 0 {
+            context.state.writeRegister(ra, value)
+        }
         return .continued
     }
 }
@@ -1701,7 +1703,7 @@ extension CppHelper.Instructions.RemS64: Instruction {
         let a = Int64(bitPattern: raVal)
         let b = Int64(bitPattern: rbVal)
         if rbVal == 0 {
-            context.state.writeRegister(rd, raVal)
+            context.state.writeRegister(rd, a)
         } else if a == Int64.min, b == -1 {
             context.state.writeRegister(rd, 0)
         } else {

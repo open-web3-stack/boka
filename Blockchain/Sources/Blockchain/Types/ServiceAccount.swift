@@ -1,7 +1,10 @@
+import Codec
 import Foundation
 import Utils
 
 public struct ServiceAccountDetails: Sendable, Equatable, Codable {
+    @CodingAs<Compact<UInt8>> public var version: UInt8
+
     // c
     public var codeHash: Data32
 
@@ -12,7 +15,7 @@ public struct ServiceAccountDetails: Sendable, Equatable, Codable {
     public var minAccumlateGas: Gas
 
     // m
-    public var minOnTransferGas: Gas
+    public var minMemoGas: Gas
 
     // o: the total number of octets used in storage
     public var totalByteLength: UInt64
@@ -82,6 +85,9 @@ public struct ServiceAccountDetails: Sendable, Equatable, Codable {
 }
 
 public struct ServiceAccount: Sendable, Equatable, Codable {
+    // v
+    @CodingAs<Compact<UInt8>> public var version: UInt8
+
     // s
     public var storage: [Data: Data]
 
@@ -103,7 +109,7 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
     public var minAccumlateGas: Gas
 
     // m
-    public var minOnTransferGas: Gas
+    public var minMemoGas: Gas
 
     // f
     public var gratisStorage: Balance
@@ -118,25 +124,27 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
     public var parentService: ServiceIndex
 
     public init(
+        version: UInt8,
         storage: [Data: Data],
         preimages: [Data32: Data],
         preimageInfos: [HashAndLength: LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>],
         codeHash: Data32,
         balance: Balance,
         minAccumlateGas: Gas,
-        minOnTransferGas: Gas,
+        minMemoGas: Gas,
         gratisStorage: Balance,
         createdAt: TimeslotIndex,
         lastAccAt: TimeslotIndex,
         parentService: ServiceIndex
     ) {
+        self.version = version
         self.storage = storage
         self.preimages = preimages
         self.preimageInfos = preimageInfos
         self.codeHash = codeHash
         self.balance = balance
         self.minAccumlateGas = minAccumlateGas
-        self.minOnTransferGas = minOnTransferGas
+        self.minMemoGas = minMemoGas
         self.gratisStorage = gratisStorage
         self.createdAt = createdAt
         self.lastAccAt = lastAccAt
@@ -145,10 +153,11 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
 
     public func toDetails() -> ServiceAccountDetails {
         ServiceAccountDetails(
+            version: version,
             codeHash: codeHash,
             balance: balance,
             minAccumlateGas: minAccumlateGas,
-            minOnTransferGas: minOnTransferGas,
+            minMemoGas: minMemoGas,
             totalByteLength: totalByteLength,
             gratisStorage: gratisStorage,
             itemsCount: itemsCount,
@@ -163,13 +172,14 @@ extension ServiceAccount: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config _: Config) -> ServiceAccount {
         ServiceAccount(
+            version: 0,
             storage: [:],
             preimages: [:],
             preimageInfos: [:],
             codeHash: Data32(),
             balance: Balance(0),
             minAccumlateGas: Gas(0),
-            minOnTransferGas: Gas(0),
+            minMemoGas: Gas(0),
             gratisStorage: Balance(0),
             createdAt: TimeslotIndex(0),
             lastAccAt: TimeslotIndex(0),

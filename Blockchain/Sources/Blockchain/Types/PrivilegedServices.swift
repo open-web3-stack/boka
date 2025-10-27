@@ -8,18 +8,22 @@ public struct PrivilegedServices: Sendable, Equatable, Codable {
     public var assigners: ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>
     // v
     public var delegator: ServiceIndex
-    // g or z
+    // r
+    public var registrar: ServiceIndex
+    // z
     public var alwaysAcc: [ServiceIndex: Gas]
 
     public init(
         manager: ServiceIndex,
         assigners: ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>,
         delegator: ServiceIndex,
+        registrar: ServiceIndex,
         alwaysAcc: [ServiceIndex: Gas]
     ) {
         self.manager = manager
         self.assigners = assigners
         self.delegator = delegator
+        self.registrar = registrar
         self.alwaysAcc = alwaysAcc
     }
 
@@ -28,7 +32,7 @@ public struct PrivilegedServices: Sendable, Equatable, Codable {
         manager = try container.decode(ServiceIndex.self, forKey: .manager)
         assigners = try container.decode(ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>.self, forKey: .assigners)
         delegator = try container.decode(ServiceIndex.self, forKey: .delegator)
-
+        registrar = try container.decode(ServiceIndex.self, forKey: .registrar)
         let compactGas = try container.decode(SortedKeyValues<ServiceIndex, Compact<Gas>>.self, forKey: .alwaysAcc)
         alwaysAcc = compactGas.alias.mapValues { $0.alias }
     }
@@ -38,12 +42,12 @@ public struct PrivilegedServices: Sendable, Equatable, Codable {
         try container.encode(manager, forKey: .manager)
         try container.encode(assigners, forKey: .assigners)
         try container.encode(delegator, forKey: .delegator)
-
+        try container.encode(registrar, forKey: .registrar)
         let compactGas = SortedKeyValues(alias: alwaysAcc.mapValues { Compact(alias: $0) })
         try container.encode(compactGas, forKey: .alwaysAcc)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case manager, assigners, delegator, alwaysAcc
+        case manager, assigners, delegator, registrar, alwaysAcc
     }
 }

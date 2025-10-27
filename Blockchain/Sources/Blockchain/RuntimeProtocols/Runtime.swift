@@ -205,7 +205,7 @@ public final class Runtime {
             let availableReports = try await updateAssurances(block: block, state: &newState)
 
             // accumulate
-            let (accumulateRoot, commitments, accumulateStats, transfersStats) = try await newState.update(
+            let (accumulateRoot, commitments, accumulateStats) = try await newState.update(
                 config: config,
                 availableReports: availableReports,
                 timeslot: block.header.timeslot,
@@ -243,8 +243,7 @@ public final class Runtime {
                 reporters: reporters,
                 authorIndex: block.header.authorIndex,
                 availableReports: availableReports,
-                accumulateStats: accumulateStats,
-                transfersStats: transfersStats
+                accumulateStats: accumulateStats
             )
 
             try await newState.save()

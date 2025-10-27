@@ -71,8 +71,8 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     /// R = 10: The rotation period of validator-core assignments, in timeslots.
     public var coreAssignmentRotationPeriod: Int
 
-    /// S = 1024: The maximum number of entries in the accumulation queue.
-    public var maxAccumulationQueueItems: Int
+    /// S = 2^16: The minimum public service index. Services of indices below these may only be created by the Registrar.
+    public var minPublicServiceIndex: Int
 
     /// T = 128: The maximum number of extrinsics in a work-package.
     public var maxWorkPackageExtrinsics: Int
@@ -152,7 +152,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         slotPeriodSeconds: Int,
         maxAuthorizationsQueueItems: Int,
         coreAssignmentRotationPeriod: Int,
-        maxAccumulationQueueItems: Int,
+        minPublicServiceIndex: Int,
         maxWorkPackageExtrinsics: Int,
         maxIsAuthorizedCodeSize: Int,
         maxServiceCodeSize: Int,
@@ -194,7 +194,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         self.slotPeriodSeconds = slotPeriodSeconds
         self.maxAuthorizationsQueueItems = maxAuthorizationsQueueItems
         self.coreAssignmentRotationPeriod = coreAssignmentRotationPeriod
-        self.maxAccumulationQueueItems = maxAccumulationQueueItems
+        self.minPublicServiceIndex = minPublicServiceIndex
         self.maxWorkPackageExtrinsics = maxWorkPackageExtrinsics
         self.maxIsAuthorizedCodeSize = maxIsAuthorizedCodeSize
         self.maxServiceCodeSize = maxServiceCodeSize
@@ -273,8 +273,8 @@ extension ProtocolConfig {
                 ? other.maxAuthorizationsQueueItems : maxAuthorizationsQueueItems,
             coreAssignmentRotationPeriod: other.coreAssignmentRotationPeriod != 0
                 ? other.coreAssignmentRotationPeriod : coreAssignmentRotationPeriod,
-            maxAccumulationQueueItems: other.maxAccumulationQueueItems != 0
-                ? other.maxAccumulationQueueItems : maxAccumulationQueueItems,
+            minPublicServiceIndex: other.minPublicServiceIndex != 0
+                ? other.minPublicServiceIndex : minPublicServiceIndex,
             maxWorkPackageExtrinsics: other.maxWorkPackageExtrinsics != 0
                 ? other.maxWorkPackageExtrinsics : maxWorkPackageExtrinsics,
             maxIsAuthorizedCodeSize: other.maxIsAuthorizedCodeSize != 0
@@ -367,8 +367,8 @@ extension ProtocolConfig {
         coreAssignmentRotationPeriod = try decode(
             .coreAssignmentRotationPeriod, defaultValue: 0, required: required
         )
-        maxAccumulationQueueItems = try decode(
-            .maxAccumulationQueueItems, defaultValue: 0, required: required
+        minPublicServiceIndex = try decode(
+            .minPublicServiceIndex, defaultValue: 0, required: required
         )
         maxWorkPackageExtrinsics = try decode(
             .maxWorkPackageExtrinsics, defaultValue: 0, required: required
@@ -582,10 +582,10 @@ extension ProtocolConfig {
         }
     }
 
-    public enum MaxAccumulationQueueItems: ReadInt {
+    public enum MinPublicServiceIndex: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
-            config.value.maxAccumulationQueueItems
+            config.value.minPublicServiceIndex
         }
     }
 
@@ -812,7 +812,7 @@ extension ProtocolConfig {
             slotPeriodSeconds: Int(slotPeriodSeconds),
             maxAuthorizationsQueueItems: Int(maxAuthorizationsQueueItems),
             coreAssignmentRotationPeriod: Int(coreAssignmentRotationPeriod),
-            maxAccumulationQueueItems: 1024, // S = 1024
+            minPublicServiceIndex: 1 << 16, // S = 2^16
             maxWorkPackageExtrinsics: Int(maxWorkPackageExtrinsics),
             maxIsAuthorizedCodeSize: Int(maxIsAuthorizedCodeSize),
             maxServiceCodeSize: Int(maxServiceCodeSize),

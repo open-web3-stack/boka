@@ -19,6 +19,11 @@ private struct PreimageMapEntry: Codable, Equatable {
     var blob: Data
 }
 
+private struct PreimageStatusMapEntry: Codable, Equatable {
+    var hash: Data32
+    var status: StateKeys.ServiceAccountPreimageInfoKey.Value
+}
+
 private struct StorageMapEntry: Codable, Equatable {
     var key: Data
     var value: Data
@@ -27,7 +32,8 @@ private struct StorageMapEntry: Codable, Equatable {
 private struct Account: Codable, Equatable {
     var service: ServiceAccountDetails
     var storage: [StorageMapEntry]
-    var preimages: [PreimageMapEntry]
+    var preimagesBlobs: [PreimageMapEntry]
+    var preimagesStatus: [PreimageStatusMapEntry]
 }
 
 private struct AccountsMapEntry: Codable, Equatable {
@@ -204,8 +210,11 @@ struct AccumulateTests {
             for storage in entry.data.storage {
                 fullState.storages[entry.index, default: [:]][storage.key] = storage.value
             }
-            for preimage in entry.data.preimages {
+            for preimage in entry.data.preimagesBlobs {
                 fullState.preimages[entry.index, default: [:]][preimage.hash] = preimage.blob
+            }
+            for preimageStatus in entry.data.preimagesStatus {
+                fullState.preimageInfo[entry.index, default: [:]][preimageStatus.hash] = preimageStatus.status
             }
         }
 
@@ -235,8 +244,14 @@ struct AccumulateTests {
                     for storage in entry.data.storage {
                         #expect(fullState.storages[entry.index]?[storage.key] == storage.value, "Storage mismatch")
                     }
-                    for preimage in entry.data.preimages {
+                    for preimage in entry.data.preimagesBlobs {
                         #expect(fullState.preimages[entry.index]?[preimage.hash] == preimage.blob, "Preimage mismatch")
+                    }
+                    for preimageStatus in entry.data.preimagesStatus {
+                        #expect(
+                            fullState.preimageInfo[entry.index]?[preimageStatus.hash] == preimageStatus.status,
+                            "Preimage status mismatch"
+                        )
                     }
                 }
             case .err:

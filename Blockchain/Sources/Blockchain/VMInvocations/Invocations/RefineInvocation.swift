@@ -10,6 +10,8 @@ public func refine(
     workItemIndex: Int,
     /// The work package
     workPackage: WorkPackage,
+    /// The core which is doing refine
+    coreIndex: CoreIndex,
     /// The output of the authorizer
     authorizerTrace: Data,
     /// all work items's import segments
@@ -37,6 +39,7 @@ public func refine(
     let codeBlob = try CodeAndMeta(data: preimage).codeBlob
 
     let argumentData = try JamEncoder.encode(
+        UInt(coreIndex),
         UInt(workItemIndex),
         UInt(service),
         workItem.payloadBlob,

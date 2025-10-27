@@ -7,7 +7,7 @@ public enum HostCallResultCode: UInt64 {
     case OOB = 0xFFFF_FFFF_FFFF_FFFD
     /// WHO = 2^64 − 4: Index unknown.
     case WHO = 0xFFFF_FFFF_FFFF_FFFC
-    /// FULL = 2^64 − 5: Storage full.
+    /// FULL = 2^64 − 5: Storage full or resource already allocated.
     case FULL = 0xFFFF_FFFF_FFFF_FFFB
     /// CORE = 2^64 − 6: Core index unknown.
     case CORE = 0xFFFF_FFFF_FFFF_FFFA
@@ -15,7 +15,7 @@ public enum HostCallResultCode: UInt64 {
     case CASH = 0xFFFF_FFFF_FFFF_FFF9
     /// LOW = 2^64 − 8: Gas limit too low.
     case LOW = 0xFFFF_FFFF_FFFF_FFF8
-    /// HUH = 2^64 − 9: The item is already solicited or cannot be forgotten.
+    /// HUH = 2^64 − 9: The item is already solicited, cannot be forgotten or the operation is invalid due to privilege level.
     case HUH = 0xFFFF_FFFF_FFFF_FFF7
     /// OK = 0: The return value indicating general success.
     case OK = 0

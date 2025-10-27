@@ -16,7 +16,6 @@ extension ActivityStatistics {
         authorIndex: ValidatorIndex,
         availableReports: [WorkReport],
         accumulateStats: AccumulationStats,
-        transfersStats: TransfersStats
     ) throws -> Statistics {
         let epochLength = UInt32(config.value.epochLength)
         let currentEpoch = timeslot / epochLength
@@ -49,7 +48,7 @@ extension ActivityStatistics {
         }
 
         // service indices (to be used in the service statistics)
-        var indices = Set(accumulateStats.keys).union(transfersStats.keys)
+        var indices = Set(accumulateStats.keys)
         indices.formUnion(extrinsic.preimages.preimages.map(\.serviceIndex))
         indices.formUnion(extrinsic.reports.guarantees.flatMap(\.workReport.digests).map(\.serviceIndex))
 
@@ -102,11 +101,6 @@ extension ActivityStatistics {
             let index = UInt32(accumulateItem.key)
             serviceStats[index]!.accumulates.count += UInt(accumulateItem.value.1)
             serviceStats[index]!.accumulates.gasUsed += UInt(accumulateItem.value.0.value)
-        }
-        for transferItem in transfersStats {
-            let index = UInt32(transferItem.key)
-            serviceStats[index]!.transfers.count += UInt(transferItem.value.0)
-            serviceStats[index]!.transfers.gasUsed += UInt(transferItem.value.1.value)
         }
 
         return Statistics(

@@ -11,7 +11,7 @@ public protocol SecretKeyProtocol: Sendable {
     var publicKey: PublicKey { get }
 }
 
-public protocol KeyType {
+public protocol KeyType: Sendable {
     associatedtype SecretKey: SecretKeyProtocol
 }
 
