@@ -8,7 +8,7 @@ import Utils
 struct JavajamTests {
     @Test(arguments: try JamTestnet.loadTests(path: "stf/state_transitions", src: .javajam))
     func stfTests(_ input: Testcase) async throws {
-        if input.description.starts(with: "3373062") { return } // problematic initial recent history
+        if input.description.starts(with: "3932781") { return } // problematic initial recent history
 
         try await TraceTest.test(input)
     }
