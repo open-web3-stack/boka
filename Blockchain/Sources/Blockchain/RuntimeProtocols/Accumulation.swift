@@ -662,12 +662,10 @@ extension Accumulation {
 
             let digests = accumulated.compactMap(\.digests).flatMap(\.self)
             let num = digests.filter { $0.serviceIndex == service }.count
-
-            if num == 0 { continue }
-
             let gasUsed = accumulateOutput.gasUsed
                 .filter { $0.serviceIndex == service }
                 .reduce(Gas(0)) { $0 + $1.gas }
+            if Int(gasUsed.value) + num == 0 { continue }
 
             accumulateStats[service] = (gasUsed, UInt32(num))
         }
