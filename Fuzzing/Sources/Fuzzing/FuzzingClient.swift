@@ -228,8 +228,8 @@ public class FuzzingClient {
         var targetMap: [String: String] = [:]
         var duplicateTargetKeys: [String] = []
         for kv in targetState {
-            let keyHex = kv.key.data.toHexString()
-            let valueHex = kv.value.toHexString()
+            let keyHex = kv.key.data.toDebugHexString()
+            let valueHex = kv.value.toDebugHexString()
             if targetMap[keyHex] != nil {
                 duplicateTargetKeys.append(keyHex)
                 logger.warning("Duplicate key in target state: \(keyHex)")
@@ -240,8 +240,8 @@ public class FuzzingClient {
         var expectedMap: [String: String] = [:]
         var duplicateExpectedKeys: [String] = []
         for kv in expectedState {
-            let keyHex = kv.key.data.toHexString()
-            let valueHex = kv.value.toHexString()
+            let keyHex = kv.key.data.toDebugHexString()
+            let valueHex = kv.value.toDebugHexString()
             if expectedMap[keyHex] != nil {
                 duplicateExpectedKeys.append(keyHex)
                 logger.warning("Duplicate key in expected state: \(keyHex)")

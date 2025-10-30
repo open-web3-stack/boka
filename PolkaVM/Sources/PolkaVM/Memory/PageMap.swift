@@ -202,7 +202,8 @@ public class PageMap {
             return 0
         }
         let addressPageIndex = address >> pageSizeShift
-        let endPageIndex = (address + UInt32(length) - 1) >> pageSizeShift
+        let (endAddress, overflow) = address.addingReportingOverflow(UInt32(length) - 1)
+        let endPageIndex = (overflow ? UInt32.max : endAddress) >> pageSizeShift
         return endPageIndex - addressPageIndex + 1
     }
 

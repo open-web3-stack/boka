@@ -50,4 +50,16 @@ struct FuzzTests {
     func v070(_: Testcase) async throws {
         // try await TraceTest.test(input)
     }
+
+    @Test(arguments: try loadTests(
+        version: "0.7.1",
+        filters: [
+            // empty to include all
+        ],
+        ignore: [
+        ]
+    ))
+    func v071(input: Testcase) async throws {
+        try await TraceTest.test(input)
+    }
 }
