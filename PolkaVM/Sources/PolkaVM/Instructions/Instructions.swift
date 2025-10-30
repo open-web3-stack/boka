@@ -1545,7 +1545,7 @@ extension CppHelper.Instructions.RemS32: Instruction {
         let (raVal, rbVal): (UInt32, UInt32) = context.state.readRegister(ra, rb)
         let a = Int32(bitPattern: raVal)
         let b = Int32(bitPattern: rbVal)
-        if rbVal == 0 {
+        if b == 0 {
             context.state.writeRegister(rd, a)
         } else if a == Int32.min, b == -1 {
             context.state.writeRegister(rd, 0)
@@ -1702,7 +1702,7 @@ extension CppHelper.Instructions.RemS64: Instruction {
         let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
         let a = Int64(bitPattern: raVal)
         let b = Int64(bitPattern: rbVal)
-        if rbVal == 0 {
+        if b == 0 {
             context.state.writeRegister(rd, a)
         } else if a == Int64.min, b == -1 {
             context.state.writeRegister(rd, 0)
