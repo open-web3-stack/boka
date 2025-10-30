@@ -286,7 +286,7 @@ public class Read: HostCall {
             nil
         }
 
-        logger.debug("value: \(value?.toHexString() ?? "nil")")
+        logger.debug("value: \(value?.toDebugHexString() ?? "nil")")
 
         guard let value else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
@@ -346,6 +346,7 @@ public class Write: HostCall {
             throw VMInvocationsError.panic
         }
 
+        // update footprint for threshold balance check
         let oldValue = try await serviceAccounts.value.get(serviceAccount: serviceIndex, storageKey: key)
         if regs[3] == 0 {
             accountDetails.updateFootprintStorage(key: key, oldValue: oldValue, newValue: nil)
@@ -1213,6 +1214,8 @@ public class Solicit: HostCall {
         let hashData = try? state.readMemory(address: startAddr, length: 32)
         let hash = Data32(hashData ?? Data())
 
+        logger.debug("hash: \(hash?.description ?? "nil"), length: \(length)")
+
         guard let hash else {
             throw VMInvocationsError.panic
         }
@@ -1222,21 +1225,40 @@ public class Solicit: HostCall {
             preimageHash: hash,
             length: length
         )
+        logger.debug("previous info: \(String(describing: preimageInfo))")
+
         let notRequestedYet = preimageInfo == nil
         let isPreviouslyAvailable = preimageInfo?.count == 2
         let canSolicit = notRequestedYet || isPreviouslyAvailable
 
-        let acc = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex)
-
         if !canSolicit {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
-        } else if let acc, acc.balance < acc.thresholdBalance(config: config) {
+            return
+        }
+
+        var acc = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex)
+
+        if var tempAcc = acc {
+            // update footprints for threshold balance check
+            let oldValue = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex, preimageHash: hash, length: length)
+            if notRequestedYet {
+                tempAcc.updateFootprintPreimage(oldValue: oldValue, newValue: [], length: length)
+            } else if isPreviouslyAvailable, var preimageInfo {
+                try preimageInfo.append(timeslot)
+                tempAcc.updateFootprintPreimage(oldValue: oldValue, newValue: preimageInfo, length: length)
+            }
+            acc = tempAcc
+        }
+
+        if let acc, acc.balance < acc.thresholdBalance(config: config) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
             if notRequestedYet {
+                logger.debug("solicit new preimage")
                 try await x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: hash, length: length, value: [])
             } else if isPreviouslyAvailable, var preimageInfo {
+                logger.debug("solicit existing preimage")
                 try preimageInfo.append(timeslot)
                 try await x.state.accounts.set(
                     serviceAccount: x.serviceIndex,
