@@ -29,8 +29,7 @@ public actor InMemoryBackend: StateBackendProtocol {
 
         // Filter and sort entries
         let filtered = store
-            .filter { $0.key.starts(with: prefix) }
-            .filter { $0.key.lexicographicallyPrecedes(startKey) == false }
+            .filter { $0.key.starts(with: prefix) && !$0.key.lexicographicallyPrecedes(startKey) }
             .sorted { $0.key.lexicographicallyPrecedes($1.key) }
 
         // Apply limit if specified
