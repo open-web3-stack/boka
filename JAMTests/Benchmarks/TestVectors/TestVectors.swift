@@ -52,7 +52,7 @@ let benchmarks: @Sendable () -> Void = {
     }
 
     // Traces
-    let tracePaths = [("traces/fallback", 15), ("traces/safrole", 10), ("traces/storage", 5), ("traces/preimages", 5)]
+    let tracePaths = [("traces/fallback", 15), ("traces/safrole", 10), ("traces/storage", 5), ("traces/preimages", 5), ("traces/fuzzy", 5)]
     for (path, iterations) in tracePaths {
         let traces = try! JamTestnet.loadTests(path: path, src: .w3f)
         Benchmark(
