@@ -6,18 +6,8 @@ import Utils
 private let logger = Logger(label: "InMemoryBackend")
 
 public actor InMemoryBackend: StateBackendProtocol {
-    public struct KVPair: Comparable, Sendable {
-        var key: Data
-        var value: Data
-
-        public static func < (lhs: KVPair, rhs: KVPair) -> Bool {
-            lhs.key.lexicographicallyPrecedes(rhs.key)
-        }
-    }
-
-    // we really should be using Heap or some other Tree based structure here
-    // but let's keep it simple for now
-    public private(set) var store: SortedArray<KVPair> = .init([])
+    // Use Dictionary for O(1) lookups
+    private var store: [Data: Data] = [:]
     private var rawValues: [Data32: Data] = [:]
     public private(set) var refCounts: [Data: Int] = [:]
     private var rawValueRefCounts: [Data32: Int] = [:]
@@ -25,12 +15,7 @@ public actor InMemoryBackend: StateBackendProtocol {
     public init() {}
 
     public func read(key: Data) async throws -> Data? {
-        let idx = store.insertIndex(KVPair(key: key, value: Data()))
-        let item = store.array[safe: idx]
-        if item?.key == key {
-            return item?.value
-        }
-        return nil
+        store[key]
     }
 
     public func readAll(prefix: Data, startKey: Data?, limit: UInt32?) async throws -> [(key: Data, value: Data)] {
@@ -41,33 +26,25 @@ public actor InMemoryBackend: StateBackendProtocol {
         }
 
         let startKey = startKey ?? prefix
-        let startIndex = store.insertIndex(KVPair(key: startKey, value: Data()))
-        for i in startIndex ..< store.array.count {
-            let item = store.array[i]
-            if item.key.starts(with: prefix) {
-                resp.append((item.key, item.value))
-            } else {
-                break
-            }
-            if let limit, resp.count == limit {
-                break
-            }
+
+        // Filter and sort entries
+        let filtered = store
+            .filter { $0.key.starts(with: prefix) && !$0.key.lexicographicallyPrecedes(startKey) }
+            .sorted { $0.key.lexicographicallyPrecedes($1.key) }
+
+        // Apply limit if specified
+        if let limit {
+            return Array(filtered.prefix(Int(limit)))
         }
-        return resp
+
+        return filtered
     }
 
     public func batchUpdate(_ updates: [StateBackendOperation]) async throws {
         for update in updates {
             switch update {
             case let .write(key, value):
-                let idx = store.insertIndex(KVPair(key: key, value: value))
-                let item = store.array[safe: idx]
-                if let item, item.key == key { // found
-                    // value is not used for ordering so this is safe
-                    store.unsafeArrayAccess[idx].value = value
-                } else { // not found
-                    store.insert(KVPair(key: key, value: value))
-                }
+                store[key] = value
             case let .writeRawValue(key, value):
                 rawValues[key] = value
                 rawValueRefCounts[key, default: 0] += 1
@@ -86,11 +63,9 @@ public actor InMemoryBackend: StateBackendProtocol {
     public func gc(callback: @Sendable (Data) -> Data32?) async throws {
         // check ref counts and remove keys with 0 ref count
         for (key, count) in refCounts where count == 0 {
-            let idx = store.insertIndex(KVPair(key: key, value: Data()))
-            let item = store.array[safe: idx]
-            if let item, item.key == key {
-                store.remove(at: idx)
-                if let rawValueKey = callback(item.value) {
+            if let value = store[key] {
+                store.removeValue(forKey: key)
+                if let rawValueKey = callback(value) {
                     rawValueRefCounts[rawValueKey, default: 0] -= 1
                     if rawValueRefCounts[rawValueKey] == 0 {
                         rawValues.removeValue(forKey: rawValueKey)
@@ -102,31 +77,30 @@ public actor InMemoryBackend: StateBackendProtocol {
     }
 
     public func debugPrint() {
-        for item in store.array {
-            let refCount = refCounts[item.key, default: 0]
-            logger.info("key: \(item.key.toHexString())")
-            logger.info("value: \(item.value.toHexString())")
+        for (key, value) in store {
+            let refCount = refCounts[key, default: 0]
+            logger.info("key: \(key.toHexString())")
+            logger.info("value: \(value.toHexString())")
             logger.info("ref count: \(refCount)")
         }
     }
 
     public func createIterator(prefix: Data, startKey: Data?) async throws -> StateBackendIterator {
-        InMemoryStateIterator(store: store, prefix: prefix, startKey: startKey)
+        // Create sorted array of matching items
+        let searchKey = startKey ?? prefix
+        let matchingItems = store
+            .filter { $0.key.starts(with: prefix) && !$0.key.lexicographicallyPrecedes(searchKey) }
+            .sorted { $0.key.lexicographicallyPrecedes($1.key) }
+
+        return InMemoryStateIterator(items: matchingItems)
     }
 }
 
 public final class InMemoryStateIterator: StateBackendIterator, @unchecked Sendable {
     private var iterator: Array<(key: Data, value: Data)>.Iterator
 
-    init(store: SortedArray<InMemoryBackend.KVPair>, prefix: Data, startKey: Data?) {
-        let searchKey = startKey ?? prefix
-        let startIndex = store.insertIndex(InMemoryBackend.KVPair(key: searchKey, value: Data()))
-
-        let matchingItems = Array(store.array[startIndex...].prefix { item in
-            item.key.starts(with: prefix)
-        }.map { (key: $0.key, value: $0.value) })
-
-        iterator = matchingItems.makeIterator()
+    init(items: [(key: Data, value: Data)]) {
+        iterator = items.makeIterator()
     }
 
     public func next() async throws -> (key: Data, value: Data)? {
