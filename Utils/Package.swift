@@ -19,7 +19,6 @@ let package = Package(
         .package(path: "../Codec"),
         .package(path: "../TracingUtils"),
         .package(url: "https://github.com/tesseract-one/Blake2.swift.git", from: "0.2.0"),
-        .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0" ..< "4.0.0"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "6.0.0"),
         .package(url: "https://github.com/apple/swift-numerics.git", branch: "main"),
     ],
@@ -32,10 +31,10 @@ let package = Package(
                 "Codec",
                 "TracingUtils",
                 .product(name: "Blake2", package: "Blake2.swift"),
-                .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Numerics", package: "swift-numerics"),
                 "bls",
                 "bandersnatch_vrfs",
+                "ed25519_zebra_ffi",
                 "erasure_coding",
                 "SHA3IUF",
             ],
@@ -61,6 +60,10 @@ let package = Package(
         ),
         .systemLibrary(
             name: "erasure_coding",
+            path: "Sources"
+        ),
+        .systemLibrary(
+            name: "ed25519_zebra_ffi",
             path: "Sources"
         ),
         .testTarget(

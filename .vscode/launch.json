@@ -6,8 +6,9 @@
 			"args": [],
 			"cwd": "${workspaceFolder:boka}/Boka",
 			"name": "Debug Boka (Boka)",
-			"program": "${workspaceFolder:boka}/Boka/.build/debug/Boka",
-			"preLaunchTask": "swift: Build Debug Boka (Boka)"
+			"preLaunchTask": "swift: Build Debug Boka (Boka)",
+			"target": "Boka",
+			"configuration": "debug"
 		},
 		{
 			"type": "swift",
@@ -15,62 +16,29 @@
 			"args": [],
 			"cwd": "${workspaceFolder:boka}/Boka",
 			"name": "Release Boka (Boka)",
-			"program": "${workspaceFolder:boka}/Boka/.build/release/Boka",
-			"preLaunchTask": "swift: Build Release Boka (Boka)"
+			"preLaunchTask": "swift: Build Release Boka (Boka)",
+			"target": "Boka",
+			"configuration": "release"
 		},
 		{
-			"type": "lldb",
-			"request": "launch",
-			"args": [],
-			"cwd": "${workspaceFolder:boka}/Cli",
-			"name": "Debug Cli (Cli)",
-			"program": "${workspaceFolder:boka}/Cli/.build/debug/Cli",
-			"preLaunchTask": "swift: Build Debug Cli (Cli)"
-		},
-		{
-			"type": "lldb",
-			"request": "launch",
-			"args": [],
-			"cwd": "${workspaceFolder:boka}/Cli",
-			"name": "Release Cli (Cli)",
-			"program": "${workspaceFolder:boka}/Cli/.build/release/Cli",
-			"preLaunchTask": "swift: Build Release Cli (Cli)"
-		},
-		{
-			"type": "lldb",
+			"type": "swift",
 			"request": "launch",
 			"args": [],
 			"cwd": "${workspaceFolder:boka}/Tools",
 			"name": "Debug Tools (Tools)",
-			"program": "${workspaceFolder:boka}/Tools/.build/debug/Tools",
-			"preLaunchTask": "swift: Build Debug Tools (Tools)"
+			"preLaunchTask": "swift: Build Debug Tools (Tools)",
+			"target": "Tools",
+			"configuration": "debug"
 		},
 		{
-			"type": "lldb",
+			"type": "swift",
 			"request": "launch",
 			"args": [],
 			"cwd": "${workspaceFolder:boka}/Tools",
 			"name": "Release Tools (Tools)",
-			"program": "${workspaceFolder:boka}/Tools/.build/release/Tools",
-			"preLaunchTask": "swift: Build Release Tools (Tools)"
-		},
-		{
-			"type": "swift",
-			"request": "launch",
-			"args": [],
-			"cwd": "${workspaceFolder:boka}/Fuzzing",
-			"name": "Debug BokaFuzzer (Fuzzing)",
-			"program": "${workspaceFolder:boka}/Fuzzing/.build/debug/BokaFuzzer",
-			"preLaunchTask": "swift: Build Debug BokaFuzzer (Fuzzing)"
-		},
-		{
-			"type": "swift",
-			"request": "launch",
-			"args": [],
-			"cwd": "${workspaceFolder:boka}/Fuzzing",
-			"name": "Release BokaFuzzer (Fuzzing)",
-			"program": "${workspaceFolder:boka}/Fuzzing/.build/release/BokaFuzzer",
-			"preLaunchTask": "swift: Build Release BokaFuzzer (Fuzzing)"
+			"preLaunchTask": "swift: Build Release Tools (Tools)",
+			"target": "Tools",
+			"configuration": "release"
 		},
 		{
 			"type": "swift",
@@ -78,8 +46,9 @@
 			"args": [],
 			"cwd": "${workspaceFolder:boka}/JAMTests",
 			"name": "Debug BenchmarkTestVectors (JAMTests)",
-			"program": "${workspaceFolder:boka}/JAMTests/.build/debug/BenchmarkTestVectors",
-			"preLaunchTask": "swift: Build Debug BenchmarkTestVectors (JAMTests)"
+			"preLaunchTask": "swift: Build Debug BenchmarkTestVectors (JAMTests)",
+			"target": "BenchmarkTestVectors",
+			"configuration": "debug"
 		},
 		{
 			"type": "swift",
@@ -87,8 +56,9 @@
 			"args": [],
 			"cwd": "${workspaceFolder:boka}/JAMTests",
 			"name": "Release BenchmarkTestVectors (JAMTests)",
-			"program": "${workspaceFolder:boka}/JAMTests/.build/release/BenchmarkTestVectors",
-			"preLaunchTask": "swift: Build Release BenchmarkTestVectors (JAMTests)"
+			"preLaunchTask": "swift: Build Release BenchmarkTestVectors (JAMTests)",
+			"target": "BenchmarkTestVectors",
+			"configuration": "release"
 		}
 	]
 }

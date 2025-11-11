@@ -1,7 +1,7 @@
 import ArgumentParser
 import Foundation
 import JSONSchema
-import JSONSchemaBuilder
+@preconcurrency import JSONSchemaBuilder
 import RPC
 import Runtime
 import Utils
@@ -65,15 +65,15 @@ extension Optional: OptionalProtocol {
 struct AnyJSONSchemaComponent: JSONSchemaComponent, @unchecked Sendable {
     typealias Output = Any
 
-    private var _schemaValue: [KeywordIdentifier: JSONValue]
+    private var _schemaValue: SchemaValue
     private let _parse: @Sendable (JSONValue) -> Parsed<Any, ParseIssue>
 
-    init(wrapped component: some JSONSchemaComponent) {
+    init(wrapped component: some JSONSchemaComponent & Sendable) {
         _schemaValue = component.schemaValue
-        _parse = { value in component.parse(value).map { $0 as Any } }
+        _parse = { [component] value in component.parse(value).map { $0 as Any } }
     }
 
-    var schemaValue: [KeywordIdentifier: JSONValue] {
+    var schemaValue: SchemaValue {
         get { _schemaValue }
         set {
             _schemaValue = newValue
@@ -86,13 +86,13 @@ struct AnyJSONSchemaComponent: JSONSchemaComponent, @unchecked Sendable {
 }
 
 // 👇 Wrap helper for nicer syntax
-func wrap(_ schema: any JSONSchemaComponent) -> AnyJSONSchemaComponent {
+func wrap(_ schema: any JSONSchemaComponent & Sendable) -> AnyJSONSchemaComponent {
     .init(wrapped: schema)
 }
 
 // MARK: - Builder helpers
 
-func build(@JSONSchemaBuilder _ content: () -> any JSONSchemaComponent) -> any JSONSchemaComponent {
+func build(@JSONSchemaBuilder _ content: () -> any JSONSchemaComponent & Sendable) -> any JSONSchemaComponent & Sendable {
     content()
 }
 
@@ -118,7 +118,7 @@ func createSpecContent(type: Any.Type, name: String?) -> SpecContent {
 
 protocol TypeDescription {
     static var name: String { get }
-    static var schema: any JSONSchemaComponent { get }
+    static var schema: any JSONSchemaComponent & Sendable { get }
 }
 
 func getName(type: Any.Type) -> String {
@@ -128,7 +128,7 @@ func getName(type: Any.Type) -> String {
     return String(describing: type)
 }
 
-func getSchema(type: Any.Type) -> any JSONSchemaComponent {
+func getSchema(type: Any.Type) -> any JSONSchemaComponent & Sendable {
     if let t = type as? TypeDescription.Type {
         return t.schema
     }
@@ -160,24 +160,24 @@ extension Optional: TypeDescription {
         "Optional<\(getName(type: Wrapped.self))>"
     }
 
-    static var schema: any JSONSchemaComponent {
+    static var schema: any JSONSchemaComponent & Sendable {
         getSchema(type: Wrapped.self)
     }
 }
 
 extension Bool: TypeDescription {
     static var name: String { "Bool" }
-    static var schema: any JSONSchemaComponent { JSONBoolean() }
+    static var schema: any JSONSchemaComponent & Sendable { JSONBoolean() }
 }
 
 extension String: TypeDescription {
     static var name: String { "String" }
-    static var schema: any JSONSchemaComponent { JSONString() }
+    static var schema: any JSONSchemaComponent & Sendable { JSONString() }
 }
 
 extension BinaryInteger where Self: TypeDescription {
     static var name: String { String(describing: Self.self) }
-    static var schema: any JSONSchemaComponent { JSONInteger() }
+    static var schema: any JSONSchemaComponent & Sendable { JSONInteger() }
 }
 
 extension Int8: TypeDescription {}
@@ -193,21 +193,21 @@ extension UInt: TypeDescription {}
 
 extension Data: TypeDescription {
     static var name: String { "Data" }
-    static var schema: any JSONSchemaComponent {
+    static var schema: any JSONSchemaComponent & Sendable {
         JSONString().title(name).pattern("^0x[0-9a-fA-F]*$")
     }
 }
 
 extension FixedSizeData: TypeDescription {
     static var name: String { "Data\(T.value)" }
-    static var schema: any JSONSchemaComponent {
+    static var schema: any JSONSchemaComponent & Sendable {
         JSONString().title(name).pattern("^0x[0-9a-fA-F]{\(T.value * 2)}$")
     }
 }
 
 extension Array: TypeDescription {
     static var name: String { "Array<\(getName(type: Element.self))>" }
-    static var schema: any JSONSchemaComponent {
+    static var schema: any JSONSchemaComponent & Sendable {
         JSONArray { wrap(getSchema(type: Element.self)) }
     }
 }
@@ -217,7 +217,7 @@ extension Dictionary: TypeDescription {
         "Dictionary<\(getName(type: Key.self)), \(getName(type: Value.self))>"
     }
 
-    static var schema: any JSONSchemaComponent {
+    static var schema: any JSONSchemaComponent & Sendable {
         JSONObject().title(name)
     }
 }
@@ -227,7 +227,7 @@ extension Set: TypeDescription {
         "Set<\(getName(type: Element.self))>"
     }
 
-    static var schema: any JSONSchemaComponent {
+    static var schema: any JSONSchemaComponent & Sendable {
         JSONArray { wrap(getSchema(type: Element.self)) }
     }
 }
@@ -241,7 +241,7 @@ extension LimitedSizeArray: TypeDescription {
         }
     }
 
-    static var schema: any JSONSchemaComponent {
+    static var schema: any JSONSchemaComponent & Sendable {
         JSONArray { wrap(getSchema(type: T.self)) }
     }
 }
@@ -251,14 +251,14 @@ extension ConfigLimitedSizeArray: TypeDescription {
         "Array<\(getName(type: T.self))>[\(getName(type: TMinLength.self)) ..< \(getName(type: TMaxLength.self))]"
     }
 
-    static var schema: any JSONSchemaComponent {
+    static var schema: any JSONSchemaComponent & Sendable {
         JSONArray { wrap(getSchema(type: T.self)) }
     }
 }
 
 extension Ref: TypeDescription {
     static var name: String { getName(type: T.self) }
-    static var schema: any JSONSchemaComponent {
+    static var schema: any JSONSchemaComponent & Sendable {
         getSchema(type: T.self)
     }
 }

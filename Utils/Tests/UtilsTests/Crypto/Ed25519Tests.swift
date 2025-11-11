@@ -39,14 +39,18 @@ import Testing
     }
 
     @Test func initializeFromData() throws {
-        let randomData = Data32.random()
-        let publicKey = try Ed25519.PublicKey(from: randomData)
-        #expect(publicKey.data == randomData)
+        let secretKey = try Ed25519.SecretKey(from: Data32.random())
+        let publicKey = secretKey.publicKey
+        let publicKeyData = publicKey.data
+
+        // Re-create from the same data
+        let recreatedKey = try Ed25519.PublicKey(from: publicKeyData)
+        #expect(recreatedKey.data == publicKeyData)
     }
 
     @Test func encodeAndDecode() throws {
-        let originalData = Data32.random()
-        let originalKey = try Ed25519.PublicKey(from: originalData)
+        let secretKey = try Ed25519.SecretKey(from: Data32.random())
+        let originalKey = secretKey.publicKey
 
         let encoder = JSONEncoder()
         let encodedData = try encoder.encode(originalKey)
@@ -58,12 +62,12 @@ import Testing
     }
 
     @Test func hashAndEquality() throws {
-        let data1 = Data32.random()
-        let data2 = Data32.random()
+        let secretKey1 = try Ed25519.SecretKey(from: Data32.random())
+        let secretKey2 = try Ed25519.SecretKey(from: Data32.random())
 
-        let publicKey1 = try Ed25519.PublicKey(from: data1)
-        let publicKey2 = try Ed25519.PublicKey(from: data1)
-        let publicKey3 = try Ed25519.PublicKey(from: data2)
+        let publicKey1 = secretKey1.publicKey
+        let publicKey2 = try Ed25519.PublicKey(from: publicKey1.data) // Same key from data
+        let publicKey3 = secretKey2.publicKey // Different key
 
         var hashSet: Set<Ed25519.PublicKey> = []
         hashSet.insert(publicKey1)
@@ -75,10 +79,11 @@ import Testing
     }
 
     @Test func descriptionCheck() throws {
-        let randomData = Data32.random()
-        let publicKey = try Ed25519.PublicKey(from: randomData)
+        let secretKey = try Ed25519.SecretKey(from: Data32.random())
+        let publicKey = secretKey.publicKey
+        let publicKeyData = publicKey.data
 
-        #expect(publicKey.description == randomData.description)
+        #expect(publicKey.description == publicKeyData.description)
     }
 
     @Test func signatureVerification() throws {

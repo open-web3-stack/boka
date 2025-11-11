@@ -30,13 +30,21 @@ jobs:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: us-east-2
+      - name: Setup Swift
+        uses: SwiftyLab/setup-swift@latest
+      - name: Get Swift Version
+        id: swift-version
+        run: |
+          SWIFT_VERSION=$(swift --version 2>&1 | head -n1 | sed -E 's/.*Swift version ([0-9.]+).*/\1/')
+          echo "Detected Swift version: $SWIFT_VERSION"
+          echo "version=$SWIFT_VERSION" >> $GITHUB_OUTPUT
       - name: Cache SPM
         uses: runs-on/cache@v4
         with:
           path: '**/.build'
-          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+          key: ${{ runner.os }}-spm-swift-${{ steps.swift-version.outputs.version }}-${{ hashFiles('**/Package.resolved') }}
           restore-keys: |
-            ${{ runner.os }}-spm-
+            ${{ runner.os }}-spm-swift-${{ steps.swift-version.outputs.version }}-
         env:
           RUNS_ON_S3_BUCKET_CACHE: laminar-gh-action-cache
       - name: Cache Cargo
@@ -70,8 +78,13 @@ jobs:
           key: ${{ runner.os }}-libs-libec-${{ hashFiles('Utils/Sources/erasure-coding/**') }}
           restore-keys: |
             ${{ runner.os }}-libs-libec
-      - name: Setup Swift
-        uses: SwiftyLab/setup-swift@latest
+      - name: Cache ed25519-zebra static lib
+        uses: actions/cache@v4
+        with:
+          path: .lib/libed25519_zebra_ffi.a
+          key: ${{ runner.os }}-libs-libed25519-${{ hashFiles('Utils/Sources/ed25519-zebra/**') }}
+          restore-keys: |
+            ${{ runner.os }}-libs-libed25519
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@nightly
       - name: Build deps
