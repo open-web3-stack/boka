@@ -30,9 +30,14 @@ jobs:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: us-east-2
+      - name: Setup Swift
+        uses: SwiftyLab/setup-swift@latest
       - name: Get Swift Version
         id: swift-version
-        run: echo "version=$(swift --version 2>&1 | grep -oE 'Swift version [0-9.]+' | grep -oE '[0-9.]+')" >> $GITHUB_OUTPUT
+        run: |
+          SWIFT_VERSION=$(swift --version 2>&1 | head -n1 | sed -E 's/.*Swift version ([0-9.]+).*/\1/')
+          echo "Detected Swift version: $SWIFT_VERSION"
+          echo "version=$SWIFT_VERSION" >> $GITHUB_OUTPUT
       - name: Cache SPM
         uses: runs-on/cache@v4
         with:
