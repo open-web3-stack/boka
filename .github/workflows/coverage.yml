@@ -85,8 +85,6 @@ jobs:
           key: ${{ runner.os }}-libs-libed25519-${{ hashFiles('Utils/Sources/ed25519-zebra/**') }}
           restore-keys: |
             ${{ runner.os }}-libs-libed25519
-      - name: Setup Swift
-        uses: SwiftyLab/setup-swift@latest
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@nightly
       - name: Build deps
