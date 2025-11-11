@@ -14,7 +14,7 @@ let package = Package(
         .package(path: "../TracingUtils"),
         .package(path: "../Utils"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
-        .package(url: "https://github.com/ajevans99/swift-json-schema.git", from: "0.3.2"),
+        .package(url: "https://github.com/ajevans99/swift-json-schema.git", from: "0.10.0"),
         .package(url: "https://github.com/wickwirew/Runtime.git", from: "2.2.7"),
     ],
     targets: [
