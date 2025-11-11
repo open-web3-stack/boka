@@ -31,13 +31,17 @@ jobs:
         with:
           aws-region: us-east-2
 
+      - name: Get Swift Version
+        id: swift-version
+        run: echo "version=$(swift --version 2>&1 | grep -oE 'Swift version [0-9.]+' | grep -oE '[0-9.]+')" >> $GITHUB_OUTPUT
+
       - name: Cache SPM
         uses: runs-on/cache@v4
         with:
           path: '**/.build'
-          key: ${{ runner.os }}-spm-release-${{ hashFiles('**/Package.resolved') }}
+          key: ${{ runner.os }}-spm-release-swift-${{ steps.swift-version.outputs.version }}-${{ hashFiles('**/Package.resolved') }}
           restore-keys: |
-            ${{ runner.os }}-spm-release-
+            ${{ runner.os }}-spm-release-swift-${{ steps.swift-version.outputs.version }}-
         env:
           RUNS_ON_S3_BUCKET_CACHE: laminar-gh-action-cache
 

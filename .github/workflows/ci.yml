@@ -44,13 +44,16 @@ jobs:
     - uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-region: us-east-2
+    - name: Get Swift Version
+      id: swift-version
+      run: echo "version=$(swift --version 2>&1 | grep -oE 'Swift version [0-9.]+' | grep -oE '[0-9.]+')" >> $GITHUB_OUTPUT
     - name: Cache SPM
       uses: runs-on/cache@v4
       with:
         path: '**/.build'
-        key: ${{ runner.os }}-spm-${{ matrix.config }}-${{ hashFiles('**/Package.resolved') }}
+        key: ${{ runner.os }}-spm-${{ matrix.config }}-swift-${{ steps.swift-version.outputs.version }}-${{ hashFiles('**/Package.resolved') }}
         restore-keys: |
-          ${{ runner.os }}-spm-${{ matrix.config }}-
+          ${{ runner.os }}-spm-${{ matrix.config }}-swift-${{ steps.swift-version.outputs.version }}-
       env:
         RUNS_ON_S3_BUCKET_CACHE: laminar-gh-action-cache
     - name: Cache Cargo
