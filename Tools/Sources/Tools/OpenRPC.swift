@@ -68,9 +68,9 @@ struct AnyJSONSchemaComponent: JSONSchemaComponent, @unchecked Sendable {
     private var _schemaValue: SchemaValue
     private let _parse: @Sendable (JSONValue) -> Parsed<Any, ParseIssue>
 
-    init(wrapped component: some JSONSchemaComponent) {
+    init(wrapped component: some JSONSchemaComponent & Sendable) {
         _schemaValue = component.schemaValue
-        _parse = { value in component.parse(value).map { $0 as Any } }
+        _parse = { [component] value in component.parse(value).map { $0 as Any } }
     }
 
     var schemaValue: SchemaValue {
