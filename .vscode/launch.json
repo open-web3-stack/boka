@@ -37,22 +37,24 @@
 			"preLaunchTask": "swift: Build Release Cli (Cli)"
 		},
 		{
-			"type": "lldb",
+			"type": "swift",
 			"request": "launch",
 			"args": [],
 			"cwd": "${workspaceFolder:boka}/Tools",
 			"name": "Debug Tools (Tools)",
-			"program": "${workspaceFolder:boka}/Tools/.build/debug/Tools",
-			"preLaunchTask": "swift: Build Debug Tools (Tools)"
+			"preLaunchTask": "swift: Build Debug Tools (Tools)",
+			"target": "Tools",
+			"configuration": "debug"
 		},
 		{
-			"type": "lldb",
+			"type": "swift",
 			"request": "launch",
 			"args": [],
 			"cwd": "${workspaceFolder:boka}/Tools",
 			"name": "Release Tools (Tools)",
-			"program": "${workspaceFolder:boka}/Tools/.build/release/Tools",
-			"preLaunchTask": "swift: Build Release Tools (Tools)"
+			"preLaunchTask": "swift: Build Release Tools (Tools)",
+			"target": "Tools",
+			"configuration": "release"
 		},
 		{
 			"type": "swift",

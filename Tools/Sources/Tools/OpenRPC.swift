@@ -1,7 +1,7 @@
 import ArgumentParser
 import Foundation
-import JSONSchema
-import JSONSchemaBuilder
+@preconcurrency import JSONSchema
+@preconcurrency import JSONSchemaBuilder
 import RPC
 import Runtime
 import Utils
