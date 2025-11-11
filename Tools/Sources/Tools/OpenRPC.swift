@@ -65,7 +65,7 @@ extension Optional: OptionalProtocol {
 struct AnyJSONSchemaComponent: JSONSchemaComponent, @unchecked Sendable {
     typealias Output = Any
 
-    private var _schemaValue: [KeywordIdentifier: JSONValue]
+    private var _schemaValue: SchemaValue
     private let _parse: @Sendable (JSONValue) -> Parsed<Any, ParseIssue>
 
     init(wrapped component: some JSONSchemaComponent) {
@@ -73,7 +73,7 @@ struct AnyJSONSchemaComponent: JSONSchemaComponent, @unchecked Sendable {
         _parse = { value in component.parse(value).map { $0 as Any } }
     }
 
-    var schemaValue: [KeywordIdentifier: JSONValue] {
+    var schemaValue: SchemaValue {
         get { _schemaValue }
         set {
             _schemaValue = newValue
