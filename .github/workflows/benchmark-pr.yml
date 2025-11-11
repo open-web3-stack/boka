@@ -76,6 +76,14 @@ jobs:
           restore-keys: |
               ${{ runner.os }}-libs-libec
 
+      - name: Cache ed25519-zebra static lib
+        uses: actions/cache@v4
+        with:
+          path: .lib/libed25519_zebra_ffi.a
+          key: ${{ runner.os }}-libs-libed25519-${{ hashFiles('Utils/Sources/ed25519-zebra/**') }}
+          restore-keys: |
+              ${{ runner.os }}-libs-libed25519
+
       - name: Setup Swift
         uses: SwiftyLab/setup-swift@latest
 

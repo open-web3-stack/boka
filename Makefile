@@ -8,7 +8,7 @@ default: build
 githooks: .git/hooks/pre-commit
 
 .PHONY: deps
-deps: .lib/libbls.a .lib/libbandersnatch_vrfs.a .lib/libec.a .lib/libmsquic.a
+deps: .lib/libbls.a .lib/libbandersnatch_vrfs.a .lib/libec.a .lib/libed25519_zebra_ffi.a .lib/libmsquic.a
 
 .lib/libbls.a: $(wildcard Utils/Sources/bls/src/*)
 	./scripts/build-rust-libs.sh
@@ -17,6 +17,9 @@ deps: .lib/libbls.a .lib/libbandersnatch_vrfs.a .lib/libec.a .lib/libmsquic.a
 	./scripts/build-rust-libs.sh
 
 .lib/libec.a: $(wildcard Utils/Sources/erasure-coding/src/*)
+	./scripts/build-rust-libs.sh
+
+.lib/libed25519_zebra_ffi.a: $(wildcard Utils/Sources/ed25519-zebra/src/*)
 	./scripts/build-rust-libs.sh
 
 .lib/libmsquic.a:
