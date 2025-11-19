@@ -1,5 +1,5 @@
 {
-  "originHash" : "facff6700a475c5bbca4fdc65076bcb87506b7b0ed7f37887965fc3b9a14d1e9",
+  "originHash" : "f606f601144252f7525860f7cc6225bfe5ba177808c8553f62b8efc9e127f811",
   "pins" : [
     {
       "identity" : "async-channels",
@@ -204,8 +204,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/ajevans99/swift-json-schema.git",
       "state" : {
-        "revision" : "707fc4c2d53138e8fbb4ee9e6669b050ba4b2239",
-        "version" : "0.3.2"
+        "revision" : "6e33690b8b744352bf24440149acaf629a2ed44e",
+        "version" : "0.10.0"
       }
     },
     {

@@ -33,30 +33,23 @@ struct FuzzTests {
     }
 
     @Test(arguments: try loadTests(
-        version: "0.7.0",
-        filters: [
-            // empty to include all
-            // example: ("0.7.0/1754982630", "00000004")
-        ],
-        ignore: [
-            // NOTE: most 0.7.0 ones are fixed except some privileged service related mismatches which are changed in 0.7.1+
-            ("0.7.0/1758622403", "00000239"), // privileged service mismatch
-            ("0.7.0/1758622442", "00000164"), // privileged service mismatch
-            ("0.7.0/1758621952", "00000292"), // many (seems manager service 0 need to change delegator to 3436841821)
-            ("0.7.0/1758622104", "00000022"), // many
-            ("0.7.0/1758708840", "00000958"), // error (exp post state is empty)
-        ]
-    ))
-    func v070(_: Testcase) async throws {
-        // try await TraceTest.test(input)
-    }
-
-    @Test(arguments: try loadTests(
         version: "0.7.1",
         filters: [
             // empty to include all
         ],
         ignore: [
+            ("0.7.1/1763371098", "00000006"), // tooFewElements (block decode fail, expected to fail)
+            ("0.7.1/1763371531", "00000006"), // tooFewElements
+            ("0.7.1/1763371531", "00000008"), // tooFewElements
+            ("0.7.1/1763371531", "00000011"), // tooFewElements
+            ("0.7.1/1763371531", "00000014"), // tooFewElements
+            ("0.7.1/1763371531", "00000023"), // tooFewElements
+            ("0.7.1/1763371531", "00000028"), // tooFewElements
+            ("0.7.1/1763371531", "00000030"), // tooFewElements
+            ("0.7.1/1763371531", "00000032"), // tooFewElements
+            ("0.7.1/1763371531", "00000038"), // tooFewElements
+            ("0.7.1/1763371531", "00000042"), // missing "keyvals": [] in prestate (expected to fail)
+            ("0.7.1/1763372314", "00000094"), // tooFewElements
         ]
     ))
     func v071(input: Testcase) async throws {
