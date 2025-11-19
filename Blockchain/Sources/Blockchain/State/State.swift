@@ -543,7 +543,6 @@ extension State: ActivityStatistics {}
 extension State: Preimages {
     public mutating func mergeWith(postState: PreimagesPostState) async throws {
         for update in postState.updates {
-            // TODO: may need to use set method so account footprint is updated
             self[serviceAccount: update.serviceIndex, preimageHash: update.hash] = update.data
             self[serviceAccount: update.serviceIndex, preimageHash: update.hash, length: update.length] =
                 LimitedSizeArray([update.timeslot])

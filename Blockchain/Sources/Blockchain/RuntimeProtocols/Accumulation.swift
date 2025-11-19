@@ -314,6 +314,10 @@ extension Accumulation {
         // parallel batch results merging
         var batchAccountChanges = AccountChanges()
         var newTransfers: [DeferredTransfers] = []
+        // initial privileged services
+        let initialDelegator = currentState.delegator
+        let initialRegistrar = currentState.registrar
+        let initialAssigners = currentState.assigners
         for (service, singleOutput) in batchResults {
             // u
             gasUsed.append((service, singleOutput.gasUsed))
@@ -341,11 +345,11 @@ extension Accumulation {
                 currentState.assigners = temp
             }
             // v' - New delegator
-            if service == currentState.delegator {
+            if service == initialDelegator {
                 currentState.delegator = singleOutput.state.delegator
             }
             // r' - New registrar
-            if service == currentState.registrar {
+            if service == initialRegistrar {
                 currentState.registrar = singleOutput.state.registrar
             }
 
@@ -359,22 +363,22 @@ extension Accumulation {
             }
         }
 
-        // manager can overwrite all if changed any
+        // manager's changes override service's changes
         if let managerResult = batchResults.first(where: { $0.0 == privilegedServices.manager })?.1 {
-            // m'
+            // m' - manager always writes
             currentState.manager = managerResult.state.manager
-            // z'
+            // z' - alwaysAcc always writes
             currentState.alwaysAcc = managerResult.state.alwaysAcc
-            // a'
-            if currentState.assigners != managerResult.state.assigners {
+            // a' - if manager changed assigners from initial, use manager's value
+            if initialAssigners != managerResult.state.assigners {
                 currentState.assigners = managerResult.state.assigners
             }
-            // v'
-            if currentState.delegator != managerResult.state.delegator {
+            // v' - if manager changed delegator from initial, use manager's value
+            if initialDelegator != managerResult.state.delegator {
                 currentState.delegator = managerResult.state.delegator
             }
-            // r'
-            if currentState.registrar != managerResult.state.registrar {
+            // r' - if manager changed registrar from initial, use manager's value
+            if initialRegistrar != managerResult.state.registrar {
                 currentState.registrar = managerResult.state.registrar
             }
         }

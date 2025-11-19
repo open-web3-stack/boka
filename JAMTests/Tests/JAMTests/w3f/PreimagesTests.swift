@@ -88,12 +88,14 @@ struct PreimagesTests {
         let testcase = try decoder.decode(PreimagesTestcase.self)
 
         var state = testcase.preState
+        let priorState = testcase.preState
         let result = await Result {
             try testcase.input.preimages.validate(config: config)
             return try await state.updatePreimages(
                 config: config,
                 timeslot: testcase.input.slot,
-                preimages: testcase.input.preimages
+                preimages: testcase.input.preimages,
+                priorState: priorState
             )
         }
 
