@@ -211,7 +211,13 @@ public class FuzzingTarget {
             try connection.sendMessage(response)
         } catch {
             logger.error("❌ Failed to initialize state: \(error)")
-            throw error
+            if let currentStateRef {
+                let response = await FuzzingMessage.stateRoot(currentStateRef.value.stateRoot)
+                try connection.sendMessage(response)
+            } else {
+                logger.error("No head state root available")
+                throw error
+            }
         }
     }
 

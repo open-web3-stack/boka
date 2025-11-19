@@ -203,7 +203,15 @@ public class FuzzingSocketConnection {
         }
 
         let data = Data(messageBuffer)
-        return try JamDecoder.decode(FuzzingMessage.self, from: data, withConfig: config)
+
+        // Try to decode the message, catching decoding errors
+        do {
+            return try JamDecoder.decode(FuzzingMessage.self, from: data, withConfig: config)
+        } catch {
+            logger.error("Failed to decode: \(error)")
+            // Return an error message instead of throwing, to keep connection alive
+            return .error("Failed to decode: \(error)")
+        }
     }
 
     public func sendMessage(_ message: FuzzingMessage) throws {

@@ -112,15 +112,21 @@ public class FuzzingClient {
             // generate pre-state
             let (_, kv) = try await fuzzGenerator.generatePreState(timeslot: timeslot, config: config)
 
-            // set state locally
-            let rawKV = kv.map { (key: $0.key, value: $0.value) }
-            let backend = StateBackend(InMemoryBackend(), config: config, rootHash: Data32())
-            try await backend.writeRaw(rawKV)
-            let state = try await State(backend: backend)
-            currentStateRef = state.asRef()
-
             // set state on target
             try await initializeState(kv: kv, connection: connection)
+
+            // set state locally
+            let rawKV = kv.map { (key: $0.key, value: $0.value) }
+            let state: State
+            do {
+                let backend = StateBackend(InMemoryBackend(), config: config, rootHash: Data32())
+                try await backend.writeRaw(rawKV)
+                state = try await State(backend: backend)
+            } catch {
+                logger.warning("⚠️ Skipping block \(blockIndex) due to state init failure: \(error)")
+                continue
+            }
+            currentStateRef = state.asRef()
 
             // generate a block
             let blockRef = try await fuzzGenerator.generateBlock(

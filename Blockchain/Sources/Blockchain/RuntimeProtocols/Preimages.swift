@@ -45,7 +45,8 @@ extension Preimages {
     public func updatePreimages(
         config _: ProtocolConfigRef,
         timeslot: TimeslotIndex,
-        preimages: ExtrinsicPreimages
+        preimages: ExtrinsicPreimages,
+        priorState: any Preimages
     ) async throws(PreimagesError) -> PreimagesPostState {
         let preimages = preimages.preimages
         var updates: [PreimageUpdate] = []
@@ -55,20 +56,35 @@ extension Preimages {
 
             // check prior state
             let prevPreimageData = try await Result {
-                try await get(serviceAccount: preimage.serviceIndex, preimageHash: hash)
+                try await priorState.get(serviceAccount: preimage.serviceIndex, preimageHash: hash)
             }.mapError { _ in PreimagesError.invalidServiceIndex }.get()
 
             guard prevPreimageData == nil else {
                 throw PreimagesError.duplicatedPreimage
             }
 
-            let requested = try? await get(serviceAccount: preimage.serviceIndex, preimageHash: hash, length: UInt32(preimage.data.count))
+            let requested = try? await priorState.get(
+                serviceAccount: preimage.serviceIndex,
+                preimageHash: hash,
+                length: UInt32(preimage.data.count)
+            )
             guard let requested else {
                 throw PreimagesError.preimageNotSolicited
             }
 
             guard requested.isEmpty else {
                 throw PreimagesError.preimageIsProvided
+            }
+
+            // check post-accumulation state
+            // disregard, without prejudice, any preimages which due to effects of accumulation are no longer useful
+            let stillRequested = try? await get(
+                serviceAccount: preimage.serviceIndex,
+                preimageHash: hash,
+                length: UInt32(preimage.data.count)
+            )
+            guard let stillRequested, stillRequested.isEmpty else {
+                continue
             }
 
             updates.append(PreimageUpdate(
