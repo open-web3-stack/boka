@@ -41,9 +41,9 @@ jobs:
           review: true
         env:
           POLKA_API_PROVIDER: google-vertex
-          POLKA_MODEL: gemini-2.5-pro
+          POLKA_MODEL: gemini-3-pro-preview
           GITHUB_TOKEN: ${{ github.token }}
-          GOOGLE_VERTEX_LOCATION: us-central1
+          GOOGLE_VERTEX_LOCATION: global
           GOOGLE_VERTEX_PROJECT: ${{ secrets.GOOGLE_VERTEX_PROJECT }}
 
   review_gpt5:
@@ -63,7 +63,7 @@ jobs:
           review: true
         env:
           POLKA_API_PROVIDER: openai
-          POLKA_MODEL: gpt-5-2025-08-07
+          POLKA_MODEL: gpt-5.1-codex
           GITHUB_TOKEN: ${{ github.token }}
           POLKA_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
