@@ -19,12 +19,14 @@ public struct LimitedSizeArray<T, TMinLength: ConstInt, TMaxLength: ConstInt> {
         self.init(Array(repeating: defaultValue, count: Self.minLength))
     }
 
-    public init(_ array: [T]) {
+    public init(_ array: [T], validate: Bool = true) {
         assert(Self.minLength >= 0)
         assert(Self.maxLength >= Self.minLength)
         self.array = array
 
-        validate()
+        if validate {
+            self.validate()
+        }
     }
 
     private func validate() {
@@ -32,7 +34,7 @@ public struct LimitedSizeArray<T, TMinLength: ConstInt, TMaxLength: ConstInt> {
         assert(array.count <= Self.maxLength)
     }
 
-    private func validateThrowing() throws(LimitedSizeArrayError) {
+    public func validateThrowing() throws(LimitedSizeArrayError) {
         guard array.count >= Self.minLength else {
             throw LimitedSizeArrayError.tooFewElements
         }
@@ -149,7 +151,7 @@ extension LimitedSizeArray: Encodable where T: Encodable {
 
 extension LimitedSizeArray: Decodable where T: Decodable {
     public init(from decoder: any Decoder) throws {
-        array = []
+        var arr = [T]()
         var container = try decoder.unkeyedContainer()
         var length = TMaxLength.value
 
@@ -168,10 +170,10 @@ extension LimitedSizeArray: Decodable where T: Decodable {
         }
 
         for _ in 0 ..< length {
-            try array.append(container.decode(T.self))
+            try arr.append(container.decode(T.self))
         }
 
-        try validateThrowing()
+        self.init(arr, validate: false)
     }
 }
 

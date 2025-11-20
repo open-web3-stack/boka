@@ -38,3 +38,5 @@ extension EpochMarker: Dummy {
         )
     }
 }
+
+extension EpochMarker: Validate {}

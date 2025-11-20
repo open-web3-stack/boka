@@ -62,13 +62,21 @@ extension Array where Element: Validate {
 
 extension ConfigLimitedSizeArray: Validate where T: Validate {
     public func validate(config: Config) throws {
+        try validateThrowing()
         try array.validate(config: config)
     }
 }
 
 extension LimitedSizeArray: Validate where T: Validate {
     public func validate(config: Config) throws {
+        try validateThrowing()
         try array.validate(config: config)
+    }
+}
+
+extension ConfigSizeBitString: Validate {
+    public func validate(config _: Config) throws {
+        try validateThrowing()
     }
 }
 

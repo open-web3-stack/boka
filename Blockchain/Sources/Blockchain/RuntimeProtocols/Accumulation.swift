@@ -308,7 +308,7 @@ extension Accumulation {
             for try await result in group {
                 results.append(result)
             }
-            return results
+            return results.sorted { $0.0 < $1.0 }
         }
 
         // parallel batch results merging

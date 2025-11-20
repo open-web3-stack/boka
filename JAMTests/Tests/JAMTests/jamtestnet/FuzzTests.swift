@@ -38,18 +38,10 @@ struct FuzzTests {
             // empty to include all
         ],
         ignore: [
-            ("0.7.1/1763371098", "00000006"), // tooFewElements (block decode fail, expected to fail)
-            ("0.7.1/1763371531", "00000006"), // tooFewElements
-            ("0.7.1/1763371531", "00000008"), // tooFewElements
-            ("0.7.1/1763371531", "00000011"), // tooFewElements
-            ("0.7.1/1763371531", "00000014"), // tooFewElements
-            ("0.7.1/1763371531", "00000023"), // tooFewElements
-            ("0.7.1/1763371531", "00000028"), // tooFewElements
-            ("0.7.1/1763371531", "00000030"), // tooFewElements
-            ("0.7.1/1763371531", "00000032"), // tooFewElements
-            ("0.7.1/1763371531", "00000038"), // tooFewElements
             ("0.7.1/1763371531", "00000042"), // missing "keyvals": [] in prestate (expected to fail)
-            ("0.7.1/1763372314", "00000094"), // tooFewElements
+            ("0.7.1/1763487981", "00000050"), // missing "keyvals": [] in prestate (expected to fail)
+            ("0.7.1/1763488328", "00000050"), // missing "keyvals": [] in prestate (expected to fail)
+            ("0.7.1/1763489287", "00000872"), // missing "keyvals": [] in prestate (expected to fail)
         ]
     ))
     func v071(input: Testcase) async throws {
