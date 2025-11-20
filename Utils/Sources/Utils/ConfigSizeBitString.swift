@@ -17,12 +17,12 @@ public struct ConfigSizeBitString<TBitLength: ReadInt>: Equatable, Sendable, Cod
         (length + 7) / 8
     }
 
-    public init(config: TBitLength.TConfig, data: Data) throws(ConfigSizeBitStringError) {
+    public init(config: TBitLength.TConfig, data: Data, validate: Bool = true) throws(ConfigSizeBitStringError) {
         length = TBitLength.read(config: config)
         bytes = data
 
-        if byteLength != data.count {
-            throw .invalidData
+        if validate {
+            try validateThrowing()
         }
     }
 
@@ -30,6 +30,12 @@ public struct ConfigSizeBitString<TBitLength: ReadInt>: Equatable, Sendable, Cod
         length = TBitLength.read(config: config)
         let byteLength = (length + 7) / 8
         bytes = Data(repeating: 0, count: byteLength)
+    }
+
+    public func validateThrowing() throws(ConfigSizeBitStringError) {
+        if byteLength != bytes.count {
+            throw .invalidData
+        }
     }
 
     private func at(unchecked index: Int) -> Bool {
@@ -129,7 +135,7 @@ extension ConfigSizeBitString: FixedLengthData {
         guard let config = decoder.getConfig(TBitLength.TConfig.self) else {
             throw ConfigSizeBitStringError.missingConfig
         }
-        try self.init(config: config, data: data)
+        try self.init(config: config, data: data, validate: false)
     }
 }
 
@@ -149,4 +155,8 @@ extension ConfigSizeBitString: DataPtrRepresentable {
     ) rethrows -> R {
         try data.withUnsafeBytes(cb)
     }
+}
+
+extension ConfigSizeBitString: HasConfig {
+    public typealias Config = TBitLength.TConfig
 }
