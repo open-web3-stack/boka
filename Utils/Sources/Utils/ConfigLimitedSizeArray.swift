@@ -40,7 +40,7 @@ public struct ConfigLimitedSizeArray<T, TMinLength: ReadInt, TMaxLength: ReadInt
         try self.init(array, minLength: minLength, maxLength: maxLength)
     }
 
-    private init(_ array: [T], minLength: Int, maxLength: Int) throws(ConfigLimitedSizeArrayError) {
+    private init(_ array: [T], minLength: Int, maxLength: Int, validate: Bool = true) throws(ConfigLimitedSizeArrayError) {
         guard minLength >= 0 else {
             throw ConfigLimitedSizeArrayError.invalidMinLength
         }
@@ -52,7 +52,9 @@ public struct ConfigLimitedSizeArray<T, TMinLength: ReadInt, TMaxLength: ReadInt
         self.minLength = minLength
         self.maxLength = maxLength
 
-        try validateThrowing()
+        if validate {
+            try validateThrowing()
+        }
     }
 
     private func validate() {
@@ -60,7 +62,7 @@ public struct ConfigLimitedSizeArray<T, TMinLength: ReadInt, TMaxLength: ReadInt
         assert(array.count <= maxLength, "count \(array.count) <= maxLength \(maxLength)")
     }
 
-    private func validateThrowing() throws(ConfigLimitedSizeArrayError) {
+    public func validateThrowing() throws(ConfigLimitedSizeArrayError) {
         guard array.count >= minLength else {
             throw ConfigLimitedSizeArrayError.tooFewElements
         }
@@ -231,19 +233,19 @@ extension ConfigLimitedSizeArray: Decodable where T: Decodable {
             for _ in 0 ..< minLength {
                 try arr.append(container.decode(T.self))
             }
-            try self.init(arr, minLength: minLength, maxLength: maxLength)
+            try self.init(arr, minLength: minLength, maxLength: maxLength, validate: false)
         } else {
             // variable size array
             var container = try decoder.unkeyedContainer()
             if decoder.isJamCodec {
                 let array = try container.decode([T].self)
-                try self.init(array, minLength: minLength, maxLength: maxLength)
+                try self.init(array, minLength: minLength, maxLength: maxLength, validate: false)
             } else {
                 var array = [T]()
                 while !container.isAtEnd {
                     try array.append(container.decode(T.self))
                 }
-                try self.init(array, minLength: minLength, maxLength: maxLength)
+                try self.init(array, minLength: minLength, maxLength: maxLength, validate: false)
             }
         }
     }

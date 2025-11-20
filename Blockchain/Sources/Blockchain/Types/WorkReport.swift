@@ -81,7 +81,7 @@ extension WorkReport: Validate {
         case tooManyDependencies
     }
 
-    public func validate(config: Config) throws(WorkReportError) {
+    public func validateSelf(config: Config) throws(WorkReportError) {
         guard refinementContext.prerequisiteWorkPackages.count + lookup.count <= config.value.maxDepsInWorkReport else {
             throw .tooManyDependencies
         }
