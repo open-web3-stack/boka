@@ -19,9 +19,6 @@ public class Engine {
     public func execute(state: any VMState) async -> ExitReason {
         let context = ExecutionContext(state: state, config: config)
         while true {
-            guard state.getGas() > GasInt(0) else {
-                return .outOfGas
-            }
             if case let .exit(reason) = step(program: state.program, context: context) {
                 switch reason {
                 case let .hostCall(callIndex):
@@ -44,8 +41,6 @@ public class Engine {
         switch result {
         case let .exit(reason):
             switch reason {
-            case let .pageFault(address):
-                return .exit(.pageFault(address))
             case let .hostCall(callIndexInner):
                 return await hostCall(state: state, callIndex: callIndexInner)
             default:
@@ -76,6 +71,10 @@ public class Engine {
         //     let blockGas = context.state.program.getBlockGasCosts(pc: pc)
         //     context.state.consumeGas(blockGas)
         // }
+
+        guard context.state.getGas() >= GasInt(0) else {
+            return .exit(.outOfGas)
+        }
 
         let result = inst.execute(context: context, skip: skip)
 

@@ -468,7 +468,7 @@ extension Accumulation {
         }
     }
 
-    // P: preimage integration function
+    // I: preimage integration function
     private func preimageIntegration(
         servicePreimageSet: Set<ServicePreimagePair>,
         accounts: ServiceAccountsMutRef,

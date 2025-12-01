@@ -86,7 +86,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     /// WA = 64,000: The maximum size of is-authorized code in octets.
     public var maxIsAuthorizedCodeSize: Int
 
-    /// WB = 13,794,305: The maximum size of an encoded work-package together with its extrinsic data and import implications, in octets.
+    /// WB = 13,791,360: The maximum size of an encoded work-package together with its extrinsic data and import implications, in octets.
     public var maxEncodedWorkPackageSize: Int
 
     /// WC = 4,000,000: The maximum size of service code in octets.
@@ -97,6 +97,9 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
 
     /// WG = WP*WE = 4104: The size of a segment in octets.
     public var segmentSize: Int
+
+    /// WF = WG + 32 * ceil(log2(WM)) = 4488: The additional footprint in the Audits DA of a single imported segment.
+    public var segmentFootprint: Int
 
     /// WM = 3,072: The maximum number of imports in a work-package.
     public var maxWorkPackageImports: Int
@@ -163,6 +166,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         maxWorkPackageExports: Int,
         maxEncodedWorkPackageSize: Int,
         segmentSize: Int,
+        segmentFootprint: Int,
         maxWorkReportBlobSize: Int,
         erasureCodedSegmentSize: Int,
         ticketSubmissionEndSlot: Int,
@@ -205,6 +209,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         self.maxWorkPackageExports = maxWorkPackageExports
         self.maxEncodedWorkPackageSize = maxEncodedWorkPackageSize
         self.segmentSize = segmentSize
+        self.segmentFootprint = segmentFootprint
         self.maxWorkReportBlobSize = maxWorkReportBlobSize
         self.erasureCodedSegmentSize = erasureCodedSegmentSize
         self.ticketSubmissionEndSlot = ticketSubmissionEndSlot
@@ -294,6 +299,7 @@ extension ProtocolConfig {
             maxEncodedWorkPackageSize: other.maxEncodedWorkPackageSize != 0
                 ? other.maxEncodedWorkPackageSize : maxEncodedWorkPackageSize,
             segmentSize: other.segmentSize != 0 ? other.segmentSize : segmentSize,
+            segmentFootprint: other.segmentFootprint != 0 ? other.segmentFootprint : segmentFootprint,
             maxWorkReportBlobSize: other.maxWorkReportBlobSize != 0
                 ? other.maxWorkReportBlobSize : maxWorkReportBlobSize,
             erasureCodedSegmentSize: other.erasureCodedSegmentSize != 0
@@ -392,6 +398,7 @@ extension ProtocolConfig {
             .maxEncodedWorkPackageSize, defaultValue: 0, required: required
         )
         segmentSize = try decode(.segmentSize, defaultValue: 0, required: required)
+        segmentFootprint = try decode(.segmentFootprint, defaultValue: 0, required: required)
         maxWorkReportBlobSize = try decode(
             .maxWorkReportBlobSize, defaultValue: 0, required: required
         )
@@ -652,6 +659,13 @@ extension ProtocolConfig {
         }
     }
 
+    public enum SegmentFootprint: ReadInt {
+        public typealias TConfig = ProtocolConfigRef
+        public static func read(config: ProtocolConfigRef) -> Int {
+            config.value.segmentFootprint
+        }
+    }
+
     public enum MaxWorkReportBlobSize: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
@@ -823,6 +837,7 @@ extension ProtocolConfig {
             maxWorkPackageExports: Int(maxWorkPackageExports),
             maxEncodedWorkPackageSize: Int(maxEncodedWorkPackageSize),
             segmentSize: 4104, // WG = WP*WE = 4104
+            segmentFootprint: 4488, // WF = 4488
             maxWorkReportBlobSize: Int(maxWorkReportBlobSize),
             erasureCodedSegmentSize: Int(erasureCodedSegmentSize),
             ticketSubmissionEndSlot: Int(ticketSubmissionEndSlot),
