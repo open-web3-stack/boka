@@ -19,9 +19,14 @@ private struct PreimageMapEntry: Codable, Equatable {
     var blob: Data
 }
 
-private struct PreimageStatusMapEntry: Codable, Equatable {
+private struct PreimageRequestKey: Codable, Equatable {
     var hash: Data32
-    var status: StateKeys.ServiceAccountPreimageInfoKey.Value
+    var length: DataLength
+}
+
+private struct PreimageRequestMapEntry: Codable, Equatable {
+    var key: PreimageRequestKey
+    var value: StateKeys.ServiceAccountPreimageInfoKey.Value
 }
 
 private struct StorageMapEntry: Codable, Equatable {
@@ -33,7 +38,7 @@ private struct Account: Codable, Equatable {
     var service: ServiceAccountDetails
     var storage: [StorageMapEntry]
     var preimagesBlobs: [PreimageMapEntry]
-    var preimagesStatus: [PreimageStatusMapEntry]
+    var preimageRequests: [PreimageRequestMapEntry]
 }
 
 private struct AccountsMapEntry: Codable, Equatable {
@@ -64,29 +69,40 @@ private struct AccumulateState: Equatable, Codable {
 
 private enum Output: Codable {
     case ok(Data32)
-    case err
+    case err(UInt8)
+
+    private enum CodingKeys: String, CodingKey {
+        case ok
+        case err
+    }
 
     init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let val = try container.decode(UInt8.self)
-        switch val {
+        var container = try decoder.unkeyedContainer()
+        let variant = try container.decode(UInt8.self)
+        switch variant {
         case 0:
             self = try .ok(container.decode(Data32.self))
         case 1:
-            self = .err
+            self = try .err(container.decode(UInt8.self))
         default:
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "invalid output")
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "invalid output variant \(variant)"
+                )
+            )
         }
     }
 
     func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
+        var container = encoder.unkeyedContainer()
         switch self {
         case let .ok(data):
-            try container.encode(0)
+            try container.encode(UInt8(0))
             try container.encode(data)
-        case .err:
-            try container.encode(1)
+        case let .err(code):
+            try container.encode(UInt8(1))
+            try container.encode(code)
         }
     }
 }
@@ -112,7 +128,7 @@ private struct FullAccumulateState: Accumulation {
     var accounts: [ServiceIndex: ServiceAccountDetails] = [:]
     var storages: [ServiceIndex: [Data: Data]] = [:]
     var preimages: [ServiceIndex: [Data32: Data]] = [:]
-    var preimageInfo: [ServiceIndex: [Data32: StateKeys.ServiceAccountPreimageInfoKey.Value]] = [:]
+    var preimageInfo: [ServiceIndex: [HashAndLength: StateKeys.ServiceAccountPreimageInfoKey.Value]] = [:]
 
     func copy() -> ServiceAccounts {
         self
@@ -130,10 +146,12 @@ private struct FullAccumulateState: Accumulation {
         preimages[index]?[hash]
     }
 
-    func get(serviceAccount index: ServiceIndex, preimageHash hash: Data32, length _: UInt32) async throws -> StateKeys
-        .ServiceAccountPreimageInfoKey.Value?
-    {
-        preimageInfo[index]?[hash]
+    func get(
+        serviceAccount index: ServiceIndex,
+        preimageHash hash: Data32,
+        length: UInt32
+    ) async throws -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
+        preimageInfo[index]?[HashAndLength(hash: hash, length: length)]
     }
 
     func historicalLookup(serviceAccount _: ServiceIndex, timeslot _: TimeslotIndex, preimageHash _: Data32) async throws -> Data? {
@@ -165,14 +183,15 @@ private struct FullAccumulateState: Accumulation {
         length: UInt32,
         value: StateKeys.ServiceAccountPreimageInfoKey.Value?
     ) {
+        let key = HashAndLength(hash: hash, length: length)
         // update footprint
-        let oldValue = preimageInfo[index]?[hash]
+        let oldValue = preimageInfo[index]?[key]
         logger.debug("preimage footprint before: \(accounts[index]?.itemsCount ?? 0) items, \(accounts[index]?.totalByteLength ?? 0) bytes")
         accounts[index]?.updateFootprintPreimage(oldValue: oldValue, newValue: value, length: length)
         logger.debug("preimage footprint after: \(accounts[index]?.itemsCount ?? 0) items, \(accounts[index]?.totalByteLength ?? 0) bytes")
 
         // update value
-        preimageInfo[index, default: [:]][hash] = value
+        preimageInfo[index, default: [:]][key] = value
     }
 
     mutating func remove(serviceAccount index: ServiceIndex) async throws {
@@ -213,8 +232,9 @@ struct AccumulateTests {
             for preimage in entry.data.preimagesBlobs {
                 fullState.preimages[entry.index, default: [:]][preimage.hash] = preimage.blob
             }
-            for preimageStatus in entry.data.preimagesStatus {
-                fullState.preimageInfo[entry.index, default: [:]][preimageStatus.hash] = preimageStatus.status
+            for preimageRequest in entry.data.preimageRequests {
+                let key = HashAndLength(hash: preimageRequest.key.hash, length: preimageRequest.key.length)
+                fullState.preimageInfo[entry.index, default: [:]][key] = preimageRequest.value
             }
         }
 
@@ -247,10 +267,11 @@ struct AccumulateTests {
                     for preimage in entry.data.preimagesBlobs {
                         #expect(fullState.preimages[entry.index]?[preimage.hash] == preimage.blob, "Preimage mismatch")
                     }
-                    for preimageStatus in entry.data.preimagesStatus {
+                    for preimageRequest in entry.data.preimageRequests {
+                        let key = HashAndLength(hash: preimageRequest.key.hash, length: preimageRequest.key.length)
                         #expect(
-                            fullState.preimageInfo[entry.index]?[preimageStatus.hash] == preimageStatus.status,
-                            "Preimage status mismatch"
+                            fullState.preimageInfo[entry.index]?[key] == preimageRequest.value,
+                            "Preimage request mismatch"
                         )
                     }
                 }
