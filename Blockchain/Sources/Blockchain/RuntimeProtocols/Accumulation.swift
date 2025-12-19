@@ -661,10 +661,10 @@ extension Accumulation {
 
         // get accumulation statistics
         var accumulateStats = AccumulationStats()
+        let digests = accumulated.compactMap(\.digests).flatMap(\.self)
         for (service, _) in accumulateOutput.gasUsed {
             if accumulateStats[service] != nil { continue }
 
-            let digests = accumulated.compactMap(\.digests).flatMap(\.self)
             let num = digests.filter { $0.serviceIndex == service }.count
             let gasUsed = accumulateOutput.gasUsed
                 .filter { $0.serviceIndex == service }
