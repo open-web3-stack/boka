@@ -7,6 +7,7 @@ public enum GuaranteeingError: Error {
     case coreNotAvailable
     case invalidReportAuthorizer
     case invalidServiceIndex
+    case missingWorkResults
     case outOfGas
     case invalidContext
     case duplicatedWorkPackage
@@ -92,6 +93,10 @@ extension Guaranteeing {
         for guarantee in extrinsic.guarantees {
             var totalGasUsage = Gas(0)
             let report = guarantee.workReport
+
+            guard !report.digests.isEmpty else {
+                throw .missingWorkResults
+            }
 
             for digest in report.digests {
                 guard let acc = try? await serviceAccount(index: digest.serviceIndex) else {
