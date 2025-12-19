@@ -10,10 +10,13 @@ import Utils
 private let logger = Logger(label: "TraceTest")
 
 enum TraceTest {
-    static func test(_ input: Testcase) async throws {
+    static func test(
+        _ input: Testcase,
+        config: ProtocolConfigRef = TestVariants.tiny.config
+    ) async throws {
         // setupTestLogger()
 
-        let testcase = try JamTestnet.decodeTestcase(input)
+        let testcase = try JamTestnet.decodeTestcase(input, config: config)
         let expectFailure = testcase.preState.root == testcase.postState.root
 
         // test state merklize
@@ -23,10 +26,10 @@ enum TraceTest {
         #expect(try stateMerklize(kv: postKv) == testcase.postState.root, "post_state root mismatch")
 
         // test STF
-        let result = try await JamTestnet.runSTF(testcase)
+        let result = try await JamTestnet.runSTF(testcase, config: config)
         switch result {
         case let .success(stateRef):
-            let expectedState = try await testcase.postState.toState()
+            let expectedState = try await testcase.postState.toState(config: config)
             // compare details
             #expect(stateRef.value.coreAuthorizationPool == expectedState.coreAuthorizationPool)
             #expect(stateRef.value.authorizationQueue == expectedState.authorizationQueue)

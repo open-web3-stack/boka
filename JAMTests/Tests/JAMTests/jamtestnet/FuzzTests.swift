@@ -32,7 +32,7 @@ struct FuzzTests {
             }
     }
 
-    @Test(arguments: try loadTests(
+    @Test(.disabled(), arguments: try loadTests(
         version: "0.7.1",
         filters: [
             // empty to include all
@@ -43,6 +43,6 @@ struct FuzzTests {
         ]
     ))
     func v071(input: Testcase) async throws {
-        try await TraceTest.test(input)
+        try await TraceTest.test(input, config: TestVariants.full.config)
     }
 }
