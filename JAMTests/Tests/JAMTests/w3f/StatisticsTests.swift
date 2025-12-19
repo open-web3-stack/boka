@@ -43,6 +43,14 @@ struct StatisticsTests {
         let testcase = try decoder.decode(StatsTestcase.self)
 
         var testStatsState = testcase.preState
+
+        let reporters = Set(
+            testcase.input.extrinsic.reports.guarantees.flatMap { guarantee in
+                guarantee.credential.map { credential in
+                    testStatsState.currentValidators[Int(credential.index)].ed25519
+                }
+            }
+        )
         var activityStatistics = Statistics.dummy(config: config)
         activityStatistics.accumulator = testStatsState.current
         activityStatistics.previous = testStatsState.previous
@@ -55,7 +63,7 @@ struct StatisticsTests {
             config: config,
             newTimeslot: testcase.input.timeslot,
             extrinsic: testcase.input.extrinsic,
-            reporters: [], // TODO: testcase should provide reporters set G (defined in GP) from guaranteeing result
+            reporters: Array(reporters),
             authorIndex: testcase.input.author,
             availableReports: [],
             accumulateStats: [:],
@@ -68,9 +76,7 @@ struct StatisticsTests {
 
     @Test(arguments: try StatisticsTests.loadTests(variant: .tiny))
     func tinyTests(_ testcase: Testcase) throws {
-        withKnownIssue("outdated testcase, missing reporters", isIntermittent: true) {
-            try statisticsTests(testcase, variant: .tiny)
-        }
+        try statisticsTests(testcase, variant: .tiny)
     }
 
     @Test(arguments: try StatisticsTests.loadTests(variant: .full))
