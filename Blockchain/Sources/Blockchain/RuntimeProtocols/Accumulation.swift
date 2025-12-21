@@ -662,13 +662,19 @@ extension Accumulation {
         // get accumulation statistics
         var accumulateStats = AccumulationStats()
         let digests = accumulated.compactMap(\.digests).flatMap(\.self)
-        for (service, _) in accumulateOutput.gasUsed {
-            if accumulateStats[service] != nil { continue }
 
-            let num = digests.filter { $0.serviceIndex == service }.count
-            let gasUsed = accumulateOutput.gasUsed
-                .filter { $0.serviceIndex == service }
-                .reduce(Gas(0)) { $0 + $1.gas }
+        var digestCounts: [ServiceIndex: Int] = [:]
+        for digest in digests {
+            digestCounts[digest.serviceIndex, default: 0] += 1
+        }
+
+        var gasUsedMap: [ServiceIndex: Gas] = [:]
+        for (service, gas) in accumulateOutput.gasUsed {
+            gasUsedMap[service, default: Gas(0)] += gas
+        }
+
+        for (service, gasUsed) in gasUsedMap {
+            let num = digestCounts[service] ?? 0
             if Int(gasUsed.value) + num == 0 { continue }
 
             accumulateStats[service] = (gasUsed, UInt32(num))
