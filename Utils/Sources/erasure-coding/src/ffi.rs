@@ -184,12 +184,7 @@ pub extern "C" fn reed_solomon_recovery(
         }
     }
 
-    match reed_solomon_simd::decode(
-        original_count,
-        recovery_count,
-        original_vec,
-        recovery_vec,
-    ) {
+    match reed_solomon_simd::decode(original_count, recovery_count, original_vec, recovery_vec) {
         Ok(restored) => {
             for i in 0..original_count {
                 if let Some(data) = restored.get(&i) {

@@ -74,6 +74,7 @@ format: githooks
 .PHONY: format-cargo
 format-cargo:
 	cargo fmt --manifest-path Utils/Sources/bandersnatch/Cargo.toml
+	cargo fmt --manifest-path Utils/Sources/erasure-coding/Cargo.toml
 
 .PHONY: format-all
 format-all: format format-cargo
