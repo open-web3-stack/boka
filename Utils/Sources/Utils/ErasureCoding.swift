@@ -11,6 +11,7 @@ public enum ErasureCoding {
         case reconstructFailed
         case invalidBasicSize(Int)
         case invalidShardsCount
+        case invalidShardIndex(UInt32)
     }
 
     public enum Constants {
@@ -189,6 +190,36 @@ public enum ErasureCoding {
         guard recoveryCount >= originalCount else { throw Error.invalidShardsCount }
         let parityCount = recoveryCount - originalCount
 
+        var originalShards: [InnerShard] = []
+        var parityShards: [InnerShard] = []
+
+        for shard in recovery {
+            guard let rawIndex = shard.index else {
+                throw Error.getIndexFailed(-1)
+            }
+
+            guard let data = shard.data else {
+                throw Error.getDataFailed(-1)
+            }
+
+            if rawIndex < UInt32(originalCount) {
+                try originalShards.append(InnerShard(data: data, index: rawIndex))
+                continue
+            }
+
+            let parityIndex: UInt32 = if rawIndex >= UInt32(originalCount) {
+                rawIndex - UInt32(originalCount)
+            } else {
+                rawIndex
+            }
+
+            guard parityIndex < UInt32(parityCount) else {
+                throw Error.invalidShardIndex(rawIndex)
+            }
+
+            try parityShards.append(InnerShard(data: data, index: parityIndex))
+        }
+
         // output original shards
         var originalPtrs = [UnsafeMutablePointer<UInt8>?](repeating: nil, count: originalCount)
         for i in 0 ..< originalCount {
@@ -203,22 +234,42 @@ public enum ErasureCoding {
         }
 
         // use arrays of OpaquePointer directly without copying SafePointer
-        var recoveryOpaquePtrs = [OpaquePointer?](repeating: nil, count: recovery.count)
+        var originalOpaquePtrs = [OpaquePointer?](repeating: nil, count: originalShards.count)
+        for (i, shard) in originalShards.enumerated() {
+            originalOpaquePtrs[i] = shard.ptr.value
+        }
 
-        for (i, shard) in recovery.enumerated() {
+        // Prefill known original shards so the output contains provided data even if FFI does not write it back.
+        for shard in originalShards {
+            guard
+                let idx = shard.index,
+                let data = shard.data,
+                idx < UInt32(originalCount)
+            else { continue }
+
+            data.copyBytes(to: originalPtrs[Int(idx)]!, count: min(data.count, shardSize))
+        }
+
+        var recoveryOpaquePtrs = [OpaquePointer?](repeating: nil, count: parityShards.count)
+
+        for (i, shard) in parityShards.enumerated() {
             recoveryOpaquePtrs[i] = shard.ptr.value
         }
 
         try FFIUtils.call { _ in
-            recoveryOpaquePtrs.withUnsafeBufferPointer { recoveryBuffer in
-                reed_solomon_recovery(
-                    UInt(originalCount),
-                    UInt(parityCount),
-                    recoveryBuffer.baseAddress,
-                    UInt(recovery.count),
-                    UInt(shardSize),
-                    &originalPtrs
-                )
+            originalOpaquePtrs.withUnsafeBufferPointer { originalBuffer in
+                recoveryOpaquePtrs.withUnsafeBufferPointer { recoveryBuffer in
+                    reed_solomon_recovery(
+                        UInt(originalCount),
+                        UInt(parityCount),
+                        originalBuffer.baseAddress,
+                        UInt(originalOpaquePtrs.count),
+                        recoveryBuffer.baseAddress,
+                        UInt(recoveryOpaquePtrs.count),
+                        UInt(shardSize),
+                        &originalPtrs
+                    )
+                }
             }
         } onErr: { err throws(Error) in
             throw .recoveryFailed(err)

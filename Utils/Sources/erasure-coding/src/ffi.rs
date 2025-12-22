@@ -143,6 +143,8 @@ pub extern "C" fn reed_solomon_encode(
 pub extern "C" fn reed_solomon_recovery(
     original_count: usize,
     recovery_count: usize,
+    original_shards: *const *const Shard,
+    original_len: usize,
     recovery_shards: *const *const Shard,
     recovery_len: usize,
     shard_size: usize,
@@ -156,8 +158,21 @@ pub extern "C" fn reed_solomon_recovery(
         return 2;
     }
 
+    let mut original_vec = Vec::new();
+    if original_len > 0 && !original_shards.is_null() {
+        for i in 0..original_len {
+            let shard_ptr = unsafe { *original_shards.add(i) };
+            let shard = unsafe { &*shard_ptr };
+
+            if !shard.data.is_null() {
+                let data = unsafe { slice::from_raw_parts(shard.data, shard_size) };
+                original_vec.push((shard.index as usize, data.to_vec()));
+            }
+        }
+    }
+
     let mut recovery_vec = Vec::new();
-    if recovery_len > 0 {
+    if recovery_len > 0 && !recovery_shards.is_null() {
         for i in 0..recovery_len {
             let shard_ptr = unsafe { *recovery_shards.add(i) };
             let shard = unsafe { &*shard_ptr };
@@ -172,7 +187,7 @@ pub extern "C" fn reed_solomon_recovery(
     match reed_solomon_simd::decode(
         original_count,
         recovery_count,
-        Vec::<(usize, Vec<u8>)>::new(),
+        original_vec,
         recovery_vec,
     ) {
         Ok(restored) => {
