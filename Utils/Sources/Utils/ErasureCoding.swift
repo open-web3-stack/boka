@@ -129,6 +129,7 @@ public enum ErasureCoding {
         }
 
         var originalBuffers: [UnsafeMutableBufferPointer<UInt8>] = []
+        originalBuffers.reserveCapacity(originalCount)
         for shard in original {
             let buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: shardSize)
             _ = buffer.initialize(from: shard)
@@ -136,6 +137,7 @@ public enum ErasureCoding {
         }
 
         var recoveryBuffers: [UnsafeMutableBufferPointer<UInt8>] = []
+        recoveryBuffers.reserveCapacity(parityCount)
         for _ in 0 ..< parityCount {
             let buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: shardSize)
             buffer.initialize(repeating: 0)
@@ -151,20 +153,21 @@ public enum ErasureCoding {
             }
         }
 
-        var originalPtrs = originalBuffers.map { UnsafePointer<UInt8>($0.baseAddress) }
-        var recoveryPtrs = recoveryBuffers.map(\.baseAddress)
+        let originalPtrs: [UnsafePointer<UInt8>?] = originalBuffers.map { UnsafePointer<UInt8>($0.baseAddress) }
+        var recoveryPtrs: [UnsafeMutablePointer<UInt8>?] = recoveryBuffers.map(\.baseAddress)
 
-        try FFIUtils.call { _ in
-            reed_solomon_encode(
-                &originalPtrs,
-                UInt(originalCount),
-                UInt(parityCount),
-                UInt(shardSize),
-                &recoveryPtrs
-            )
-        } onErr: { err throws(Error) in
-            throw .encodeFailed(err)
+        let ret = originalPtrs.withUnsafeBufferPointer { originalBuffer in
+            recoveryPtrs.withUnsafeMutableBufferPointer { recoveryBuffer in
+                reed_solomon_encode(
+                    originalBuffer.baseAddress,
+                    UInt(originalCount),
+                    UInt(parityCount),
+                    UInt(shardSize),
+                    recoveryBuffer.baseAddress
+                )
+            }
         }
+        if ret != 0 { throw Error.encodeFailed(Int(ret)) }
 
         var parity = [Data]()
         for i in 0 ..< parityCount {
@@ -221,10 +224,12 @@ public enum ErasureCoding {
         }
 
         // output original shards
-        var originalPtrs = [UnsafeMutablePointer<UInt8>?](repeating: nil, count: originalCount)
-        for i in 0 ..< originalCount {
-            originalPtrs[i] = UnsafeMutablePointer<UInt8>.allocate(capacity: shardSize)
-            originalPtrs[i]?.initialize(repeating: 0, count: shardSize)
+        var originalPtrs: [UnsafeMutablePointer<UInt8>?] = []
+        originalPtrs.reserveCapacity(originalCount)
+        for _ in 0 ..< originalCount {
+            let ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: shardSize)
+            ptr.initialize(repeating: 0, count: shardSize)
+            originalPtrs.append(ptr)
         }
 
         defer {
@@ -256,9 +261,9 @@ public enum ErasureCoding {
             recoveryOpaquePtrs[i] = shard.ptr.value
         }
 
-        try FFIUtils.call { _ in
-            originalOpaquePtrs.withUnsafeBufferPointer { originalBuffer in
-                recoveryOpaquePtrs.withUnsafeBufferPointer { recoveryBuffer in
+        let ret = originalOpaquePtrs.withUnsafeBufferPointer { originalBuffer in
+            recoveryOpaquePtrs.withUnsafeBufferPointer { recoveryBuffer in
+                originalPtrs.withUnsafeMutableBufferPointer { outputBuffer in
                     reed_solomon_recovery(
                         UInt(originalCount),
                         UInt(parityCount),
@@ -267,12 +272,13 @@ public enum ErasureCoding {
                         recoveryBuffer.baseAddress,
                         UInt(recoveryOpaquePtrs.count),
                         UInt(shardSize),
-                        &originalPtrs
+                        outputBuffer.baseAddress
                     )
                 }
             }
-        } onErr: { err throws(Error) in
-            throw .recoveryFailed(err)
+        }
+        if ret != 0 {
+            throw Error.recoveryFailed(Int(ret))
         }
 
         var recoveredShards = [Data](repeating: Data(), count: originalCount)
