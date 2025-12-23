@@ -3,7 +3,7 @@ import Foundation
 public protocol DataInput {
     /// read some data chunk
     /// throw when no more data
-    mutating func read(length: Int) throws -> Data
+    mutating func read(length: Int, codingPath: @autoclosure () -> [CodingKey]) throws -> Data
 
     mutating func readAll() throws -> Data
 
@@ -11,21 +11,21 @@ public protocol DataInput {
 }
 
 extension DataInput {
-    public mutating func read() throws -> UInt8 {
-        try read(length: 1).first!
+    public mutating func read(_ codingPath: @autoclosure () -> [CodingKey]) throws -> UInt8 {
+        try read(length: 1, codingPath: codingPath()).first!
     }
 
     public mutating func readAll() throws -> Data {
         try readAll()
     }
 
-    public mutating func decodeUInt64() throws -> UInt64 {
+    public mutating func decodeUInt64(_ codingPath: @autoclosure () -> [CodingKey]) throws -> UInt64 {
         // TODO: improve this by use `read(minLength: 8)` to avoid read byte by byte
-        let res = try IntegerCodec.decode { try self.read() }
+        let res = try IntegerCodec.decode { try self.read(codingPath()) }
         guard let res else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
-                    codingPath: [],
+                    codingPath: codingPath(),
                     debugDescription: "Not enough data to perform variable length integer decoding"
                 )
             )
@@ -35,11 +35,11 @@ extension DataInput {
 }
 
 extension Data: DataInput {
-    public mutating func read(length: Int) throws -> Data {
+    public mutating func read(length: Int, codingPath: @autoclosure () -> [CodingKey]) throws -> Data {
         guard count >= length else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
-                    codingPath: [],
+                    codingPath: codingPath(),
                     debugDescription: "Not enough data to decode \(length) bytes"
                 )
             )
