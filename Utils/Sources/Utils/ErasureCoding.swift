@@ -11,6 +11,7 @@ public enum ErasureCoding {
         case reconstructFailed
         case invalidBasicSize(Int)
         case invalidShardsCount
+        case invalidShardIndex(UInt32)
     }
 
     public enum Constants {
@@ -114,14 +115,21 @@ public enum ErasureCoding {
         }
     }
 
-    /// C: encode original shards into recovery shards
+    /// C: encode original shards into a systematic codeword of length `recoveryCount`
     static func encode(original: [Data], recoveryCount: Int) throws -> [Data] {
         guard !original.isEmpty else { return [] }
 
         let originalCount = original.count
         let shardSize = original[0].count
+        guard recoveryCount >= originalCount else { throw Error.invalidShardsCount }
+
+        let parityCount = recoveryCount - originalCount
+        if parityCount == 0 {
+            return original
+        }
 
         var originalBuffers: [UnsafeMutableBufferPointer<UInt8>] = []
+        originalBuffers.reserveCapacity(originalCount)
         for shard in original {
             let buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: shardSize)
             _ = buffer.initialize(from: shard)
@@ -129,7 +137,8 @@ public enum ErasureCoding {
         }
 
         var recoveryBuffers: [UnsafeMutableBufferPointer<UInt8>] = []
-        for _ in 0 ..< recoveryCount {
+        recoveryBuffers.reserveCapacity(parityCount)
+        for _ in 0 ..< parityCount {
             let buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: shardSize)
             buffer.initialize(repeating: 0)
             recoveryBuffers.append(buffer)
@@ -144,28 +153,29 @@ public enum ErasureCoding {
             }
         }
 
-        var originalPtrs = originalBuffers.map { UnsafePointer<UInt8>($0.baseAddress) }
-        var recoveryPtrs = recoveryBuffers.map(\.baseAddress)
+        let originalPtrs: [UnsafePointer<UInt8>?] = originalBuffers.map { UnsafePointer<UInt8>($0.baseAddress) }
+        var recoveryPtrs: [UnsafeMutablePointer<UInt8>?] = recoveryBuffers.map(\.baseAddress)
 
-        try FFIUtils.call { _ in
-            reed_solomon_encode(
-                &originalPtrs,
-                UInt(originalCount),
-                UInt(recoveryCount),
-                UInt(shardSize),
-                &recoveryPtrs
-            )
-        } onErr: { err throws(Error) in
-            throw .encodeFailed(err)
+        let ret = originalPtrs.withUnsafeBufferPointer { originalBuffer in
+            recoveryPtrs.withUnsafeMutableBufferPointer { recoveryBuffer in
+                reed_solomon_encode(
+                    originalBuffer.baseAddress,
+                    UInt(originalCount),
+                    UInt(parityCount),
+                    UInt(shardSize),
+                    recoveryBuffer.baseAddress
+                )
+            }
         }
+        if ret != 0 { throw Error.encodeFailed(Int(ret)) }
 
-        var recovery = [Data]()
-        for i in 0 ..< recoveryCount {
+        var parity = [Data]()
+        for i in 0 ..< parityCount {
             let data = Data(bytes: recoveryBuffers[i].baseAddress!, count: shardSize)
-            recovery.append(data)
+            parity.append(data)
         }
 
-        return recovery
+        return original + parity
     }
 
     /// R: recover original shards from recovery and/or original shards
@@ -180,11 +190,46 @@ public enum ErasureCoding {
         recovery: [InnerShard],
         shardSize: Int
     ) throws -> [Data] {
+        guard recoveryCount >= originalCount else { throw Error.invalidShardsCount }
+        let parityCount = recoveryCount - originalCount
+
+        var originalShards: [InnerShard] = []
+        var parityShards: [InnerShard] = []
+
+        for shard in recovery {
+            guard let rawIndex = shard.index else {
+                throw Error.getIndexFailed(-1)
+            }
+
+            guard let data = shard.data else {
+                throw Error.getDataFailed(-1)
+            }
+
+            if rawIndex < UInt32(originalCount) {
+                try originalShards.append(InnerShard(data: data, index: rawIndex))
+                continue
+            }
+
+            let parityIndex: UInt32 = if rawIndex >= UInt32(originalCount) {
+                rawIndex - UInt32(originalCount)
+            } else {
+                rawIndex
+            }
+
+            guard parityIndex < UInt32(parityCount) else {
+                throw Error.invalidShardIndex(rawIndex)
+            }
+
+            try parityShards.append(InnerShard(data: data, index: parityIndex))
+        }
+
         // output original shards
-        var originalPtrs = [UnsafeMutablePointer<UInt8>?](repeating: nil, count: originalCount)
-        for i in 0 ..< originalCount {
-            originalPtrs[i] = UnsafeMutablePointer<UInt8>.allocate(capacity: shardSize)
-            originalPtrs[i]?.initialize(repeating: 0, count: shardSize)
+        var originalPtrs: [UnsafeMutablePointer<UInt8>?] = []
+        originalPtrs.reserveCapacity(originalCount)
+        for _ in 0 ..< originalCount {
+            let ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: shardSize)
+            ptr.initialize(repeating: 0, count: shardSize)
+            originalPtrs.append(ptr)
         }
 
         defer {
@@ -194,25 +239,46 @@ public enum ErasureCoding {
         }
 
         // use arrays of OpaquePointer directly without copying SafePointer
-        var recoveryOpaquePtrs = [OpaquePointer?](repeating: nil, count: recovery.count)
+        var originalOpaquePtrs = [OpaquePointer?](repeating: nil, count: originalShards.count)
+        for (i, shard) in originalShards.enumerated() {
+            originalOpaquePtrs[i] = shard.ptr.value
+        }
 
-        for (i, shard) in recovery.enumerated() {
+        // Prefill known original shards so the output contains provided data even if FFI does not write it back.
+        for shard in originalShards {
+            guard
+                let idx = shard.index,
+                let data = shard.data,
+                idx < UInt32(originalCount)
+            else { continue }
+
+            data.copyBytes(to: originalPtrs[Int(idx)]!, count: min(data.count, shardSize))
+        }
+
+        var recoveryOpaquePtrs = [OpaquePointer?](repeating: nil, count: parityShards.count)
+
+        for (i, shard) in parityShards.enumerated() {
             recoveryOpaquePtrs[i] = shard.ptr.value
         }
 
-        try FFIUtils.call { _ in
+        let ret = originalOpaquePtrs.withUnsafeBufferPointer { originalBuffer in
             recoveryOpaquePtrs.withUnsafeBufferPointer { recoveryBuffer in
-                reed_solomon_recovery(
-                    UInt(originalCount),
-                    UInt(recoveryCount),
-                    recoveryBuffer.baseAddress,
-                    UInt(recovery.count),
-                    UInt(shardSize),
-                    &originalPtrs
-                )
+                originalPtrs.withUnsafeMutableBufferPointer { outputBuffer in
+                    reed_solomon_recovery(
+                        UInt(originalCount),
+                        UInt(parityCount),
+                        originalBuffer.baseAddress,
+                        UInt(originalOpaquePtrs.count),
+                        recoveryBuffer.baseAddress,
+                        UInt(recoveryOpaquePtrs.count),
+                        UInt(shardSize),
+                        outputBuffer.baseAddress
+                    )
+                }
             }
-        } onErr: { err throws(Error) in
-            throw .recoveryFailed(err)
+        }
+        if ret != 0 {
+            throw Error.recoveryFailed(Int(ret))
         }
 
         var recoveredShards = [Data](repeating: Data(), count: originalCount)
@@ -233,10 +299,16 @@ public enum ErasureCoding {
     /// - Returns: the list of smaller data chunks
     public static func chunk(data: Data, basicSize: Int, recoveryCount: Int) throws -> [Data] {
         guard basicSize % 2 == 0 else { throw Error.invalidBasicSize(basicSize) }
+        guard !data.isEmpty else { return [] }
 
-        let k = data.count / basicSize
+        let k = (data.count + basicSize - 1) / basicSize
+        let paddedLength = k * basicSize
+        var padded = data
+        if padded.count < paddedLength {
+            padded.append(contentsOf: repeatElement(0, count: paddedLength - padded.count))
+        }
 
-        let splitted = split(data: data, n: 2 * k)
+        let splitted = split(data: padded, n: 2 * k)
 
         let splitted2 = splitted.map { split(data: $0, n: Constants.INNER_SHARD_SIZE) }
 
@@ -245,8 +317,8 @@ public enum ErasureCoding {
         var result2d: [[Data]] = []
 
         for original in originalShards {
-            let recoveryShards = try encode(original: original, recoveryCount: recoveryCount)
-            result2d.append(recoveryShards)
+            let codeword = try encode(original: original, recoveryCount: recoveryCount)
+            result2d.append(codeword)
         }
 
         let transposed = transpose(result2d)
@@ -260,11 +332,29 @@ public enum ErasureCoding {
     ///   - basicSize: ≈ 2 * number of cores; 684 for full config
     ///   - originalCount: the total number of original items
     ///   - recoveryCount: the total number of recovery items
+    ///   - originalLength: optional original data length, used to drop padding when known
     /// - Returns: the reconstructed original data
-    public static func reconstruct(shards: [Shard], basicSize: Int, originalCount: Int, recoveryCount: Int) throws -> Data {
+    public static func reconstruct(
+        shards: [Shard],
+        basicSize: Int,
+        originalCount: Int,
+        recoveryCount: Int,
+        originalLength: Int? = nil
+    ) throws -> Data {
         guard !shards.isEmpty else { return Data() }
         guard basicSize % 2 == 0 else { throw Error.invalidBasicSize(basicSize) }
         guard shards.count >= originalCount else { throw Error.invalidShardsCount }
+
+        // Fast path: all original shards are available
+        let originalMap = Dictionary(uniqueKeysWithValues: shards.map { (Int($0.index), $0.data) })
+        let availableOriginals = (0 ..< originalCount).compactMap { originalMap[$0] }
+        if availableOriginals.count == originalCount {
+            let reconstructed = join(arr: availableOriginals)
+            if let originalLength {
+                return reconstructed.prefix(originalLength)
+            }
+            return reconstructed
+        }
 
         let shardSize = shards[0].data.count
         let k = (shardSize + Constants.INNER_SHARD_SIZE - 1) / Constants.INNER_SHARD_SIZE
@@ -292,6 +382,10 @@ public enum ErasureCoding {
 
         let transposed = transpose(result2d)
 
-        return join(arr: transposed.map { join(arr: $0) })
+        let reconstructed = join(arr: transposed.map { join(arr: $0) })
+        if let originalLength {
+            return reconstructed.prefix(originalLength)
+        }
+        return reconstructed
     }
 }

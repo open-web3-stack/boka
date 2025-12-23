@@ -25,11 +25,22 @@ jobs:
       with:
         args: --config .swiftlint.yml --strict
 
+  cargo-format:
+    name: Cargo Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - run: cargo +nightly fmt --all -- --check
+
   test:
     name: Build and Test (${{ matrix.config }})
     runs-on: [self-hosted, linux]
     timeout-minutes: 90
     strategy:
+      fail-fast: false
       matrix:
         config: [debug, release]
     steps:
@@ -103,8 +114,6 @@ jobs:
       uses: dtolnay/rust-toolchain@nightly
       with:
         components: rustfmt
-    - name: Check rust format
-      run: cargo +nightly fmt --all -- --check
     - name: Build (Debug)
       if: matrix.config == 'debug'
       run: make build

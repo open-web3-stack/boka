@@ -103,7 +103,7 @@ jobs:
                 llvm-cov export "${XCTEST_PATH}" \
                 -instr-profile=default.profdata \
                 -format lcov >> coverage.lcov \
-                -ignore-filename-regex=".build/repositories/*"
+                -ignore-filename-regex=".build/repositories/.*|.*/JAMTests/.*"
             done
           done
       - uses: codecov/codecov-action@v4

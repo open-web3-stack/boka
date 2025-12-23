@@ -9,6 +9,7 @@ public enum GuaranteeingServiceError: Error, Equatable {
     case invalidExports
     case invalidWorkPackage
     case invalidBundle
+    case bundleSizeExceeded
     case segmentsRootNotFound
     case notValidator
     case invalidCore
@@ -135,7 +136,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
     /**
      * Validates a work package bundle and its associated segments root mappings.
      *
-     * As per GP section 14.1, this validates the work package authorization
+     * As per GP section 14, this validates the work package authorization
      * and ensures all required conditions are met before guaranteeing.
      *
      * @param bundle The work package bundle to validate
@@ -154,12 +155,13 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         }
 
         try validateImportedSegments(bundle)
+        try validateBundleSize(bundle)
     }
 
     /**
      * Validates that the imported segments in a bundle match the work items' input declarations.
      *
-     * This is part of the validation process described in GP section 14.1, ensuring
+     * This is part of the validation process described in GP section 14, ensuring
      * that all declared inputs are present and valid.
      *
      * @param bundle The work package bundle to validate
@@ -172,15 +174,35 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                          metadata: ["expected": "\(importSegmentCount)", "actual": "\(bundle.importSegments.count)"])
             throw GuaranteeingServiceError.invalidImportSegmentCount
         }
+    }
 
-        // TODO: implement additional validation of segment content
+    /**
+     * Validate bundle size
+     *
+     * @param bundle The work package bundle to validate
+     */
+    func validateBundleSize(_ bundle: WorkPackageBundle) throws {
+        let bundleSize = bundle.workPackage.authorizationToken.count
+            + bundle.workPackage.configurationBlob.count
+            + bundle.workPackage.workItems.array.reduce(0) { total, item in
+                let extrinsicsSize = item.outputs.reduce(0) { $0 + Int($1.length) }
+                return total + item.payloadBlob.count
+                    + item.inputs.count * config.value.segmentFootprint
+                    + extrinsicsSize
+            }
+
+        guard bundleSize <= config.value.maxEncodedWorkPackageSize else {
+            logger.debug("Bundle size exceeds limit",
+                         metadata: ["actual": "\(bundleSize)", "limit": "\(config.value.maxEncodedWorkPackageSize)"])
+            throw GuaranteeingServiceError.bundleSizeExceeded
+        }
     }
 
     /**
      * Processes a work package bundle to create a work report.
      * This is the core function that validates, processes, and generates a work report from a bundle.
      *
-     * As per GP section 14.2, this implements the work-report creation process:
+     * As per GP section 14.4, this implements the work-report creation process:
      * r = Ξ(p, c) where p is the work package and c is the core index.
      *
      * @param coreIndex The core index to process the bundle for
@@ -242,10 +264,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      * and distributing the final work report.
      *
      * This implements the full guaranteeing workflow described in GP section 14:
-     * - Validates the work package (GP 14.1)
-     * - Creates a work report (GP 14.2)
-     * - Collects signatures from other validators (GP 14.4-14.5)
-     * - Distributes the signed work report (GP 14.5)
+     * - Validates the work package
+     * - Creates a work report
+     * - Collects signatures from other validators
+     * - Distributes the signed work report
      *
      * @param coreIndex The core index to process the work package for
      * @param workPackage The work package to process
@@ -398,7 +420,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
     /**
      * Validates a segments root mapping against a work package.
      *
-     * This is part of the validation process described in GP section 14.1,
+     * This is part of the validation process described in GP section 14.4,
      * ensuring that segment root mappings are valid and properly formed.
      *
      * @param mapping The mapping to validate
@@ -429,7 +451,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      * 2. The service account exists and has appropriate permissions
      * 3. The code hash matches the expected value
      *
-     * As per GP section 14.1, this validates the work package against the
+     * As per GP section 14.3, this validates the work package against the
      * authorization pool in the most recent chain state.
      *
      * @param workPackage The work package to validate
@@ -473,11 +495,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
     /**
      * Validates a work package by verifying:
      * 1. The work items are valid
-     * 2. The service accounts exist and are authorized
-     * 3. The gas limits are within bounds
-     * 4. The refinement context is valid
+     * 2. The gas limits are within bounds
+     * 3. The refinement context is valid
      *
-     * This implements the validation requirements described in GP section 14.1,
+     * This implements the validation requirements described in GP section 14.3,
      * ensuring the work package meets all requirements before processing.
      *
      * @param workPackage The work package to validate
@@ -489,42 +510,35 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             throw GuaranteeingServiceError.invalidWorkPackage
         }
 
-        // Validate max gas usage
-        var totalGas = Gas(0)
+        // Validate gas limits
+        var totalRefineGas = Gas(0)
+        var totalAccumulateGas = Gas(0)
+
         for item in workPackage.workItems {
-            totalGas += item.refineGasLimit
-
-            // Check gas limits
-            let maxWorkItemRefineGas = Gas(1_000_000_000) // Default maximum refine gas
-            guard item.refineGasLimit <= maxWorkItemRefineGas else {
-                logger.debug("Work item refine gas exceeds limit",
-                             metadata: ["actual": "\(item.refineGasLimit)", "limit": "\(maxWorkItemRefineGas)"])
-                throw GuaranteeingServiceError.invalidWorkPackage
-            }
-
-            let maxWorkItemAccumulateGas = Gas(1_000_000) // Default maximum accumulate gas
-            guard item.accumulateGasLimit <= maxWorkItemAccumulateGas else {
-                logger.debug("Work item accumulate gas exceeds limit",
-                             metadata: ["actual": "\(item.accumulateGasLimit)", "limit": "\(maxWorkItemAccumulateGas)"])
-                throw GuaranteeingServiceError.invalidWorkPackage
-            }
+            totalRefineGas += item.refineGasLimit
+            totalAccumulateGas += item.accumulateGasLimit
         }
 
-        // Check total gas usage
-        let maxWorkPackageTotalGas = Gas(5_000_000_000) // Default maximum total gas
-        guard totalGas <= maxWorkPackageTotalGas else {
-            logger.debug("Work package total gas exceeds limit",
-                         metadata: ["actual": "\(totalGas)", "limit": "\(maxWorkPackageTotalGas)"])
+        // Check total refine gas
+        guard totalRefineGas < config.value.workPackageRefineGas else {
+            logger.debug("Work package total refine gas exceeds limit",
+                         metadata: ["actual": "\(totalRefineGas)", "limit": "\(config.value.workPackageRefineGas)"])
+            throw GuaranteeingServiceError.invalidWorkPackage
+        }
+
+        // Check total accumulate gas
+        guard totalAccumulateGas < config.value.workReportAccumulationGas else {
+            logger.debug("Work package total accumulate gas exceeds limit",
+                         metadata: ["actual": "\(totalAccumulateGas)", "limit": "\(config.value.workReportAccumulationGas)"])
             throw GuaranteeingServiceError.invalidWorkPackage
         }
 
         // Validate the refinement context
         let context = workPackage.context
-        let maxPrerequisiteWorkPackages = 8 // Default maximum prerequisite work packages
-        guard context.prerequisiteWorkPackages.count <= maxPrerequisiteWorkPackages else {
+        guard context.prerequisiteWorkPackages.count <= config.value.maxDepsInWorkReport else {
             logger.debug("Too many prerequisite work packages",
                          metadata: ["count": "\(context.prerequisiteWorkPackages.count)",
-                                    "limit": "\(maxPrerequisiteWorkPackages)"])
+                                    "limit": "\(config.value.maxDepsInWorkReport)"])
             throw GuaranteeingServiceError.invalidWorkPackage
         }
     }

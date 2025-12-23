@@ -157,4 +157,31 @@ func createShards(from data: Data, count: Int) -> [Data] {
         )
         #expect(recovered2 == originalData)
     }
+
+    @Test func testRecoverWithParityOnly() throws {
+        let dataLength = 32
+        let originalCount = 2
+        let recoveryCount = 5
+        let shardSize = (dataLength + originalCount - 1) / originalCount
+
+        let originalData = Data((0 ..< dataLength).map { UInt8($0 % 256) })
+        let originalShards = createShards(from: originalData, count: originalCount)
+
+        let encoded = try ErasureCoding.encode(original: originalShards, recoveryCount: recoveryCount)
+
+        var parityOnly: [ErasureCoding.InnerShard] = []
+        for i in originalCount ..< recoveryCount {
+            try parityOnly.append(.init(data: encoded[i], index: UInt32(i)))
+        }
+
+        let recovered = try ErasureCoding.recover(
+            originalCount: originalCount,
+            recoveryCount: recoveryCount,
+            recovery: parityOnly,
+            shardSize: shardSize
+        )
+
+        let recoveredData = recovered.reduce(Data(), +)
+        #expect(recoveredData == originalData)
+    }
 }

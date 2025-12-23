@@ -46,6 +46,7 @@ struct ErasureTests {
             basicSize: basicSize,
             originalCount: originalCount,
             recoveryCount: recoveryCount,
+            originalLength: testcase.data.count
         )
 
         #expect(reconstructedData == testcase.data, "Reconstructed data does not match original")
@@ -53,15 +54,11 @@ struct ErasureTests {
 
     @Test(arguments: try ErasureTests.loadTests(variant: .tiny))
     func tinyTests(_ testcase: Testcase) throws {
-        withKnownIssue("TODO: test does not match GP", isIntermittent: true) {
-            try erasureTests(testcase, variant: .tiny)
-        }
+        try erasureTests(testcase, variant: .tiny)
     }
 
     @Test(arguments: try ErasureTests.loadTests(variant: .full))
     func fullTests(_ testcase: Testcase) throws {
-        withKnownIssue("TODO: test does not match GP", isIntermittent: true) {
-            try erasureTests(testcase, variant: .full)
-        }
+        try erasureTests(testcase, variant: .full)
     }
 }
