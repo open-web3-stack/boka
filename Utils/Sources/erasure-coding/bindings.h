@@ -23,6 +23,8 @@ intptr_t reed_solomon_encode(const uint8_t *const *original,
 
 intptr_t reed_solomon_recovery(uintptr_t original_count,
                                uintptr_t recovery_count,
+                               const struct Shard *const *original_shards,
+                               uintptr_t original_len,
                                const struct Shard *const *recovery_shards,
                                uintptr_t recovery_len,
                                uintptr_t shard_size,

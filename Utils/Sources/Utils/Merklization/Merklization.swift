@@ -98,7 +98,7 @@ public enum Merklization {
         hasher: Hashing.Type = Blake2b256.self
     ) -> [Data32] {
         let length = UInt32(nodes.count)
-        let newLength = Int(length.nextPowerOfTwo ?? 0)
+        let newLength = Int(max(1, length).nextPowerOfTwo ?? 0)
         var res: [Data32] = []
         res.reserveCapacity(newLength)
         for node in nodes {

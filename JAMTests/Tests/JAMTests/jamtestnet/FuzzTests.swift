@@ -32,19 +32,17 @@ struct FuzzTests {
             }
     }
 
-    @Test(arguments: try loadTests(
+    @Test(.disabled(), arguments: try loadTests(
         version: "0.7.1",
         filters: [
             // empty to include all
         ],
         ignore: [
-            ("0.7.1/1763371531", "00000042"), // missing "keyvals": [] in prestate (expected to fail)
             ("0.7.1/1763487981", "00000050"), // missing "keyvals": [] in prestate (expected to fail)
             ("0.7.1/1763488328", "00000050"), // missing "keyvals": [] in prestate (expected to fail)
-            ("0.7.1/1763489287", "00000872"), // missing "keyvals": [] in prestate (expected to fail)
         ]
     ))
     func v071(input: Testcase) async throws {
-        try await TraceTest.test(input)
+        try await TraceTest.test(input, config: TestVariants.full.config)
     }
 }

@@ -5,3 +5,4 @@ members = [
 	"Utils/Sources/ed25519-zebra",
 	"Utils/Sources/erasure-coding",
 ]
+resolver = "2"

@@ -1,8 +1,8 @@
 use std::{ptr, slice};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Shard {
-    data: *mut u8,
+    data: Vec<u8>,
     index: u32,
 }
 
@@ -20,16 +20,12 @@ pub extern "C" fn shard_new(
     unsafe {
         let data_slice = slice::from_raw_parts(data, data_len);
 
-        let mut data_vec = Vec::with_capacity(data_len);
-        data_vec.extend_from_slice(data_slice);
+        let data_vec = data_slice.to_vec();
 
         let shard = Shard {
-            data: data_vec.as_mut_ptr(),
+            data: data_vec,
             index,
         };
-
-        // Prevent Vec from deallocating the memory (hand it over to the Shard)
-        std::mem::forget(data_vec);
 
         *out = Box::into_raw(Box::new(shard));
     }
@@ -41,10 +37,7 @@ pub extern "C" fn shard_new(
 pub extern "C" fn shard_free(shard: *mut Shard) {
     if !shard.is_null() {
         unsafe {
-            let shard = Box::from_raw(shard);
-            if !shard.data.is_null() {
-                drop(Box::from_raw(shard.data));
-            }
+            drop(Box::from_raw(shard));
         }
     }
 }
@@ -57,11 +50,7 @@ pub extern "C" fn shard_get_data(shard: *const Shard, out_data: *mut *const u8) 
 
     unsafe {
         let shard_ref = &*shard;
-        if shard_ref.data.is_null() {
-            return 2;
-        }
-
-        *out_data = shard_ref.data;
+        *out_data = shard_ref.data.as_ptr();
     }
 
     0
@@ -143,6 +132,8 @@ pub extern "C" fn reed_solomon_encode(
 pub extern "C" fn reed_solomon_recovery(
     original_count: usize,
     recovery_count: usize,
+    original_shards: *const *const Shard,
+    original_len: usize,
     recovery_shards: *const *const Shard,
     recovery_len: usize,
     shard_size: usize,
@@ -156,25 +147,29 @@ pub extern "C" fn reed_solomon_recovery(
         return 2;
     }
 
+    let mut original_vec = Vec::new();
+    if original_len > 0 && !original_shards.is_null() {
+        for i in 0..original_len {
+            let shard_ptr = unsafe { *original_shards.add(i) };
+            let shard = unsafe { &*shard_ptr };
+
+            let data = shard.data.as_slice();
+            original_vec.push((shard.index as usize, data.to_vec()));
+        }
+    }
+
     let mut recovery_vec = Vec::new();
-    if recovery_len > 0 {
+    if recovery_len > 0 && !recovery_shards.is_null() {
         for i in 0..recovery_len {
             let shard_ptr = unsafe { *recovery_shards.add(i) };
             let shard = unsafe { &*shard_ptr };
 
-            if !shard.data.is_null() {
-                let data = unsafe { slice::from_raw_parts(shard.data, shard_size) };
-                recovery_vec.push((shard.index as usize, data.to_vec()));
-            }
+            let data = shard.data.as_slice();
+            recovery_vec.push((shard.index as usize, data.to_vec()));
         }
     }
 
-    match reed_solomon_simd::decode(
-        original_count,
-        recovery_count,
-        Vec::<(usize, Vec<u8>)>::new(),
-        recovery_vec,
-    ) {
+    match reed_solomon_simd::decode(original_count, recovery_count, original_vec, recovery_vec) {
         Ok(restored) => {
             for i in 0..original_count {
                 if let Some(data) = restored.get(&i) {
@@ -199,6 +194,30 @@ pub extern "C" fn reed_solomon_recovery(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    fn make_shard(data: &[u8], index: u32) -> *mut Shard {
+        let mut out = std::ptr::null_mut();
+        let ret = shard_new(data.as_ptr(), data.len(), index, &mut out);
+        assert_eq!(ret, 0, "shard_new failed with code {ret}");
+        out
+    }
+
+    #[test]
+    fn shard_roundtrip() {
+        let data = [1u8, 2, 3, 4];
+        let shard_ptr = make_shard(&data, 7);
+        let mut out_data = std::ptr::null();
+        let mut out_index: u32 = 0;
+        unsafe {
+            assert_eq!(shard_get_data(shard_ptr, &mut out_data), 0);
+            assert_eq!(shard_get_index(shard_ptr, &mut out_index), 0);
+            assert_eq!(out_index, 7);
+            let slice = std::slice::from_raw_parts(out_data, data.len());
+            assert_eq!(slice, data);
+            shard_free(shard_ptr);
+        }
+    }
 
     #[test]
     fn debug_original_reed_solomon_encode_recover() {
@@ -251,6 +270,62 @@ mod tests {
                 println!("Shard {}: {:?}", i, data);
                 assert_eq!(*data, original_data[i]);
             }
+        }
+    }
+
+    #[test]
+    fn ffi_encode_recover_parity_only_roundtrip() {
+        let original_count = 2;
+        let parity_count = 3; // matches Swift usage (recoveryCount - originalCount)
+        let shard_size = 4usize;
+
+        let original_data = vec![vec![1u8, 2, 3, 4], vec![5u8, 6, 7, 8]];
+
+        let original_ptrs: Vec<*const u8> = original_data.iter().map(|v| v.as_ptr()).collect();
+        let mut recovery_buffers: Vec<Vec<u8>> = vec![vec![0u8; shard_size]; parity_count];
+        let mut recovery_ptrs: Vec<*mut u8> = recovery_buffers
+            .iter_mut()
+            .map(|v| v.as_mut_ptr())
+            .collect();
+
+        let ret = reed_solomon_encode(
+            original_ptrs.as_ptr(),
+            original_count,
+            parity_count,
+            shard_size,
+            recovery_ptrs.as_mut_ptr(),
+        );
+        assert_eq!(ret, 0, "reed_solomon_encode failed with {ret}");
+
+        let mut recovery_shards: Vec<*mut Shard> = Vec::new();
+        for (i, buf) in recovery_buffers.iter().enumerate() {
+            let shard = make_shard(buf, i as u32);
+            recovery_shards.push(shard);
+        }
+        let recovery_shards_const: Vec<*const Shard> =
+            recovery_shards.iter().map(|&p| p as *const Shard).collect();
+
+        // Output buffers
+        let mut out_original: Vec<Vec<u8>> = vec![vec![0u8; shard_size]; original_count];
+        let mut out_ptrs: Vec<*mut u8> = out_original.iter_mut().map(|v| v.as_mut_ptr()).collect();
+
+        let ret = reed_solomon_recovery(
+            original_count,
+            parity_count,
+            std::ptr::null(),
+            0,
+            recovery_shards_const.as_ptr(),
+            recovery_shards_const.len(),
+            shard_size,
+            out_ptrs.as_mut_ptr(),
+        );
+        assert_eq!(ret, 0, "reed_solomon_recovery failed with {ret}");
+
+        assert_eq!(out_original, original_data);
+
+        // free shards
+        for shard in recovery_shards {
+            shard_free(shard);
         }
     }
 }

@@ -124,7 +124,7 @@ public class Fetch: HostCall {
             }
         case 8:
             if let workPackage {
-                value = try JamEncoder.encode(workPackage.authorizationCodeHash, workPackage.configurationBlob)
+                value = workPackage.configurationBlob
             }
         case 9:
             if let workPackage {
@@ -726,7 +726,8 @@ public class Invoke: HostCall {
 
         switch exitReason {
         case let .hostCall(callIndex):
-            context.pvms[pvmIndex]?.pc = innerPvm.pc + 1
+            let skip = program.skip(innerPvm.pc)
+            context.pvms[pvmIndex]?.pc = innerPvm.pc + skip + 1
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCodeInner.HOST.rawValue)
             state.writeRegister(Registers.Index(raw: 8), callIndex)
         case let .pageFault(addr):
@@ -1054,35 +1055,55 @@ public class Transfer: HostCall {
         self.x = x
     }
 
-    public func gasCost(state: VMState) -> Gas {
-        let reg9: UInt64 = state.readRegister(Registers.Index(raw: 9))
-        return Gas(10) + Gas(reg9)
-    }
+    // GP v0.7.2: g = 10 + t, where t = gasLimit when OK, 0 otherwise
+    // We override call() to implement conditional gas charging
+    public func call(config: ProtocolConfigRef, state: VMState) async -> ExecOutcome {
+        logger.debug("===== host call: \(Self.self) =====")
 
-    public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
+        state.consumeGas(Gas(10))
+        logger.debug("consumed base 10 gas, \(state.getGas()) left")
+
+        guard state.getGas() >= GasInt(0) else {
+            logger.debug("not enough gas")
+            return .exit(.outOfGas)
+        }
+
         let regs: [UInt64] = state.readRegisters(in: 7 ..< 11)
         let amount = Balance(regs[1])
         let gasLimit = Gas(regs[2])
         let memo = try? state.readMemory(address: regs[3], length: config.value.transferMemoSize)
         let dest = UInt32(truncatingIfNeeded: regs[0])
 
-        let srcAccount = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex)
-
-        let destAccount = try await x.state.accounts.value.get(serviceAccount: dest)
+        let srcAccount = try? await x.state.accounts.value.get(serviceAccount: x.serviceIndex)
+        let destAccount = try? await x.state.accounts.value.get(serviceAccount: dest)
 
         logger.debug("src: \(x.serviceIndex), dest: \(dest), amount: \(amount), gasLimit: \(gasLimit)")
         logger.debug("dest is found: \(destAccount != nil)")
 
+        let (resultCode, additionalGas): (UInt64, Gas)
+
         if memo == nil {
-            throw VMInvocationsError.panic
+            return .exit(.panic(.trap))
         } else if destAccount == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
+            (resultCode, additionalGas) = (HostCallResultCode.WHO.rawValue, Gas(0))
         } else if gasLimit < destAccount!.minMemoGas {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.LOW.rawValue)
+            (resultCode, additionalGas) = (HostCallResultCode.LOW.rawValue, Gas(0))
         } else if let srcAccount, srcAccount.balance - amount < srcAccount.thresholdBalance(config: config) {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.CASH.rawValue)
-        } else if var srcAccount {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
+            (resultCode, additionalGas) = (HostCallResultCode.CASH.rawValue, Gas(0))
+        } else {
+            (resultCode, additionalGas) = (HostCallResultCode.OK.rawValue, gasLimit)
+        }
+
+        state.consumeGas(additionalGas)
+        logger.debug("consumed additional \(additionalGas) gas, \(state.getGas()) left")
+
+        guard state.getGas() >= GasInt(0) else {
+            logger.debug("not enough gas for additional charge")
+            return .exit(.outOfGas)
+        }
+
+        state.writeRegister(Registers.Index(raw: 7), resultCode)
+        if resultCode == HostCallResultCode.OK.rawValue, var srcAccount {
             x.transfers.append(DeferredTransfers(
                 sender: x.serviceIndex,
                 destination: dest,
@@ -1093,6 +1114,12 @@ public class Transfer: HostCall {
             srcAccount.balance -= amount
             x.state.accounts.set(serviceAccount: x.serviceIndex, account: srcAccount)
         }
+
+        return .continued
+    }
+
+    public func _callImpl(config _: ProtocolConfigRef, state _: VMState) async throws {
+        // Not used - we override call() instead
     }
 }
 
@@ -1415,7 +1442,7 @@ public class Log: HostCall {
     }()
 
     public func gasCost(state _: VMState) -> Gas {
-        Gas(0)
+        Gas(10)
     }
 
     public enum Level: UInt32, Codable {
@@ -1511,5 +1538,8 @@ public class Log: HostCall {
         default:
             logger.error("Invalid log level: \(level)")
         }
+
+        // always return WHAT
+        state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHAT.rawValue)
     }
 }
