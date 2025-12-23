@@ -76,6 +76,7 @@ extension ExtrinsicGuarantees: Validate {
         case invalidCoreIndex
         case invalidValidatorIndex
         case credentialsNotSorted
+        case invalidCredentialCount
         case duplicatedWorkPackageHash
     }
 
@@ -89,6 +90,12 @@ extension ExtrinsicGuarantees: Validate {
         for guarantee in guarantees {
             guard guarantee.workReport.coreIndex < UInt32(config.value.totalNumberOfCores) else {
                 throw Error.invalidCoreIndex
+            }
+
+            do {
+                try guarantee.credential.validateThrowing()
+            } catch {
+                throw Error.invalidCredentialCount
             }
 
             guard guarantee.credential.isSortedAndUnique(by: { $0.index < $1.index }) else {
