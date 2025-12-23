@@ -113,15 +113,15 @@ private class DecodeContext: Decoder {
         JamSingleValueDecodingContainer(codingPath: codingPath, decoder: self)
     }
 
-    fileprivate func decodeInt<T: FixedWidthInteger>(codingPath _: @autoclosure () -> [CodingKey]) throws -> T {
-        let data = try input.read(length: MemoryLayout<T>.size)
+    fileprivate func decodeInt<T: FixedWidthInteger>(codingPath: @autoclosure () -> [CodingKey]) throws -> T {
+        let data = try input.read(length: MemoryLayout<T>.size, codingPath: codingPath())
         return data.withUnsafeBytes { ptr in
             ptr.loadUnaligned(as: T.self)
         }
     }
 
     fileprivate func decodeCompact<T: FixedWidthInteger>(codingPath: @autoclosure () -> [CodingKey]) throws -> T {
-        let value = try input.decodeUInt64()
+        let value = try input.decodeUInt64(codingPath())
         guard let res = T(exactly: value) else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
@@ -138,7 +138,7 @@ private class DecodeContext: Decoder {
         if path.isEmpty {
             return try input.readAll()
         }
-        let length = try input.decodeUInt64()
+        let length = try input.decodeUInt64(path)
         // sanity check: length must be less than 4gb
         guard length < 0x1_0000_0000 else {
             throw DecodingError.dataCorrupted(
@@ -148,7 +148,7 @@ private class DecodeContext: Decoder {
                 )
             )
         }
-        let res = try input.read(length: Int(length))
+        let res = try input.read(length: Int(length), codingPath: path)
         return res
     }
 
@@ -157,7 +157,7 @@ private class DecodeContext: Decoder {
         if path.isEmpty {
             return try [UInt8](input.readAll())
         }
-        let length = try input.decodeUInt64()
+        let length = try input.decodeUInt64(path)
         // sanity check: length must be less than 4gb
         guard length < 0x1_0000_0000 else {
             throw DecodingError.dataCorrupted(
@@ -167,12 +167,12 @@ private class DecodeContext: Decoder {
                 )
             )
         }
-        let res = try input.read(length: Int(length))
+        let res = try input.read(length: Int(length), codingPath: path)
         return Array(res)
     }
 
     fileprivate func decodeArray<T: ArrayWrapper>(_ type: T.Type, key: CodingKey?) throws -> T {
-        let length = try input.decodeUInt64()
+        let length = try input.decodeUInt64(codingPath)
         // sanity check: length can't be unreasonably large
         guard length < 0xFFFFFF else {
             throw DecodingError.dataCorrupted(
@@ -193,13 +193,13 @@ private class DecodeContext: Decoder {
     fileprivate func decodeFixedLengthData<T: FixedLengthData>(_ type: T.Type, key: CodingKey?) throws -> T {
         try withExtendedLifetime(PushCodingPath(decoder: self, key: key)) {
             let length = try type.length(decoder: self)
-            let data = try input.read(length: length)
+            let data = try input.read(length: length, codingPath: codingPath)
             return try type.init(decoder: self, data: data)
         }
     }
 
     fileprivate func decodeOptional<T: Decodable>(_ type: T.Type, key: CodingKey?) throws -> T? {
-        let byte = try input.read()
+        let byte = try input.read(codingPath)
         switch byte {
         case 0:
             return nil
@@ -251,12 +251,12 @@ private struct JamKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPr
     }
 
     func decodeNil(forKey _: K) throws -> Bool {
-        let byte = try decoder.input.read()
+        let byte = try decoder.input.read(codingPath)
         return byte == 0
     }
 
     func decode(_: Bool.Type, forKey _: K) throws -> Bool {
-        let byte = try decoder.input.read()
+        let byte = try decoder.input.read(codingPath)
         return byte == 1
     }
 
@@ -283,8 +283,8 @@ private struct JamKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPr
         return value
     }
 
-    func decode(_: Int8.Type, forKey _: K) throws -> Int8 {
-        let byte = try decoder.input.read()
+    func decode(_: Int8.Type) throws -> Int8 {
+        let byte = try decoder.input.read(codingPath)
         return Int8(bitPattern: byte)
     }
 
@@ -305,7 +305,7 @@ private struct JamKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPr
     }
 
     func decode(_: UInt8.Type, forKey _: K) throws -> UInt8 {
-        let byte = try decoder.input.read()
+        let byte = try decoder.input.read(codingPath)
         return byte
     }
 
@@ -326,7 +326,7 @@ private struct JamKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPr
     }
 
     func decodeIfPresent<T: Decodable>(_ type: T.Type, forKey key: K) throws -> T? {
-        let byte = try decoder.input.read()
+        let byte = try decoder.input.read(codingPath)
         switch byte {
         case 0:
             return nil
@@ -373,13 +373,13 @@ private struct JamUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     let decoder: DecodeContext
 
     mutating func decodeNil() throws -> Bool {
-        let byte = try decoder.input.read()
+        let byte = try decoder.input.read(codingPath)
         currentIndex += 1
         return byte == 0
     }
 
     mutating func decode(_: Bool.Type) throws -> Bool {
-        let byte = try decoder.input.read()
+        let byte = try decoder.input.read(codingPath)
         currentIndex += 1
         return byte == 1
     }
@@ -410,7 +410,7 @@ private struct JamUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
 
     mutating func decode(_: Int8.Type) throws -> Int8 {
-        let byte = try decoder.input.read()
+        let byte = try decoder.input.read(codingPath)
         currentIndex += 1
         return Int8(bitPattern: byte)
     }
@@ -437,7 +437,7 @@ private struct JamUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
 
     mutating func decode(_: UInt8.Type) throws -> UInt8 {
-        let byte = try decoder.input.read()
+        let byte = try decoder.input.read(codingPath)
         currentIndex += 1
         return byte
     }
@@ -483,12 +483,12 @@ private struct JamSingleValueDecodingContainer: SingleValueDecodingContainer {
     let decoder: DecodeContext
 
     func decodeNil() -> Bool {
-        let byte = try? decoder.input.read()
+        let byte = try? decoder.input.read(codingPath)
         return byte == 0
     }
 
     func decode(_: Bool.Type) throws -> Bool {
-        let byte = try decoder.input.read()
+        let byte = try decoder.input.read(codingPath)
         return byte == 1
     }
 
@@ -516,7 +516,7 @@ private struct JamSingleValueDecodingContainer: SingleValueDecodingContainer {
     }
 
     func decode(_: Int8.Type) throws -> Int8 {
-        let byte = try decoder.input.read()
+        let byte = try decoder.input.read(codingPath)
         return Int8(bitPattern: byte)
     }
 
@@ -537,7 +537,7 @@ private struct JamSingleValueDecodingContainer: SingleValueDecodingContainer {
     }
 
     func decode(_: UInt8.Type) throws -> UInt8 {
-        let byte = try decoder.input.read()
+        let byte = try decoder.input.read(codingPath)
         return byte
     }
 
