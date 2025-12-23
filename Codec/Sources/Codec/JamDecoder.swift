@@ -133,8 +133,8 @@ private class DecodeContext: Decoder {
         return res
     }
 
-    fileprivate func decodeData(codingPath: @autoclosure () -> [CodingKey]) throws -> Data {
-        let path = codingPath()
+    fileprivate func decodeData(codingPath: [CodingKey]) throws -> Data {
+        let path = codingPath
         if path.isEmpty {
             return try input.readAll()
         }
@@ -152,8 +152,8 @@ private class DecodeContext: Decoder {
         return res
     }
 
-    fileprivate func decodeData(codingPath: @autoclosure () -> [CodingKey]) throws -> [UInt8] {
-        let path = codingPath()
+    fileprivate func decodeData(codingPath: [CodingKey]) throws -> [UInt8] {
+        let path = codingPath
         if path.isEmpty {
             return try [UInt8](input.readAll())
         }
