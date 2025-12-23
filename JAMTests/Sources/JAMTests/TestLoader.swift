@@ -41,7 +41,7 @@ public enum TestLoader {
         filtered.sort()
         return try filtered.map {
             let data = try Data(contentsOf: URL(fileURLWithPath: prefix + "/" + $0))
-            return Testcase(description: $0, data: data)
+            return Testcase(description: path + "/" + $0, data: data)
         }
     }
 

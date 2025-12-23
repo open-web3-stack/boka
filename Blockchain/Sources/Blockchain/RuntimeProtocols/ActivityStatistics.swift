@@ -16,6 +16,9 @@ extension ActivityStatistics {
         authorIndex: ValidatorIndex,
         availableReports: [WorkReport],
         accumulateStats: AccumulationStats,
+        activeValidators: ConfigFixedSizeArray<
+            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        >? = nil
     ) throws -> Statistics {
         let epochLength = UInt32(config.value.epochLength)
         let currentEpoch = timeslot / epochLength
@@ -37,8 +40,9 @@ extension ActivityStatistics {
         item.preimagesBytes += UInt32(extrinsic.preimages.preimages.reduce(into: 0) { $0 += $1.data.count })
         acc[authorIndex] = item
 
+        let validators = activeValidators ?? currentValidators
         for reporter in reporters {
-            if let index = currentValidators.firstIndex(where: { $0.ed25519 == reporter }) {
+            if let index = validators.firstIndex(where: { $0.ed25519 == reporter }) {
                 acc[index].guarantees += 1
             }
         }
