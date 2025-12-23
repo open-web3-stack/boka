@@ -243,7 +243,8 @@ public final class Runtime {
                 reporters: reporters,
                 authorIndex: block.header.authorIndex,
                 availableReports: availableReports,
-                accumulateStats: accumulateStats
+                accumulateStats: accumulateStats,
+                activeValidators: newState.currentValidators
             )
 
             try await newState.save()

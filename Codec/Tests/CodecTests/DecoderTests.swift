@@ -209,7 +209,7 @@ struct DecoderTests {
         #expect(decodedInt8 == -5)
         #expect(decodedUInt64 == 123_456_789)
         #expect(throws: Error.self) {
-            _ = try encodedInt8.read(length: 8)
+            _ = try encodedInt8.read(length: 8, codingPath: [])
         }
     }
 

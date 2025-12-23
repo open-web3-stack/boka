@@ -21,12 +21,12 @@ struct FuzzTests {
                 return testcases
                     .filter { testcase in
                         !ignore.contains { ignorePath, ignorePrefix in
-                            path == ignorePath && testcase.description.starts(with: ignorePrefix)
+                            path == ignorePath && testcase.description.contains(ignorePrefix)
                         }
                     }
                     .filter { testcase in
                         filters.isEmpty || filters.contains { filterPath, filterPrefix in
-                            path == filterPath && testcase.description.starts(with: filterPrefix)
+                            path == filterPath && testcase.description.contains(filterPrefix)
                         }
                     }
             }
@@ -41,6 +41,6 @@ struct FuzzTests {
         ]
     ))
     func v072(input: Testcase) async throws {
-        try await TraceTest.test(input, config: TestVariants.full.config)
+        try await TraceTest.test(input, config: TestVariants.tiny.config)
     }
 }
