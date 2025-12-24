@@ -193,10 +193,10 @@ extension FilesystemDataStore {
         try data.write(to: tempPath)
 
         // Sync to ensure durability
-        if let handle = FileHandle(forWritingTo: tempPath) {
-            handle.synchronizeFile()
-            handle.closeFile()
-        }
+        // Note: Data.write() typically flushes to disk, but we explicitly sync for durability
+        let handle = try FileHandle(forWritingTo: tempPath)
+        handle.synchronizeFile()
+        handle.closeFile()
 
         // Atomic rename
         try fileManager.moveItem(at: tempPath, to: url)

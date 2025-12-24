@@ -30,6 +30,14 @@ public actor ErasureCodingService {
     /// - Parameter segments: Array of 4,104-byte segments
     /// - Returns: Array of 1,023 shard data chunks
     /// - Throws: ErasureCodingError if encoding fails
+    ///
+    /// **IMPORTANT**: This implementation encodes all segments as one concatenated blob.
+    /// The `generateSegmentJustification` method assumes that each shard contains interleaved
+    /// data from all segments (i.e., the first 12 bytes of shard 0 belong to segment 0, the
+    /// next 12 bytes belong to segment 1, etc.). For this assumption to hold, the encoding
+    /// strategy should be changed to encode each segment individually and then interleave
+    /// the shards. This is a known limitation that should be addressed when segment
+    /// justifications are fully implemented.
     public func encodeSegments(_ segments: [Data4104]) throws -> [Data] {
         guard !segments.isEmpty else {
             throw ErasureCodingError.emptyInput
@@ -438,9 +446,9 @@ extension ErasureCodingService {
             throw ErasureCodingError.invalidShardIndex
         }
 
-        // Extract the portion of each shard that corresponds to this segment index
-        // Each segment shard is 4104 / 342 = 12 bytes (approximately)
-        let segmentShardSize = 4104 / 342 // ~12 bytes per segment in each shard
+        // Calculate segment shard size from constants
+        // Each segment is 4104 bytes, divided by original shard count (342)
+        let segmentShardSize = 4104 / originalShardCount
 
         var segmentShards: [Data] = []
         for shard in shards {

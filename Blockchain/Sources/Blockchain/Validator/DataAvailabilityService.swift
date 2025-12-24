@@ -244,13 +244,16 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             for i in 0 ..< segmentCount {
                 let start = i * 4104
                 let end = min(start + 4104, serializedData.count)
-                var segment = Data(count: 4104)
-                segment.withUnsafeMutableBytes { destPtr in
-                    serializedData.withUnsafeBytes { sourcePtr in
-                        destPtr.baseAddress!.copyMemory(from: sourcePtr.baseAddress! + start, byteCount: end - start)
-                    }
+
+                // Safely extract segment data using subdata
+                var segmentData = serializedData.subdata(in: start ..< end)
+
+                // Pad to 4104 bytes if necessary
+                if segmentData.count < 4104 {
+                    segmentData.append(Data(count: 4104 - segmentData.count))
                 }
-                if let seg = Data4104(segment) {
+
+                if let seg = Data4104(segmentData) {
                     segments.append(seg)
                 }
             }

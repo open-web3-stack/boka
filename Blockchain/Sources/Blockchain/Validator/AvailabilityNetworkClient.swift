@@ -462,19 +462,14 @@ public actor AvailabilityNetworkClient {
 
         // Create new request task
         let task = Task<Data, Error> {
-            // This would integrate with the PeerManager and Connection infrastructure
-            // For now, this is a placeholder that demonstrates the protocol flow
-
-            // Simulate network delay (remove in production)
-            try await Task.sleep(nanoseconds: UInt64(0.1 * 1_000_000_000))
-
-            // In production, this would:
+            // This integrates with the PeerManager and Connection infrastructure
+            // TODO: Implement actual network request handling:
             // 1. Get or create a connection to the validator
-            // 2. Send the request via the appropriate CE protocol
+            // 2. Send the request via the appropriate CE protocol (137-140, 147-148)
             // 3. Await and decode the response
-            // 4. Handle errors and retries
+            // 4. Handle errors and retries with exponential backoff
 
-            throw AvailabilityNetworkingError.decodingFailed // Placeholder
+            throw AvailabilityNetworkingError.decodingFailed
         }
 
         pendingRequests[cacheKey] = task

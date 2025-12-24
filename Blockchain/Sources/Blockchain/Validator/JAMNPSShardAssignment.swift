@@ -112,10 +112,9 @@ public actor JAMNPSShardAssignment {
         // This is equivalent to: v % V == (targetShardIndex - c * R) % V
         // So: v = (targetShardIndex - c * R + k * V) for k = 0, 1, 2, ...
 
-        let base = (targetShardIndex - c * R) % V
-
-        // Since v must be in range 0..<V, we only need k=0
-        let v = base < 0 ? base + V : base
+        // Cast to Int for safe modular arithmetic with potential negative results
+        let base = (Int(targetShardIndex) - Int(c * R)) % Int(V)
+        let v = base >= 0 ? UInt32(base) : UInt32(base + Int(V))
 
         if v < V {
             validators.append(UInt16(v))
@@ -161,10 +160,9 @@ public actor JAMNPSShardAssignment {
             let V = UInt32(totalValidators)
             let R = recoveryThreshold
 
-            var v = (i - c * R) % V
-            if v < 0 {
-                v += V
-            }
+            // Cast to Int for safe modular arithmetic with potential negative results
+            let base = (Int(i) - Int(c * R)) % Int(V)
+            let v = base >= 0 ? UInt32(base) : UInt32(base + Int(V))
 
             let validatorIndex = UInt16(v)
 

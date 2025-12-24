@@ -319,8 +319,9 @@ extension RocksDBDataStore {
             if key.count == prefix.count + 2 {
                 let indexData = key.suffix(from: prefix.count)
                 if indexData.count == 2 {
+                    // Use loadUnaligned for safety since Data slices are not guaranteed to be aligned
                     let index = indexData.withUnsafeBytes { bytes in
-                        UInt16(bigEndian: bytes.load(as: UInt16.self))
+                        bytes.loadUnaligned(as: UInt16.self).bigEndian
                     }
                     indices.append(index)
                 }
