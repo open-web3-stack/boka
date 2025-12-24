@@ -620,7 +620,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             // According to GP spec (reporting_assurance.tex eq:guarantorsig):
             // The signature is over: Xguarantee || blake(encode(workReport))
             // Where Xguarantee is the string "$jam_guarantee"
-            let guaranteePrefix = "\u{10}$jam_guarantee".data(using: .utf8)!
+            let guaranteePrefix = Data("\u{10}$jam_guarantee".utf8)
             let signatureMessage = guaranteePrefix + workReportHash.data
 
             let isValid = publicKey.verify(signature: sig.signature, message: signatureMessage)
@@ -885,7 +885,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             let bitfieldData = try JamEncoder.encode(assurance.assurance)
             let payload = try JamEncoder.encode(parentHash, bitfieldData)
             let message = try JamEncoder.encode(UInt8(0x01), payload.blake2b256hash())
-            let signatureMessage = try JamEncoder.encode("\u{10}$jam_available".data(using: .utf8)!, message)
+            let signatureMessage = try JamEncoder.encode(Data("\u{10}$jam_available".utf8), message)
 
             guard publicKey.verify(signature: assurance.signature, message: signatureMessage) else {
                 throw DataAvailabilityError.invalidWorkReport
@@ -938,7 +938,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             let bitfieldData = try JamEncoder.encode(assurance.assurance)
             let payload = try JamEncoder.encode(parentHash, bitfieldData)
             let message = try JamEncoder.encode(UInt8(0x01), payload.blake2b256hash())
-            let signatureMessage = try JamEncoder.encode("\u{10}$jam_available".data(using: .utf8)!, message)
+            let signatureMessage = try JamEncoder.encode(Data("\u{10}$jam_available".utf8), message)
 
             guard publicKey.verify(signature: assurance.signature, message: signatureMessage) else {
                 logger.warning("Invalid signature for validator \(assurance.validatorIndex)")

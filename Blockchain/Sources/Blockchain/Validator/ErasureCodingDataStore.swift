@@ -660,10 +660,8 @@ public actor ErasureCodingDataStore {
         let availableSet = Set(availableIndices)
         var missing: [UInt16] = []
 
-        for i in 0 ..< 1023 {
-            if !availableSet.contains(UInt16(i)) {
-                missing.append(UInt16(i))
-            }
+        for i in 0 ..< 1023 where !availableSet.contains(UInt16(i)) {
+            missing.append(UInt16(i))
         }
 
         return missing
