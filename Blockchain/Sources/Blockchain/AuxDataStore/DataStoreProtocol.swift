@@ -3,7 +3,7 @@ import Utils
 
 public protocol DataStoreProtocol: Sendable {
     // segment root => erasure root
-    func getEasureRoot(forSegmentRoot: Data32) async throws -> Data32?
+    func getErasureRoot(forSegmentRoot: Data32) async throws -> Data32?
     func set(erasureRoot: Data32, forSegmentRoot: Data32) async throws
     func delete(erasureRoot: Data32) async throws
 

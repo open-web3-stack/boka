@@ -64,7 +64,7 @@ public final class DataStore: Sendable {
     }
 
     private func getErasureRootForSegment(segmentRoot: Data32) async throws -> Data32 {
-        try await impl.getEasureRoot(forSegmentRoot: segmentRoot)
+        try await impl.getErasureRoot(forSegmentRoot: segmentRoot)
             .unwrap(orError: DataStoreError.invalidSegmentRoot(segmentRoot))
     }
 

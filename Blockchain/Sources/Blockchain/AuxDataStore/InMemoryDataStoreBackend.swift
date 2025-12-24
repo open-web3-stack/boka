@@ -21,7 +21,7 @@ public actor InMemoryDataStoreBackend {
 }
 
 extension InMemoryDataStoreBackend: DataStoreProtocol {
-    public func getEasureRoot(forSegmentRoot: Data32) async throws -> Data32? {
+    public func getErasureRoot(forSegmentRoot: Data32) async throws -> Data32? {
         erasureRootBySegmentRoot[forSegmentRoot]
     }
 
