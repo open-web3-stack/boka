@@ -27,16 +27,19 @@ public enum DataAvailabilityError: Error {
 public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, OnSyncCompleted {
     private let dataProvider: BlockchainDataProvider
     private let dataStore: DataStore
+    private let erasureCodingDataStore: ErasureCodingDataStore?
 
     public init(
         config: ProtocolConfigRef,
         eventBus: EventBus,
         scheduler: Scheduler,
         dataProvider: BlockchainDataProvider,
-        dataStore: DataStore
+        dataStore: DataStore,
+        erasureCodingDataStore: ErasureCodingDataStore? = nil
     ) async {
         self.dataProvider = dataProvider
         self.dataStore = dataStore
+        self.erasureCodingDataStore = erasureCodingDataStore
 
         super.init(id: "DataAvailability", config: config, eventBus: eventBus, scheduler: scheduler)
 
@@ -76,39 +79,38 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         // result's work-package is assured. Items in the second, meanwhile, are long-lived and expected to be kept for a minimum
         // of 28 days (672 complete epochs) following the reporting of the work-report.
 
-        // Purge old audit store data (short-term storage, kept until finality, approximately 1 hour)
-        // Assuming approximately 6 epochs per hour at 10 minutes per epoch
-        let auditRetentionEpochs: EpochIndex = 6
+        // Use ErasureCodingDataStore if available for efficient cleanup
+        if let ecStore = erasureCodingDataStore {
+            do {
+                // Purge old audit store data (short-term storage, kept until finality, approximately 1 hour)
+                // Assuming approximately 6 epochs per hour at 10 minutes per epoch
+                let auditRetentionEpochs: EpochIndex = 6
 
-        if epoch > auditRetentionEpochs {
-            _ = epoch - auditRetentionEpochs
+                if epoch > auditRetentionEpochs {
+                    let (deleted, bytes) = try await ecStore.cleanupAuditEntries(retentionEpochs: auditRetentionEpochs)
+                    logger.info("Purged \(deleted) audit entries (\(bytes) bytes)")
+                }
 
-            // Get all entries from audit store and remove old ones
-            // Note: DataStore protocol doesn't expose a method to list all entries
-            // This is a placeholder for the actual implementation
-            // TODO: Implement iteration over audit store entries and remove those older than cutoff
+                // Purge old import/D3L store data (long-term storage, kept for 28 days = 672 epochs)
+                let d3lRetentionEpochs: EpochIndex = 672
+
+                if epoch > d3lRetentionEpochs {
+                    let (entriesDeleted, segmentsDeleted) = try await ecStore.cleanupD3LEntries(retentionEpochs: d3lRetentionEpochs)
+                    logger.info("Purged \(entriesDeleted) D³L entries (\(segmentsDeleted) segments)")
+                }
+            } catch {
+                logger.error("Failed to purge old data: \(error)")
+            }
+        } else {
+            // Fallback to timestamp-based approach for legacy DataStore
+            // Assuming 1 hour for audit data, 28 days for D3L data
+            let currentTimestamp = Date()
+            let auditCutoffTime = currentTimestamp.addingTimeInterval(-3600) // 1 hour ago
+            let d3lCutoffTime = currentTimestamp.addingTimeInterval(-28 * 24 * 3600) // 28 days ago
+
+            // TODO: Implement timestamp-based cleanup when DataStore exposes iteration methods
+            _ = (auditCutoffTime, d3lCutoffTime)
         }
-
-        // Purge old import/D3L store data (long-term storage, kept for 28 days = 672 epochs)
-        let d3lRetentionEpochs: EpochIndex = 672
-
-        if epoch > d3lRetentionEpochs {
-            _ = epoch - d3lRetentionEpochs
-
-            // Get all entries from import store and remove old ones
-            // Note: DataStore protocol doesn't expose a method to list all entries
-            // This is a placeholder for the actual implementation
-            // TODO: Implement iteration over import store entries and remove those older than cutoff
-        }
-
-        // Alternative approach: Use timestamps
-        // Assuming 1 hour for audit data, 28 days for D3L data
-        let currentTimestamp = Date()
-        let auditCutoffTime = currentTimestamp.addingTimeInterval(-3600) // 1 hour ago
-        let d3lCutoffTime = currentTimestamp.addingTimeInterval(-28 * 24 * 3600) // 28 days ago
-
-        // TODO: Implement timestamp-based cleanup when DataStore exposes iteration methods
-        _ = (auditCutoffTime, d3lCutoffTime)
     }
 
     /// Fetch segments from import store
@@ -131,6 +133,27 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     ///   - erasureRoot: The erasure root to associate with the segments
     /// - Returns: The segments root
     public func exportSegments(data: [Data4104], erasureRoot: Data32) async throws -> Data32 {
+        // Use ErasureCodingDataStore if available for automatic erasure coding
+        if let ecStore = erasureCodingDataStore {
+            // For D³L store, we need to track work package hash
+            // Use erasureRoot as temporary workPackageHash placeholder
+            let workPackageHash = erasureRoot
+
+            let segmentRoot = Merklization.constantDepthMerklize(data.map(\.data))
+
+            // Store using ErasureCodingDataStore
+            let storedErasureRoot = try await ecStore.storeExportedSegments(
+                segments: data,
+                workPackageHash: workPackageHash,
+                segmentsRoot: segmentRoot
+            )
+
+            logger.info("Stored exported segments: erasureRoot=\(storedErasureRoot.toHexString()), count=\(data.count)")
+
+            return segmentRoot
+        }
+
+        // Fallback to legacy implementation
         let segmentRoot = Merklization.constantDepthMerklize(data.map(\.data))
 
         let currentTimestamp = Date()
@@ -180,6 +203,43 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         let serializedData = try JamEncoder.encode(bundle)
         let dataLength = DataLength(UInt32(serializedData.count))
 
+        // Extract the work package hash from the bundle
+        let workPackageHash = bundle.workPackage.hash()
+
+        // Use ErasureCodingDataStore if available for automatic erasure coding
+        if let ecStore = erasureCodingDataStore {
+            // Calculate segments root from bundle for validation
+            let segmentCount = (serializedData.count + 4103) / 4104
+            var segments = [Data4104]()
+            for i in 0 ..< segmentCount {
+                let start = i * 4104
+                let end = min(start + 4104, serializedData.count)
+                var segment = Data(count: 4104)
+                segment.withUnsafeMutableBytes { destPtr in
+                    serializedData.withUnsafeBytes { sourcePtr in
+                        destPtr.baseAddress!.copyMemory(from: sourcePtr.baseAddress! + start, byteCount: end - start)
+                    }
+                }
+                if let seg = Data4104(segment) {
+                    segments.append(seg)
+                }
+            }
+
+            let segmentsRoot = Merklization.constantDepthMerklize(segments.map(\.data))
+
+            // Store using ErasureCodingDataStore (handles erasure coding automatically)
+            let erasureRoot = try await ecStore.storeAuditBundle(
+                bundle: serializedData,
+                workPackageHash: workPackageHash,
+                segmentsRoot: segmentsRoot
+            )
+
+            logger.info("Stored audit bundle: erasureRoot=\(erasureRoot.toHexString()), size=\(serializedData.count)")
+
+            return (erasureRoot: erasureRoot, length: dataLength)
+        }
+
+        // Fallback to legacy implementation
         // Calculate the erasure root
         // Work-package bundle shard hash
         let bundleShards = try ErasureCoding.chunk(
@@ -214,9 +274,6 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
         // ErasureRoot
         let erasureRoot = Merklization.binaryMerklize(nodes)
-
-        // Extract the work package hash from the bundle
-        let workPackageHash = bundle.workPackage.hash()
 
         // Store the serialized bundle in the audit store (short-term storage)
         // Store the segment in the data store
@@ -275,6 +332,20 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     }
 
     // MARK: - Erasure Coding Reconstruction
+
+    /// Retrieve an audit bundle by erasure root
+    /// - Parameter erasureRoot: The erasure root identifying the bundle
+    /// - Returns: The audit bundle data, or nil if not found
+    public func retrieveAuditBundle(erasureRoot: Data32) async throws -> Data? {
+        // Use ErasureCodingDataStore if available
+        if let ecStore = erasureCodingDataStore {
+            return try await ecStore.getAuditBundle(erasureRoot: erasureRoot)
+        }
+
+        // Fallback: not supported by legacy DataStore
+        logger.warning("Audit bundle retrieval requires ErasureCodingDataStore")
+        return nil
+    }
 
     /// Reconstruct erasure-coded data from shards
     /// - Parameters:
@@ -1043,6 +1114,16 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     /// Get data availability statistics
     /// - Returns: Statistics about stored data
     public func getStatistics() async -> (auditStoreCount: Int, importStoreCount: Int, totalSegments: Int) {
+        // Use ErasureCodingDataStore if available
+        if let ecStore = erasureCodingDataStore, let dataStore = dataStore as? RocksDBDataStore {
+            do {
+                let stats = try await dataStore.getStatistics()
+                return (stats.auditCount, stats.d3lCount, stats.totalSegments)
+            } catch {
+                logger.error("Failed to get statistics: \(error)")
+            }
+        }
+
         // TODO: Implement once DataStore supports statistics
         // For now, return zeros
         (0, 0, 0)
@@ -1051,7 +1132,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     /// Get storage usage information
     /// - Returns: Storage usage in bytes
     public func getStorageUsage() async -> (auditStore: Int, importStore: Int) {
-        // TODO: Implement once DataStore supports size queries
+        // TODO: Implement once DataStore supports size queries or add to ErasureCodingDataStore
         // For now, return zeros
         (0, 0)
     }
