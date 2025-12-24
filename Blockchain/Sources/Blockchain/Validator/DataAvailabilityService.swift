@@ -28,6 +28,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     private let dataProvider: BlockchainDataProvider
     private let dataStore: DataStore
     private let erasureCodingDataStore: ErasureCodingDataStore?
+    private var networkClient: AvailabilityNetworkClient?
 
     public init(
         config: ProtocolConfigRef,
@@ -35,11 +36,13 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         scheduler: Scheduler,
         dataProvider: BlockchainDataProvider,
         dataStore: DataStore,
-        erasureCodingDataStore: ErasureCodingDataStore? = nil
+        erasureCodingDataStore: ErasureCodingDataStore? = nil,
+        networkClient: AvailabilityNetworkClient? = nil
     ) async {
         self.dataProvider = dataProvider
         self.dataStore = dataStore
         self.erasureCodingDataStore = erasureCodingDataStore
+        self.networkClient = networkClient
 
         super.init(id: "DataAvailability", config: config, eventBus: eventBus, scheduler: scheduler)
 
@@ -47,6 +50,17 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         scheduleForNextEpoch("DataAvailability.scheduleForNextEpoch") { [weak self] epoch in
             await self?.purge(epoch: epoch)
         }
+    }
+
+    /// Set the network client for fetching missing shards
+    public func setNetworkClient(_ client: AvailabilityNetworkClient) {
+        networkClient = client
+        erasureCodingDataStore?.setNetworkClient(client)
+    }
+
+    /// Set the fetch strategy for network operations
+    public func setFetchStrategy(_ strategy: FetchStrategy) {
+        erasureCodingDataStore?.setFetchStrategy(strategy)
     }
 
     public func onSyncCompleted() async {
@@ -1077,6 +1091,70 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         logger.info("Fetching work package \(workPackageHash) from \(validators.count) validators")
 
         throw DataAvailabilityError.retrievalError
+    }
+
+    /// Batch reconstruction with network fallback
+    /// - Parameters:
+    ///   - erasureRoots: Erasure roots to reconstruct
+    ///   - originalLengths: Mapping of erasure root to original length
+    ///   - validatorAddresses: Optional dictionary of validator index to network address
+    ///   - coreIndex: Core index for shard assignment (default: 0)
+    ///   - totalValidators: Total number of validators (default: 1023)
+    /// - Returns: Dictionary mapping erasure root to reconstructed data
+    /// - Throws: DataAvailabilityError if reconstruction fails
+    public func batchReconstructWithFallback(
+        erasureRoots: [Data32],
+        originalLengths: [Data32: Int],
+        validatorAddresses: [UInt16: NetAddr]? = nil,
+        coreIndex: UInt16 = 0,
+        totalValidators: UInt16 = 1023
+    ) async throws -> [Data32: Data] {
+        guard let ecStore = erasureCodingDataStore else {
+            throw DataAvailabilityError.retrievalError
+        }
+
+        // Convert validator addresses from NetAddr if needed
+        var addresses: [UInt16: NetAddr] = [:]
+        if let validatorAddresses {
+            addresses = validatorAddresses
+        }
+
+        return try await ecStore.batchReconstruct(
+            erasureRoots: erasureRoots,
+            originalLengths: originalLengths,
+            validators: addresses.isEmpty ? nil : addresses,
+            coreIndex: coreIndex,
+            totalValidators: totalValidators
+        )
+    }
+
+    /// Fetch segments with network fallback
+    /// - Parameters:
+    ///   - erasureRoot: Erasure root identifying the data
+    ///   - indices: Segment indices to retrieve
+    ///   - validatorAddresses: Optional dictionary of validator index to network address
+    ///   - coreIndex: Core index for shard assignment (default: 0)
+    ///   - totalValidators: Total number of validators (default: 1023)
+    /// - Returns: Array of segments
+    /// - Throws: DataAvailabilityError if retrieval fails
+    public func fetchSegmentsWithFallback(
+        erasureRoot: Data32,
+        indices: [Int],
+        validatorAddresses: [UInt16: NetAddr]? = nil,
+        coreIndex: UInt16 = 0,
+        totalValidators: UInt16 = 1023
+    ) async throws -> [Data4104] {
+        guard let ecStore = erasureCodingDataStore else {
+            throw DataAvailabilityError.segmentNotFound
+        }
+
+        return try await ecStore.getSegmentsWithNetworkFallback(
+            erasureRoot: erasureRoot,
+            indices: indices,
+            validators: validatorAddresses,
+            coreIndex: coreIndex,
+            totalValidators: totalValidators
+        )
     }
 
     // MARK: - Shard Management
