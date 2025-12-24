@@ -13,6 +13,12 @@ public actor ErasureCodingDataStore {
     private let filesystemStore: FilesystemDataStore
     private let erasureCoding: ErasureCodingService
     private let config: ProtocolConfigRef
+    private let segmentCache: SegmentCache
+
+    // Expose rocksdbStore for testing purposes
+    public var rocksdbStoreForTesting: RocksDBDataStore {
+        rocksdbStore
+    }
 
     public init(
         rocksdbStore: RocksDBDataStore,
@@ -23,6 +29,8 @@ public actor ErasureCodingDataStore {
         self.filesystemStore = filesystemStore
         self.config = config
         erasureCoding = ErasureCodingService(config: config)
+        // Use default cache size for now - can be made configurable later
+        segmentCache = SegmentCache(maxSize: 1000)
     }
 
     // MARK: - Audit Bundle Storage (Short-term)
@@ -538,6 +546,249 @@ public actor ErasureCodingDataStore {
 
         return (deletedEntries, deletedSegments)
     }
+
+    // MARK: - Local Shard Retrieval & Caching
+
+    /// Get count of locally available shards for an erasure root
+    /// - Parameter erasureRoot: Erasure root identifying the data
+    /// - Returns: Number of locally available shards
+    public func getLocalShardCount(erasureRoot: Data32) async throws -> Int {
+        try await rocksdbStore.getShardCount(erasureRoot: erasureRoot)
+    }
+
+    /// Get indices of locally available shards
+    /// - Parameter erasureRoot: Erasure root identifying the data
+    /// - Returns: Array of available shard indices
+    public func getLocalShardIndices(erasureRoot: Data32) async throws -> [UInt16] {
+        try await rocksdbStore.getAvailableShardIndices(erasureRoot: erasureRoot)
+    }
+
+    /// Get local shards with caching
+    /// - Parameters:
+    ///   - erasureRoot: Erasure root identifying the data
+    ///   - indices: Shard indices to retrieve
+    /// - Returns: Array of shard data tuples
+    public func getLocalShards(erasureRoot: Data32, indices: [UInt16]) async throws -> [(index: UInt16, data: Data)] {
+        var shards: [(index: UInt16, data: Data)] = []
+
+        for index in indices {
+            if let shardData = try await rocksdbStore.getShard(erasureRoot: erasureRoot, shardIndex: index) {
+                shards.append((index: index, data: shardData))
+            }
+        }
+
+        return shards
+    }
+
+    /// Get segments with caching support
+    /// - Parameters:
+    ///   - erasureRoot: Erasure root identifying the data
+    ///   - indices: Segment indices to retrieve
+    /// - Returns: Array of segments
+    public func getSegmentsWithCache(erasureRoot: Data32, indices: [Int]) async throws -> [Data4104] {
+        guard let d3lEntry = try await rocksdbStore.getD3LEntry(erasureRoot: erasureRoot) else {
+            throw DataAvailabilityError.segmentNotFound
+        }
+
+        let segmentCount = Int(d3lEntry.segmentCount)
+        var segments: [Data4104] = []
+
+        for index in indices {
+            guard index < segmentCount else {
+                continue
+            }
+
+            // Check cache first
+            if let cachedSegment = segmentCache.get(segment: Data4104(), erasureRoot: erasureRoot, index: index) {
+                segments.append(cachedSegment)
+                continue
+            }
+
+            // Cache miss - retrieve from storage
+            let retrievedSegments = try await getSegments(erasureRoot: erasureRoot, indices: [index])
+            if let segment = retrievedSegments.first {
+                // Store in cache
+                segmentCache.set(segment: segment, erasureRoot: erasureRoot, index: index)
+                segments.append(segment)
+            }
+        }
+
+        return segments
+    }
+
+    /// Clear segment cache for a specific erasure root
+    /// - Parameter erasureRoot: Erasure root to invalidate
+    public func clearCache(erasureRoot: Data32) {
+        segmentCache.invalidate(erasureRoot: erasureRoot)
+    }
+
+    /// Clear entire segment cache
+    public func clearAllCache() {
+        segmentCache.clear()
+    }
+
+    /// Get cache statistics
+    /// - Returns: Cache statistics including hit rate
+    public func getCacheStatistics() -> (hits: Int, misses: Int, evictions: Int, size: Int, hitRate: Double) {
+        segmentCache.getStatistics()
+    }
+
+    // MARK: - Reconstruction from Local Shards
+
+    /// Check if we can reconstruct data from local shards
+    /// - Parameter erasureRoot: Erasure root identifying the data
+    /// - Returns: True if at least 342 shards are available
+    public func canReconstructLocally(erasureRoot: Data32) async throws -> Bool {
+        let shardCount = try await getLocalShardCount(erasureRoot: erasureRoot)
+        return shardCount >= 342
+    }
+
+    /// Get reconstruction potential
+    /// - Parameter erasureRoot: Erasure root identifying the data
+    /// - Returns: Percentage of required shards available (capped at 100%)
+    public func getReconstructionPotential(erasureRoot: Data32) async throws -> Double {
+        let shardCount = try await getLocalShardCount(erasureRoot: erasureRoot)
+        let percentage = Double(shardCount) / 342.0 * 100.0
+        return min(percentage, 100.0)
+    }
+
+    /// Get missing shard indices
+    /// - Parameter erasureRoot: Erasure root identifying the data
+    /// - Returns: Array of missing shard indices
+    public func getMissingShardIndices(erasureRoot: Data32) async throws -> [UInt16] {
+        let availableIndices = try await getLocalShardIndices(erasureRoot: erasureRoot)
+        let availableSet = Set(availableIndices)
+        var missing: [UInt16] = []
+
+        for i in 0 ..< 1023 {
+            if !availableSet.contains(UInt16(i)) {
+                missing.append(UInt16(i))
+            }
+        }
+
+        return missing
+    }
+
+    /// Get reconstruction plan
+    /// - Parameter erasureRoot: Erasure root identifying the data
+    /// - Returns: Reconstruction plan with status and recommendations
+    public func getReconstructionPlan(erasureRoot: Data32) async throws -> ReconstructionPlan {
+        let localShards = try await getLocalShardCount(erasureRoot: erasureRoot)
+        let missingShards = 1023 - localShards
+        let canReconstruct = localShards >= 342
+
+        return ReconstructionPlan(
+            erasureRoot: erasureRoot,
+            localShards: localShards,
+            missingShards: missingShards,
+            canReconstructLocally: canReconstruct,
+            reconstructionPercentage: Double(localShards) / 342.0 * 100.0
+        )
+    }
+
+    /// Reconstruct data from local shards if possible
+    /// - Parameters:
+    ///   - erasureRoot: Erasure root identifying the data
+    ///   - originalLength: Expected original data length
+    /// - Returns: Reconstructed data
+    public func reconstructFromLocalShards(erasureRoot: Data32, originalLength: Int) async throws -> Data {
+        guard try await canReconstructLocally(erasureRoot: erasureRoot) else {
+            throw try await DataAvailabilityError.insufficientShards(
+                available: getLocalShardCount(erasureRoot: erasureRoot),
+                required: 342
+            )
+        }
+
+        let availableIndices = try await getLocalShardIndices(erasureRoot: erasureRoot)
+        let shards = try await getLocalShards(erasureRoot: erasureRoot, indices: Array(availableIndices.prefix(342)))
+
+        return try erasureCoding.reconstruct(shards: shards, originalLength: originalLength)
+    }
+
+    // MARK: - Batch Operations
+
+    /// Batch get segments for multiple erasure roots
+    /// - Parameter requests: Array of segment requests
+    /// - Returns: Dictionary mapping erasure root to segments
+    public func batchGetSegments(requests: [SegmentRequest]) async throws -> [Data32: [Data4104]] {
+        var results: [Data32: [Data4104]] = [:]
+
+        for request in requests {
+            do {
+                let segments = try await getSegmentsWithCache(
+                    erasureRoot: request.erasureRoot,
+                    indices: request.indices
+                )
+                results[request.erasureRoot] = segments
+            } catch {
+                logger.warning("Failed to retrieve segments for erasureRoot=\(request.erasureRoot.toHexString()): \(error)")
+            }
+        }
+
+        return results
+    }
+
+    /// Batch reconstruction for multiple erasure roots
+    /// - Parameters:
+    ///   - erasureRoots: Erasure roots to reconstruct
+    ///   - originalLengths: Mapping of erasure root to original length
+    /// - Returns: Dictionary mapping erasure root to reconstructed data
+    public func batchReconstruct(
+        erasureRoots: [Data32],
+        originalLengths: [Data32: Int]
+    ) async throws -> [Data32: Data] {
+        var results: [Data32: Data] = [:]
+
+        for erasureRoot in erasureRoots {
+            guard let originalLength = originalLengths[erasureRoot] else {
+                logger.warning("Missing original length for erasureRoot=\(erasureRoot.toHexString())")
+                continue
+            }
+
+            do {
+                let data = try await reconstructFromLocalShards(
+                    erasureRoot: erasureRoot,
+                    originalLength: originalLength
+                )
+                results[erasureRoot] = data
+            } catch {
+                logger.warning("Failed to reconstruct erasureRoot=\(erasureRoot.toHexString()): \(error)")
+            }
+        }
+
+        return results
+    }
+}
+
+// MARK: - Supporting Types
+
+/// Segment request for batch operations
+public struct SegmentRequest: Sendable {
+    public let erasureRoot: Data32
+    public let indices: [Int]
+
+    public init(erasureRoot: Data32, indices: [Int]) {
+        self.erasureRoot = erasureRoot
+        self.indices = indices
+    }
+}
+
+/// Reconstruction plan with status and recommendations
+public struct ReconstructionPlan: Sendable {
+    public let erasureRoot: Data32
+    public let localShards: Int
+    public let missingShards: Int
+    public let canReconstructLocally: Bool
+    public let reconstructionPercentage: Double
+
+    public var needsNetworkFetch: Bool {
+        !canReconstructLocally
+    }
+
+    public var estimatedTimeToFetch: TimeInterval? {
+        // Rough estimate: 100ms per missing shard over network
+        missingShards > 0 ? Double(missingShards) * 0.1 : nil
+    }
 }
 
 // MARK: - Errors
@@ -549,4 +800,5 @@ public enum DataAvailabilityError: Error {
     case insufficientShards(available: Int, required: Int)
     case metadataNotFound(erasureRoot: Data32)
     case reconstructionFailed(underlying: Error)
+    case segmentNotFound
 }
