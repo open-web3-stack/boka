@@ -238,6 +238,7 @@ public enum ErasureCodingError: Error {
     case invalidDataLength(expected: Int, actual: Int)
     case insufficientShards(required: Int, provided: Int)
     case duplicateShardIndices
+    case invalidShardIndex
     case invalidShardCount(expected: Int, provided: Int)
     case invalidSegmentLength(expected: Int, actual: Int)
     case reconstructionFailed(underlying: Error)
@@ -331,5 +332,159 @@ extension ErasureCodingService {
         }
 
         return isValid
+    }
+
+    // MARK: - JAMNP-S Justification Generation
+
+    /// Generate JAMNP-S justification for CE 137 (Shard Distribution)
+    ///
+    /// Per JAMNP-S spec, this generates the co-path T(s, i, H) where:
+    /// - s is the sequence of (bundle shard hash, segment shard root) pairs
+    /// - i is the shard index
+    /// - H is the Blake2b hash function
+    ///
+    /// - Parameters:
+    ///   - shardIndex: Index of the shard (0-1022)
+    ///   - segmentsRoot: Merkle root of segments
+    ///   - shards: Array of all shard data
+    /// - Returns: Array of justification steps (co-path)
+    /// - Throws: ErasureCodingError if justification generation fails
+    public func generateJustification(
+        shardIndex: UInt16,
+        segmentsRoot: Data32,
+        shards: [Data]
+    ) throws -> [Justification.JustificationStep] {
+        guard shardIndex < UInt16(shards.count) else {
+            throw ErasureCodingError.invalidShardIndex
+        }
+
+        guard shards.count == totalShardCount else {
+            throw ErasureCodingError.invalidShardCount(
+                expected: totalShardCount,
+                provided: shards.count
+            )
+        }
+
+        // Generate nodes: encode(shardHash) || encode(segmentsRoot)
+        var nodes: [Data] = []
+
+        for shard in shards {
+            let shardHash = shard.blake2b256hash()
+            let node = JamEncoder.encode(shardHash) + JamEncoder.encode(segmentsRoot)
+            nodes.append(node)
+        }
+
+        // Generate co-path using T(s, i, H) function
+        let copath = Merklization.trace(
+            nodes,
+            index: Int(shardIndex),
+            hasher: Blake2b256.self
+        )
+
+        // Convert to JustificationSteps
+        var steps: [Justification.JustificationStep] = []
+
+        for step in copath {
+            switch step {
+            case let .left(data):
+                if let hash = Data32(data) {
+                    steps.append(.left(hash))
+                } else {
+                    throw ErasureCodingError.merkleProofGenerationFailed
+                }
+            case let .right(data):
+                if let hash = Data32(data) {
+                    steps.append(.right(hash))
+                } else {
+                    throw ErasureCodingError.merkleProofGenerationFailed
+                }
+            }
+        }
+
+        logger.debug("Generated JAMNP-S justification for shard \(shardIndex) with \(steps.count) steps")
+
+        return steps
+    }
+
+    /// Generate JAMNP-S justification for CE 140 (Segment Shard Request with justification)
+    ///
+    /// Per JAMNP-S spec, this generates: j ++ [b] ++ T(s, i, H) where:
+    /// - j is the justification from CE 137
+    /// - b is the bundle shard hash
+    /// - s is the full sequence of segment shards with the given shard index
+    /// - i is the segment index
+    ///
+    /// - Parameters:
+    ///   - segmentIndex: Index of the segment
+    ///   - bundleShardHash: Hash of the bundle shard
+    ///   - shardIndex: Index of the shard (0-1022)
+    ///   - segmentsRoot: Merkle root of segments
+    ///   - shards: Array of all shard data
+    ///   - baseJustification: Justification received from CE 137
+    /// - Returns: Complete justification for CE 140
+    /// - Throws: ErasureCodingError if justification generation fails
+    public func generateSegmentJustification(
+        segmentIndex: UInt16,
+        bundleShardHash: Data32,
+        shardIndex: UInt16,
+        segmentsRoot _: Data32,
+        shards: [Data],
+        baseJustification: [Justification.JustificationStep]
+    ) throws -> [Justification.JustificationStep] {
+        // Generate the segment co-path T(s, i, H) for the segment shards
+        // The segment shards form a sequence at the same shard index across all segments
+
+        guard Int(shardIndex) < shards.count else {
+            throw ErasureCodingError.invalidShardIndex
+        }
+
+        // Extract the portion of each shard that corresponds to this segment index
+        // Each segment shard is 4104 / 342 = 12 bytes (approximately)
+        let segmentShardSize = 4104 / 342 // ~12 bytes per segment in each shard
+
+        var segmentShards: [Data] = []
+        for shard in shards {
+            let offset = Int(segmentIndex) * segmentShardSize
+            let endOffset = min(offset + segmentShardSize, shard.count)
+            if offset < shard.count {
+                let segmentShard = Data(shard[offset ..< endOffset])
+                segmentShards.append(segmentShard)
+            }
+        }
+
+        // Generate co-path for segment shards
+        let segmentCopath = Merklization.trace(
+            segmentShards,
+            index: Int(shardIndex),
+            hasher: Blake2b256.self
+        )
+
+        // Combine: baseJustification ++ [bundleShardHash] ++ segmentCopath
+        var fullJustification = baseJustification
+
+        // Insert bundle shard hash as a right sibling
+        fullJustification.append(.right(bundleShardHash))
+
+        // Add segment co-path steps
+        for step in segmentCopath {
+            switch step {
+            case let .left(data):
+                if let hash = Data32(data) {
+                    fullJustification.append(.left(hash))
+                } else {
+                    throw ErasureCodingError.merkleProofGenerationFailed
+                }
+            case let .right(data):
+                if let hash = Data32(data) {
+                    fullJustification.append(.right(hash))
+                } else {
+                    throw ErasureCodingError.merkleProofGenerationFailed
+                }
+            }
+        }
+
+        logger.debug("Generated segment justification with \(fullJustification.count) steps")
+
+        return fullJustification
     }
 }
