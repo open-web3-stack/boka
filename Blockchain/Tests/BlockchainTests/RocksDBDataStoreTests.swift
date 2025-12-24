@@ -43,7 +43,7 @@ struct RocksDBDataStoreTests {
         let retrieved = try await dataStore.get(erasureRoot: erasureRoot, index: index)
 
         #expect(retrieved != nil)
-        #expect(retriered?[0] == 42)
+        #expect(retrieved?[0] == 42)
         #expect(retrieved?[100] == 99)
     }
 
