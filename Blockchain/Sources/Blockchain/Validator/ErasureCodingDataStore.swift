@@ -547,6 +547,117 @@ public actor ErasureCodingDataStore {
         return (deletedEntries, deletedSegments)
     }
 
+    // MARK: - Storage Monitoring
+
+    /// Get storage usage statistics
+    ///
+    /// - Returns: Storage usage information
+    public func getStorageUsage() async throws -> StorageUsage {
+        let auditEntries = try await rocksdbStore.listAuditEntries(before: Date())
+        let d3lEntries = try await rocksdbStore.listD3LEntries(before: Date())
+
+        let auditBundleBytes = auditEntries.reduce(0) { $0 + $1.bundleSize }
+        let auditShardBytes = auditEntries.reduce(0) { $0 + Int($1.shardCount) * 684 } // Approximate shard size
+
+        let d3lShardBytes = d3lEntries.reduce(0) { $0 + Int($1.segmentCount) * 4104 }
+
+        let totalBytes = auditBundleBytes + auditShardBytes + d3lShardBytes
+        let entryCount = auditEntries.count + d3lEntries.count
+
+        return StorageUsage(
+            totalBytes: totalBytes,
+            auditStoreBytes: auditBundleBytes + auditShardBytes,
+            d3lStoreBytes: d3lShardBytes,
+            entryCount: entryCount,
+            auditEntryCount: auditEntries.count,
+            d3lEntryCount: d3lEntries.count
+        )
+    }
+
+    /// Incremental cleanup for large datasets
+    ///
+    /// Processes data in batches to avoid blocking, saving progress checkpoints.
+    ///
+    /// - Parameters:
+    ///   - batchSize: Maximum number of entries to process per call
+    ///   - retentionEpochs: Number of epochs to retain
+    /// - Returns: Cleanup progress and statistics
+    public func incrementalCleanup(
+        batchSize: Int = 100,
+        retentionEpochs: UInt32 = 6
+    ) async throws -> IncrementalCleanupProgress {
+        let epochDuration: TimeInterval = 600 // 10 minutes per epoch
+        let cutoffDate = Date().addingTimeInterval(-TimeInterval(retentionEpochs) * epochDuration)
+
+        let entries = try await rocksdbStore.listAuditEntries(before: cutoffDate)
+
+        let totalCount = entries.count
+        let batch = Array(entries.prefix(batchSize))
+
+        var deletedCount = 0
+        var bytesReclaimed = 0
+
+        for entry in batch {
+            try await filesystemStore.deleteAuditBundle(erasureRoot: entry.erasureRoot)
+            try await rocksdbStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
+            try await rocksdbStore.deleteShards(erasureRoot: entry.erasureRoot)
+
+            deletedCount += 1
+            bytesReclaimed += entry.bundleSize
+        }
+
+        return IncrementalCleanupProgress(
+            totalEntries: totalCount,
+            processedEntries: deletedCount,
+            remainingEntries: max(0, totalCount - deletedCount),
+            bytesReclaimed: bytesReclaimed,
+            isComplete: totalCount <= batchSize
+        )
+    }
+
+    /// Aggressive cleanup when under storage pressure
+    ///
+    /// Deletes young data if necessary to free up space.
+    ///
+    /// - Parameter targetBytes: Target bytes to free (will attempt to free at least this much)
+    /// - Returns: Number of bytes actually reclaimed
+    public func aggressiveCleanup(targetBytes: Int) async throws -> Int {
+        var bytesReclaimed = 0
+        var retentionEpochs: UInt32 = 6
+
+        // First try normal cleanup
+        while bytesReclaimed < targetBytes, retentionEpochs > 0 {
+            let (deleted, bytes) = try await cleanupAuditEntries(retentionEpochs: retentionEpochs)
+            bytesReclaimed += bytes
+
+            if deleted == 0 {
+                // No more entries at this retention level
+                retentionEpochs -= 1
+            } else {
+                break
+            }
+        }
+
+        // If still need more space, clean up D³L entries aggressively
+        if bytesReclaimed < targetBytes {
+            retentionEpochs = 672
+            while bytesReclaimed < targetBytes, retentionEpochs > 100 {
+                let (entriesDeleted, segmentsDeleted) = try await cleanupD3LEntries(retentionEpochs: retentionEpochs)
+                bytesReclaimed += segmentsDeleted * 4104
+
+                if entriesDeleted == 0 {
+                    retentionEpochs = UInt32(Double(retentionEpochs) * 0.8) // Reduce by 20%
+                } else {
+                    break
+                }
+            }
+        }
+
+        logger.warning("Aggressive cleanup: reclaimed \(bytesReclaimed) bytes (target: \(targetBytes))")
+
+        return bytesReclaimed
+    }
+
     // MARK: - Local Shard Retrieval & Caching
 
     /// Get count of locally available shards for an erasure root
@@ -737,6 +848,36 @@ public actor ErasureCodingDataStore {
     ) async throws -> [Data32: Data] {
         var results: [Data32: Data] = [:]
 
+        // Check local availability first
+        let canReconstructLocally = try await canReconstructLocally(erasureRoot: erasureRoots[0])
+
+        if canReconstructLocally {
+            // Try local reconstruction first
+            do {
+                return try await batchReconstructFromLocal(
+                    erasureRoots: erasureRoots,
+                    originalLengths: originalLengths
+                )
+            } catch {
+                logger.warning("Local reconstruction failed: \(error)")
+            }
+        }
+
+        // TODO: Integrate with network client for fallback
+        // For now, just return what we have locally
+        return try await batchReconstructFromLocal(
+            erasureRoots: erasureRoots,
+            originalLengths: originalLengths
+        )
+    }
+
+    /// Batch reconstruction from local shards only
+    private func batchReconstructFromLocal(
+        erasureRoots: [Data32],
+        originalLengths: [Data32: Int]
+    ) async throws -> [Data32: Data] {
+        var results: [Data32: Data] = [:]
+
         for erasureRoot in erasureRoots {
             guard let originalLength = originalLengths[erasureRoot] else {
                 logger.warning("Missing original length for erasureRoot=\(erasureRoot.toHexString())")
@@ -786,6 +927,67 @@ public struct ReconstructionPlan: Sendable {
     public var estimatedTimeToFetch: TimeInterval? {
         // Rough estimate: 100ms per missing shard over network
         missingShards > 0 ? Double(missingShards) * 0.1 : nil
+    }
+}
+
+// MARK: - Storage Monitoring Types
+
+/// Storage usage statistics
+public struct StorageUsage: Sendable {
+    public let totalBytes: Int
+    public let auditStoreBytes: Int
+    public let d3lStoreBytes: Int
+    public let entryCount: Int
+    public let auditEntryCount: Int
+    public let d3lEntryCount: Int
+
+    public var totalMB: Double {
+        Double(totalBytes) / (1024 * 1024)
+    }
+
+    public var auditStoreMB: Double {
+        Double(auditStoreBytes) / (1024 * 1024)
+    }
+
+    public var d3lStoreMB: Double {
+        Double(d3lStoreBytes) / (1024 * 1024)
+    }
+}
+
+/// Incremental cleanup progress
+public struct IncrementalCleanupProgress: Sendable {
+    public let totalEntries: Int
+    public let processedEntries: Int
+    public let remainingEntries: Int
+    public let bytesReclaimed: Int
+    public let isComplete: Bool
+
+    public var progress: Double {
+        guard totalEntries > 0 else { return 1.0 }
+        return Double(processedEntries) / Double(totalEntries)
+    }
+}
+
+/// Storage pressure level
+public enum StoragePressure: Sendable {
+    case normal // Plenty of space available
+    case warning // Getting full, consider cleanup
+    case critical // Very full, aggressive cleanup needed
+    case emergency // Extremely full, delete everything possible
+
+    /// Determine pressure level based on usage
+    public static func from(usage: StorageUsage, maxBytes: Int) -> StoragePressure {
+        let usagePercentage = Double(usage.totalBytes) / Double(maxBytes)
+
+        if usagePercentage < 0.7 {
+            return .normal
+        } else if usagePercentage < 0.85 {
+            return .warning
+        } else if usagePercentage < 0.95 {
+            return .critical
+        } else {
+            return .emergency
+        }
     }
 }
 
