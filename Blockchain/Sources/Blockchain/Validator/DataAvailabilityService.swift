@@ -642,30 +642,30 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         do {
             // Fetch shard data from local storage
             // CE 137: Respond with bundle shard and segment shards
-            // TODO: Fetch from dataStore once it supports get by erasure root and index
 
-            // For now, throw an error as this needs the DataStore to support retrieval
-            throw DataAvailabilityError.segmentNotFound
+            // Try to get the shard from local storage
+            let shards = try await dataStore.getLocalShards(
+                erasureRoot: erasureRoot,
+                indices: [shardIndex]
+            )
 
-            // Once DataStore supports retrieval, the implementation should be:
-            // let bundleShard = try await dataStore.getBundleShard(erasureRoot: erasureRoot, index: shardIndex)
-            // let segmentShards = try await dataStore.getSegmentShards(erasureRoot: erasureRoot, index: shardIndex)
+            guard let shardData = shards.first(where: { $0.index == shardIndex })?.data else {
+                throw DataAvailabilityError.segmentNotFound
+            }
 
-            // Generate Merkle proof justification
+            // TODO: Generate Merkle proof justification
             // let justification = try await generateJustification(
             //     erasureRoot: erasureRoot,
             //     shardIndex: shardIndex,
-            //     bundleShard: bundleShard,
-            //     segmentShards: segmentShards
+            //     shardData: shardData
             // )
 
-            // Respond with shards + proof
-            // publish(RuntimeEvents.ShardDistributionReceivedResponse(
-            //     requestId: requestId,
-            //     bundleShard: bundleShard,
-            //     segmentShards: segmentShards,
-            //     justification: justification
-            // ))
+            // Respond with shard + proof
+            publish(RuntimeEvents.ShardDistributionReceivedResponse(
+                requestId: requestId,
+                shardIndex: shardIndex,
+                shardData: shardData
+            ))
 
         } catch {
             publish(RuntimeEvents.ShardDistributionReceivedResponse(
@@ -1085,28 +1085,97 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     /// - Parameter erasureRoot: The erasure root to check
     /// - Returns: Number of locally available shards
     public func getLocalShardCount(erasureRoot: Data32) async -> Int {
-        // TODO: Implement once DataStore supports iteration/counting
-        // For now, return 0
-        logger.debug("Checking local shard count for erasure root: \(erasureRoot)")
-        return 0
+        guard let ecStore = erasureCodingDataStore else {
+            logger.warning("ErasureCodingDataStore not available")
+            return 0
+        }
+
+        do {
+            return try await ecStore.getLocalShardCount(erasureRoot: erasureRoot)
+        } catch {
+            logger.error("Failed to get local shard count: \(error)")
+            return 0
+        }
     }
 
     /// Calculate reconstruction potential
     /// - Parameter erasureRoot: The erasure root to check
     /// - Returns: True if we have enough shards for reconstruction (>= 342)
     public func canReconstruct(erasureRoot: Data32) async -> Bool {
-        let localShardCount = await getLocalShardCount(erasureRoot: erasureRoot)
-        return localShardCount >= 342
+        guard let ecStore = erasureCodingDataStore else {
+            return false
+        }
+
+        do {
+            return try await ecStore.canReconstructLocally(erasureRoot: erasureRoot)
+        } catch {
+            logger.error("Failed to check reconstruction capability: \(error)")
+            return false
+        }
     }
 
     /// Get missing shard indices for an erasure root
     /// - Parameter erasureRoot: The erasure root to check
     /// - Returns: Array of missing shard indices
     public func getMissingShardIndices(erasureRoot: Data32) async -> [UInt16] {
-        // TODO: Implement once DataStore supports querying available indices
-        // For now, return empty array
-        logger.debug("Getting missing shard indices for erasure root: \(erasureRoot)")
-        return []
+        guard let ecStore = erasureCodingDataStore else {
+            logger.warning("ErasureCodingDataStore not available")
+            return []
+        }
+
+        do {
+            return try await ecStore.getMissingShardIndices(erasureRoot: erasureRoot)
+        } catch {
+            logger.error("Failed to get missing shard indices: \(error)")
+            return []
+        }
+    }
+
+    /// Get reconstruction plan for an erasure root
+    /// - Parameter erasureRoot: The erasure root to check
+    /// - Returns: Reconstruction plan with detailed information
+    public func getReconstructionPlan(erasureRoot: Data32) async -> ReconstructionPlan? {
+        guard let ecStore = erasureCodingDataStore else {
+            logger.warning("ErasureCodingDataStore not available")
+            return nil
+        }
+
+        do {
+            return try await ecStore.getReconstructionPlan(erasureRoot: erasureRoot)
+        } catch {
+            logger.error("Failed to get reconstruction plan: \(error)")
+            return nil
+        }
+    }
+
+    /// Fetch segments with automatic reconstruction if needed
+    /// - Parameters:
+    ///   - erasureRoot: The erasure root identifying the data
+    ///   - indices: Segment indices to fetch
+    /// - Returns: Array of segments
+    public func fetchSegments(erasureRoot: Data32, indices: [Int]) async throws -> [Data4104] {
+        guard let ecStore = erasureCodingDataStore else {
+            throw DataAvailabilityError.segmentNotFound
+        }
+
+        // Try fetching with cache first
+        return try await ecStore.getSegmentsWithCache(erasureRoot: erasureRoot, indices: indices)
+    }
+
+    /// Reconstruct data from local shards
+    /// - Parameters:
+    ///   - erasureRoot: The erasure root identifying the data
+    ///   - originalLength: Original data length
+    /// - Returns: Reconstructed data
+    public func reconstructFromLocalShards(erasureRoot: Data32, originalLength: Int) async throws -> Data {
+        guard let ecStore = erasureCodingDataStore else {
+            throw DataAvailabilityError.segmentNotFound
+        }
+
+        return try await ecStore.reconstructFromLocalShards(
+            erasureRoot: erasureRoot,
+            originalLength: originalLength
+        )
     }
 
     // MARK: - Statistics and Monitoring
@@ -1127,6 +1196,27 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         // TODO: Implement once DataStore supports statistics
         // For now, return zeros
         (0, 0, 0)
+    }
+
+    /// Get cache statistics
+    /// - Returns: Cache statistics including hits, misses, evictions, size, and hit rate
+    public func getCacheStatistics() -> (hits: Int, misses: Int, evictions: Int, size: Int, hitRate: Double)? {
+        guard let ecStore = erasureCodingDataStore else {
+            return nil
+        }
+
+        return ecStore.getCacheStatistics()
+    }
+
+    /// Clear cache for a specific erasure root
+    /// - Parameter erasureRoot: The erasure root to clear cache for
+    public func clearCache(erasureRoot: Data32) {
+        erasureCodingDataStore?.clearCache(erasureRoot: erasureRoot)
+    }
+
+    /// Clear all cache
+    public func clearAllCache() {
+        erasureCodingDataStore?.clearAllCache()
     }
 
     /// Get storage usage information
