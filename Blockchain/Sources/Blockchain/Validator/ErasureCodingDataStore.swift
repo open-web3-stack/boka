@@ -15,6 +15,12 @@ public actor ErasureCodingDataStore {
     private let config: ProtocolConfigRef
     private let segmentCache: SegmentCache
 
+    /// Optional network client for fetching missing shards
+    private var networkClient: AvailabilityNetworkClient?
+
+    /// Fetch strategy for network operations
+    private var fetchStrategy: FetchStrategy = .localOnly
+
     // Expose rocksdbStore for testing purposes
     public var rocksdbStoreForTesting: RocksDBDataStore {
         rocksdbStore
@@ -23,7 +29,8 @@ public actor ErasureCodingDataStore {
     public init(
         rocksdbStore: RocksDBDataStore,
         filesystemStore: FilesystemDataStore,
-        config: ProtocolConfigRef
+        config: ProtocolConfigRef,
+        networkClient: AvailabilityNetworkClient? = nil
     ) {
         self.rocksdbStore = rocksdbStore
         self.filesystemStore = filesystemStore
@@ -31,6 +38,17 @@ public actor ErasureCodingDataStore {
         erasureCoding = ErasureCodingService(config: config)
         // Use default cache size for now - can be made configurable later
         segmentCache = SegmentCache(maxSize: 1000)
+        self.networkClient = networkClient
+    }
+
+    /// Set the network client for fetching missing shards
+    public func setNetworkClient(_ client: AvailabilityNetworkClient) {
+        networkClient = client
+    }
+
+    /// Set the fetch strategy
+    public func setFetchStrategy(_ strategy: FetchStrategy) {
+        fetchStrategy = strategy
     }
 
     // MARK: - Audit Bundle Storage (Short-term)
@@ -727,6 +745,86 @@ public actor ErasureCodingDataStore {
         return segments
     }
 
+    /// Get segments with network fallback
+    /// - Parameters:
+    ///   - erasureRoot: Erasure root identifying the data
+    ///   - indices: Segment indices to retrieve
+    ///   - validators: Optional validator addresses for network fallback
+    ///   - coreIndex: Core index for shard assignment (default: 0)
+    ///   - totalValidators: Total number of validators (default: 1023)
+    /// - Returns: Array of segments
+    public func getSegmentsWithNetworkFallback(
+        erasureRoot: Data32,
+        indices: [Int],
+        validators: [UInt16: NetAddr]? = nil,
+        coreIndex: UInt16 = 0,
+        totalValidators: UInt16 = 1023
+    ) async throws -> [Data4104] {
+        // Try cache first
+        var segments: [Data4104] = []
+        var missingIndices: [Int] = []
+
+        for index in indices {
+            if let cachedSegment = segmentCache.get(segment: Data4104(), erasureRoot: erasureRoot, index: index) {
+                segments.append(cachedSegment)
+            } else {
+                missingIndices.append(index)
+            }
+        }
+
+        guard !missingIndices.isEmpty else {
+            return segments
+        }
+
+        // Try local storage
+        do {
+            let localSegments = try await getSegmentsWithCache(erasureRoot: erasureRoot, indices: missingIndices)
+            segments.append(contentsOf: localSegments)
+            return segments
+        } catch {
+            logger.warning("Failed to retrieve segments from local storage: \(error)")
+        }
+
+        // Try network fallback if enabled
+        if fetchStrategy != .localOnly,
+           let client = networkClient,
+           let validatorAddrs = validators,
+           !validatorAddrs.isEmpty
+        {
+            logger.info("Attempting network fallback for segments")
+
+            // Get missing shards for reconstruction
+            let missingShards = try await getMissingShardIndices(erasureRoot: erasureRoot)
+
+            // Fetch missing shards
+            let fetchedShards = try await client.fetchFromValidatorsConcurrently(
+                erasureRoot: erasureRoot,
+                shardIndices: Array(missingShards.prefix(342)),
+                validators: validatorAddrs,
+                coreIndex: coreIndex,
+                totalValidators: totalValidators,
+                requiredShards: max(0, 342 - getLocalShardCount(erasureRoot: erasureRoot))
+            )
+
+            // Store fetched shards
+            for (shardIndex, shardData) in fetchedShards {
+                try await rocksdbStore.storeShard(
+                    shard: shardData,
+                    index: shardIndex,
+                    erasureRoot: erasureRoot
+                )
+            }
+
+            // Now get segments from reconstructed data
+            let reconstructedSegments = try await getSegmentsWithCache(erasureRoot: erasureRoot, indices: missingIndices)
+            segments.append(contentsOf: reconstructedSegments)
+
+            return segments
+        }
+
+        throw DataAvailabilityError.segmentNotFound
+    }
+
     /// Clear segment cache for a specific erasure root
     /// - Parameter erasureRoot: Erasure root to invalidate
     public func clearCache(erasureRoot: Data32) {
@@ -837,38 +935,91 @@ public actor ErasureCodingDataStore {
         return results
     }
 
-    /// Batch reconstruction for multiple erasure roots
+    /// Batch reconstruction for multiple erasure roots with network fallback
     /// - Parameters:
     ///   - erasureRoots: Erasure roots to reconstruct
     ///   - originalLengths: Mapping of erasure root to original length
+    ///   - validators: Optional validator addresses for network fallback
+    ///   - coreIndex: Core index for shard assignment (default: 0)
+    ///   - totalValidators: Total number of validators (default: 1023)
     /// - Returns: Dictionary mapping erasure root to reconstructed data
     public func batchReconstruct(
         erasureRoots: [Data32],
-        originalLengths: [Data32: Int]
+        originalLengths: [Data32: Int],
+        validators: [UInt16: NetAddr]? = nil,
+        coreIndex: UInt16 = 0,
+        totalValidators: UInt16 = 1023
     ) async throws -> [Data32: Data] {
         var results: [Data32: Data] = [:]
 
-        // Check local availability first
-        let canReconstructLocally = try await canReconstructLocally(erasureRoot: erasureRoots[0])
+        for erasureRoot in erasureRoots {
+            // Check local availability first
+            let canReconstructLocally = try await canReconstructLocally(erasureRoot: erasureRoot)
 
-        if canReconstructLocally {
-            // Try local reconstruction first
-            do {
-                return try await batchReconstructFromLocal(
-                    erasureRoots: erasureRoots,
-                    originalLengths: originalLengths
-                )
-            } catch {
-                logger.warning("Local reconstruction failed: \(error)")
+            if canReconstructLocally {
+                // Try local reconstruction first
+                do {
+                    let data = try await reconstructFromLocalShards(
+                        erasureRoot: erasureRoot,
+                        originalLength: originalLengths[erasureRoot] ?? 0
+                    )
+                    results[erasureRoot] = data
+                    continue
+                } catch {
+                    logger.warning("Local reconstruction failed for erasureRoot=\(erasureRoot.toHexString()): \(error)")
+                }
+            }
+
+            // Try network fallback if enabled and validators available
+            if fetchStrategy != .localOnly,
+               let client = networkClient,
+               let validatorAddrs = validators,
+               !validatorAddrs.isEmpty
+            {
+                do {
+                    logger.info("Attempting network fallback for erasureRoot=\(erasureRoot.toHexString())")
+
+                    let missingShards = try await getMissingShardIndices(erasureRoot: erasureRoot)
+
+                    // Fetch missing shards from network
+                    let fetchedShards = try await client.fetchFromValidatorsConcurrently(
+                        erasureRoot: erasureRoot,
+                        shardIndices: missingShards,
+                        validators: validatorAddrs,
+                        coreIndex: coreIndex,
+                        totalValidators: totalValidators,
+                        requiredShards: max(0, 342 - getLocalShardCount(erasureRoot: erasureRoot))
+                    )
+
+                    // Store fetched shards locally
+                    for (shardIndex, shardData) in fetchedShards {
+                        try await rocksdbStore.storeShard(
+                            shard: shardData,
+                            index: shardIndex,
+                            erasureRoot: erasureRoot
+                        )
+                    }
+
+                    // Now reconstruct with combined local + fetched shards
+                    let data = try await reconstructFromLocalShards(
+                        erasureRoot: erasureRoot,
+                        originalLength: originalLengths[erasureRoot] ?? 0
+                    )
+                    results[erasureRoot] = data
+
+                    logger.info("Successfully reconstructed erasureRoot=\(erasureRoot.toHexString()) with network fallback")
+                } catch {
+                    logger.error("Network fallback failed for erasureRoot=\(erasureRoot.toHexString()): \(error)")
+                    throw error
+                }
+            } else {
+                // No network fallback available, throw error
+                let localShardCount = try await getLocalShardCount(erasureRoot: erasureRoot)
+                throw DataAvailabilityError.insufficientShards(available: localShardCount, required: 342)
             }
         }
 
-        // TODO: Integrate with network client for fallback
-        // For now, just return what we have locally
-        return try await batchReconstructFromLocal(
-            erasureRoots: erasureRoots,
-            originalLengths: originalLengths
-        )
+        return results
     }
 
     /// Batch reconstruction from local shards only
