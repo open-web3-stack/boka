@@ -276,11 +276,59 @@ public actor ErasureCodingDataStore {
         return try await getSegments(erasureRoot: erasureRoot, indices: indices)
     }
 
+    /// Get segments by page (64 segments per page)
+    ///
+    /// - Parameters:
+    ///   - erasureRoot: Erasure root identifying the segments
+    ///   - pageIndex: Page index to retrieve
+    /// - Returns: Array of segments in the page
+    public func getSegmentsByPage(erasureRoot: Data32, pageIndex: Int) async throws -> [Data4104] {
+        guard let d3lEntry = try await rocksdbStore.getD3LEntry(erasureRoot: erasureRoot) else {
+            throw DataAvailabilityError.metadataNotFound(erasureRoot: erasureRoot)
+        }
+
+        let segmentCount = Int(d3lEntry.segmentCount)
+        let pageSize = 64
+
+        let startIdx = pageIndex * pageSize
+        guard startIdx < segmentCount else {
+            return []
+        }
+
+        let endIdx = min(startIdx + pageSize, segmentCount)
+        let indices = Array(startIdx ..< endIdx)
+
+        return try await getSegments(erasureRoot: erasureRoot, indices: indices)
+    }
+
+    /// Get Paged-Proofs metadata for an erasure root
+    ///
+    /// - Parameter erasureRoot: Erasure root identifying the segments
+    /// - Returns: Paged-Proofs metadata, or nil if not found
+    public func getPagedProofsMetadata(erasureRoot: Data32) async throws -> Data? {
+        try await rocksdbStore.getPagedProofsMetadata(erasureRoot: erasureRoot)
+    }
+
+    /// Get the number of pages for an erasure root
+    ///
+    /// - Parameter erasureRoot: Erasure root identifying the segments
+    /// - Returns: Number of pages, or nil if not found
+    public func getPageCount(erasureRoot: Data32) async throws -> Int? {
+        guard let d3lEntry = try await rocksdbStore.getD3LEntry(erasureRoot: erasureRoot) else {
+            return nil
+        }
+
+        let segmentCount = Int(d3lEntry.segmentCount)
+        let pageSize = 64
+        return (segmentCount + pageSize - 1) / pageSize
+    }
+
     // MARK: - Paged-Proofs Metadata Generation
 
     /// Generate Paged-Proofs metadata for exported segments
     ///
-    /// Per GP spec: Groups segments into pages of 64, generates Merkle paths
+    /// Per GP spec (work_packages_and_reports.tex eq:pagedproofs):
+    /// Groups segments into pages of 64, generates Merkle justification paths
     /// and subtree pages for efficient segment justification
     ///
     /// - Parameter segments: Array of exported segments
@@ -290,9 +338,12 @@ public actor ErasureCodingDataStore {
             return Data()
         }
 
-        // Calculate page size (64 segments per page)
+        // Per GP spec: Page size is 64 segments
         let pageSize = 64
         let pageCount = (segments.count + pageSize - 1) / pageSize
+
+        // Calculate the segments root (constant-depth Merkle tree)
+        let segmentsRoot = Merklization.constantDepthMerklize(segments.map(\.data))
 
         var pages: [Data] = []
 
@@ -301,25 +352,131 @@ public actor ErasureCodingDataStore {
             let endIdx = min(startIdx + pageSize, segments.count)
             let pageSegments = Array(segments[startIdx ..< endIdx])
 
-            // Calculate Merkle path for this page
-            let pageData = pageSegments.map(\.data).reduce(Data(), +)
+            // For each page, generate:
+            // 1. Merkle justification paths for each segment in the page (depth 6)
+            // 2. Merkle subtree page for the page
 
-            // For now, store the page data padded to segment size
-            // Full Paged-Proofs implementation would generate proper Merkle paths
-            var paddedPage = pageData
-            if paddedPage.count < 4104 {
-                paddedPage.append(Data(count: 4104 - paddedPage.count))
-            }
+            let pageMetadata = try generatePageMetadata(
+                pageSegments: pageSegments,
+                pageIndex: pageIndex,
+                segmentsRoot: segmentsRoot,
+                totalSegments: segments.count
+            )
 
-            pages.append(paddedPage)
+            pages.append(pageMetadata)
         }
 
-        // Encode pages
-        let encoded = JamEncoder.encode(pages)
+        // Encode pages using JamEncoder
+        let encoded = JamEncoder.encode(pageCount, segmentsRoot, pages)
 
-        logger.debug("Generated Paged-Proofs metadata: \(pageCount) pages")
+        logger.debug("Generated Paged-Proofs metadata: \(pageCount) pages, \(segments.count) segments")
 
         return encoded
+    }
+
+    /// Generate metadata for a single page of segments
+    ///
+    /// - Parameters:
+    ///   - pageSegments: Segments in this page
+    ///   - pageIndex: Index of the page
+    ///   - segmentsRoot: Root of all segments
+    ///   - totalSegments: Total number of segments
+    /// - Returns: Page metadata as Data
+    private func generatePageMetadata(
+        pageSegments: [Data4104],
+        pageIndex: Int,
+        segmentsRoot _: Data32,
+        totalSegments _: Int
+    ) throws -> Data {
+        // Per GP spec: depth 6 for 64 segments per page
+        let merkleDepth: UInt8 = 6
+
+        // For each segment in the page, generate its Merkle justification path
+        var justificationPaths: [[Data32]] = []
+        for (localIndex, segment) in pageSegments.enumerated() {
+            let globalIndex = pageIndex * 64 + localIndex
+
+            // Generate Merkle proof path from segment to root
+            let path = Merklization.trace(
+                pageSegments.map(\.data),
+                index: localIndex,
+                hasher: Blake2b256.self
+            )
+
+            // Convert PathElements to Data32 hashes
+            var pathHashes: [Data32] = []
+            for element in path {
+                switch element {
+                case let .left(hash):
+                    pathHashes.append(hash)
+                case let .right(hash):
+                    pathHashes.append(hash)
+                }
+            }
+
+            justificationPaths.append(pathHashes)
+        }
+
+        // Calculate the Merkle subtree page for this page
+        // This is a Merkle tree of the 64 segments in the page
+        let pageHashes = pageSegments.map { $0.data.blake2b256hash() }
+        let subtreeRoot = Merklization.binaryMerklize(pageHashes.map(\.data))
+
+        // Encode page metadata:
+        // - Merkle depth (6)
+        // - Justification paths for each segment
+        // - Subtree root
+        let encoded = try JamEncoder.encode(
+            merkleDepth,
+            justificationPaths.count,
+            justificationPaths,
+            subtreeRoot
+        )
+
+        return encoded
+    }
+
+    /// Verify a segment's Paged-Proofs justification
+    ///
+    /// - Parameters:
+    ///   - segment: The segment to verify
+    ///   - pageIndex: Page containing the segment
+    ///   - localIndex: Index within the page
+    ///   - proof: Merkle proof path
+    ///   - segmentsRoot: Expected root
+    /// - Returns: True if the segment is valid
+    public func verifySegmentProof(
+        segment: Data4104,
+        pageIndex _: Int,
+        localIndex: Int,
+        proof: [Data32],
+        segmentsRoot: Data32
+    ) async throws -> Bool {
+        // Calculate segment hash
+        let segmentHash = segment.data.blake2b256hash()
+
+        // Start with segment hash
+        var currentValue = segmentHash
+        var currentIndex = localIndex
+
+        // Traverse the Merkle proof
+        for (level, proofElement) in proof.enumerated() {
+            // At each level, combine current value with proof element
+            let bitSet = (currentIndex >> level) & 1
+
+            if bitSet == 0 {
+                // Current value is on the left
+                let combined = currentValue.data + proofElement.data
+                currentValue = combined.blake2b256hash()
+            } else {
+                // Current value is on the right
+                let combined = proofElement.data + currentValue.data
+                currentValue = combined.blake2b256hash()
+            }
+        }
+
+        // Final value should match segmentsRoot
+        return currentValue == segmentsRoot
     }
 
     // MARK: - Cleanup
