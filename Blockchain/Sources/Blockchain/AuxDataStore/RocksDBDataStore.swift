@@ -243,12 +243,166 @@ extension RocksDBDataStore {
     }
 }
 
+// MARK: - Shard-Level Operations
+
+extension RocksDBDataStore {
+    /// Store a single shard for an erasure root
+    /// - Parameters:
+    ///   - shardData: Raw shard data (erasure-coded piece)
+    ///   - erasureRoot: Erasure root identifying the data
+    ///   - shardIndex: Index of the shard (0-1022)
+    public func storeShard(shardData: Data, erasureRoot: Data32, shardIndex: UInt16) async throws {
+        let key = makeShardKey(erasureRoot: erasureRoot, shardIndex: shardIndex)
+
+        // Store in availabilitySegments column family
+        try segments.put(key: key, value: Data4104(shardData) ?? Data4104())
+
+        // Update metadata
+        var meta = try await getOrCreateMetadata(erasureRoot: erasureRoot)
+        meta.shardCount += 1
+        try metadata.put(key: erasureRoot, value: meta)
+
+        logger.trace("Stored shard \(shardIndex) for erasureRoot=\(erasureRoot.toHexString())")
+    }
+
+    /// Retrieve a single shard by erasure root and index
+    /// - Parameters:
+    ///   - erasureRoot: Erasure root identifying the data
+    ///   - shardIndex: Index of the shard (0-1022)
+    /// - Returns: Shard data or nil if not found
+    public func getShard(erasureRoot: Data32, shardIndex: UInt16) async throws -> Data? {
+        let key = makeShardKey(erasureRoot: erasureRoot, shardIndex: shardIndex)
+        guard let segment = try segments.get(key: key) else {
+            return nil
+        }
+        return segment.data
+    }
+
+    /// Get count of available shards for an erasure root
+    /// - Parameter erasureRoot: Erasure root identifying the data
+    /// - Returns: Number of shards stored (0-1023)
+    public func getShardCount(erasureRoot: Data32) async throws -> Int {
+        guard let meta = try metadata.get(key: erasureRoot) else {
+            return 0
+        }
+        return Int(meta.shardCount)
+    }
+
+    /// Check if we have enough shards to reconstruct (≥342)
+    /// - Parameter erasureRoot: Erasure root identifying the data
+    /// - Returns: True if reconstruction is possible
+    public func canReconstruct(erasureRoot: Data32) async throws -> Bool {
+        let count = try await getShardCount(erasureRoot: erasureRoot)
+        return count >= 342
+    }
+
+    /// Get all available shard indices for an erasure root
+    /// - Parameter erasureRoot: Erasure root identifying the data
+    /// - Returns: Array of available shard indices
+    public func getAvailableShardIndices(erasureRoot: Data32) async throws -> [UInt16] {
+        var indices: [UInt16] = []
+
+        let iterator = db.createIterator(column: .availabilitySegments)
+        defer { iterator.close() }
+
+        // Seek to first key with this erasure root prefix
+        let prefix = erasureRoot.data
+        iterator.seek(to: prefix)
+
+        while let (key, _) = iterator.read() {
+            // Check if key starts with erasure root
+            guard key.starts(with: prefix) else {
+                break
+            }
+
+            // Extract shard index from key (erasureRoot || index)
+            if key.count == prefix.count + 2 {
+                let indexData = key.suffix(from: prefix.count)
+                if indexData.count == 2 {
+                    let index = indexData.withUnsafeBytes { bytes in
+                        UInt16(bigEndian: bytes.load(as: UInt16.self))
+                    }
+                    indices.append(index)
+                }
+            }
+
+            iterator.next()
+        }
+
+        return indices.sorted()
+    }
+
+    /// Batch store multiple shards
+    /// - Parameters:
+    ///   - shards: Array of (index, data) tuples
+    ///   - erasureRoot: Erasure root identifying the data
+    public func storeShards(shards: [(index: UInt16, data: Data)], erasureRoot: Data32) async throws {
+        // Update metadata once at the end
+        var shardCount = 0
+
+        for shard in shards {
+            let key = makeShardKey(erasureRoot: erasureRoot, shardIndex: shard.index)
+            try segments.put(key: key, value: Data4104(shard.data) ?? Data4104())
+            shardCount += 1
+        }
+
+        // Update metadata
+        var meta = try await getOrCreateMetadata(erasureRoot: erasureRoot)
+        meta.shardCount = UInt32(shardCount)
+        try metadata.put(key: erasureRoot, value: meta)
+
+        logger.debug("Stored \(shards.count) shards for erasureRoot=\(erasureRoot.toHexString())")
+    }
+
+    /// Batch retrieve multiple shards
+    /// - Parameters:
+    ///   - erasureRoot: Erasure root identifying the data
+    ///   - shardIndices: Array of shard indices to retrieve
+    /// - Returns: Array of (index, data) tuples for found shards
+    public func getShards(erasureRoot: Data32, shardIndices: [UInt16]) async throws -> [(index: UInt16, data: Data)] {
+        var result: [(index: UInt16, data: Data)] = []
+
+        for index in shardIndices {
+            if let shard = try await getShard(erasureRoot: erasureRoot, shardIndex: index) {
+                result.append((index, shard))
+            }
+        }
+
+        logger.trace("Retrieved \(result.count)/\(shardIndices.count) shards for erasureRoot=\(erasureRoot.toHexString())")
+
+        return result
+    }
+
+    /// Delete all shards for an erasure root
+    /// - Parameter erasureRoot: Erasure root identifying the data
+    public func deleteShards(erasureRoot: Data32) async throws {
+        let indices = try await getAvailableShardIndices(erasureRoot: erasureRoot)
+
+        for index in indices {
+            let key = makeShardKey(erasureRoot: erasureRoot, shardIndex: index)
+            try segments.delete(key: key)
+        }
+
+        // Update metadata
+        var meta = try await getOrCreateMetadata(erasureRoot: erasureRoot)
+        meta.shardCount = 0
+        try metadata.put(key: erasureRoot, value: meta)
+
+        logger.debug("Deleted \(indices.count) shards for erasureRoot=\(erasureRoot.toHexString())")
+    }
+}
+
 // MARK: - Helper Methods
 
 extension RocksDBDataStore {
     /// Create segment storage key from erasure root and index
     private func makeSegmentKey(erasureRoot: Data32, index: UInt16) -> Data {
         erasureRoot.data + Data(withUnsafeBytes(of: index.bigEndian) { Array($0) })
+    }
+
+    /// Create shard storage key from erasure root and shard index
+    private func makeShardKey(erasureRoot: Data32, shardIndex: UInt16) -> Data {
+        erasureRoot.data + Data(withUnsafeBytes(of: shardIndex.bigEndian) { Array($0) })
     }
 
     /// Get or create metadata for erasure root
