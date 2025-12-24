@@ -21,6 +21,9 @@ public actor ErasureCodingDataStore {
     /// Fetch strategy for network operations
     private var fetchStrategy: FetchStrategy = .localOnly
 
+    /// Cleanup metrics tracking
+    private var cleanupMetrics = CleanupMetrics()
+
     // Expose rocksdbStore for testing purposes
     public var rocksdbStoreForTesting: RocksDBDataStore {
         rocksdbStore
@@ -565,6 +568,101 @@ public actor ErasureCodingDataStore {
         return (deletedEntries, deletedSegments)
     }
 
+    /// Cleanup expired audit entries (older than cutoff epoch)
+    ///
+    /// - Parameter cutoffEpoch: Cleanup entries from epochs before this value
+    /// - Returns: Tuple of (entries deleted, bytes reclaimed)
+    public func cleanupAuditEntriesBeforeEpoch(cutoffEpoch: UInt32) async throws -> (entriesDeleted: Int, bytesReclaimed: Int) {
+        let startTime = Date()
+        let cutoffDate = epochToTimestamp(epoch: cutoffEpoch)
+
+        let entries = try await rocksdbStore.listAuditEntries(before: cutoffDate)
+
+        var deletedCount = 0
+        var bytesReclaimed = 0
+
+        for entry in entries {
+            // Delete from filesystem
+            try await filesystemStore.deleteAuditBundle(erasureRoot: entry.erasureRoot)
+
+            // Delete from RocksDB
+            try await rocksdbStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
+            try await rocksdbStore.deleteShards(erasureRoot: entry.erasureRoot)
+
+            deletedCount += 1
+            bytesReclaimed += entry.bundleSize
+        }
+
+        let duration = Date().timeIntervalSince(startTime)
+
+        // Update metrics
+        cleanupMetrics.lastCleanupTime = Date()
+        cleanupMetrics.entriesDeletedLastRun = deletedCount
+        cleanupMetrics.bytesReclaimedLastRun = bytesReclaimed
+        cleanupMetrics.cleanupDuration = duration
+        cleanupMetrics.totalEntriesDeleted += deletedCount
+        cleanupMetrics.totalBytesReclaimed += bytesReclaimed
+
+        logger.info(
+            "Cleanup: deleted \(deletedCount) audit entries before epoch \(cutoffEpoch), reclaimed \(bytesReclaimed) bytes in \(duration)s"
+        )
+
+        return (deletedCount, bytesReclaimed)
+    }
+
+    /// Cleanup expired D³L entries (older than cutoff epoch)
+    ///
+    /// - Parameter cutoffEpoch: Cleanup entries from epochs before this value
+    /// - Returns: Tuple of (entries deleted, segments deleted)
+    public func cleanupD3LEntriesBeforeEpoch(cutoffEpoch: UInt32) async throws -> (entriesDeleted: Int, segmentsDeleted: Int) {
+        let startTime = Date()
+        let cutoffDate = epochToTimestamp(epoch: cutoffEpoch)
+
+        let entries = try await rocksdbStore.listD3LEntries(before: cutoffDate)
+
+        var deletedEntries = 0
+        var deletedSegments = 0
+
+        for entry in entries {
+            // Delete from filesystem
+            try await filesystemStore.deleteD3LShards(erasureRoot: entry.erasureRoot)
+
+            // Delete from RocksDB
+            try await rocksdbStore.deleteD3LEntry(erasureRoot: entry.erasureRoot)
+            try await rocksdbStore.deleteShards(erasureRoot: entry.erasureRoot)
+
+            deletedEntries += 1
+            deletedSegments += Int(entry.segmentCount)
+        }
+
+        let duration = Date().timeIntervalSince(startTime)
+
+        // Update metrics
+        cleanupMetrics.lastCleanupTime = Date()
+        cleanupMetrics.entriesDeletedLastRun += deletedEntries
+        cleanupMetrics.segmentsDeletedLastRun = deletedSegments
+        cleanupMetrics.cleanupDuration += duration
+        cleanupMetrics.totalEntriesDeleted += deletedEntries
+
+        logger.info(
+            "Cleanup: deleted \(deletedEntries) D³L entries before epoch \(cutoffEpoch), \(deletedSegments) segments in \(duration)s"
+        )
+
+        return (deletedEntries, deletedSegments)
+    }
+
+    /// Convert epoch index to timestamp
+    /// - Parameter epoch: The epoch index to convert
+    /// - Returns: The timestamp for the start of the given epoch
+    private func epochToTimestamp(epoch: UInt32) -> Date {
+        // GP spec: 10 minutes per epoch (600 seconds)
+        let epochDuration: TimeInterval = 600
+        let epochStartTime = TimeInterval(epoch) * epochDuration
+
+        // Assume genesis at Unix epoch (can be made configurable if needed)
+        return Date(timeIntervalSince1970: epochStartTime)
+    }
+
     // MARK: - Storage Monitoring
 
     /// Get storage usage statistics
@@ -674,6 +772,17 @@ public actor ErasureCodingDataStore {
         logger.warning("Aggressive cleanup: reclaimed \(bytesReclaimed) bytes (target: \(targetBytes))")
 
         return bytesReclaimed
+    }
+
+    /// Get cleanup metrics
+    /// - Returns: Current cleanup metrics
+    public func getCleanupMetrics() -> CleanupMetrics {
+        cleanupMetrics
+    }
+
+    /// Reset cleanup metrics
+    public func resetCleanupMetrics() {
+        cleanupMetrics = CleanupMetrics()
     }
 
     // MARK: - Local Shard Retrieval & Caching
@@ -1139,6 +1248,37 @@ public enum StoragePressure: Sendable {
         } else {
             return .emergency
         }
+    }
+}
+
+/// Cleanup operation metrics
+public struct CleanupMetrics: Sendable {
+    public var lastCleanupTime = Date.distantPast
+    public var entriesDeletedLastRun = 0
+    public var segmentsDeletedLastRun = 0
+    public var bytesReclaimedLastRun = 0
+    public var cleanupDuration: TimeInterval = 0.0
+    public var totalEntriesDeleted = 0
+    public var totalBytesReclaimed = 0
+
+    public init() {}
+
+    public init(
+        lastCleanupTime: Date,
+        entriesDeletedLastRun: Int,
+        segmentsDeletedLastRun: Int,
+        bytesReclaimedLastRun: Int,
+        cleanupDuration: TimeInterval,
+        totalEntriesDeleted: Int,
+        totalBytesReclaimed: Int
+    ) {
+        self.lastCleanupTime = lastCleanupTime
+        self.entriesDeletedLastRun = entriesDeletedLastRun
+        self.segmentsDeletedLastRun = segmentsDeletedLastRun
+        self.bytesReclaimedLastRun = bytesReclaimedLastRun
+        self.cleanupDuration = cleanupDuration
+        self.totalEntriesDeleted = totalEntriesDeleted
+        self.totalBytesReclaimed = totalBytesReclaimed
     }
 }
 

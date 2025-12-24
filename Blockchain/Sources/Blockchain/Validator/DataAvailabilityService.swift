@@ -101,16 +101,18 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
                 let auditRetentionEpochs: EpochIndex = 6
 
                 if epoch > auditRetentionEpochs {
-                    let (deleted, bytes) = try await ecStore.cleanupAuditEntries(retentionEpochs: auditRetentionEpochs)
-                    logger.info("Purged \(deleted) audit entries (\(bytes) bytes)")
+                    let auditCutoffEpoch = epoch - auditRetentionEpochs
+                    let (deleted, bytes) = try await ecStore.cleanupAuditEntriesBeforeEpoch(cutoffEpoch: auditCutoffEpoch)
+                    logger.info("Purged \(deleted) audit entries (\(bytes) bytes) from epochs before \(auditCutoffEpoch)")
                 }
 
                 // Purge old import/D3L store data (long-term storage, kept for 28 days = 672 epochs)
                 let d3lRetentionEpochs: EpochIndex = 672
 
                 if epoch > d3lRetentionEpochs {
-                    let (entriesDeleted, segmentsDeleted) = try await ecStore.cleanupD3LEntries(retentionEpochs: d3lRetentionEpochs)
-                    logger.info("Purged \(entriesDeleted) D³L entries (\(segmentsDeleted) segments)")
+                    let d3lCutoffEpoch = epoch - d3lRetentionEpochs
+                    let (entriesDeleted, segmentsDeleted) = try await ecStore.cleanupD3LEntriesBeforeEpoch(cutoffEpoch: d3lCutoffEpoch)
+                    logger.info("Purged \(entriesDeleted) D³L entries (\(segmentsDeleted) segments) from epochs before \(d3lCutoffEpoch)")
                 }
             } catch {
                 logger.error("Failed to purge old data: \(error)")
@@ -125,6 +127,20 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             // TODO: Implement timestamp-based cleanup when DataStore exposes iteration methods
             _ = (auditCutoffTime, d3lCutoffTime)
         }
+    }
+
+    /// Get cleanup metrics
+    /// - Returns: Cleanup metrics if ErasureCodingDataStore is available
+    public func getCleanupMetrics() -> CleanupMetrics? {
+        guard let ecStore = erasureCodingDataStore else {
+            return nil
+        }
+        return ecStore.getCleanupMetrics()
+    }
+
+    /// Reset cleanup metrics
+    public func resetCleanupMetrics() {
+        erasureCodingDataStore?.resetCleanupMetrics()
     }
 
     /// Fetch segments from import store
