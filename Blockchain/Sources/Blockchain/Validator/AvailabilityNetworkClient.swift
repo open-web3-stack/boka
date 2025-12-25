@@ -31,6 +31,9 @@ public actor AvailabilityNetworkClient {
     /// Network metrics tracking
     private var metrics = NetworkMetrics()
 
+    /// Fallback timeout configuration
+    private var fallbackTimeoutConfig = FallbackTimeoutConfig()
+
     public init(
         config: ProtocolConfigRef,
         erasureCoding: ErasureCodingService
@@ -43,6 +46,20 @@ public actor AvailabilityNetworkClient {
     /// Set the peer manager for validator connections
     public func setPeerManager(_ peerManager: PeerManager) {
         self.peerManager = peerManager
+    }
+
+    /// Configure fallback timeouts
+    /// - Parameter config: Fallback timeout configuration
+    public func configureFallbackTimeouts(_ config: FallbackTimeoutConfig) {
+        fallbackTimeoutConfig = config
+        logger.info(
+            """
+            Fallback timeouts configured: local=\(config.localTimeout)s, \
+            ce147=\(config.ce147Timeout)s, ce138=\(config.ce138Timeout)s, \
+            ce139=\(config.ce139Timeout)s, ce140=\(config.ce140Timeout)s, \
+            ce148=\(config.ce148Timeout)s
+            """
+        )
     }
 
     // MARK: - CE 138: Audit Shard Request
@@ -70,6 +87,9 @@ public actor AvailabilityNetworkClient {
             Fetching audit shard \(shardIndex) from \(assurerAddress)
             """
         )
+
+        // Record CE 138 fallback usage
+        await recordCE138Request()
 
         let responseData = try await sendRequest(
             to: assurerAddress,
@@ -127,6 +147,9 @@ public actor AvailabilityNetworkClient {
             """
         )
 
+        // Record CE 139 fallback usage
+        await recordCE139Request()
+
         let responseData = try await sendRequest(
             to: assurerAddress,
             requestType: .segmentShardsFast,
@@ -174,6 +197,9 @@ public actor AvailabilityNetworkClient {
             from \(assurerAddress) using CE 140 (verified mode)
             """
         )
+
+        // Record CE 140 fallback usage
+        await recordCE140Request()
 
         let responseData = try await sendRequest(
             to: assurerAddress,
@@ -227,6 +253,9 @@ public actor AvailabilityNetworkClient {
             """
         )
 
+        // Record CE 147 fallback usage
+        await recordCE147Request()
+
         do {
             let responseData = try await sendRequest(
                 to: guarantorAddress,
@@ -279,6 +308,9 @@ public actor AvailabilityNetworkClient {
             Fetching \(segmentIndices.count) segments from \(guarantorAddress) using CE 148
             """
         )
+
+        // Record CE 148 fallback usage
+        await recordCE148Request()
 
         do {
             let responseData = try await sendRequest(
@@ -542,6 +574,43 @@ public actor AvailabilityNetworkClient {
             metrics.totalRetries += 1
         }
     }
+
+    // MARK: - Fallback Metrics Recording
+
+    /// Record when data is found locally (no network request needed)
+    private func recordLocalHit() {
+        metrics.localHits += 1
+    }
+
+    /// Record a CE 138 request (Audit Shard Request)
+    private func recordCE138Request() {
+        metrics.ce138Requests += 1
+        metrics.fallbackCount += 1
+    }
+
+    /// Record a CE 139 request (Segment Shard Request - fast)
+    private func recordCE139Request() {
+        metrics.ce139Requests += 1
+        metrics.fallbackCount += 1
+    }
+
+    /// Record a CE 140 request (Segment Shard Request - verified)
+    private func recordCE140Request() {
+        metrics.ce140Requests += 1
+        metrics.fallbackCount += 1
+    }
+
+    /// Record a CE 147 request (Bundle Request)
+    private func recordCE147Request() {
+        metrics.ce147Requests += 1
+        metrics.fallbackCount += 1
+    }
+
+    /// Record a CE 148 request (Segment Request)
+    private func recordCE148Request() {
+        metrics.ce148Requests += 1
+        metrics.fallbackCount += 1
+    }
 }
 
 // MARK: - Timeout Extension
@@ -614,6 +683,29 @@ public struct NetworkMetrics: Sendable {
     /// Recent request latencies (last 100)
     public var recentLatencies: [TimeInterval] = []
 
+    // MARK: - Fallback Usage Tracking
+
+    /// Number of requests served from local storage
+    public var localHits: Int = 0
+
+    /// Number of CE 138 requests (Audit Shard Request)
+    public var ce138Requests: Int = 0
+
+    /// Number of CE 139 requests (Segment Shard Request - fast)
+    public var ce139Requests: Int = 0
+
+    /// Number of CE 140 requests (Segment Shard Request - verified)
+    public var ce140Requests: Int = 0
+
+    /// Number of CE 147 requests (Bundle Request)
+    public var ce147Requests: Int = 0
+
+    /// Number of CE 148 requests (Segment Request)
+    public var ce148Requests: Int = 0
+
+    /// Number of fallback operations (local → network)
+    public var fallbackCount: Int = 0
+
     /// Average request latency
     public var averageLatency: TimeInterval {
         guard successfulRequests > 0 else { return 0 }
@@ -655,6 +747,82 @@ public struct NetworkMetrics: Sendable {
     }
 
     public init() {}
+
+    // MARK: - Fallback Tracking Methods
+
+    /// Record when data is found locally (no network request)
+    public mutating func recordLocalHit() {
+        localHits += 1
+    }
+
+    /// Record a CE 138 request (Audit Shard Request)
+    public mutating func recordCE138Request() {
+        ce138Requests += 1
+        fallbackCount += 1
+    }
+
+    /// Record a CE 139 request (Segment Shard Request - fast)
+    public mutating func recordCE139Request() {
+        ce139Requests += 1
+        fallbackCount += 1
+    }
+
+    /// Record a CE 140 request (Segment Shard Request - verified)
+    public mutating func recordCE140Request() {
+        ce140Requests += 1
+        fallbackCount += 1
+    }
+
+    /// Record a CE 147 request (Bundle Request)
+    public mutating func recordCE147Request() {
+        ce147Requests += 1
+        fallbackCount += 1
+    }
+
+    /// Record a CE 148 request (Segment Request)
+    public mutating func recordCE148Request() {
+        ce148Requests += 1
+        fallbackCount += 1
+    }
+}
+
+// MARK: - Fallback Timeout Configuration
+
+/// Timeout configuration for each stage of the fallback chain
+public struct FallbackTimeoutConfig: Sendable {
+    /// Timeout for local operations (default: 0.1s)
+    public var localTimeout: TimeInterval
+
+    /// Timeout for CE 147 (Bundle Request from guarantors) (default: 5s)
+    public var ce147Timeout: TimeInterval
+
+    /// Timeout for CE 138 (Audit Shard Request) (default: 5s)
+    public var ce138Timeout: TimeInterval
+
+    /// Timeout for CE 139 (Segment Shard Request - fast) (default: 3s)
+    public var ce139Timeout: TimeInterval
+
+    /// Timeout for CE 140 (Segment Shard Request - verified) (default: 10s)
+    public var ce140Timeout: TimeInterval
+
+    /// Timeout for CE 148 (Segment Request from guarantors) (default: 5s)
+    public var ce148Timeout: TimeInterval
+
+    public init(
+        localTimeout: TimeInterval = 0.1,
+        ce147Timeout: TimeInterval = 5.0,
+        ce138Timeout: TimeInterval = 5.0,
+        ce139Timeout: TimeInterval = 3.0,
+        ce140Timeout: TimeInterval = 10.0,
+        ce148Timeout: TimeInterval = 5.0
+    ) {
+        self.localTimeout = localTimeout
+        self.ce147Timeout = ce147Timeout
+        self.ce138Timeout = ce138Timeout
+        self.ce139Timeout = ce139Timeout
+        self.ce140Timeout = ce140Timeout
+        self.ce148Timeout = ce148Timeout
+    }
 }
 
 // MARK: - Placeholder PeerManager
