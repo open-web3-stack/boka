@@ -189,17 +189,16 @@ extension FilesystemDataStore {
         try createDirectoryIfNeeded(parentDir)
 
         // Write to temporary file
-        let tempPath = url.appendingPathExtension("tmp")
-        try data.write(to: tempPath)
+        let tempUrl = url.deletingLastPathComponent().appendingPathComponent("\(UUID().uuidString).tmp")
 
-        // Sync to ensure durability
-        // Note: Data.write() typically flushes to disk, but we explicitly sync for durability
-        let handle = try FileHandle(forWritingTo: tempPath)
-        handle.synchronizeFile()
+        // Use FileHandle for writing to ensure proper sync
+        let handle = try FileHandle(forWritingTo: tempUrl)
+        try handle.write(contentsOf: data)
+        handle.synchronizeFile() // Sync before closing to ensure durability
         handle.closeFile()
 
         // Atomic rename
-        try fileManager.moveItem(at: tempPath, to: url)
+        try fileManager.moveItem(at: tempUrl, to: url)
     }
 
     /// Read data from file

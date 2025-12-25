@@ -186,7 +186,10 @@ public actor ErasureCodingDataStore {
 
         // Calculate segments root Merkle tree
         let calculatedSegmentsRoot = Merklization.binaryMerklize(segments.map(\.data))
-        #expect(calculatedSegmentsRoot == segmentsRoot)
+        precondition(
+            calculatedSegmentsRoot == segmentsRoot,
+            "Segments root mismatch: calculated \(calculatedSegmentsRoot.toHexString()) != expected \(segmentsRoot.toHexString())"
+        )
 
         // Generate Paged-Proofs metadata
         let pagedProofsMetadata = try generatePagedProofsMetadata(segments: segments)
@@ -1097,6 +1100,54 @@ public actor ErasureCodingDataStore {
     }
 
     // MARK: - Local Shard Retrieval & Caching
+
+    /// Check if a shard exists
+    /// - Parameters:
+    ///   - erasureRoot: Erasure root identifying the data
+    ///   - shardIndex: Index of the shard to check
+    /// - Returns: True if the shard exists
+    public func hasShard(erasureRoot: Data32, shardIndex: UInt16) async throws -> Bool {
+        let shardData = try await rocksdbStore.getShard(erasureRoot: erasureRoot, shardIndex: shardIndex)
+        return shardData != nil
+    }
+
+    /// Get a single shard by erasure root and index
+    /// - Parameters:
+    ///   - erasureRoot: Erasure root identifying the data
+    ///   - shardIndex: Index of the shard to retrieve
+    /// - Returns: Shard data or nil if not found
+    public func getShard(erasureRoot: Data32, shardIndex: UInt16) async throws -> Data? {
+        try await rocksdbStore.getShard(erasureRoot: erasureRoot, shardIndex: shardIndex)
+    }
+
+    /// Get audit entry metadata
+    /// - Parameter erasureRoot: Erasure root identifying the data
+    /// - Returns: Audit entry or nil if not found
+    public func getAuditEntry(erasureRoot: Data32) async throws -> AuditEntry? {
+        try await rocksdbStore.getAuditEntry(erasureRoot: erasureRoot)
+    }
+
+    /// Get D³L entry by segments root
+    /// - Parameter segmentsRoot: Segments root identifying the data
+    /// - Returns: D³L entry or nil if not found
+    public func getD3LEntry(segmentsRoot: Data32) async throws -> D3LEntry? {
+        // First get the erasure root from segments root
+        guard let erasureRoot = try await rocksdbStore.getErasureRoot(forSegmentRoot: segmentsRoot) else {
+            return nil
+        }
+        // Then get the D³L entry
+        return try await rocksdbStore.getD3LEntry(erasureRoot: erasureRoot)
+    }
+
+    /// Get a single segment by erasure root and index
+    /// - Parameters:
+    ///   - erasureRoot: Erasure root identifying the data
+    ///   - segmentIndex: Index of the segment to retrieve
+    /// - Returns: Segment data or nil if not found
+    public func getSegment(erasureRoot: Data32, segmentIndex: UInt16) async throws -> Data? {
+        let segments = try await getSegments(erasureRoot: erasureRoot, indices: [Int(segmentIndex)])
+        return segments.first.map { Data($0) }
+    }
 
     /// Get count of locally available shards for an erasure root
     /// - Parameter erasureRoot: Erasure root identifying the data

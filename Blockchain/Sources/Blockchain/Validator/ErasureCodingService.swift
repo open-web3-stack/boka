@@ -25,19 +25,18 @@ public actor ErasureCodingService {
     /// Encode segments into erasure-coded shards
     ///
     /// Each segment is 4,104 bytes = 6 × 684-byte pieces
-    /// This encodes segments individually as per GP spec
+    /// Per GP spec (erasure_coding.tex eq. 32-35), this:
+    /// 1. Concatenates all segments into a single data blob
+    /// 2. Transposes the data (via the ^T operator in the spec)
+    /// 3. Erasure codes the transposed data into 1,023 shards
+    ///
+    /// The transposition ensures that each shard contains interleaved data from all segments,
+    /// allowing efficient parallel recovery. After transposition and encoding, shard i contains
+    /// piece i from each segment, making it possible to recover any segment from any 342 shards.
     ///
     /// - Parameter segments: Array of 4,104-byte segments
     /// - Returns: Array of 1,023 shard data chunks
     /// - Throws: ErasureCodingError if encoding fails
-    ///
-    /// **IMPORTANT**: This implementation encodes all segments as one concatenated blob.
-    /// The `generateSegmentJustification` method assumes that each shard contains interleaved
-    /// data from all segments (i.e., the first 12 bytes of shard 0 belong to segment 0, the
-    /// next 12 bytes belong to segment 1, etc.). For this assumption to hold, the encoding
-    /// strategy should be changed to encode each segment individually and then interleave
-    /// the shards. This is a known limitation that should be addressed when segment
-    /// justifications are fully implemented.
     public func encodeSegments(_ segments: [Data4104]) throws -> [Data] {
         guard !segments.isEmpty else {
             throw ErasureCodingError.emptyInput
@@ -46,7 +45,8 @@ public actor ErasureCodingService {
         logger.debug("Encoding \(segments.count) segments into shards")
 
         // Each segment is 4,104 bytes = 6 pieces of 684 bytes each
-        // We encode all segments together as a batch
+        // Per GP spec: concatenate all segments, then transpose and encode
+        // The ErasureCoding.chunk function handles the transposition as part of encoding
         let totalData = segments.map(\.data).reduce(Data(), +)
 
         // Calculate k (original pieces)
@@ -60,6 +60,7 @@ public actor ErasureCodingService {
         }
 
         // Encode using existing ErasureCoding utility
+        // This handles the transposition (^T operator) per GP spec
         let shards = try ErasureCoding.chunk(
             data: totalData,
             basicSize: pieceSize,

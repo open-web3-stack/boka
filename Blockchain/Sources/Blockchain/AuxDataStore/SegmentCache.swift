@@ -2,11 +2,16 @@ import Foundation
 import TracingUtils
 
 /// LRU cache for segment data to optimize repeated access
+///
+/// Uses a doubly-linked list implemented via Dictionary for O(1) operations
+/// instead of O(N) array operations for LRU tracking.
 public final class SegmentCache: Sendable {
     private struct CacheEntry: Sendable {
         let segment: Data4104
-        let accessTime: ContinuousClock.Instant
-        let hitCount: Int
+        var accessTime: ContinuousClock.Instant
+        var hitCount: Int
+        var previousKey: CacheKey?
+        var nextKey: CacheKey?
     }
 
     private struct CacheKey: Hashable, Sendable {
@@ -20,7 +25,8 @@ public final class SegmentCache: Sendable {
 
     private struct CacheState: Sendable {
         var storage: [CacheKey: CacheEntry]
-        var accessOrder: [CacheKey]
+        var head: CacheKey? // Most recently used
+        var tail: CacheKey? // Least recently used
         var hits: Int
         var misses: Int
         var evictions: Int
@@ -40,21 +46,17 @@ public final class SegmentCache: Sendable {
         lock.withLock { state in
             let key = CacheKey(erasureRoot: erasureRoot, index: index)
 
-            if let entry = state.storage[key] {
-                // Cache hit - update access statistics and move to end
+            if var entry = state.storage[key] {
+                // Cache hit - update access statistics and move to head (most recent)
                 state.hits += 1
-                let updatedEntry = CacheEntry(
-                    segment: entry.segment,
-                    accessTime: .now,
-                    hitCount: entry.hitCount + 1
-                )
-                state.storage[key] = updatedEntry
+                entry.accessTime = .now
+                entry.hitCount += 1
 
-                // Move to end of access order
-                if let index = state.accessOrder.firstIndex(of: key) {
-                    state.accessOrder.remove(at: index)
-                }
-                state.accessOrder.append(key)
+                // Remove from current position in linked list
+                removeFromList(state: &state, key: key)
+
+                // Add to head (most recently used)
+                addToHead(state: &state, key: key, entry: entry)
 
                 logger.debug("Cache hit: erasureRoot=\(erasureRoot.toHexString()), index=\(index)")
                 return entry.segment
@@ -76,24 +78,27 @@ public final class SegmentCache: Sendable {
         lock.withLock { state in
             let key = CacheKey(erasureRoot: erasureRoot, index: index)
 
-            // Check if we need to evict
-            if !state.storage.keys.contains(key), state.storage.count >= maxSize {
+            // Check if we need to evict (only if this is a new key)
+            if state.storage[key] == nil, state.storage.count >= maxSize {
                 evictLeastRecentlyUsed(state: &state)
             }
 
-            // Add or update entry
-            let entry = CacheEntry(
+            // Create entry
+            var entry = CacheEntry(
                 segment: segment,
                 accessTime: .now,
-                hitCount: 0
+                hitCount: 0,
+                previousKey: nil,
+                nextKey: nil
             )
-            state.storage[key] = entry
 
-            // Update access order
-            if let existingIndex = state.accessOrder.firstIndex(of: key) {
-                state.accessOrder.remove(at: existingIndex)
+            // Remove from current position if updating existing
+            if state.storage[key] != nil {
+                removeFromList(state: &state, key: key)
             }
-            state.accessOrder.append(key)
+
+            // Add to head (most recently used)
+            addToHead(state: &state, key: key, entry: entry)
 
             logger.debug("Cached segment: erasureRoot=\(erasureRoot.toHexString()), index=\(index), size=\(state.storage.count)")
         }
@@ -106,10 +111,8 @@ public final class SegmentCache: Sendable {
     public func remove(erasureRoot: Data32, index: Int) {
         lock.withLock { state in
             let key = CacheKey(erasureRoot: erasureRoot, index: index)
+            removeFromList(state: &state, key: key)
             state.storage.removeValue(forKey: key)
-            if let index = state.accessOrder.firstIndex(of: key) {
-                state.accessOrder.remove(at: index)
-            }
         }
     }
 
@@ -117,7 +120,8 @@ public final class SegmentCache: Sendable {
     public func clear() {
         lock.withLock { state in
             state.storage.removeAll()
-            state.accessOrder.removeAll()
+            state.head = nil
+            state.tail = nil
             logger.info("Cache cleared")
         }
     }
@@ -128,10 +132,8 @@ public final class SegmentCache: Sendable {
         lock.withLock { state in
             let keysToRemove = state.storage.keys.filter { $0.erasureRoot == erasureRoot }
             for key in keysToRemove {
+                removeFromList(state: &state, key: key)
                 state.storage.removeValue(forKey: key)
-                if let index = state.accessOrder.firstIndex(of: key) {
-                    state.accessOrder.remove(at: index)
-                }
             }
             logger.info("Invalidated \(keysToRemove.count) entries for erasureRoot=\(erasureRoot.toHexString())")
         }
@@ -158,15 +160,55 @@ public final class SegmentCache: Sendable {
         lock.withLock { $0.storage.count }
     }
 
-    // MARK: - Private Methods
+    // MARK: - Private Methods (O(1) Doubly-Linked List Operations)
+
+    private func addToHead(state: inout CacheState, key: CacheKey, entry: CacheEntry) {
+        state.storage[key] = entry
+
+        if let head = state.head {
+            // Link new entry as head
+            state.storage[key]?.nextKey = head
+            state.storage[head]?.previousKey = key
+        }
+
+        state.head = key
+
+        // If this is the first entry, it's also the tail
+        if state.tail == nil {
+            state.tail = key
+        }
+    }
+
+    private func removeFromList(state: inout CacheState, key: CacheKey) {
+        guard let entry = state.storage[key] else { return }
+
+        // Update previous entry's next pointer
+        if let prevKey = entry.previousKey {
+            state.storage[prevKey]?.nextKey = entry.nextKey
+        } else if state.head == key {
+            // This was the head, update head
+            state.head = entry.nextKey
+        }
+
+        // Update next entry's previous pointer
+        if let nextKey = entry.nextKey {
+            state.storage[nextKey]?.previousKey = entry.previousKey
+        } else if state.tail == key {
+            // This was the tail, update tail
+            state.tail = entry.previousKey
+        }
+    }
 
     private func evictLeastRecentlyUsed(state: inout CacheState) {
-        guard let oldestKey = state.accessOrder.first else { return }
+        guard let tailKey = state.tail else { return }
 
-        state.storage.removeValue(forKey: oldestKey)
-        state.accessOrder.removeFirst()
+        // Remove from linked list
+        removeFromList(state: &state, key: tailKey)
+
+        // Remove from storage
+        state.storage.removeValue(forKey: tailKey)
         state.evictions += 1
 
-        logger.debug("Evicted LRU entry: erasureRoot=\(oldestKey.erasureRoot.toHexString()), index=\(oldestKey.index)")
+        logger.debug("Evicted LRU entry: erasureRoot=\(tailKey.erasureRoot.toHexString()), index=\(tailKey.index)")
     }
 }
