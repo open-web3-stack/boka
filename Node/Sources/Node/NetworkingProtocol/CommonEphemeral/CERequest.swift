@@ -21,11 +21,13 @@ public enum CERequest: Sendable, Equatable, Hashable {
     case auditShardRequest(AuditShardRequestMessage)
     case segmentShardRequest1(SegmentShardRequestMessage)
     case segmentShardRequest2(SegmentShardRequestMessage)
+    case segmentRequest(SegmentRequestMessage)
     case assuranceDistribution(AssuranceDistributionMessage)
     case preimageAnnouncement(PreimageAnnouncementMessage)
     case preimageRequest(PreimageRequestMessage)
     case auditAnnouncement(AuditAnnouncementMessage)
     case judgementPublication(JudgementPublicationMessage)
+    case workPackageBundleSubmission(WorkPackageBundleSubmissionMessage)
 }
 
 extension CERequest: RequestProtocol {
@@ -57,6 +59,8 @@ extension CERequest: RequestProtocol {
             try message.encode()
         case let .segmentShardRequest2(message):
             try message.encode()
+        case let .segmentRequest(message):
+            try message.encode()
         case let .assuranceDistribution(message):
             try message.encode()
         case let .preimageAnnouncement(message):
@@ -66,6 +70,8 @@ extension CERequest: RequestProtocol {
         case let .auditAnnouncement(message):
             try message.encode()
         case let .judgementPublication(message):
+            try message.encode()
+        case let .workPackageBundleSubmission(message):
             try message.encode()
         }
     }
@@ -96,6 +102,8 @@ extension CERequest: RequestProtocol {
             .segmentShardRequest1
         case .segmentShardRequest2:
             .segmentShardRequest2
+        case .segmentRequest:
+            .segmentRequest
         case .assuranceDistribution:
             .assuranceDistribution
         case .preimageAnnouncement:
@@ -106,6 +114,8 @@ extension CERequest: RequestProtocol {
             .auditAnnouncement
         case .judgementPublication:
             .judgementPublication
+        case .workPackageBundleSubmission:
+            .workPackageBundleSubmission
         }
     }
 
@@ -135,6 +145,8 @@ extension CERequest: RequestProtocol {
             SegmentShardRequestMessage.self
         case .segmentShardRequest2:
             SegmentShardRequestMessage.self
+        case .segmentRequest:
+            SegmentRequestMessage.self
         case .assuranceDistribution:
             AssuranceDistributionMessage.self
         case .preimageAnnouncement:
@@ -145,6 +157,8 @@ extension CERequest: RequestProtocol {
             AuditAnnouncementMessage.self
         case .judgementPublication:
             JudgementPublicationMessage.self
+        case .workPackageBundleSubmission:
+            WorkPackageBundleSubmissionMessage.self
         }
     }
 
@@ -186,6 +200,9 @@ extension CERequest: RequestProtocol {
         case .segmentShardRequest2:
             guard let message = data as? SegmentShardRequestMessage else { return nil }
             return .segmentShardRequest2(message)
+        case .segmentRequest:
+            guard let message = data as? SegmentRequestMessage else { return nil }
+            return .segmentRequest(message)
         case .assuranceDistribution:
             guard let message = data as? AssuranceDistributionMessage else { return nil }
             return .assuranceDistribution(message)
@@ -201,6 +218,9 @@ extension CERequest: RequestProtocol {
         case .judgementPublication:
             guard let message = data as? JudgementPublicationMessage else { return nil }
             return .judgementPublication(message)
+        case .workPackageBundleSubmission:
+            guard let message = data as? WorkPackageBundleSubmissionMessage else { return nil }
+            return .workPackageBundleSubmission(message)
         }
     }
 

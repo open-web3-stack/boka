@@ -17,9 +17,12 @@ public enum CommonEphemeralStreamKind: UInt8, StreamKindProtocol {
     case auditShardRequest = 138
     case segmentShardRequest1 = 139
     case segmentShardRequest2 = 140
+    case segmentRequest = 146
     case assuranceDistribution = 141
     case preimageAnnouncement = 142
     case preimageRequest = 143
     case auditAnnouncement = 144
     case judgementPublication = 145
+    case workPackageBundleSubmission = 147
+    case bundleRequest = 148
 }
