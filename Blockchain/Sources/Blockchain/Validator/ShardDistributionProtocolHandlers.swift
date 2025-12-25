@@ -5,6 +5,12 @@ import Utils
 
 private let logger = Logger(label: "ShardDistributionProtocol")
 
+// GP spec constants from definitions.tex
+private let cValCount: UInt16 = 1023 /// Total number of validators (Cvalcount)
+private let cEcPiecesize = 684 /// Erasure coding piece size in octets
+private let cEcOriginalCount = 342 /// Original shard count for reconstruction
+private let cEcRecoveryCount = 1023 /// Recovery shard count
+
 /// Protocol handlers for JAMNP-S CE 137-148 shard distribution protocols
 ///
 /// Implements the server-side handling of shard distribution requests as per
@@ -302,7 +308,7 @@ public actor ShardDistributionProtocolHandlers {
 
         // For each segment shard, generate and append justification
         for (index, segmentIndex) in message.segmentIndices.enumerated() {
-            let justification = try generateSegmentJustification(
+            let justification = try await generateSegmentJustification(
                 erasureRoot: message.erasureRoot,
                 shardIndex: message.shardIndex,
                 segmentIndex: segmentIndex,
@@ -351,11 +357,10 @@ public actor ShardDistributionProtocolHandlers {
 
         // Reconstruct the bundle from shards
         let shardAssignments = JAMNPSShardAssignment()
-        let totalValidators = 1023 // TODO: Get from config
         let validators = shardAssignments.getValidatorsForShard(
             shardIndex: 0, // Will need all shards for full bundle
             coreIndex: 0,
-            totalValidators: UInt16(totalValidators)
+            totalValidators: cValCount
         )
 
         // Collect available shards
@@ -483,7 +488,7 @@ public actor ShardDistributionProtocolHandlers {
         let metadata = try await getAuditMetadata(erasureRoot: erasureRoot)
 
         var hashes: [Data32] = []
-        for i in 0 ..< 1023 {
+        for i in 0 ..< cEcRecoveryCount {
             if let shardData = try await dataStore.getShard(
                 erasureRoot: erasureRoot,
                 shardIndex: UInt16(i)
@@ -528,22 +533,63 @@ public actor ShardDistributionProtocolHandlers {
     }
 
     private func generateSegmentJustification(
-        erasureRoot _: Data32,
-        shardIndex _: UInt16,
-        segmentIndex _: UInt16,
-        bundleShard: Data,
+        erasureRoot: Data32,
+        shardIndex: UInt16,
+        segmentIndex: UInt16,
+        bundleShard _: Data,
         segmentShard _: Data
-    ) throws -> [Justification.JustificationStep] {
-        // Get base justification from CE 137
-        // For now, create a simple justification
-        // TODO: Implement full CE 140 justification with co-path
+    ) async throws -> [Justification.JustificationStep] {
+        // CE 140 requires a justification that proves the segment shard belongs to the segment
+        //
+        // Per GP spec, we need to generate a Merkle co-path that proves:
+        // 1. The segment shard is part of the shard
+        // 2. The shard is part of the erasure-coded data
+        //
+        // Strategy:
+        // - Calculate all segment shard hashes within this shard
+        // - Generate Merkle tree from these segment shard hashes
+        // - Provide co-path for the requested segment
 
-        let bundleShardHash = bundleShard.blake2b256hash()
+        // Get metadata to determine segment count
+        let metadata = try await getAuditMetadata(erasureRoot: erasureRoot)
+        let segmentCount = Int(metadata.segmentCount)
 
-        // Simple justification with bundle shard hash
-        return [
-            .right(bundleShardHash),
-        ]
+        // Extract all segment shards from this shard
+        let shardData = try await getShardData(
+            erasureRoot: erasureRoot,
+            shardIndex: shardIndex
+        )
+
+        let segmentShards = try extractSegmentShards(
+            from: shardData,
+            segmentIndices: Array(0 ..< UInt16(segmentCount)),
+            segmentCount: metadata.segmentCount
+        )
+
+        // Generate Merkle tree nodes for segment shards
+        // Node format: encode(segmentShardHash) || encode(segmentIndex)
+        var nodes: [Data] = []
+        for (idx, segShard) in segmentShards.enumerated() {
+            let segmentShardHash = segShard.blake2b256hash()
+            let segmentIndexData = JamEncoder.encode(UInt32(idx))
+
+            var nodeData = Data()
+            nodeData.append(segmentShardHash)
+            nodeData.append(contentsOf: segmentIndexData)
+            nodes.append(nodeData)
+        }
+
+        // Generate co-path using Merkle trace
+        let copath = Merklization.trace(
+            nodes,
+            index: Int(segmentIndex),
+            hasher: Blake2b256.self
+        )
+
+        // Convert copath to justification steps
+        return copath.map { nodeHash in
+            .right(Data32(nodeHash))
+        }
     }
 
     private func getSegmentByRootAndIndex(
