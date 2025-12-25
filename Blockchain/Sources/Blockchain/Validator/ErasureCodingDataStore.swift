@@ -24,6 +24,9 @@ public actor ErasureCodingDataStore {
     /// Cleanup metrics tracking
     private var cleanupMetrics = CleanupMetrics()
 
+    /// Cleanup state for persistence and resumption
+    private var cleanupState = CleanupState()
+
     // Expose rocksdbStore for testing purposes
     public var rocksdbStoreForTesting: RocksDBDataStore {
         rocksdbStore
@@ -576,6 +579,12 @@ public actor ErasureCodingDataStore {
         let startTime = Date()
         let cutoffDate = epochToTimestamp(epoch: cutoffEpoch)
 
+        // Save state before starting cleanup
+        cleanupState.auditCleanupEpoch = cutoffEpoch
+        cleanupState.isInProgress = true
+        cleanupState.lastCleanupTime = startTime
+        try await saveCleanupState()
+
         let entries = try await rocksdbStore.listAuditEntries(before: cutoffDate)
 
         var deletedCount = 0
@@ -603,6 +612,10 @@ public actor ErasureCodingDataStore {
         cleanupMetrics.totalEntriesDeleted += deletedCount
         cleanupMetrics.totalBytesReclaimed += bytesReclaimed
 
+        // Mark cleanup as complete
+        cleanupState.isInProgress = false
+        try await saveCleanupState()
+
         logger.info(
             "Cleanup: deleted \(deletedCount) audit entries before epoch \(cutoffEpoch), reclaimed \(bytesReclaimed) bytes in \(duration)s"
         )
@@ -617,6 +630,12 @@ public actor ErasureCodingDataStore {
     public func cleanupD3LEntriesBeforeEpoch(cutoffEpoch: UInt32) async throws -> (entriesDeleted: Int, segmentsDeleted: Int) {
         let startTime = Date()
         let cutoffDate = epochToTimestamp(epoch: cutoffEpoch)
+
+        // Save state before starting cleanup
+        cleanupState.d3lCleanupEpoch = cutoffEpoch
+        cleanupState.isInProgress = true
+        cleanupState.lastCleanupTime = startTime
+        try await saveCleanupState()
 
         let entries = try await rocksdbStore.listD3LEntries(before: cutoffDate)
 
@@ -643,6 +662,10 @@ public actor ErasureCodingDataStore {
         cleanupMetrics.segmentsDeletedLastRun = deletedSegments
         cleanupMetrics.cleanupDuration += duration
         cleanupMetrics.totalEntriesDeleted += deletedEntries
+
+        // Mark cleanup as complete
+        cleanupState.isInProgress = false
+        try await saveCleanupState()
 
         logger.info(
             "Cleanup: deleted \(deletedEntries) D³L entries before epoch \(cutoffEpoch), \(deletedSegments) segments in \(duration)s"
@@ -783,6 +806,78 @@ public actor ErasureCodingDataStore {
     /// Reset cleanup metrics
     public func resetCleanupMetrics() {
         cleanupMetrics = CleanupMetrics()
+    }
+
+    // MARK: - Cleanup State Persistence
+
+    /// Save cleanup state to RocksDB metadata
+    private func saveCleanupState() async throws {
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(cleanupState)
+
+        // Store in RocksDB metadata with a special key
+        let stateKey = Data("__cleanup_state__".utf8)
+        try await rocksdbStore.setMetadata(key: stateKey, value: data)
+
+        logger.trace("Saved cleanup state: auditEpoch=\(cleanupState.auditCleanupEpoch), d3lEpoch=\(cleanupState.d3lCleanupEpoch)")
+    }
+
+    /// Load cleanup state from RocksDB metadata
+    private func loadCleanupState() async throws {
+        let stateKey = Data("__cleanup_state__".utf8)
+
+        if let data = try await rocksdbStore.getMetadata(key: stateKey) {
+            let decoder = JSONDecoder()
+            cleanupState = try decoder.decode(CleanupState.self, from: data)
+
+            logger.debug(
+                """
+                Loaded cleanup state: auditEpoch=\(cleanupState.auditCleanupEpoch), \
+                d3lEpoch=\(cleanupState.d3lCleanupEpoch), \
+                inProgress=\(cleanupState.isInProgress)
+                """
+            )
+        } else {
+            // No saved state found, use defaults
+            cleanupState = CleanupState()
+            logger.debug("No saved cleanup state found, using defaults")
+        }
+    }
+
+    /// Resume incomplete cleanup if state indicates one was in progress
+    public func resumeIncompleteCleanupIfNeeded() async throws {
+        try await loadCleanupState()
+
+        guard cleanupState.isInProgress else {
+            logger.debug("No incomplete cleanup to resume")
+            return
+        }
+
+        logger.info("Resuming incomplete cleanup from epoch \(cleanupState.auditCleanupEpoch)")
+
+        // Resume audit cleanup
+        if cleanupState.auditCleanupEpoch > 0 {
+            let (deleted, bytes) = try await cleanupAuditEntriesBeforeEpoch(
+                cutoffEpoch: cleanupState.auditCleanupEpoch
+            )
+
+            logger.info("Resumed audit cleanup: deleted \(deleted) entries, \(bytes) bytes")
+        }
+
+        // Resume D³L cleanup
+        if cleanupState.d3lCleanupEpoch > 0 {
+            let (deleted, segments) = try await cleanupD3LEntriesBeforeEpoch(
+                cutoffEpoch: cleanupState.d3lCleanupEpoch
+            )
+
+            logger.info("Resumed D³L cleanup: deleted \(deleted) entries, \(segments) segments")
+        }
+
+        // Mark cleanup as complete
+        cleanupState.isInProgress = false
+        try await saveCleanupState()
+
+        logger.info("Successfully resumed incomplete cleanup")
     }
 
     // MARK: - Local Shard Retrieval & Caching
@@ -1279,6 +1374,26 @@ public struct CleanupMetrics: Sendable {
         self.cleanupDuration = cleanupDuration
         self.totalEntriesDeleted = totalEntriesDeleted
         self.totalBytesReclaimed = totalBytesReclaimed
+    }
+}
+
+/// Cleanup state for persistence and resumption
+public struct CleanupState: Sendable, Codable {
+    public var auditCleanupEpoch: UInt32
+    public var d3lCleanupEpoch: UInt32
+    public var lastCleanupTime: Date
+    public var isInProgress: Bool
+
+    public init(
+        auditCleanupEpoch: UInt32 = 0,
+        d3lCleanupEpoch: UInt32 = 0,
+        lastCleanupTime: Date = .distantPast,
+        isInProgress: Bool = false
+    ) {
+        self.auditCleanupEpoch = auditCleanupEpoch
+        self.d3lCleanupEpoch = d3lCleanupEpoch
+        self.lastCleanupTime = lastCleanupTime
+        self.isInProgress = isInProgress
     }
 }
 

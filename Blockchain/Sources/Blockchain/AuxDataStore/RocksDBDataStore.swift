@@ -418,6 +418,49 @@ extension RocksDBDataStore {
             shardCount: 0
         )
     }
+
+    // MARK: - Generic Metadata Storage
+
+    /// Store arbitrary metadata with a custom key
+    /// - Parameters:
+    ///   - key: Custom key for the metadata
+    ///   - value: Metadata value to store
+    public func setMetadata(key: Data, value: Data) async throws {
+        // Store in metadata column family with a special prefix
+        // We encode the key as a Data32 by padding or truncating
+        let keyData32 = Data32(key.subdata(in: 0 ..< min(32, key.count)))
+        let metadataValue = AvailabilityMetadata(
+            timestamp: Date(),
+            pagedProofsHash: keyData32,
+            pagedProofsMetadata: value,
+            shardCount: UInt32(value.count)
+        )
+        try metadata.put(key: keyData32, value: metadataValue)
+        logger.trace("Stored metadata: key=\(key.base64EncodedString()), size=\(value.count)")
+    }
+
+    /// Retrieve arbitrary metadata by custom key
+    /// - Parameter key: Custom key for the metadata
+    /// - Returns: Metadata value if found, nil otherwise
+    public func getMetadata(key: Data) async throws -> Data? {
+        let keyData32 = Data32(key.subdata(in: 0 ..< min(32, key.count)))
+        if let metadataValue = try metadata.get(key: keyData32) {
+            // Verify this is actually custom metadata by checking if timestamp matches
+            // and if the pagedProofsHash matches our key
+            if metadataValue.pagedProofsHash.data == keyData32.data {
+                return metadataValue.pagedProofsMetadata
+            }
+        }
+        return nil
+    }
+
+    /// Delete metadata by custom key
+    /// - Parameter key: Custom key for the metadata to delete
+    public func deleteMetadata(key: Data) async throws {
+        let keyData32 = Data32(key.subdata(in: 0 ..< min(32, key.count)))
+        try metadata.delete(key: keyData32)
+        logger.trace("Deleted metadata: key=\(key.base64EncodedString())")
+    }
 }
 
 // MARK: - Data Structures
