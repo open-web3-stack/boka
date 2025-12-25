@@ -572,6 +572,8 @@ public enum AvailabilityNetworkingError: Error {
     case invalidSegmentLength
     case encodingFailed
     case decodingFailed
+    case peerManagerUnavailable
+    case unsupportedProtocol
 }
 
 // MARK: - Protocol Request Types

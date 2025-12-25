@@ -29,6 +29,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     private let dataStore: DataStore
     private let erasureCodingDataStore: ErasureCodingDataStore?
     private var networkClient: AvailabilityNetworkClient?
+    private let erasureCodingService: ErasureCodingService
 
     public init(
         config: ProtocolConfigRef,
@@ -43,6 +44,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         self.dataStore = dataStore
         self.erasureCodingDataStore = erasureCodingDataStore
         self.networkClient = networkClient
+        erasureCodingService = ErasureCodingService(config: config)
 
         super.init(id: "DataAvailability", config: config, eventBus: eventBus, scheduler: scheduler)
 
@@ -672,33 +674,101 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     ) async throws {
         // Generate request ID
         let requestId = try JamEncoder.encode(erasureRoot, shardIndex).blake2b256hash()
+
         do {
-            // Fetch shard data from local storage
-            // CE 137: Respond with bundle shard and segment shards
+            // CE 137: Respond with bundle shard and segment shards with justification
 
-            // Try to get the shard from local storage
-            let shards = try await dataStore.getLocalShards(
-                erasureRoot: erasureRoot,
-                indices: [shardIndex]
-            )
+            // Use ErasureCodingDataStore if available
+            if let ecStore = erasureCodingDataStore {
+                // Check if we have this shard
+                let hasShard = try await ecStore.hasShard(
+                    erasureRoot: erasureRoot,
+                    shardIndex: shardIndex
+                )
 
-            guard let shardData = shards.first(where: { $0.index == shardIndex })?.data else {
-                throw DataAvailabilityError.segmentNotFound
+                guard hasShard else {
+                    throw DataAvailabilityError.segmentNotFound
+                }
+
+                // Get shard data
+                guard let shardData = try await ecStore.getShard(
+                    erasureRoot: erasureRoot,
+                    shardIndex: shardIndex
+                ) else {
+                    throw DataAvailabilityError.retrievalError
+                }
+
+                // Get metadata
+                guard let metadata = try await ecStore.getAuditEntry(erasureRoot: erasureRoot) else {
+                    throw DataAvailabilityError.invalidErasureRoot
+                }
+
+                // Extract bundle shard (first 684 bytes)
+                let bundleShardSize = 684
+                guard shardData.count >= bundleShardSize else {
+                    throw DataAvailabilityError.invalidDataLength
+                }
+
+                let bundleShard = Data(shardData[0 ..< bundleShardSize])
+
+                // Extract segment shards
+                let segmentCount = Int(metadata.segmentCount)
+                let segmentShardSize = (shardData.count - bundleShardSize) / segmentCount
+                var segmentShards: [Data] = []
+
+                for i in 0 ..< segmentCount {
+                    let start = bundleShardSize + (i * segmentShardSize)
+                    let end = min(start + segmentShardSize, shardData.count)
+                    let segmentShard = Data(shardData[start ..< end])
+                    segmentShards.append(segmentShard)
+                }
+
+                // Generate justification T(s, i, H) using ErasureCodingService
+                // Get all shard hashes for justification generation
+                var allShardHashes: [Data] = []
+                for i in 0 ..< 1023 {
+                    if let shard = try await ecStore.getShard(
+                        erasureRoot: erasureRoot,
+                        shardIndex: UInt16(i)
+                    ) {
+                        allShardHashes.append(shard)
+                    }
+                }
+
+                // Generate co-path justification
+                let justification = try erasureCodingService.generateJustification(
+                    shardIndex: shardIndex,
+                    segmentsRoot: metadata.segmentsRoot,
+                    shards: allShardHashes
+                )
+
+                // Respond with bundle shard + segment shards + justification
+                publish(RuntimeEvents.ShardDistributionReceivedResponse(
+                    requestId: requestId,
+                    bundleShard: bundleShard,
+                    segmentShards: segmentShards,
+                    justification: justification
+                ))
+
+            } else {
+                // Fallback to legacy dataStore
+                let shards = try await dataStore.getLocalShards(
+                    erasureRoot: erasureRoot,
+                    indices: [shardIndex]
+                )
+
+                guard let shardData = shards.first(where: { $0.index == shardIndex })?.data else {
+                    throw DataAvailabilityError.segmentNotFound
+                }
+
+                // For legacy path, we can't generate proper justification
+                // Return empty justification
+                publish(RuntimeEvents.ShardDistributionReceivedResponse(
+                    requestId: requestId,
+                    shardIndex: shardIndex,
+                    shardData: shardData
+                ))
             }
-
-            // TODO: Generate Merkle proof justification
-            // let justification = try await generateJustification(
-            //     erasureRoot: erasureRoot,
-            //     shardIndex: shardIndex,
-            //     shardData: shardData
-            // )
-
-            // Respond with shard + proof
-            publish(RuntimeEvents.ShardDistributionReceivedResponse(
-                requestId: requestId,
-                shardIndex: shardIndex,
-                shardData: shardData
-            ))
 
         } catch {
             publish(RuntimeEvents.ShardDistributionReceivedResponse(
