@@ -28,6 +28,9 @@ public actor AvailabilityNetworkClient {
     /// Request deduplication cache
     private var pendingRequests: [String: Task<Data, Error>] = [:]
 
+    /// Network metrics tracking
+    private var metrics = NetworkMetrics()
+
     public init(
         config: ProtocolConfigRef,
         erasureCoding: ErasureCodingService
@@ -461,6 +464,7 @@ public actor AvailabilityNetworkClient {
         }
 
         // Create new request task
+        let startTime = Date()
         let task = Task<Data, Error> {
             // This integrates with the PeerManager and Connection infrastructure
             // TODO: Implement actual network request handling:
@@ -476,11 +480,66 @@ public actor AvailabilityNetworkClient {
 
         do {
             let result = try await task.value
+            let latency = Date().timeIntervalSince(startTime)
+
+            // Record success metrics
+            recordSuccess(latency: latency)
+
             pendingRequests.removeValue(forKey: cacheKey)
             return result
         } catch {
+            let latency = Date().timeIntervalSince(startTime)
+
+            // Record failure metrics (considered a retry if timeout occurred)
+            let wasRetry = latency >= requestTimeout
+            recordFailure(wasRetry: wasRetry)
+
             pendingRequests.removeValue(forKey: cacheKey)
             throw error
+        }
+    }
+
+    // MARK: - Metrics
+
+    /// Get current network metrics
+    /// - Returns: Network performance metrics
+    public func getNetworkMetrics() -> NetworkMetrics {
+        metrics
+    }
+
+    /// Reset network metrics
+    public func resetNetworkMetrics() {
+        metrics = NetworkMetrics()
+    }
+
+    /// Record a successful request
+    private func recordSuccess(latency: TimeInterval) {
+        metrics.totalRequests += 1
+        metrics.successfulRequests += 1
+        metrics.totalLatency += latency
+
+        // Update min/max latency
+        if latency < metrics.minLatency {
+            metrics.minLatency = latency
+        }
+        if latency > metrics.maxLatency {
+            metrics.maxLatency = latency
+        }
+
+        // Track recent latencies (last 100)
+        metrics.recentLatencies.append(latency)
+        if metrics.recentLatencies.count > 100 {
+            metrics.recentLatencies.removeFirst()
+        }
+    }
+
+    /// Record a failed request
+    private func recordFailure(wasRetry: Bool) {
+        metrics.totalRequests += 1
+        metrics.failedRequests += 1
+
+        if wasRetry {
+            metrics.totalRetries += 1
         }
     }
 }
@@ -520,11 +579,82 @@ public enum FetchStrategy: Sendable {
     /// Verified mode: Use CE 140 (with justification)
     case verified
 
-    /// Adaptive: Start with CE 139, fallback to CE 140 on inconsistency
+    /// Adaptive: Start with CE 139, fallback to CE 140
     case adaptive
 
     /// Local-only: Don't use network, only local shards
     case localOnly
+}
+
+// MARK: - Network Metrics
+
+/// Network operation metrics
+public struct NetworkMetrics: Sendable {
+    /// Total number of requests made
+    public var totalRequests: Int = 0
+
+    /// Number of successful requests
+    public var successfulRequests: Int = 0
+
+    /// Number of failed requests
+    public var failedRequests: Int = 0
+
+    /// Total number of retries
+    public var totalRetries: Int = 0
+
+    /// Total latency across all requests (seconds)
+    public var totalLatency: TimeInterval = 0
+
+    /// Minimum request latency (seconds)
+    public var minLatency: TimeInterval = .infinity
+
+    /// Maximum request latency (seconds)
+    public var maxLatency: TimeInterval = 0
+
+    /// Recent request latencies (last 100)
+    public var recentLatencies: [TimeInterval] = []
+
+    /// Average request latency
+    public var averageLatency: TimeInterval {
+        guard successfulRequests > 0 else { return 0 }
+        return totalLatency / Double(successfulRequests)
+    }
+
+    /// Request success rate (0.0 to 1.0)
+    public var successRate: Double {
+        guard totalRequests > 0 else { return 1.0 }
+        return Double(successfulRequests) / Double(totalRequests)
+    }
+
+    /// Median latency from recent samples
+    public var medianLatency: TimeInterval {
+        guard !recentLatencies.isEmpty else { return 0 }
+        let sorted = recentLatencies.sorted()
+        let count = sorted.count
+        if count % 2 == 0 {
+            return (sorted[count / 2 - 1] + sorted[count / 2]) / 2
+        } else {
+            return sorted[count / 2]
+        }
+    }
+
+    /// P95 latency from recent samples
+    public var p95Latency: TimeInterval {
+        guard !recentLatencies.isEmpty else { return 0 }
+        let sorted = recentLatencies.sorted()
+        let index = Int(Double(sorted.count) * 0.95)
+        return sorted[min(index, sorted.count - 1)]
+    }
+
+    /// P99 latency from recent samples
+    public var p99Latency: TimeInterval {
+        guard !recentLatencies.isEmpty else { return 0 }
+        let sorted = recentLatencies.sorted()
+        let index = Int(Double(sorted.count) * 0.99)
+        return sorted[min(index, sorted.count - 1)]
+    }
+
+    public init() {}
 }
 
 // MARK: - Placeholder PeerManager
