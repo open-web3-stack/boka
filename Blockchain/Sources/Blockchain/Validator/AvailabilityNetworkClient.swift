@@ -13,8 +13,8 @@ public actor AvailabilityNetworkClient {
     private let erasureCoding: ErasureCodingService
     private let shardAssignment: JAMNPSShardAssignment
 
-    /// Peer manager for validator connections
-    private var peerManager: PeerManager?
+    /// Network protocol for sending requests
+    private var network: (any NetworkProtocol)?
 
     /// Connection timeout in seconds
     private let connectionTimeout: TimeInterval = 5.0
@@ -43,9 +43,9 @@ public actor AvailabilityNetworkClient {
         shardAssignment = JAMNPSShardAssignment()
     }
 
-    /// Set the peer manager for validator connections
-    public func setPeerManager(_ peerManager: PeerManager) {
-        self.peerManager = peerManager
+    /// Set the network protocol for sending requests
+    public func setNetwork(_ network: any NetworkProtocol) {
+        self.network = network
     }
 
     /// Configure fallback timeouts
@@ -498,9 +498,9 @@ public actor AvailabilityNetworkClient {
         // Create new request task
         let startTime = Date()
         let task = Task<Data, Error> {
-            // Use PeerManager to send the actual network request
-            guard let peerManager else {
-                logger.error("PeerManager not set")
+            // Use Network to send the actual network request
+            guard let network else {
+                logger.error("Network not set - call setNetwork() first")
                 throw AvailabilityNetworkingError.peerManagerUnavailable
             }
 
@@ -574,14 +574,20 @@ public actor AvailabilityNetworkClient {
                 throw AvailabilityNetworkingError.unsupportedProtocol
             }
 
-            // Send the request via PeerManager
-            // For now, we'll simulate the response by publishing an event
-            // In a full implementation, this would go through the NetworkManager
+            // Send the request via Network
             logger.debug("Sending \(requestType) request to \(address)")
 
-            // Publish request event for DataAvailabilityService to handle
-            // This is a temporary solution - ideally we'd use the Network layer directly
-            throw AvailabilityNetworkingError.decodingFailed
+            // Send request and get response
+            let responseData = try await network.send(to: address, message: ceRequest)
+
+            // Response should be a single Data blob
+            guard let response = responseData.first else {
+                logger.error("Empty response from \(address)")
+                throw AvailabilityNetworkingError.decodingFailed
+            }
+
+            logger.debug("Received response: \(response.count) bytes")
+            return response
         }
 
         pendingRequests[cacheKey] = task
