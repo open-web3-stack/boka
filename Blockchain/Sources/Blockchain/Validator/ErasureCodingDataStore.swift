@@ -757,38 +757,88 @@ public actor ErasureCodingDataStore {
     /// Aggressive cleanup when under storage pressure
     ///
     /// Deletes young data if necessary to free up space.
+    /// Uses priority queue to delete oldest and largest entries first.
     ///
     /// - Parameter targetBytes: Target bytes to free (will attempt to free at least this much)
     /// - Returns: Number of bytes actually reclaimed
     public func aggressiveCleanup(targetBytes: Int) async throws -> Int {
         var bytesReclaimed = 0
-        var retentionEpochs: UInt32 = 6
 
-        // First try normal cleanup
-        while bytesReclaimed < targetBytes, retentionEpochs > 0 {
-            let (deleted, bytes) = try await cleanupAuditEntries(retentionEpochs: retentionEpochs)
-            bytesReclaimed += bytes
+        // Build priority queue of all entries
+        let auditEntries = try await rocksdbStore.listAuditEntries(before: Date())
+        let d3lEntries = try await rocksdbStore.listD3LEntries(before: Date())
 
-            if deleted == 0 {
-                // No more entries at this retention level
-                retentionEpochs -= 1
-            } else {
-                break
-            }
+        // Create prioritized entries
+        var prioritizedEntries: [PrioritizedEntry] = []
+
+        // Add audit entries
+        for entry in auditEntries {
+            let size = entry.bundleSize + Int(entry.shardCount) * 684 // Approximate shard size
+            let priority = CleanupPriority(
+                timestamp: entry.timestamp,
+                size: size,
+                entryType: .audit
+            )
+            prioritizedEntries.append(
+                PrioritizedEntry(
+                    erasureRoot: entry.erasureRoot,
+                    priority: priority,
+                    size: size,
+                    entryType: .audit
+                )
+            )
         }
 
-        // If still need more space, clean up D³L entries aggressively
-        if bytesReclaimed < targetBytes {
-            retentionEpochs = 672
-            while bytesReclaimed < targetBytes, retentionEpochs > 100 {
-                let (entriesDeleted, segmentsDeleted) = try await cleanupD3LEntries(retentionEpochs: retentionEpochs)
-                bytesReclaimed += segmentsDeleted * 4104
+        // Add D³L entries
+        for entry in d3lEntries {
+            let size = Int(entry.segmentCount) * 4104
+            let priority = CleanupPriority(
+                timestamp: entry.timestamp,
+                size: size,
+                entryType: .d3l
+            )
+            prioritizedEntries.append(
+                PrioritizedEntry(
+                    erasureRoot: entry.erasureRoot,
+                    priority: priority,
+                    size: size,
+                    entryType: .d3l
+                )
+            )
+        }
 
-                if entriesDeleted == 0 {
-                    retentionEpochs = UInt32(Double(retentionEpochs) * 0.8) // Reduce by 20%
-                } else {
-                    break
+        // Sort by priority (oldest first, largest first within same age)
+        prioritizedEntries.sort { $0.priority < $1.priority }
+
+        // Delete entries until target is met
+        for entry in prioritizedEntries {
+            guard bytesReclaimed < targetBytes else {
+                break
+            }
+
+            do {
+                switch entry.entryType {
+                case .audit:
+                    try await filesystemStore.deleteAuditBundle(erasureRoot: entry.erasureRoot)
+                    try await rocksdbStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
+                    try await rocksdbStore.deleteShards(erasureRoot: entry.erasureRoot)
+
+                case .d3l:
+                    try await filesystemStore.deleteD3LShards(erasureRoot: entry.erasureRoot)
+                    try await rocksdbStore.deleteD3LEntry(erasureRoot: entry.erasureRoot)
+                    try await rocksdbStore.deleteShards(erasureRoot: entry.erasureRoot)
                 }
+
+                bytesReclaimed += entry.size
+
+                logger.trace(
+                    """
+                    Aggressive cleanup: deleted \(entry.entryType) entry \(entry.erasureRoot.hex), \
+                    freed \(entry.size) bytes (total: \(bytesReclaimed)/\(targetBytes))
+                    """
+                )
+            } catch {
+                logger.warning("Failed to delete entry \(entry.erasureRoot.hex): \(error)")
             }
         }
 
@@ -1560,6 +1610,62 @@ public struct CleanupState: Sendable, Codable {
         self.d3lCleanupEpoch = d3lCleanupEpoch
         self.lastCleanupTime = lastCleanupTime
         self.isInProgress = isInProgress
+    }
+}
+
+// MARK: - Cleanup Priority Queue
+
+/// Entry type for cleanup
+public enum CleanupEntryType: Sendable {
+    case audit
+    case d3l
+}
+
+/// Priority for cleanup operations
+///
+/// Lower priority values are cleaned up first.
+/// Priority is determined by (timestamp, size) tuple:
+/// - Older entries (smaller timestamp) have higher priority
+/// - Larger entries (bigger size) have higher priority within same age
+public struct CleanupPriority: Sendable, Comparable {
+    public let timestamp: Date
+    public let size: Int
+    public let entryType: CleanupEntryType
+
+    public init(timestamp: Date, size: Int, entryType: CleanupEntryType) {
+        self.timestamp = timestamp
+        self.size = size
+        self.entryType = entryType
+    }
+
+    public static func < (lhs: CleanupPriority, rhs: CleanupPriority) -> Bool {
+        // First compare by timestamp (older first)
+        if lhs.timestamp != rhs.timestamp {
+            return lhs.timestamp < rhs.timestamp
+        }
+
+        // Then compare by size (larger first within same age)
+        if lhs.size != rhs.size {
+            return lhs.size > rhs.size
+        }
+
+        // Finally compare by type (audit before d3l)
+        return lhs.entryType == .audit && rhs.entryType == .d3l
+    }
+}
+
+/// Prioritized entry for cleanup operations
+public struct PrioritizedEntry: Sendable {
+    public let erasureRoot: Data32
+    public let priority: CleanupPriority
+    public let size: Int
+    public let entryType: CleanupEntryType
+
+    public init(erasureRoot: Data32, priority: CleanupPriority, size: Int, entryType: CleanupEntryType) {
+        self.erasureRoot = erasureRoot
+        self.priority = priority
+        self.size = size
+        self.entryType = entryType
     }
 }
 
