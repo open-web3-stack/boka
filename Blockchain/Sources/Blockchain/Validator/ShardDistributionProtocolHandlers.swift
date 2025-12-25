@@ -587,8 +587,18 @@ public actor ShardDistributionProtocolHandlers {
         )
 
         // Convert copath to justification steps
-        return copath.map { nodeHash in
-            .right(Data32(nodeHash))
+        // trace returns Either<Data, Data32> where:
+        // - .left(Data) is the raw leaf data on the other side
+        // - .right(Data32) is a hash of internal node on the other side
+        return copath.map { either in
+            switch either {
+            case let .left(data):
+                // Leaf value on the other side - use its hash as sibling
+                .right(data.blake2b256hash())
+            case let .right(hash):
+                // Internal node hash on the other side
+                .right(hash)
+            }
         }
     }
 

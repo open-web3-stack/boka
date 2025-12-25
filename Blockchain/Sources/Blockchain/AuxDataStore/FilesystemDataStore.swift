@@ -6,6 +6,15 @@ private let logger = Logger(label: "FilesystemDataStore")
 
 /// Filesystem-based storage for availability data shards
 ///
+/// **Architecture Note:**
+/// This is a low-level storage component that does NOT conform to `DataStoreProtocol`.
+/// It is designed to be used internally by `ErasureCodingDataStore`, not directly.
+///
+/// Storage Architecture:
+/// - `FilesystemDataStore` (this) → Low-level file storage (audit bundles + D³L shards)
+/// - `RocksDBDataStore` → Metadata + indices (conforms to DataStoreProtocol)
+/// - `ErasureCodingDataStore` → High-level facade combining both
+///
 /// Directory Structure:
 /// ```
 /// <data_path>/

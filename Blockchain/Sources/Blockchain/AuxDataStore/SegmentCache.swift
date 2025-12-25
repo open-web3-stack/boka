@@ -46,17 +46,20 @@ public final class SegmentCache: Sendable {
         lock.withLock { state in
             let key = CacheKey(erasureRoot: erasureRoot, index: index)
 
-            if var entry = state.storage[key] {
+            if let entry = state.storage[key] {
                 // Cache hit - update access statistics and move to head (most recent)
                 state.hits += 1
-                entry.accessTime = .now
-                entry.hitCount += 1
 
                 // Remove from current position in linked list
                 removeFromList(state: &state, key: key)
 
+                // Update entry statistics
+                var updatedEntry = entry
+                updatedEntry.accessTime = .now
+                updatedEntry.hitCount += 1
+
                 // Add to head (most recently used)
-                addToHead(state: &state, key: key, entry: entry)
+                addToHead(state: &state, key: key, entry: updatedEntry)
 
                 logger.debug("Cache hit: erasureRoot=\(erasureRoot.toHexString()), index=\(index)")
                 return entry.segment
@@ -163,20 +166,28 @@ public final class SegmentCache: Sendable {
     // MARK: - Private Methods (O(1) Doubly-Linked List Operations)
 
     private func addToHead(state: inout CacheState, key: CacheKey, entry: CacheEntry) {
-        state.storage[key] = entry
+        // Create a mutable copy to update links
+        var newEntry = entry
+        newEntry.previousKey = nil // Head has no previous entry
 
         if let head = state.head {
             // Link new entry as head
-            state.storage[key]?.nextKey = head
-            state.storage[head]?.previousKey = key
-        }
+            newEntry.nextKey = head
 
-        state.head = key
-
-        // If this is the first entry, it's also the tail
-        if state.tail == nil {
+            // Update old head's previous pointer
+            if var oldHeadEntry = state.storage[head] {
+                oldHeadEntry.previousKey = key
+                state.storage[head] = oldHeadEntry
+            }
+        } else {
+            // This is the first entry, it's also the tail
+            newEntry.nextKey = nil
             state.tail = key
         }
+
+        // Store the updated entry
+        state.storage[key] = newEntry
+        state.head = key
     }
 
     private func removeFromList(state: inout CacheState, key: CacheKey) {

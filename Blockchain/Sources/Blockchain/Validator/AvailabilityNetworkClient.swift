@@ -367,7 +367,8 @@ public actor AvailabilityNetworkClient {
 
         logger.info(
             """
-            Starting concurrent fetch: need \(requiredCount) shards from \(validators.count) validators
+            Starting concurrent fetch: need \(requiredCount) shards from \(validators.count) validators \
+            (max concurrent: \(maxConcurrentRequests))
             """
         )
 
@@ -378,85 +379,89 @@ public actor AvailabilityNetworkClient {
             totalValidators: totalValidators
         )
 
-        // Create fetch tasks for each validator
-        var fetchTasks: [(validatorIndex: UInt16, task: Task<(UInt16, Data), Error>)] = []
-
+        // Prepare validator/shard pairs to fetch
+        var fetchPairs: [(validatorIndex: UInt16, shardIndex: UInt16, address: NetAddr)] = []
         for (validatorIndex, address) in validators {
             guard let assignedShards = validatorToShards[validatorIndex] else {
                 continue
             }
-
             // Fetch the first assigned shard from this validator
-            let shardIndex = assignedShards[0]
-
-            let task = Task<Data, Error> {
-                try await fetchAuditShard(
-                    erasureRoot: erasureRoot,
-                    shardIndex: shardIndex,
-                    from: address
-                ).0
-            }
-
-            fetchTasks.append((validatorIndex, Task {
-                try await (shardIndex, task.value)
-            }))
+            fetchPairs.append((validatorIndex, assignedShards[0], address))
         }
 
-        // Collect results with timeout
+        // Use TaskGroup with controlled concurrency via a semaphore
         let startTime = Date()
         var completedTasks = 0
 
-        for (validatorIndex, task) in fetchTasks {
-            // Check if we have enough shards
-            if collectedShards.count >= requiredCount {
-                logger.info(
-                    """
-                    Collected sufficient shards (\(collectedShards.count)/\(requiredCount)), \
-                    cancelling remaining requests
-                    """
-                )
-                break
-            }
+        try await withThrowingTaskGroup(of: (UInt16, UInt16, Data).self) { group in
+            // Semaphore to limit concurrent tasks
+            var activeTasks = 0
+            var currentIndex = 0
 
-            // Check timeout
-            let elapsed = Date().timeIntervalSince(startTime)
-            if elapsed > requestTimeout {
-                logger.warning(
-                    """
-                    Request timeout after \(elapsed)s, collected \(collectedShards.count)/\(requiredCount) shards
-                    """
-                )
-                break
-            }
+            // Helper to add tasks up to the concurrency limit
+            func addTasksIfNeeded() {
+                while activeTasks < maxConcurrentRequests, currentIndex < fetchPairs.count {
+                    let pair = fetchPairs[currentIndex]
+                    currentIndex += 1
+                    activeTasks += 1
 
-            do {
-                // Use adaptive timeout based on response rate
-                let adaptiveTimeout = max(1.0, requestTimeout - elapsed)
-                let result = try await withThrowingTaskGroup(of: (UInt16, Data).self) { group in
                     group.addTask {
-                        try await task.value
+                        let shardData = try await self.fetchAuditShard(
+                            erasureRoot: erasureRoot,
+                            shardIndex: pair.shardIndex,
+                            from: pair.address
+                        ).0
+                        return (pair.validatorIndex, pair.shardIndex, shardData)
                     }
-
-                    return try await group.next(timeout: adaptiveTimeout) ?? {
-                        throw AvailabilityNetworkingError.decodingFailed
-                    }()
                 }
+            }
 
-                collectedShards[result.0] = result.1
+            // Initial batch of tasks
+            addTasksIfNeeded()
+
+            // Process results as they complete
+            while await group.next() != nil {
+                activeTasks -= 1
                 completedTasks += 1
 
-                logger.trace(
-                    """
-                    Collected shard \(result.0) from validator \(validatorIndex), \
-                    total: \(collectedShards.count)/\(requiredCount)
-                    """
-                )
-            } catch {
-                logger.warning(
-                    """
-                    Failed to fetch shard from validator \(validatorIndex): \(error)
-                    """
-                )
+                // Check timeout
+                let elapsed = Date().timeIntervalSince(startTime)
+                if elapsed > requestTimeout {
+                    logger.warning(
+                        """
+                        Request timeout after \(elapsed)s, collected \(collectedShards.count)/\(requiredCount) shards
+                        """
+                    )
+                    group.cancelAll()
+                    break
+                }
+
+                // Collect the result
+                if let result = try await group.next() {
+                    collectedShards[result.1] = result.2
+
+                    logger.trace(
+                        """
+                        Collected shard \(result.1) from validator \(result.0), \
+                        total: \(collectedShards.count)/\(requiredCount)
+                        """
+                    )
+
+                    // Check if we have enough shards
+                    if collectedShards.count >= requiredCount {
+                        logger.info(
+                            """
+                            Collected sufficient shards (\(collectedShards.count)/\(requiredCount)), \
+                            cancelling remaining requests
+                            """
+                        )
+                        group.cancelAll()
+                        break
+                    }
+
+                    // Add more tasks if available
+                    addTasksIfNeeded()
+                }
             }
         }
 
