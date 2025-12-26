@@ -29,7 +29,7 @@ struct ErasureCodingJustificationTests {
         let segmentsRoot = Data32.random()
         let shardIndex: UInt16 = 0
 
-        let steps = try service.generateJustification(
+        let steps = try await service.generateJustification(
             shardIndex: shardIndex,
             segmentsRoot: segmentsRoot,
             shards: shards
@@ -46,7 +46,7 @@ struct ErasureCodingJustificationTests {
         let segmentsRoot = Data32.random()
         let shardIndex: UInt16 = 511
 
-        let steps = try service.generateJustification(
+        let steps = try await service.generateJustification(
             shardIndex: shardIndex,
             segmentsRoot: segmentsRoot,
             shards: shards
@@ -62,7 +62,7 @@ struct ErasureCodingJustificationTests {
         let segmentsRoot = Data32.random()
         let shardIndex: UInt16 = 1022
 
-        let steps = try service.generateJustification(
+        let steps = try await service.generateJustification(
             shardIndex: shardIndex,
             segmentsRoot: segmentsRoot,
             shards: shards
@@ -80,7 +80,7 @@ struct ErasureCodingJustificationTests {
 
         await confirmation("Invalid shard index throws") { _ in
             #expect(throws: ErasureCodingError.self) {
-                try service.generateJustification(
+                try await service.generateJustification(
                     shardIndex: shardIndex,
                     segmentsRoot: segmentsRoot,
                     shards: shards
@@ -98,7 +98,7 @@ struct ErasureCodingJustificationTests {
 
         await confirmation("Invalid shard count throws") { _ in
             #expect(throws: ErasureCodingError.self) {
-                try service.generateJustification(
+                try await service.generateJustification(
                     shardIndex: shardIndex,
                     segmentsRoot: segmentsRoot,
                     shards: shards
@@ -114,7 +114,7 @@ struct ErasureCodingJustificationTests {
         let segmentsRoot = Data32.random()
 
         // Test first shard
-        let steps0 = try service.generateJustification(
+        let steps0 = try await service.generateJustification(
             shardIndex: 0,
             segmentsRoot: segmentsRoot,
             shards: shards
@@ -122,7 +122,7 @@ struct ErasureCodingJustificationTests {
         #expect(!steps0.isEmpty)
 
         // Test middle shard
-        let steps511 = try service.generateJustification(
+        let steps511 = try await service.generateJustification(
             shardIndex: 511,
             segmentsRoot: segmentsRoot,
             shards: shards
@@ -130,7 +130,7 @@ struct ErasureCodingJustificationTests {
         #expect(!steps511.isEmpty)
 
         // Test last shard
-        let steps1022 = try service.generateJustification(
+        let steps1022 = try await service.generateJustification(
             shardIndex: 1022,
             segmentsRoot: segmentsRoot,
             shards: shards
@@ -146,13 +146,13 @@ struct ErasureCodingJustificationTests {
         let segmentsRoot2 = Data32([2; 32])
         let shardIndex: UInt16 = 100
 
-        let steps1 = try service.generateJustification(
+        let steps1 = try await service.generateJustification(
             shardIndex: shardIndex,
             segmentsRoot: segmentsRoot1,
             shards: shards
         )
 
-        let steps2 = try service.generateJustification(
+        let steps2 = try await service.generateJustification(
             shardIndex: shardIndex,
             segmentsRoot: segmentsRoot2,
             shards: shards
@@ -273,7 +273,7 @@ struct ErasureCodingJustificationTests {
     }
 
     @Test
-    void generateSegmentJustificationIncludesBundleHash() async throws {
+    func generateSegmentJustificationIncludesBundleHash() async throws {
         let service = makeService()
         let shards = makeTestShards()
         let segmentsRoot = Data32.random()
@@ -318,7 +318,7 @@ struct ErasureCodingJustificationTests {
         let shardIndex: UInt16 = 100
 
         // Generate justification
-        let steps = try service.generateJustification(
+        let steps = try await service.generateJustification(
             shardIndex: shardIndex,
             segmentsRoot: segmentsRoot,
             shards: shards
@@ -360,7 +360,7 @@ struct ErasureCodingJustificationTests {
         let shardIndex: UInt16 = 100
 
         // Generate justification for different shard
-        let steps = try service.generateJustification(
+        let steps = try await service.generateJustification(
             shardIndex: shardIndex,
             segmentsRoot: segmentsRoot,
             shards: shards
@@ -399,7 +399,7 @@ struct ErasureCodingJustificationTests {
         let segmentsRoot = Data32.random()
         let shardIndex: UInt16 = 0
 
-        let steps = try service.generateJustification(
+        let steps = try await service.generateJustification(
             shardIndex: shardIndex,
             segmentsRoot: segmentsRoot,
             shards: shards
@@ -437,7 +437,7 @@ struct ErasureCodingJustificationTests {
         let segmentsRoot = Data32.random()
         let shardIndex: UInt16 = 1022
 
-        let steps = try service.generateJustification(
+        let steps = try await service.generateJustification(
             shardIndex: shardIndex,
             segmentsRoot: segmentsRoot,
             shards: shards
@@ -471,7 +471,7 @@ struct ErasureCodingJustificationTests {
     // MARK: - Integration Tests
 
     @Test
-    void fullJustificationFlow() async throws {
+    func fullJustificationFlow() async throws {
         let service = makeService()
         let shards = makeTestShards()
         let segmentsRoot = Data32.random()
@@ -480,7 +480,7 @@ struct ErasureCodingJustificationTests {
         var justifications: [UInt16: [Justification.JustificationStep]] = [:]
 
         for shardIndex in [0, 100, 500, 1022] {
-            let steps = try service.generateJustification(
+            let steps = try await service.generateJustification(
                 shardIndex: UInt16(shardIndex),
                 segmentsRoot: segmentsRoot,
                 shards: shards
@@ -529,7 +529,7 @@ struct ErasureCodingJustificationTests {
 
         await confirmation("Requires 1023 shards") { _ in
             #expect(throws: ErasureCodingError.self) {
-                try service.generateJustification(
+                try await service.generateJustification(
                     shardIndex: shardIndex,
                     segmentsRoot: segmentsRoot,
                     shards: shards
@@ -545,13 +545,13 @@ struct ErasureCodingJustificationTests {
         let segmentsRoot = Data32.random()
         let shardIndex: UInt16 = 42
 
-        let steps1 = try service.generateJustification(
+        let steps1 = try await service.generateJustification(
             shardIndex: shardIndex,
             segmentsRoot: segmentsRoot,
             shards: shards
         )
 
-        let steps2 = try service.generateJustification(
+        let steps2 = try await service.generateJustification(
             shardIndex: shardIndex,
             segmentsRoot: segmentsRoot,
             shards: shards
@@ -579,7 +579,7 @@ struct ErasureCodingJustificationTests {
         let segmentsRoot = Data32.random()
         let shardIndex: UInt16 = 0
 
-        let steps = try service.generateJustification(
+        let steps = try await service.generateJustification(
             shardIndex: shardIndex,
             segmentsRoot: segmentsRoot,
             shards: shards

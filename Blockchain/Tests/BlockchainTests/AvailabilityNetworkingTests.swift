@@ -116,8 +116,8 @@ struct AvailabilityNetworkingTests {
     func shardResponseWithJustificationEncodeDecode() throws {
         let bundleShard = Data([1, 2, 3, 4, 5])
         let segmentShards = [Data([6, 7]), Data([8, 9])]
-        let leftHash = Data32([1; 32])
-        let rightHash = Data32([2; 32])
+        let leftHash = Data32([UInt8](repeating: 1, count: 32))
+        let rightHash = Data32([UInt8](repeating: 2, count: 32))
         let justification = Justification.branch(left: leftHash, right: rightHash)
 
         let response = ShardResponse(
@@ -168,8 +168,8 @@ struct AvailabilityNetworkingTests {
 
     @Test
     func justificationBranchEncodeDecode() throws {
-        let leftHash = Data32([1; 32])
-        let rightHash = Data32([2; 32])
+        let leftHash = Data32([UInt8](repeating: 1, count: 32))
+        let rightHash = Data32([UInt8](repeating: 2, count: 32))
         let justification = Justification.branch(left: leftHash, right: rightHash)
 
         let encoded = try justification.encode()
@@ -203,9 +203,9 @@ struct AvailabilityNetworkingTests {
     @Test
     func justificationCopathEncodeDecode() throws {
         let steps: [Justification.JustificationStep] = [
-            .left(Data32([1; 32])),
-            .right(Data32([2; 32])),
-            .left(Data32([3; 32])),
+            .left(Data32([UInt8](repeating: 1, count: 32))),
+            .right(Data32([UInt8](repeating: 2, count: 32))),
+            .left(Data32([UInt8](repeating: 3, count: 32))),
         ]
         let justification = Justification.copath(steps)
 
@@ -217,7 +217,7 @@ struct AvailabilityNetworkingTests {
             #expect(decodedSteps.count == 3)
             switch decodedSteps[0] {
             case let .left(hash):
-                #expect(hash == Data32([1; 32]))
+                #expect(hash == Data32([UInt8](repeating: 1, count: 32)))
             default:
                 Issue.record("Expected left step")
             }
@@ -250,7 +250,7 @@ struct AvailabilityNetworkingTests {
 
     @Test
     func bundleRequestEncodeDecode() throws {
-        let erasureRoot = Data32([5; 32])
+        let erasureRoot = Data32([UInt8](repeating: 5, count: 32))
         let request = BundleRequest(erasureRoot: erasureRoot)
 
         let encoded = request.encode()
@@ -319,7 +319,7 @@ struct AvailabilityNetworkingTests {
 
     @Test
     func segmentRequestEncodeDecode() throws {
-        let segmentsRoot = Data32([6; 32])
+        let segmentsRoot = Data32([UInt8](repeating: 6, count: 32))
         let segmentIndices: [UInt16] = [0, 100, 500, 1000]
         let request = SegmentRequest(segmentsRoot: segmentsRoot, segmentIndices: segmentIndices)
 
@@ -332,7 +332,7 @@ struct AvailabilityNetworkingTests {
 
     @Test
     func segmentRequestEmptyIndices() throws {
-        let segmentsRoot = Data32([7; 32])
+        let segmentsRoot = Data32([UInt8](repeating: 7, count: 32))
         let segmentIndices: [UInt16] = []
         let request = SegmentRequest(segmentsRoot: segmentsRoot, segmentIndices: segmentIndices)
 
@@ -356,7 +356,7 @@ struct AvailabilityNetworkingTests {
     func segmentRequestIncompleteIndices() {
         // Has count but not enough indices
         var data = Data()
-        let root = Data32([8; 32])
+        let root = Data32([UInt8](repeating: 8, count: 32))
         data.append(root.data)
 
         let count = UInt32(10).littleEndian
@@ -383,11 +383,15 @@ struct AvailabilityNetworkingTests {
         }
 
         let importProofs: [[Data32]] = [
-            [Data32([1; 32]), Data32([2; 32])],
-            [Data32([3; 32])],
+            [Data32(Data([UInt8](repeating: 1, count: 32))!)!, Data32(Data([UInt8](repeating: 2, count: 32))!)!],
+            [Data32(Data([UInt8](repeating: 3, count: 32))!)!],
             [],
-            [Data32([4; 32]), Data32([5; 32]), Data32([6; 32])],
-            [Data32([7; 32])],
+            [
+                Data32(Data([UInt8](repeating: 4, count: 32))!)!,
+                Data32(Data([UInt8](repeating: 5, count: 32))!)!,
+                Data32(Data([UInt8](repeating: 6, count: 32))!)!,
+            ],
+            [Data32(Data([UInt8](repeating: 7, count: 32))!)!],
         ]
 
         let response = SegmentResponse(segments: segments, importProofs: importProofs)
@@ -474,7 +478,7 @@ struct AvailabilityNetworkingTests {
     @Test
     func shardRequestMaxIndices() throws {
         // Test with maximum number of segment indices
-        let segmentIndices = [UInt16](0 ..< MessageSizeLimits.maxSegmentShardsPerStream)
+        let segmentIndices = [UInt16](0 ..< UInt16(MessageSizeLimits.maxSegmentShardsPerStream))
         let request = ShardRequest(
             erasureRoot: Data32.random(),
             shardIndex: 0,

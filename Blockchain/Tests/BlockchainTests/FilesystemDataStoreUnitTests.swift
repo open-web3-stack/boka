@@ -352,7 +352,7 @@ struct FilesystemDataStoreUnitTests {
     // MARK: - Concurrent Access Tests
 
     @Test
-    fn concurrentReads() async throws {
+    func concurrentReads() async throws {
         let dataStore = try makeDataStore()
         let erasureRoot = Data32.random()
 

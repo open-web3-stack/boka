@@ -18,7 +18,7 @@ struct JAMNPSShardAssignmentTests {
         let assignment = makeAssignment()
 
         // Test basic case: core 0, validator 0, total validators 1023
-        let shardIndex = assignment.getShardAssignment(
+        let shardIndex = await assignment.getShardAssignment(
             validatorIndex: 0,
             coreIndex: 0,
             totalValidators: 1023
@@ -34,7 +34,7 @@ struct JAMNPSShardAssignmentTests {
         let assignment = makeAssignment()
 
         // Test: core 1, validator 0, total validators 1023
-        let shardIndex = assignment.getShardAssignment(
+        let shardIndex = await assignment.getShardAssignment(
             validatorIndex: 0,
             coreIndex: 1,
             totalValidators: 1023
@@ -50,7 +50,7 @@ struct JAMNPSShardAssignmentTests {
         let assignment = makeAssignment()
 
         // Test: core 0, validator 1, total validators 1023
-        let shardIndex = assignment.getShardAssignment(
+        let shardIndex = await assignment.getShardAssignment(
             validatorIndex: 1,
             coreIndex: 0,
             totalValidators: 1023
@@ -66,7 +66,7 @@ struct JAMNPSShardAssignmentTests {
         let assignment = makeAssignment()
 
         // Test modulo wraparound: core 3, validator 0
-        let shardIndex = assignment.getShardAssignment(
+        let shardIndex = await assignment.getShardAssignment(
             validatorIndex: 0,
             coreIndex: 3,
             totalValidators: 1023
@@ -82,7 +82,7 @@ struct JAMNPSShardAssignmentTests {
         let assignment = makeAssignment()
 
         // Test last core: core 15, validator 0
-        let shardIndex = assignment.getShardAssignment(
+        let shardIndex = await assignment.getShardAssignment(
             validatorIndex: 0,
             coreIndex: 15,
             totalValidators: 1023
@@ -98,7 +98,7 @@ struct JAMNPSShardAssignmentTests {
         let assignment = makeAssignment()
 
         // Test last validator: core 0, validator 1022
-        let shardIndex = assignment.getShardAssignment(
+        let shardIndex = await assignment.getShardAssignment(
             validatorIndex: 1022,
             coreIndex: 0,
             totalValidators: 1023
@@ -114,7 +114,7 @@ struct JAMNPSShardAssignmentTests {
         let assignment = makeAssignment()
 
         // Test with larger values
-        let shardIndex = assignment.getShardAssignment(
+        let shardIndex = await assignment.getShardAssignment(
             validatorIndex: 500,
             coreIndex: 10,
             totalValidators: 1023
@@ -132,7 +132,7 @@ struct JAMNPSShardAssignmentTests {
         let assignment = makeAssignment()
 
         // Test with 6 validators (devnet scenario)
-        let shardIndex = assignment.getShardAssignment(
+        let shardIndex = await assignment.getShardAssignment(
             validatorIndex: 0,
             coreIndex: 0,
             totalValidators: 6
@@ -148,7 +148,7 @@ struct JAMNPSShardAssignmentTests {
         let assignment = makeAssignment()
 
         // Test with 6 validators, should wrap around
-        let shardIndex = assignment.getShardAssignment(
+        let shardIndex = await assignment.getShardAssignment(
             validatorIndex: 0,
             coreIndex: 1,
             totalValidators: 6
@@ -165,7 +165,7 @@ struct JAMNPSShardAssignmentTests {
     func getAllAssignedShardsDefaultCores() async throws {
         let assignment = makeAssignment()
 
-        let shards = assignment.getAllAssignedShards(
+        let shards = await assignment.getAllAssignedShards(
             validatorIndex: 0,
             coreCount: 16,
             totalValidators: 1023
@@ -187,7 +187,7 @@ struct JAMNPSShardAssignmentTests {
     func getAllAssignedShardsValidator100() async throws {
         let assignment = makeAssignment()
 
-        let shards = assignment.getAllAssignedShards(
+        let shards = await assignment.getAllAssignedShards(
             validatorIndex: 100,
             coreCount: 16,
             totalValidators: 1023
@@ -204,7 +204,7 @@ struct JAMNPSShardAssignmentTests {
     func getAllAssignedShardsEightCores() async throws {
         let assignment = makeAssignment()
 
-        let shards = assignment.getAllAssignedShards(
+        let shards = await assignment.getAllAssignedShards(
             validatorIndex: 0,
             coreCount: 8,
             totalValidators: 1023
@@ -228,7 +228,7 @@ struct JAMNPSShardAssignmentTests {
     func getValidatorsForShardBasic() async throws {
         let assignment = makeAssignment()
 
-        let validators = assignment.getValidatorsForShard(
+        let validators = await assignment.getValidatorsForShard(
             shardIndex: 0,
             coreIndex: 0,
             totalValidators: 1023
@@ -243,7 +243,7 @@ struct JAMNPSShardAssignmentTests {
     func getValidatorsForShard342() async throws {
         let assignment = makeAssignment()
 
-        let validators = assignment.getValidatorsForShard(
+        let validators = await assignment.getValidatorsForShard(
             shardIndex: 342,
             coreIndex: 1,
             totalValidators: 1023
@@ -258,7 +258,7 @@ struct JAMNPSShardAssignmentTests {
     func getValidatorsForShardMiddle() async throws {
         let assignment = makeAssignment()
 
-        let validators = assignment.getValidatorsForShard(
+        let validators = await assignment.getValidatorsForShard(
             shardIndex: 100,
             coreIndex: 0,
             totalValidators: 1023
@@ -276,7 +276,7 @@ struct JAMNPSShardAssignmentTests {
         let assignment = makeAssignment()
 
         let missingShards: [UInt16] = [0, 100, 200, 300]
-        let validatorMap = assignment.getValidatorsForMissingShards(
+        let validatorMap = await assignment.getValidatorsForMissingShards(
             missingShardIndices: missingShards,
             coreIndex: 0,
             totalValidators: 1023
@@ -303,7 +303,7 @@ struct JAMNPSShardAssignmentTests {
         let assignment = makeAssignment()
 
         let missingShards: [UInt16] = [342, 442, 542]
-        let validatorMap = assignment.getValidatorsForMissingShards(
+        let validatorMap = await assignment.getValidatorsForMissingShards(
             missingShardIndices: missingShards,
             coreIndex: 1,
             totalValidators: 1023
@@ -327,7 +327,7 @@ struct JAMNPSShardAssignmentTests {
         let assignment = makeAssignment()
 
         let missingShards: [UInt16] = []
-        let validatorMap = assignment.getValidatorsForMissingShards(
+        let validatorMap = await assignment.getValidatorsForMissingShards(
             missingShardIndices: missingShards,
             coreIndex: 0,
             totalValidators: 1023
@@ -342,7 +342,7 @@ struct JAMNPSShardAssignmentTests {
 
         // Test with many missing shards
         let missingShards = Array(0 ..< 100) as [UInt16]
-        let validatorMap = assignment.getValidatorsForMissingShards(
+        let validatorMap = await assignment.getValidatorsForMissingShards(
             missingShardIndices: missingShards,
             coreIndex: 0,
             totalValidators: 1023
@@ -363,7 +363,7 @@ struct JAMNPSShardAssignmentTests {
     func isValidShardIndexValid() async throws {
         let assignment = makeAssignment()
 
-        let isValid = assignment.isValidShardIndex(
+        let isValid = await assignment.isValidShardIndex(
             shardIndex: 500,
             totalValidators: 1023
         )
@@ -375,7 +375,7 @@ struct JAMNPSShardAssignmentTests {
     func isValidShardIndexZero() async throws {
         let assignment = makeAssignment()
 
-        let isValid = assignment.isValidShardIndex(
+        let isValid = await assignment.isValidShardIndex(
             shardIndex: 0,
             totalValidators: 1023
         )
@@ -387,7 +387,7 @@ struct JAMNPSShardAssignmentTests {
     func isValidShardIndexMax() async throws {
         let assignment = makeAssignment()
 
-        let isValid = assignment.isValidShardIndex(
+        let isValid = await assignment.isValidShardIndex(
             shardIndex: 1022,
             totalValidators: 1023
         )
@@ -399,7 +399,7 @@ struct JAMNPSShardAssignmentTests {
     func isValidShardIndexInvalid() async throws {
         let assignment = makeAssignment()
 
-        let isValid = assignment.isValidShardIndex(
+        let isValid = await assignment.isValidShardIndex(
             shardIndex: 1023,
             totalValidators: 1023
         )
@@ -411,7 +411,7 @@ struct JAMNPSShardAssignmentTests {
     func getShardsPerValidatorDefault() async throws {
         let assignment = makeAssignment()
 
-        let count = assignment.getShardsPerValidator(coreCount: 16)
+        let count = await assignment.getShardsPerValidator(coreCount: 16)
 
         #expect(count == 16)
     }
@@ -420,7 +420,7 @@ struct JAMNPSShardAssignmentTests {
     func getShardsPerValidatorCustom() async throws {
         let assignment = makeAssignment()
 
-        let count = assignment.getShardsPerValidator(coreCount: 8)
+        let count = await assignment.getShardsPerValidator(coreCount: 8)
 
         #expect(count == 8)
     }
@@ -431,7 +431,7 @@ struct JAMNPSShardAssignmentTests {
     func getShardAssignmentAllMaxValues() async throws {
         let assignment = makeAssignment()
 
-        let shardIndex = assignment.getShardAssignment(
+        let shardIndex = await assignment.getShardAssignment(
             validatorIndex: 1022,
             coreIndex: 15,
             totalValidators: 1023
@@ -450,7 +450,7 @@ struct JAMNPSShardAssignmentTests {
     func getShardAssignmentMinValues() async throws {
         let assignment = makeAssignment()
 
-        let shardIndex = assignment.getShardAssignment(
+        let shardIndex = await assignment.getShardAssignment(
             validatorIndex: 0,
             coreIndex: 0,
             totalValidators: 1
@@ -465,7 +465,7 @@ struct JAMNPSShardAssignmentTests {
     func getAllAssignedShardsAllCores() async throws {
         let assignment = makeAssignment()
 
-        let shards = assignment.getAllAssignedShards(
+        let shards = await assignment.getAllAssignedShards(
             validatorIndex: 0,
             coreCount: 16,
             totalValidators: 1023
@@ -488,13 +488,13 @@ struct JAMNPSShardAssignmentTests {
         let assignment = makeAssignment()
 
         // Same inputs should produce same outputs
-        let result1 = assignment.getShardAssignment(
+        let result1 = await assignment.getShardAssignment(
             validatorIndex: 42,
             coreIndex: 7,
             totalValidators: 1023
         )
 
-        let result2 = assignment.getShardAssignment(
+        let result2 = await assignment.getShardAssignment(
             validatorIndex: 42,
             coreIndex: 7,
             totalValidators: 1023
@@ -512,7 +512,7 @@ struct JAMNPSShardAssignmentTests {
 
         for validatorIndex in 0 ..< 100 {
             for coreIndex in 0 ..< 16 {
-                let shardIndex = assignment.getShardAssignment(
+                let shardIndex = await assignment.getShardAssignment(
                     validatorIndex: UInt16(validatorIndex),
                     coreIndex: UInt16(coreIndex),
                     totalValidators: 1023
