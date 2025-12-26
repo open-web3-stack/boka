@@ -52,7 +52,9 @@ public struct ShardRequest: Codable, Sendable {
             )
         }
 
-        let erasureRoot = Data32(data[0 ..< 32])
+        guard let erasureRoot = Data32(data[0 ..< 32]) else {
+            throw AvailabilityNetworkingError.invalidHash
+        }
         let shardIndex = data.withUnsafeBytes { $0.load(fromByteOffset: 32, as: UInt16.self).littleEndian }
 
         var segmentIndices: [UInt16]?
@@ -293,8 +295,12 @@ public enum AvailabilityJustification: Codable, Sendable {
             guard data.count == 1 + 32 + 32 else {
                 throw AvailabilityNetworkingError.invalidAvailabilityJustification
             }
-            let left = Data32(data[1 ..< 33])
-            let right = Data32(data[33 ..< 65])
+            guard let left = Data32(data[1 ..< 33]) else {
+                throw AvailabilityNetworkingError.invalidAvailabilityJustification
+            }
+            guard let right = Data32(data[33 ..< 65]) else {
+                throw AvailabilityNetworkingError.invalidAvailabilityJustification
+            }
             return .branch(left: left, right: right)
 
         case 2:
@@ -323,7 +329,9 @@ public enum AvailabilityJustification: Codable, Sendable {
                     throw AvailabilityNetworkingError.invalidAvailabilityJustification
                 }
 
-                let hash = Data32(data[offset ..< offset + 32])
+                guard let hash = Data32(data[offset ..< offset + 32]) else {
+                    throw AvailabilityNetworkingError.invalidAvailabilityJustification
+                }
                 offset += 32
 
                 if disc == 0 {
@@ -359,7 +367,10 @@ public struct BundleRequest: Codable, Sendable {
                 actual: data.count
             )
         }
-        return BundleRequest(erasureRoot: Data32(data))
+        guard let erasureRoot = Data32(data) else {
+            throw AvailabilityNetworkingError.invalidData
+        }
+        return BundleRequest(erasureRoot: erasureRoot)
     }
 }
 
@@ -434,7 +445,9 @@ public struct SegmentRequest: Codable, Sendable {
             )
         }
 
-        let segmentsRoot = Data32(data[0 ..< 32])
+        guard let segmentsRoot = Data32(data[0 ..< 32]) else {
+            throw AvailabilityNetworkingError.invalidHash
+        }
         let count = data.withUnsafeBytes { $0.load(fromByteOffset: 32, as: UInt32.self).littleEndian }
 
         let expectedLength = 36 + Int(count) * 2
@@ -552,7 +565,9 @@ public struct SegmentResponse: Codable, Sendable {
             proof.reserveCapacity(Int(proofLength))
 
             for _ in 0 ..< proofLength {
-                let hash = Data32(data[offset ..< offset + 32])
+                guard let hash = Data32(data[offset ..< offset + 32]) else {
+                    throw AvailabilityNetworkingError.invalidAvailabilityJustification
+                }
                 proof.append(hash)
                 offset += 32
             }
@@ -574,6 +589,8 @@ public enum AvailabilityNetworkingError: Error {
     case decodingFailed
     case peerManagerUnavailable
     case unsupportedProtocol
+    case invalidHash
+    case invalidData
 }
 
 // MARK: - Protocol Request Types

@@ -414,7 +414,7 @@ struct ShardRetrievalTests {
 
         // Batch get
         let requests = erasureRoots.map { erasureRoot in
-            SegmentRequest(erasureRoot: erasureRoot, indices: [0, 1, 2])
+            BatchSegmentRequest(erasureRoot: erasureRoot, indices: [0, 1, 2])
         }
 
         let results = try await dataStore.batchGetSegments(requests: requests)

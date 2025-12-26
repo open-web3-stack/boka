@@ -1,8 +1,18 @@
+import Codec
 import Foundation
+import Networking
 import TracingUtils
 import Utils
 
 private let logger = Logger(label: "ErasureCodingDataStore")
+
+/// Actor for thread-safe counters
+private actor Counter {
+    private var value: Int = 0
+    func increment() -> Int { value += 1; return value }
+    func add(_ delta: Int) -> Int { value += delta; return value }
+    func get() -> Int { value }
+}
 
 /// Enhanced data store that automatically handles erasure coding for availability system
 ///
@@ -86,10 +96,10 @@ public actor ErasureCodingDataStore {
         }
 
         // Erasure-code the bundle
-        let shards = try erasureCoding.encodeBlob(bundle)
+        let shards = try await erasureCoding.encodeBlob(bundle)
 
         // Calculate erasure root
-        let erasureRoot = try erasureCoding.calculateErasureRoot(
+        let erasureRoot = try await erasureCoding.calculateErasureRoot(
             segmentsRoot: segmentsRoot,
             shards: shards
         )
@@ -143,7 +153,7 @@ public actor ErasureCodingDataStore {
         }
 
         // Reconstruct
-        let reconstructed = try erasureCoding.reconstruct(
+        let reconstructed = try await erasureCoding.reconstruct(
             shards: shards,
             originalLength: auditEntry.bundleSize
         )
@@ -197,10 +207,10 @@ public actor ErasureCodingDataStore {
         let pagedProofsMetadata = try generatePagedProofsMetadata(segments: segments)
 
         // Encode all segments together
-        let shards = try erasureCoding.encodeSegments(segments)
+        let shards = try await erasureCoding.encodeSegments(segments)
 
         // Calculate erasure root
-        let erasureRoot = try erasureCoding.calculateErasureRoot(
+        let erasureRoot = try await erasureCoding.calculateErasureRoot(
             segmentsRoot: segmentsRoot,
             shards: shards
         )
@@ -270,7 +280,7 @@ public actor ErasureCodingDataStore {
         let originalLength = segmentCount * 4104
 
         // Reconstruct segments
-        let reconstructedData = try erasureCoding.reconstruct(
+        let reconstructedData = try await erasureCoding.reconstruct(
             shards: shardTuples,
             originalLength: originalLength
         )
@@ -404,7 +414,7 @@ public actor ErasureCodingDataStore {
         }
 
         // Encode pages using JamEncoder
-        let encoded = JamEncoder.encode(pageCount, segmentsRoot, pages)
+        let encoded = try JamEncoder.encode(pageCount, segmentsRoot, pages)
 
         logger.debug("Generated Paged-Proofs metadata: \(pageCount) pages, \(segments.count) segments")
 
@@ -444,7 +454,11 @@ public actor ErasureCodingDataStore {
             var pathHashes: [Data32] = []
             for element in path {
                 switch element {
-                case let .left(hash):
+                case let .left(data):
+                    // Convert Data to Data32
+                    guard let hash = Data32(data) else {
+                        throw ErasureCodingStoreError.proofGenerationFailed
+                    }
                     pathHashes.append(hash)
                 case let .right(hash):
                     pathHashes.append(hash)
@@ -527,11 +541,11 @@ public actor ErasureCodingDataStore {
         let epochDuration: TimeInterval = 600 // 10 minutes per epoch (GP spec)
         let cutoffDate = Date().addingTimeInterval(-TimeInterval(retentionEpochs) * epochDuration)
 
-        var deletedCount = 0
-        var bytesReclaimed = 0
+        let deletedCount = Counter()
+        let bytesReclaimed = Counter()
 
         // Use iterator-based cleanup to process entries in batches
-        let totalCount = try await dataStore.cleanupAuditEntriesIteratively(
+        _ = try await dataStore.cleanupAuditEntriesIteratively(
             before: cutoffDate,
             batchSize: 100
         ) { batch in
@@ -543,14 +557,17 @@ public actor ErasureCodingDataStore {
                 try await dataStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
                 try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
 
-                deletedCount += 1
-                bytesReclaimed += entry.bundleSize
+                _ = await deletedCount.increment()
+                _ = await bytesReclaimed.add(entry.bundleSize)
             }
         }
 
-        logger.info("Cleanup: deleted \(deletedCount) audit entries, reclaimed \(bytesReclaimed) bytes")
+        let finalDeletedCount = await deletedCount.get()
+        let finalBytesReclaimed = await bytesReclaimed.get()
 
-        return (deletedCount, bytesReclaimed)
+        logger.info("Cleanup: deleted \(finalDeletedCount) audit entries, reclaimed \(finalBytesReclaimed) bytes")
+
+        return (finalDeletedCount, finalBytesReclaimed)
     }
 
     /// Cleanup expired D³L entries (older than retention period)
@@ -562,11 +579,11 @@ public actor ErasureCodingDataStore {
         let epochDuration: TimeInterval = 600 // 10 minutes per epoch
         let cutoffDate = Date().addingTimeInterval(-TimeInterval(retentionEpochs) * epochDuration)
 
-        var deletedEntries = 0
-        var deletedSegments = 0
+        let deletedEntries = Counter()
+        let deletedSegments = Counter()
 
         // Use iterator-based cleanup to process entries in batches
-        let totalCount = try await dataStore.cleanupD3LEntriesIteratively(
+        _ = try await dataStore.cleanupD3LEntriesIteratively(
             before: cutoffDate,
             batchSize: 100
         ) { batch in
@@ -578,14 +595,17 @@ public actor ErasureCodingDataStore {
                 try await dataStore.deleteD3LEntry(erasureRoot: entry.erasureRoot)
                 try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
 
-                deletedEntries += 1
-                deletedSegments += Int(entry.segmentCount)
+                _ = await deletedEntries.increment()
+                _ = await deletedSegments.add(Int(entry.segmentCount))
             }
         }
 
-        logger.info("Cleanup: deleted \(deletedEntries) D³L entries, \(deletedSegments) segments")
+        let finalDeletedEntries = await deletedEntries.get()
+        let finalDeletedSegments = await deletedSegments.get()
 
-        return (deletedEntries, deletedSegments)
+        logger.info("Cleanup: deleted \(finalDeletedEntries) D³L entries, \(finalDeletedSegments) segments")
+
+        return (finalDeletedEntries, finalDeletedSegments)
     }
 
     /// Cleanup expired audit entries (older than cutoff epoch)
@@ -712,10 +732,10 @@ public actor ErasureCodingDataStore {
         let auditEntries = try await dataStore.listAuditEntries(before: Date())
         let d3lEntries = try await dataStore.listD3LEntries(before: Date())
 
-        let auditBundleBytes = auditEntries.reduce(0) { $0 + $1.bundleSize }
-        let auditShardBytes = auditEntries.reduce(0) { $0 + Int($1.shardCount) * 684 } // Approximate shard size
+        let auditBundleBytes = auditEntries.reduce(into: 0) { $0 += $1.bundleSize }
+        let auditShardBytes = auditEntries.count * 1023 * 684 // 1023 shards per entry
 
-        let d3lShardBytes = d3lEntries.reduce(0) { $0 + Int($1.segmentCount) * 4104 }
+        let d3lShardBytes = d3lEntries.reduce(into: 0) { $0 += Int($1.segmentCount) * 4104 }
 
         let totalBytes = auditBundleBytes + auditShardBytes + d3lShardBytes
         let entryCount = auditEntries.count + d3lEntries.count
@@ -790,7 +810,7 @@ public actor ErasureCodingDataStore {
 
         // Add audit entries
         for entry in auditEntries {
-            let size = entry.bundleSize + Int(entry.shardCount) * 684 // Approximate shard size
+            let size = entry.bundleSize + 1023 * 684 // 1023 shards per entry
             let priority = CleanupPriority(
                 timestamp: entry.timestamp,
                 size: size,
@@ -850,12 +870,12 @@ public actor ErasureCodingDataStore {
 
                 logger.trace(
                     """
-                    Aggressive cleanup: deleted \(entry.entryType) entry \(entry.erasureRoot.hex), \
+                    Aggressive cleanup: deleted \(entry.entryType) entry \(entry.erasureRoot), \
                     freed \(entry.size) bytes (total: \(bytesReclaimed)/\(targetBytes))
                     """
                 )
             } catch {
-                logger.warning("Failed to delete entry \(entry.erasureRoot.hex): \(error)")
+                logger.warning("Failed to delete entry \(entry.erasureRoot): \(error)")
             }
         }
 
@@ -1012,8 +1032,10 @@ public actor ErasureCodingDataStore {
                         Double(usage.totalBytes) / Double(monitoringConfig.maxStorageBytes) * 100
                     )
                     logger.critical(
-                        "🚨 EMERGENCY storage pressure: \(usage.totalMB) MB / \(maxStorageMB) MB " +
-                            "(\(usagePercentage)% used) - System may become unstable!"
+                        """
+                        🚨 EMERGENCY storage pressure: \(usage.totalMB) MB / \(maxStorageMB) MB \
+                        (\(usagePercentage)% used) - System may become unstable!
+                        """
                     )
 
                     // Immediate aggressive cleanup
@@ -1141,6 +1163,13 @@ public actor ErasureCodingDataStore {
         try await dataStore.getAuditEntry(erasureRoot: erasureRoot)
     }
 
+    /// Get D³L entry by erasure root
+    /// - Parameter erasureRoot: Erasure root identifying the data
+    /// - Returns: D³L entry or nil if not found
+    public func getD3LEntry(erasureRoot: Data32) async throws -> D3LEntry? {
+        try await dataStore.getD3LEntry(erasureRoot: erasureRoot)
+    }
+
     /// Get D³L entry by segments root
     /// - Parameter segmentsRoot: Segments root identifying the data
     /// - Returns: D³L entry or nil if not found
@@ -1160,7 +1189,7 @@ public actor ErasureCodingDataStore {
     /// - Returns: Segment data or nil if not found
     public func getSegment(erasureRoot: Data32, segmentIndex: UInt16) async throws -> Data? {
         let segments = try await getSegments(erasureRoot: erasureRoot, indices: [Int(segmentIndex)])
-        return segments.first.map { Data($0) }
+        return segments.first.map(\.data)
     }
 
     /// Get count of locally available shards for an erasure root
@@ -1294,9 +1323,9 @@ public actor ErasureCodingDataStore {
             // Store fetched shards
             for (shardIndex, shardData) in fetchedShards {
                 try await dataStore.storeShard(
-                    shard: shardData,
-                    index: shardIndex,
-                    erasureRoot: erasureRoot
+                    shardData: shardData,
+                    erasureRoot: erasureRoot,
+                    shardIndex: shardIndex
                 )
             }
 
@@ -1394,7 +1423,7 @@ public actor ErasureCodingDataStore {
         let availableIndices = try await getLocalShardIndices(erasureRoot: erasureRoot)
         let shards = try await getLocalShards(erasureRoot: erasureRoot, indices: Array(availableIndices.prefix(342)))
 
-        return try erasureCoding.reconstruct(shards: shards, originalLength: originalLength)
+        return try await erasureCoding.reconstruct(shards: shards, originalLength: originalLength)
     }
 
     // MARK: - Batch Operations
@@ -1402,7 +1431,7 @@ public actor ErasureCodingDataStore {
     /// Batch get segments for multiple erasure roots
     /// - Parameter requests: Array of segment requests
     /// - Returns: Dictionary mapping erasure root to segments
-    public func batchGetSegments(requests: [SegmentRequest]) async throws -> [Data32: [Data4104]] {
+    public func batchGetSegments(requests: [BatchSegmentRequest]) async throws -> [Data32: [Data4104]] {
         var results: [Data32: [Data4104]] = [:]
 
         for request in requests {
@@ -1479,9 +1508,9 @@ public actor ErasureCodingDataStore {
                     // Store fetched shards locally
                     for (shardIndex, shardData) in fetchedShards {
                         try await dataStore.storeShard(
-                            shard: shardData,
-                            index: shardIndex,
-                            erasureRoot: erasureRoot
+                            shardData: shardData,
+                            erasureRoot: erasureRoot,
+                            shardIndex: shardIndex
                         )
                     }
 
@@ -1538,7 +1567,7 @@ public actor ErasureCodingDataStore {
 // MARK: - Supporting Types
 
 /// Segment request for batch operations
-public struct SegmentRequest: Sendable {
+public struct BatchSegmentRequest: Sendable {
     public let erasureRoot: Data32
     public let indices: [Int]
 
@@ -1744,4 +1773,6 @@ public enum ErasureCodingStoreError: Error {
     case metadataNotFound(erasureRoot: Data32)
     case reconstructionFailed(underlying: Error)
     case segmentNotFound
+    case segmentsRootMismatch(calculated: Data32, expected: Data32)
+    case proofGenerationFailed
 }

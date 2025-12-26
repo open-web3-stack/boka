@@ -114,12 +114,12 @@ public actor FilesystemDataStore {
 
     /// Get storage size for audit store
     public func getAuditStoreSize() async throws -> Int {
-        try getTotalSize(of: auditPath)
+        try await getTotalSize(of: auditPath)
     }
 
     /// Get storage size for D³L store
     public func getD3LStoreSize() async throws -> Int {
-        try getTotalSize(of: d3lPath)
+        try await getTotalSize(of: d3lPath)
     }
 
     /// List all audit bundle erasure roots

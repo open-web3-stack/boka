@@ -5,6 +5,11 @@ import Utils
 
 private let logger = Logger(label: "AvailabilityNetworkClient")
 
+/// Network protocol for sending requests (local abstraction to avoid Node dependency)
+public protocol AvailabilityNetworkProtocol: Sendable {
+    func send(to: NetAddr, data: Data) async throws -> [Data]
+}
+
 /// Network client for fetching availability shards via JAMNP-S protocols
 ///
 /// Implements JAMNP-S CE 137/138/139/140/147/148 for shard distribution.
@@ -14,7 +19,7 @@ public actor AvailabilityNetworkClient {
     private let shardAssignment: JAMNPSShardAssignment
 
     /// Network protocol for sending requests
-    private var network: (any NetworkProtocol)?
+    private var network: (any AvailabilityNetworkProtocol)?
 
     /// Connection timeout in seconds
     private let connectionTimeout: TimeInterval = 5.0
@@ -44,7 +49,7 @@ public actor AvailabilityNetworkClient {
     }
 
     /// Set the network protocol for sending requests
-    public func setNetwork(_ network: any NetworkProtocol) {
+    public func setNetwork(_ network: any AvailabilityNetworkProtocol) {
         self.network = network
     }
 
@@ -233,7 +238,7 @@ public actor AvailabilityNetworkClient {
     ) async throws -> Data {
         logger.debug(
             """
-            Fetching bundle \(erasureRoot.hex) from \(guarantorAddress) using CE 147
+            Fetching bundle \(erasureRoot) from \(guarantorAddress) using CE 147
             """
         )
 
@@ -356,7 +361,7 @@ public actor AvailabilityNetworkClient {
         )
 
         // Map validators to their assigned shard indices
-        let validatorToShards = shardAssignment.getValidatorsForMissingShards(
+        let validatorToShards = await shardAssignment.getValidatorsForMissingShards(
             missingShardIndices: shardIndices,
             coreIndex: coreIndex,
             totalValidators: totalValidators
@@ -473,11 +478,17 @@ public actor AvailabilityNetworkClient {
         erasureRoot: Data32,
         shardIndex: UInt16
     ) async throws -> Data {
-        let ceRequest = CERequest.auditShardRequest(AuditShardRequestMessage(
+        let requestData = try ShardRequest(
             erasureRoot: erasureRoot,
-            shardIndex: shardIndex
-        ))
-        return try await sendCERequest(to: address, request: ceRequest)
+            shardIndex: shardIndex,
+            segmentIndices: nil
+        ).encode()
+
+        return try await sendRequest(
+            to: address,
+            requestType: .auditShard,
+            data: requestData
+        )
     }
 
     /// Send a segment shard request (CE 139/140)
@@ -488,19 +499,17 @@ public actor AvailabilityNetworkClient {
         segmentIndices: [UInt16],
         requestType: ShardRequestType
     ) async throws -> Data {
-        let message = SegmentShardRequestMessage(
+        let requestData = try ShardRequest(
             erasureRoot: erasureRoot,
             shardIndex: shardIndex,
             segmentIndices: segmentIndices
+        ).encode()
+
+        return try await sendRequest(
+            to: address,
+            requestType: requestType,
+            data: requestData
         )
-
-        let ceRequest: CERequest = if requestType == .segmentShardsFast {
-            .segmentShardRequest1(message)
-        } else {
-            .segmentShardRequest2(message)
-        }
-
-        return try await sendCERequest(to: address, request: ceRequest)
     }
 
     /// Send a bundle request (CE 147)
@@ -508,32 +517,24 @@ public actor AvailabilityNetworkClient {
         to address: NetAddr,
         erasureRoot: Data32
     ) async throws -> Data {
-        let ceRequest = CERequest.blockRequest(BlockRequest(
-            hash: erasureRoot,
-            direction: .descendingInclusive,
-            maxBlocks: 1
-        ))
-        return try await sendCERequest(to: address, request: ceRequest)
+        let requestData = BundleRequest(erasureRoot: erasureRoot).encode()
+
+        return try await sendRequest(
+            to: address,
+            requestType: .fullBundle,
+            data: requestData
+        )
     }
 
-    /// Send a CERequest to a validator
-    private func sendCERequest(
+    /// Send a request to a validator
+    private func sendRequest(
         to address: NetAddr,
-        request: CERequest
+        requestType: ShardRequestType,
+        data: Data
     ) async throws -> Data {
         // Use the request type and key components for cache key
-        let cacheKey = switch request {
-        case let .auditShardRequest(msg):
-            "\(address):138:\(msg.erasureRoot.hex):\(msg.shardIndex)"
-        case let .segmentShardRequest1(msg):
-            "\(address):139:\(msg.erasureRoot.hex):\(msg.shardIndex):\(msg.segmentIndices.hashValue)"
-        case let .segmentShardRequest2(msg):
-            "\(address):140:\(msg.erasureRoot.hex):\(msg.shardIndex):\(msg.segmentIndices.hashValue)"
-        case let .blockRequest(req):
-            "\(address):147:\(req.hash.hex)"
-        default:
-            "\(address):\(UUID().uuidString)"
-        }
+        let dataHash = data.prefix(64).reduce(0) { ($0 << 8) + Int($1) }
+        let cacheKey = "\(address):\(requestType.rawValue):\(dataHash)"
 
         // Check for duplicate requests
         if let existingTask = pendingRequests[cacheKey] {
@@ -551,10 +552,10 @@ public actor AvailabilityNetworkClient {
             }
 
             // Send the request via Network
-            logger.debug("Sending \(request) request to \(address)")
+            logger.debug("Sending \(requestType) request to \(address)")
 
             // Send request and get response
-            let responseData = try await network.send(to: address, message: request)
+            let responseData = try await network.send(to: address, data: data)
 
             // Response should be a single Data blob
             guard let response = responseData.first else {
@@ -668,31 +669,6 @@ public actor AvailabilityNetworkClient {
     private func recordCE148Request() {
         metrics.ce148Requests += 1
         metrics.fallbackCount += 1
-    }
-}
-
-// MARK: - Timeout Extension
-
-extension TaskGroup where Failure == Error {
-    func next(timeout: TimeInterval) async throws -> T? {
-        try await withThrowingTaskGroup(of: T?.self) { group in
-            group.addTask {
-                try await self.next()
-            }
-
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-                return nil
-            }
-
-            guard let result = try await group.next() else {
-                return nil
-            }
-
-            group.cancelAll()
-
-            return result
-        }
     }
 }
 

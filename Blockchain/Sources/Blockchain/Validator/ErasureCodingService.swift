@@ -228,7 +228,9 @@ public actor ErasureCodingService {
 
         for shard in shards {
             let shardHash = shard.blake2b256hash()
-            let node = try JamEncoder.encode(shardHash) + try JamEncoder.encode(segmentsRoot)
+            let encodedShardHash = try JamEncoder.encode(shardHash)
+            let encodedSegmentsRoot = try JamEncoder.encode(segmentsRoot)
+            let node = encodedShardHash + encodedSegmentsRoot
             nodes.append(node)
         }
 
@@ -254,6 +256,7 @@ public enum ErasureCodingError: Error {
     case reconstructionFailed(underlying: Error)
     case merkleProofGenerationFailed
     case invalidMerkleProof
+    case invalidHash
 }
 
 // MARK: - Merkle Proof Generation
@@ -283,14 +286,12 @@ extension ErasureCodingService {
         for step in proof {
             switch step {
             case let .left(data):
-                guard data.count == 32, let hash = Data32(data) else {
-                    throw ErasureCodingError.merkleProofGenerationFailed
+                // Convert Data to Data32
+                guard let hash = Data32(data) else {
+                    throw ErasureCodingError.invalidHash
                 }
                 hashes.append(hash)
-            case let .right(data):
-                guard data.count == 32, let hash = Data32(data) else {
-                    throw ErasureCodingError.merkleProofGenerationFailed
-                }
+            case let .right(hash):
                 hashes.append(hash)
             }
         }
@@ -380,7 +381,9 @@ extension ErasureCodingService {
 
         for shard in shards {
             let shardHash = shard.blake2b256hash()
-            let node = try JamEncoder.encode(shardHash) + try JamEncoder.encode(segmentsRoot)
+            let encodedShardHash = try JamEncoder.encode(shardHash)
+            let encodedSegmentsRoot = try JamEncoder.encode(segmentsRoot)
+            let node = encodedShardHash + encodedSegmentsRoot
             nodes.append(node)
         }
 
@@ -397,14 +400,12 @@ extension ErasureCodingService {
         for step in copath {
             switch step {
             case let .left(data):
-                guard data.count == 32, let hash = Data32(data) else {
-                    throw ErasureCodingError.merkleProofGenerationFailed
+                // Convert Data to Data32
+                guard let hash = Data32(data) else {
+                    throw ErasureCodingError.invalidHash
                 }
                 steps.append(.left(hash))
-            case let .right(data):
-                guard data.count == 32, let hash = Data32(data) else {
-                    throw ErasureCodingError.merkleProofGenerationFailed
-                }
+            case let .right(hash):
                 steps.append(.right(hash))
             }
         }
@@ -477,14 +478,12 @@ extension ErasureCodingService {
         for step in segmentCopath {
             switch step {
             case let .left(data):
-                guard data.count == 32, let hash = Data32(data) else {
-                    throw ErasureCodingError.merkleProofGenerationFailed
+                // Convert Data to Data32
+                guard let hash = Data32(data) else {
+                    throw ErasureCodingError.invalidHash
                 }
                 fullJustification.append(.left(hash))
-            case let .right(data):
-                guard data.count == 32, let hash = Data32(data) else {
-                    throw ErasureCodingError.merkleProofGenerationFailed
-                }
+            case let .right(hash):
                 fullJustification.append(.right(hash))
             }
         }

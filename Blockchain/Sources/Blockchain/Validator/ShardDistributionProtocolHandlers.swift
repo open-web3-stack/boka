@@ -45,11 +45,11 @@ public actor ShardDistributionProtocolHandlers {
     /// - Parameter message: Shard distribution message
     /// - Returns: Encoded response containing bundle shard, segment shards, and justification
     public func handleShardDistribution(
-        message: ShardDistributionMessage
+        message: some ShardDistributionRequestProtocol
     ) async throws -> [Data] {
         logger.debug(
             """
-            CE 137: Shard distribution request for erasureRoot=\(message.erasureRoot.hex), \
+            CE 137: Shard distribution request for erasureRoot=\(message.erasureRoot.toHexString()), \
             shardIndex=\(message.shardIndex)
             """
         )
@@ -63,7 +63,7 @@ public actor ShardDistributionProtocolHandlers {
         guard hasShard else {
             logger.warning(
                 """
-                CE 137: Shard \(message.shardIndex) for erasureRoot \(message.erasureRoot.hex) not found
+                CE 137: Shard \(message.shardIndex) for erasureRoot \(message.erasureRoot.toHexString()) not found
                 """
             )
             throw ShardDistributionError.shardNotFound
@@ -80,17 +80,24 @@ public actor ShardDistributionProtocolHandlers {
             throw ShardDistributionError.shardDataUnavailable
         }
 
-        // Get metadata
-        let metadata = try await dataStore.getAuditEntry(erasureRoot: message.erasureRoot)
-        guard let metadata else {
-            logger.warning("CE 137: No metadata found for erasureRoot \(message.erasureRoot.hex)")
+        // Get metadata - we need both audit entry and D³L entry
+        let auditMetadata = try await dataStore.getAuditEntry(erasureRoot: message.erasureRoot)
+        guard let auditMetadata else {
+            logger.warning("CE 137: No audit metadata found for erasureRoot \(message.erasureRoot.toHexString())")
+            throw ShardDistributionError.metadataNotFound
+        }
+
+        // Get D³L entry for segment count
+        let d3lMetadata = try await dataStore.getD3LEntry(erasureRoot: message.erasureRoot)
+        guard let d3lMetadata else {
+            logger.warning("CE 137: No D³L metadata found for erasureRoot \(message.erasureRoot.toHexString())")
             throw ShardDistributionError.metadataNotFound
         }
 
         // Extract bundle shard and segment shards from the shard data
         // Per spec, shard contains: [bundle shard (684 bytes)] + [segment shards for each segment]
         let bundleShardSize = 684
-        let segmentCount = metadata.segmentCount
+        let segmentCount = Int(d3lMetadata.segmentCount)
 
         guard shardData.count >= bundleShardSize else {
             logger.error("CE 137: Shard data too small: \(shardData.count) bytes")
@@ -119,10 +126,10 @@ public actor ShardDistributionProtocolHandlers {
         let allShardHashes = try await getAllShardHashes(erasureRoot: message.erasureRoot)
 
         // Generate the Merkle co-path for the requested shard
-        let justification = try erasureCoding.generateJustification(
+        let justification = try await erasureCoding.generateJustification(
             shardIndex: message.shardIndex,
-            segmentsRoot: metadata.segmentsRoot,
-            shards: allShardHashes.map { Data($0) }
+            segmentsRoot: d3lMetadata.segmentsRoot,
+            shards: allShardHashes.map(\.data)
         )
 
         logger.debug(
@@ -144,7 +151,8 @@ public actor ShardDistributionProtocolHandlers {
             try encoder.encode(segmentShard)
         }
 
-        // Encode justification
+        // Encode justification (length-prefixed array)
+        try encoder.encode(UInt32(justification.count))
         try encodeJustification(encoder, justification: justification)
 
         return [encoder.data]
@@ -164,17 +172,17 @@ public actor ShardDistributionProtocolHandlers {
     /// - Parameter message: Audit shard request message
     /// - Returns: Encoded response containing bundle shard and justification
     public func handleAuditShardRequest(
-        message: AuditShardRequestMessage
+        message: some AuditShardRequestProtocol
     ) async throws -> [Data] {
         logger.debug(
             """
-            CE 138: Audit shard request for erasureRoot=\(message.erasureRoot.hex), \
+            CE 138: Audit shard request for erasureRoot=\(message.erasureRoot.toHexString()), \
             shardIndex=\(message.shardIndex)
             """
         )
 
         // Reuse CE 137 logic but only return bundle shard + justification
-        let shardDistributionMsg = ShardDistributionMessage(
+        let shardDistributionMsg = SimpleShardDistributionRequest(
             erasureRoot: message.erasureRoot,
             shardIndex: message.shardIndex
         )
@@ -182,7 +190,7 @@ public actor ShardDistributionProtocolHandlers {
         let fullResponse = try await handleShardDistribution(message: shardDistributionMsg)
 
         // Decode the full response to extract just bundle shard + justification
-        let decoder = JamDecoder(data: fullResponse[0], config: config)
+        var decoder = try JamDecoder(data: fullResponse[0], config: config)
 
         // Decode bundle shard
         let bundleShard = try decoder.decode(Data.self)
@@ -193,8 +201,8 @@ public actor ShardDistributionProtocolHandlers {
             _ = try decoder.decode(Data.self)
         }
 
-        // Decode justification (remainder of data)
-        let justificationData = Data(decoder.remainingData)
+        // Decode justification steps
+        let justificationSteps = try decoder.decode([AvailabilityJustification.AvailabilityJustificationStep].self)
 
         logger.debug(
             """
@@ -205,7 +213,7 @@ public actor ShardDistributionProtocolHandlers {
         // Re-encode just bundle shard + justification
         let encoder = JamEncoder()
         try encoder.encode(bundleShard)
-        encoder.data.append(justificationData)
+        try encoder.encode(justificationSteps)
 
         return [encoder.data]
     }
@@ -223,11 +231,11 @@ public actor ShardDistributionProtocolHandlers {
     /// - Parameter message: Segment shard request message
     /// - Returns: Encoded response containing segment shards
     public func handleSegmentShardRequestFast(
-        message: SegmentShardRequestMessage
+        message: some SegmentShardRequestProtocol
     ) async throws -> [Data] {
         logger.debug(
             """
-            CE 139: Fast segment shard request for erasureRoot=\(message.erasureRoot.hex), \
+            CE 139: Fast segment shard request for erasureRoot=\(message.erasureRoot.toHexString()), \
             shardIndex=\(message.shardIndex), segmentIndices=\(message.segmentIndices.count)
             """
         )
@@ -237,13 +245,14 @@ public actor ShardDistributionProtocolHandlers {
             shardIndex: message.shardIndex
         )
 
-        let metadata = try await getAuditMetadata(erasureRoot: message.erasureRoot)
+        // Get D³L metadata for segment count
+        let d3lMetadata = try await getD3LMetadata(erasureRoot: message.erasureRoot)
 
         // Extract segment shards for requested indices
         let segmentShards = try extractSegmentShards(
             from: shardData,
             segmentIndices: message.segmentIndices,
-            segmentCount: metadata.segmentCount
+            segmentCount: d3lMetadata.segmentCount
         )
 
         logger.debug("CE 139: Returning \(segmentShards.count) segment shards (fast mode)")
@@ -272,11 +281,11 @@ public actor ShardDistributionProtocolHandlers {
     /// - Parameter message: Segment shard request message
     /// - Returns: Encoded response containing segment shards and justifications
     public func handleSegmentShardRequestVerified(
-        message: SegmentShardRequestMessage
+        message: some SegmentShardRequestProtocol
     ) async throws -> [Data] {
         logger.debug(
             """
-            CE 140: Verified segment shard request for erasureRoot=\(message.erasureRoot.hex), \
+            CE 140: Verified segment shard request for erasureRoot=\(message.erasureRoot.toHexString()), \
             shardIndex=\(message.shardIndex), segmentIndices=\(message.segmentIndices.count)
             """
         )
@@ -286,13 +295,14 @@ public actor ShardDistributionProtocolHandlers {
             shardIndex: message.shardIndex
         )
 
-        let metadata = try await getAuditMetadata(erasureRoot: message.erasureRoot)
+        // Get D³L metadata for segment count
+        let d3lMetadata = try await getD3LMetadata(erasureRoot: message.erasureRoot)
 
         // Extract segment shards for requested indices
         let segmentShards = try extractSegmentShards(
             from: shardData,
             segmentIndices: message.segmentIndices,
-            segmentCount: metadata.segmentCount
+            segmentCount: d3lMetadata.segmentCount
         )
 
         // Generate justifications for each segment shard
@@ -345,19 +355,19 @@ public actor ShardDistributionProtocolHandlers {
     public func handleBundleRequest(
         erasureRoot: Data32
     ) async throws -> [Data] {
-        logger.debug("CE 147: Bundle request for erasureRoot=\(erasureRoot.hex)")
+        logger.debug("CE 147: Bundle request for erasureRoot=\(erasureRoot.toHexString())")
 
         // Retrieve the full bundle from storage
         let metadata = try await dataStore.getAuditEntry(erasureRoot: erasureRoot)
 
         guard let metadata else {
-            logger.warning("CE 147: No metadata found for erasureRoot \(erasureRoot.hex)")
+            logger.warning("CE 147: No metadata found for erasureRoot \(erasureRoot.toHexString())")
             throw ShardDistributionError.metadataNotFound
         }
 
         // Reconstruct the bundle from shards
         let shardAssignments = JAMNPSShardAssignment()
-        let validators = shardAssignments.getValidatorsForShard(
+        let validators = await shardAssignments.getValidatorsForShard(
             shardIndex: 0, // Will need all shards for full bundle
             coreIndex: 0,
             totalValidators: cValCount
@@ -414,7 +424,7 @@ public actor ShardDistributionProtocolHandlers {
     ) async throws -> [Data] {
         logger.debug(
             """
-            CE 148: Segment request for segmentsRoot=\(segmentsRoot.hex), \
+            CE 148: Segment request for segmentsRoot=\(segmentsRoot.toHexString()), \
             indices=\(segmentIndices.count)
             """
         )
@@ -483,6 +493,16 @@ public actor ShardDistributionProtocolHandlers {
         return metadata
     }
 
+    private func getD3LMetadata(erasureRoot: Data32) async throws -> D3LEntry {
+        let metadata = try await dataStore.getD3LEntry(erasureRoot: erasureRoot)
+
+        guard let metadata else {
+            throw ShardDistributionError.metadataNotFound
+        }
+
+        return metadata
+    }
+
     private func getAllShardHashes(erasureRoot: Data32) async throws -> [Data32] {
         // Get metadata to determine shard count
         let metadata = try await getAuditMetadata(erasureRoot: erasureRoot)
@@ -538,7 +558,7 @@ public actor ShardDistributionProtocolHandlers {
         segmentIndex: UInt16,
         bundleShard _: Data,
         segmentShard _: Data
-    ) async throws -> [Justification.JustificationStep] {
+    ) async throws -> [AvailabilityJustification.AvailabilityJustificationStep] {
         // CE 140 requires a justification that proves the segment shard belongs to the segment
         //
         // Per GP spec, we need to generate a Merkle co-path that proves:
@@ -550,9 +570,9 @@ public actor ShardDistributionProtocolHandlers {
         // - Generate Merkle tree from these segment shard hashes
         // - Provide co-path for the requested segment
 
-        // Get metadata to determine segment count
-        let metadata = try await getAuditMetadata(erasureRoot: erasureRoot)
-        let segmentCount = Int(metadata.segmentCount)
+        // Get D³L metadata to determine segment count
+        let d3lMetadata = try await getD3LMetadata(erasureRoot: erasureRoot)
+        let segmentCount = Int(d3lMetadata.segmentCount)
 
         // Extract all segment shards from this shard
         let shardData = try await getShardData(
@@ -563,7 +583,7 @@ public actor ShardDistributionProtocolHandlers {
         let segmentShards = try extractSegmentShards(
             from: shardData,
             segmentIndices: Array(0 ..< UInt16(segmentCount)),
-            segmentCount: metadata.segmentCount
+            segmentCount: UInt32(segmentCount)
         )
 
         // Generate Merkle tree nodes for segment shards
@@ -571,10 +591,10 @@ public actor ShardDistributionProtocolHandlers {
         var nodes: [Data] = []
         for (idx, segShard) in segmentShards.enumerated() {
             let segmentShardHash = segShard.blake2b256hash()
-            let segmentIndexData = JamEncoder.encode(UInt32(idx))
+            let segmentIndexData = try JamEncoder.encode(UInt32(idx))
 
             var nodeData = Data()
-            nodeData.append(segmentShardHash)
+            nodeData.append(segmentShardHash.data)
             nodeData.append(contentsOf: segmentIndexData)
             nodes.append(nodeData)
         }
@@ -612,7 +632,7 @@ public actor ShardDistributionProtocolHandlers {
         guard let d3lEntry else {
             logger.warning(
                 """
-                CE 148: No D³L entry found for segmentsRoot \(segmentsRoot.hex), \
+                CE 148: No D³L entry found for segmentsRoot \(segmentsRoot.toHexString()), \
                 segment \(segmentIndex)
                 """
             )
@@ -634,7 +654,7 @@ public actor ShardDistributionProtocolHandlers {
 
     private func encodeJustification(
         _ encoder: JamEncoder,
-        justification: [Justification.JustificationStep]
+        justification: [AvailabilityJustification.AvailabilityJustificationStep]
     ) throws {
         // Encode justification steps
         // Format: [discriminator ++ hash] per step

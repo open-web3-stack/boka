@@ -1,5 +1,6 @@
 import Codec
 import Foundation
+import Networking
 import Synchronization
 import TracingUtils
 import Utils
@@ -56,14 +57,14 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     }
 
     /// Set the network client for fetching missing shards
-    public func setNetworkClient(_ client: AvailabilityNetworkClient) {
+    public func setNetworkClient(_ client: AvailabilityNetworkClient) async {
         networkClient = client
-        erasureCodingDataStore?.setNetworkClient(client)
+        await erasureCodingDataStore?.setNetworkClient(client)
     }
 
     /// Set the fetch strategy for network operations
-    public func setFetchStrategy(_ strategy: FetchStrategy) {
-        erasureCodingDataStore?.setFetchStrategy(strategy)
+    public func setFetchStrategy(_ strategy: FetchStrategy) async {
+        await erasureCodingDataStore?.setFetchStrategy(strategy)
     }
 
     public func onSyncCompleted() async {
@@ -134,16 +135,16 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
     /// Get cleanup metrics
     /// - Returns: Cleanup metrics if ErasureCodingDataStore is available
-    public func getCleanupMetrics() -> CleanupMetrics? {
+    public func getCleanupMetrics() async -> CleanupMetrics? {
         guard let ecStore = erasureCodingDataStore else {
             return nil
         }
-        return ecStore.getCleanupMetrics()
+        return await ecStore.getCleanupMetrics()
     }
 
     /// Reset cleanup metrics
-    public func resetCleanupMetrics() {
-        erasureCodingDataStore?.resetCleanupMetrics()
+    public func resetCleanupMetrics() async {
+        await erasureCodingDataStore?.resetCleanupMetrics()
     }
 
     /// Fetch segments from import store
@@ -699,9 +700,13 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
                     throw DataAvailabilityError.retrievalError
                 }
 
-                // Get metadata
-                guard let metadata = try await ecStore.getAuditEntry(erasureRoot: erasureRoot) else {
+                // Get metadata - we need both audit and D³L entries
+                guard let auditMetadata = try await ecStore.getAuditEntry(erasureRoot: erasureRoot) else {
                     throw DataAvailabilityError.invalidErasureRoot
+                }
+
+                guard let d3lMetadata = try await ecStore.getD3LEntry(erasureRoot: erasureRoot) else {
+                    throw DataAvailabilityError.segmentsRootMappingNotFound
                 }
 
                 // Extract bundle shard (first 684 bytes)
@@ -713,14 +718,14 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
                 let bundleShard = Data(shardData[0 ..< bundleShardSize])
 
                 // Extract segment shards
-                let segmentCount = Int(metadata.segmentCount)
+                let segmentCount = Int(d3lMetadata.segmentCount)
                 let segmentShardSize = (shardData.count - bundleShardSize) / segmentCount
                 var segmentShards: [Data] = []
 
                 for i in 0 ..< segmentCount {
-                    let start = bundleShardSize + (i * segmentShardSize)
-                    let end = min(start + segmentShardSize, shardData.count)
-                    let segmentShard = Data(shardData[start ..< end])
+                    let startOffset = bundleShardSize + (i * segmentShardSize)
+                    let end = min(startOffset + segmentShardSize, shardData.count)
+                    let segmentShard = Data(shardData[startOffset ..< end])
                     segmentShards.append(segmentShard)
                 }
 
@@ -737,11 +742,12 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
                 }
 
                 // Generate co-path justification
-                let justification = try erasureCodingService.generateJustification(
+                let justificationSteps = try await erasureCodingService.generateJustification(
                     shardIndex: shardIndex,
-                    segmentsRoot: metadata.segmentsRoot,
+                    segmentsRoot: d3lMetadata.segmentsRoot,
                     shards: allShardHashes
                 )
+                let justification = AvailabilityJustification.copath(justificationSteps)
 
                 // Respond with bundle shard + segment shards + justification
                 publish(RuntimeEvents.ShardDistributionReceivedResponse(
@@ -752,23 +758,8 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
                 ))
 
             } else {
-                // Fallback to legacy dataStore
-                let shards = try await dataStore.getLocalShards(
-                    erasureRoot: erasureRoot,
-                    indices: [shardIndex]
-                )
-
-                guard let shardData = shards.first(where: { $0.index == shardIndex })?.data else {
-                    throw DataAvailabilityError.segmentNotFound
-                }
-
-                // For legacy path, we can't generate proper justification
-                // Return empty justification
-                publish(RuntimeEvents.ShardDistributionReceivedResponse(
-                    requestId: requestId,
-                    shardIndex: shardIndex,
-                    shardData: shardData
-                ))
+                // Fallback: throw error since we can't generate proper justification
+                throw DataAvailabilityError.segmentNotFound
             }
 
         } catch {
@@ -1358,23 +1349,23 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
     /// Get cache statistics
     /// - Returns: Cache statistics including hits, misses, evictions, size, and hit rate
-    public func getCacheStatistics() -> (hits: Int, misses: Int, evictions: Int, size: Int, hitRate: Double)? {
+    public func getCacheStatistics() async -> (hits: Int, misses: Int, evictions: Int, size: Int, hitRate: Double)? {
         guard let ecStore = erasureCodingDataStore else {
             return nil
         }
 
-        return ecStore.getCacheStatistics()
+        return await ecStore.getCacheStatistics()
     }
 
     /// Clear cache for a specific erasure root
     /// - Parameter erasureRoot: The erasure root to clear cache for
-    public func clearCache(erasureRoot: Data32) {
-        erasureCodingDataStore?.clearCache(erasureRoot: erasureRoot)
+    public func clearCache(erasureRoot: Data32) async {
+        await erasureCodingDataStore?.clearCache(erasureRoot: erasureRoot)
     }
 
     /// Clear all cache
-    public func clearAllCache() {
-        erasureCodingDataStore?.clearAllCache()
+    public func clearAllCache() async {
+        await erasureCodingDataStore?.clearAllCache()
     }
 
     /// Get storage usage information

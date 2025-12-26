@@ -277,9 +277,9 @@ public enum RuntimeEvents {
     public struct ShardDistributionReceivedResponse: Event {
         public let requestId: Data32
 
-        public let result: Result<(bundleShard: Data, segmentShards: [Data], justification: Justification), Error>
+        public let result: Result<(bundleShard: Data, segmentShards: [Data], justification: AvailabilityJustification), Error>
 
-        public init(requestId: Data32, bundleShard: Data, segmentShards: [Data], justification: Justification) {
+        public init(requestId: Data32, bundleShard: Data, segmentShards: [Data], justification: AvailabilityJustification) {
             self.requestId = requestId
             result = .success((bundleShard, segmentShards, justification))
         }
@@ -307,9 +307,18 @@ public enum RuntimeEvents {
     public struct AuditShardRequestReceivedResponse: Event {
         public var requestId: Data32
 
-        public let result: Result<(erasureRoot: Data32, shardIndex: UInt32, bundleShard: Data, justification: Justification), Error>
+        public let result: Result<
+            (erasureRoot: Data32, shardIndex: UInt32, bundleShard: Data, justification: AvailabilityJustification),
+            Error
+        >
 
-        public init(requestId: Data32, erasureRoot: Data32, shardIndex: UInt32, bundleShard: Data, justification: Justification) {
+        public init(
+            requestId: Data32,
+            erasureRoot: Data32,
+            shardIndex: UInt32,
+            bundleShard: Data,
+            justification: AvailabilityJustification
+        ) {
             self.requestId = requestId
             result = .success((erasureRoot, shardIndex, bundleShard, justification))
         }
