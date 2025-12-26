@@ -33,15 +33,15 @@ public actor FilesystemDataStore {
     private let d3lPath: URL
     private let fileManager: FileManager
 
-    public init(dataPath: URL) throws {
+    public init(dataPath: URL) async throws {
         self.dataPath = dataPath
         auditPath = dataPath.appendingPathComponent("audit")
         d3lPath = dataPath.appendingPathComponent("d3l")
         fileManager = FileManager.default
 
         // Create directories if they don't exist
-        try createDirectoryIfNeeded(auditPath)
-        try createDirectoryIfNeeded(d3lPath)
+        await createDirectoryIfNeeded(auditPath)
+        await createDirectoryIfNeeded(d3lPath)
 
         logger.info("FilesystemDataStore initialized at \(dataPath.path)")
     }
@@ -49,7 +49,7 @@ public actor FilesystemDataStore {
     /// Store audit bundle (short-term storage)
     public func storeAuditBundle(erasureRoot: Data32, data: Data) async throws {
         let path = auditPathFor(erasureRoot: erasureRoot)
-        try writeDataAtomically(to: path, data: data)
+        try await writeDataAtomically(to: path, data: data)
         logger.debug("Stored audit bundle: erasureRoot=\(erasureRoot.toHexString()), size=\(data.count)")
     }
 
@@ -59,20 +59,20 @@ public actor FilesystemDataStore {
         guard fileManager.fileExists(atPath: path.path) else {
             return nil
         }
-        return try readData(from: path)
+        return try await readData(from: path)
     }
 
     /// Delete audit bundle
     public func deleteAuditBundle(erasureRoot: Data32) async throws {
         let path = auditPathFor(erasureRoot: erasureRoot)
-        try removeFile(at: path)
+        try await removeFile(at: path)
         logger.trace("Deleted audit bundle: erasureRoot=\(erasureRoot.toHexString())")
     }
 
     /// Store D³L shard (long-term storage)
     public func storeD3LShard(erasureRoot: Data32, shardIndex: UInt16, data: Data) async throws {
         let path = d3lShardPathFor(erasureRoot: erasureRoot, shardIndex: shardIndex)
-        try writeDataAtomically(to: path, data: data)
+        try await writeDataAtomically(to: path, data: data)
         logger.trace("Stored D³L shard: erasureRoot=\(erasureRoot.toHexString()), index=\(shardIndex)")
     }
 
@@ -82,13 +82,13 @@ public actor FilesystemDataStore {
         guard fileManager.fileExists(atPath: path.path) else {
             return nil
         }
-        return try readData(from: path)
+        return try await readData(from: path)
     }
 
     /// Delete all D³L shards for an erasure root
     public func deleteD3LShards(erasureRoot: Data32) async throws {
         let shardsDir = d3lShardsDirectoryFor(erasureRoot: erasureRoot)
-        try? removeDirectory(at: shardsDir)
+        try? await removeDirectory(at: shardsDir)
         logger.trace("Deleted D³L shards: erasureRoot=\(erasureRoot.toHexString())")
     }
 
@@ -140,7 +140,7 @@ public actor FilesystemDataStore {
             for file in files {
                 guard file.pathExtension == "bin" else { continue }
                 let filename = file.deletingPathExtension().lastPathComponent
-                if let erasureRoot = Data32(hex: filename) {
+                if let erasureRoot = Data32(fromHexString: filename) {
                     erasureRoots.append(erasureRoot)
                 }
             }
@@ -166,7 +166,7 @@ public actor FilesystemDataStore {
 
             for erasureRootDir in erasureRootDirs {
                 guard erasureRootDir.hasDirectoryPath else { continue }
-                if let erasureRoot = Data32(hex: erasureRootDir.lastPathComponent) {
+                if let erasureRoot = Data32(fromHexString: erasureRootDir.lastPathComponent) {
                     erasureRoots.append(erasureRoot)
                 }
             }
@@ -180,22 +180,23 @@ public actor FilesystemDataStore {
 
 extension FilesystemDataStore {
     /// Create directory if it doesn't exist
-    private func createDirectoryIfNeeded(_ url: URL) throws {
+    private func createDirectoryIfNeeded(_ url: URL) async {
         var isDirectory: ObjCBool = false
         if fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) {
             guard isDirectory.boolValue else {
-                throw FilesystemDataStoreError.pathNotDirectory(path: url)
+                logger.error("Path exists but is not a directory: \(url.path)")
+                return
             }
         } else {
-            try fileManager.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
+            try? fileManager.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
         }
     }
 
     /// Write data atomically (write to temp file, then rename)
-    private func writeDataAtomically(to url: URL, data: Data) throws {
+    private func writeDataAtomically(to url: URL, data: Data) async throws {
         // Ensure parent directory exists
         let parentDir = url.deletingLastPathComponent()
-        try createDirectoryIfNeeded(parentDir)
+        await createDirectoryIfNeeded(parentDir)
 
         // Write to temporary file
         let tempUrl = url.deletingLastPathComponent().appendingPathComponent("\(UUID().uuidString).tmp")
@@ -226,21 +227,21 @@ extension FilesystemDataStore {
     }
 
     /// Remove file
-    private func removeFile(at url: URL) throws {
+    private func removeFile(at url: URL) async throws {
         if fileManager.fileExists(atPath: url.path) {
             try fileManager.removeItem(at: url)
         }
     }
 
     /// Remove directory
-    private func removeDirectory(at url: URL) throws {
+    private func removeDirectory(at url: URL) async throws {
         if fileManager.fileExists(atPath: url.path) {
             try fileManager.removeItem(at: url)
         }
     }
 
     /// Calculate total size of directory
-    private func getTotalSize(of url: URL) throws -> Int {
+    private func getTotalSize(of url: URL) async throws -> Int {
         guard fileManager.fileExists(atPath: url.path) else {
             return 0
         }
@@ -249,8 +250,8 @@ extension FilesystemDataStore {
         let enumerator = fileManager.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey])
 
         while case let file as URL? = enumerator?.nextObject() {
-            let resourceValues = try file.resourceValues(forKeys: [.fileSizeKey])
-            if let fileSize = resourceValues.fileSize {
+            let resourceValues = try file?.resourceValues(forKeys: [.fileSizeKey])
+            if let fileSize = resourceValues?.fileSize {
                 totalSize += fileSize
             }
         }
@@ -260,7 +261,7 @@ extension FilesystemDataStore {
 
     /// Path for audit bundle storage
     private func auditPathFor(erasureRoot: Data32) -> URL {
-        let prefix = String(erasureRoot.data.prefix(8).hexEncoded())
+        let prefix = erasureRoot.data.prefix(8).toHexString()
         let prefixDir = auditPath.appendingPathComponent(prefix)
         let filename = erasureRoot.toHexString() + ".bin"
         return prefixDir.appendingPathComponent(filename)
@@ -275,7 +276,7 @@ extension FilesystemDataStore {
 
     /// Directory containing D³L shards for an erasure root
     private func d3lShardsDirectoryFor(erasureRoot: Data32) -> URL {
-        let prefix = String(erasureRoot.data.prefix(4).hexEncoded())
+        let prefix = erasureRoot.data.prefix(4).toHexString()
         let prefixDir = d3lPath.appendingPathComponent(prefix)
         let erasureRootDir = prefixDir.appendingPathComponent(erasureRoot.toHexString())
         return erasureRootDir.appendingPathComponent("segments")

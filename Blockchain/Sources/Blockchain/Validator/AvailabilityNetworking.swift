@@ -102,13 +102,13 @@ public struct ShardRequest: Codable, Sendable {
 /// Wire format:
 /// - Bundle Shard (variable)
 /// - [Segment Shard] (variable, optional for CE 138)
-/// - Justification (variable)
+/// - AvailabilityJustification (variable)
 public struct ShardResponse: Codable, Sendable {
     public let bundleShard: Data
     public let segmentShards: [Data]
-    public let justification: Justification
+    public let justification: AvailabilityJustification
 
-    public init(bundleShard: Data, segmentShards: [Data], justification: Justification) {
+    public init(bundleShard: Data, segmentShards: [Data], justification: AvailabilityJustification) {
         self.bundleShard = bundleShard
         self.segmentShards = segmentShards
         self.justification = justification
@@ -134,7 +134,7 @@ public struct ShardResponse: Codable, Sendable {
             data.append(shard)
         }
 
-        // Justification
+        // AvailabilityJustification
         try data.append(justification.encode())
 
         return data
@@ -202,8 +202,8 @@ public struct ShardResponse: Codable, Sendable {
             offset += Int(shardLength)
         }
 
-        // Justification
-        let justification = try Justification.decode(Data(data[offset ..< data.count]))
+        // AvailabilityJustification
+        let justification = try AvailabilityJustification.decode(Data(data[offset ..< data.count]))
 
         return ShardResponse(
             bundleShard: bundleShard,
@@ -215,9 +215,9 @@ public struct ShardResponse: Codable, Sendable {
 
 /// Merkle proof justification for JAMNP-S protocols
 ///
-/// Per JAMNP-S spec, Justification = [0 ++ Hash OR 1 ++ Hash ++ Hash OR 2 ++ Segment Shard]
+/// Per JAMNP-S spec, AvailabilityJustification = [0 ++ Hash OR 1 ++ Hash ++ Hash OR 2 ++ Segment Shard]
 /// Each discriminator is a single byte
-public enum Justification: Codable, Sendable {
+public enum AvailabilityJustification: Codable, Sendable {
     /// 0 ++ Hash - Leaf node, no sibling needed
     case leaf
 
@@ -228,9 +228,9 @@ public enum Justification: Codable, Sendable {
     case segmentShard(Data)
 
     /// Co-path sequence for multi-level proofs
-    case copath([JustificationStep])
+    case copath([AvailabilityJustificationStep])
 
-    public enum JustificationStep: Codable, Sendable {
+    public enum AvailabilityJustificationStep: Codable, Sendable {
         case left(Data32) // Sibling on the left
         case right(Data32) // Sibling on the right
     }
@@ -276,9 +276,9 @@ public enum Justification: Codable, Sendable {
     }
 
     /// Decode justification from wire format
-    public static func decode(_ data: Data) throws -> Justification {
+    public static func decode(_ data: Data) throws -> AvailabilityJustification {
         guard !data.isEmpty else {
-            throw AvailabilityNetworkingError.invalidJustification
+            throw AvailabilityNetworkingError.invalidAvailabilityJustification
         }
 
         let discriminator = data[0]
@@ -291,7 +291,7 @@ public enum Justification: Codable, Sendable {
         case 1:
             // Branch: 1 ++ Hash ++ Hash
             guard data.count == 1 + 32 + 32 else {
-                throw AvailabilityNetworkingError.invalidJustification
+                throw AvailabilityNetworkingError.invalidAvailabilityJustification
             }
             let left = Data32(data[1 ..< 33])
             let right = Data32(data[33 ..< 65])
@@ -300,19 +300,19 @@ public enum Justification: Codable, Sendable {
         case 2:
             // Segment Shard: 2 ++ length ++ data
             guard data.count >= 5 else {
-                throw AvailabilityNetworkingError.invalidJustification
+                throw AvailabilityNetworkingError.invalidAvailabilityJustification
             }
             let length = data.withUnsafeBytes { $0.load(fromByteOffset: 1, as: UInt32.self).littleEndian }
             let expectedLength = 1 + 4 + Int(length)
             guard data.count >= expectedLength else {
-                throw AvailabilityNetworkingError.invalidJustification
+                throw AvailabilityNetworkingError.invalidAvailabilityJustification
             }
             let shard = Data(data[5 ..< 5 + Int(length)])
             return .segmentShard(shard)
 
         default:
             // Co-path sequence
-            var steps: [JustificationStep] = []
+            var steps: [AvailabilityJustificationStep] = []
             var offset = 0
 
             while offset < data.count {
@@ -320,7 +320,7 @@ public enum Justification: Codable, Sendable {
                 offset += 1
 
                 guard offset + 32 <= data.count else {
-                    throw AvailabilityNetworkingError.invalidJustification
+                    throw AvailabilityNetworkingError.invalidAvailabilityJustification
                 }
 
                 let hash = Data32(data[offset ..< offset + 32])
@@ -331,7 +331,7 @@ public enum Justification: Codable, Sendable {
                 } else if disc == 1 {
                     steps.append(.right(hash))
                 } else {
-                    throw AvailabilityNetworkingError.invalidJustification
+                    throw AvailabilityNetworkingError.invalidAvailabilityJustification
                 }
             }
 
@@ -568,7 +568,7 @@ public struct SegmentResponse: Codable, Sendable {
 
 public enum AvailabilityNetworkingError: Error {
     case invalidMessageLength(expected: Int, actual: Int)
-    case invalidJustification
+    case invalidAvailabilityJustification
     case invalidSegmentLength
     case encodingFailed
     case decodingFailed

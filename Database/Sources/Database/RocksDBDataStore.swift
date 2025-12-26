@@ -594,22 +594,6 @@ private struct AvailabilityMetadata: Codable {
     var shardCount: UInt32
 }
 
-/// Audit store entry (short-term storage)
-public struct AuditEntry: Codable {
-    public var workPackageHash: Data32
-    public var erasureRoot: Data32
-    public var bundleSize: Int
-    public var timestamp: Date
-}
-
-/// D³L store entry (long-term storage)
-public struct D3LEntry: Codable {
-    public var segmentsRoot: Data32
-    public var erasureRoot: Data32
-    public var segmentCount: UInt32
-    public var timestamp: Date
-}
-
 // MARK: - Put Helper
 
 extension AvailabilityMetadata {

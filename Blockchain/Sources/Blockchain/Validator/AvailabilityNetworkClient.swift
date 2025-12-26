@@ -78,7 +78,7 @@ public actor AvailabilityNetworkClient {
         erasureRoot: Data32,
         shardIndex: UInt16,
         from assurerAddress: NetAddr
-    ) async throws -> (Data, Justification) {
+    ) async throws -> (Data, AvailabilityJustification) {
         logger.debug(
             """
             Fetching audit shard \(shardIndex) from \(assurerAddress)
@@ -101,7 +101,7 @@ public actor AvailabilityNetworkClient {
             throw AvailabilityNetworkingError.decodingFailed
         }
 
-        // Justification should be the co-path from erasure-root to the shard
+        // AvailabilityJustification should be the co-path from erasure-root to the shard
         let justification = response.justification
 
         logger.info(
@@ -170,12 +170,12 @@ public actor AvailabilityNetworkClient {
     ///   - assurerAddress: The assurer's network address
     /// - Returns: Tuple of (segment shards, justifications)
     /// - Throws: AvailabilityNetworkingError if request fails
-    public func fetchSegmentShardsWithJustification(
+    public func fetchSegmentShardsWithAvailabilityJustification(
         erasureRoot: Data32,
         shardIndex: UInt16,
         segmentIndices: [UInt16],
         from assurerAddress: NetAddr
-    ) async throws -> ([Data], [Justification]) {
+    ) async throws -> ([Data], [AvailabilityJustification]) {
         logger.debug(
             """
             Fetching \(segmentIndices.count) segment shards (shard \(shardIndex)) \
@@ -198,7 +198,7 @@ public actor AvailabilityNetworkClient {
 
         // Extract justifications from the response
         // In CE 140, each segment shard should have a justification
-        var justifications: [Justification] = []
+        var justifications: [AvailabilityJustification] = []
 
         if case let .copath(steps) = response.justification {
             justifications = Array(repeating: .copath(steps), count: response.segmentShards.count)

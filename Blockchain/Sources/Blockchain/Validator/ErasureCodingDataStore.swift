@@ -2,23 +2,14 @@ import Foundation
 import TracingUtils
 import Utils
 
-#if canImport(Database)
-    import Database
-#endif
-
 private let logger = Logger(label: "ErasureCodingDataStore")
 
 /// Enhanced data store that automatically handles erasure coding for availability system
 ///
-/// This service sits on top of RocksDBDataStore and FilesystemDataStore, providing
-/// automatic erasure coding/decoding for segments and bundles.
+/// This service sits on top of a DataStoreProtocol implementation and FilesystemDataStore,
+/// providing automatic erasure coding/decoding for segments and bundles.
 public actor ErasureCodingDataStore {
-    #if canImport(Database)
-        private let rocksdbStore: RocksDBDataStore
-    #else
-        // Fallback when Database module is not available
-        private let rocksdbStore: InMemoryDataStoreBackend
-    #endif
+    private let dataStore: any DataStoreProtocol
     private let filesystemStore: FilesystemDataStore
     private let erasureCoding: ErasureCodingService
     private let config: ProtocolConfigRef
@@ -36,49 +27,25 @@ public actor ErasureCodingDataStore {
     /// Cleanup state for persistence and resumption
     private var cleanupState = CleanupState()
 
-    #if canImport(Database)
-        // Expose rocksdbStore for testing purposes
-        public var rocksdbStoreForTesting: RocksDBDataStore {
-            rocksdbStore
-        }
-    #else
-        // Expose rocksdbStore for testing purposes
-        public var rocksdbStoreForTesting: InMemoryDataStoreBackend {
-            rocksdbStore
-        }
-    #endif
+    /// Expose dataStore for testing purposes
+    public var dataStoreForTesting: any DataStoreProtocol {
+        dataStore
+    }
 
-    #if canImport(Database)
-        public init(
-            rocksdbStore: RocksDBDataStore,
-            filesystemStore: FilesystemDataStore,
-            config: ProtocolConfigRef,
-            networkClient: AvailabilityNetworkClient? = nil
-        ) {
-            self.rocksdbStore = rocksdbStore
-            self.filesystemStore = filesystemStore
-            self.config = config
-            erasureCoding = ErasureCodingService(config: config)
-            // Use default cache size for now - can be made configurable later
-            segmentCache = SegmentCache(maxSize: 1000)
-            self.networkClient = networkClient
-        }
-    #else
-        public init(
-            rocksdbStore: InMemoryDataStoreBackend,
-            filesystemStore: FilesystemDataStore,
-            config: ProtocolConfigRef,
-            networkClient: AvailabilityNetworkClient? = nil
-        ) {
-            self.rocksdbStore = rocksdbStore
-            self.filesystemStore = filesystemStore
-            self.config = config
-            erasureCoding = ErasureCodingService(config: config)
-            // Use default cache size for now - can be made configurable later
-            segmentCache = SegmentCache(maxSize: 1000)
-            self.networkClient = networkClient
-        }
-    #endif
+    public init(
+        dataStore: any DataStoreProtocol,
+        filesystemStore: FilesystemDataStore,
+        config: ProtocolConfigRef,
+        networkClient: AvailabilityNetworkClient? = nil
+    ) {
+        self.dataStore = dataStore
+        self.filesystemStore = filesystemStore
+        self.config = config
+        erasureCoding = ErasureCodingService(config: config)
+        // Use default cache size for now - can be made configurable later
+        segmentCache = SegmentCache(maxSize: 1000)
+        self.networkClient = networkClient
+    }
 
     /// Set the network client for fetching missing shards
     public func setNetworkClient(_ client: AvailabilityNetworkClient) {
@@ -134,17 +101,17 @@ public actor ErasureCodingDataStore {
         let shardTuples = shards.enumerated().map { index, data in
             (index: UInt16(index), data: data)
         }
-        try await rocksdbStore.storeShards(shards: shardTuples, erasureRoot: erasureRoot)
+        try await dataStore.storeShards(shards: shardTuples, erasureRoot: erasureRoot)
 
         // Store metadata
-        try await rocksdbStore.setTimestamp(erasureRoot: erasureRoot, timestamp: Date())
-        try await rocksdbStore.setAuditEntry(
+        try await dataStore.setTimestamp(erasureRoot: erasureRoot, timestamp: Date())
+        try await dataStore.setAuditEntry(
             workPackageHash: workPackageHash,
             erasureRoot: erasureRoot,
             bundleSize: bundle.count,
             timestamp: Date()
         )
-        try await rocksdbStore.set(erasureRoot: erasureRoot, forSegmentRoot: segmentsRoot)
+        try await dataStore.set(erasureRoot: erasureRoot, forSegmentRoot: segmentsRoot)
 
         logger.info("Stored audit bundle: erasureRoot=\(erasureRoot.toHexString())")
 
@@ -162,16 +129,16 @@ public actor ErasureCodingDataStore {
         }
 
         // Fallback to reconstruction from shards
-        let indices = try await rocksdbStore.getAvailableShardIndices(erasureRoot: erasureRoot)
+        let indices = try await dataStore.getAvailableShardIndices(erasureRoot: erasureRoot)
         guard indices.count >= 342 else {
             logger.warning("Insufficient shards for reconstruction: \(indices.count)/342")
             return nil
         }
 
-        let shards = try await rocksdbStore.getShards(erasureRoot: erasureRoot, shardIndices: Array(indices.prefix(342)))
+        let shards = try await dataStore.getShards(erasureRoot: erasureRoot, shardIndices: Array(indices.prefix(342)))
 
         // Determine original size from audit metadata
-        guard let auditEntry = try await rocksdbStore.getAuditEntry(erasureRoot: erasureRoot) else {
+        guard let auditEntry = try await dataStore.getAuditEntry(erasureRoot: erasureRoot) else {
             return nil
         }
 
@@ -248,16 +215,16 @@ public actor ErasureCodingDataStore {
         }
 
         // Store metadata
-        try await rocksdbStore.setTimestamp(erasureRoot: erasureRoot, timestamp: Date())
-        try await rocksdbStore.setPagedProofsMetadata(erasureRoot: erasureRoot, metadata: pagedProofsMetadata)
-        try await rocksdbStore.setD3LEntry(
+        try await dataStore.setTimestamp(erasureRoot: erasureRoot, timestamp: Date())
+        try await dataStore.setPagedProofsMetadata(erasureRoot: erasureRoot, metadata: pagedProofsMetadata)
+        try await dataStore.setD3LEntry(
             segmentsRoot: segmentsRoot,
             erasureRoot: erasureRoot,
             segmentCount: UInt32(segments.count),
             timestamp: Date()
         )
-        try await rocksdbStore.set(segmentRoot: segmentsRoot, forWorkPackageHash: workPackageHash)
-        try await rocksdbStore.set(erasureRoot: erasureRoot, forSegmentRoot: segmentsRoot)
+        try await dataStore.set(segmentRoot: segmentsRoot, forWorkPackageHash: workPackageHash)
+        try await dataStore.set(erasureRoot: erasureRoot, forSegmentRoot: segmentsRoot)
 
         logger.info("Stored exported segments: erasureRoot=\(erasureRoot.toHexString()), count=\(segments.count)")
 
@@ -278,7 +245,7 @@ public actor ErasureCodingDataStore {
         logger.debug("Retrieving \(indices.count) segments from erasureRoot=\(erasureRoot.toHexString())")
 
         // Try to get available shard indices
-        let availableShardIndices = try await rocksdbStore.getAvailableShardIndices(erasureRoot: erasureRoot)
+        let availableShardIndices = try await dataStore.getAvailableShardIndices(erasureRoot: erasureRoot)
 
         // Check if we can reconstruct
         guard availableShardIndices.count >= 342 else {
@@ -289,13 +256,13 @@ public actor ErasureCodingDataStore {
         }
 
         // Get shards for reconstruction
-        let shardTuples = try await rocksdbStore.getShards(
+        let shardTuples = try await dataStore.getShards(
             erasureRoot: erasureRoot,
             shardIndices: Array(availableShardIndices.prefix(342))
         )
 
         // Get segment count from metadata
-        guard let d3lEntry = try await rocksdbStore.getD3LEntry(erasureRoot: erasureRoot) else {
+        guard let d3lEntry = try await dataStore.getD3LEntry(erasureRoot: erasureRoot) else {
             throw DataAvailabilityError.metadataNotFound(erasureRoot: erasureRoot)
         }
 
@@ -336,7 +303,7 @@ public actor ErasureCodingDataStore {
     /// - Parameter erasureRoot: Erasure root identifying the segments
     /// - Returns: Array of all segments
     public func getAllSegments(erasureRoot: Data32) async throws -> [Data4104] {
-        guard let d3lEntry = try await rocksdbStore.getD3LEntry(erasureRoot: erasureRoot) else {
+        guard let d3lEntry = try await dataStore.getD3LEntry(erasureRoot: erasureRoot) else {
             return []
         }
 
@@ -353,7 +320,7 @@ public actor ErasureCodingDataStore {
     ///   - pageIndex: Page index to retrieve
     /// - Returns: Array of segments in the page
     public func getSegmentsByPage(erasureRoot: Data32, pageIndex: Int) async throws -> [Data4104] {
-        guard let d3lEntry = try await rocksdbStore.getD3LEntry(erasureRoot: erasureRoot) else {
+        guard let d3lEntry = try await dataStore.getD3LEntry(erasureRoot: erasureRoot) else {
             throw DataAvailabilityError.metadataNotFound(erasureRoot: erasureRoot)
         }
 
@@ -376,7 +343,7 @@ public actor ErasureCodingDataStore {
     /// - Parameter erasureRoot: Erasure root identifying the segments
     /// - Returns: Paged-Proofs metadata, or nil if not found
     public func getPagedProofsMetadata(erasureRoot: Data32) async throws -> Data? {
-        try await rocksdbStore.getPagedProofsMetadata(erasureRoot: erasureRoot)
+        try await dataStore.getPagedProofsMetadata(erasureRoot: erasureRoot)
     }
 
     /// Get the number of pages for an erasure root
@@ -384,7 +351,7 @@ public actor ErasureCodingDataStore {
     /// - Parameter erasureRoot: Erasure root identifying the segments
     /// - Returns: Number of pages, or nil if not found
     public func getPageCount(erasureRoot: Data32) async throws -> Int? {
-        guard let d3lEntry = try await rocksdbStore.getD3LEntry(erasureRoot: erasureRoot) else {
+        guard let d3lEntry = try await dataStore.getD3LEntry(erasureRoot: erasureRoot) else {
             return nil
         }
 
@@ -564,7 +531,7 @@ public actor ErasureCodingDataStore {
         var bytesReclaimed = 0
 
         // Use iterator-based cleanup to process entries in batches
-        let totalCount = try await rocksdbStore.cleanupAuditEntriesIteratively(
+        let totalCount = try await dataStore.cleanupAuditEntriesIteratively(
             before: cutoffDate,
             batchSize: 100
         ) { batch in
@@ -573,8 +540,8 @@ public actor ErasureCodingDataStore {
                 try await filesystemStore.deleteAuditBundle(erasureRoot: entry.erasureRoot)
 
                 // Delete from RocksDB
-                try await rocksdbStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
-                try await rocksdbStore.deleteShards(erasureRoot: entry.erasureRoot)
+                try await dataStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
+                try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
 
                 deletedCount += 1
                 bytesReclaimed += entry.bundleSize
@@ -599,7 +566,7 @@ public actor ErasureCodingDataStore {
         var deletedSegments = 0
 
         // Use iterator-based cleanup to process entries in batches
-        let totalCount = try await rocksdbStore.cleanupD3LEntriesIteratively(
+        let totalCount = try await dataStore.cleanupD3LEntriesIteratively(
             before: cutoffDate,
             batchSize: 100
         ) { batch in
@@ -608,8 +575,8 @@ public actor ErasureCodingDataStore {
                 try await filesystemStore.deleteD3LShards(erasureRoot: entry.erasureRoot)
 
                 // Delete from RocksDB
-                try await rocksdbStore.deleteD3LEntry(erasureRoot: entry.erasureRoot)
-                try await rocksdbStore.deleteShards(erasureRoot: entry.erasureRoot)
+                try await dataStore.deleteD3LEntry(erasureRoot: entry.erasureRoot)
+                try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
 
                 deletedEntries += 1
                 deletedSegments += Int(entry.segmentCount)
@@ -635,7 +602,7 @@ public actor ErasureCodingDataStore {
         cleanupState.lastCleanupTime = startTime
         try await saveCleanupState()
 
-        let entries = try await rocksdbStore.listAuditEntries(before: cutoffDate)
+        let entries = try await dataStore.listAuditEntries(before: cutoffDate)
 
         var deletedCount = 0
         var bytesReclaimed = 0
@@ -645,8 +612,8 @@ public actor ErasureCodingDataStore {
             try await filesystemStore.deleteAuditBundle(erasureRoot: entry.erasureRoot)
 
             // Delete from RocksDB
-            try await rocksdbStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
-            try await rocksdbStore.deleteShards(erasureRoot: entry.erasureRoot)
+            try await dataStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
+            try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
 
             deletedCount += 1
             bytesReclaimed += entry.bundleSize
@@ -687,7 +654,7 @@ public actor ErasureCodingDataStore {
         cleanupState.lastCleanupTime = startTime
         try await saveCleanupState()
 
-        let entries = try await rocksdbStore.listD3LEntries(before: cutoffDate)
+        let entries = try await dataStore.listD3LEntries(before: cutoffDate)
 
         var deletedEntries = 0
         var deletedSegments = 0
@@ -697,8 +664,8 @@ public actor ErasureCodingDataStore {
             try await filesystemStore.deleteD3LShards(erasureRoot: entry.erasureRoot)
 
             // Delete from RocksDB
-            try await rocksdbStore.deleteD3LEntry(erasureRoot: entry.erasureRoot)
-            try await rocksdbStore.deleteShards(erasureRoot: entry.erasureRoot)
+            try await dataStore.deleteD3LEntry(erasureRoot: entry.erasureRoot)
+            try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
 
             deletedEntries += 1
             deletedSegments += Int(entry.segmentCount)
@@ -742,8 +709,8 @@ public actor ErasureCodingDataStore {
     ///
     /// - Returns: Storage usage information
     public func getStorageUsage() async throws -> StorageUsage {
-        let auditEntries = try await rocksdbStore.listAuditEntries(before: Date())
-        let d3lEntries = try await rocksdbStore.listD3LEntries(before: Date())
+        let auditEntries = try await dataStore.listAuditEntries(before: Date())
+        let d3lEntries = try await dataStore.listD3LEntries(before: Date())
 
         let auditBundleBytes = auditEntries.reduce(0) { $0 + $1.bundleSize }
         let auditShardBytes = auditEntries.reduce(0) { $0 + Int($1.shardCount) * 684 } // Approximate shard size
@@ -778,7 +745,7 @@ public actor ErasureCodingDataStore {
         let epochDuration: TimeInterval = 600 // 10 minutes per epoch
         let cutoffDate = Date().addingTimeInterval(-TimeInterval(retentionEpochs) * epochDuration)
 
-        let entries = try await rocksdbStore.listAuditEntries(before: cutoffDate)
+        let entries = try await dataStore.listAuditEntries(before: cutoffDate)
 
         let totalCount = entries.count
         let batch = Array(entries.prefix(batchSize))
@@ -788,8 +755,8 @@ public actor ErasureCodingDataStore {
 
         for entry in batch {
             try await filesystemStore.deleteAuditBundle(erasureRoot: entry.erasureRoot)
-            try await rocksdbStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
-            try await rocksdbStore.deleteShards(erasureRoot: entry.erasureRoot)
+            try await dataStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
+            try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
 
             deletedCount += 1
             bytesReclaimed += entry.bundleSize
@@ -815,8 +782,8 @@ public actor ErasureCodingDataStore {
         var bytesReclaimed = 0
 
         // Build priority queue of all entries
-        let auditEntries = try await rocksdbStore.listAuditEntries(before: Date())
-        let d3lEntries = try await rocksdbStore.listD3LEntries(before: Date())
+        let auditEntries = try await dataStore.listAuditEntries(before: Date())
+        let d3lEntries = try await dataStore.listD3LEntries(before: Date())
 
         // Create prioritized entries
         var prioritizedEntries: [PrioritizedEntry] = []
@@ -870,13 +837,13 @@ public actor ErasureCodingDataStore {
                 switch entry.entryType {
                 case .audit:
                     try await filesystemStore.deleteAuditBundle(erasureRoot: entry.erasureRoot)
-                    try await rocksdbStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
-                    try await rocksdbStore.deleteShards(erasureRoot: entry.erasureRoot)
+                    try await dataStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
+                    try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
 
                 case .d3l:
                     try await filesystemStore.deleteD3LShards(erasureRoot: entry.erasureRoot)
-                    try await rocksdbStore.deleteD3LEntry(erasureRoot: entry.erasureRoot)
-                    try await rocksdbStore.deleteShards(erasureRoot: entry.erasureRoot)
+                    try await dataStore.deleteD3LEntry(erasureRoot: entry.erasureRoot)
+                    try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
                 }
 
                 bytesReclaimed += entry.size
@@ -1083,7 +1050,7 @@ public actor ErasureCodingDataStore {
 
         // Store in RocksDB metadata with a special key
         let stateKey = Data("__cleanup_state__".utf8)
-        try await rocksdbStore.setMetadata(key: stateKey, value: data)
+        try await dataStore.setMetadata(key: stateKey, value: data)
 
         logger.trace("Saved cleanup state: auditEpoch=\(cleanupState.auditCleanupEpoch), d3lEpoch=\(cleanupState.d3lCleanupEpoch)")
     }
@@ -1092,7 +1059,7 @@ public actor ErasureCodingDataStore {
     private func loadCleanupState() async throws {
         let stateKey = Data("__cleanup_state__".utf8)
 
-        if let data = try await rocksdbStore.getMetadata(key: stateKey) {
+        if let data = try await dataStore.getMetadata(key: stateKey) {
             let decoder = JSONDecoder()
             cleanupState = try decoder.decode(CleanupState.self, from: data)
 
@@ -1154,7 +1121,7 @@ public actor ErasureCodingDataStore {
     ///   - shardIndex: Index of the shard to check
     /// - Returns: True if the shard exists
     public func hasShard(erasureRoot: Data32, shardIndex: UInt16) async throws -> Bool {
-        let shardData = try await rocksdbStore.getShard(erasureRoot: erasureRoot, shardIndex: shardIndex)
+        let shardData = try await dataStore.getShard(erasureRoot: erasureRoot, shardIndex: shardIndex)
         return shardData != nil
     }
 
@@ -1164,14 +1131,14 @@ public actor ErasureCodingDataStore {
     ///   - shardIndex: Index of the shard to retrieve
     /// - Returns: Shard data or nil if not found
     public func getShard(erasureRoot: Data32, shardIndex: UInt16) async throws -> Data? {
-        try await rocksdbStore.getShard(erasureRoot: erasureRoot, shardIndex: shardIndex)
+        try await dataStore.getShard(erasureRoot: erasureRoot, shardIndex: shardIndex)
     }
 
     /// Get audit entry metadata
     /// - Parameter erasureRoot: Erasure root identifying the data
     /// - Returns: Audit entry or nil if not found
     public func getAuditEntry(erasureRoot: Data32) async throws -> AuditEntry? {
-        try await rocksdbStore.getAuditEntry(erasureRoot: erasureRoot)
+        try await dataStore.getAuditEntry(erasureRoot: erasureRoot)
     }
 
     /// Get D³L entry by segments root
@@ -1179,11 +1146,11 @@ public actor ErasureCodingDataStore {
     /// - Returns: D³L entry or nil if not found
     public func getD3LEntry(segmentsRoot: Data32) async throws -> D3LEntry? {
         // First get the erasure root from segments root
-        guard let erasureRoot = try await rocksdbStore.getErasureRoot(forSegmentRoot: segmentsRoot) else {
+        guard let erasureRoot = try await dataStore.getErasureRoot(forSegmentRoot: segmentsRoot) else {
             return nil
         }
         // Then get the D³L entry
-        return try await rocksdbStore.getD3LEntry(erasureRoot: erasureRoot)
+        return try await dataStore.getD3LEntry(erasureRoot: erasureRoot)
     }
 
     /// Get a single segment by erasure root and index
@@ -1200,14 +1167,14 @@ public actor ErasureCodingDataStore {
     /// - Parameter erasureRoot: Erasure root identifying the data
     /// - Returns: Number of locally available shards
     public func getLocalShardCount(erasureRoot: Data32) async throws -> Int {
-        try await rocksdbStore.getShardCount(erasureRoot: erasureRoot)
+        try await dataStore.getShardCount(erasureRoot: erasureRoot)
     }
 
     /// Get indices of locally available shards
     /// - Parameter erasureRoot: Erasure root identifying the data
     /// - Returns: Array of available shard indices
     public func getLocalShardIndices(erasureRoot: Data32) async throws -> [UInt16] {
-        try await rocksdbStore.getAvailableShardIndices(erasureRoot: erasureRoot)
+        try await dataStore.getAvailableShardIndices(erasureRoot: erasureRoot)
     }
 
     /// Get local shards with caching
@@ -1219,7 +1186,7 @@ public actor ErasureCodingDataStore {
         var shards: [(index: UInt16, data: Data)] = []
 
         for index in indices {
-            if let shardData = try await rocksdbStore.getShard(erasureRoot: erasureRoot, shardIndex: index) {
+            if let shardData = try await dataStore.getShard(erasureRoot: erasureRoot, shardIndex: index) {
                 shards.append((index: index, data: shardData))
             }
         }
@@ -1233,7 +1200,7 @@ public actor ErasureCodingDataStore {
     ///   - indices: Segment indices to retrieve
     /// - Returns: Array of segments
     public func getSegmentsWithCache(erasureRoot: Data32, indices: [Int]) async throws -> [Data4104] {
-        guard let d3lEntry = try await rocksdbStore.getD3LEntry(erasureRoot: erasureRoot) else {
+        guard let d3lEntry = try await dataStore.getD3LEntry(erasureRoot: erasureRoot) else {
             throw DataAvailabilityError.segmentNotFound
         }
 
@@ -1326,7 +1293,7 @@ public actor ErasureCodingDataStore {
 
             // Store fetched shards
             for (shardIndex, shardData) in fetchedShards {
-                try await rocksdbStore.storeShard(
+                try await dataStore.storeShard(
                     shard: shardData,
                     index: shardIndex,
                     erasureRoot: erasureRoot
@@ -1511,7 +1478,7 @@ public actor ErasureCodingDataStore {
 
                     // Store fetched shards locally
                     for (shardIndex, shardData) in fetchedShards {
-                        try await rocksdbStore.storeShard(
+                        try await dataStore.storeShard(
                             shard: shardData,
                             index: shardIndex,
                             erasureRoot: erasureRoot
