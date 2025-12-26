@@ -10,7 +10,7 @@ struct FilesystemDataStoreTests {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("filesystem_test_\(UUID().uuidString)")
 
-        return await FilesystemDataStore(dataPath: tempDir)
+        return try await FilesystemDataStore(dataPath: tempDir)
     }
 
     // MARK: - Audit Bundle Tests
