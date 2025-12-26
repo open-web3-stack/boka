@@ -24,7 +24,7 @@ struct ErasureCodingServiceTests {
         let segment = Data4104(segmentData)!
 
         // Encode
-        let shards = try service.encodeSegments([segment])
+        let shards = try await service.encodeSegments([segment])
 
         // Should produce 1,023 shards
         #expect(shards.count == 1023)
@@ -55,7 +55,7 @@ struct ErasureCodingServiceTests {
         }
 
         // Encode
-        let shards = try service.encodeSegments(segments)
+        let shards = try await service.encodeSegments(segments)
 
         // Should produce 1,023 shards
         #expect(shards.count == 1023)
@@ -73,7 +73,7 @@ struct ErasureCodingServiceTests {
         }
 
         // Encode
-        let shards = try service.encodeBlob(blobData)
+        let shards = try await service.encodeBlob(blobData)
 
         // Should produce 1,023 shards
         #expect(shards.count == 1023)
@@ -84,12 +84,12 @@ struct ErasureCodingServiceTests {
         let service = makeService()
 
         // Try to encode empty array
-        #expect(throws: ErasureCodingError.self) {
-            try service.encodeSegments([])
+        await #expect(throws: ErasureCodingError.self) {
+            try await service.encodeSegments([])
         }
 
-        #expect(throws: ErasureCodingError.self) {
-            try service.encodeBlob(Data())
+        await #expect(throws: ErasureCodingError.self) {
+            try await service.encodeBlob(Data())
         }
     }
 
@@ -100,8 +100,8 @@ struct ErasureCodingServiceTests {
         // Try to encode data that's not a multiple of 684 bytes
         let invalidData = Data(count: 100) // Not divisible by 684
 
-        #expect(throws: ErasureCodingError.self) {
-            try service.encodeBlob(invalidData)
+        await #expect(throws: ErasureCodingError.self) {
+            try await service.encodeBlob(invalidData)
         }
     }
 
@@ -113,14 +113,14 @@ struct ErasureCodingServiceTests {
 
         // Create and encode test data
         let originalData = Data(count: 684 * 10)
-        let shards = try service.encodeBlob(originalData)
+        let shards = try await service.encodeBlob(originalData)
 
         // Reconstruct from all shards
         let shardTuples = shards.enumerated().map { index, data in
             (index: UInt16(index), data: data)
         }
 
-        let reconstructed = try service.reconstruct(
+        let reconstructed = try await service.reconstruct(
             shards: shardTuples,
             originalLength: originalData.count
         )
@@ -135,7 +135,7 @@ struct ErasureCodingServiceTests {
 
         // Create and encode test data
         let originalData = Data(count: 684 * 10)
-        let shards = try service.encodeBlob(originalData)
+        let shards = try await service.encodeBlob(originalData)
 
         // Take only first 342 shards (minimum required)
         let partialShards = Array(shards.prefix(342))
@@ -143,7 +143,7 @@ struct ErasureCodingServiceTests {
             (index: UInt16(index), data: data)
         }
 
-        let reconstructed = try service.reconstruct(
+        let reconstructed = try await service.reconstruct(
             shards: shardTuples,
             originalLength: originalData.count
         )
@@ -158,7 +158,7 @@ struct ErasureCodingServiceTests {
 
         // Create and encode test data
         let originalData = Data(count: 684 * 20)
-        let shards = try service.encodeBlob(originalData)
+        let shards = try await service.encodeBlob(originalData)
 
         // Take 500 random shards
         var randomShards = shards
@@ -168,7 +168,7 @@ struct ErasureCodingServiceTests {
             (index: UInt16(index), data: data)
         }
 
-        let reconstructed = try service.reconstruct(
+        let reconstructed = try await service.reconstruct(
             shards: shardTuples,
             originalLength: originalData.count
         )
@@ -183,7 +183,7 @@ struct ErasureCodingServiceTests {
 
         // Create and encode test data
         let originalData = Data(count: 684 * 10)
-        let shards = try service.encodeBlob(originalData)
+        let shards = try await service.encodeBlob(originalData)
 
         // Take only 300 shards (insufficient)
         let partialShards = Array(shards.prefix(300))
@@ -191,8 +191,8 @@ struct ErasureCodingServiceTests {
             (index: UInt16(index), data: data)
         }
 
-        #expect(throws: ErasureCodingError.self) {
-            try service.reconstruct(
+        await #expect(throws: ErasureCodingError.self) {
+            try await service.reconstruct(
                 shards: shardTuples,
                 originalLength: originalData.count
             )
@@ -214,13 +214,13 @@ struct ErasureCodingServiceTests {
         }
 
         // Encode
-        let shards = try service.encodeSegments(segments)
+        let shards = try await service.encodeSegments(segments)
         let shardTuples = shards.enumerated().map { index, data in
             (index: UInt16(index), data: data)
         }
 
         // Reconstruct
-        let reconstructedSegments = try service.reconstructSegments(
+        let reconstructedSegments = try await service.reconstructSegments(
             shards: shardTuples,
             segmentCount: 3
         )
@@ -240,11 +240,11 @@ struct ErasureCodingServiceTests {
 
         // Create test data
         let originalData = Data(count: 684 * 10)
-        let shards = try service.encodeBlob(originalData)
+        let shards = try await service.encodeBlob(originalData)
         let segmentsRoot = Data32.random()
 
         // Calculate erasure root
-        let erasureRoot = try service.calculateErasureRoot(
+        let erasureRoot = try await service.calculateErasureRoot(
             segmentsRoot: segmentsRoot,
             shards: shards
         )
@@ -253,7 +253,7 @@ struct ErasureCodingServiceTests {
         #expect(erasureRoot.data.count == 32)
 
         // Same input should produce same erasure root
-        let erasureRoot2 = try service.calculateErasureRoot(
+        let erasureRoot2 = try await service.calculateErasureRoot(
             segmentsRoot: segmentsRoot,
             shards: shards
         )
@@ -265,16 +265,16 @@ struct ErasureCodingServiceTests {
         let service = makeService()
 
         let originalData = Data(count: 684 * 10)
-        let shards = try service.encodeBlob(originalData)
+        let shards = try await service.encodeBlob(originalData)
 
         let segmentsRoot1 = Data32.random()
         let segmentsRoot2 = Data32.random()
 
-        let erasureRoot1 = try service.calculateErasureRoot(
+        let erasureRoot1 = try await service.calculateErasureRoot(
             segmentsRoot: segmentsRoot1,
             shards: shards
         )
-        let erasureRoot2 = try service.calculateErasureRoot(
+        let erasureRoot2 = try await service.calculateErasureRoot(
             segmentsRoot: segmentsRoot2,
             shards: shards
         )
@@ -290,8 +290,8 @@ struct ErasureCodingServiceTests {
         let segmentsRoot = Data32.random()
         let invalidShards = Array(repeating: Data(count: 100), count: 100)
 
-        #expect(throws: ErasureCodingError.self) {
-            try service.calculateErasureRoot(
+        await #expect(throws: ErasureCodingError.self) {
+            try await service.calculateErasureRoot(
                 segmentsRoot: segmentsRoot,
                 shards: invalidShards
             )
@@ -306,19 +306,19 @@ struct ErasureCodingServiceTests {
 
         // Create test data
         let originalData = Data(count: 684 * 10)
-        let shards = try service.encodeBlob(originalData)
+        let shards = try await service.encodeBlob(originalData)
 
         // Calculate shard hashes
         let shardHashes: [Data32] = shards.map { $0.blake2b256hash() }
 
         // Generate proof for shard 0
-        let proof = try service.generateMerkleProof(shardIndex: 0, shardHashes: shardHashes)
+        let proof = try await service.generateMerkleProof(shardIndex: 0, shardHashes: shardHashes)
 
         // Proof should not be empty
         #expect(!proof.isEmpty)
 
         // Verify proof
-        let isValid = try service.verifyMerkleProof(
+        let isValid = try await service.verifyMerkleProof(
             shardHash: shardHashes[0],
             shardIndex: 0,
             proof: proof,
@@ -336,20 +336,20 @@ struct ErasureCodingServiceTests {
         let service = makeService()
 
         let originalData = Data(count: 684 * 10)
-        let shards = try service.encodeBlob(originalData)
+        let shards = try await service.encodeBlob(originalData)
         let shardHashes: [Data32] = shards.map { $0.blake2b256hash() }
 
         // Generate proof for middle shard (511)
-        let proof = try service.generateMerkleProof(shardIndex: 511, shardHashes: shardHashes)
+        let proof = try await service.generateMerkleProof(shardIndex: 511, shardHashes: shardHashes)
 
         #expect(!proof.isEmpty)
 
-        let erasureRoot = try service.calculateErasureRoot(
+        let erasureRoot = try await service.calculateErasureRoot(
             segmentsRoot: Data32.random(),
             shards: shards
         )
 
-        let isValid = service.verifyMerkleProof(
+        let isValid = try await service.verifyMerkleProof(
             shardHash: shardHashes[511],
             shardIndex: 511,
             proof: proof,
@@ -364,9 +364,9 @@ struct ErasureCodingServiceTests {
         let service = makeService()
 
         let originalData = Data(count: 684 * 10)
-        let shards = try service.encodeBlob(originalData)
+        let shards = try await service.encodeBlob(originalData)
         let shardHashes: [Data32] = shards.map { $0.blake2b256hash() }
-        let erasureRoot = try service.calculateErasureRoot(
+        let erasureRoot = try await service.calculateErasureRoot(
             segmentsRoot: Data32.random(),
             shards: shards
         )
@@ -374,7 +374,7 @@ struct ErasureCodingServiceTests {
         // Create fake proof
         let fakeProof = Array(repeating: Data32.random(), count: 10)
 
-        let isValid = service.verifyMerkleProof(
+        let isValid = try await service.verifyMerkleProof(
             shardHash: shardHashes[0],
             shardIndex: 0,
             proof: fakeProof,
@@ -389,17 +389,17 @@ struct ErasureCodingServiceTests {
         let service = makeService()
 
         let originalData = Data(count: 684 * 10)
-        let shards = try service.encodeBlob(originalData)
+        let shards = try await service.encodeBlob(originalData)
         let shardHashes: [Data32] = shards.map { $0.blake2b256hash() }
 
-        let proof = try service.generateMerkleProof(shardIndex: 0, shardHashes: shardHashes)
-        let erasureRoot = try service.calculateErasureRoot(
+        let proof = try await service.generateMerkleProof(shardIndex: 0, shardHashes: shardHashes)
+        let erasureRoot = try await service.calculateErasureRoot(
             segmentsRoot: Data32.random(),
             shards: shards
         )
 
         // Try to verify shard 0 proof with shard 1 hash
-        let isValid = service.verifyMerkleProof(
+        let isValid = try await service.verifyMerkleProof(
             shardHash: shardHashes[1],
             shardIndex: 0,
             proof: proof,
@@ -414,12 +414,12 @@ struct ErasureCodingServiceTests {
         let service = makeService()
 
         let originalData = Data(count: 684 * 10)
-        let shards = try service.encodeBlob(originalData)
+        let shards = try await service.encodeBlob(originalData)
         let shardHashes: [Data32] = shards.map { $0.blake2b256hash() }
 
         // Try to generate proof for invalid index
-        #expect(throws: ErasureCodingError.self) {
-            try service.generateMerkleProof(shardIndex: 2000, shardHashes: shardHashes)
+        await #expect(throws: ErasureCodingError.self) {
+            try await service.generateMerkleProof(shardIndex: 2000, shardHashes: shardHashes)
         }
     }
 }

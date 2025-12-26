@@ -6,18 +6,18 @@ import Utils
 @testable import Blockchain
 
 struct FilesystemDataStoreTests {
-    func makeDataStore() throws -> FilesystemDataStore {
+    func makeDataStore() async throws -> FilesystemDataStore {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("filesystem_test_\(UUID().uuidString)")
 
-        return try FilesystemDataStore(dataPath: tempDir)
+        return await FilesystemDataStore(dataPath: tempDir)
     }
 
     // MARK: - Audit Bundle Tests
 
     @Test
     func storeAndGetAuditBundle() async throws {
-        let dataStore = try makeDataStore()
+        let dataStore = try await makeDataStore()
 
         let erasureRoot = Data32.random()
         var bundleData = Data(count: 10000)
@@ -39,7 +39,7 @@ struct FilesystemDataStoreTests {
 
     @Test
     func getNonExistentAuditBundleReturnsNil() async throws {
-        let dataStore = try makeDataStore()
+        let dataStore = try await makeDataStore()
 
         let erasureRoot = Data32.random()
 
@@ -50,7 +50,7 @@ struct FilesystemDataStoreTests {
 
     @Test
     func deleteAuditBundle() async throws {
-        let dataStore = try makeDataStore()
+        let dataStore = try await makeDataStore()
 
         let erasureRoot = Data32.random()
         let bundleData = Data(count: 1000)
@@ -74,7 +74,7 @@ struct FilesystemDataStoreTests {
 
     @Test
     func storeAndGetD3LShard() async throws {
-        let dataStore = try makeDataStore()
+        let dataStore = try await makeDataStore()
 
         let erasureRoot = Data32.random()
         let shardIndex: UInt16 = 500
@@ -104,7 +104,7 @@ struct FilesystemDataStoreTests {
 
     @Test
     func storeMultipleD3LShards() async throws {
-        let dataStore = try makeDataStore()
+        let dataStore = try await makeDataStore()
 
         let erasureRoot = Data32.random()
 
@@ -134,7 +134,7 @@ struct FilesystemDataStoreTests {
 
     @Test
     func getAvailableShardIndices() async throws {
-        let dataStore = try makeDataStore()
+        let dataStore = try await makeDataStore()
 
         let erasureRoot = Data32.random()
 
@@ -158,7 +158,7 @@ struct FilesystemDataStoreTests {
 
     @Test
     func deleteD3LShards() async throws {
-        let dataStore = try makeDataStore()
+        let dataStore = try await makeDataStore()
 
         let erasureRoot = Data32.random()
 
@@ -188,7 +188,7 @@ struct FilesystemDataStoreTests {
 
     @Test
     func listAuditBundles() async throws {
-        let dataStore = try makeDataStore()
+        let dataStore = try await makeDataStore()
 
         let erasureRoots = [
             Data32.random(),
@@ -216,7 +216,7 @@ struct FilesystemDataStoreTests {
 
     @Test
     func listD3LEntries() async throws {
-        let dataStore = try makeDataStore()
+        let dataStore = try await makeDataStore()
 
         let erasureRoots = [
             Data32.random(),
@@ -246,7 +246,7 @@ struct FilesystemDataStoreTests {
 
     @Test
     func getAuditStoreSize() async throws {
-        let dataStore = try makeDataStore()
+        let dataStore = try await makeDataStore()
 
         // Store multiple bundles
         for _ in 0 ..< 5 {
@@ -266,7 +266,7 @@ struct FilesystemDataStoreTests {
 
     @Test
     func getD3LStoreSize() async throws {
-        let dataStore = try makeDataStore()
+        let dataStore = try await makeDataStore()
 
         let erasureRoot = Data32.random()
 
@@ -293,7 +293,7 @@ struct FilesystemDataStoreTests {
 
     @Test
     func atomicWritePreventsCorruption() async throws {
-        let dataStore = try makeDataStore()
+        let dataStore = try await makeDataStore()
 
         let erasureRoot = Data32.random()
         let originalData = Data(count: 1000)
@@ -316,7 +316,7 @@ struct FilesystemDataStoreTests {
 
     @Test
     func directoryStructureUsesPrefix() async throws {
-        let dataStore = try makeDataStore()
+        let dataStore = try await makeDataStore()
 
         let erasureRoot = Data32.random()
         let bundleData = Data(count: 100)
@@ -335,7 +335,7 @@ struct FilesystemDataStoreTests {
 
     @Test
     func getMissingShardReturnsNil() async throws {
-        let dataStore = try makeDataStore()
+        let dataStore = try await makeDataStore()
 
         let erasureRoot = Data32.random()
         let shardIndex: UInt16 = 999
