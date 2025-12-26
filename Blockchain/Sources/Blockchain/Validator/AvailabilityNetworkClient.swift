@@ -420,7 +420,7 @@ public actor AvailabilityNetworkClient {
             addTasksIfNeeded()
 
             // Process results as they complete
-            while await group.next() != nil {
+            while let result = try await group.next() {
                 activeTasks -= 1
                 completedTasks += 1
 
@@ -437,31 +437,29 @@ public actor AvailabilityNetworkClient {
                 }
 
                 // Collect the result
-                if let result = try await group.next() {
-                    collectedShards[result.1] = result.2
+                collectedShards[result.1] = result.2
 
-                    logger.trace(
+                logger.trace(
+                    """
+                    Collected shard \(result.1) from validator \(result.0), \
+                    total: \(collectedShards.count)/\(requiredCount)
+                    """
+                )
+
+                // Check if we have enough shards
+                if collectedShards.count >= requiredCount {
+                    logger.info(
                         """
-                        Collected shard \(result.1) from validator \(result.0), \
-                        total: \(collectedShards.count)/\(requiredCount)
+                        Collected sufficient shards (\(collectedShards.count)/\(requiredCount)), \
+                        cancelling remaining requests
                         """
                     )
-
-                    // Check if we have enough shards
-                    if collectedShards.count >= requiredCount {
-                        logger.info(
-                            """
-                            Collected sufficient shards (\(collectedShards.count)/\(requiredCount)), \
-                            cancelling remaining requests
-                            """
-                        )
-                        group.cancelAll()
-                        break
-                    }
-
-                    // Add more tasks if available
-                    addTasksIfNeeded()
+                    group.cancelAll()
+                    break
                 }
+
+                // Add more tasks if available
+                addTasksIfNeeded()
             }
         }
 
@@ -911,13 +909,4 @@ public struct PeerManager {
     // Placeholder - would contain connection management logic
 }
 
-/// Validator network address
-public struct NetAddr: Sendable, Hashable {
-    public let ip: String
-    public let port: UInt16
-
-    public init(ip: String, port: UInt16) {
-        self.ip = ip
-        self.port = port
-    }
-}
+// Note: NetAddr is imported from Networking module
