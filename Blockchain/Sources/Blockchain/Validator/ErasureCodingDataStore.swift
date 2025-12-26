@@ -82,7 +82,7 @@ public actor ErasureCodingDataStore {
         // Validate bundle size (GP spec: max ~13.6 MB)
         let maxBundleSize = 13_791_360 // From GP spec
         guard bundle.count <= maxBundleSize else {
-            throw DataAvailabilityError.bundleTooLarge(size: bundle.count, maxSize: maxBundleSize)
+            throw ErasureCodingStoreError.bundleTooLarge(size: bundle.count, maxSize: maxBundleSize)
         }
 
         // Erasure-code the bundle
@@ -174,12 +174,12 @@ public actor ErasureCodingDataStore {
         segmentsRoot: Data32
     ) async throws -> Data32 {
         guard !segments.isEmpty else {
-            throw DataAvailabilityError.noSegmentsToStore
+            throw ErasureCodingStoreError.noSegmentsToStore
         }
 
         // Validate segment count (GP spec: max 3,072)
         guard segments.count <= 3072 else {
-            throw DataAvailabilityError.tooManySegments(count: segments.count, max: 3072)
+            throw ErasureCodingStoreError.tooManySegments(count: segments.count, max: 3072)
         }
 
         logger.debug("Storing \(segments.count) exported segments: workPackageHash=\(workPackageHash.toHexString())")
@@ -187,7 +187,7 @@ public actor ErasureCodingDataStore {
         // Calculate segments root Merkle tree
         let calculatedSegmentsRoot = Merklization.binaryMerklize(segments.map(\.data))
         guard calculatedSegmentsRoot == segmentsRoot else {
-            throw DataAvailabilityError.segmentsRootMismatch(
+            throw ErasureCodingStoreError.segmentsRootMismatch(
                 calculated: calculatedSegmentsRoot,
                 expected: segmentsRoot
             )
@@ -249,7 +249,7 @@ public actor ErasureCodingDataStore {
 
         // Check if we can reconstruct
         guard availableShardIndices.count >= 342 else {
-            throw DataAvailabilityError.insufficientShards(
+            throw ErasureCodingStoreError.insufficientShards(
                 available: availableShardIndices.count,
                 required: 342
             )
@@ -263,7 +263,7 @@ public actor ErasureCodingDataStore {
 
         // Get segment count from metadata
         guard let d3lEntry = try await dataStore.getD3LEntry(erasureRoot: erasureRoot) else {
-            throw DataAvailabilityError.metadataNotFound(erasureRoot: erasureRoot)
+            throw ErasureCodingStoreError.metadataNotFound(erasureRoot: erasureRoot)
         }
 
         let segmentCount = Int(d3lEntry.segmentCount)
@@ -321,7 +321,7 @@ public actor ErasureCodingDataStore {
     /// - Returns: Array of segments in the page
     public func getSegmentsByPage(erasureRoot: Data32, pageIndex: Int) async throws -> [Data4104] {
         guard let d3lEntry = try await dataStore.getD3LEntry(erasureRoot: erasureRoot) else {
-            throw DataAvailabilityError.metadataNotFound(erasureRoot: erasureRoot)
+            throw ErasureCodingStoreError.metadataNotFound(erasureRoot: erasureRoot)
         }
 
         let segmentCount = Int(d3lEntry.segmentCount)
@@ -1201,7 +1201,7 @@ public actor ErasureCodingDataStore {
     /// - Returns: Array of segments
     public func getSegmentsWithCache(erasureRoot: Data32, indices: [Int]) async throws -> [Data4104] {
         guard let d3lEntry = try await dataStore.getD3LEntry(erasureRoot: erasureRoot) else {
-            throw DataAvailabilityError.segmentNotFound
+            throw ErasureCodingStoreError.segmentNotFound
         }
 
         let segmentCount = Int(d3lEntry.segmentCount)
@@ -1307,7 +1307,7 @@ public actor ErasureCodingDataStore {
             return segments
         }
 
-        throw DataAvailabilityError.segmentNotFound
+        throw ErasureCodingStoreError.segmentNotFound
     }
 
     /// Clear segment cache for a specific erasure root
@@ -1385,7 +1385,7 @@ public actor ErasureCodingDataStore {
     /// - Returns: Reconstructed data
     public func reconstructFromLocalShards(erasureRoot: Data32, originalLength: Int) async throws -> Data {
         guard try await canReconstructLocally(erasureRoot: erasureRoot) else {
-            throw try await DataAvailabilityError.insufficientShards(
+            throw try await ErasureCodingStoreError.insufficientShards(
                 available: getLocalShardCount(erasureRoot: erasureRoot),
                 required: 342
             )
@@ -1500,7 +1500,7 @@ public actor ErasureCodingDataStore {
             } else {
                 // No network fallback available, throw error
                 let localShardCount = try await getLocalShardCount(erasureRoot: erasureRoot)
-                throw DataAvailabilityError.insufficientShards(available: localShardCount, required: 342)
+                throw ErasureCodingStoreError.insufficientShards(available: localShardCount, required: 342)
             }
         }
 
@@ -1736,7 +1736,7 @@ public struct PrioritizedEntry: Sendable {
 
 // MARK: - Errors
 
-public enum DataAvailabilityError: Error {
+public enum ErasureCodingStoreError: Error {
     case bundleTooLarge(size: Int, maxSize: Int)
     case noSegmentsToStore
     case tooManySegments(count: Int, max: Int)
