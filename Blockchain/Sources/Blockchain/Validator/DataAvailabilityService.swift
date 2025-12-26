@@ -4,6 +4,10 @@ import Synchronization
 import TracingUtils
 import Utils
 
+#if canImport(Database)
+    import Database
+#endif
+
 public enum DataAvailabilityError: Error {
     case storeError
     case retrievalError
@@ -1351,15 +1355,17 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     /// Get data availability statistics
     /// - Returns: Statistics about stored data
     public func getStatistics() async -> (auditStoreCount: Int, importStoreCount: Int, totalSegments: Int) {
-        // Use ErasureCodingDataStore if available
-        if let ecStore = erasureCodingDataStore, let dataStore = dataStore as? RocksDBDataStore {
-            do {
-                let stats = try await dataStore.getStatistics()
-                return (stats.auditCount, stats.d3lCount, stats.totalSegments)
-            } catch {
-                logger.error("Failed to get statistics: \(error)")
+        #if canImport(Database)
+            // Use ErasureCodingDataStore if available
+            if let ecStore = erasureCodingDataStore, let dataStore = ecStore.rocksdbStoreForTesting as? RocksDBDataStore {
+                do {
+                    let stats = try await dataStore.getStatistics()
+                    return (stats.auditCount, stats.d3lCount, stats.totalSegments)
+                } catch {
+                    logger.error("Failed to get statistics: \(error)")
+                }
             }
-        }
+        #endif
 
         // TODO: Implement once DataStore supports statistics
         // For now, return zeros

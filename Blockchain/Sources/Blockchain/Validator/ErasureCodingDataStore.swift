@@ -2,6 +2,10 @@ import Foundation
 import TracingUtils
 import Utils
 
+#if canImport(Database)
+    import Database
+#endif
+
 private let logger = Logger(label: "ErasureCodingDataStore")
 
 /// Enhanced data store that automatically handles erasure coding for availability system
@@ -9,7 +13,12 @@ private let logger = Logger(label: "ErasureCodingDataStore")
 /// This service sits on top of RocksDBDataStore and FilesystemDataStore, providing
 /// automatic erasure coding/decoding for segments and bundles.
 public actor ErasureCodingDataStore {
-    private let rocksdbStore: RocksDBDataStore
+    #if canImport(Database)
+        private let rocksdbStore: RocksDBDataStore
+    #else
+        // Fallback when Database module is not available
+        private let rocksdbStore: InMemoryDataStoreBackend
+    #endif
     private let filesystemStore: FilesystemDataStore
     private let erasureCoding: ErasureCodingService
     private let config: ProtocolConfigRef
@@ -27,25 +36,49 @@ public actor ErasureCodingDataStore {
     /// Cleanup state for persistence and resumption
     private var cleanupState = CleanupState()
 
-    // Expose rocksdbStore for testing purposes
-    public var rocksdbStoreForTesting: RocksDBDataStore {
-        rocksdbStore
-    }
+    #if canImport(Database)
+        // Expose rocksdbStore for testing purposes
+        public var rocksdbStoreForTesting: RocksDBDataStore {
+            rocksdbStore
+        }
+    #else
+        // Expose rocksdbStore for testing purposes
+        public var rocksdbStoreForTesting: InMemoryDataStoreBackend {
+            rocksdbStore
+        }
+    #endif
 
-    public init(
-        rocksdbStore: RocksDBDataStore,
-        filesystemStore: FilesystemDataStore,
-        config: ProtocolConfigRef,
-        networkClient: AvailabilityNetworkClient? = nil
-    ) {
-        self.rocksdbStore = rocksdbStore
-        self.filesystemStore = filesystemStore
-        self.config = config
-        erasureCoding = ErasureCodingService(config: config)
-        // Use default cache size for now - can be made configurable later
-        segmentCache = SegmentCache(maxSize: 1000)
-        self.networkClient = networkClient
-    }
+    #if canImport(Database)
+        public init(
+            rocksdbStore: RocksDBDataStore,
+            filesystemStore: FilesystemDataStore,
+            config: ProtocolConfigRef,
+            networkClient: AvailabilityNetworkClient? = nil
+        ) {
+            self.rocksdbStore = rocksdbStore
+            self.filesystemStore = filesystemStore
+            self.config = config
+            erasureCoding = ErasureCodingService(config: config)
+            // Use default cache size for now - can be made configurable later
+            segmentCache = SegmentCache(maxSize: 1000)
+            self.networkClient = networkClient
+        }
+    #else
+        public init(
+            rocksdbStore: InMemoryDataStoreBackend,
+            filesystemStore: FilesystemDataStore,
+            config: ProtocolConfigRef,
+            networkClient: AvailabilityNetworkClient? = nil
+        ) {
+            self.rocksdbStore = rocksdbStore
+            self.filesystemStore = filesystemStore
+            self.config = config
+            erasureCoding = ErasureCodingService(config: config)
+            // Use default cache size for now - can be made configurable later
+            segmentCache = SegmentCache(maxSize: 1000)
+            self.networkClient = networkClient
+        }
+    #endif
 
     /// Set the network client for fetching missing shards
     public func setNetworkClient(_ client: AvailabilityNetworkClient) {
