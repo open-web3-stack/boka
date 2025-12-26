@@ -104,7 +104,7 @@ extension InMemoryDataStoreBackend: DataStoreProtocol {
     public func cleanupAuditEntriesIteratively(
         before cutoff: Date,
         batchSize: Int,
-        processor: ([AuditEntry]) async throws -> Void
+        processor: @Sendable ([AuditEntry]) async throws -> Void
     ) async throws -> Int {
         let entries = auditEntries.values.filter { $0.timestamp < cutoff }
         var totalProcessed = 0
@@ -143,7 +143,7 @@ extension InMemoryDataStoreBackend: DataStoreProtocol {
     public func cleanupD3LEntriesIteratively(
         before cutoff: Date,
         batchSize: Int,
-        processor: ([D3LEntry]) async throws -> Void
+        processor: @Sendable ([D3LEntry]) async throws -> Void
     ) async throws -> Int {
         let entries = d3lEntries.values.filter { $0.timestamp < cutoff }
         var totalProcessed = 0

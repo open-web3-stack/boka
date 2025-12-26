@@ -191,7 +191,7 @@ extension RocksDBDataStore {
     public func cleanupAuditEntriesIteratively(
         before cutoff: Date,
         batchSize: Int = 100,
-        processor: ([AuditEntry]) async throws -> Void
+        processor: @Sendable ([AuditEntry]) async throws -> Void
     ) async throws -> Int {
         var totalProcessed = 0
         var batch: [AuditEntry] = []
@@ -280,7 +280,7 @@ extension RocksDBDataStore {
     public func cleanupD3LEntriesIteratively(
         before cutoff: Date,
         batchSize: Int = 100,
-        processor: ([D3LEntry]) async throws -> Void
+        processor: @Sendable ([D3LEntry]) async throws -> Void
     ) async throws -> Int {
         var totalProcessed = 0
         var batch: [D3LEntry] = []
