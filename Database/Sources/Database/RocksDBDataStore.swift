@@ -29,26 +29,30 @@ public final actor RocksDBDataStore {
     private let config: ProtocolConfigRef
 
     // Column families
-    private let metadata: Store<StoreId, BinaryCoder<Data32, AvailabilityMetadata>>
-    private let segments: Store<StoreId, BinaryCoder<Data, Data4104>>
-    private let mappings: Store<StoreId, BinaryCoder<Data, Data32>>
-    private let audit: Store<StoreId, BinaryCoder<Data32, AuditEntry>>
-    private let d3l: Store<StoreId, BinaryCoder<Data32, D3LEntry>>
+    private let metadata: Store<StoreId, JamCoder<Data32, AvailabilityMetadata>>
+    private let segments: Store<StoreId, JamCoder<Data, Data4104>>
+    private let mappings: Store<StoreId, JamCoder<Data, Data32>>
+    private let audit: Store<StoreId, JamCoder<Data32, AuditEntry>>
+    private let d3l: Store<StoreId, JamCoder<Data32, D3LEntry>>
 
     // Key prefixes for mappings
     private static let workPackageHashPrefix = Data([0x01])
     private static let segmentsRootPrefix = Data([0x02])
 
-    public init(db: RocksDB<StoreId>, config: ProtocolConfigRef) {
+    init(db: RocksDB<StoreId>, config: ProtocolConfigRef) {
         self.db = db
         self.config = config
 
         // Initialize column family stores
-        metadata = Store(db: db, column: .availabilityMetadata, coder: BinaryCoder(config: config))
-        segments = Store(db: db, column: .availabilitySegments, coder: BinaryCoder(config: config))
-        mappings = Store(db: db, column: .availabilityMappings, coder: BinaryCoder(config: config))
-        audit = Store(db: db, column: .availabilityAudit, coder: BinaryCoder(config: config))
-        d3l = Store(db: db, column: .availabilityD3L, coder: BinaryCoder(config: config))
+        metadata = Store<StoreId, JamCoder<Data32, AvailabilityMetadata>>(
+            db: db,
+            column: .availabilityMetadata,
+            coder: JamCoder(config: config)
+        )
+        segments = Store<StoreId, JamCoder<Data, Data4104>>(db: db, column: .availabilitySegments, coder: JamCoder(config: config))
+        mappings = Store<StoreId, JamCoder<Data, Data32>>(db: db, column: .availabilityMappings, coder: JamCoder(config: config))
+        audit = Store<StoreId, JamCoder<Data32, AuditEntry>>(db: db, column: .availabilityAudit, coder: JamCoder(config: config))
+        d3l = Store<StoreId, JamCoder<Data32, D3LEntry>>(db: db, column: .availabilityD3L, coder: JamCoder(config: config))
     }
 }
 
@@ -106,15 +110,15 @@ extension RocksDBDataStore: DataStoreProtocol {
 
     /// Set timestamp for erasure root
     public func setTimestamp(erasureRoot: Data32, timestamp: Date) async throws {
-        var metadata = try await getOrCreateMetadata(erasureRoot: erasureRoot)
-        metadata.timestamp = timestamp
-        try metadata.put(to: metadata, erasureRoot: erasureRoot)
+        var meta = try await getOrCreateMetadata(erasureRoot: erasureRoot)
+        meta.timestamp = timestamp
+        try metadata.put(key: erasureRoot, value: meta)
     }
 
     /// Get timestamp for erasure root
     public func getTimestamp(erasureRoot: Data32) async throws -> Date? {
-        let metadata = try metadata.get(key: erasureRoot)
-        return metadata?.timestamp
+        let meta = try metadata.get(key: erasureRoot)
+        return meta?.timestamp
     }
 
     /// Set Paged-Proofs metadata
@@ -122,14 +126,14 @@ extension RocksDBDataStore: DataStoreProtocol {
         var meta = try await getOrCreateMetadata(erasureRoot: erasureRoot)
         meta.pagedProofsHash = metadata.blake2b256hash()
         meta.pagedProofsMetadata = metadata
-        try meta.put(to: metadata, erasureRoot: erasureRoot)
+        try self.metadata.put(key: erasureRoot, value: meta)
         logger.trace("Set Paged-Proofs metadata: erasureRoot=\(erasureRoot.toHexString())")
     }
 
     /// Get Paged-Proofs metadata
     public func getPagedProofsMetadata(erasureRoot: Data32) async throws -> Data? {
-        let metadata = try metadata.get(key: erasureRoot)
-        return metadata?.pagedProofsMetadata
+        let meta = try metadata.get(key: erasureRoot)
+        return meta?.pagedProofsMetadata
     }
 }
 
@@ -157,10 +161,9 @@ extension RocksDBDataStore {
     public func listAuditEntries(before cutoff: Date) async throws -> [AuditEntry] {
         var entries: [AuditEntry] = []
 
-        let iterator = db.createIterator(column: .availabilityAudit)
-        defer { iterator.close() }
+        let iterator = db.createIterator(column: .availabilityAudit, readOptions: ReadOptions())
 
-        iterator.seek(toFirst: true)
+        iterator.seek(to: Data())
 
         while let (key, value) = iterator.read(), key.count == 32 {
             let entry = try JamDecoder.decode(AuditEntry.self, from: value)
@@ -197,10 +200,9 @@ extension RocksDBDataStore {
         var batch: [AuditEntry] = []
         batch.reserveCapacity(batchSize)
 
-        let iterator = db.createIterator(column: .availabilityAudit)
-        defer { iterator.close() }
+        let iterator = db.createIterator(column: .availabilityAudit, readOptions: ReadOptions())
 
-        iterator.seek(toFirst: true)
+        iterator.seek(to: Data())
 
         while let (key, value) = iterator.read(), key.count == 32 {
             let entry = try JamDecoder.decode(AuditEntry.self, from: value)
@@ -246,10 +248,9 @@ extension RocksDBDataStore {
     public func listD3LEntries(before cutoff: Date) async throws -> [D3LEntry] {
         var entries: [D3LEntry] = []
 
-        let iterator = db.createIterator(column: .availabilityD3L)
-        defer { iterator.close() }
+        let iterator = db.createIterator(column: .availabilityD3L, readOptions: ReadOptions())
 
-        iterator.seek(toFirst: true)
+        iterator.seek(to: Data())
 
         while let (key, value) = iterator.read(), key.count == 32 {
             let entry = try JamDecoder.decode(D3LEntry.self, from: value)
@@ -286,10 +287,9 @@ extension RocksDBDataStore {
         var batch: [D3LEntry] = []
         batch.reserveCapacity(batchSize)
 
-        let iterator = db.createIterator(column: .availabilityD3L)
-        defer { iterator.close() }
+        let iterator = db.createIterator(column: .availabilityD3L, readOptions: ReadOptions())
 
-        iterator.seek(toFirst: true)
+        iterator.seek(to: Data())
 
         while let (key, value) = iterator.read(), key.count == 32 {
             let entry = try JamDecoder.decode(D3LEntry.self, from: value)
@@ -321,18 +321,16 @@ extension RocksDBDataStore {
         var totalSegments = 0
 
         // Count audit entries
-        let auditIterator = db.createIterator(column: .availabilityAudit)
-        defer { auditIterator.close() }
-        auditIterator.seek(toFirst: true)
+        let auditIterator = db.createIterator(column: .availabilityAudit, readOptions: ReadOptions())
+        auditIterator.seek(to: Data())
         while auditIterator.read() != nil {
             auditCount += 1
             auditIterator.next()
         }
 
         // Count D³L entries and segments
-        let d3lIterator = db.createIterator(column: .availabilityD3L)
-        defer { d3lIterator.close() }
-        d3lIterator.seek(toFirst: true)
+        let d3lIterator = db.createIterator(column: .availabilityD3L, readOptions: ReadOptions())
+        d3lIterator.seek(to: Data())
         while let (_, value) = d3lIterator.read() {
             d3lCount += 1
             let entry = try JamDecoder.decode(D3LEntry.self, from: value)
@@ -411,8 +409,7 @@ extension RocksDBDataStore {
     public func getAvailableShardIndices(erasureRoot: Data32) async throws -> [UInt16] {
         var indices: [UInt16] = []
 
-        let iterator = db.createIterator(column: .availabilitySegments)
-        defer { iterator.close() }
+        let iterator = db.createIterator(column: .availabilitySegments, readOptions: ReadOptions())
 
         // Seek to first key with this erasure root prefix
         let prefix = erasureRoot.data
@@ -442,13 +439,12 @@ extension RocksDBDataStore {
         return indices.sorted()
     }
 
-    /// Batch store multiple shards atomically using WriteBatch
+    /// Batch store multiple shards atomically using batch operations
     /// - Parameters:
     ///   - shards: Array of (index, data) tuples
     ///   - erasureRoot: Erasure root identifying the data
     public func storeShards(shards: [(index: UInt16, data: Data)], erasureRoot: Data32) async throws {
-        // Create a write batch for atomic insertion
-        let batch = WriteBatch()
+        var operations: [BatchOperation] = []
 
         // Add all shard writes to the batch
         for shard in shards {
@@ -462,16 +458,16 @@ extension RocksDBDataStore {
                 )
             }
 
-            batch.put(key: key, value: segment, in: segments)
+            try operations.append(segments.putOperation(key: key, value: segment))
         }
 
         // Update metadata
         var meta = try await getOrCreateMetadata(erasureRoot: erasureRoot)
         meta.shardCount = UInt32(shards.count)
-        batch.put(key: erasureRoot, value: meta, in: metadata)
+        try operations.append(metadata.putOperation(key: erasureRoot, value: meta))
 
         // Write everything atomically
-        try db.write(batch)
+        try db.batch(operations: operations)
 
         logger.debug("Stored \(shards.count) shards atomically for erasureRoot=\(erasureRoot.toHexString())")
     }
@@ -549,7 +545,16 @@ extension RocksDBDataStore {
     public func setMetadata(key: Data, value: Data) async throws {
         // Store in metadata column family with a special prefix
         // We encode the key as a Data32 by padding or truncating
-        let keyData32 = Data32(key.subdata(in: 0 ..< min(32, key.count)))
+        let keyData = key.subdata(in: 0 ..< min(32, key.count))
+        let keyData32: Data32
+        if keyData.count == 32 {
+            keyData32 = Data32(keyData)!
+        } else {
+            // Pad with zeros if less than 32 bytes
+            var padded = keyData
+            padded.count = 32
+            keyData32 = Data32(padded)!
+        }
         let metadataValue = AvailabilityMetadata(
             timestamp: Date(),
             pagedProofsHash: keyData32,
@@ -564,7 +569,21 @@ extension RocksDBDataStore {
     /// - Parameter key: Custom key for the metadata
     /// - Returns: Metadata value if found, nil otherwise
     public func getMetadata(key: Data) async throws -> Data? {
-        let keyData32 = Data32(key.subdata(in: 0 ..< min(32, key.count)))
+        let keyData = key.subdata(in: 0 ..< min(32, key.count))
+        let keyData32: Data32
+        if keyData.count == 32 {
+            guard let kd = Data32(keyData) else {
+                return nil
+            }
+            keyData32 = kd
+        } else {
+            var padded = keyData
+            padded.count = 32
+            guard let kd = Data32(padded) else {
+                return nil
+            }
+            keyData32 = kd
+        }
         if let metadataValue = try metadata.get(key: keyData32) {
             // Verify this is actually custom metadata by checking if timestamp matches
             // and if the pagedProofsHash matches our key
@@ -578,7 +597,21 @@ extension RocksDBDataStore {
     /// Delete metadata by custom key
     /// - Parameter key: Custom key for the metadata to delete
     public func deleteMetadata(key: Data) async throws {
-        let keyData32 = Data32(key.subdata(in: 0 ..< min(32, key.count)))
+        let keyData = key.subdata(in: 0 ..< min(32, key.count))
+        let keyData32: Data32
+        if keyData.count == 32 {
+            guard let kd = Data32(keyData) else {
+                return
+            }
+            keyData32 = kd
+        } else {
+            var padded = keyData
+            padded.count = 32
+            guard let kd = Data32(padded) else {
+                return
+            }
+            keyData32 = kd
+        }
         try metadata.delete(key: keyData32)
         logger.trace("Deleted metadata: key=\(key.base64EncodedString())")
     }
@@ -597,7 +630,7 @@ private struct AvailabilityMetadata: Codable {
 // MARK: - Put Helper
 
 extension AvailabilityMetadata {
-    fileprivate func put(to store: Store<StoreId, BinaryCoder<Data32, AvailabilityMetadata>>, erasureRoot: Data32) throws {
+    fileprivate func put(to store: Store<StoreId, JamCoder<Data32, AvailabilityMetadata>>, erasureRoot: Data32) throws {
         try store.put(key: erasureRoot, value: self)
     }
 }
