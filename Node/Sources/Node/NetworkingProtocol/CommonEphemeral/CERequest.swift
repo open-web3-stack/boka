@@ -8,8 +8,9 @@ protocol CEMessage {
     static func decode(data: [Data], config: ProtocolConfigRef) throws -> Self
 }
 
-public enum CERequest: Sendable, Equatable, Hashable {
+public enum CERequest: Sendable {
     case blockRequest(BlockRequest)
+    case bundleRequest(BundleRequestMessage)
     case stateRequest(StateRequest)
     case safroleTicket1(SafroleTicketMessage)
     case safroleTicket2(SafroleTicketMessage)
@@ -36,6 +37,8 @@ extension CERequest: RequestProtocol {
     public func encode() throws -> [Data] {
         switch self {
         case let .blockRequest(message):
+            try message.encode()
+        case let .bundleRequest(message):
             try message.encode()
         case let .stateRequest(message):
             try message.encode()
@@ -94,6 +97,8 @@ extension CERequest: RequestProtocol {
             .workReportDistribution
         case .workReportRequest:
             .workReportRequest
+        case .bundleRequest:
+            .bundleRequest
         case .shardDistribution:
             .shardDistribution
         case .auditShardRequest:
@@ -137,6 +142,8 @@ extension CERequest: RequestProtocol {
             WorkReportDistributionMessage.self
         case .workReportRequest:
             WorkReportRequestMessage.self
+        case .bundleRequest:
+            BundleRequestMessage.self
         case .shardDistribution:
             ShardDistributionMessage.self
         case .auditShardRequest:
@@ -188,6 +195,9 @@ extension CERequest: RequestProtocol {
         case .workReportRequest:
             guard let message = data as? WorkReportRequestMessage else { return nil }
             return .workReportRequest(message)
+        case .bundleRequest:
+            guard let message = data as? BundleRequestMessage else { return nil }
+            return .bundleRequest(message)
         case .shardDistribution:
             guard let message = data as? ShardDistributionMessage else { return nil }
             return .shardDistribution(message)

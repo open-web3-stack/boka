@@ -16,6 +16,7 @@ enum BroadcastTarget {
 
 enum NetworkManagerError: Error {
     case peerNotFound
+    case unimplemented(String)
 }
 
 private actor NetworkManagerStorage {
@@ -333,6 +334,9 @@ struct HandlerImpl: NetworkProtocolHandler {
                 }
             }
             return [encoder.data]
+        case let .bundleRequest(message):
+            // TODO: Implement CE 147 bundle request
+            throw NetworkManagerError.unimplemented("bundleRequest not yet implemented")
         case let .stateRequest(message):
             blockchain
                 .publish(
@@ -516,6 +520,12 @@ struct HandlerImpl: NetworkProtocolHandler {
                             evidence: message.evidence
                         )
                 )
+            return []
+        case let .segmentRequest(message):
+            // TODO: Implement CE 148 segment request
+            throw NetworkManagerError.unimplemented("segmentRequest not yet implemented")
+        case let .workPackageBundleSubmission(message):
+            // TODO: Implement CE work package bundle submission handling
             return []
         }
     }

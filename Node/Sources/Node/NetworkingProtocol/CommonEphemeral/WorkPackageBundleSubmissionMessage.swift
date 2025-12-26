@@ -2,6 +2,7 @@ import Blockchain
 import Codec
 import Foundation
 import Networking
+import Utils
 
 /// CE 146: Work-package bundle submission
 ///
