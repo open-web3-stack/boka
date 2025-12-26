@@ -799,89 +799,108 @@ public actor ErasureCodingDataStore {
     /// - Parameter targetBytes: Target bytes to free (will attempt to free at least this much)
     /// - Returns: Number of bytes actually reclaimed
     public func aggressiveCleanup(targetBytes: Int) async throws -> Int {
-        var bytesReclaimed = 0
+        // Use a local actor to protect the shared counter
+        actor Counter {
+            private var value: Int = 0
 
-        // Build priority queue of all entries
-        let auditEntries = try await dataStore.listAuditEntries(before: Date())
-        let d3lEntries = try await dataStore.listD3LEntries(before: Date())
-
-        // Create prioritized entries
-        var prioritizedEntries: [PrioritizedEntry] = []
-
-        // Add audit entries
-        for entry in auditEntries {
-            let size = entry.bundleSize + 1023 * 684 // 1023 shards per entry
-            let priority = CleanupPriority(
-                timestamp: entry.timestamp,
-                size: size,
-                entryType: .audit
-            )
-            prioritizedEntries.append(
-                PrioritizedEntry(
-                    erasureRoot: entry.erasureRoot,
-                    priority: priority,
-                    size: size,
-                    entryType: .audit
-                )
-            )
-        }
-
-        // Add D³L entries
-        for entry in d3lEntries {
-            let size = Int(entry.segmentCount) * 4104
-            let priority = CleanupPriority(
-                timestamp: entry.timestamp,
-                size: size,
-                entryType: .d3l
-            )
-            prioritizedEntries.append(
-                PrioritizedEntry(
-                    erasureRoot: entry.erasureRoot,
-                    priority: priority,
-                    size: size,
-                    entryType: .d3l
-                )
-            )
-        }
-
-        // Sort by priority (oldest first, largest first within same age)
-        prioritizedEntries.sort { $0.priority < $1.priority }
-
-        // Delete entries until target is met
-        for entry in prioritizedEntries {
-            guard bytesReclaimed < targetBytes else {
-                break
+            func add(_ amount: Int) {
+                value += amount
             }
 
-            do {
-                switch entry.entryType {
-                case .audit:
+            func get() -> Int {
+                value
+            }
+        }
+
+        let counter = Counter()
+
+        // Use iterative cleanup to avoid loading all entries into memory at once
+        // Process audit entries first (they're older and smaller)
+        _ = try await dataStore.cleanupAuditEntriesIteratively(
+            before: Date(),
+            batchSize: 50 // Smaller batch size to limit memory usage
+        ) { batch in
+            // Sort batch by timestamp (oldest first) within this batch only
+            let sortedBatch = batch.sorted { $0.timestamp < $1.timestamp }
+
+            for entry in sortedBatch {
+                // Check if we've met the target
+                let current = await counter.get()
+                guard current < targetBytes else {
+                    return
+                }
+
+                do {
+                    let size = entry.bundleSize + 1023 * 684 // 1023 shards per entry
+
                     try await filesystemStore.deleteAuditBundle(erasureRoot: entry.erasureRoot)
                     try await dataStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
                     try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
 
-                case .d3l:
-                    try await filesystemStore.deleteD3LShards(erasureRoot: entry.erasureRoot)
-                    try await dataStore.deleteD3LEntry(erasureRoot: entry.erasureRoot)
-                    try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
+                    // Update counter
+                    await counter.add(size)
+
+                    let updated = await counter.get()
+                    logger.trace(
+                        """
+                        Aggressive cleanup: deleted audit entry \(entry.erasureRoot), \
+                        freed \(size) bytes (total: \(updated)/\(targetBytes))
+                        """
+                    )
+                } catch {
+                    logger.warning("Failed to delete audit entry \(entry.erasureRoot): \(error)")
                 }
-
-                bytesReclaimed += entry.size
-
-                logger.trace(
-                    """
-                    Aggressive cleanup: deleted \(entry.entryType) entry \(entry.erasureRoot), \
-                    freed \(entry.size) bytes (total: \(bytesReclaimed)/\(targetBytes))
-                    """
-                )
-            } catch {
-                logger.warning("Failed to delete entry \(entry.erasureRoot): \(error)")
             }
         }
 
-        logger.warning("Aggressive cleanup: reclaimed \(bytesReclaimed) bytes (target: \(targetBytes))")
+        // If we haven't met the target yet, process D³L entries
+        let currentTotal = await counter.get()
+        guard currentTotal < targetBytes else {
+            logger.warning("Aggressive cleanup: reclaimed \(currentTotal) bytes (target: \(targetBytes))")
+            return currentTotal
+        }
 
-        return bytesReclaimed
+        _ = try await dataStore.cleanupD3LEntriesIteratively(
+            before: Date(),
+            batchSize: 50 // Smaller batch size to limit memory usage
+        ) { batch in
+            // Sort batch by timestamp (oldest first) within this batch only
+            let sortedBatch = batch.sorted { $0.timestamp < $1.timestamp }
+
+            for entry in sortedBatch {
+                // Check if we've met the target
+                let current = await counter.get()
+                guard current < targetBytes else {
+                    return
+                }
+
+                do {
+                    let size = Int(entry.segmentCount) * 4104
+
+                    try await filesystemStore.deleteD3LShards(erasureRoot: entry.erasureRoot)
+                    try await dataStore.deleteD3LEntry(erasureRoot: entry.erasureRoot)
+                    try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
+
+                    // Update counter
+                    await counter.add(size)
+
+                    let updated = await counter.get()
+                    logger.trace(
+                        """
+                        Aggressive cleanup: deleted D³L entry \(entry.erasureRoot), \
+                        freed \(size) bytes (total: \(updated)/\(targetBytes))
+                        """
+                    )
+                } catch {
+                    logger.warning("Failed to delete D³L entry \(entry.erasureRoot): \(error)")
+                }
+            }
+        }
+
+        let finalTotal = await counter.get()
+        logger.warning("Aggressive cleanup: reclaimed \(finalTotal) bytes (target: \(targetBytes))")
+
+        return finalTotal
     }
 
     /// Get cleanup metrics
@@ -1154,6 +1173,15 @@ public actor ErasureCodingDataStore {
     /// - Returns: Shard data or nil if not found
     public func getShard(erasureRoot: Data32, shardIndex: UInt16) async throws -> Data? {
         try await dataStore.getShard(erasureRoot: erasureRoot, shardIndex: shardIndex)
+    }
+
+    /// Get multiple shards in a single batch operation
+    /// - Parameters:
+    ///   - erasureRoot: Erasure root identifying the data
+    ///   - shardIndices: Indices of shards to retrieve
+    /// - Returns: Array of tuples containing shard index and data
+    public func getShards(erasureRoot: Data32, shardIndices: [UInt16]) async throws -> [(index: UInt16, data: Data)] {
+        try await dataStore.getShards(erasureRoot: erasureRoot, shardIndices: shardIndices)
     }
 
     /// Get audit entry metadata

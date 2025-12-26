@@ -200,7 +200,13 @@ public final class SegmentCache: @unchecked Sendable {
 
         // Update previous entry's next pointer
         if let prevKey = entry.previousKey {
-            var prevEntry = storage[prevKey]!
+            // Safe unwrapping with fallback for corrupted linked list
+            guard var prevEntry = storage[prevKey] else {
+                logger.error("Cache corruption: previous key \(prevKey.erasureRoot.toHexString()):\(prevKey.index) not found in storage")
+                // Attempt to recover by removing the orphaned entry
+                storage.removeValue(forKey: key)
+                return
+            }
             prevEntry.nextKey = entry.nextKey
             storage[prevKey] = prevEntry
         } else if head == key {
@@ -210,7 +216,13 @@ public final class SegmentCache: @unchecked Sendable {
 
         // Update next entry's previous pointer
         if let nextKey = entry.nextKey {
-            var nextEntry = storage[nextKey]!
+            // Safe unwrapping with fallback for corrupted linked list
+            guard var nextEntry = storage[nextKey] else {
+                logger.error("Cache corruption: next key \(nextKey.erasureRoot.toHexString()):\(nextKey.index) not found in storage")
+                // Attempt to recover by removing the orphaned entry
+                storage.removeValue(forKey: key)
+                return
+            }
             nextEntry.previousKey = entry.previousKey
             storage[nextKey] = nextEntry
         } else if tail == key {

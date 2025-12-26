@@ -730,16 +730,13 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
                 }
 
                 // Generate justification T(s, i, H) using ErasureCodingService
-                // Get all shard hashes for justification generation
-                var allShardHashes: [Data] = []
-                for i in 0 ..< 1023 {
-                    if let shard = try await ecStore.getShard(
-                        erasureRoot: erasureRoot,
-                        shardIndex: UInt16(i)
-                    ) {
-                        allShardHashes.append(shard)
-                    }
-                }
+                // Get all shard hashes for justification generation using batch operation
+                let allShardIndices = Array(0 ..< 1023).map { UInt16($0) }
+                let allShards = try await ecStore.getShards(
+                    erasureRoot: erasureRoot,
+                    shardIndices: allShardIndices
+                )
+                let allShardHashes = allShards.map(\.data)
 
                 // Generate co-path justification
                 let justificationSteps = try await erasureCodingService.generateJustification(

@@ -133,7 +133,7 @@ public actor FilesystemDataStore {
         let prefixDirs = try fileManager.contentsOfDirectory(at: auditPath, includingPropertiesForKeys: nil)
 
         for prefixDir in prefixDirs {
-            guard prefixDir.hasDirectoryPath else { continue }
+            guard prefixDir.isDirectoryExists else { continue }
 
             let files = try fileManager.contentsOfDirectory(at: prefixDir, includingPropertiesForKeys: nil)
 
@@ -160,12 +160,12 @@ public actor FilesystemDataStore {
         let prefixDirs = try fileManager.contentsOfDirectory(at: d3lPath, includingPropertiesForKeys: nil)
 
         for prefixDir in prefixDirs {
-            guard prefixDir.hasDirectoryPath else { continue }
+            guard prefixDir.isDirectoryExists else { continue }
 
             let erasureRootDirs = try fileManager.contentsOfDirectory(at: prefixDir, includingPropertiesForKeys: nil)
 
             for erasureRootDir in erasureRootDirs {
-                guard erasureRootDir.hasDirectoryPath else { continue }
+                guard erasureRootDir.isDirectoryExists else { continue }
                 if let erasureRoot = Data32(fromHexString: erasureRootDir.lastPathComponent) {
                     erasureRoots.append(erasureRoot)
                 }
@@ -201,11 +201,8 @@ extension FilesystemDataStore {
         // Write to temporary file
         let tempUrl = url.deletingLastPathComponent().appendingPathComponent("\(UUID().uuidString).tmp")
 
-        // Use FileHandle for writing to ensure proper sync
-        let handle = try FileHandle(forWritingTo: tempUrl)
-        try handle.write(contentsOf: data)
-        handle.synchronizeFile() // Sync before closing to ensure durability
-        handle.closeFile()
+        // Create file and write data atomically
+        try data.write(to: tempUrl)
 
         // Atomic rename
         try fileManager.moveItem(at: tempUrl, to: url)
@@ -213,17 +210,11 @@ extension FilesystemDataStore {
 
     /// Read data from file asynchronously (non-blocking)
     ///
-    /// Uses withCheckedThrowingContinuation to bridge synchronous File I/O
-    /// to async/await, preventing the actor thread from blocking.
+    /// Uses Task.detached to run file I/O off the actor executor
     private func readData(from url: URL) async throws -> Data {
-        try await withCheckedThrowingContinuation { continuation in
-            do {
-                let data = try Data(contentsOf: url)
-                continuation.resume(returning: data)
-            } catch {
-                continuation.resume(throwing: error)
-            }
-        }
+        try await Task.detached {
+            try Data(contentsOf: url)
+        }.value
     }
 
     /// Remove file
@@ -298,7 +289,7 @@ public enum FilesystemDataStoreError: Error {
 // MARK: - URL Extension
 
 extension URL {
-    fileprivate var hasDirectoryPath: Bool {
+    fileprivate var isDirectoryExists: Bool {
         var isDirectory: ObjCBool = false
         return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
     }
