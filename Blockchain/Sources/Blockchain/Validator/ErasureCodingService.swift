@@ -1,3 +1,4 @@
+import Codec
 import Foundation
 import TracingUtils
 import Utils
@@ -227,7 +228,7 @@ public actor ErasureCodingService {
 
         for shard in shards {
             let shardHash = shard.blake2b256hash()
-            let node = JamEncoder.encode(shardHash) + JamEncoder.encode(segmentsRoot)
+            let node = try JamEncoder.encode(shardHash) + try JamEncoder.encode(segmentsRoot)
             nodes.append(node)
         }
 
@@ -281,16 +282,16 @@ extension ErasureCodingService {
 
         for step in proof {
             switch step {
-            case let .left(hash):
-                guard let data32 = Data32(hash) else {
+            case let .left(data):
+                guard data.count == 32, let hash = Data32(data) else {
                     throw ErasureCodingError.merkleProofGenerationFailed
                 }
-                hashes.append(data32)
-            case let .right(hash):
-                guard let data32 = Data32(hash) else {
+                hashes.append(hash)
+            case let .right(data):
+                guard data.count == 32, let hash = Data32(data) else {
                     throw ErasureCodingError.merkleProofGenerationFailed
                 }
-                hashes.append(data32)
+                hashes.append(hash)
             }
         }
 
@@ -362,7 +363,7 @@ extension ErasureCodingService {
         shardIndex: UInt16,
         segmentsRoot: Data32,
         shards: [Data]
-    ) throws -> [Justification.JustificationStep] {
+    ) throws -> [AvailabilityJustification.AvailabilityJustificationStep] {
         guard shardIndex < UInt16(shards.count) else {
             throw ErasureCodingError.invalidShardIndex
         }
@@ -379,7 +380,7 @@ extension ErasureCodingService {
 
         for shard in shards {
             let shardHash = shard.blake2b256hash()
-            let node = JamEncoder.encode(shardHash) + JamEncoder.encode(segmentsRoot)
+            let node = try JamEncoder.encode(shardHash) + try JamEncoder.encode(segmentsRoot)
             nodes.append(node)
         }
 
@@ -391,22 +392,20 @@ extension ErasureCodingService {
         )
 
         // Convert to JustificationSteps
-        var steps: [Justification.JustificationStep] = []
+        var steps: [AvailabilityJustification.AvailabilityJustificationStep] = []
 
         for step in copath {
             switch step {
             case let .left(data):
-                if let hash = Data32(data) {
-                    steps.append(.left(hash))
-                } else {
+                guard data.count == 32, let hash = Data32(data) else {
                     throw ErasureCodingError.merkleProofGenerationFailed
                 }
+                steps.append(.left(hash))
             case let .right(data):
-                if let hash = Data32(data) {
-                    steps.append(.right(hash))
-                } else {
+                guard data.count == 32, let hash = Data32(data) else {
                     throw ErasureCodingError.merkleProofGenerationFailed
                 }
+                steps.append(.right(hash))
             }
         }
 
@@ -438,8 +437,8 @@ extension ErasureCodingService {
         shardIndex: UInt16,
         segmentsRoot _: Data32,
         shards: [Data],
-        baseJustification: [Justification.JustificationStep]
-    ) throws -> [Justification.JustificationStep] {
+        baseJustification: [AvailabilityJustification.AvailabilityJustificationStep]
+    ) throws -> [AvailabilityJustification.AvailabilityJustificationStep] {
         // Generate the segment co-path T(s, i, H) for the segment shards
         // The segment shards form a sequence at the same shard index across all segments
 
@@ -478,17 +477,15 @@ extension ErasureCodingService {
         for step in segmentCopath {
             switch step {
             case let .left(data):
-                if let hash = Data32(data) {
-                    fullJustification.append(.left(hash))
-                } else {
+                guard data.count == 32, let hash = Data32(data) else {
                     throw ErasureCodingError.merkleProofGenerationFailed
                 }
+                fullJustification.append(.left(hash))
             case let .right(data):
-                if let hash = Data32(data) {
-                    fullJustification.append(.right(hash))
-                } else {
+                guard data.count == 32, let hash = Data32(data) else {
                     throw ErasureCodingError.merkleProofGenerationFailed
                 }
+                fullJustification.append(.right(hash))
             }
         }
 
