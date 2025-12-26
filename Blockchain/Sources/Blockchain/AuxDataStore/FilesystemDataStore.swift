@@ -180,16 +180,19 @@ public actor FilesystemDataStore {
 
 extension FilesystemDataStore {
     /// Create directory if it doesn't exist
+    /// Uses Task.detached to avoid blocking the actor executor
     private func createDirectoryIfNeeded(_ url: URL) async {
-        var isDirectory: ObjCBool = false
-        if fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) {
-            guard isDirectory.boolValue else {
-                logger.error("Path exists but is not a directory: \(url.path)")
-                return
+        await Task.detached {
+            var isDirectory: ObjCBool = false
+            if self.fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) {
+                guard isDirectory.boolValue else {
+                    self.logger.error("Path exists but is not a directory: \(url.path)")
+                    return
+                }
+            } else {
+                try? self.fileManager.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
             }
-        } else {
-            try? fileManager.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
-        }
+        }.value
     }
 
     /// Write data atomically (write to temp file, then rename)
@@ -198,14 +201,16 @@ extension FilesystemDataStore {
         let parentDir = url.deletingLastPathComponent()
         await createDirectoryIfNeeded(parentDir)
 
-        // Write to temporary file
-        let tempUrl = url.deletingLastPathComponent().appendingPathComponent("\(UUID().uuidString).tmp")
+        // Perform blocking file I/O off the actor executor
+        try await Task.detached {
+            let tempUrl = url.deletingLastPathComponent().appendingPathComponent("\(UUID().uuidString).tmp")
 
-        // Create file and write data atomically
-        try data.write(to: tempUrl)
+            // Create file and write data atomically
+            try data.write(to: tempUrl)
 
-        // Atomic rename
-        try fileManager.moveItem(at: tempUrl, to: url)
+            // Atomic rename
+            try self.fileManager.moveItem(at: tempUrl, to: url)
+        }.value
     }
 
     /// Read data from file asynchronously (non-blocking)
@@ -219,16 +224,20 @@ extension FilesystemDataStore {
 
     /// Remove file
     private func removeFile(at url: URL) async throws {
-        if fileManager.fileExists(atPath: url.path) {
-            try fileManager.removeItem(at: url)
-        }
+        try await Task.detached {
+            if self.fileManager.fileExists(atPath: url.path) {
+                try self.fileManager.removeItem(at: url)
+            }
+        }.value
     }
 
     /// Remove directory
     private func removeDirectory(at url: URL) async throws {
-        if fileManager.fileExists(atPath: url.path) {
-            try fileManager.removeItem(at: url)
-        }
+        try await Task.detached {
+            if self.fileManager.fileExists(atPath: url.path) {
+                try self.fileManager.removeItem(at: url)
+            }
+        }.value
     }
 
     /// Calculate total size of directory
