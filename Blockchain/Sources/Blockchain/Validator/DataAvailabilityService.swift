@@ -22,6 +22,7 @@ public enum DataAvailabilityError: Error {
     case invalidMerklePath
     case emptySegmentShards
     case invalidJustificationFormat
+    case segmentsRootMismatch(calculated: Data32, expected: Data32)
 }
 
 public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, OnSyncCompleted {

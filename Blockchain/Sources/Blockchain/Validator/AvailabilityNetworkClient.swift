@@ -512,16 +512,6 @@ public actor AvailabilityNetworkClient {
             // Determine the CERequest type based on requestType
             let ceRequest: CERequest
             switch requestType {
-            case .shardDistribution:
-                // Decode ShardDistribution from data
-                let decoder = JamDecoder(data: data, config: config)
-                let erasureRoot = try decoder.decode(Data32.self)
-                let shardIndex = try decoder.decode(UInt16.self)
-                ceRequest = .shardDistribution(ShardDistributionMessage(
-                    erasureRoot: erasureRoot,
-                    shardIndex: shardIndex
-                ))
-
             case .auditShard:
                 // Decode AuditShardRequest from data
                 let decoder = JamDecoder(data: data, config: config)
@@ -556,7 +546,7 @@ public actor AvailabilityNetworkClient {
                     ceRequest = .segmentShardRequest2(message)
                 }
 
-            case .bundle:
+            case .fullBundle:
                 // Decode bundle request from data
                 let decoder = JamDecoder(data: data, config: config)
                 let erasureRoot = try decoder.decode(Data32.self)
@@ -566,7 +556,7 @@ public actor AvailabilityNetworkClient {
                     maxBlocks: 1
                 ))
 
-            case .segment:
+            case .reconstructedSegments:
                 // Decode segment request from data
                 let decoder = JamDecoder(data: data, config: config)
                 let segmentsRoot = try decoder.decode(Data32.self)

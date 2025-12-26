@@ -186,10 +186,12 @@ public actor ErasureCodingDataStore {
 
         // Calculate segments root Merkle tree
         let calculatedSegmentsRoot = Merklization.binaryMerklize(segments.map(\.data))
-        precondition(
-            calculatedSegmentsRoot == segmentsRoot,
-            "Segments root mismatch: calculated \(calculatedSegmentsRoot.toHexString()) != expected \(segmentsRoot.toHexString())"
-        )
+        guard calculatedSegmentsRoot == segmentsRoot else {
+            throw DataAvailabilityError.segmentsRootMismatch(
+                calculated: calculatedSegmentsRoot,
+                expected: segmentsRoot
+            )
+        }
 
         // Generate Paged-Proofs metadata
         let pagedProofsMetadata = try generatePagedProofsMetadata(segments: segments)

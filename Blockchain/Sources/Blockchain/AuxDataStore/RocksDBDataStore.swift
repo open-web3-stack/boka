@@ -5,6 +5,13 @@ import Utils
 
 private let logger = Logger(label: "RocksDBDataStore")
 
+/// Errors that can occur in RocksDB operations
+public enum RocksDBError: Error {
+    case invalidShardDataSize(actual: Int, expected: Int)
+    case writeFailed(underlying: Error)
+    case readFailed(underlying: Error)
+}
+
 /// RocksDB-backed implementation of DataStoreProtocol for availability system
 ///
 /// Storage Layout:
@@ -254,8 +261,16 @@ extension RocksDBDataStore {
     public func storeShard(shardData: Data, erasureRoot: Data32, shardIndex: UInt16) async throws {
         let key = makeShardKey(erasureRoot: erasureRoot, shardIndex: shardIndex)
 
+        // Validate shard data size and convert to Data4104
+        guard let segment = Data4104(shardData) else {
+            throw RocksDBError.invalidShardDataSize(
+                actual: shardData.count,
+                expected: 4104
+            )
+        }
+
         // Store in availabilitySegments column family
-        try segments.put(key: key, value: Data4104(shardData) ?? Data4104())
+        try segments.put(key: key, value: segment)
 
         // Update metadata
         var meta = try await getOrCreateMetadata(erasureRoot: erasureRoot)
