@@ -79,9 +79,6 @@ public actor AvailabilityNetworkClient {
         shardIndex: UInt16,
         from assurerAddress: NetAddr
     ) async throws -> (Data, Justification) {
-        let request = ShardRequest(erasureRoot: erasureRoot, shardIndex: shardIndex)
-        let requestData = try request.encode()
-
         logger.debug(
             """
             Fetching audit shard \(shardIndex) from \(assurerAddress)
@@ -91,10 +88,10 @@ public actor AvailabilityNetworkClient {
         // Record CE 138 fallback usage
         await recordCE138Request()
 
-        let responseData = try await sendRequest(
+        let responseData = try await sendAuditShardRequest(
             to: assurerAddress,
-            requestType: .auditShard,
-            data: requestData
+            erasureRoot: erasureRoot,
+            shardIndex: shardIndex
         )
 
         let response = try ShardResponse.decode(responseData)
@@ -133,13 +130,6 @@ public actor AvailabilityNetworkClient {
         segmentIndices: [UInt16],
         from assurerAddress: NetAddr
     ) async throws -> [Data] {
-        let request = ShardRequest(
-            erasureRoot: erasureRoot,
-            shardIndex: shardIndex,
-            segmentIndices: segmentIndices
-        )
-        let requestData = try request.encode()
-
         logger.debug(
             """
             Fetching \(segmentIndices.count) segment shards (shard \(shardIndex)) \
@@ -150,10 +140,12 @@ public actor AvailabilityNetworkClient {
         // Record CE 139 fallback usage
         await recordCE139Request()
 
-        let responseData = try await sendRequest(
+        let responseData = try await sendSegmentShardRequest(
             to: assurerAddress,
-            requestType: .segmentShardsFast,
-            data: requestData
+            erasureRoot: erasureRoot,
+            shardIndex: shardIndex,
+            segmentIndices: segmentIndices,
+            requestType: .segmentShardsFast
         )
 
         let response = try ShardResponse.decode(responseData)
@@ -184,13 +176,6 @@ public actor AvailabilityNetworkClient {
         segmentIndices: [UInt16],
         from assurerAddress: NetAddr
     ) async throws -> ([Data], [Justification]) {
-        let request = ShardRequest(
-            erasureRoot: erasureRoot,
-            shardIndex: shardIndex,
-            segmentIndices: segmentIndices
-        )
-        let requestData = try request.encode()
-
         logger.debug(
             """
             Fetching \(segmentIndices.count) segment shards (shard \(shardIndex)) \
@@ -201,10 +186,12 @@ public actor AvailabilityNetworkClient {
         // Record CE 140 fallback usage
         await recordCE140Request()
 
-        let responseData = try await sendRequest(
+        let responseData = try await sendSegmentShardRequest(
             to: assurerAddress,
-            requestType: .segmentShardsVerified,
-            data: requestData
+            erasureRoot: erasureRoot,
+            shardIndex: shardIndex,
+            segmentIndices: segmentIndices,
+            requestType: .segmentShardsVerified
         )
 
         let response = try ShardResponse.decode(responseData)
@@ -244,9 +231,6 @@ public actor AvailabilityNetworkClient {
         erasureRoot: Data32,
         from guarantorAddress: NetAddr
     ) async throws -> Data {
-        let request = BundleRequest(erasureRoot: erasureRoot)
-        let requestData = request.encode()
-
         logger.debug(
             """
             Fetching bundle \(erasureRoot.hex) from \(guarantorAddress) using CE 147
@@ -257,10 +241,9 @@ public actor AvailabilityNetworkClient {
         await recordCE147Request()
 
         do {
-            let responseData = try await sendRequest(
+            let responseData = try await sendBundleRequest(
                 to: guarantorAddress,
-                requestType: .fullBundle,
-                data: requestData
+                erasureRoot: erasureRoot
             )
 
             let response = try BundleResponse.decode(responseData)
@@ -484,15 +467,75 @@ public actor AvailabilityNetworkClient {
 
     // MARK: - Helper Methods
 
-    /// Send a request to a validator
-    private func sendRequest(
+    /// Send an audit shard request (CE 138)
+    private func sendAuditShardRequest(
         to address: NetAddr,
-        requestType: ShardRequestType,
-        data: Data
+        erasureRoot: Data32,
+        shardIndex: UInt16
     ) async throws -> Data {
-        // Check for duplicate requests
-        let cacheKey = "\(address):\(requestType.rawValue):\(data.blake2b256hash().hex)"
+        let ceRequest = CERequest.auditShardRequest(AuditShardRequestMessage(
+            erasureRoot: erasureRoot,
+            shardIndex: shardIndex
+        ))
+        return try await sendCERequest(to: address, request: ceRequest)
+    }
 
+    /// Send a segment shard request (CE 139/140)
+    private func sendSegmentShardRequest(
+        to address: NetAddr,
+        erasureRoot: Data32,
+        shardIndex: UInt16,
+        segmentIndices: [UInt16],
+        requestType: ShardRequestType
+    ) async throws -> Data {
+        let message = SegmentShardRequestMessage(
+            erasureRoot: erasureRoot,
+            shardIndex: shardIndex,
+            segmentIndices: segmentIndices
+        )
+
+        let ceRequest: CERequest = if requestType == .segmentShardsFast {
+            .segmentShardRequest1(message)
+        } else {
+            .segmentShardRequest2(message)
+        }
+
+        return try await sendCERequest(to: address, request: ceRequest)
+    }
+
+    /// Send a bundle request (CE 147)
+    private func sendBundleRequest(
+        to address: NetAddr,
+        erasureRoot: Data32
+    ) async throws -> Data {
+        let ceRequest = CERequest.blockRequest(BlockRequest(
+            hash: erasureRoot,
+            direction: .descendingInclusive,
+            maxBlocks: 1
+        ))
+        return try await sendCERequest(to: address, request: ceRequest)
+    }
+
+    /// Send a CERequest to a validator
+    private func sendCERequest(
+        to address: NetAddr,
+        request: CERequest
+    ) async throws -> Data {
+        // Use the request type and key components for cache key
+        let cacheKey = switch request {
+        case let .auditShardRequest(msg):
+            "\(address):138:\(msg.erasureRoot.hex):\(msg.shardIndex)"
+        case let .segmentShardRequest1(msg):
+            "\(address):139:\(msg.erasureRoot.hex):\(msg.shardIndex):\(msg.segmentIndices.hashValue)"
+        case let .segmentShardRequest2(msg):
+            "\(address):140:\(msg.erasureRoot.hex):\(msg.shardIndex):\(msg.segmentIndices.hashValue)"
+        case let .blockRequest(req):
+            "\(address):147:\(req.hash.hex)"
+        default:
+            "\(address):\(UUID().uuidString)"
+        }
+
+        // Check for duplicate requests
         if let existingTask = pendingRequests[cacheKey] {
             logger.trace("Deduplicating request: \(cacheKey)")
             return try await existingTask.value
@@ -507,71 +550,11 @@ public actor AvailabilityNetworkClient {
                 throw AvailabilityNetworkingError.peerManagerUnavailable
             }
 
-            // Determine the CERequest type based on requestType
-            let ceRequest: CERequest
-            switch requestType {
-            case .auditShard:
-                // Decode AuditShardRequest from data
-                let decoder = JamDecoder(data: data, config: config)
-                let erasureRoot = try decoder.decode(Data32.self)
-                let shardIndex = try decoder.decode(UInt16.self)
-                ceRequest = .auditShardRequest(AuditShardRequestMessage(
-                    erasureRoot: erasureRoot,
-                    shardIndex: shardIndex
-                ))
-
-            case .segmentShardFast, .segmentShardVerified:
-                // Decode SegmentShardRequest from data
-                let decoder = JamDecoder(data: data, config: config)
-                let erasureRoot = try decoder.decode(Data32.self)
-                let shardIndex = try decoder.decode(UInt16.self)
-                let segmentCount = try decoder.decode(UInt32.self)
-                var segmentIndices: [UInt16] = []
-                for _ in 0 ..< segmentCount {
-                    try segmentIndices.append(decoder.decode(UInt16.self))
-                }
-
-                let message = SegmentShardRequestMessage(
-                    erasureRoot: erasureRoot,
-                    shardIndex: shardIndex,
-                    segmentIndices: segmentIndices
-                )
-
-                // Use fast or verified variant
-                if requestType == .segmentShardFast {
-                    ceRequest = .segmentShardRequest1(message)
-                } else {
-                    ceRequest = .segmentShardRequest2(message)
-                }
-
-            case .fullBundle:
-                // Decode bundle request from data
-                let decoder = JamDecoder(data: data, config: config)
-                let erasureRoot = try decoder.decode(Data32.self)
-                ceRequest = .blockRequest(BlockRequest(
-                    hash: erasureRoot,
-                    direction: .descendingInclusive,
-                    maxBlocks: 1
-                ))
-
-            case .reconstructedSegments:
-                // Decode segment request from data
-                let decoder = JamDecoder(data: data, config: config)
-                let segmentsRoot = try decoder.decode(Data32.self)
-                let segmentCount = try decoder.decode(UInt32.self)
-                var segmentIndices: [UInt16] = []
-                for _ in 0 ..< segmentCount {
-                    try segmentIndices.append(decoder.decode(UInt16.self))
-                }
-                // Note: CE 148 not fully implemented yet
-                throw AvailabilityNetworkingError.unsupportedProtocol
-            }
-
             // Send the request via Network
-            logger.debug("Sending \(requestType) request to \(address)")
+            logger.debug("Sending \(request) request to \(address)")
 
             // Send request and get response
-            let responseData = try await network.send(to: address, message: ceRequest)
+            let responseData = try await network.send(to: address, message: request)
 
             // Response should be a single Data blob
             guard let response = responseData.first else {

@@ -520,26 +520,32 @@ public actor ErasureCodingDataStore {
 
     /// Cleanup expired audit entries (older than retention period)
     ///
+    /// Uses iterator-based cleanup to avoid loading all entries into memory.
+    ///
     /// - Parameter retentionEpochs: Number of epochs to retain (default: 6)
     public func cleanupAuditEntries(retentionEpochs: UInt32 = 6) async throws -> (entriesDeleted: Int, bytesReclaimed: Int) {
         let epochDuration: TimeInterval = 600 // 10 minutes per epoch (GP spec)
         let cutoffDate = Date().addingTimeInterval(-TimeInterval(retentionEpochs) * epochDuration)
 
-        let entries = try await rocksdbStore.listAuditEntries(before: cutoffDate)
-
         var deletedCount = 0
         var bytesReclaimed = 0
 
-        for entry in entries {
-            // Delete from filesystem
-            try await filesystemStore.deleteAuditBundle(erasureRoot: entry.erasureRoot)
+        // Use iterator-based cleanup to process entries in batches
+        let totalCount = try await rocksdbStore.cleanupAuditEntriesIteratively(
+            before: cutoffDate,
+            batchSize: 100
+        ) { batch in
+            for entry in batch {
+                // Delete from filesystem
+                try await filesystemStore.deleteAuditBundle(erasureRoot: entry.erasureRoot)
 
-            // Delete from RocksDB
-            try await rocksdbStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
-            try await rocksdbStore.deleteShards(erasureRoot: entry.erasureRoot)
+                // Delete from RocksDB
+                try await rocksdbStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
+                try await rocksdbStore.deleteShards(erasureRoot: entry.erasureRoot)
 
-            deletedCount += 1
-            bytesReclaimed += entry.bundleSize
+                deletedCount += 1
+                bytesReclaimed += entry.bundleSize
+            }
         }
 
         logger.info("Cleanup: deleted \(deletedCount) audit entries, reclaimed \(bytesReclaimed) bytes")
@@ -549,26 +555,32 @@ public actor ErasureCodingDataStore {
 
     /// Cleanup expired D³L entries (older than retention period)
     ///
+    /// Uses iterator-based cleanup to avoid loading all entries into memory.
+    ///
     /// - Parameter retentionEpochs: Number of epochs to retain (default: 672)
     public func cleanupD3LEntries(retentionEpochs: UInt32 = 672) async throws -> (entriesDeleted: Int, segmentsDeleted: Int) {
         let epochDuration: TimeInterval = 600 // 10 minutes per epoch
         let cutoffDate = Date().addingTimeInterval(-TimeInterval(retentionEpochs) * epochDuration)
 
-        let entries = try await rocksdbStore.listD3LEntries(before: cutoffDate)
-
         var deletedEntries = 0
         var deletedSegments = 0
 
-        for entry in entries {
-            // Delete from filesystem
-            try await filesystemStore.deleteD3LShards(erasureRoot: entry.erasureRoot)
+        // Use iterator-based cleanup to process entries in batches
+        let totalCount = try await rocksdbStore.cleanupD3LEntriesIteratively(
+            before: cutoffDate,
+            batchSize: 100
+        ) { batch in
+            for entry in batch {
+                // Delete from filesystem
+                try await filesystemStore.deleteD3LShards(erasureRoot: entry.erasureRoot)
 
-            // Delete from RocksDB
-            try await rocksdbStore.deleteD3LEntry(erasureRoot: entry.erasureRoot)
-            try await rocksdbStore.deleteShards(erasureRoot: entry.erasureRoot)
+                // Delete from RocksDB
+                try await rocksdbStore.deleteD3LEntry(erasureRoot: entry.erasureRoot)
+                try await rocksdbStore.deleteShards(erasureRoot: entry.erasureRoot)
 
-            deletedEntries += 1
-            deletedSegments += Int(entry.segmentCount)
+                deletedEntries += 1
+                deletedSegments += Int(entry.segmentCount)
+            }
         }
 
         logger.info("Cleanup: deleted \(deletedEntries) D³L entries, \(deletedSegments) segments")

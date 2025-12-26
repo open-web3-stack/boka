@@ -210,9 +210,19 @@ extension FilesystemDataStore {
         try fileManager.moveItem(at: tempUrl, to: url)
     }
 
-    /// Read data from file
-    private func readData(from url: URL) throws -> Data {
-        try Data(contentsOf: url)
+    /// Read data from file asynchronously (non-blocking)
+    ///
+    /// Uses withCheckedThrowingContinuation to bridge synchronous File I/O
+    /// to async/await, preventing the actor thread from blocking.
+    private func readData(from url: URL) async throws -> Data {
+        try await withCheckedThrowingContinuation { continuation in
+            do {
+                let data = try Data(contentsOf: url)
+                continuation.resume(returning: data)
+            } catch {
+                continuation.resume(throwing: error)
+            }
+        }
     }
 
     /// Remove file

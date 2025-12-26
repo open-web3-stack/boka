@@ -177,6 +177,52 @@ extension RocksDBDataStore {
         logger.trace("Deleted audit entry: erasureRoot=\(erasureRoot.toHexString())")
     }
 
+    /// Cleanup audit entries iteratively (memory-efficient for large datasets)
+    ///
+    /// Processes entries in batches using a callback, avoiding loading all entries into memory.
+    ///
+    /// - Parameters:
+    ///   - cutoff: Timestamp cutoff (delete entries older than this)
+    ///   - batchSize: Maximum number of entries to process per batch
+    ///   - processor: Callback to process each batch of entries
+    /// - Returns: Total number of entries processed
+    public func cleanupAuditEntriesIteratively(
+        before cutoff: Date,
+        batchSize: Int = 100,
+        processor: ([AuditEntry]) async throws -> Void
+    ) async throws -> Int {
+        var totalProcessed = 0
+        var batch: [AuditEntry] = []
+        batch.reserveCapacity(batchSize)
+
+        let iterator = db.createIterator(column: .availabilityAudit)
+        defer { iterator.close() }
+
+        iterator.seek(toFirst: true)
+
+        while let (key, value) = iterator.read(), key.count == 32 {
+            let entry = try JamDecoder.decode(AuditEntry.self, from: value)
+            if entry.timestamp < cutoff {
+                batch.append(entry)
+                totalProcessed += 1
+
+                // Process batch when it reaches the batch size
+                if batch.count >= batchSize {
+                    try await processor(batch)
+                    batch.removeAll()
+                }
+            }
+            iterator.next()
+        }
+
+        // Process any remaining entries in the final batch
+        if !batch.isEmpty {
+            try await processor(batch)
+        }
+
+        return totalProcessed
+    }
+
     /// Store D³L entry (long-term)
     public func setD3LEntry(segmentsRoot: Data32, erasureRoot: Data32, segmentCount: UInt32, timestamp: Date) async throws {
         let entry = D3LEntry(
@@ -218,6 +264,52 @@ extension RocksDBDataStore {
     public func deleteD3LEntry(erasureRoot: Data32) async throws {
         try d3l.delete(key: erasureRoot)
         logger.trace("Deleted D³L entry: erasureRoot=\(erasureRoot.toHexString())")
+    }
+
+    /// Cleanup D³L entries iteratively (memory-efficient for large datasets)
+    ///
+    /// Processes entries in batches using a callback, avoiding loading all entries into memory.
+    ///
+    /// - Parameters:
+    ///   - cutoff: Timestamp cutoff (delete entries older than this)
+    ///   - batchSize: Maximum number of entries to process per batch
+    ///   - processor: Callback to process each batch of entries
+    /// - Returns: Total number of entries processed
+    public func cleanupD3LEntriesIteratively(
+        before cutoff: Date,
+        batchSize: Int = 100,
+        processor: ([D3LEntry]) async throws -> Void
+    ) async throws -> Int {
+        var totalProcessed = 0
+        var batch: [D3LEntry] = []
+        batch.reserveCapacity(batchSize)
+
+        let iterator = db.createIterator(column: .availabilityD3L)
+        defer { iterator.close() }
+
+        iterator.seek(toFirst: true)
+
+        while let (key, value) = iterator.read(), key.count == 32 {
+            let entry = try JamDecoder.decode(D3LEntry.self, from: value)
+            if entry.timestamp < cutoff {
+                batch.append(entry)
+                totalProcessed += 1
+
+                // Process batch when it reaches the batch size
+                if batch.count >= batchSize {
+                    try await processor(batch)
+                    batch.removeAll()
+                }
+            }
+            iterator.next()
+        }
+
+        // Process any remaining entries in the final batch
+        if !batch.isEmpty {
+            try await processor(batch)
+        }
+
+        return totalProcessed
     }
 
     /// Get storage statistics
@@ -348,26 +440,38 @@ extension RocksDBDataStore {
         return indices.sorted()
     }
 
-    /// Batch store multiple shards
+    /// Batch store multiple shards atomically using WriteBatch
     /// - Parameters:
     ///   - shards: Array of (index, data) tuples
     ///   - erasureRoot: Erasure root identifying the data
     public func storeShards(shards: [(index: UInt16, data: Data)], erasureRoot: Data32) async throws {
-        // Update metadata once at the end
-        var shardCount = 0
+        // Create a write batch for atomic insertion
+        let batch = WriteBatch()
 
+        // Add all shard writes to the batch
         for shard in shards {
             let key = makeShardKey(erasureRoot: erasureRoot, shardIndex: shard.index)
-            try segments.put(key: key, value: Data4104(shard.data) ?? Data4104())
-            shardCount += 1
+
+            // Validate shard data size and convert to Data4104
+            guard let segment = Data4104(shard.data) else {
+                throw RocksDBError.invalidShardDataSize(
+                    actual: shard.data.count,
+                    expected: 4104
+                )
+            }
+
+            batch.put(key: key, value: segment, in: segments)
         }
 
         // Update metadata
         var meta = try await getOrCreateMetadata(erasureRoot: erasureRoot)
-        meta.shardCount = UInt32(shardCount)
-        try metadata.put(key: erasureRoot, value: meta)
+        meta.shardCount = UInt32(shards.count)
+        batch.put(key: erasureRoot, value: meta, in: metadata)
 
-        logger.debug("Stored \(shards.count) shards for erasureRoot=\(erasureRoot.toHexString())")
+        // Write everything atomically
+        try db.write(batch)
+
+        logger.debug("Stored \(shards.count) shards atomically for erasureRoot=\(erasureRoot.toHexString())")
     }
 
     /// Batch retrieve multiple shards
