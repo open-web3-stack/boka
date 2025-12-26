@@ -391,7 +391,7 @@ struct AvailabilityNetworkingTests {
                 Data32(Data([UInt8](repeating: 5, count: 32))!)!,
                 Data32(Data([UInt8](repeating: 6, count: 32))!)!,
             ],
-            [Data32(Data([UInt8](repeating: 7, count: 32))!)!],
+            [Data32(Data([UInt8](repeating: 7, count: 32))!)],
         ]
 
         let response = SegmentResponse(segments: segments, importProofs: importProofs)
