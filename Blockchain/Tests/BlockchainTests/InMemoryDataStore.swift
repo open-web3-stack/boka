@@ -32,7 +32,7 @@ public actor InMemoryDataStore: DataStoreProtocol {
 
     public func delete(erasureRoot: Data32) async throws {
         // Remove all associated data
-        erasureRoots.values.removeAll { $0 == erasureRoot }
+        erasureRoots = erasureRoots.filter { $0.value != erasureRoot }
         segments.removeValue(forKey: erasureRoot)
         timestamps.removeValue(forKey: erasureRoot)
         pagedProofs.removeValue(forKey: erasureRoot)
@@ -52,7 +52,7 @@ public actor InMemoryDataStore: DataStoreProtocol {
     }
 
     public func delete(segmentRoot: Data32) async throws {
-        segmentRoots.values.removeAll { $0 == segmentRoot }
+        segmentRoots = segmentRoots.filter { $0.value != segmentRoot }
     }
 
     // MARK: - Segment Operations

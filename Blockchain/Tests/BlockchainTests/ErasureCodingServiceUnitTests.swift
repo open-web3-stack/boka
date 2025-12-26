@@ -353,50 +353,41 @@ struct ErasureCodingServiceUnitTests {
     }
 
     @Test
-    func encodeMaximumSize() {
+    func encodeMaximumSize() async throws {
         let service = makeService()
 
         // Maximum reasonable size (3072 segments = 12,587,776 bytes)
         let maxData = Data(count: 684 * 3072)
 
-        do {
-            let shards = try service.encodeBlob(maxData)
-
-            #expect(shards.count == 1023, "Should produce 1023 shards")
-        } catch {
-            #expect(Bool(false), "Encoding max size failed: \(error)")
-        }
+        let shards = try await service.encodeBlob(maxData)
+        #expect(shards.count == 1023, "Should produce 1023 shards")
     }
 
     @Test
-    func reconstructWithExactShards() {
+    func reconstructWithExactShards() async throws {
         let service = makeService()
 
         // Create test data with known pattern
         let testData: [UInt8] = [0, 1, 2, 3, 4, 5]
         let data = Data(testData) + Data(count: 684 * 10 - testData.count)
 
-        do {
-            let shards = try service.encodeBlob(data)
+        let shards = try await service.encodeBlob(data)
 
-            // Take exactly 342 shards
-            let partialShards = Array(shards.prefix(342))
-            let shardTuples = partialShards.enumerated().map { index, data in
-                (index: UInt16(index), data: data)
-            }
-
-            let reconstructed = try service.reconstruct(
-                shards: shardTuples,
-                originalLength: data.count
-            )
-
-            // Verify reconstruction
-            #expect(reconstructed.count == data.count)
-            #expect(reconstructed[0] == 0)
-            #expect(reconstructed[1] == 1)
-            #expect(reconstructed[2] == 2)
-        } catch {
-            #expect(Bool(false), "Reconstruction failed: \(error)")
+        // Take exactly 342 shards
+        let partialShards = Array(shards.prefix(342))
+        let shardTuples = partialShards.enumerated().map { index, data in
+            (index: UInt16(index), data: data)
         }
+
+        let reconstructed = try await service.reconstruct(
+            shards: shardTuples,
+            originalLength: data.count
+        )
+
+        // Verify reconstruction
+        #expect(reconstructed.count == data.count)
+        #expect(reconstructed[0] == 0)
+        #expect(reconstructed[1] == 1)
+        #expect(reconstructed[2] == 2)
     }
 }
