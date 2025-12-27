@@ -219,7 +219,7 @@ public struct ShardResponse: Codable, Sendable {
 ///
 /// Per JAMNP-S spec, AvailabilityJustification = [0 ++ Hash OR 1 ++ Hash ++ Hash OR 2 ++ Segment Shard]
 /// Each discriminator is a single byte
-public enum AvailabilityJustification: Codable, Sendable {
+public enum AvailabilityJustification: Codable, Sendable, Equatable {
     /// 0 ++ Hash - Leaf node, no sibling needed
     case leaf
 
@@ -232,7 +232,7 @@ public enum AvailabilityJustification: Codable, Sendable {
     /// Co-path sequence for multi-level proofs
     case copath([AvailabilityJustificationStep])
 
-    public enum AvailabilityJustificationStep: Codable, Sendable {
+    public enum AvailabilityJustificationStep: Codable, Sendable, Equatable {
         case left(Data32) // Sibling on the left
         case right(Data32) // Sibling on the right
     }

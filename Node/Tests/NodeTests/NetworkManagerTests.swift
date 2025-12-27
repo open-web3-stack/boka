@@ -389,7 +389,7 @@ struct NetworkManagerTests {
         let testErasureRoot = Data32(repeating: 1)
         let testShardIndex: UInt32 = 2
         let testBundleShard = Data([0x01, 0x02, 0x03])
-        let testJustification = Justification.singleHash(Data32())
+        let testJustification = AvailabilityJustification.leaf
         let testError = NSError(domain: "test", code: 404)
 
         let requestMessage = CERequest.auditShardRequest(AuditShardRequestMessage(
