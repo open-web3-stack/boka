@@ -102,7 +102,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             do {
                 // Purge old audit store data (short-term storage, kept until finality, approximately 1 hour)
                 // Assuming approximately 6 epochs per hour at 10 minutes per epoch
-                let auditRetentionEpochs: EpochIndex = 6
+                let auditRetentionEpochs: EpochIndex = DataAvailabilityConstants.auditRetentionEpochs
 
                 if epoch > auditRetentionEpochs {
                     let auditCutoffEpoch = epoch - auditRetentionEpochs
@@ -111,7 +111,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
                 }
 
                 // Purge old import/D3L store data (long-term storage, kept for 28 days = 672 epochs)
-                let d3lRetentionEpochs: EpochIndex = 672
+                let d3lRetentionEpochs: EpochIndex = DataAvailabilityConstants.d3lRetentionEpochs
 
                 if epoch > d3lRetentionEpochs {
                     let d3lCutoffEpoch = epoch - d3lRetentionEpochs
@@ -395,8 +395,8 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         originalLength: Int
     ) async throws -> Data {
         // GP section 10: Erasure Coding
-        // We need at least 342 shards to reconstruct the original data
-        let requiredShards = 342
+        // We need at least minimumValidatorResponses shards to reconstruct the original data
+        let requiredShards = DataAvailabilityConstants.minimumValidatorResponses
         guard shards.count >= requiredShards else {
             throw DataAvailabilityError.retrievalError
         }
@@ -576,8 +576,8 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         shardRequest: Data
     ) async throws -> [(validator: ValidatorIndex, data: Data)] {
         // Fetch from validators concurrently with timeout
-        // We need at least 342 validators to respond for successful reconstruction
-        let requiredResponses = 342
+        // We need at least minimumValidatorResponses validators to respond for successful reconstruction
+        let requiredResponses = DataAvailabilityConstants.minimumValidatorResponses
 
         logger.debug("Fetching from \(validatorIndices.count) validators concurrently (need \(requiredResponses) responses)")
 
@@ -919,7 +919,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         // CE 138: Request audit shards from validators
         // 1. Determine which validators to request from
         //    We need at least 342 validators to reconstruct the data
-        let requiredValidators = 342
+        let requiredValidators = DataAvailabilityConstants.minimumValidatorResponses
         guard validators.count >= requiredValidators else {
             throw DataAvailabilityError.insufficientSignatures
         }
@@ -977,7 +977,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     ) async throws -> [Data4104] {
         // CE 139/140: Request segment shards from validators
         // 1. Determine which validators to request from
-        let requiredValidators = 342
+        let requiredValidators = DataAvailabilityConstants.minimumValidatorResponses
         guard validators.count >= requiredValidators else {
             throw DataAvailabilityError.insufficientSignatures
         }
