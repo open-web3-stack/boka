@@ -1163,8 +1163,14 @@ public actor ErasureCodingDataStore {
     ///   - shardIndex: Index of the shard to check
     /// - Returns: True if the shard exists
     public func hasShard(erasureRoot: Data32, shardIndex: UInt16) async throws -> Bool {
-        let shardData = try await dataStore.getShard(erasureRoot: erasureRoot, shardIndex: shardIndex)
-        return shardData != nil
+        // Try RocksDB first (for audit shards)
+        if let shard = try await dataStore.getShard(erasureRoot: erasureRoot, shardIndex: shardIndex) {
+            return true
+        }
+
+        // Check filesystem (for D³L shards)
+        let filesystemShard = try await filesystemStore.getD3LShard(erasureRoot: erasureRoot, shardIndex: shardIndex)
+        return filesystemShard != nil
     }
 
     /// Get a single shard by erasure root and index
@@ -1173,7 +1179,13 @@ public actor ErasureCodingDataStore {
     ///   - shardIndex: Index of the shard to retrieve
     /// - Returns: Shard data or nil if not found
     public func getShard(erasureRoot: Data32, shardIndex: UInt16) async throws -> Data? {
-        try await dataStore.getShard(erasureRoot: erasureRoot, shardIndex: shardIndex)
+        // Try RocksDB first (for audit shards)
+        if let shard = try await dataStore.getShard(erasureRoot: erasureRoot, shardIndex: shardIndex) {
+            return shard
+        }
+
+        // Fallback to filesystem (for D³L shards)
+        return try await filesystemStore.getD3LShard(erasureRoot: erasureRoot, shardIndex: shardIndex)
     }
 
     /// Get multiple shards in a single batch operation
@@ -1182,7 +1194,22 @@ public actor ErasureCodingDataStore {
     ///   - shardIndices: Indices of shards to retrieve
     /// - Returns: Array of tuples containing shard index and data
     public func getShards(erasureRoot: Data32, shardIndices: [UInt16]) async throws -> [(index: UInt16, data: Data)] {
-        try await dataStore.getShards(erasureRoot: erasureRoot, shardIndices: shardIndices)
+        // Try RocksDB first (for audit shards)
+        let rocksDBShards = try await dataStore.getShards(erasureRoot: erasureRoot, shardIndices: shardIndices)
+
+        // For any missing shards, try filesystem (for D³L shards)
+        var result: [(index: UInt16, data: Data)] = []
+        let foundIndices = Set(rocksDBShards.map(\.index))
+
+        for shardIndex in shardIndices {
+            if let shard = rocksDBShards.first(where: { $0.index == shardIndex }) {
+                result.append(shard)
+            } else if let shardData = try await filesystemStore.getD3LShard(erasureRoot: erasureRoot, shardIndex: shardIndex) {
+                result.append((index: shardIndex, data: shardData))
+            }
+        }
+
+        return result
     }
 
     /// Get audit entry metadata
@@ -1232,7 +1259,14 @@ public actor ErasureCodingDataStore {
     /// - Parameter erasureRoot: Erasure root identifying the data
     /// - Returns: Array of available shard indices
     public func getLocalShardIndices(erasureRoot: Data32) async throws -> [UInt16] {
-        try await dataStore.getAvailableShardIndices(erasureRoot: erasureRoot)
+        // Try RocksDB first (for audit shards)
+        let rocksDBIndices = try await dataStore.getAvailableShardIndices(erasureRoot: erasureRoot)
+
+        // Also check filesystem (for D³L shards)
+        let filesystemIndices = try await filesystemStore.getAvailableShardIndices(erasureRoot: erasureRoot)
+
+        // Merge and deduplicate
+        return Set(rocksDBIndices + filesystemIndices).sorted()
     }
 
     /// Get local shards with caching
@@ -1350,6 +1384,9 @@ public actor ErasureCodingDataStore {
             )
 
             // Store fetched shards
+            // TODO: For D³L segments, should store to filesystemStore instead of dataStore
+            // for consistency with storeExportedSegments. Need to determine if this is
+            // a D³L segment vs audit shard. See GP spec for retention requirements.
             for (shardIndex, shardData) in fetchedShards {
                 try await dataStore.storeShard(
                     shardData: shardData,
@@ -1551,6 +1588,7 @@ public actor ErasureCodingDataStore {
                             )
 
                             // Store fetched shards locally
+                            // TODO: For D³L segments, should store to filesystemStore instead of dataStore
                             for (shardIndex, shardData) in fetchedShards {
                                 try await dataStore.storeShard(
                                     shardData: shardData,

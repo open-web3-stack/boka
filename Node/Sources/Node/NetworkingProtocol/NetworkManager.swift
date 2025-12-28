@@ -355,8 +355,9 @@ struct HandlerImpl: NetworkProtocolHandler {
             ))
 
             // Wait for response
-            // Note: Currently returning empty response as the actual response
-            // will be handled via the network layer by DataAvailabilityService
+            // TODO: Implement proper async response handling.
+            // Need to add BundleRequestReceivedResponse event to RuntimeEvents
+            // and wait for it similar to auditShardRequest handling.
             logger.debug("CE 147 bundle request received for erasure root: \(message.erasureRoot.toHexString())")
             return []
         case let .stateRequest(message):
@@ -662,8 +663,9 @@ struct HandlerImpl: NetworkProtocolHandler {
                 ))
             }
 
-            // Note: Currently returning empty response as the actual response
-            // will be handled via the network layer by DataAvailabilityService
+            // TODO: Implement proper async response handling.
+            // Need to add SegmentRequestReceivedResponse event to RuntimeEvents
+            // and wait for it similar to auditShardRequest handling.
             logger.debug("CE 148 segment request received for \(message.requests.count) segment roots")
             return []
         case let .workPackageBundleSubmission(message):
