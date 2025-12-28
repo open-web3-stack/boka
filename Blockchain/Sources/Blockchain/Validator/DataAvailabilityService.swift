@@ -510,13 +510,13 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
         // Get the validator's network address from metadata
         let validator = validators[Int(validatorIndex)]
-        let networkAddress = try extractNetworkAddress(from: validator.metadata)
+        let networkAddress = try extractNetworkAddress(from: validator.metadata.data)
 
         // Send request via network client
         logger.debug("Sending request to validator \(validatorIndex) at \(networkAddress)")
 
         do {
-            guard let networkProtocol = networkClient.getNetwork() else {
+            guard let networkProtocol = await networkClient.getNetwork() else {
                 logger.error("Network protocol not available in network client")
                 throw DataAvailabilityError.retrievalError
             }
@@ -540,7 +540,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     /// - Parameter metadata: Validator metadata bytes
     /// - Returns: Network address
     /// - Throws: DataAvailabilityError if extraction fails
-    private func extractNetworkAddress(from metadata: Data32) throws -> NetAddr {
+    private func extractNetworkAddress(from metadata: Data) throws -> NetAddr {
         // Metadata format: <multiaddr> (see GP spec)
         // For now, we assume it's encoded in the metadata
         // TODO: Implement proper multiaddr decoding per spec
@@ -548,7 +548,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
         // For testing purposes, try to create address from metadata
         // In production, this should parse the multiaddr format properly
-        let metadataString = metadata.data.hexadecimalString()
+        let metadataString = metadata.toHexString()
 
         // Try common formats
         if let addr = NetAddr(address: metadataString) {
@@ -593,9 +593,12 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
         await withTaskGroup(of: (ValidatorIndex, Data?).self) { group in
             for validator in validatorIndices {
-                group.addTask {
+                group.addTask { [weak self] in
+                    guard let self else {
+                        return (validator, nil)
+                    }
                     do {
-                        let data = try await self.fetchFromValidator(validator: validator, requestData: shardRequest)
+                        let data = try await fetchFromValidator(validator: validator, requestData: shardRequest)
                         return (validator, data)
                     } catch {
                         logger.warning("Failed to fetch from validator \(validator): \(error)")

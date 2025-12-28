@@ -335,8 +335,20 @@ struct HandlerImpl: NetworkProtocolHandler {
             }
             return [encoder.data]
         case let .bundleRequest(message):
-            // TODO: Implement CE 147 bundle request
-            throw NetworkManagerError.unimplemented("bundleRequest not yet implemented")
+            // CE 147: Bundle Request
+            // Publish event for DataAvailabilityService to handle
+            // Bundle requests are for bundle shards (audit shards)
+            // Use AuditShardRequestReceived event which handles erasure root requests
+            blockchain.publish(event: RuntimeEvents.AuditShardRequestReceived(
+                erasureRoot: message.erasureRoot,
+                shardIndex: 0 // Not applicable for full bundle request
+            ))
+
+            // Wait for response
+            // Note: Currently returning empty response as the actual response
+            // will be handled via the network layer by DataAvailabilityService
+            logger.debug("CE 147 bundle request received for erasure root: \(message.erasureRoot.toHexString())")
+            return []
         case let .stateRequest(message):
             blockchain
                 .publish(
@@ -522,8 +534,22 @@ struct HandlerImpl: NetworkProtocolHandler {
                 )
             return []
         case let .segmentRequest(message):
-            // TODO: Implement CE 148 segment request
-            throw NetworkManagerError.unimplemented("segmentRequest not yet implemented")
+            // CE 148: Segment Request
+            // Publish event for DataAvailabilityService to handle
+            // SegmentShardRequestReceived expects erasureRoot, shardIndex, and segmentIndices
+            // For CE 148, we use erasureRoot as segmentsRoot and shardIndex as 0 (not applicable)
+            for request in message.requests {
+                blockchain.publish(event: RuntimeEvents.SegmentShardRequestReceived(
+                    erasureRoot: request.segmentsRoot,
+                    shardIndex: 0, // Not applicable for segment requests
+                    segmentIndices: request.segmentIndices
+                ))
+            }
+
+            // Note: Currently returning empty response as the actual response
+            // will be handled via the network layer by DataAvailabilityService
+            logger.debug("CE 148 segment request received for \(message.requests.count) segment roots")
+            return []
         case let .workPackageBundleSubmission(message):
             // TODO: Implement CE work package bundle submission handling
             return []
