@@ -350,21 +350,51 @@ struct HandlerImpl: NetworkProtocolHandler {
             logger.debug("CE 147 bundle request received for erasure root: \(message.erasureRoot.toHexString())")
             return []
         case let .stateRequest(message):
-            blockchain
-                .publish(
-                    event: RuntimeEvents
-                        .StateRequestReceived(
-                            headerHash: message.headerHash,
-                            startKey: message.startKey,
-                            endKey: message.endKey,
-                            maxSize: message.maxSize
-                        )
+            // Publish state request event
+            blockchain.publish(
+                event: RuntimeEvents.StateRequestReceived(
+                    headerHash: message.headerHash,
+                    startKey: message.startKey,
+                    endKey: message.endKey,
+                    maxSize: message.maxSize
                 )
-            // TODO: waitfor StateRequestReceivedResponse
-            // let resp = try await blockchain.waitFor(RuntimeEvents.StateRequestReceivedResponse.self) { event in
-            //
-            // }
-            return []
+            )
+
+            // Wait for response with timeout
+            do {
+                let requestId = try JamEncoder.encode(
+                    message.headerHash,
+                    message.startKey,
+                    message.endKey,
+                    message.maxSize
+                ).blake2b256hash()
+
+                let response = try await blockchain.waitFor(
+                    RuntimeEvents.StateRequestReceivedResponse.self,
+                    check: { $0.requestId == requestId },
+                    timeout: 5.0
+                )
+
+                // Return the key-value pairs as response
+                switch response.result {
+                case let .success((_, _, keyValuePairs)):
+                    // Encode the key-value pairs
+                    var encoder = JamEncoder()
+                    try encoder.encode(UInt32(keyValuePairs.count))
+                    for (key, value) in keyValuePairs {
+                        try encoder.encode(key)
+                        try encoder.encode(Data(value))
+                    }
+                    return [encoder.data]
+
+                case let .failure(error):
+                    logger.error("State request failed: \(error)")
+                    return []
+                }
+            } catch {
+                logger.warning("State request timed out or failed: \(error)")
+                return []
+            }
         case let .safroleTicket1(message):
             blockchain.publish(event: RuntimeEvents.SafroleTicketsReceived(
                 items: [
@@ -448,40 +478,100 @@ struct HandlerImpl: NetworkProtocolHandler {
             let (bundleShard, segmentShards, justification) = try resp.result.get()
             return try [JamEncoder.encode(bundleShard, segmentShards, justification)]
         case let .auditShardRequest(message):
-            blockchain
-                .publish(event: RuntimeEvents.AuditShardRequestReceived(erasureRoot: message.erasureRoot, shardIndex: message.shardIndex))
-            // TODO: waitfor AuditShardRequestReceivedResponse
-            // let resp = try await blockchain.waitFor(RuntimeEvents.AuditShardRequestReceivedResponse.self) { event in
-            //
-            // }
-            return []
+            // Publish audit shard request event
+            let receivedEvent = RuntimeEvents.AuditShardRequestReceived(
+                erasureRoot: message.erasureRoot,
+                shardIndex: message.shardIndex
+            )
+            blockchain.publish(event: receivedEvent)
+
+            // Wait for response with timeout
+            do {
+                let requestId = try receivedEvent.generateRequestId()
+
+                let response = try await blockchain.waitFor(
+                    RuntimeEvents.AuditShardRequestReceivedResponse.self,
+                    check: { $0.requestId == requestId },
+                    timeout: 5.0
+                )
+
+                // Return the bundle shard and justification
+                switch response.result {
+                case let .success((_, _, bundleShard, justification)):
+                    return try [JamEncoder.encode(bundleShard, justification)]
+
+                case let .failure(error):
+                    logger.error("Audit shard request failed: \(error)")
+                    return []
+                }
+            } catch {
+                logger.warning("Audit shard request timed out or failed: \(error)")
+                return []
+            }
         case let .segmentShardRequest1(message):
-            blockchain
-                .publish(
-                    event: RuntimeEvents
-                        .SegmentShardRequestReceived(
-                            erasureRoot: message.erasureRoot,
-                            shardIndex: message.shardIndex,
-                            segmentIndices: message.segmentIndices
-                        )
+            // Publish segment shard request event
+            let receivedEvent = RuntimeEvents.SegmentShardRequestReceived(
+                erasureRoot: message.erasureRoot,
+                shardIndex: message.shardIndex,
+                segmentIndices: message.segmentIndices
+            )
+            blockchain.publish(event: receivedEvent)
+
+            // Wait for response with timeout
+            do {
+                let requestId = try receivedEvent.generateRequestId()
+
+                let response = try await blockchain.waitFor(
+                    RuntimeEvents.SegmentShardRequestReceivedResponse.self,
+                    check: { $0.requestId == requestId },
+                    timeout: 5.0
                 )
-            // TODO: waitfor AuditShardRequestReceivedResponse
-            // let resp = try await blockchain.waitFor(RuntimeEvents.AuditShardRequestReceivedResponse.self) { event in
-            //
-            // }
-            return []
+
+                // Return the segment shards
+                switch response.result {
+                case let .success(segmentShards):
+                    return try [JamEncoder.encode(segmentShards)]
+
+                case let .failure(error):
+                    logger.error("Segment shard request failed: \(error)")
+                    return []
+                }
+            } catch {
+                logger.warning("Segment shard request timed out or failed: \(error)")
+                return []
+            }
         case let .segmentShardRequest2(message):
-            blockchain
-                .publish(
-                    event: RuntimeEvents
-                        .SegmentShardRequestReceived(
-                            erasureRoot: message.erasureRoot,
-                            shardIndex: message.shardIndex,
-                            segmentIndices: message.segmentIndices
-                        )
+            // Publish segment shard request event
+            let receivedEvent = RuntimeEvents.SegmentShardRequestReceived(
+                erasureRoot: message.erasureRoot,
+                shardIndex: message.shardIndex,
+                segmentIndices: message.segmentIndices
+            )
+            blockchain.publish(event: receivedEvent)
+
+            // Wait for response with timeout
+            do {
+                let requestId = try receivedEvent.generateRequestId()
+
+                let response = try await blockchain.waitFor(
+                    RuntimeEvents.SegmentShardRequestReceivedResponse.self,
+                    check: { $0.requestId == requestId },
+                    timeout: 5.0
                 )
-            // TODO: waitfor AuditShardRequestReceivedResponse
-            return []
+
+                // Return the segment shards
+                switch response.result {
+                case let .success(segmentShards):
+                    return try [JamEncoder.encode(segmentShards)]
+
+                case let .failure(error):
+                    logger.error("Segment shard request failed: \(error)")
+                    return []
+                }
+            } catch {
+                logger.warning("Segment shard request timed out or failed: \(error)")
+                return []
+            }
         case let .assuranceDistribution(message):
             blockchain
                 .publish(
@@ -505,9 +595,30 @@ struct HandlerImpl: NetworkProtocolHandler {
                 )
             return []
         case let .preimageRequest(message):
+            // Publish preimage request event
             blockchain.publish(event: RuntimeEvents.PreimageRequestReceived(hash: message.hash))
-            // TODO: waitfor PreimageRequestReceivedResponse
-            return []
+
+            // Wait for response with timeout
+            do {
+                let response = try await blockchain.waitFor(
+                    RuntimeEvents.PreimageRequestReceivedResponse.self,
+                    check: { $0.hash == message.hash },
+                    timeout: 5.0
+                )
+
+                // Return the preimage
+                switch response.result {
+                case let .success(preimage):
+                    return try [JamEncoder.encode(preimage)]
+
+                case let .failure(error):
+                    logger.error("Preimage request failed: \(error)")
+                    return []
+                }
+            } catch {
+                logger.warning("Preimage request timed out or failed: \(error)")
+                return []
+            }
         case let .judgementPublication(message):
             blockchain
                 .publish(
