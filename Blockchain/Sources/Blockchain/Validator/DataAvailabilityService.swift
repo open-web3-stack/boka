@@ -557,7 +557,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
                 throw DataAvailabilityError.invalidWorkReportSlot
             }
             // verify signatures
-            try await validate(signatures: signatures)
+            try await validate(signatures: signatures, workReportHash: hash)
 
             // store guaranteedWorkReport
             let report = GuaranteedWorkReport(
@@ -580,7 +580,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         return slot + 5 >= currentSlot && slot <= currentSlot + 3
     }
 
-    private func validate(signatures: [ValidatorSignature]) async throws {
+    private func validate(signatures: [ValidatorSignature], workReportHash: Data32) async throws {
         // Per GP section 15.2, at least 3 validators are required for a work-report
         guard signatures.count >= 3 else {
             throw DataAvailabilityError.insufficientSignatures
@@ -589,6 +589,12 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         // Get the current validator set to verify signatures
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
         let currentValidators = state.value.currentValidators
+
+        // According to GP spec (reporting_assurance.tex eq:guarantorsig):
+        // The signature is over: Xguarantee || blake(encode(workReport))
+        // Where Xguarantee is the string "$jam_guarantee" with a length prefix byte
+        let guaranteePrefix = Data("\u{10}$jam_guarantee".utf8)
+        let signatureMessage = guaranteePrefix + workReportHash.data
 
         // Verify each signature
         for sig in signatures {
@@ -606,13 +612,8 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
                 throw DataAvailabilityError.invalidWorkReport
             }
 
-            // According to GP spec, the signature is over: Xguarantee || blake(encode(workReport))
-            // Where Xguarantee is the string "$jam_guarantee"
-            // The signature verification requires the work report hash to be provided
-            // For now, we verify against a placeholder message
-            // TODO: Pass the work report hash to this function and construct the proper message:
-            // let message = "\u{10}$jam_guarantee".data(using: .utf8)! + workReportHash.data
-            let isValid = publicKey.verify(signature: sig.signature, message: Data())
+            // Verify the signature over the constructed message
+            let isValid = publicKey.verify(signature: sig.signature, message: signatureMessage)
 
             if !isValid {
                 throw DataAvailabilityError.invalidWorkReport
