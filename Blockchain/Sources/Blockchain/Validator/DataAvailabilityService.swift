@@ -866,41 +866,62 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         )
 
         // Generate Justification based on Merkle path length
-        // According to GP, the justification format depends on the tree depth
+        return try generateJustificationFromMerklePath(merklePath, shardIndex: shardIndex, segmentShards: segmentShards)
+    }
+
+    /// Generate justification from Merkle path
+    private func generateJustificationFromMerklePath(
+        from merklePath: [MerklePath.Element],
+        shardIndex: UInt16,
+        segmentShards: [Data]
+    ) throws -> Justification {
         switch merklePath.count {
         case 1:
-            // 0 ++ Hash - single hash for shallow trees
-            guard case let .right(hash) = merklePath.first! else {
-                throw DataAvailabilityError.invalidMerklePath
-            }
-            return .singleHash(hash)
-
+            try generateSingleHashJustification(from: merklePath)
         case 2:
-            // 1 ++ Hash ++ Hash - double hash for medium depth trees
-            guard case let .right(hash1) = merklePath[0],
-                  case let .right(hash2) = merklePath[1]
-            else {
-                throw DataAvailabilityError.invalidMerklePath
-            }
-            return .doubleHash(hash1, hash2)
-
+            try generateDoubleHashJustification(from: merklePath)
         default:
-            // 2 ++ Segment Shard (12 bytes) - for deep trees, use segment shard
-            // The segment shard is the first 12 bytes of the erasure-coded data
-            guard shardIndex < UInt16(segmentShards.count) else {
-                throw DataAvailabilityError.invalidSegmentIndex
-            }
-
-            let shardData = segmentShards[Int(shardIndex)]
-            guard shardData.count >= 12 else {
-                throw DataAvailabilityError.invalidSegmentIndex
-            }
-
-            guard let segmentShard = Data12(Data(shardData[0 ..< 12])) else {
-                throw DataAvailabilityError.invalidDataLength
-            }
-            return .segmentShard(segmentShard)
+            try generateSegmentShardJustification(shardIndex: shardIndex, segmentShards: segmentShards)
         }
+    }
+
+    /// Generate single hash justification for shallow trees
+    private func generateSingleHashJustification(from merklePath: [MerklePath.Element]) throws -> Justification {
+        guard case let .right(hash) = merklePath.first else {
+            throw DataAvailabilityError.invalidMerklePath
+        }
+        return .singleHash(hash)
+    }
+
+    /// Generate double hash justification for medium depth trees
+    private func generateDoubleHashJustification(from merklePath: [MerklePath.Element]) throws -> Justification {
+        guard case let .right(hash1) = merklePath[0],
+              case let .right(hash2) = merklePath[1]
+        else {
+            throw DataAvailabilityError.invalidMerklePath
+        }
+        return .doubleHash(hash1, hash2)
+    }
+
+    /// Generate segment shard justification for deep trees
+    private func generateSegmentShardJustification(
+        shardIndex: UInt16,
+        segmentShards: [Data]
+    ) throws -> Justification {
+        // The segment shard is the first 12 bytes of the erasure-coded data
+        guard shardIndex < UInt16(segmentShards.count) else {
+            throw DataAvailabilityError.invalidSegmentIndex
+        }
+
+        let shardData = segmentShards[Int(shardIndex)]
+        guard shardData.count >= 12 else {
+            throw DataAvailabilityError.invalidSegmentIndex
+        }
+
+        guard let segmentShard = Data12(Data(shardData[0 ..< 12])) else {
+            throw DataAvailabilityError.invalidDataLength
+        }
+        return .segmentShard(segmentShard)
     }
 
     // MARK: - Audit Shard Requests (CE 138)
