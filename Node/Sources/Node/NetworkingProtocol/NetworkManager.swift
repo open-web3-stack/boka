@@ -72,12 +72,7 @@ public final class NetworkManager: Sendable {
 
         var selfDevPeers = Set<Either<PeerId, NetAddr>>()
 
-        do {
-            let address = try network.listenAddress()
-            logger.info("P2P Listening on \(address)")
-        } catch {
-            logger.warning("Failed to get listen address: \(error)")
-        }
+        logger.info("P2P Listening on \(try! network.listenAddress())")
 
         for peer in devPeers {
             let conn = try network.connect(to: peer, role: .validator)

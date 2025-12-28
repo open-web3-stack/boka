@@ -562,10 +562,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         // Fallback to localhost for testing
         // TODO: Remove this fallback and implement proper multiaddr parsing
         logger.warning("Unable to parse network address from metadata, using localhost fallback")
-        guard let address = NetAddr(address: "127.0.0.1:0") else {
-            throw DataAvailabilityError.retrievalError
-        }
-        return address
+        return NetAddr(address: "127.0.0.1:0")!
     }
 
     /// Fetch shards from multiple validators concurrently

@@ -27,11 +27,7 @@ final class VMStateJIT: VMState, @unchecked Sendable {
         } catch {
             logger.error("Failed to create ReadonlyMemory: \(error)")
             // Return an empty memory as a fallback - shouldn't happen in practice
-            // Creating empty memory should not fail, but use try? for safety
-            guard let memory = try? GeneralMemory(pageMap: [], chunks: []) else {
-                fatalError("Failed to create empty GeneralMemory - this should never happen")
-            }
-            return ReadonlyMemory(memory)
+            return ReadonlyMemory(try! GeneralMemory(pageMap: [], chunks: []))
         }
     }()
 
@@ -41,11 +37,7 @@ final class VMStateJIT: VMState, @unchecked Sendable {
         } catch {
             logger.error("Failed to create GeneralMemory: \(error)")
             // Return an empty memory as a fallback - shouldn't happen in practice
-            // Creating empty memory should not fail, but use try? for safety
-            guard let memory = try? GeneralMemory(pageMap: [], chunks: []) else {
-                fatalError("Failed to create empty GeneralMemory - this should never happen")
-            }
-            return memory
+            return try! GeneralMemory(pageMap: [], chunks: [])
         }
     }()
 
