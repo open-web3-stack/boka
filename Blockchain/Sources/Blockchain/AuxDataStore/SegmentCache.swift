@@ -3,9 +3,7 @@ import Synchronization
 import TracingUtils
 import Utils
 
-/// LRU cache for segment data to optimize repeated access
-///
-/// Uses Mutex for thread safety with simple operations
+/// LRU cache for segment data
 public final class SegmentCache: @unchecked Sendable {
     private struct CacheEntry: Sendable {
         let segment: Data4104
@@ -20,7 +18,6 @@ public final class SegmentCache: @unchecked Sendable {
         let index: Int
     }
 
-    /// Cache state protected by Mutex
     private struct CacheState: Sendable {
         var storage: [CacheKey: CacheEntry] = [:]
         var head: CacheKey? // Most recently used
@@ -40,10 +37,6 @@ public final class SegmentCache: @unchecked Sendable {
     }
 
     /// Get a segment from cache
-    /// - Parameters:
-    ///   - segment: The segment data
-    ///   - erasureRoot: Erasure root identifying the data
-    ///   - index: Segment index
     public func get(segment _: Data4104, erasureRoot: Data32, index: Int) -> Data4104? {
         state.withLock { state in
             let key = CacheKey(erasureRoot: erasureRoot, index: index)
@@ -54,17 +47,15 @@ public final class SegmentCache: @unchecked Sendable {
                 return nil
             }
 
-            // Cache hit - update access statistics and move to head (most recent)
+            // Cache hit - update access time and move to head
             state.hits += 1
             removeFromList(key: key, state: &state)
 
-            // Update entry statistics
             var updatedEntry = entry
             updatedEntry.accessTime = .now
             updatedEntry.hitCount += 1
             state.storage[key] = updatedEntry
 
-            // Add to head (most recently used)
             addToHead(key: key, entry: updatedEntry, state: &state)
 
             logger.debug("Cache hit: erasureRoot=\(erasureRoot.toHexString()), index=\(index)")
@@ -73,20 +64,14 @@ public final class SegmentCache: @unchecked Sendable {
     }
 
     /// Set a segment in cache
-    /// - Parameters:
-    ///   - segment: The segment data to cache
-    ///   - erasureRoot: Erasure root identifying the data
-    ///   - index: Segment index
     public func set(segment: Data4104, erasureRoot: Data32, index: Int) {
         state.withLock { state in
             let key = CacheKey(erasureRoot: erasureRoot, index: index)
 
-            // Check if we need to evict (only if this is a new key)
             if state.storage[key] == nil, state.storage.count >= maxSize {
                 evictLeastRecentlyUsed(state: &state)
             }
 
-            // Create entry
             let entry = CacheEntry(
                 segment: segment,
                 accessTime: .now,
@@ -95,12 +80,10 @@ public final class SegmentCache: @unchecked Sendable {
                 nextKey: nil
             )
 
-            // Remove from current position if updating existing
             if state.storage[key] != nil {
                 removeFromList(key: key, state: &state)
             }
 
-            // Add to head (most recently used)
             addToHead(key: key, entry: entry, state: &state)
 
             logger.debug("Cached segment: erasureRoot=\(erasureRoot.toHexString()), index=\(index), size=\(state.storage.count)")
@@ -108,9 +91,6 @@ public final class SegmentCache: @unchecked Sendable {
     }
 
     /// Remove a segment from cache
-    /// - Parameters:
-    ///   - erasureRoot: Erasure root identifying the data
-    ///   - index: Segment index
     public func remove(erasureRoot: Data32, index: Int) {
         state.withLock { state in
             let key = CacheKey(erasureRoot: erasureRoot, index: index)
@@ -130,7 +110,6 @@ public final class SegmentCache: @unchecked Sendable {
     }
 
     /// Invalidate all entries for a specific erasure root
-    /// - Parameter erasureRoot: Erasure root to invalidate
     public func invalidate(erasureRoot: Data32) {
         state.withLock { state in
             let keysToRemove = state.storage.keys.filter { $0.erasureRoot == erasureRoot }
@@ -143,7 +122,6 @@ public final class SegmentCache: @unchecked Sendable {
     }
 
     /// Get cache statistics
-    /// - Returns: Statistics tuple with hits, misses, evictions, and current size
     public func getStatistics() -> (hits: Int, misses: Int, evictions: Int, size: Int, hitRate: Double) {
         state.withLock { state in
             let total = state.hits + state.misses
@@ -163,29 +141,23 @@ public final class SegmentCache: @unchecked Sendable {
         state.withLock { $0.storage.count }
     }
 
-    // MARK: - Private Methods (O(1) Doubly-Linked List Operations)
+    // MARK: - Private Methods (O(1) Doubly-Linked List)
 
     private func addToHead(key: CacheKey, entry: CacheEntry, state: inout CacheState) {
-        // Create a mutable copy to update links
         var newEntry = entry
-        newEntry.previousKey = nil // Head has no previous entry
+        newEntry.previousKey = nil
 
         if let head = state.head {
-            // Link new entry as head
             newEntry.nextKey = head
-
-            // Update old head's previous pointer
             if var oldHeadEntry = state.storage[head] {
                 oldHeadEntry.previousKey = key
                 state.storage[head] = oldHeadEntry
             }
         } else {
-            // This is the first entry, it's also the tail
             newEntry.nextKey = nil
             state.tail = key
         }
 
-        // Store the updated entry
         state.storage[key] = newEntry
         state.head = key
     }
@@ -193,35 +165,27 @@ public final class SegmentCache: @unchecked Sendable {
     private func removeFromList(key: CacheKey, state: inout CacheState) {
         guard let entry = state.storage[key] else { return }
 
-        // Update previous entry's next pointer
         if let prevKey = entry.previousKey {
-            // Safe unwrapping with fallback for corrupted linked list
             guard var prevEntry = state.storage[prevKey] else {
-                logger.error("Cache corruption: previous key \(prevKey.erasureRoot.toHexString()):\(prevKey.index) not found in storage")
-                // Attempt to recover by removing the orphaned entry
+                logger.error("Cache corruption: previous key \(prevKey.erasureRoot.toHexString()):\(prevKey.index) not found")
                 state.storage.removeValue(forKey: key)
                 return
             }
             prevEntry.nextKey = entry.nextKey
             state.storage[prevKey] = prevEntry
         } else if state.head == key {
-            // This was the head, update head
             state.head = entry.nextKey
         }
 
-        // Update next entry's previous pointer
         if let nextKey = entry.nextKey {
-            // Safe unwrapping with fallback for corrupted linked list
             guard var nextEntry = state.storage[nextKey] else {
-                logger.error("Cache corruption: next key \(nextKey.erasureRoot.toHexString()):\(nextKey.index) not found in storage")
-                // Attempt to recover by removing the orphaned entry
+                logger.error("Cache corruption: next key \(nextKey.erasureRoot.toHexString()):\(nextKey.index) not found")
                 state.storage.removeValue(forKey: key)
                 return
             }
             nextEntry.previousKey = entry.previousKey
             state.storage[nextKey] = nextEntry
         } else if state.tail == key {
-            // This was the tail, update tail
             state.tail = entry.previousKey
         }
     }
@@ -229,10 +193,7 @@ public final class SegmentCache: @unchecked Sendable {
     private func evictLeastRecentlyUsed(state: inout CacheState) {
         guard let tailKey = state.tail else { return }
 
-        // Remove from linked list
         removeFromList(key: tailKey, state: &state)
-
-        // Remove from storage
         state.storage.removeValue(forKey: tailKey)
         state.evictions += 1
 
