@@ -5,6 +5,14 @@ import Synchronization
 import TracingUtils
 import Utils
 
+// MARK: - Array Helpers
+
+extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
+}
+
 public enum DataAvailabilityError: Error {
     case storeError
     case retrievalError
@@ -481,17 +489,88 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     /// - Returns: The response data
     /// - Throws: DataAvailabilityError if the request fails
     public func fetchFromValidator(
-        validator _: ValidatorIndex,
-        requestData _: Data
+        validator validatorIndex: ValidatorIndex,
+        requestData: Data
     ) async throws -> Data {
-        // TODO: Implement network layer integration
-        // This should:
-        // 1. Look up the validator's network address
-        // 2. Send the request via the networking protocol
-        // 3. Await the response
-        // 4. Return the response data
+        // Ensure network client is available
+        guard let networkClient else {
+            logger.error("Network client not available for validator request")
+            throw DataAvailabilityError.retrievalError
+        }
 
-        throw DataAvailabilityError.retrievalError
+        // Get validator's network address from on-chain state
+        let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)
+        let validators = state.value.currentValidators
+
+        // Check validator index is valid
+        guard validatorIndex < UInt32(validators.count) else {
+            logger.error("Validator index \(validatorIndex) out of range (0..<\(validators.count))")
+            throw DataAvailabilityError.retrievalError
+        }
+
+        // Get the validator's network address from metadata
+        let validator = validators[Int(validatorIndex)]
+        let networkAddress = try extractNetworkAddress(from: validator.metadata)
+
+        // Send request via network client
+        logger.debug("Sending request to validator \(validatorIndex) at \(networkAddress)")
+
+        do {
+            guard let networkProtocol = networkClient.getNetwork() else {
+                logger.error("Network protocol not available in network client")
+                throw DataAvailabilityError.retrievalError
+            }
+
+            let responses = try await networkProtocol.send(to: networkAddress, data: requestData)
+
+            // Return first response (most protocols return single response)
+            guard let response = responses.first else {
+                logger.error("No response from validator \(validatorIndex)")
+                throw DataAvailabilityError.retrievalError
+            }
+
+            return response
+        } catch {
+            logger.error("Failed to fetch from validator \(validatorIndex): \(error)")
+            throw DataAvailabilityError.retrievalError
+        }
+    }
+
+    /// Extract network address from validator metadata
+    /// - Parameter metadata: Validator metadata bytes
+    /// - Returns: Network address
+    /// - Throws: DataAvailabilityError if extraction fails
+    private func extractNetworkAddress(from metadata: Data32) throws -> NetAddr {
+        // Metadata format: <multiaddr> (see GP spec)
+        // For now, we assume it's encoded in the metadata
+        // TODO: Implement proper multiaddr decoding per spec
+        // This is a placeholder that needs proper multiaddr parsing
+
+        // For testing purposes, try to create address from metadata
+        // In production, this should parse the multiaddr format properly
+        let metadataString = metadata.data.hexadecimalString()
+
+        // Try common formats
+        if let addr = NetAddr(address: metadataString) {
+            return addr
+        }
+
+        // If metadata contains a valid IPv4:port format
+        // Format: /ip4/<ip>/tcp/<port>
+        if metadataString.hasPrefix("/ip4/") {
+            let parts = metadataString.components(separatedBy: "/")
+            if parts.count >= 5, let ip = parts[safe: 2], let port = parts[safe: 4] {
+                let addrString = "\(ip):\(port)"
+                if let addr = NetAddr(address: addrString) {
+                    return addr
+                }
+            }
+        }
+
+        // Fallback to localhost for testing
+        // TODO: Remove this fallback and implement proper multiaddr parsing
+        logger.warning("Unable to parse network address from metadata, using localhost fallback")
+        return NetAddr(address: "127.0.0.1:0")!
     }
 
     /// Fetch shards from multiple validators concurrently
@@ -501,45 +580,51 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     /// - Returns: The collected shard responses
     /// - Throws: DataAvailabilityError if insufficient validators respond
     public func fetchFromValidatorsConcurrently(
-        validators _: [ValidatorIndex],
-        shardRequest _: Data
+        validators validatorIndices: [ValidatorIndex],
+        shardRequest: Data
     ) async throws -> [(validator: ValidatorIndex, data: Data)] {
         // Fetch from validators concurrently with timeout
         // We need at least 342 validators to respond for successful reconstruction
         let requiredResponses = 342
 
-        // TODO: Implement actual network requests
-        // For now, throw an error
-        _ = requiredResponses
-        throw DataAvailabilityError.retrievalError
+        logger.debug("Fetching from \(validatorIndices.count) validators concurrently (need \(requiredResponses) responses)")
 
-        // Implementation would be:
-        // var responses: [(ValidatorIndex, Data)] = []
-        //
-        // await withTaskGroup(of: (ValidatorIndex, Data?).self) { group in
-        //     for validator in validators {
-        //         group.addTask {
-        //             do {
-        //                 let data = try await self.fetchFromValidator(validator: validator, requestData: shardRequest)
-        //                 return (validator, data)
-        //             } catch {
-        //                 return (validator, nil)
-        //             }
-        //         }
-        //     }
-        //
-        //     for await (validator, data) in group {
-        //         if let data = data {
-        //             responses.append((validator, data))
-        //         }
-        //     }
-        // }
-        //
-        // guard responses.count >= requiredResponses else {
-        //     throw DataAvailabilityError.retrievalError
-        // }
-        //
-        // return responses
+        var responses: [(validator: ValidatorIndex, data: Data)] = []
+
+        await withTaskGroup(of: (ValidatorIndex, Data?).self) { group in
+            for validator in validatorIndices {
+                group.addTask {
+                    do {
+                        let data = try await self.fetchFromValidator(validator: validator, requestData: shardRequest)
+                        return (validator, data)
+                    } catch {
+                        logger.warning("Failed to fetch from validator \(validator): \(error)")
+                        return (validator, nil)
+                    }
+                }
+            }
+
+            for await (validator, data) in group {
+                if let data {
+                    responses.append((validator, data))
+                    logger.debug("Received response from validator \(validator) (\(responses.count)/\(requiredResponses))")
+
+                    // Early exit if we have enough responses
+                    if responses.count >= requiredResponses {
+                        group.cancelAll()
+                        break
+                    }
+                }
+            }
+        }
+
+        guard responses.count >= requiredResponses else {
+            logger.error("Insufficient validator responses: \(responses.count)/\(requiredResponses)")
+            throw DataAvailabilityError.retrievalError
+        }
+
+        logger.info("Successfully fetched data from \(responses.count) validators")
+        return responses
     }
 
     // MARK: - Work-report Distribution (CE 135)

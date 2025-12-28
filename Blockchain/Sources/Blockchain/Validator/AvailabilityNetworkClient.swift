@@ -53,6 +53,11 @@ public actor AvailabilityNetworkClient {
         self.network = network
     }
 
+    /// Get the network protocol (exposed for DataAvailabilityService to use)
+    public func getNetwork() -> (any AvailabilityNetworkProtocol)? {
+        network
+    }
+
     /// Configure fallback timeouts
     /// - Parameter config: Fallback timeout configuration
     public func configureFallbackTimeouts(_ config: FallbackTimeoutConfig) {
