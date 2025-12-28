@@ -19,6 +19,16 @@ enum NetworkManagerError: Error {
     case unimplemented(String)
 }
 
+/// Handle request errors with consistent logging and empty response
+/// - Parameters:
+///   - error: The error that occurred
+///   - messageType: Description of the message type for logging
+/// - Returns: Empty array to signal failure
+func handleRequestError(_ error: Error, messageType: String) -> [Data] {
+    logger.error("\(messageType) failed: \(error)")
+    return []
+}
+
 private actor NetworkManagerStorage {
     var peerIdByPublicKey: [Data32: PeerId] = [:]
 
@@ -393,8 +403,7 @@ struct HandlerImpl: NetworkProtocolHandler {
                     return [encoder.data]
 
                 case let .failure(error):
-                    logger.error("State request failed: \(error)")
-                    return []
+                    return handleRequestError(error, messageType: "State request")
                 }
             } catch {
                 logger.warning("State request timed out or failed: \(error)")
@@ -506,8 +515,7 @@ struct HandlerImpl: NetworkProtocolHandler {
                     return try [JamEncoder.encode(bundleShard, justification)]
 
                 case let .failure(error):
-                    logger.error("Audit shard request failed: \(error)")
-                    return []
+                    return handleRequestError(error, messageType: "Audit shard request")
                 }
             } catch {
                 logger.warning("Audit shard request timed out or failed: \(error)")
@@ -538,8 +546,7 @@ struct HandlerImpl: NetworkProtocolHandler {
                     return try [JamEncoder.encode(segmentShards)]
 
                 case let .failure(error):
-                    logger.error("Segment shard request failed: \(error)")
-                    return []
+                    return handleRequestError(error, messageType: "Segment shard request")
                 }
             } catch {
                 logger.warning("Segment shard request timed out or failed: \(error)")
@@ -570,8 +577,7 @@ struct HandlerImpl: NetworkProtocolHandler {
                     return try [JamEncoder.encode(segmentShards)]
 
                 case let .failure(error):
-                    logger.error("Segment shard request failed: \(error)")
-                    return []
+                    return handleRequestError(error, messageType: "Segment shard request")
                 }
             } catch {
                 logger.warning("Segment shard request timed out or failed: \(error)")
@@ -617,8 +623,7 @@ struct HandlerImpl: NetworkProtocolHandler {
                     return try [JamEncoder.encode(preimage)]
 
                 case let .failure(error):
-                    logger.error("Preimage request failed: \(error)")
-                    return []
+                    return handleRequestError(error, messageType: "Preimage request")
                 }
             } catch {
                 logger.warning("Preimage request timed out or failed: \(error)")
