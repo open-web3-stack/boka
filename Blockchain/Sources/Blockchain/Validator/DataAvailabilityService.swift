@@ -986,6 +986,19 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     // MARK: - Segment Shard Requests (CE 139/140)
 
     /// Request segment shards from validators
+    ///
+    /// **CE 139→140 Fallback Pattern (per JAMNP-S spec):**
+    /// - Initially use CE 139 (segment shard request without justification)
+    /// - Verify reconstructed segment against its proof
+    /// - If inconsistent, retry with CE 140 (with justification for each shard)
+    ///
+    /// The fallback logic should be implemented in the network layer (NetworkManager)
+    /// where it can:
+    /// 1. Send CE 139 requests (segmentShardRequest1)
+    /// 2. Collect responses and verify segments
+    /// 3. On verification failure, automatically retry with CE 140 (segmentShardRequest2)
+    /// 4. Use justifications from CE 140 to validate shard correctness
+    ///
     /// - Parameters:
     ///   - segmentsRoot: The root of the segments
     ///   - indices: The indices of the shards to request
@@ -1005,6 +1018,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
         // 2-5. TODO: Send requests, collect responses, verify, return
         // This requires network layer integration
+        // Note: Implement CE 139→140 fallback pattern in NetworkManager
         throw DataAvailabilityError.retrievalError
     }
 

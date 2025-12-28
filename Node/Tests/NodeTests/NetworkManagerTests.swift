@@ -391,7 +391,7 @@ struct NetworkManagerTests {
     @Test
     func testHandleAuditShardRequest() async throws {
         let testErasureRoot = Data32(repeating: 1)
-        let testShardIndex: UInt32 = 2
+        let testShardIndex: UInt16 = 2
         let testBundleShard = Data([0x01, 0x02, 0x03])
         let testJustification = AvailabilityJustification.leaf
         let testError = NSError(domain: "test", code: 404)
@@ -449,7 +449,7 @@ struct NetworkManagerTests {
     @Test
     func testHandleSegmentShardRequest() async throws {
         let testErasureRoot = Data32(repeating: 1)
-        let testShardIndex: UInt32 = 2
+        let testShardIndex: UInt16 = 2
         let testSegmentIndices: [UInt16] = [1, 2, 3]
         let testSegments = [SegmentShard(shard: Data12(repeating: 0), justification: nil)]
         let testError = NSError(domain: "test", code: 404)

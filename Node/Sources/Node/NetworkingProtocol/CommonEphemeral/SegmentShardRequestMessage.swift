@@ -9,16 +9,22 @@ public struct SegmentShardRequestMessage: Codable, Sendable, Equatable, Hashable
     }
 
     public let erasureRoot: Data32
-    public let shardIndex: UInt32
+    public let shardIndex: UInt16
     public let segmentIndices: [UInt16]
+
+    /// Maximum number of segment shards that can be requested (CE 139/140 limit)
+    public static let maxSegmentShardsPerRequest = 6144
 
     public init(
         erasureRoot: Data32,
-        shardIndex: UInt32,
+        shardIndex: UInt16,
         segmentIndices: [UInt16]
     ) throws {
-        guard segmentIndices.count <= 2048 else {
-            throw SegmentShardError.segmentIndicesExceedLimit(maxAllowed: 2048, actual: segmentIndices.count)
+        guard segmentIndices.count <= Self.maxSegmentShardsPerRequest else {
+            throw SegmentShardError.segmentIndicesExceedLimit(
+                maxAllowed: Self.maxSegmentShardsPerRequest,
+                actual: segmentIndices.count
+            )
         }
         self.erasureRoot = erasureRoot
         self.shardIndex = shardIndex

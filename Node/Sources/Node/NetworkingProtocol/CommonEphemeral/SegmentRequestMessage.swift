@@ -22,6 +22,10 @@ import Networking
 /// <-- FIN
 /// ```
 public struct SegmentRequestMessage: Codable, Sendable {
+    public enum SegmentRequestError: Error {
+        case segmentIndicesExceedLimit(maxAllowed: Int, actual: Int)
+    }
+
     public struct SegmentRequest: Codable, Sendable {
         /// Segments root identifying the import data
         public let segmentsRoot: Data32
@@ -38,16 +42,27 @@ public struct SegmentRequestMessage: Codable, Sendable {
     /// Multiple segment requests (for different segments roots)
     public let requests: [SegmentRequest]
 
-    public init(requests: [SegmentRequest]) {
+    /// Maximum number of segments that can be requested in a single stream (W_M)
+    public static let maxSegmentsPerRequest = 3072
+
+    public init(requests: [SegmentRequest]) throws {
+        // Validate total segment count across all requests doesn't exceed W_M
+        let totalSegments = requests.reduce(0) { $0 + $1.segmentIndices.count }
+        guard totalSegments <= Self.maxSegmentsPerRequest else {
+            throw SegmentRequestError.segmentIndicesExceedLimit(
+                maxAllowed: Self.maxSegmentsPerRequest,
+                actual: totalSegments
+            )
+        }
         self.requests = requests
     }
 
-    public init(segmentsRoot: Data32, segmentIndices: [UInt16]) {
+    public init(segmentsRoot: Data32, segmentIndices: [UInt16]) throws {
         let request = SegmentRequest(
             segmentsRoot: segmentsRoot,
             segmentIndices: segmentIndices
         )
-        requests = [request]
+        try self.init(requests: [request])
     }
 }
 
@@ -98,6 +113,7 @@ extension SegmentRequestMessage: CEMessage {
             ))
         }
 
-        return SegmentRequestMessage(requests: requests)
+        // Validate total segment count doesn't exceed W_M
+        return try SegmentRequestMessage(requests: requests)
     }
 }

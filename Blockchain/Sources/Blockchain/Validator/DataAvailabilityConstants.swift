@@ -26,6 +26,11 @@ public enum DataAvailabilityConstants {
     /// Default timeout for network requests (in seconds)
     public static let requestTimeout: TimeInterval = 5.0
 
-    /// Maximum number of segments to request in a single batch
+    // MARK: - Protocol Message Size Limits
+
+    /// Maximum number of segments to request in a single batch (CE 148: W_M)
     public static let maxSegmentsPerRequest = 3072
+
+    /// Maximum number of segment shards to request in a single batch (CE 139/140)
+    public static let maxSegmentShardsPerRequest = 6144
 }

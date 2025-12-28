@@ -292,9 +292,9 @@ public enum RuntimeEvents {
 
     public struct AuditShardRequestReceived: Event {
         public let erasureRoot: Data32
-        public let shardIndex: UInt32
+        public let shardIndex: UInt16
 
-        public init(erasureRoot: Data32, shardIndex: UInt32) {
+        public init(erasureRoot: Data32, shardIndex: UInt16) {
             self.erasureRoot = erasureRoot
             self.shardIndex = shardIndex
         }
@@ -308,14 +308,14 @@ public enum RuntimeEvents {
         public var requestId: Data32
 
         public let result: Result<
-            (erasureRoot: Data32, shardIndex: UInt32, bundleShard: Data, justification: AvailabilityJustification),
+            (erasureRoot: Data32, shardIndex: UInt16, bundleShard: Data, justification: AvailabilityJustification),
             Error
         >
 
         public init(
             requestId: Data32,
             erasureRoot: Data32,
-            shardIndex: UInt32,
+            shardIndex: UInt16,
             bundleShard: Data,
             justification: AvailabilityJustification
         ) {
@@ -331,12 +331,12 @@ public enum RuntimeEvents {
 
     public struct SegmentShardRequestReceived: Event {
         public let erasureRoot: Data32
-        public let shardIndex: UInt32
+        public let shardIndex: UInt16
         public let segmentIndices: [UInt16]
 
         public init(
             erasureRoot: Data32,
-            shardIndex: UInt32,
+            shardIndex: UInt16,
             segmentIndices: [UInt16]
         ) {
             self.erasureRoot = erasureRoot
