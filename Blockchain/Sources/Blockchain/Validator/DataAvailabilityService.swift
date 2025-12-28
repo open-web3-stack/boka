@@ -866,12 +866,12 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         )
 
         // Generate Justification based on Merkle path length
-        return try generateJustificationFromMerklePath(merklePath, shardIndex: shardIndex, segmentShards: segmentShards)
+        return try generateJustificationFromMerklePath(from: merklePath, shardIndex: shardIndex, segmentShards: segmentShards)
     }
 
     /// Generate justification from Merkle path
     private func generateJustificationFromMerklePath(
-        from merklePath: [MerklePath.Element],
+        from merklePath: [Either<Data, Data32>],
         shardIndex: UInt16,
         segmentShards: [Data]
     ) throws -> Justification {
@@ -886,7 +886,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     }
 
     /// Generate single hash justification for shallow trees
-    private func generateSingleHashJustification(from merklePath: [MerklePath.Element]) throws -> Justification {
+    private func generateSingleHashJustification(from merklePath: [Either<Data, Data32>]) throws -> Justification {
         guard case let .right(hash) = merklePath.first else {
             throw DataAvailabilityError.invalidMerklePath
         }
@@ -894,7 +894,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     }
 
     /// Generate double hash justification for medium depth trees
-    private func generateDoubleHashJustification(from merklePath: [MerklePath.Element]) throws -> Justification {
+    private func generateDoubleHashJustification(from merklePath: [Either<Data, Data32>]) throws -> Justification {
         guard case let .right(hash1) = merklePath[0],
               case let .right(hash2) = merklePath[1]
         else {
