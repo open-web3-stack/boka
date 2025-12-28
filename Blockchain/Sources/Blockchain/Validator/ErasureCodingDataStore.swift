@@ -5,6 +5,7 @@ import TracingUtils
 import Utils
 
 private let logger = Logger(label: "ErasureCodingDataStore")
+private let cEcOriginalCount = 342
 
 /// Actor for thread-safe counters
 private actor Counter {
@@ -140,12 +141,12 @@ public actor ErasureCodingDataStore {
 
         // Fallback to reconstruction from shards
         let indices = try await dataStore.getAvailableShardIndices(erasureRoot: erasureRoot)
-        guard indices.count >= 342 else {
-            logger.warning("Insufficient shards for reconstruction: \(indices.count)/342")
+        guard indices.count >= cEcOriginalCount else {
+            logger.warning("Insufficient shards for reconstruction: \(indices.count)/\(cEcOriginalCount)")
             return nil
         }
 
-        let shards = try await dataStore.getShards(erasureRoot: erasureRoot, shardIndices: Array(indices.prefix(342)))
+        let shards = try await dataStore.getShards(erasureRoot: erasureRoot, shardIndices: Array(indices.prefix(cEcOriginalCount)))
 
         // Determine original size from audit metadata
         guard let auditEntry = try await dataStore.getAuditEntry(erasureRoot: erasureRoot) else {
@@ -258,17 +259,17 @@ public actor ErasureCodingDataStore {
         let availableShardIndices = try await dataStore.getAvailableShardIndices(erasureRoot: erasureRoot)
 
         // Check if we can reconstruct
-        guard availableShardIndices.count >= 342 else {
+        guard availableShardIndices.count >= cEcOriginalCount else {
             throw ErasureCodingStoreError.insufficientShards(
                 available: availableShardIndices.count,
-                required: 342
+                required: cEcOriginalCount
             )
         }
 
         // Get shards for reconstruction
         let shardTuples = try await dataStore.getShards(
             erasureRoot: erasureRoot,
-            shardIndices: Array(availableShardIndices.prefix(342))
+            shardIndices: Array(availableShardIndices.prefix(cEcOriginalCount))
         )
 
         // Get segment count from metadata
@@ -1341,11 +1342,11 @@ public actor ErasureCodingDataStore {
             // Fetch missing shards
             let fetchedShards = try await client.fetchFromValidatorsConcurrently(
                 erasureRoot: erasureRoot,
-                shardIndices: Array(missingShards.prefix(342)),
+                shardIndices: Array(missingShards.prefix(cEcOriginalCount)),
                 validators: validatorAddrs,
                 coreIndex: coreIndex,
                 totalValidators: totalValidators,
-                requiredShards: max(0, 342 - getLocalShardCount(erasureRoot: erasureRoot))
+                requiredShards: max(0, cEcOriginalCount - getLocalShardCount(erasureRoot: erasureRoot))
             )
 
             // Store fetched shards
@@ -1391,7 +1392,7 @@ public actor ErasureCodingDataStore {
     /// - Returns: True if at least 342 shards are available
     public func canReconstructLocally(erasureRoot: Data32) async throws -> Bool {
         let shardCount = try await getLocalShardCount(erasureRoot: erasureRoot)
-        return shardCount >= 342
+        return shardCount >= cEcOriginalCount
     }
 
     /// Get reconstruction potential
@@ -1399,7 +1400,7 @@ public actor ErasureCodingDataStore {
     /// - Returns: Percentage of required shards available (capped at 100%)
     public func getReconstructionPotential(erasureRoot: Data32) async throws -> Double {
         let shardCount = try await getLocalShardCount(erasureRoot: erasureRoot)
-        let percentage = Double(shardCount) / 342.0 * 100.0
+        let percentage = Double(shardCount) / Double(cEcOriginalCount) * 100.0
         return min(percentage, 100.0)
     }
 
@@ -1424,14 +1425,14 @@ public actor ErasureCodingDataStore {
     public func getReconstructionPlan(erasureRoot: Data32) async throws -> ReconstructionPlan {
         let localShards = try await getLocalShardCount(erasureRoot: erasureRoot)
         let missingShards = 1023 - localShards
-        let canReconstruct = localShards >= 342
+        let canReconstruct = localShards >= cEcOriginalCount
 
         return ReconstructionPlan(
             erasureRoot: erasureRoot,
             localShards: localShards,
             missingShards: missingShards,
             canReconstructLocally: canReconstruct,
-            reconstructionPercentage: Double(localShards) / 342.0 * 100.0
+            reconstructionPercentage: Double(localShards) / Double(cEcOriginalCount) * 100.0
         )
     }
 
@@ -1444,12 +1445,12 @@ public actor ErasureCodingDataStore {
         guard try await canReconstructLocally(erasureRoot: erasureRoot) else {
             throw try await ErasureCodingStoreError.insufficientShards(
                 available: getLocalShardCount(erasureRoot: erasureRoot),
-                required: 342
+                required: cEcOriginalCount
             )
         }
 
         let availableIndices = try await getLocalShardIndices(erasureRoot: erasureRoot)
-        let shards = try await getLocalShards(erasureRoot: erasureRoot, indices: Array(availableIndices.prefix(342)))
+        let shards = try await getLocalShards(erasureRoot: erasureRoot, indices: Array(availableIndices.prefix(cEcOriginalCount)))
 
         return try await erasureCoding.reconstruct(shards: shards, originalLength: originalLength)
     }
@@ -1492,76 +1493,111 @@ public actor ErasureCodingDataStore {
         coreIndex: UInt16 = 0,
         totalValidators: UInt16 = 1023
     ) async throws -> [Data32: Data] {
-        var results: [Data32: Data] = [:]
+        // Capture state for TaskGroup closures
+        let dataStore = dataStore
+        let networkClient = networkClient
+        let fetchStrategy = fetchStrategy
 
-        for erasureRoot in erasureRoots {
-            // Check local availability first
-            let canReconstructLocally = try await canReconstructLocally(erasureRoot: erasureRoot)
+        // Limit concurrency
+        let maxConcurrentTasks = 10
 
-            if canReconstructLocally {
-                // Try local reconstruction first
-                do {
-                    let data = try await reconstructFromLocalShards(
-                        erasureRoot: erasureRoot,
-                        originalLength: originalLengths[erasureRoot] ?? 0
-                    )
-                    results[erasureRoot] = data
-                    continue
-                } catch {
-                    logger.warning("Local reconstruction failed for erasureRoot=\(erasureRoot.toHexString()): \(error)")
-                }
-            }
+        // Parallelize reconstruction across erasure roots
+        return try await withThrowingTaskGroup(of: (Data32, Data).self) { group in
+            var results: [Data32: Data] = [:]
+            var activeTasks = 0
+            var iterator = erasureRoots.makeIterator()
 
-            // Try network fallback if enabled and validators available
-            if fetchStrategy != .localOnly,
-               let client = networkClient,
-               let validatorAddrs = validators,
-               !validatorAddrs.isEmpty
-            {
-                do {
-                    logger.info("Attempting network fallback for erasureRoot=\(erasureRoot.toHexString())")
+            // Helper to add next task
+            func addNextTask() {
+                guard let erasureRoot = iterator.next() else { return }
 
-                    let missingShards = try await getMissingShardIndices(erasureRoot: erasureRoot)
+                activeTasks += 1
+                group.addTask {
+                    // Check local availability first
+                    let canReconstructLocally = try await self.canReconstructLocally(erasureRoot: erasureRoot)
 
-                    // Fetch missing shards from network
-                    let fetchedShards = try await client.fetchFromValidatorsConcurrently(
-                        erasureRoot: erasureRoot,
-                        shardIndices: missingShards,
-                        validators: validatorAddrs,
-                        coreIndex: coreIndex,
-                        totalValidators: totalValidators,
-                        requiredShards: max(0, 342 - getLocalShardCount(erasureRoot: erasureRoot))
-                    )
-
-                    // Store fetched shards locally
-                    for (shardIndex, shardData) in fetchedShards {
-                        try await dataStore.storeShard(
-                            shardData: shardData,
-                            erasureRoot: erasureRoot,
-                            shardIndex: shardIndex
-                        )
+                    if canReconstructLocally {
+                        // Try local reconstruction first
+                        do {
+                            let data = try await self.reconstructFromLocalShards(
+                                erasureRoot: erasureRoot,
+                                originalLength: originalLengths[erasureRoot] ?? 0
+                            )
+                            return (erasureRoot, data)
+                        } catch {
+                            logger.warning("Local reconstruction failed for erasureRoot=\(erasureRoot.toHexString()): \(error)")
+                        }
                     }
 
-                    // Now reconstruct with combined local + fetched shards
-                    let data = try await reconstructFromLocalShards(
-                        erasureRoot: erasureRoot,
-                        originalLength: originalLengths[erasureRoot] ?? 0
-                    )
-                    results[erasureRoot] = data
+                    // Try network fallback if enabled and validators available
+                    if fetchStrategy != .localOnly,
+                       let client = networkClient,
+                       let validatorAddrs = validators,
+                       !validatorAddrs.isEmpty
+                    {
+                        do {
+                            logger.info("Attempting network fallback for erasureRoot=\(erasureRoot.toHexString())")
 
-                    logger.info("Successfully reconstructed erasureRoot=\(erasureRoot.toHexString()) with network fallback")
-                } catch {
-                    logger.error("Network fallback failed for erasureRoot=\(erasureRoot.toHexString()): \(error)")
-                    throw error
+                            let missingShards = try await self.getMissingShardIndices(erasureRoot: erasureRoot)
+
+                            // Fetch missing shards from network
+                            let fetchedShards = try await client.fetchFromValidatorsConcurrently(
+                                erasureRoot: erasureRoot,
+                                shardIndices: missingShards,
+                                validators: validatorAddrs,
+                                coreIndex: coreIndex,
+                                totalValidators: totalValidators,
+                                requiredShards: max(0, cEcOriginalCount - (self.getLocalShardCount(erasureRoot: erasureRoot)))
+                            )
+
+                            // Store fetched shards locally
+                            for (shardIndex, shardData) in fetchedShards {
+                                try await dataStore.storeShard(
+                                    shardData: shardData,
+                                    erasureRoot: erasureRoot,
+                                    shardIndex: shardIndex
+                                )
+                            }
+
+                            // Now reconstruct with combined local + fetched shards
+                            let data = try await self.reconstructFromLocalShards(
+                                erasureRoot: erasureRoot,
+                                originalLength: originalLengths[erasureRoot] ?? 0
+                            )
+
+                            logger.info("Successfully reconstructed erasureRoot=\(erasureRoot.toHexString()) with network fallback")
+                            return (erasureRoot, data)
+                        } catch {
+                            logger.error("Network fallback failed for erasureRoot=\(erasureRoot.toHexString()): \(error)")
+                            throw error
+                        }
+                    } else {
+                        // No network fallback available, throw error
+                        let localShardCount = try await self.getLocalShardCount(erasureRoot: erasureRoot)
+                        throw ErasureCodingStoreError.insufficientShards(available: localShardCount, required: cEcOriginalCount)
+                    }
                 }
-            } else {
-                // No network fallback available, throw error
-                let localShardCount = try await getLocalShardCount(erasureRoot: erasureRoot)
-                throw ErasureCodingStoreError.insufficientShards(available: localShardCount, required: 342)
             }
-        }
 
-        return results
+            // Start initial batch
+            for _ in 0 ..< maxConcurrentTasks {
+                addNextTask()
+            }
+
+            // Process results and schedule new tasks
+            while activeTasks > 0 {
+                if let (erasureRoot, data) = try await group.next() {
+                    results[erasureRoot] = data
+                    activeTasks -= 1
+                    addNextTask()
+                } else {
+                    // Should not happen if activeTasks > 0, but break to avoid infinite loop
+                    break
+                }
+            }
+
+            return results
+        }
     }
 
     /// Batch reconstruction from local shards only
@@ -1569,26 +1605,37 @@ public actor ErasureCodingDataStore {
         erasureRoots: [Data32],
         originalLengths: [Data32: Int]
     ) async throws -> [Data32: Data] {
-        var results: [Data32: Data] = [:]
+        // Parallelize local reconstruction
+        try await withThrowingTaskGroup(of: (Data32, Data?).self) { group in
+            for erasureRoot in erasureRoots {
+                group.addTask {
+                    guard let originalLength = originalLengths[erasureRoot] else {
+                        logger.warning("Missing original length for erasureRoot=\(erasureRoot.toHexString())")
+                        return (erasureRoot, nil)
+                    }
 
-        for erasureRoot in erasureRoots {
-            guard let originalLength = originalLengths[erasureRoot] else {
-                logger.warning("Missing original length for erasureRoot=\(erasureRoot.toHexString())")
-                continue
+                    do {
+                        let data = try await self.reconstructFromLocalShards(
+                            erasureRoot: erasureRoot,
+                            originalLength: originalLength
+                        )
+                        return (erasureRoot, data)
+                    } catch {
+                        logger.warning("Failed to reconstruct erasureRoot=\(erasureRoot.toHexString()): \(error)")
+                        return (erasureRoot, nil)
+                    }
+                }
             }
 
-            do {
-                let data = try await reconstructFromLocalShards(
-                    erasureRoot: erasureRoot,
-                    originalLength: originalLength
-                )
-                results[erasureRoot] = data
-            } catch {
-                logger.warning("Failed to reconstruct erasureRoot=\(erasureRoot.toHexString()): \(error)")
+            // Collect all results
+            var results: [Data32: Data] = [:]
+            for try await (erasureRoot, data) in group {
+                if let data {
+                    results[erasureRoot] = data
+                }
             }
+            return results
         }
-
-        return results
     }
 }
 

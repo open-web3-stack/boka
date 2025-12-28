@@ -176,6 +176,7 @@ public actor ErasureCodingService {
 
         // Split into segments
         var segments: [Data4104] = []
+        segments.reserveCapacity(segmentCount)
 
         for i in 0 ..< segmentCount {
             let start = i * 4104
@@ -224,12 +225,14 @@ public actor ErasureCodingService {
         }
 
         // Generate nodes: encode(shardHash) || encode(segmentsRoot)
+        // Encode segmentsRoot once outside the loop to avoid redundant encoding
+        let encodedSegmentsRoot = try JamEncoder.encode(segmentsRoot)
         var nodes: [Data] = []
+        nodes.reserveCapacity(shards.count)
 
         for shard in shards {
             let shardHash = shard.blake2b256hash()
             let encodedShardHash = try JamEncoder.encode(shardHash)
-            let encodedSegmentsRoot = try JamEncoder.encode(segmentsRoot)
             let node = encodedShardHash + encodedSegmentsRoot
             nodes.append(node)
         }
@@ -282,6 +285,7 @@ extension ErasureCodingService {
 
         // Convert MerklePath to array of hashes
         var hashes: [Data32] = []
+        hashes.reserveCapacity(proof.count)
 
         for step in proof {
             switch step {
@@ -377,12 +381,14 @@ extension ErasureCodingService {
         }
 
         // Generate nodes: encode(shardHash) || encode(segmentsRoot)
+        // Encode segmentsRoot once outside the loop to avoid redundant encoding
+        let encodedSegmentsRoot = try JamEncoder.encode(segmentsRoot)
         var nodes: [Data] = []
+        nodes.reserveCapacity(shards.count)
 
         for shard in shards {
             let shardHash = shard.blake2b256hash()
             let encodedShardHash = try JamEncoder.encode(shardHash)
-            let encodedSegmentsRoot = try JamEncoder.encode(segmentsRoot)
             let node = encodedShardHash + encodedSegmentsRoot
             nodes.append(node)
         }

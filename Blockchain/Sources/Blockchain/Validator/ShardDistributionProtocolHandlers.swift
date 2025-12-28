@@ -11,6 +11,36 @@ private let cEcPiecesize = 684 /// Erasure coding piece size in octets
 private let cEcOriginalCount = 342 /// Original shard count for reconstruction
 private let cEcRecoveryCount = 1023 /// Recovery shard count
 
+/// Cache for shard hashes to avoid repeated I/O operations
+private actor ShardHashCache {
+    private var cache: [Data32: [Data32]] = [:]
+    private var accessTimes: [Data32: Date] = [:]
+
+    func get(_ key: Data32) -> [Data32]? {
+        accessTimes[key] = Date()
+        return cache[key]
+    }
+
+    func set(_ key: Data32, hashes: [Data32]) {
+        cache[key] = hashes
+        accessTimes[key] = Date()
+
+        // Limit cache size to prevent unbounded growth
+        if cache.count > 1000 {
+            evictOldest()
+        }
+    }
+
+    private func evictOldest() {
+        guard let oldestKey = accessTimes.min(by: { $0.value < $1.value })?.key else {
+            return
+        }
+        cache.removeValue(forKey: oldestKey)
+        accessTimes.removeValue(forKey: oldestKey)
+        logger.debug("Evicted oldest shard hash cache entry")
+    }
+}
+
 /// Protocol handlers for JAMNP-S CE 137-148 shard distribution protocols
 ///
 /// Implements the server-side handling of shard distribution requests as per
@@ -19,6 +49,7 @@ public actor ShardDistributionProtocolHandlers {
     private let dataStore: ErasureCodingDataStore
     private let erasureCoding: ErasureCodingService
     private let config: ProtocolConfigRef
+    private let shardHashCache = ShardHashCache()
 
     public init(
         dataStore: ErasureCodingDataStore,
@@ -81,16 +112,18 @@ public actor ShardDistributionProtocolHandlers {
         }
 
         // Get metadata - we need both audit entry and D³L entry
-        let auditMetadata = try await dataStore.getAuditEntry(erasureRoot: message.erasureRoot)
-        guard let auditMetadata else {
-            logger.warning("CE 137: No audit metadata found for erasureRoot \(message.erasureRoot.toHexString())")
+        // Fetch both in parallel to reduce latency
+        let erasureRoot = message.erasureRoot
+        async let auditMetadata = dataStore.getAuditEntry(erasureRoot: erasureRoot)
+        async let d3lMetadata = dataStore.getD3LEntry(erasureRoot: erasureRoot)
+
+        guard let _ = try await auditMetadata else {
+            logger.warning("CE 137: No audit metadata found for erasureRoot \(erasureRoot.toHexString())")
             throw ShardDistributionError.metadataNotFound
         }
 
-        // Get D³L entry for segment count
-        let d3lMetadata = try await dataStore.getD3LEntry(erasureRoot: message.erasureRoot)
-        guard let d3lMetadata else {
-            logger.warning("CE 137: No D³L metadata found for erasureRoot \(message.erasureRoot.toHexString())")
+        guard let d3lMetadata = try await d3lMetadata else {
+            logger.warning("CE 137: No D³L metadata found for erasureRoot \(erasureRoot.toHexString())")
             throw ShardDistributionError.metadataNotFound
         }
 
@@ -504,18 +537,27 @@ public actor ShardDistributionProtocolHandlers {
     }
 
     private func getAllShardHashes(erasureRoot: Data32) async throws -> [Data32] {
-        // Get metadata to determine shard count
-        let metadata = try await getAuditMetadata(erasureRoot: erasureRoot)
+        // Check cache first to avoid expensive I/O operations
+        if let cachedHashes = await shardHashCache.get(erasureRoot) {
+            logger.debug("Cache hit for shard hashes: erasureRoot=\(erasureRoot.toHexString())")
+            return cachedHashes
+        }
+
+        logger.debug("Cache miss for shard hashes, computing: erasureRoot=\(erasureRoot.toHexString())")
+
+        // Batch fetch all shards in a single database call instead of N+1 queries
+        let allShardIndices = Array(0 ..< UInt16(cEcRecoveryCount))
+        let shards = try await dataStore.getShards(erasureRoot: erasureRoot, shardIndices: allShardIndices)
 
         var hashes: [Data32] = []
-        for i in 0 ..< cEcRecoveryCount {
-            if let shardData = try await dataStore.getShard(
-                erasureRoot: erasureRoot,
-                shardIndex: UInt16(i)
-            ) {
-                hashes.append(shardData.blake2b256hash())
-            }
+        hashes.reserveCapacity(cEcRecoveryCount)
+
+        for shard in shards {
+            hashes.append(shard.data.blake2b256hash())
         }
+
+        // Cache the computed hashes for future requests
+        await shardHashCache.set(erasureRoot, hashes: hashes)
 
         return hashes
     }
@@ -530,6 +572,7 @@ public actor ShardDistributionProtocolHandlers {
         let segmentShardSize = totalSegmentDataSize / Int(segmentCount)
 
         var segmentShards: [Data] = []
+        segmentShards.reserveCapacity(segmentIndices.count)
 
         for segmentIndex in segmentIndices {
             let offset = bundleShardSize + (Int(segmentIndex) * segmentShardSize)

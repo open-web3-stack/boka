@@ -533,39 +533,89 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     /// - Returns: Network address
     /// - Throws: DataAvailabilityError if extraction fails
     private func extractNetworkAddress(from metadata: Data) throws -> NetAddr {
-        // Metadata format: <multiaddr> (see GP spec)
-        // For now, we assume it's encoded in the metadata
-        // TODO: Implement proper multiaddr decoding per spec
-        // This is a placeholder that needs proper multiaddr parsing
+        // Metadata format: multiaddr encoded as UTF-8 string
+        // GP spec multiaddr format: /ip4/<ip>/tcp/<port> or /ip6/<ip>/tcp/<port>
+        // See: https://github.com/multiformats/multiaddr
 
-        // For testing purposes, try to create address from metadata
-        // In production, this should parse the multiaddr format properly
-        let metadataString = metadata.toHexString()
-
-        // Try common formats
-        if let addr = NetAddr(address: metadataString) {
-            return addr
+        guard let metadataString = String(data: metadata, encoding: .utf8) else {
+            logger.error("Failed to decode metadata as UTF-8 string. Hex: \(metadata.toHexString())")
+            throw DataAvailabilityError.retrievalError
         }
 
-        // If metadata contains a valid IPv4:port format
-        // Format: /ip4/<ip>/tcp/<port>
-        if metadataString.hasPrefix("/ip4/") {
-            let parts = metadataString.components(separatedBy: "/")
-            if parts.count >= 5, let ip = parts[safe: 2], let port = parts[safe: 4] {
-                let addrString = "\(ip):\(port)"
-                if let addr = NetAddr(address: addrString) {
-                    return addr
+        // Parse multiaddr format: /ip4/<ip>/tcp/<port>
+        let parts = metadataString.components(separatedBy: "/").filter { !$0.isEmpty }
+
+        var ipAddress: String?
+        var port: UInt16?
+
+        var index = 0
+        while index < parts.count {
+            let part = parts[index]
+
+            switch part {
+            case "ip4":
+                if index + 1 < parts.count {
+                    ipAddress = parts[index + 1]
+                    index += 2
+                } else {
+                    index += 1
                 }
+
+            case "ip6":
+                if index + 1 < parts.count {
+                    // IPv6 addresses contain colons, preserve them
+                    ipAddress = parts[index + 1]
+                    index += 2
+                } else {
+                    index += 1
+                }
+
+            case "tcp", "udp":
+                if index + 1 < parts.count, let portNum = UInt16(parts[index + 1]) {
+                    port = portNum
+                    index += 2
+                } else {
+                    index += 1
+                }
+
+            default:
+                index += 1
             }
         }
 
-        // Fallback to localhost for testing
-        // TODO: Remove this fallback and implement proper multiaddr parsing
-        logger.warning("Unable to parse network address from metadata, using localhost fallback")
-        return NetAddr(address: "127.0.0.1:0")!
+        // Construct address string from parsed components
+        if let ip = ipAddress, let p = port {
+            if let addr = NetAddr(ipAddress: ip, port: p) {
+                logger.debug("Parsed multiaddr: \(metadataString) -> \(ip):\(p)")
+                return addr
+            }
+        }
+
+        // Try direct format (ip:port)
+        if let addr = NetAddr(address: metadataString) {
+            logger.debug("Parsed direct address format: \(metadataString)")
+            return addr
+        }
+
+        // If we have IPv4 and port but NetAddr creation failed, try string format
+        if let ip = ipAddress, let p = port {
+            let addrString = "\(ip):\(p)"
+            if let addr = NetAddr(address: addrString) {
+                logger.debug("Parsed as string format: \(addrString)")
+                return addr
+            }
+        }
+
+        logger.error("Failed to parse network address from metadata: \(metadataString)")
+        throw DataAvailabilityError.retrievalError
     }
 
     /// Fetch shards from multiple validators concurrently
+    ///
+    /// **Note**: This is a simplified implementation. For production use with shard
+    /// assignment and controlled concurrency, use `AvailabilityNetworkClient.fetchFromValidatorsConcurrently`
+    /// which has the optimized implementation with JAMNP-S shard assignment logic.
+    ///
     /// - Parameters:
     ///   - validators: The validators to fetch from
     ///   - shardRequest: The shard request data

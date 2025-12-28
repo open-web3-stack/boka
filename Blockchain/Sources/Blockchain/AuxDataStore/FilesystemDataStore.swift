@@ -40,8 +40,8 @@ public actor FilesystemDataStore {
         fileManager = FileManager.default
 
         // Create directories if they don't exist
-        await createDirectoryIfNeeded(auditPath)
-        await createDirectoryIfNeeded(d3lPath)
+        try await createDirectoryIfNeeded(auditPath)
+        try await createDirectoryIfNeeded(d3lPath)
 
         logger.info("FilesystemDataStore initialized at \(dataPath.path)")
     }
@@ -101,6 +101,7 @@ public actor FilesystemDataStore {
 
         let files = try fileManager.contentsOfDirectory(at: shardsDir, includingPropertiesForKeys: nil)
         var indices: [UInt16] = []
+        indices.reserveCapacity(files.count)
 
         for file in files {
             guard file.pathExtension == "bin" else { continue }
@@ -181,29 +182,42 @@ public actor FilesystemDataStore {
 extension FilesystemDataStore {
     /// Create directory if it doesn't exist
     /// Uses Task.detached to avoid blocking the actor executor
-    private func createDirectoryIfNeeded(_ url: URL) async {
+    private func createDirectoryIfNeeded(_ url: URL) async throws {
         // Capture path as a String to avoid capturing URL in Task.detached
         let path = url.path
-        let fileManager = FileManager.default
 
-        await Task.detached {
+        let (directoryExists, isDirectory) = await Task.detached {
             var isDirectory: ObjCBool = false
-            if fileManager.fileExists(atPath: path, isDirectory: &isDirectory) {
-                guard isDirectory.boolValue else {
-                    logger.error("Path exists but is not a directory: \(path)")
+            let exists = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
+            return (exists, isDirectory)
+        }.value
+
+        if directoryExists {
+            guard isDirectory.boolValue else {
+                logger.error("Path exists but is not a directory: \(path)")
+                throw FilesystemDataStoreError.directoryCreationFailed("Path exists but is not a directory: \(path)")
+            }
+        } else {
+            do {
+                try FileManager.default.createDirectory(at: URL(fileURLWithPath: path), withIntermediateDirectories: true, attributes: nil)
+            } catch {
+                logger.error("Failed to create directory at \(path): \(error.localizedDescription)")
+                // Verify if it was created by another task
+                var isDirectory: ObjCBool = false
+                if FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue {
                     return
                 }
-            } else {
-                try? fileManager.createDirectory(at: URL(fileURLWithPath: path), withIntermediateDirectories: true, attributes: nil)
+                throw FilesystemDataStoreError
+                    .directoryCreationFailed("Failed to create directory at \(path): \(error.localizedDescription)")
             }
-        }.value
+        }
     }
 
     /// Write data atomically (write to temp file, then rename)
     private func writeDataAtomically(to url: URL, data: Data) async throws {
         // Ensure parent directory exists
         let parentDir = url.deletingLastPathComponent()
-        await createDirectoryIfNeeded(parentDir)
+        try await createDirectoryIfNeeded(parentDir)
 
         // Capture paths to avoid capturing URL in Task.detached
         let targetPath = url.path
@@ -252,7 +266,12 @@ extension FilesystemDataStore {
 
         try await Task.detached {
             if fileManager.fileExists(atPath: path) {
-                try fileManager.removeItem(at: URL(fileURLWithPath: path))
+                do {
+                    try fileManager.removeItem(at: URL(fileURLWithPath: path))
+                } catch {
+                    logger.error("Failed to remove directory at \(path): \(error.localizedDescription)")
+                    throw FilesystemDataStoreError.directoryRemovalFailed("Failed to remove directory: \(path)")
+                }
             }
         }.value
     }
@@ -310,6 +329,8 @@ public enum FilesystemDataStoreError: Error {
     case permissionDenied(path: URL)
     case corruptedData(erasureRoot: Data32)
     case invalidSegmentLength(expected: Int, actual: Int)
+    case directoryCreationFailed(String)
+    case directoryRemovalFailed(String)
 }
 
 // MARK: - URL Extension
