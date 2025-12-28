@@ -5,14 +5,6 @@ import Synchronization
 import TracingUtils
 import Utils
 
-// MARK: - Array Helpers
-
-extension Array {
-    subscript(safe index: Int) -> Element? {
-        indices.contains(index) ? self[index] : nil
-    }
-}
-
 public enum DataAvailabilityError: Error {
     case storeError
     case retrievalError
