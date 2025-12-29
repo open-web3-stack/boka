@@ -15,6 +15,13 @@ private struct IdCancellable: Hashable, Sendable {
     }
 }
 
+/// Enhanced base class for services with scheduling capabilities
+///
+/// Thread-safety: @unchecked Sendable is safe here because:
+/// - Inherits safety from ServiceBase (immutable properties + actors)
+/// - ThreadSafeContainer provides synchronized access to cancellables set
+/// - All mutable state is protected by ThreadSafeContainer
+/// - Scheduler is thread-safe and manages its own state
 public class ServiceBase2: ServiceBase, @unchecked Sendable {
     private let scheduler: Scheduler
     private let cancellables: ThreadSafeContainer<Set<IdCancellable>> = .init([])
