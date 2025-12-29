@@ -430,6 +430,12 @@ public actor ErasureCodingDataStore {
     ///   - segmentsRoot: Root of all segments
     ///   - totalSegments: Total number of segments
     /// - Returns: Page metadata as Data
+    ///
+    /// TODO: This method only generates Merkle proofs from segment to page root (depth 6).
+    /// For complete verification, we need to also generate the path from page root to global root.
+    /// This requires calculating the Merkle tree of all page roots and generating the co-path
+    /// from this page's root to the global segmentsRoot. The current implementation only
+    /// provides proofs valid within a page, not the complete proof to the global root.
     private func generatePageMetadata(
         pageSegments: [Data4104],
         pageIndex: Int,
@@ -497,6 +503,15 @@ public actor ErasureCodingDataStore {
     ///   - proof: Merkle proof path
     ///   - segmentsRoot: Expected root
     /// - Returns: True if the segment is valid
+    ///
+    /// TODO: Critical logic error - this method uses localIndex (bits 0-5) for ALL proof levels,
+    /// but localIndex only provides meaningful bits for the first 6 levels (within-page).
+    /// For deeper trees (beyond 64 segments), pageIndex must be used for levels 6+.
+    /// The current implementation will incorrectly calculate paths for trees deeper than 6 levels,
+    /// causing verification failures for large segment sets. Fix requires:
+    /// 1. Use localIndex bits for levels 0-5 (within page)
+    /// 2. Use pageIndex bits for levels 6+ (across pages)
+    /// 3. Combine both to get the complete global index path
     public func verifySegmentProof(
         segment: Data4104,
         pageIndex _: Int,

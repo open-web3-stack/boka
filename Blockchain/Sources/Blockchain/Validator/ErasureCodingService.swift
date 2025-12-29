@@ -104,14 +104,11 @@ public actor ErasureCodingService {
             ErasureCoding.Shard(data: shard.data, index: UInt32(shard.index))
         }
 
-        // Calculate original count (approximately 1/3 of recovery count)
-        let originalCount = (totalShardCount + 2) / 3
-
         do {
             let reconstructed = try ErasureCoding.reconstruct(
                 shards: erasureShards,
                 basicSize: pieceSize,
-                originalCount: originalCount,
+                originalCount: originalShardCount,
                 recoveryCount: totalShardCount,
                 originalLength: originalLength
             )

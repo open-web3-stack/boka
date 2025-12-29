@@ -722,8 +722,8 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
         // According to GP spec (reporting_assurance.tex eq:guarantorsig):
         // The signature is over: Xguarantee || blake(encode(workReport))
-        // Where Xguarantee is the string "$jam_guarantee" with a length prefix byte
-        let guaranteePrefix = Data("\u{10}$jam_guarantee".utf8)
+        // Where Xguarantee is the string "$jam_guarantee" (14 bytes) with a length prefix byte
+        let guaranteePrefix = Data("\u{0E}$jam_guarantee".utf8)
         let signatureMessage = guaranteePrefix + workReportHash.data
 
         // Verify each signature
@@ -1140,10 +1140,11 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             }
 
             // Create the message: $jam_available || blake(encode(parentHash, bitfield))
+            // $jam_available is 14 bytes, so length prefix is \u{0E}
             let bitfieldData = try JamEncoder.encode(assurance.assurance)
             let payload = try JamEncoder.encode(parentHash, bitfieldData)
             let message = try JamEncoder.encode(UInt8(0x01), payload.blake2b256hash())
-            let signatureMessage = try JamEncoder.encode(Data("\u{10}$jam_available".utf8), message)
+            let signatureMessage = try JamEncoder.encode(Data("\u{0E}$jam_available".utf8), message)
 
             guard publicKey.verify(signature: assurance.signature, message: signatureMessage) else {
                 throw DataAvailabilityError.invalidWorkReport
@@ -1193,10 +1194,11 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             }
 
             // Create the message: $jam_available || blake(encode(parentHash, bitfield))
+            // $jam_available is 14 bytes, so length prefix is \u{0E}
             let bitfieldData = try JamEncoder.encode(assurance.assurance)
             let payload = try JamEncoder.encode(parentHash, bitfieldData)
             let message = try JamEncoder.encode(UInt8(0x01), payload.blake2b256hash())
-            let signatureMessage = try JamEncoder.encode(Data("\u{10}$jam_available".utf8), message)
+            let signatureMessage = try JamEncoder.encode(Data("\u{0E}$jam_available".utf8), message)
 
             guard publicKey.verify(signature: assurance.signature, message: signatureMessage) else {
                 logger.warning("Invalid signature for validator \(assurance.validatorIndex)")
