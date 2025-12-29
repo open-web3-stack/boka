@@ -94,18 +94,21 @@ public actor ShardDistributionProtocolHandlers {
             throw ShardDistributionError.shardDataUnavailable
         }
 
-        // Fetch metadata in parallel
-        let erasureRoot = message.erasureRoot
-        async let auditMetadata = dataStore.getAuditEntry(erasureRoot: erasureRoot)
-        async let d3lMetadata = dataStore.getD3LEntry(erasureRoot: erasureRoot)
+        // This erasureRoot is for the AUDIT BUNDLE
+        let auditErasureRoot = message.erasureRoot
 
-        guard let _ = try await auditMetadata else {
-            logger.warning("CE 137: No audit metadata found for erasureRoot \(erasureRoot.toHexString())")
+        // Get audit metadata first
+        guard let auditMetadata = try await dataStore.getAuditEntry(erasureRoot: auditErasureRoot) else {
+            logger.warning("CE 137: No audit metadata found for erasureRoot=\(auditErasureRoot.toHexString())")
             throw ShardDistributionError.metadataNotFound
         }
 
-        guard let d3lMetadata = try await d3lMetadata else {
-            logger.warning("CE 137: No D³L metadata found for erasureRoot \(erasureRoot.toHexString())")
+        // The segmentsRoot tells us where to find D³L entries
+        let segmentsRoot = auditMetadata.segmentsRoot
+
+        // Now fetch D³L metadata using segmentsRoot (not the audit erasure root)
+        guard let d3lMetadata = try await dataStore.getD3LEntry(segmentsRoot: segmentsRoot) else {
+            logger.warning("CE 137: No D³L metadata found for segmentsRoot=\(segmentsRoot.toHexString())")
             throw ShardDistributionError.metadataNotFound
         }
 
@@ -130,12 +133,12 @@ public actor ShardDistributionProtocolHandlers {
             segmentShards.append(segmentShard)
         }
 
-        // Generate justification
-        let allShardHashes = try await getAllShardHashes(erasureRoot: message.erasureRoot)
+        // Generate justification using audit erasure root
+        let allShardHashes = try await getAllShardHashes(erasureRoot: auditErasureRoot)
 
         let justification = try await erasureCoding.generateJustification(
             shardIndex: message.shardIndex,
-            segmentsRoot: d3lMetadata.segmentsRoot,
+            segmentsRoot: segmentsRoot,
             shards: allShardHashes.map(\.data)
         )
 

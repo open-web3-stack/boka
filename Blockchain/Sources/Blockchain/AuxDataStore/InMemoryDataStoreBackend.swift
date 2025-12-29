@@ -8,8 +8,8 @@ public actor InMemoryDataStoreBackend {
     // work package hash => segment root
     private var segmentRootByWorkPackageHash: [Data32: Data32] = [:]
 
-    // erasure root + index => segment data
-    private var chunks: [Data32: [UInt16: Data4104]] = [:]
+    // erasure root + index => segment data (variable-length to support both audit and D³L shards)
+    private var chunks: [Data32: [UInt16: Data]] = [:]
 
     // erasure root => timestamp
     private var timestamps: [Data32: Date] = [:]
@@ -159,14 +159,13 @@ extension InMemoryDataStoreBackend: DataStoreProtocol {
     // MARK: - Shard Operations
 
     public func storeShard(shardData: Data, erasureRoot: Data32, shardIndex: UInt16) async throws {
-        guard let segment = Data4104(shardData) else {
-            return
-        }
-        chunks[erasureRoot, default: [:]][shardIndex] = segment
+        // Store variable-length shard data directly (no longer constrained to 4104 bytes)
+        // This supports both audit bundle shards (variable-sized) and D³L segment shards (4104 bytes)
+        chunks[erasureRoot, default: [:]][shardIndex] = shardData
     }
 
     public func getShard(erasureRoot: Data32, shardIndex: UInt16) async throws -> Data? {
-        chunks[erasureRoot]?[shardIndex]?.data
+        chunks[erasureRoot]?[shardIndex]
     }
 
     public func getShards(erasureRoot: Data32, shardIndices: [UInt16]) async throws -> [(index: UInt16, data: Data)] {

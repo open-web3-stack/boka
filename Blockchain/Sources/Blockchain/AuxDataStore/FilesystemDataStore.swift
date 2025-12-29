@@ -189,31 +189,32 @@ extension FilesystemDataStore {
         // Capture path as a String to avoid capturing URL in Task.detached
         let path = url.path
 
-        let (directoryExists, isDirectory) = await Task.detached {
+        try await Task.detached {
             var isDirectory: ObjCBool = false
             let exists = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
-            return (exists, isDirectory)
-        }.value
 
-        if directoryExists {
-            guard isDirectory.boolValue else {
-                logger.error("Path exists but is not a directory: \(path)")
-                throw FilesystemDataStoreError.directoryCreationFailed("Path exists but is not a directory: \(path)")
-            }
-        } else {
-            do {
-                try FileManager.default.createDirectory(at: URL(fileURLWithPath: path), withIntermediateDirectories: true, attributes: nil)
-            } catch {
-                logger.error("Failed to create directory at \(path): \(error.localizedDescription)")
-                // Verify if it was created by another task
-                var isDirectory: ObjCBool = false
-                if FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue {
-                    return
+            if exists {
+                guard isDirectory.boolValue else {
+                    throw FilesystemDataStoreError.directoryCreationFailed("Path exists but is not a directory: \(path)")
                 }
-                throw FilesystemDataStoreError
-                    .directoryCreationFailed("Failed to create directory at \(path): \(error.localizedDescription)")
+            } else {
+                do {
+                    try FileManager.default.createDirectory(
+                        at: URL(fileURLWithPath: path),
+                        withIntermediateDirectories: true,
+                        attributes: nil
+                    )
+                } catch {
+                    // Verify if it was created by another task
+                    var isDir: ObjCBool = false
+                    if FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue {
+                        return
+                    }
+                    throw FilesystemDataStoreError
+                        .directoryCreationFailed("Failed to create directory at \(path): \(error.localizedDescription)")
+                }
             }
-        }
+        }.value
     }
 
     /// Write data atomically (write to temp file, then rename)
@@ -231,14 +232,16 @@ extension FilesystemDataStore {
 
         // Perform blocking file I/O off the actor executor
         try await Task.detached {
+            // Ensure temp file is cleaned up even if an error occurs
+            defer {
+                try? FileManager.default.removeItem(at: tempUrl)
+            }
+
             // Create file and write data atomically
             try data.write(to: tempUrl)
 
             // Atomic rename
             try fileManager.moveItem(at: tempUrl, to: targetUrl)
-
-            // Clean up temp file if it still exists (shouldn't after successful move)
-            try? FileManager.default.removeItem(at: tempUrl)
         }.value
     }
 

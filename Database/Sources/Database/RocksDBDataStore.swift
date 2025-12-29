@@ -30,7 +30,7 @@ public final actor RocksDBDataStore {
 
     // Column families
     private let metadata: Store<StoreId, JamCoder<Data32, AvailabilityMetadata>>
-    private let segments: Store<StoreId, JamCoder<Data, Data4104>>
+    private let segments: Store<StoreId, JamCoder<Data, Data>> // Changed from Data4104 to Data for variable-length shards
     private let mappings: Store<StoreId, JamCoder<Data, Data32>>
     private let audit: Store<StoreId, JamCoder<Data32, AuditEntry>>
     private let d3l: Store<StoreId, JamCoder<Data32, D3LEntry>>
@@ -353,23 +353,16 @@ extension RocksDBDataStore {
     public func storeShard(shardData: Data, erasureRoot: Data32, shardIndex: UInt16) async throws {
         let key = makeShardKey(erasureRoot: erasureRoot, shardIndex: shardIndex)
 
-        // Validate shard data size and convert to Data4104
-        guard let segment = Data4104(shardData) else {
-            throw RocksDBError.invalidShardDataSize(
-                actual: shardData.count,
-                expected: 4104
-            )
-        }
-
-        // Store in availabilitySegments column family
-        try segments.put(key: key, value: segment)
+        // Store variable-length shard data directly (no longer constrained to 4104 bytes)
+        // This supports both audit bundle shards (variable-sized) and D³L segment shards (4104 bytes)
+        try segments.put(key: key, value: shardData)
 
         // Update metadata
         var meta = try await getOrCreateMetadata(erasureRoot: erasureRoot)
         meta.shardCount += 1
         try metadata.put(key: erasureRoot, value: meta)
 
-        logger.trace("Stored shard \(shardIndex) for erasureRoot=\(erasureRoot.toHexString())")
+        logger.trace("Stored shard \(shardIndex) (size: \(shardData.count) bytes) for erasureRoot=\(erasureRoot.toHexString())")
     }
 
     /// Retrieve a single shard by erasure root and index
@@ -450,15 +443,8 @@ extension RocksDBDataStore {
         for shard in shards {
             let key = makeShardKey(erasureRoot: erasureRoot, shardIndex: shard.index)
 
-            // Validate shard data size and convert to Data4104
-            guard let segment = Data4104(shard.data) else {
-                throw RocksDBError.invalidShardDataSize(
-                    actual: shard.data.count,
-                    expected: 4104
-                )
-            }
-
-            try operations.append(segments.putOperation(key: key, value: segment))
+            // Store variable-length shard data directly (no longer constrained to 4104 bytes)
+            try operations.append(segments.putOperation(key: key, value: shard.data))
         }
 
         // Update metadata
