@@ -503,18 +503,9 @@ public actor ErasureCodingDataStore {
     ///   - proof: Merkle proof path
     ///   - segmentsRoot: Expected root
     /// - Returns: True if the segment is valid
-    ///
-    /// TODO: Critical logic error - this method uses localIndex (bits 0-5) for ALL proof levels,
-    /// but localIndex only provides meaningful bits for the first 6 levels (within-page).
-    /// For deeper trees (beyond 64 segments), pageIndex must be used for levels 6+.
-    /// The current implementation will incorrectly calculate paths for trees deeper than 6 levels,
-    /// causing verification failures for large segment sets. Fix requires:
-    /// 1. Use localIndex bits for levels 0-5 (within page)
-    /// 2. Use pageIndex bits for levels 6+ (across pages)
-    /// 3. Combine both to get the complete global index path
     public func verifySegmentProof(
         segment: Data4104,
-        pageIndex _: Int,
+        pageIndex: Int,
         localIndex: Int,
         proof: [Data32],
         segmentsRoot: Data32
@@ -524,12 +515,18 @@ public actor ErasureCodingDataStore {
 
         // Start with segment hash
         var currentValue = segmentHash
-        var currentIndex = localIndex
 
         // Traverse the Merkle proof
         for (level, proofElement) in proof.enumerated() {
-            // At each level, combine current value with proof element
-            let bitSet = (currentIndex >> level) & 1
+            // Combine localIndex bits (levels 0-5) with pageIndex bits (levels 6+)
+            // This creates the complete global index path through the Merkle tree
+            let bitSet: Int = if level < 6 {
+                // Levels 0-5: within page (64 segments per page)
+                (localIndex >> level) & 1
+            } else {
+                // Levels 6+: across pages
+                (pageIndex >> (level - 6)) & 1
+            }
 
             if bitSet == 0 {
                 // Current value is on the left

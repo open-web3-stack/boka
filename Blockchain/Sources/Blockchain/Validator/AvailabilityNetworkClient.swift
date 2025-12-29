@@ -538,7 +538,8 @@ public actor AvailabilityNetworkClient {
         data: Data
     ) async throws -> Data {
         // Use the request type and key components for cache key
-        let dataHash = data.prefix(64).reduce(0) { ($0 << 8) + Int($1) }
+        // Use proper hash to avoid integer overflow (was: reduce(0) { ($0 << 8) + Int($1) })
+        let dataHash = data.prefix(64).blake2b256hash().toHexString()
         let cacheKey = "\(address):\(requestType.rawValue):\(dataHash)"
 
         // Check for duplicate requests

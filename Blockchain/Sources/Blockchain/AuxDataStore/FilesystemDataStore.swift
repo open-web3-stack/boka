@@ -221,15 +221,13 @@ extension FilesystemDataStore {
 
         // Capture paths to avoid capturing URL in Task.detached
         let targetPath = url.path
-        let parentPath = url.deletingLastPathComponent().path
-        let tempPath = parentPath + "/\(UUID().uuidString).tmp"
+        let parentUrl = url.deletingLastPathComponent()
+        let tempUrl = parentUrl.appendingPathComponent("\(UUID().uuidString).tmp")
+        let targetUrl = url
         let fileManager = FileManager.default
 
         // Perform blocking file I/O off the actor executor
         try await Task.detached {
-            let tempUrl = URL(fileURLWithPath: tempPath)
-            let targetUrl = URL(fileURLWithPath: targetPath)
-
             // Create file and write data atomically
             try data.write(to: tempUrl)
 
