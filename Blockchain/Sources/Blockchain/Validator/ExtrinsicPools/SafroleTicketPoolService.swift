@@ -69,6 +69,12 @@ private actor ServiceStorage {
     }
 }
 
+/// Service for managing Safrole ticket pool
+///
+/// Thread-safety: @unchecked Sendable is safe here because:
+/// - Inherits safety from ServiceBase (immutable properties + actors)
+/// - All mutable state is in ServiceStorage actor
+/// - Actor provides its own synchronization
 public final class SafroleTicketPoolService: ServiceBase, @unchecked Sendable {
     private var storage: ServiceStorage
     private let dataProvider: BlockchainDataProvider

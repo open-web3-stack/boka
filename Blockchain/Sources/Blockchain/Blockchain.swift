@@ -2,6 +2,12 @@ import Foundation
 import TracingUtils
 import Utils
 
+/// Main blockchain coordinator for block import and management
+///
+/// Thread-safety: @unchecked Sendable is safe here because:
+/// - Inherits safety from ServiceBase (immutable properties + actors)
+/// - All properties are immutable (let)
+/// - No mutable shared state beyond base class
 public final class Blockchain: ServiceBase, @unchecked Sendable {
     public let dataProvider: BlockchainDataProvider
     public let timeProvider: TimeProvider

@@ -4,6 +4,12 @@ import Synchronization
 import TracingUtils
 import Utils
 
+/// Service for authoring new blocks in the blockchain
+///
+/// Thread-safety: @unchecked Sendable is safe here because:
+/// - Inherits safety from ServiceBase2 (immutable properties + ThreadSafeContainer)
+/// - tickets property is protected by ThreadSafeContainer
+/// - All other properties are immutable (let)
 public final class BlockAuthor: ServiceBase2, @unchecked Sendable, OnBeforeEpoch {
     private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore

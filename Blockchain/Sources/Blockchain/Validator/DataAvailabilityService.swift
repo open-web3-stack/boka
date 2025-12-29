@@ -27,6 +27,12 @@ public enum DataAvailabilityError: Error {
     case invalidMetadata(String)
 }
 
+/// Data availability service for managing work reports and shard distribution
+///
+/// Thread-safety: @unchecked Sendable is safe here because:
+/// - Inherits safety from ServiceBase2 (immutable properties + ThreadSafeContainer)
+/// - networkClient is protected by async methods (Swift concurrency)
+/// - All other properties are immutable (let)
 public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, OnSyncCompleted {
     private let dataProvider: BlockchainDataProvider
     private let dataStore: DataStore

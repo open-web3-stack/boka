@@ -1,5 +1,9 @@
 import Utils
 
+/// Thread-safe reference wrapper for Block with cached hash
+///
+/// Thread-safety: @unchecked Sendable is inherited from RefWithHash<T>
+/// which provides synchronization for immutable value access
 public final class BlockRef: RefWithHash<Block>, @unchecked Sendable {
     public var header: Header { value.header }
     public var extrinsic: Extrinsic { value.extrinsic }

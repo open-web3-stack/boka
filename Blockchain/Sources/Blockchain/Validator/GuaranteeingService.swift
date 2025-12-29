@@ -21,6 +21,12 @@ public enum GuaranteeingServiceError: Error, Equatable {
     case serviceAccountNotFound
 }
 
+/// Service for managing work guarantees and validation
+///
+/// Thread-safety: @unchecked Sendable is safe here because:
+/// - Inherits safety from ServiceBase2 (immutable properties + ThreadSafeContainer)
+/// - All mutable state is protected by ThreadSafeContainer instances
+/// - signingKey, coreAssignments, and workReportCache are synchronized
 public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBeforeEpoch, OnSyncCompleted {
     private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore
