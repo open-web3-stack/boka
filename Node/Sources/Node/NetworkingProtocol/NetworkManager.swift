@@ -344,36 +344,6 @@ struct HandlerImpl: NetworkProtocolHandler {
                 }
             }
             return [encoder.data]
-        case let .bundleRequest(message):
-            // CE 147: Bundle Request
-            // Publish event for DataAvailabilityService to handle
-            blockchain.publish(event: RuntimeEvents.BundleRequestReceived(
-                erasureRoot: message.erasureRoot
-            ))
-
-            // Wait for response with timeout
-            do {
-                let requestId = try JamEncoder.encode(message.erasureRoot).blake2b256hash()
-
-                let response = try await blockchain.waitFor(
-                    RuntimeEvents.BundleRequestReceivedResponse.self,
-                    check: { $0.requestId == requestId },
-                    timeout: 30.0 // Longer timeout for bundle reconstruction
-                )
-
-                // Return the bundle data as response
-                switch response.result {
-                case let .success(erasureRoot, bundleData):
-                    logger.debug("CE 147 returning bundle of \(bundleData.count) bytes for erasure root: \(erasureRoot.toHexString())")
-                    return [bundleData]
-                case let .failure(error):
-                    logger.error("CE 147 failed to retrieve bundle: \(error)")
-                    return []
-                }
-            } catch {
-                logger.warning("CE 147 timeout or error waiting for bundle response: \(error)")
-                return []
-            }
         case let .stateRequest(message):
             // Publish state request event
             blockchain.publish(
@@ -664,53 +634,6 @@ struct HandlerImpl: NetworkProtocolHandler {
                         )
                 )
             return []
-        case let .segmentRequest(message):
-            // CE 148: Segment Request
-            // Collect all responses and return them
-            var allSegmentResponses: [Data] = []
-
-            for request in message.requests {
-                // Publish event for DataAvailabilityService to handle
-                blockchain.publish(event: RuntimeEvents.SegmentRequestReceived(
-                    segmentsRoot: request.segmentsRoot,
-                    segmentIndices: request.segmentIndices
-                ))
-
-                // Wait for response with timeout
-                do {
-                    let requestId = try JamEncoder.encode(
-                        request.segmentsRoot,
-                        request.segmentIndices
-                    ).blake2b256hash()
-
-                    let response = try await blockchain.waitFor(
-                        RuntimeEvents.SegmentRequestReceivedResponse.self,
-                        check: { $0.requestId == requestId },
-                        timeout: 10.0
-                    )
-
-                    // Append segment data to response
-                    switch response.result {
-                    case let .success(segmentsRoot, segments):
-                        logger.debug("CE 148 returning \(segments.count) segments for root: \(segmentsRoot.toHexString())")
-
-                        // Encode response for this request
-                        let encoder = JamEncoder()
-                        try encoder.encode(UInt32(segments.count))
-                        for segment in segments {
-                            try encoder.encode(segment)
-                        }
-                        allSegmentResponses.append(encoder.data)
-
-                    case let .failure(error):
-                        logger.error("CE 148 failed to retrieve segments: \(error)")
-                    }
-                } catch {
-                    logger.warning("CE 148 timeout or error waiting for segment response: \(error)")
-                }
-            }
-
-            return allSegmentResponses
         case let .workPackageBundleSubmission(message):
             // TODO: Implement CE work package bundle submission handling
             return []

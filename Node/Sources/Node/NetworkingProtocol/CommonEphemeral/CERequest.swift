@@ -10,7 +10,6 @@ protocol CEMessage {
 
 public enum CERequest: Sendable {
     case blockRequest(BlockRequest)
-    case bundleRequest(BundleRequestMessage)
     case stateRequest(StateRequest)
     case safroleTicket1(SafroleTicketMessage)
     case safroleTicket2(SafroleTicketMessage)
@@ -22,7 +21,6 @@ public enum CERequest: Sendable {
     case auditShardRequest(AuditShardRequestMessage)
     case segmentShardRequest1(SegmentShardRequestMessage)
     case segmentShardRequest2(SegmentShardRequestMessage)
-    case segmentRequest(SegmentRequestMessage)
     case assuranceDistribution(AssuranceDistributionMessage)
     case preimageAnnouncement(PreimageAnnouncementMessage)
     case preimageRequest(PreimageRequestMessage)
@@ -37,8 +35,6 @@ extension CERequest: RequestProtocol {
     public func encode() throws -> [Data] {
         switch self {
         case let .blockRequest(message):
-            try message.encode()
-        case let .bundleRequest(message):
             try message.encode()
         case let .stateRequest(message):
             try message.encode()
@@ -61,8 +57,6 @@ extension CERequest: RequestProtocol {
         case let .segmentShardRequest1(message):
             try message.encode()
         case let .segmentShardRequest2(message):
-            try message.encode()
-        case let .segmentRequest(message):
             try message.encode()
         case let .assuranceDistribution(message):
             try message.encode()
@@ -97,8 +91,6 @@ extension CERequest: RequestProtocol {
             .workReportDistribution
         case .workReportRequest:
             .workReportRequest
-        case .bundleRequest:
-            .bundleRequest
         case .shardDistribution:
             .shardDistribution
         case .auditShardRequest:
@@ -107,8 +99,6 @@ extension CERequest: RequestProtocol {
             .segmentShardRequest1
         case .segmentShardRequest2:
             .segmentShardRequest2
-        case .segmentRequest:
-            .segmentRequest
         case .assuranceDistribution:
             .assuranceDistribution
         case .preimageAnnouncement:
@@ -142,8 +132,6 @@ extension CERequest: RequestProtocol {
             WorkReportDistributionMessage.self
         case .workReportRequest:
             WorkReportRequestMessage.self
-        case .bundleRequest:
-            BundleRequestMessage.self
         case .shardDistribution:
             ShardDistributionMessage.self
         case .auditShardRequest:
@@ -152,8 +140,6 @@ extension CERequest: RequestProtocol {
             SegmentShardRequestMessage.self
         case .segmentShardRequest2:
             SegmentShardRequestMessage.self
-        case .segmentRequest:
-            SegmentRequestMessage.self
         case .assuranceDistribution:
             AssuranceDistributionMessage.self
         case .preimageAnnouncement:
@@ -166,6 +152,10 @@ extension CERequest: RequestProtocol {
             JudgementPublicationMessage.self
         case .workPackageBundleSubmission:
             WorkPackageBundleSubmissionMessage.self
+        case .fullBundle:
+            fatalError("fullBundle not implemented")
+        case .reconstructedSegments:
+            fatalError("reconstructedSegments not implemented")
         }
     }
 
@@ -195,9 +185,6 @@ extension CERequest: RequestProtocol {
         case .workReportRequest:
             guard let message = data as? WorkReportRequestMessage else { return nil }
             return .workReportRequest(message)
-        case .bundleRequest:
-            guard let message = data as? BundleRequestMessage else { return nil }
-            return .bundleRequest(message)
         case .shardDistribution:
             guard let message = data as? ShardDistributionMessage else { return nil }
             return .shardDistribution(message)
@@ -210,9 +197,6 @@ extension CERequest: RequestProtocol {
         case .segmentShardRequest2:
             guard let message = data as? SegmentShardRequestMessage else { return nil }
             return .segmentShardRequest2(message)
-        case .segmentRequest:
-            guard let message = data as? SegmentRequestMessage else { return nil }
-            return .segmentRequest(message)
         case .assuranceDistribution:
             guard let message = data as? AssuranceDistributionMessage else { return nil }
             return .assuranceDistribution(message)
@@ -231,6 +215,8 @@ extension CERequest: RequestProtocol {
         case .workPackageBundleSubmission:
             guard let message = data as? WorkPackageBundleSubmissionMessage else { return nil }
             return .workPackageBundleSubmission(message)
+        case .fullBundle, .reconstructedSegments:
+            return nil
         }
     }
 
