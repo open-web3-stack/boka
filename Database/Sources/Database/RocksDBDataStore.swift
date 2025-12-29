@@ -543,18 +543,13 @@ extension RocksDBDataStore {
     ///   - key: Custom key for the metadata
     ///   - value: Metadata value to store
     public func setMetadata(key: Data, value: Data) async throws {
-        // Store in metadata column family with a special prefix
-        // Hash the key to get a Data32 and add prefix byte to avoid collision with erasure roots
-        let keyHash = key.blake2b256hash()
-
-        // Add prefix byte 0xFF to distinguish from erasure roots (which never start with 0xFF)
-        var prefixedKey = Data([0xFF])
-        prefixedKey.append(keyHash.data)
-        let keyData32 = Data32(prefixedKey)!
+        // Hash the key directly - we don't need a prefix since erasure roots are
+        // derived from different data (shard hashes + segments root)
+        let keyData32 = key.blake2b256hash()
 
         let metadataValue = AvailabilityMetadata(
             timestamp: Date(),
-            pagedProofsHash: keyHash,
+            pagedProofsHash: keyData32,
             pagedProofsMetadata: value,
             shardCount: UInt32(value.count)
         )
@@ -566,19 +561,10 @@ extension RocksDBDataStore {
     /// - Parameter key: Custom key for the metadata
     /// - Returns: Metadata value if found, nil otherwise
     public func getMetadata(key: Data) async throws -> Data? {
-        // Use the same key derivation as setMetadata
-        let keyHash = key.blake2b256hash()
-        var prefixedKey = Data([0xFF])
-        prefixedKey.append(keyHash.data)
-        guard let keyData32 = Data32(prefixedKey) else {
-            return nil
-        }
+        let keyData32 = key.blake2b256hash()
 
         if let metadataValue = try metadata.get(key: keyData32) {
-            // Verify this is actually custom metadata
-            if metadataValue.pagedProofsHash == keyHash {
-                return metadataValue.pagedProofsMetadata
-            }
+            return metadataValue.pagedProofsMetadata
         }
         return nil
     }
@@ -586,13 +572,7 @@ extension RocksDBDataStore {
     /// Delete metadata by custom key
     /// - Parameter key: Custom key for the metadata to delete
     public func deleteMetadata(key: Data) async throws {
-        // Use the same key derivation as setMetadata
-        let keyHash = key.blake2b256hash()
-        var prefixedKey = Data([0xFF])
-        prefixedKey.append(keyHash.data)
-        guard let keyData32 = Data32(prefixedKey) else {
-            return
-        }
+        let keyData32 = key.blake2b256hash()
         try metadata.delete(key: keyData32)
         logger.trace("Deleted metadata: key=\(key.base64EncodedString())")
     }

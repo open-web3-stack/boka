@@ -76,16 +76,6 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         { [weak self] event in
             await self?.handleShardDistributionReceived(event)
         }
-        await subscribe(RuntimeEvents.BundleRequestReceived.self,
-                        id: "DataAvailabilityService.BundleRequestReceived")
-        { [weak self] event in
-            await self?.handleBundleRequestReceived(event)
-        }
-        await subscribe(RuntimeEvents.SegmentRequestReceived.self,
-                        id: "DataAvailabilityService.SegmentRequestReceived")
-        { [weak self] event in
-            await self?.handleSegmentRequestReceived(event)
-        }
     }
 
     public func handleWorkReportReceived(_ event: RuntimeEvents.WorkReportReceived) async {
@@ -94,83 +84,6 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
     public func handleShardDistributionReceived(_ event: RuntimeEvents.ShardDistributionReceived) async {
         try? await shardDistribution(erasureRoot: event.erasureRoot, shardIndex: event.shardIndex)
-    }
-
-    public func handleBundleRequestReceived(_ event: RuntimeEvents.BundleRequestReceived) async {
-        guard let handlers = shardDistributionHandlers else {
-            logger.warning("CE 147: ShardDistributionProtocolHandlers not available")
-            return
-        }
-
-        do {
-            let response = try await handlers.handleBundleRequest(erasureRoot: event.erasureRoot)
-            let bundleData = response.first ?? Data()
-
-            // Publish response event
-            let requestId = try JamEncoder.encode(event.erasureRoot).blake2b256hash()
-            blockchain.publish(event: RuntimeEvents.BundleRequestReceivedResponse(
-                requestId: requestId,
-                erasureRoot: event.erasureRoot,
-                bundleData: bundleData
-            ))
-        } catch {
-            logger.error("CE 147: Failed to handle bundle request: \(error)")
-
-            // Publish error response
-            do {
-                let requestId = try JamEncoder.encode(event.erasureRoot).blake2b256hash()
-                blockchain.publish(event: RuntimeEvents.BundleRequestReceivedResponse(
-                    requestId: requestId,
-                    error: error
-                ))
-            } catch {
-                logger.error("CE 147: Failed to publish error response: \(error)")
-            }
-        }
-    }
-
-    public func handleSegmentRequestReceived(_ event: RuntimeEvents.SegmentRequestReceived) async {
-        guard let handlers = shardDistributionHandlers else {
-            logger.warning("CE 148: ShardDistributionProtocolHandlers not available")
-            return
-        }
-
-        do {
-            let segments = try await handlers.handleSegmentRequest(
-                segmentsRoot: event.segmentsRoot,
-                segmentIndices: event.segmentIndices
-            )
-
-            // Decode segments from response
-            var decoder = try JamDecoder(data: segments[0], config: config)
-            let segmentCount = try decoder.decode(UInt32.self)
-            var segmentData: [Data] = []
-            for _ in 0 ..< segmentCount {
-                let segment = try decoder.decode(Data.self)
-                segmentData.append(segment)
-            }
-
-            // Publish response event
-            let requestId = try JamEncoder.encode(event.segmentsRoot, event.segmentIndices).blake2b256hash()
-            blockchain.publish(event: RuntimeEvents.SegmentRequestReceivedResponse(
-                requestId: requestId,
-                segmentsRoot: event.segmentsRoot,
-                segments: segmentData
-            ))
-        } catch {
-            logger.error("CE 148: Failed to handle segment request: \(error)")
-
-            // Publish error response
-            do {
-                let requestId = try JamEncoder.encode(event.segmentsRoot, event.segmentIndices).blake2b256hash()
-                blockchain.publish(event: RuntimeEvents.SegmentRequestReceivedResponse(
-                    requestId: requestId,
-                    error: error
-                ))
-            } catch {
-                logger.error("CE 148: Failed to publish error response: \(error)")
-            }
-        }
     }
 
     /// Purge old data from the data availability stores
@@ -1227,11 +1140,11 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             }
 
             // Create the message: $jam_available || blake(encode(parentHash, bitfield))
-            // $jam_available is 14 bytes, so length prefix is \u{0E}
+            // Per spec eq:assurance-sig, the message is $jam_available || blake(encode(parentHash, assurance))
             let bitfieldData = try JamEncoder.encode(assurance.assurance)
             let payload = try JamEncoder.encode(parentHash, bitfieldData)
             let message = try JamEncoder.encode(UInt8(0x01), payload.blake2b256hash())
-            let signatureMessage = try JamEncoder.encode(Data("\u{0E}$jam_available".utf8), message)
+            let signatureMessage = Data("$jam_available".utf8) + message
 
             guard publicKey.verify(signature: assurance.signature, message: signatureMessage) else {
                 throw DataAvailabilityError.invalidWorkReport
@@ -1281,11 +1194,11 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             }
 
             // Create the message: $jam_available || blake(encode(parentHash, bitfield))
-            // $jam_available is 14 bytes, so length prefix is \u{0E}
+            // Per spec eq:assurance-sig, the message is $jam_available || blake(encode(parentHash, assurance))
             let bitfieldData = try JamEncoder.encode(assurance.assurance)
             let payload = try JamEncoder.encode(parentHash, bitfieldData)
             let message = try JamEncoder.encode(UInt8(0x01), payload.blake2b256hash())
-            let signatureMessage = try JamEncoder.encode(Data("\u{0E}$jam_available".utf8), message)
+            let signatureMessage = Data("$jam_available".utf8) + message
 
             guard publicKey.verify(signature: assurance.signature, message: signatureMessage) else {
                 logger.warning("Invalid signature for validator \(assurance.validatorIndex)")

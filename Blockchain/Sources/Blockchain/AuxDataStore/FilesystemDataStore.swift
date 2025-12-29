@@ -181,7 +181,10 @@ public actor FilesystemDataStore {
 
 extension FilesystemDataStore {
     /// Create directory if it doesn't exist
-    /// Uses Task.detached to avoid blocking the actor executor
+    ///
+    /// Uses Task.detached to run blocking file I/O checks off the actor executor.
+    /// This is acceptable here because the task has no cancellation semantics
+    /// and we don't need priority inheritance for simple file existence checks.
     private func createDirectoryIfNeeded(_ url: URL) async throws {
         // Capture path as a String to avoid capturing URL in Task.detached
         let path = url.path

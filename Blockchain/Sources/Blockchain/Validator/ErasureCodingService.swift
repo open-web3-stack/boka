@@ -33,7 +33,7 @@ public actor ErasureCodingService {
 
         logger.debug("Encoding \(segments.count) segments into shards")
 
-        let totalData = segments.map(\.data).reduce(Data(), +)
+        let totalData = segments.map(\.data).reduce(Data()) { $0 + $1 }
 
         let totalPieces = totalData.count / pieceSize
 
