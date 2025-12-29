@@ -428,7 +428,7 @@ extension State: ServiceAccounts {
         // update footprint
         let oldValue = try await get(serviceAccount: index, storageKey: key)
         guard var oldAccount = try await get(serviceAccount: index) else {
-            fatalError("Failed to get account details")
+            throw StateError.accountNotFound(index: index)
         }
 
         oldAccount.updateFootprintStorage(key: key, oldValue: oldValue, newValue: value)
@@ -451,7 +451,7 @@ extension State: ServiceAccounts {
         // update footprint
         let oldValue = try await get(serviceAccount: index, preimageHash: hash, length: length)
         guard var oldAccount = try await get(serviceAccount: index) else {
-            fatalError("Failed to get account details")
+            throw StateError.accountNotFound(index: index)
         }
 
         oldAccount.updateFootprintPreimage(oldValue: oldValue, newValue: value, length: length)
@@ -556,6 +556,13 @@ extension State: CustomStringConvertible {
     public var description: String {
         "State()" // TODO: maybe cache state root hash so it can be accessed here?
     }
+}
+
+// MARK: - Errors
+
+public enum StateError: Error {
+    case accountNotFound(index: ServiceIndex)
+    case backendError(String)
 }
 
 public class StateRef: Ref<State>, @unchecked Sendable {

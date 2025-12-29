@@ -5,6 +5,7 @@ enum DataStoreError: Error {
     case invalidPackageHash(Data32)
     case invalidSegmentRoot(Data32)
     case erasureCodingError
+    case networkFetchNotImplemented(Data32, UInt16)
 }
 
 public final class DataStore: Sendable {
@@ -35,7 +36,7 @@ public final class DataStore: Sendable {
                 result.append(localData)
             } else {
                 // TODO: use network for fetch shards and reconstruct the segment
-                fatalError("not implemented")
+                throw DataStoreError.networkFetchNotImplemented(erasureRoot, segment.index)
             }
         }
 
