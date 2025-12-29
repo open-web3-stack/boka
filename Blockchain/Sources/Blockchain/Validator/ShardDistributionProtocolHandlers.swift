@@ -270,36 +270,44 @@ public actor ShardDistributionProtocolHandlers {
             segmentCount: d3lMetadata.segmentCount
         )
 
-        var responses: [Data] = []
+        // Extract bundle shard
+        let bundleShard = extractBundleShard(from: shardData)
 
-        let encoder = JamEncoder()
-        try encoder.encode(UInt32(segmentShards.count))
-        for segmentShard in segmentShards {
-            try encoder.encode(segmentShard)
-        }
-        responses.append(encoder.data)
-
+        // Generate all justifications
+        var allJustifications: [[AvailabilityJustification.AvailabilityJustificationStep]] = []
         for (index, segmentIndex) in message.segmentIndices.enumerated() {
             let justification = try await generateSegmentJustification(
                 erasureRoot: message.erasureRoot,
                 shardIndex: message.shardIndex,
                 segmentIndex: segmentIndex,
-                bundleShard: extractBundleShard(from: shardData),
+                bundleShard: bundleShard,
                 segmentShard: segmentShards[index]
             )
+            allJustifications.append(justification)
+        }
 
-            let justEncoder = JamEncoder()
-            try encodeJustification(justEncoder, justification: justification)
-            responses.append(justEncoder.data)
+        // Create single ShardResponse with all data
+        let encoder = JamEncoder()
+        try encoder.encode(bundleShard)
+        try encoder.encode(UInt32(segmentShards.count))
+        for segmentShard in segmentShards {
+            try encoder.encode(segmentShard)
+        }
+
+        // Encode justifications count
+        try encoder.encode(UInt32(allJustifications.count))
+        for justification in allJustifications {
+            try encodeJustification(encoder, justification: justification)
         }
 
         logger.debug(
             """
-            CE 140: Returning \(segmentShards.count) segment shards + \(responses.count - 1) justifications
+            CE 140: Returning ShardResponse with bundle shard + \(segmentShards.count) segment shards + \(allJustifications
+                .count) justifications
             """
         )
 
-        return responses
+        return [encoder.data]
     }
 
     // MARK: - CE 147: Bundle Request
@@ -351,7 +359,11 @@ public actor ShardDistributionProtocolHandlers {
 
         logger.debug("CE 147: Returning bundle of \(bundleData.count) bytes")
 
-        return [bundleData]
+        // Wrap in BundleResponse as expected by the client
+        let encoder = JamEncoder()
+        try encoder.encode(bundleData)
+
+        return [encoder.data]
     }
 
     // MARK: - CE 148: Segment Request
@@ -381,11 +393,15 @@ public actor ShardDistributionProtocolHandlers {
 
         logger.debug("CE 148: Returning \(segments.count) segments")
 
+        // Format as SegmentResponse: segments count + segments + import proofs count (0 for now)
         let encoder = JamEncoder()
         try encoder.encode(UInt32(segments.count))
         for segment in segments {
             try encoder.encode(segment)
         }
+
+        // Import proofs not currently tracked - send empty array
+        try encoder.encode(UInt32(0))
 
         return [encoder.data]
     }
