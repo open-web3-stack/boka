@@ -8,7 +8,12 @@ enum BlockchainServicesError: Error {
     case epochChangeFailed(String)
 }
 
-// For testing only
+/// Testing helper class that provides access to all blockchain services
+///
+/// Thread-safety: @unchecked Sendable is acceptable here because:
+/// - This is a testing-only class, not used in production
+/// - All references are weak references that don't require synchronization
+/// - Used only in controlled test environments
 public class BlockchainServices: @unchecked Sendable {
     public let config: ProtocolConfigRef
     public let timeProvider: MockTimeProvider

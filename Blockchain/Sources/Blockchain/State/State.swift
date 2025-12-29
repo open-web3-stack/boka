@@ -565,6 +565,10 @@ public enum StateError: Error {
     case backendError(String)
 }
 
+/// Reference wrapper for State
+///
+/// Thread-safety: @unchecked Sendable is inherited from Ref<T>
+/// which provides its own synchronization for value access
 public class StateRef: Ref<State>, @unchecked Sendable {
     public static func dummy(config: ProtocolConfigRef, block: BlockRef?) -> StateRef {
         StateRef(State.dummy(config: config, block: block))

@@ -2,6 +2,12 @@ import Foundation
 import TracingUtils
 import Utils
 
+/// Base class for blockchain services
+///
+/// Thread-safety: @unchecked Sendable is safe here because:
+/// - All properties are either immutable (let) or thread-safe actors
+/// - EventSubscriptions is an actor that manages its own state
+/// - No mutable shared state
 public class ServiceBase: @unchecked Sendable {
     public let id: UniqueId
     let logger: Logger

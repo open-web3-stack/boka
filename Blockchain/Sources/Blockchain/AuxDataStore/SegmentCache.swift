@@ -4,6 +4,11 @@ import TracingUtils
 import Utils
 
 /// LRU cache for segment data
+///
+/// Thread-safety: @unchecked Sendable is safe here because:
+/// - All mutable state is protected by a Mutex (Swift Synchronization)
+/// - State modifications only occur within Mutex.withLock critical sections
+/// - Lock provides exclusive access to prevent data races
 public final class SegmentCache: @unchecked Sendable {
     private struct CacheEntry: Sendable {
         let segment: Data4104
