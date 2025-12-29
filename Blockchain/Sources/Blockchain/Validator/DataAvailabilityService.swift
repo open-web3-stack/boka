@@ -24,6 +24,7 @@ public enum DataAvailabilityError: Error {
     case emptySegmentShards
     case invalidJustificationFormat
     case segmentsRootMismatch(calculated: Data32, expected: Data32)
+    case invalidMetadata(String)
 }
 
 public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, OnSyncCompleted {
@@ -536,78 +537,194 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         // Metadata format: multiaddr encoded as UTF-8 string
         // GP spec multiaddr format: /ip4/<ip>/tcp/<port> or /ip6/<ip>/tcp/<port>
         // See: https://github.com/multiformats/multiaddr
+        //
+        // Supported formats:
+        // - Multiaddr: /ip4/127.0.0.1/tcp/1234
+        // - Multiaddr: /ip6/::1/tcp/1234
+        // - Direct: 127.0.0.1:1234
+        // - Direct: [::1]:1234 (IPv6 with brackets)
 
         guard let metadataString = String(data: metadata, encoding: .utf8) else {
             logger.error("Failed to decode metadata as UTF-8 string. Hex: \(metadata.toHexString())")
-            throw DataAvailabilityError.retrievalError
+            throw DataAvailabilityError.invalidMetadata("Invalid UTF-8 encoding")
         }
 
-        // Parse multiaddr format: /ip4/<ip>/tcp/<port>
-        let parts = metadataString.components(separatedBy: "/").filter { !$0.isEmpty }
+        let trimmed = metadataString.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Try multiaddr format first
+        if trimmed.hasPrefix("/") {
+            if let addr = try parseMultiaddr(trimmed) {
+                logger.debug("Parsed multiaddr: \(trimmed) -> \(addr)")
+                return addr
+            }
+            logger.warning("Failed to parse multiaddr format: \(trimmed)")
+        }
+
+        // Try direct format (ip:port)
+        if let addr = parseDirectAddress(trimmed) {
+            logger.debug("Parsed direct address format: \(trimmed) -> \(addr)")
+            return addr
+        }
+
+        logger.error("Failed to parse network address from metadata: \(trimmed)")
+        throw DataAvailabilityError.invalidMetadata("Unable to parse address: '\(trimmed)'")
+    }
+
+    /// Parse multiaddr format (e.g., /ip4/127.0.0.1/tcp/1234)
+    private func parseMultiaddr(_ addr: String) throws -> NetAddr? {
+        let parts = addr.components(separatedBy: "/").filter { !$0.isEmpty }
+
+        guard parts.count >= 4 else {
+            logger.debug("Multiaddr too short: \(addr)")
+            return nil
+        }
 
         var ipAddress: String?
         var port: UInt16?
-
         var index = 0
+
         while index < parts.count {
             let part = parts[index]
 
             switch part {
             case "ip4":
-                if index + 1 < parts.count {
-                    ipAddress = parts[index + 1]
-                    index += 2
-                } else {
-                    index += 1
+                guard index + 1 < parts.count else {
+                    logger.debug("Multiaddr ip4 missing address")
+                    return nil
                 }
+                let candidateIP = parts[index + 1]
+                guard isValidIPv4(candidateIP) else {
+                    logger.debug("Invalid IPv4 address: \(candidateIP)")
+                    return nil
+                }
+                ipAddress = candidateIP
+                index += 2
 
             case "ip6":
-                if index + 1 < parts.count {
-                    // IPv6 addresses contain colons, preserve them
-                    ipAddress = parts[index + 1]
-                    index += 2
-                } else {
-                    index += 1
+                guard index + 1 < parts.count else {
+                    logger.debug("Multiaddr ip6 missing address")
+                    return nil
                 }
+                let candidateIP = parts[index + 1]
+                guard isValidIPv6(candidateIP) else {
+                    logger.debug("Invalid IPv6 address: \(candidateIP)")
+                    return nil
+                }
+                ipAddress = candidateIP
+                index += 2
 
             case "tcp", "udp":
-                if index + 1 < parts.count, let portNum = UInt16(parts[index + 1]) {
-                    port = portNum
-                    index += 2
-                } else {
-                    index += 1
+                guard index + 1 < parts.count else {
+                    logger.debug("Multiaddr \(part) missing port")
+                    return nil
                 }
+                guard let portNum = UInt16(parts[index + 1]) else {
+                    logger.debug("Invalid port number: \(parts[index + 1])")
+                    return nil
+                }
+                // Validate port range (1-65535, 0 is reserved)
+                guard portNum > 0 else {
+                    logger.debug("Port must be > 0: \(portNum)")
+                    return nil
+                }
+                port = portNum
+                index += 2
 
             default:
+                // Unknown protocol component - skip
                 index += 1
             }
         }
 
-        // Construct address string from parsed components
-        if let ip = ipAddress, let p = port {
-            if let addr = NetAddr(ipAddress: ip, port: p) {
-                logger.debug("Parsed multiaddr: \(metadataString) -> \(ip):\(p)")
-                return addr
+        // Validate we have both components
+        guard let ip = ipAddress, let p = port else {
+            logger.debug("Multiaddr missing required components (ip=\(ipAddress != nil), port=\(port != nil))")
+            return nil
+        }
+
+        // Try to create NetAddr
+        guard let addr = NetAddr(ipAddress: ip, port: p) else {
+            logger.debug("NetAddr creation failed for \(ip):\(p)")
+            return nil
+        }
+
+        return addr
+    }
+
+    /// Parse direct address format (e.g., 127.0.0.1:1234 or [::1]:1234)
+    private func parseDirectAddress(_ addr: String) -> NetAddr? {
+        // Try NetAddr's built-in parser first
+        if let netAddr = NetAddr(address: addr) {
+            return netAddr
+        }
+
+        // Manual parsing for better error handling
+        // Handle IPv6 with brackets: [::1]:1234
+        if addr.hasPrefix("["), let closingBracket = addr.firstIndex(of: "]") {
+            let ipEnd = addr.index(after: closingBracket)
+            guard ipEnd < addr.endIndex, addr[ipEnd] == ":" else {
+                logger.debug("IPv6 address missing port separator")
+                return nil
+            }
+
+            let ipString = String(addr[addr.index(after: addr.startIndex) ..< closingBracket])
+            let portString = String(addr[ipEnd...].dropFirst())
+
+            guard isValidIPv6(ipString), let port = UInt16(portString), port > 0 else {
+                return nil
+            }
+
+            return NetAddr(ipAddress: ipString, port: port)
+        }
+
+        // Handle IPv4: 127.0.0.1:1234
+        if let colonIndex = addr.lastIndex(of: ":") {
+            let ipString = String(addr[..<colonIndex])
+            let portString = String(addr[addr.index(after: colonIndex)...])
+
+            guard isValidIPv4(ipString), let port = UInt16(portString), port > 0 else {
+                return nil
+            }
+
+            return NetAddr(ipAddress: ipString, port: port)
+        }
+
+        return nil
+    }
+
+    /// Validate IPv4 address format
+    private func isValidIPv4(_ addr: String) -> Bool {
+        let octets = addr.split(separator: ".")
+        guard octets.count == 4 else { return false }
+
+        for octet in octets {
+            guard let num = UInt8(octet) else { return false }
+            // Additional check to reject leading zeros (except "0" itself)
+            if octet.count > 1, octet.hasPrefix("0") {
+                return false
             }
         }
 
-        // Try direct format (ip:port)
-        if let addr = NetAddr(address: metadataString) {
-            logger.debug("Parsed direct address format: \(metadataString)")
-            return addr
+        return true
+    }
+
+    /// Validate IPv6 address format (basic validation)
+    private func isValidIPv6(_ addr: String) -> Bool {
+        // Basic validation: must contain colons, not empty
+        guard !addr.isEmpty, addr.contains(":") else { return false }
+
+        // Reject invalid characters
+        let validChars = CharacterSet(charactersIn: "0123456789abcdefABCDEF:.")
+        guard addr.unicodeScalars.allSatisfy({ validChars.contains($0) }) else {
+            return false
         }
 
-        // If we have IPv4 and port but NetAddr creation failed, try string format
-        if let ip = ipAddress, let p = port {
-            let addrString = "\(ip):\(p)"
-            if let addr = NetAddr(address: addrString) {
-                logger.debug("Parsed as string format: \(addrString)")
-                return addr
-            }
-        }
+        // Must have at least 2 colons for compressed form (::1)
+        // or 7 colons for full form (2001:db8::1)
+        let colonCount = addr.components(separatedBy: ":").count - 1
+        guard colonCount >= 2 else { return false }
 
-        logger.error("Failed to parse network address from metadata: \(metadataString)")
-        throw DataAvailabilityError.retrievalError
+        return true
     }
 
     /// Fetch shards from multiple validators concurrently
