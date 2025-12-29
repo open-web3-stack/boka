@@ -583,6 +583,9 @@ public actor ErasureCodingDataStore {
                 _ = await deletedCount.increment()
                 _ = await bytesReclaimed.add(entry.bundleSize)
             }
+
+            // Continue processing (return true)
+            return true
         }
 
         let finalDeletedCount = await deletedCount.get()
@@ -850,7 +853,8 @@ public actor ErasureCodingDataStore {
                 // Check if we've met the target
                 let current = await counter.get()
                 guard current < targetBytes else {
-                    return
+                    // Early termination - return false to stop iteration
+                    return false
                 }
 
                 do {
@@ -874,6 +878,10 @@ public actor ErasureCodingDataStore {
                     logger.warning("Failed to delete audit entry \(entry.erasureRoot): \(error)")
                 }
             }
+
+            // Continue to next batch
+            let currentTotal = await counter.get()
+            return currentTotal < targetBytes
         }
 
         // If we haven't met the target yet, process D³L entries
@@ -894,7 +902,8 @@ public actor ErasureCodingDataStore {
                 // Check if we've met the target
                 let current = await counter.get()
                 guard current < targetBytes else {
-                    return
+                    // Early termination - return false to stop iteration
+                    return false
                 }
 
                 do {
@@ -918,6 +927,10 @@ public actor ErasureCodingDataStore {
                     logger.warning("Failed to delete D³L entry \(entry.erasureRoot): \(error)")
                 }
             }
+
+            // Continue to next batch if we haven't met target
+            let currentTotal = await counter.get()
+            return currentTotal < targetBytes
         }
 
         let finalTotal = await counter.get()

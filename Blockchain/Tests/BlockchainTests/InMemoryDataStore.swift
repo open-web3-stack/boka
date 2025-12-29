@@ -115,14 +115,19 @@ public actor InMemoryDataStore: DataStoreProtocol {
     public func cleanupAuditEntriesIteratively(
         before: Date,
         batchSize: Int,
-        processor: @Sendable ([AuditEntry]) async throws -> Void
+        processor: @Sendable ([AuditEntry]) async throws -> Bool
     ) async throws -> Int {
         var count = 0
         let entries = auditEntries.values.filter { $0.timestamp < before }
 
         for chunk in entries.chunked(into: batchSize) {
-            try await processor(chunk)
+            let shouldContinue = try await processor(chunk)
             count += chunk.count
+
+            // Early termination if processor returns false
+            if !shouldContinue {
+                break
+            }
         }
 
         for entry in entries {
@@ -159,14 +164,19 @@ public actor InMemoryDataStore: DataStoreProtocol {
     public func cleanupD3LEntriesIteratively(
         before: Date,
         batchSize: Int,
-        processor: @Sendable ([D3LEntry]) async throws -> Void
+        processor: @Sendable ([D3LEntry]) async throws -> Bool
     ) async throws -> Int {
         var count = 0
         let entries = d3lEntries.values.filter { $0.timestamp < before }
 
         for chunk in entries.chunked(into: batchSize) {
-            try await processor(chunk)
+            let shouldContinue = try await processor(chunk)
             count += chunk.count
+
+            // Early termination if processor returns false
+            if !shouldContinue {
+                break
+            }
         }
 
         for entry in entries {

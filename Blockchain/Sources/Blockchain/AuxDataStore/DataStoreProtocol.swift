@@ -30,7 +30,7 @@ public protocol DataStoreProtocol: Sendable {
     func listAuditEntries(before: Date) async throws -> [AuditEntry]
     func deleteAuditEntry(erasureRoot: Data32) async throws
     func cleanupAuditEntriesIteratively(before: Date, batchSize: Int,
-                                        processor: @Sendable ([AuditEntry]) async throws -> Void) async throws -> Int
+                                        processor: @Sendable ([AuditEntry]) async throws -> Bool) async throws -> Int
 
     // MARK: - D³L Entry Operations
 
@@ -38,7 +38,7 @@ public protocol DataStoreProtocol: Sendable {
     func getD3LEntry(erasureRoot: Data32) async throws -> D3LEntry?
     func listD3LEntries(before: Date) async throws -> [D3LEntry]
     func deleteD3LEntry(erasureRoot: Data32) async throws
-    func cleanupD3LEntriesIteratively(before: Date, batchSize: Int, processor: @Sendable ([D3LEntry]) async throws -> Void) async throws
+    func cleanupD3LEntriesIteratively(before: Date, batchSize: Int, processor: @Sendable ([D3LEntry]) async throws -> Bool) async throws
         -> Int
 
     // MARK: - Shard Operations

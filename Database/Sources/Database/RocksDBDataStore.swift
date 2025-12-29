@@ -185,16 +185,17 @@ extension RocksDBDataStore {
     /// Cleanup audit entries iteratively (memory-efficient for large datasets)
     ///
     /// Processes entries in batches using a callback, avoiding loading all entries into memory.
+    /// The processor callback can return false to stop iteration early.
     ///
     /// - Parameters:
     ///   - cutoff: Timestamp cutoff (delete entries older than this)
     ///   - batchSize: Maximum number of entries to process per batch
-    ///   - processor: Callback to process each batch of entries
+    ///   - processor: Callback to process each batch of entries. Return false to stop iteration.
     /// - Returns: Total number of entries processed
     public func cleanupAuditEntriesIteratively(
         before cutoff: Date,
         batchSize: Int = 100,
-        processor: @Sendable ([AuditEntry]) async throws -> Void
+        processor: @Sendable ([AuditEntry]) async throws -> Bool
     ) async throws -> Int {
         var totalProcessed = 0
         var batch: [AuditEntry] = []
@@ -212,8 +213,13 @@ extension RocksDBDataStore {
 
                 // Process batch when it reaches the batch size
                 if batch.count >= batchSize {
-                    try await processor(batch)
+                    let shouldContinue = try await processor(batch)
                     batch.removeAll()
+
+                    // Early termination if processor returns false
+                    if !shouldContinue {
+                        break
+                    }
                 }
             }
             iterator.next()
@@ -221,7 +227,10 @@ extension RocksDBDataStore {
 
         // Process any remaining entries in the final batch
         if !batch.isEmpty {
-            try await processor(batch)
+            let shouldContinue = try await processor(batch)
+            if !shouldContinue {
+                return totalProcessed
+            }
         }
 
         return totalProcessed
@@ -272,16 +281,17 @@ extension RocksDBDataStore {
     /// Cleanup D³L entries iteratively (memory-efficient for large datasets)
     ///
     /// Processes entries in batches using a callback, avoiding loading all entries into memory.
+    /// The processor callback can return false to stop iteration early.
     ///
     /// - Parameters:
     ///   - cutoff: Timestamp cutoff (delete entries older than this)
     ///   - batchSize: Maximum number of entries to process per batch
-    ///   - processor: Callback to process each batch of entries
+    ///   - processor: Callback to process each batch of entries. Return false to stop iteration.
     /// - Returns: Total number of entries processed
     public func cleanupD3LEntriesIteratively(
         before cutoff: Date,
         batchSize: Int = 100,
-        processor: @Sendable ([D3LEntry]) async throws -> Void
+        processor: @Sendable ([D3LEntry]) async throws -> Bool
     ) async throws -> Int {
         var totalProcessed = 0
         var batch: [D3LEntry] = []
@@ -299,8 +309,13 @@ extension RocksDBDataStore {
 
                 // Process batch when it reaches the batch size
                 if batch.count >= batchSize {
-                    try await processor(batch)
+                    let shouldContinue = try await processor(batch)
                     batch.removeAll()
+
+                    // Early termination if processor returns false
+                    if !shouldContinue {
+                        break
+                    }
                 }
             }
             iterator.next()
@@ -308,7 +323,10 @@ extension RocksDBDataStore {
 
         // Process any remaining entries in the final batch
         if !batch.isEmpty {
-            try await processor(batch)
+            let shouldContinue = try await processor(batch)
+            if !shouldContinue {
+                return totalProcessed
+            }
         }
 
         return totalProcessed
