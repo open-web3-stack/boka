@@ -17,8 +17,8 @@ public protocol DataStoreProtocol: Sendable {
     func delete(segmentRoot: Data32) async throws
 
     // erasure root + index => segment data
-    func get(erasureRoot: Data32, index: UInt16) async throws -> Data4104?
-    func set(data: Data4104, erasureRoot: Data32, index: UInt16) async throws
+    func get(erasureRoot: Data32, index: UInt16) async throws -> Data?
+    func set(data: Data, erasureRoot: Data32, index: UInt16) async throws
 
     // New methods for timestamp and Paged-Proofs metadata
     func setTimestamp(erasureRoot: Data32, timestamp: Date) async throws

@@ -33,7 +33,13 @@ public final class DataStore: Sendable {
             let erasureRoot = try await getErasureRootForSegment(segmentRoot: segmentRoot)
 
             if let localData = try await impl.get(erasureRoot: erasureRoot, index: segment.index) {
-                result.append(localData)
+                // Convert Data to Data4104
+                guard localData.count == 4104,
+                      let segmentData = Data4104(localData)
+                else {
+                    throw DataStoreError.erasureCodingError
+                }
+                result.append(segmentData)
             } else {
                 // TODO: use network for fetch shards and reconstruct the segment
                 throw DataStoreError.networkFetchNotImplemented(erasureRoot, segment.index)
@@ -78,7 +84,8 @@ public final class DataStore: Sendable {
     ///
     /// As per GP 14.3.1, this method implements erasure coding for data availability and resilience
     public func set(data: Data4104, erasureRoot: Data32, index: UInt16) async throws {
-        try await impl.set(data: data, erasureRoot: erasureRoot, index: index)
+        // Convert Data4104 to Data for storage
+        try await impl.set(data: data.data, erasureRoot: erasureRoot, index: index)
 
         // TODO: Implement erasure coding as per GP 14.3.1
         // The current implementation of ErasureCoding in Utils is not yet compatible with GP

@@ -13,7 +13,7 @@ public actor InMemoryDataStore: DataStoreProtocol {
     private var erasureRoots: [Data32: Data32] = [:] // For audit bundles
     private var d3lErasureRoots: [Data32: Data32] = [:] // For D³L segments (separate mapping)
     private var segmentRoots: [Data32: Data32] = [:]
-    private var segments: [Data32: [UInt16: Data4104]] = [:]
+    private var segments: [Data32: [UInt16: Data]] = [:]
     private var timestamps: [Data32: Date] = [:]
     private var pagedProofs: [Data32: Data] = [:]
     private var auditEntries: [Data32: AuditEntry] = [:]
@@ -69,11 +69,11 @@ public actor InMemoryDataStore: DataStoreProtocol {
 
     // MARK: - Segment Operations
 
-    public func get(erasureRoot: Data32, index: UInt16) async throws -> Data4104? {
+    public func get(erasureRoot: Data32, index: UInt16) async throws -> Data? {
         segments[erasureRoot]?[index]
     }
 
-    public func set(data: Data4104, erasureRoot: Data32, index: UInt16) async throws {
+    public func set(data: Data, erasureRoot: Data32, index: UInt16) async throws {
         if segments[erasureRoot] == nil {
             segments[erasureRoot] = [:]
         }

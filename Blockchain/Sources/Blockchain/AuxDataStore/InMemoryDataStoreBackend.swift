@@ -65,16 +65,12 @@ extension InMemoryDataStoreBackend: DataStoreProtocol {
         segmentRootByWorkPackageHash.removeValue(forKey: segmentRoot)
     }
 
-    public func get(erasureRoot: Data32, index: UInt16) async throws -> Data4104? {
-        guard let data = chunks[erasureRoot]?[index] else {
-            return nil
-        }
-        // Convert variable-length Data to Data4104
-        return Data4104(data)
+    public func get(erasureRoot: Data32, index: UInt16) async throws -> Data? {
+        chunks[erasureRoot]?[index]
     }
 
-    public func set(data: Data4104, erasureRoot: Data32, index: UInt16) async throws {
-        chunks[erasureRoot, default: [:]][index] = data.data
+    public func set(data: Data, erasureRoot: Data32, index: UInt16) async throws {
+        chunks[erasureRoot, default: [:]][index] = data
     }
 
     public func setTimestamp(erasureRoot: Data32, timestamp: Date) async throws {

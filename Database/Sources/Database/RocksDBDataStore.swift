@@ -112,13 +112,13 @@ extension RocksDBDataStore: DataStoreProtocol {
     }
 
     /// Get segment data by erasure root and index
-    public func get(erasureRoot: Data32, index: UInt16) async throws -> Data4104? {
+    public func get(erasureRoot: Data32, index: UInt16) async throws -> Data? {
         let key = makeSegmentKey(erasureRoot: erasureRoot, index: index)
         return try segments.get(key: key)
     }
 
     /// Store segment data
-    public func set(data: Data4104, erasureRoot: Data32, index: UInt16) async throws {
+    public func set(data: Data, erasureRoot: Data32, index: UInt16) async throws {
         let key = makeSegmentKey(erasureRoot: erasureRoot, index: index)
         try segments.put(key: key, value: data)
         logger.trace("Stored segment: erasureRoot=\(erasureRoot.toHexString()), index=\(index)")
@@ -413,10 +413,7 @@ extension RocksDBDataStore {
     /// - Returns: Shard data or nil if not found
     public func getShard(erasureRoot: Data32, shardIndex: UInt16) async throws -> Data? {
         let key = makeShardKey(erasureRoot: erasureRoot, shardIndex: shardIndex)
-        guard let segment = try segments.get(key: key) else {
-            return nil
-        }
-        return segment.data
+        return try segments.get(key: key)
     }
 
     /// Get count of available shards for an erasure root
