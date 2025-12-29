@@ -2,10 +2,14 @@ import Foundation
 import Utils
 
 public protocol DataStoreProtocol: Sendable {
-    // segment root => erasure root
+    // segment root => erasure root (for audit bundles)
     func getErasureRoot(forSegmentRoot: Data32) async throws -> Data32?
     func set(erasureRoot: Data32, forSegmentRoot: Data32) async throws
     func delete(erasureRoot: Data32) async throws
+
+    // segment root => D³L erasure root (separate mapping to avoid collision)
+    func getD3LErasureRoot(forSegmentsRoot: Data32) async throws -> Data32?
+    func set(d3lErasureRoot: Data32, forSegmentsRoot: Data32) async throws
 
     // work package hash => segment root
     func getSegmentRoot(forWorkPackageHash: Data32) async throws -> Data32?
@@ -25,7 +29,7 @@ public protocol DataStoreProtocol: Sendable {
 
     // MARK: - Audit Entry Operations
 
-    func setAuditEntry(workPackageHash: Data32, erasureRoot: Data32, bundleSize: Int, timestamp: Date) async throws
+    func setAuditEntry(workPackageHash: Data32, erasureRoot: Data32, segmentsRoot: Data32, bundleSize: Int, timestamp: Date) async throws
     func getAuditEntry(erasureRoot: Data32) async throws -> AuditEntry?
     func listAuditEntries(before: Date) async throws -> [AuditEntry]
     func deleteAuditEntry(erasureRoot: Data32) async throws
@@ -62,12 +66,14 @@ public protocol DataStoreProtocol: Sendable {
 public struct AuditEntry: Sendable, Codable {
     public var workPackageHash: Data32
     public var erasureRoot: Data32
+    public var segmentsRoot: Data32 // Merkle root of segments for D³L lookup
     public var bundleSize: Int
     public var timestamp: Date
 
-    public init(workPackageHash: Data32, erasureRoot: Data32, bundleSize: Int, timestamp: Date) {
+    public init(workPackageHash: Data32, erasureRoot: Data32, segmentsRoot: Data32, bundleSize: Int, timestamp: Date) {
         self.workPackageHash = workPackageHash
         self.erasureRoot = erasureRoot
+        self.segmentsRoot = segmentsRoot
         self.bundleSize = bundleSize
         self.timestamp = timestamp
     }

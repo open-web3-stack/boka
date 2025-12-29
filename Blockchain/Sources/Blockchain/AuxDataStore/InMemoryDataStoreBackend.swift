@@ -2,8 +2,11 @@ import Foundation
 import Utils
 
 public actor InMemoryDataStoreBackend {
-    // segment root => erasure root
+    // segment root => erasure root (for audit bundles)
     private var erasureRootBySegmentRoot: [Data32: Data32] = [:]
+
+    // segment root => D³L erasure root (separate mapping to avoid collision)
+    private var d3lErasureRootBySegmentsRoot: [Data32: Data32] = [:]
 
     // work package hash => segment root
     private var segmentRootByWorkPackageHash: [Data32: Data32] = [:]
@@ -42,6 +45,14 @@ extension InMemoryDataStoreBackend: DataStoreProtocol {
         erasureRootBySegmentRoot.removeValue(forKey: erasureRoot)
     }
 
+    public func getD3LErasureRoot(forSegmentsRoot: Data32) async throws -> Data32? {
+        d3lErasureRootBySegmentsRoot[forSegmentsRoot]
+    }
+
+    public func set(d3lErasureRoot: Data32, forSegmentsRoot: Data32) async throws {
+        d3lErasureRootBySegmentsRoot[forSegmentsRoot] = d3lErasureRoot
+    }
+
     public func getSegmentRoot(forWorkPackageHash: Data32) async throws -> Data32? {
         segmentRootByWorkPackageHash[forWorkPackageHash]
     }
@@ -55,11 +66,15 @@ extension InMemoryDataStoreBackend: DataStoreProtocol {
     }
 
     public func get(erasureRoot: Data32, index: UInt16) async throws -> Data4104? {
-        chunks[erasureRoot]?[index]
+        guard let data = chunks[erasureRoot]?[index] else {
+            return nil
+        }
+        // Convert variable-length Data to Data4104
+        return Data4104(data)
     }
 
     public func set(data: Data4104, erasureRoot: Data32, index: UInt16) async throws {
-        chunks[erasureRoot, default: [:]][index] = data
+        chunks[erasureRoot, default: [:]][index] = data.data
     }
 
     public func setTimestamp(erasureRoot: Data32, timestamp: Date) async throws {
@@ -80,10 +95,17 @@ extension InMemoryDataStoreBackend: DataStoreProtocol {
 
     // MARK: - Audit Entry Operations
 
-    public func setAuditEntry(workPackageHash: Data32, erasureRoot: Data32, bundleSize: Int, timestamp: Date) async throws {
+    public func setAuditEntry(
+        workPackageHash: Data32,
+        erasureRoot: Data32,
+        segmentsRoot: Data32,
+        bundleSize: Int,
+        timestamp: Date
+    ) async throws {
         auditEntries[erasureRoot] = AuditEntry(
             workPackageHash: workPackageHash,
             erasureRoot: erasureRoot,
+            segmentsRoot: segmentsRoot,
             bundleSize: bundleSize,
             timestamp: timestamp
         )

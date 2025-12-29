@@ -698,7 +698,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         guard octets.count == 4 else { return false }
 
         for octet in octets {
-            guard let num = UInt8(octet) else { return false }
+            guard UInt8(octet) != nil else { return false }
             // Additional check to reject leading zeros (except "0" itself)
             if octet.count > 1, octet.hasPrefix("0") {
                 return false
@@ -949,7 +949,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
                 }
 
                 // Get metadata - we need both audit and D³L entries
-                guard let auditMetadata = try await ecStore.getAuditEntry(erasureRoot: erasureRoot) else {
+                guard try await ecStore.getAuditEntry(erasureRoot: erasureRoot) != nil else {
                     throw DataAvailabilityError.invalidErasureRoot
                 }
 
@@ -1261,7 +1261,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             let bitfieldData = try JamEncoder.encode(assurance.assurance)
             let payload = try JamEncoder.encode(parentHash, bitfieldData)
             let message = try JamEncoder.encode(UInt8(0x01), payload.blake2b256hash())
-            let signatureMessage = Data("$jam_available".utf8) + message
+            let signatureMessage = Data("\u{0E}$jam_available".utf8) + message
 
             guard publicKey.verify(signature: assurance.signature, message: signatureMessage) else {
                 throw DataAvailabilityError.invalidWorkReport
@@ -1315,7 +1315,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             let bitfieldData = try JamEncoder.encode(assurance.assurance)
             let payload = try JamEncoder.encode(parentHash, bitfieldData)
             let message = try JamEncoder.encode(UInt8(0x01), payload.blake2b256hash())
-            let signatureMessage = Data("$jam_available".utf8) + message
+            let signatureMessage = Data("\u{0E}$jam_available".utf8) + message
 
             guard publicKey.verify(signature: assurance.signature, message: signatureMessage) else {
                 logger.warning("Invalid signature for validator \(assurance.validatorIndex)")

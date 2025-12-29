@@ -84,12 +84,10 @@ public actor ShardDistributionProtocolHandlers {
             throw ShardDistributionError.shardNotFound
         }
 
-        let shardData = try await dataStore.getShard(
+        guard try await dataStore.getShard(
             erasureRoot: message.erasureRoot,
             shardIndex: message.shardIndex
-        )
-
-        guard let shardData else {
+        ) != nil else {
             logger.warning("CE 137: Shard data is nil for index \(message.shardIndex)")
             throw ShardDistributionError.shardDataUnavailable
         }
@@ -97,7 +95,7 @@ public actor ShardDistributionProtocolHandlers {
         // This erasureRoot is for the AUDIT BUNDLE
         let auditErasureRoot = message.erasureRoot
 
-        // Get audit metadata first
+        // Get audit metadata first (contains segmentsRoot for D³L lookup)
         guard let auditMetadata = try await dataStore.getAuditEntry(erasureRoot: auditErasureRoot) else {
             logger.warning("CE 137: No audit metadata found for erasureRoot=\(auditErasureRoot.toHexString())")
             throw ShardDistributionError.metadataNotFound
@@ -106,32 +104,55 @@ public actor ShardDistributionProtocolHandlers {
         // The segmentsRoot tells us where to find D³L entries
         let segmentsRoot = auditMetadata.segmentsRoot
 
-        // Now fetch D³L metadata using segmentsRoot (not the audit erasure root)
-        guard let d3lMetadata = try await dataStore.getD3LEntry(segmentsRoot: segmentsRoot) else {
-            logger.warning("CE 137: No D³L metadata found for segmentsRoot=\(segmentsRoot.toHexString())")
+        // Look up D³L erasure root using the separate D³L mapping (avoids collision)
+        guard let d3lErasureRoot = try await dataStore.getD3LErasureRoot(forSegmentsRoot: segmentsRoot) else {
+            logger.warning("CE 137: No D³L erasure root found for segmentsRoot=\(segmentsRoot.toHexString())")
             throw ShardDistributionError.metadataNotFound
         }
 
-        // Extract bundle shard and segment shards
-        let bundleShardSize = 684
-        let segmentCount = Int(d3lMetadata.segmentCount)
+        // Get D³L metadata to find segment count
+        guard let d3lMetadata = try await dataStore.getD3LEntry(erasureRoot: d3lErasureRoot) else {
+            logger.warning("CE 137: No D³L metadata found for erasureRoot=\(d3lErasureRoot.toHexString())")
+            throw ShardDistributionError.metadataNotFound
+        }
 
-        guard shardData.count >= bundleShardSize else {
-            logger.error("CE 137: Shard data too small: \(shardData.count) bytes")
+        // Fetch AUDIT bundle shard (contains only the bundle shard)
+        guard let auditShardData = try await dataStore.getShard(
+            erasureRoot: auditErasureRoot,
+            shardIndex: message.shardIndex
+        ) else {
+            logger.warning("CE 137: Audit shard data unavailable for index \(message.shardIndex)")
+            throw ShardDistributionError.shardDataUnavailable
+        }
+
+        // Extract bundle shard from audit shard data (first 684 bytes)
+        let bundleShardSize = 684
+        guard auditShardData.count >= bundleShardSize else {
+            logger.error("CE 137: Audit shard data too small: \(auditShardData.count) bytes")
             throw ShardDistributionError.invalidShardData
         }
 
-        let bundleShard = Data(shardData[0 ..< bundleShardSize])
+        let bundleShard = Data(auditShardData[0 ..< bundleShardSize])
 
-        let segmentShardSize = (shardData.count - bundleShardSize) / Int(segmentCount)
-        var segmentShards: [Data] = []
-
-        for i in 0 ..< Int(segmentCount) {
-            let start = bundleShardSize + (i * segmentShardSize)
-            let end = min(start + segmentShardSize, shardData.count)
-            let segmentShard = Data(shardData[start ..< end])
-            segmentShards.append(segmentShard)
+        // Fetch D³L shard SEPARATELY using its own erasure root
+        guard let d3lShardData = try await dataStore.getShard(
+            erasureRoot: d3lErasureRoot,
+            shardIndex: message.shardIndex
+        ) else {
+            logger.warning("CE 137: D³L shard data unavailable for index \(message.shardIndex)")
+            throw ShardDistributionError.shardDataUnavailable
         }
+
+        // Extract segment shards from D³L shard data
+        // D³L shards don't have a bundle prefix - they're pure segment shards
+        // CE 137 returns ALL segment shards (not specific indices)
+        let allSegmentIndices = Array(0 ..< UInt16(d3lMetadata.segmentCount))
+        let segmentShards = try extractSegmentShards(
+            from: d3lShardData,
+            segmentIndices: allSegmentIndices,
+            segmentCount: d3lMetadata.segmentCount,
+            hasBundlePrefix: false
+        )
 
         // Generate justification using audit erasure root
         let allShardHashes = try await getAllShardHashes(erasureRoot: auditErasureRoot)
@@ -184,7 +205,7 @@ public actor ShardDistributionProtocolHandlers {
 
         let fullResponse = try await handleShardDistribution(message: shardDistributionMsg)
 
-        var decoder = try JamDecoder(data: fullResponse[0], config: config)
+        let decoder = JamDecoder(data: fullResponse[0], config: config)
 
         let bundleShard = try decoder.decode(Data.self)
 
@@ -482,17 +503,19 @@ public actor ShardDistributionProtocolHandlers {
     private func extractSegmentShards(
         from shardData: Data,
         segmentIndices: [UInt16],
-        segmentCount: UInt32
+        segmentCount: UInt32,
+        hasBundlePrefix: Bool = false // D³L shards don't have bundle prefix
     ) throws -> [Data] {
         let bundleShardSize = 684
-        let totalSegmentDataSize = shardData.count - bundleShardSize
+        let dataStartOffset = hasBundlePrefix ? bundleShardSize : 0
+        let totalSegmentDataSize = shardData.count - dataStartOffset
         let segmentShardSize = totalSegmentDataSize / Int(segmentCount)
 
         var segmentShards: [Data] = []
         segmentShards.reserveCapacity(segmentIndices.count)
 
         for segmentIndex in segmentIndices {
-            let offset = bundleShardSize + (Int(segmentIndex) * segmentShardSize)
+            let offset = dataStartOffset + (Int(segmentIndex) * segmentShardSize)
             let endOffset = min(offset + segmentShardSize, shardData.count)
 
             guard offset < shardData.count else {

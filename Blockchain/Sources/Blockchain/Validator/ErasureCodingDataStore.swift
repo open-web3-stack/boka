@@ -106,8 +106,21 @@ public actor ErasureCodingDataStore {
             throw ErasureCodingStoreError.bundleTooLarge(size: bundle.count, maxSize: maxBundleSize)
         }
 
-        // Erasure-code the bundle
-        let shards = try await erasureCoding.encodeBlob(bundle)
+        // Pad bundle to 684-byte boundary (required by encodeBlob)
+        // The erasure coding process requires data to be aligned to pieceSize (684 bytes)
+        // Original size is stored in metadata to truncate padding during reconstruction
+        let pieceSize = 684
+        let remainder = bundle.count % pieceSize
+        let paddingNeeded = remainder == 0 ? 0 : (pieceSize - remainder)
+
+        var paddedBundle = bundle
+        if paddingNeeded > 0 {
+            paddedBundle.append(Data(count: paddingNeeded))
+            logger.trace("Padded bundle from \(bundle.count) to \(paddedBundle.count) bytes")
+        }
+
+        // Erasure-code the padded bundle
+        let shards = try await erasureCoding.encodeBlob(paddedBundle)
 
         // Calculate erasure root
         let erasureRoot = try await erasureCoding.calculateErasureRoot(
@@ -129,6 +142,7 @@ public actor ErasureCodingDataStore {
         try await dataStore.setAuditEntry(
             workPackageHash: workPackageHash,
             erasureRoot: erasureRoot,
+            segmentsRoot: segmentsRoot,
             bundleSize: bundle.count,
             timestamp: Date()
         )
@@ -245,7 +259,8 @@ public actor ErasureCodingDataStore {
             timestamp: Date()
         )
         try await dataStore.set(segmentRoot: segmentsRoot, forWorkPackageHash: workPackageHash)
-        try await dataStore.set(erasureRoot: erasureRoot, forSegmentRoot: segmentsRoot)
+        // Use separate D³L mapping to avoid collision with audit erasure root mapping
+        try await dataStore.set(d3lErasureRoot: erasureRoot, forSegmentsRoot: segmentsRoot)
 
         logger.info("Stored exported segments: erasureRoot=\(erasureRoot.toHexString()), count=\(segments.count)")
 
@@ -457,8 +472,8 @@ public actor ErasureCodingDataStore {
 
         // For each segment in the page, generate its Merkle justification path
         var justificationPaths: [[Data32]] = []
-        for (localIndex, segment) in pageSegments.enumerated() {
-            let globalIndex = pageIndex * 64 + localIndex
+        for (localIndex, _) in pageSegments.enumerated() {
+            _ = pageIndex * 64 + localIndex
 
             // Generate Merkle proof path from segment to root
             let path = Merklization.trace(
@@ -624,6 +639,7 @@ public actor ErasureCodingDataStore {
                 _ = await deletedEntries.increment()
                 _ = await deletedSegments.add(Int(entry.segmentCount))
             }
+            return true // Continue cleanup
         }
 
         let finalDeletedEntries = await deletedEntries.get()
@@ -1199,7 +1215,7 @@ public actor ErasureCodingDataStore {
     /// - Returns: True if the shard exists
     public func hasShard(erasureRoot: Data32, shardIndex: UInt16) async throws -> Bool {
         // Try RocksDB first (for audit shards)
-        if let shard = try await dataStore.getShard(erasureRoot: erasureRoot, shardIndex: shardIndex) {
+        if try await dataStore.getShard(erasureRoot: erasureRoot, shardIndex: shardIndex) != nil {
             return true
         }
 
@@ -1234,7 +1250,6 @@ public actor ErasureCodingDataStore {
 
         // For any missing shards, try filesystem (for D³L shards)
         var result: [(index: UInt16, data: Data)] = []
-        let foundIndices = Set(rocksDBShards.map(\.index))
 
         for shardIndex in shardIndices {
             if let shard = rocksDBShards.first(where: { $0.index == shardIndex }) {
@@ -1265,12 +1280,19 @@ public actor ErasureCodingDataStore {
     /// - Parameter segmentsRoot: Segments root identifying the data
     /// - Returns: D³L entry or nil if not found
     public func getD3LEntry(segmentsRoot: Data32) async throws -> D3LEntry? {
-        // First get the erasure root from segments root
-        guard let erasureRoot = try await dataStore.getErasureRoot(forSegmentRoot: segmentsRoot) else {
+        // First get the erasure root from segments root using the D³L-specific mapping
+        guard let erasureRoot = try await dataStore.getD3LErasureRoot(forSegmentsRoot: segmentsRoot) else {
             return nil
         }
         // Then get the D³L entry
         return try await dataStore.getD3LEntry(erasureRoot: erasureRoot)
+    }
+
+    /// Get D³L erasure root for a given segments root
+    /// - Parameter segmentsRoot: Segments root identifying the data
+    /// - Returns: D³L erasure root or nil if not found
+    public func getD3LErasureRoot(forSegmentsRoot segmentsRoot: Data32) async throws -> Data32? {
+        try await dataStore.getD3LErasureRoot(forSegmentsRoot: segmentsRoot)
     }
 
     /// Get a single segment by erasure root and index

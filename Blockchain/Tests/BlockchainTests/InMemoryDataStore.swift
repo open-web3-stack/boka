@@ -10,7 +10,8 @@ import Utils
 public actor InMemoryDataStore: DataStoreProtocol {
     // MARK: - Storage
 
-    private var erasureRoots: [Data32: Data32] = [:]
+    private var erasureRoots: [Data32: Data32] = [:] // For audit bundles
+    private var d3lErasureRoots: [Data32: Data32] = [:] // For D³L segments (separate mapping)
     private var segmentRoots: [Data32: Data32] = [:]
     private var segments: [Data32: [UInt16: Data4104]] = [:]
     private var timestamps: [Data32: Date] = [:]
@@ -33,12 +34,23 @@ public actor InMemoryDataStore: DataStoreProtocol {
     public func delete(erasureRoot: Data32) async throws {
         // Remove all associated data
         erasureRoots = erasureRoots.filter { $0.value != erasureRoot }
+        d3lErasureRoots = d3lErasureRoots.filter { $0.value != erasureRoot }
         segments.removeValue(forKey: erasureRoot)
         timestamps.removeValue(forKey: erasureRoot)
         pagedProofs.removeValue(forKey: erasureRoot)
         auditEntries.removeValue(forKey: erasureRoot)
         d3lEntries.removeValue(forKey: erasureRoot)
         shards.removeValue(forKey: erasureRoot)
+    }
+
+    // MARK: - D³L Erasure Root Operations
+
+    public func getD3LErasureRoot(forSegmentsRoot: Data32) async throws -> Data32? {
+        d3lErasureRoots[forSegmentsRoot]
+    }
+
+    public func set(d3lErasureRoot: Data32, forSegmentsRoot: Data32) async throws {
+        d3lErasureRoots[forSegmentsRoot] = d3lErasureRoot
     }
 
     // MARK: - Segment Root Operations
@@ -90,10 +102,17 @@ public actor InMemoryDataStore: DataStoreProtocol {
 
     // MARK: - Audit Entry Operations
 
-    public func setAuditEntry(workPackageHash: Data32, erasureRoot: Data32, bundleSize: Int, timestamp: Date) async throws {
+    public func setAuditEntry(
+        workPackageHash: Data32,
+        erasureRoot: Data32,
+        segmentsRoot: Data32,
+        bundleSize: Int,
+        timestamp: Date
+    ) async throws {
         auditEntries[erasureRoot] = AuditEntry(
             workPackageHash: workPackageHash,
             erasureRoot: erasureRoot,
+            segmentsRoot: segmentsRoot,
             bundleSize: bundleSize,
             timestamp: timestamp
         )

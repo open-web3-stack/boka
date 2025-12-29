@@ -37,7 +37,8 @@ public final actor RocksDBDataStore {
 
     // Key prefixes for mappings
     private static let workPackageHashPrefix = Data([0x01])
-    private static let segmentsRootPrefix = Data([0x02])
+    private static let segmentsRootPrefix = Data([0x02]) // Maps segmentsRoot → audit erasure root
+    private static let d3lSegmentsRootPrefix = Data([0x03]) // Maps segmentsRoot → D³L erasure root
 
     init(db: RocksDB<StoreId>, config: ProtocolConfigRef) {
         self.db = db
@@ -49,7 +50,7 @@ public final actor RocksDBDataStore {
             column: .availabilityMetadata,
             coder: JamCoder(config: config)
         )
-        segments = Store<StoreId, JamCoder<Data, Data4104>>(db: db, column: .availabilitySegments, coder: JamCoder(config: config))
+        segments = Store<StoreId, JamCoder<Data, Data>>(db: db, column: .availabilitySegments, coder: JamCoder(config: config))
         mappings = Store<StoreId, JamCoder<Data, Data32>>(db: db, column: .availabilityMappings, coder: JamCoder(config: config))
         audit = Store<StoreId, JamCoder<Data32, AuditEntry>>(db: db, column: .availabilityAudit, coder: JamCoder(config: config))
         d3l = Store<StoreId, JamCoder<Data32, D3LEntry>>(db: db, column: .availabilityD3L, coder: JamCoder(config: config))
@@ -93,6 +94,21 @@ extension RocksDBDataStore: DataStoreProtocol {
     /// Delete segment root mapping
     public func delete(segmentRoot: Data32) async throws {
         try mappings.delete(key: segmentRoot.data)
+    }
+
+    // MARK: - D³L Erasure Root Mapping
+
+    /// Get D³L erasure root for a given segments root
+    public func getD3LErasureRoot(forSegmentsRoot segmentsRoot: Data32) async throws -> Data32? {
+        let key = Self.d3lSegmentsRootPrefix + segmentsRoot.data
+        return try mappings.get(key: key)
+    }
+
+    /// Map segments root to D³L erasure root (separate from audit erasure root mapping)
+    public func set(d3lErasureRoot: Data32, forSegmentsRoot segmentsRoot: Data32) async throws {
+        let key = Self.d3lSegmentsRootPrefix + segmentsRoot.data
+        try mappings.put(key: key, value: d3lErasureRoot)
+        logger.trace("Mapped segmentsRoot to D³L erasure root: segmentsRoot=\(segmentsRoot.toHexString())")
     }
 
     /// Get segment data by erasure root and index
@@ -141,10 +157,17 @@ extension RocksDBDataStore: DataStoreProtocol {
 
 extension RocksDBDataStore {
     /// Store audit entry (short-term)
-    public func setAuditEntry(workPackageHash: Data32, erasureRoot: Data32, bundleSize: Int, timestamp: Date) async throws {
+    public func setAuditEntry(
+        workPackageHash: Data32,
+        erasureRoot: Data32,
+        segmentsRoot: Data32,
+        bundleSize: Int,
+        timestamp: Date
+    ) async throws {
         let entry = AuditEntry(
             workPackageHash: workPackageHash,
             erasureRoot: erasureRoot,
+            segmentsRoot: segmentsRoot,
             bundleSize: bundleSize,
             timestamp: timestamp
         )
