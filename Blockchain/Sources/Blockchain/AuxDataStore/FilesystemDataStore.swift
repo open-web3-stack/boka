@@ -233,6 +233,9 @@ extension FilesystemDataStore {
 
             // Atomic rename
             try fileManager.moveItem(at: tempUrl, to: targetUrl)
+
+            // Clean up temp file if it still exists (shouldn't after successful move)
+            try? FileManager.default.removeItem(at: tempUrl)
         }.value
     }
 

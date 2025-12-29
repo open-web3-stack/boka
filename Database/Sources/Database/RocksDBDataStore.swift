@@ -463,7 +463,7 @@ extension RocksDBDataStore {
 
         // Update metadata
         var meta = try await getOrCreateMetadata(erasureRoot: erasureRoot)
-        meta.shardCount = UInt32(shards.count)
+        meta.shardCount += UInt32(shards.count) // Increment, don't overwrite
         try operations.append(metadata.putOperation(key: erasureRoot, value: meta))
 
         // Write everything atomically
@@ -544,20 +544,17 @@ extension RocksDBDataStore {
     ///   - value: Metadata value to store
     public func setMetadata(key: Data, value: Data) async throws {
         // Store in metadata column family with a special prefix
-        // We encode the key as a Data32 by padding or truncating
-        let keyData = key.subdata(in: 0 ..< min(32, key.count))
-        let keyData32: Data32
-        if keyData.count == 32 {
-            keyData32 = Data32(keyData)!
-        } else {
-            // Pad with zeros if less than 32 bytes
-            var padded = keyData
-            padded.count = 32
-            keyData32 = Data32(padded)!
-        }
+        // Hash the key to get a Data32 and add prefix byte to avoid collision with erasure roots
+        let keyHash = key.blake2b256hash()
+
+        // Add prefix byte 0xFF to distinguish from erasure roots (which never start with 0xFF)
+        var prefixedKey = Data([0xFF])
+        prefixedKey.append(keyHash.data)
+        let keyData32 = Data32(prefixedKey)!
+
         let metadataValue = AvailabilityMetadata(
             timestamp: Date(),
-            pagedProofsHash: keyData32,
+            pagedProofsHash: keyHash,
             pagedProofsMetadata: value,
             shardCount: UInt32(value.count)
         )
@@ -569,25 +566,17 @@ extension RocksDBDataStore {
     /// - Parameter key: Custom key for the metadata
     /// - Returns: Metadata value if found, nil otherwise
     public func getMetadata(key: Data) async throws -> Data? {
-        let keyData = key.subdata(in: 0 ..< min(32, key.count))
-        let keyData32: Data32
-        if keyData.count == 32 {
-            guard let kd = Data32(keyData) else {
-                return nil
-            }
-            keyData32 = kd
-        } else {
-            var padded = keyData
-            padded.count = 32
-            guard let kd = Data32(padded) else {
-                return nil
-            }
-            keyData32 = kd
+        // Use the same key derivation as setMetadata
+        let keyHash = key.blake2b256hash()
+        var prefixedKey = Data([0xFF])
+        prefixedKey.append(keyHash.data)
+        guard let keyData32 = Data32(prefixedKey) else {
+            return nil
         }
+
         if let metadataValue = try metadata.get(key: keyData32) {
-            // Verify this is actually custom metadata by checking if timestamp matches
-            // and if the pagedProofsHash matches our key
-            if metadataValue.pagedProofsHash.data == keyData32.data {
+            // Verify this is actually custom metadata
+            if metadataValue.pagedProofsHash == keyHash {
                 return metadataValue.pagedProofsMetadata
             }
         }
@@ -597,20 +586,12 @@ extension RocksDBDataStore {
     /// Delete metadata by custom key
     /// - Parameter key: Custom key for the metadata to delete
     public func deleteMetadata(key: Data) async throws {
-        let keyData = key.subdata(in: 0 ..< min(32, key.count))
-        let keyData32: Data32
-        if keyData.count == 32 {
-            guard let kd = Data32(keyData) else {
-                return
-            }
-            keyData32 = kd
-        } else {
-            var padded = keyData
-            padded.count = 32
-            guard let kd = Data32(padded) else {
-                return
-            }
-            keyData32 = kd
+        // Use the same key derivation as setMetadata
+        let keyHash = key.blake2b256hash()
+        var prefixedKey = Data([0xFF])
+        prefixedKey.append(keyHash.data)
+        guard let keyData32 = Data32(prefixedKey) else {
+            return
         }
         try metadata.delete(key: keyData32)
         logger.trace("Deleted metadata: key=\(key.base64EncodedString())")
