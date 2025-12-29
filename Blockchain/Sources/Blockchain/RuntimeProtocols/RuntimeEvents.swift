@@ -370,6 +370,81 @@ public enum RuntimeEvents {
         }
     }
 
+    public struct BundleRequestReceived: Event {
+        public let erasureRoot: Data32
+
+        public init(erasureRoot: Data32) {
+            self.erasureRoot = erasureRoot
+        }
+
+        public func generateRequestId() throws -> Data32 {
+            try JamEncoder.encode(erasureRoot).blake2b256hash()
+        }
+    }
+
+    public struct BundleRequestReceivedResponse: Event {
+        public var requestId: Data32
+
+        public let result: Result<(erasureRoot: Data32, bundleData: Data), Error>
+
+        public init(
+            requestId: Data32,
+            erasureRoot: Data32,
+            bundleData: Data
+        ) {
+            self.requestId = requestId
+            result = .success((erasureRoot, bundleData))
+        }
+
+        public init(
+            requestId: Data32,
+            error: Error
+        ) {
+            self.requestId = requestId
+            result = .failure(error)
+        }
+    }
+
+    public struct SegmentRequestReceived: Event {
+        public let segmentsRoot: Data32
+        public let segmentIndices: [UInt16]
+
+        public init(
+            segmentsRoot: Data32,
+            segmentIndices: [UInt16]
+        ) {
+            self.segmentsRoot = segmentsRoot
+            self.segmentIndices = segmentIndices
+        }
+
+        public func generateRequestId() throws -> Data32 {
+            try JamEncoder.encode(segmentsRoot, segmentIndices).blake2b256hash()
+        }
+    }
+
+    public struct SegmentRequestReceivedResponse: Event {
+        public var requestId: Data32
+
+        public let result: Result<(segmentsRoot: Data32, segments: [Data]), Error>
+
+        public init(
+            requestId: Data32,
+            segmentsRoot: Data32,
+            segments: [Data]
+        ) {
+            self.requestId = requestId
+            result = .success((segmentsRoot, segments))
+        }
+
+        public init(
+            requestId: Data32,
+            error: Error
+        ) {
+            self.requestId = requestId
+            result = .failure(error)
+        }
+    }
+
     public struct AssuranceDistributionReceived: Event {
         public let headerHash: Data32
         public let bitfield: ConfigSizeBitString<ProtocolConfig.TotalNumberOfCores>
