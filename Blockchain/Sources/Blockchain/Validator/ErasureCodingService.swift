@@ -33,7 +33,11 @@ public actor ErasureCodingService {
 
         logger.debug("Encoding \(segments.count) segments into shards")
 
-        let totalData = segments.map(\.data).reduce(Data()) { $0 + $1 }
+        // Pre-allocate capacity to avoid O(N^2) copies from repeated concatenation
+        var totalData = Data(capacity: segments.count * 4104)
+        for segment in segments {
+            totalData.append(segment.data)
+        }
 
         let totalPieces = totalData.count / pieceSize
 

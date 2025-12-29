@@ -537,9 +537,9 @@ public actor AvailabilityNetworkClient {
         requestType: ShardRequestType,
         data: Data
     ) async throws -> Data {
-        // Use the request type and key components for cache key
-        // Use proper hash to avoid integer overflow (was: reduce(0) { ($0 << 8) + Int($1) })
-        let dataHash = data.prefix(64).blake2b256hash().toHexString()
+        // Use the request type and entire data for cache key to avoid collisions
+        // Hash the entire data since prefix(64) could collide for segment requests
+        let dataHash = data.blake2b256hash().toHexString()
         let cacheKey = "\(address):\(requestType.rawValue):\(dataHash)"
 
         // Check for duplicate requests

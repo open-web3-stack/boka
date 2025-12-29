@@ -38,6 +38,10 @@ public actor ErasureCodingDataStore {
     /// Cleanup state for persistence and resumption
     private var cleanupState = CleanupState()
 
+    /// Genesis timestamp for epoch-based cleanup calculations
+    /// Default: Unix epoch (1970-01-01) - should be configured to actual chain genesis
+    private var genesisTimestamp: Date = .init(timeIntervalSince1970: 0)
+
     /// Expose dataStore for testing purposes
     public var dataStoreForTesting: any DataStoreProtocol {
         dataStore
@@ -56,6 +60,12 @@ public actor ErasureCodingDataStore {
         // Use default cache size for now - can be made configurable later
         segmentCache = SegmentCache(maxSize: 1000)
         self.networkClient = networkClient
+    }
+
+    /// Set the genesis timestamp for epoch-based calculations
+    /// - Parameter genesis: The timestamp of the chain's genesis block
+    public func setGenesisTimestamp(_ genesis: Date) {
+        genesisTimestamp = genesis
     }
 
     /// Set the network client for fetching missing shards
@@ -732,8 +742,8 @@ public actor ErasureCodingDataStore {
         let epochDuration: TimeInterval = 600
         let epochStartTime = TimeInterval(epoch) * epochDuration
 
-        // Assume genesis at Unix epoch (can be made configurable if needed)
-        return Date(timeIntervalSince1970: epochStartTime)
+        // Add to genesis timestamp to get actual wall-clock time
+        return genesisTimestamp.addingTimeInterval(epochStartTime)
     }
 
     // MARK: - Storage Monitoring
