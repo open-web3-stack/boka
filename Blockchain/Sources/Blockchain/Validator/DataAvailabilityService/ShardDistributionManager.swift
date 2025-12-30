@@ -33,29 +33,23 @@ public actor ShardDistributionManager {
         workReport: WorkReport,
         slot: UInt32,
         signatures: [ValidatorSignature]
-    ) async {
+    ) async throws {
         let hash = workReport.hash()
 
-        do {
-            // verify slot - slot should be within valid range
-            guard await isSlotValid(slot) else {
-                throw DataAvailabilityError.invalidWorkReportSlot
-            }
-            // verify signatures
-            try await validate(signatures: signatures, workReportHash: hash)
-
-            // store guaranteedWorkReport
-            let report = GuaranteedWorkReport(
-                workReport: workReport,
-                slot: slot,
-                signatures: signatures
-            )
-            try await dataProvider.add(guaranteedWorkReport: GuaranteedWorkReportRef(report))
-            // response success result
-            publish(RuntimeEvents.WorkReportReceivedResponse(workReportHash: hash))
-        } catch {
-            publish(RuntimeEvents.WorkReportReceivedResponse(workReportHash: hash, error: error))
+        // verify slot - slot should be within valid range
+        guard await isSlotValid(slot) else {
+            throw DataAvailabilityError.invalidWorkReportSlot
         }
+        // verify signatures
+        try await validate(signatures: signatures, workReportHash: hash)
+
+        // store guaranteedWorkReport
+        let report = GuaranteedWorkReport(
+            workReport: workReport,
+            slot: slot,
+            signatures: signatures
+        )
+        try await dataProvider.add(guaranteedWorkReport: GuaranteedWorkReportRef(report))
     }
 
     private func isSlotValid(_ slot: UInt32) async -> Bool {
@@ -159,98 +153,79 @@ public actor ShardDistributionManager {
     public func shardDistribution(
         erasureRoot: Data32,
         shardIndex: UInt16
-    ) async throws {
-        // Generate request ID
-        let requestId = try JamEncoder.encode(erasureRoot, shardIndex).blake2b256hash()
+    ) async throws -> (bundleShard: Data, segmentShards: [Data], justification: AvailabilityJustification) {
+        // CE 137: Respond with bundle shard and segment shards with justification
 
-        do {
-            // CE 137: Respond with bundle shard and segment shards with justification
-
-            // Use ErasureCodingDataStore if available
-            if let ecStore = erasureCodingDataStore {
-                // Check if we have this shard
-                let hasShard = try await ecStore.hasShard(
-                    erasureRoot: erasureRoot,
-                    shardIndex: shardIndex
-                )
-
-                guard hasShard else {
-                    throw DataAvailabilityError.segmentNotFound
-                }
-
-                // Get shard data
-                guard let shardData = try await ecStore.getShard(
-                    erasureRoot: erasureRoot,
-                    shardIndex: shardIndex
-                ) else {
-                    throw DataAvailabilityError.retrievalError
-                }
-
-                // Get metadata - we need both audit and D³L entries
-                guard try await ecStore.getAuditEntry(erasureRoot: erasureRoot) != nil else {
-                    throw DataAvailabilityError.invalidErasureRoot
-                }
-
-                guard let d3lMetadata = try await ecStore.getD3LEntry(erasureRoot: erasureRoot) else {
-                    throw DataAvailabilityError.segmentsRootMappingNotFound
-                }
-
-                // Extract bundle shard (first 684 bytes)
-                let bundleShardSize = 684
-                guard shardData.count >= bundleShardSize else {
-                    throw DataAvailabilityError.invalidDataLength
-                }
-
-                let bundleShard = Data(shardData[0 ..< bundleShardSize])
-
-                // Extract segment shards
-                let segmentCount = Int(d3lMetadata.segmentCount)
-                let segmentShardSize = (shardData.count - bundleShardSize) / segmentCount
-                var segmentShards: [Data] = []
-
-                for i in 0 ..< segmentCount {
-                    let startOffset = bundleShardSize + (i * segmentShardSize)
-                    let end = min(startOffset + segmentShardSize, shardData.count)
-                    let segmentShard = Data(shardData[startOffset ..< end])
-                    segmentShards.append(segmentShard)
-                }
-
-                // Generate justification T(s, i, H) using ErasureCodingService
-                // Get all shard hashes for justification generation using batch operation
-                let allShardIndices = Array(0 ..< 1023).map { UInt16($0) }
-                let allShards = try await ecStore.getShards(
-                    erasureRoot: erasureRoot,
-                    shardIndices: allShardIndices
-                )
-                let allShardHashes = allShards.map(\.data)
-
-                // Generate co-path justification
-                let justificationSteps = try await erasureCodingService.generateJustification(
-                    shardIndex: shardIndex,
-                    segmentsRoot: d3lMetadata.segmentsRoot,
-                    shards: allShardHashes
-                )
-                let justification = AvailabilityJustification.copath(justificationSteps)
-
-                // Respond with bundle shard + segment shards + justification
-                publish(RuntimeEvents.ShardDistributionReceivedResponse(
-                    requestId: requestId,
-                    bundleShard: bundleShard,
-                    segmentShards: segmentShards,
-                    justification: justification
-                ))
-
-            } else {
-                // Fallback: throw error since we can't generate proper justification
-                throw DataAvailabilityError.segmentNotFound
-            }
-
-        } catch {
-            publish(RuntimeEvents.ShardDistributionReceivedResponse(
-                requestId: requestId,
-                error: error
-            ))
+        // Use ErasureCodingDataStore if available
+        guard let ecStore = erasureCodingDataStore else {
+            throw DataAvailabilityError.segmentNotFound
         }
+
+        // Check if we have this shard
+        let hasShard = try await ecStore.hasShard(
+            erasureRoot: erasureRoot,
+            shardIndex: shardIndex
+        )
+
+        guard hasShard else {
+            throw DataAvailabilityError.segmentNotFound
+        }
+
+        // Get shard data
+        guard let shardData = try await ecStore.getShard(
+            erasureRoot: erasureRoot,
+            shardIndex: shardIndex
+        ) else {
+            throw DataAvailabilityError.retrievalError
+        }
+
+        // Get metadata - we need both audit and D³L entries
+        guard try await ecStore.getAuditEntry(erasureRoot: erasureRoot) != nil else {
+            throw DataAvailabilityError.invalidErasureRoot
+        }
+
+        guard let d3lMetadata = try await ecStore.getD3LEntry(erasureRoot: erasureRoot) else {
+            throw DataAvailabilityError.segmentsRootMappingNotFound
+        }
+
+        // Extract bundle shard (first 684 bytes)
+        let bundleShardSize = 684
+        guard shardData.count >= bundleShardSize else {
+            throw DataAvailabilityError.invalidDataLength
+        }
+
+        let bundleShard = Data(shardData[0 ..< bundleShardSize])
+
+        // Extract segment shards
+        let segmentCount = Int(d3lMetadata.segmentCount)
+        let segmentShardSize = (shardData.count - bundleShardSize) / segmentCount
+        var segmentShards: [Data] = []
+
+        for i in 0 ..< segmentCount {
+            let startOffset = bundleShardSize + (i * segmentShardSize)
+            let end = min(startOffset + segmentShardSize, shardData.count)
+            let segmentShard = Data(shardData[startOffset ..< end])
+            segmentShards.append(segmentShard)
+        }
+
+        // Generate justification T(s, i, H) using ErasureCodingService
+        // Get all shard hashes for justification generation using batch operation
+        let allShardIndices = Array(0 ..< 1023).map { UInt16($0) }
+        let allShards = try await ecStore.getShards(
+            erasureRoot: erasureRoot,
+            shardIndices: allShardIndices
+        )
+        let allShardHashes = allShards.map(\.data)
+
+        // Generate co-path justification
+        let justificationSteps = try await erasureCodingService.generateJustification(
+            shardIndex: shardIndex,
+            segmentsRoot: d3lMetadata.segmentsRoot,
+            shards: allShardHashes
+        )
+        let justification = AvailabilityJustification.copath(justificationSteps)
+
+        return (bundleShard, segmentShards, justification)
     }
 
     private func generateJustification(

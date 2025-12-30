@@ -76,12 +76,3 @@ public actor DataAvailabilityCleaner {
         await erasureCodingDataStore?.resetCleanupMetrics()
     }
 }
-
-/// Data availability retention constants
-public enum DataAvailabilityConstants {
-    /// Audit retention: ~6 epochs (approximately 1 hour at 10 minutes per epoch)
-    public static let auditRetentionEpochs: EpochIndex = 6
-
-    /// D³L retention: 672 epochs (28 days at 10 minutes per epoch)
-    public static let d3lRetentionEpochs: EpochIndex = 672
-}

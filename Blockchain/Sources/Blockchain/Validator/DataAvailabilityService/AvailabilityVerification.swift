@@ -1,5 +1,6 @@
 import Foundation
 import TracingUtils
+import Utils
 
 private let logger = Logger(label: "AvailabilityVerification")
 

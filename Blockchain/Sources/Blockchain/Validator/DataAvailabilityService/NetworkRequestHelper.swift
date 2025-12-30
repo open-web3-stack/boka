@@ -332,9 +332,3 @@ public actor NetworkRequestHelper {
         return responses
     }
 }
-
-/// Data availability network constants
-public enum DataAvailabilityConstants {
-    /// Minimum number of validators that must respond for successful reconstruction
-    public static let minimumValidatorResponses: Int = 3
-}
