@@ -312,8 +312,14 @@ public actor StateTrie {
         return node
     }
 
+    /// Update trie with multiple key-value pairs
+    /// Note: Currently processes updates sequentially.
+    /// Performance improvement opportunities:
+    /// - Batch updates: Group inserts/deletes by tree depth to minimize I/O
+    /// - Parallel processing: Use TaskGroup for independent updates
+    /// - Write batching: Collect all operations before committing to backend
+    /// - Cache optimization: Keep recently accessed nodes in memory
     public func update(_ updates: [(key: Data31, value: Data?)]) async throws {
-        // TODO: somehow improve the efficiency of this
         for (key, value) in updates {
             if let value {
                 rootHash = try await insert(hash: rootHash, key: key, value: value, depth: 0)

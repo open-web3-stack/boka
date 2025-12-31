@@ -224,7 +224,6 @@ extension FilesystemDataStore {
         try await createDirectoryIfNeeded(parentDir)
 
         // Capture paths to avoid capturing URL in Task.detached
-        let targetPath = url.path
         let parentUrl = url.deletingLastPathComponent()
         let tempUrl = parentUrl.appendingPathComponent("\(UUID().uuidString).tmp")
         let targetUrl = url

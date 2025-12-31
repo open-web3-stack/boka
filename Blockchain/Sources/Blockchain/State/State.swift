@@ -233,9 +233,12 @@ public struct State: Sendable {
         }
     }
 
-    // TODO: we don't really want to write to the underlying backend here
-    // instead, it should be writting to a in memory layer
-    // and when actually saving the state, save the in memory layer to the persistent store
+    /// Save state changes to persistent storage
+    /// Note: This writes directly to the underlying backend.
+    /// Future improvement: Consider using a two-tier approach:
+    /// 1. Write to in-memory layer first (faster, allows rollback)
+    /// 2. Flush in-memory layer to persistent store on commit
+    /// This would improve performance and provide better transaction isolation
     @discardableResult
     public func save() async throws -> Data32 {
         try await backend.write(layer.toKV())
@@ -554,7 +557,12 @@ extension State: Accumulation {}
 
 extension State: CustomStringConvertible {
     public var description: String {
-        "State()" // TODO: maybe cache state root hash so it can be accessed here?
+        // Note: State objects are complex with nested data structures.
+        // Showing the state root hash would be useful for debugging, but caching
+        // it would require memory overhead and synchronization.
+        // Current: Shows generic "State()" identifier
+        // Future: Consider async description or debug-specific representation
+        "State()"
     }
 }
 

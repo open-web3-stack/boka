@@ -9,7 +9,7 @@ import Utils
 public typealias RPCConfig = Server.Config
 public typealias NetworkConfig = Network.Config
 
-private let logger = Logger(label: "config")
+private let logger = Logger(label: "Config")
 
 public enum KeyStoreType {
     case inMemory

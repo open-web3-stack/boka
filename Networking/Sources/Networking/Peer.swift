@@ -698,7 +698,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                             "remoteAddress": "\(conn.remoteAddress)",
                         ]
                     )
-                    try? connection.shutdown(errorCode: 1) // TODO: define some error code
+                    try? connection.shutdown(errorCode: QuicErrorCode(ConnectionErrorCode.protocolError.rawValue))
                     break
                 }
             }

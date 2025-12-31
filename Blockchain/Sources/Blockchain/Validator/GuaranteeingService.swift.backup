@@ -117,7 +117,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         }
 
         do {
-            // Work report caching is already implemented in processWorkPackageBundle
+            // TODO: we may already done the work. need to cache the result
             let report = try await processWorkPackageBundle(
                 coreIndex: event.coreIndex,
                 segmentsRootMappings: event.segmentsRootMappings,
@@ -341,10 +341,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                             check: { event in
                                 event.source == validatorKey && event.workReportHash == workReportHash
                             },
-                            // Timeout in seconds for validator response.
-                            // Value of 2s is reasonable for local network; may need adjustment for WAN.
-                            // Consider making this a ProtocolConfig parameter for tuning.
-                            timeout: 2
+                            timeout: 2 // TODO: make configurable? and determine the best value
                         )
                         return ValidatorSignature(validatorIndex: idx, signature: resp.signature)
                     } catch ContinuationError.timeout {

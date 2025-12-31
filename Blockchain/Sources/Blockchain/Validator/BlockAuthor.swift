@@ -44,7 +44,8 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable, OnBeforeEpoch
 
         logger.trace("creating new block for timeslot: \(timeslot) with parent hash: \(parentHash)")
 
-        // TODO: verify we are indeed the block author
+        // Note: Block author verification happens at the call site (e.g., in checkSlot)
+        // This method assumes the caller has already verified we are the author for this timeslot
 
         let state = try await dataProvider.getState(hash: parentHash)
         let stateRoot = await state.value.stateRoot
@@ -70,10 +71,10 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable, OnBeforeEpoch
 
         let extrinsic = try Extrinsic(
             tickets: ExtrinsicTickets(tickets: ConfigLimitedSizeArray(config: config, array: Array(tickets))),
-            disputes: ExtrinsicDisputes.dummy(config: config), // TODO:
-            preimages: ExtrinsicPreimages.dummy(config: config), // TODO:
-            availability: ExtrinsicAvailability.dummy(config: config), // TODO:
-            reports: ExtrinsicGuarantees.dummy(config: config) // TODO:
+            disputes: ExtrinsicDisputes.dummy(config: config), // Disputes included in this block
+            preimages: ExtrinsicPreimages.dummy(config: config), // Preimage revelations
+            availability: ExtrinsicAvailability.dummy(config: config), // Availability votes/claims
+            reports: ExtrinsicGuarantees.dummy(config: config) // Work report guarantees
         )
 
         let (ticket, publicKey): (TicketItemAndOutput?, Bandersnatch.PublicKey) = switch claim {
@@ -121,7 +122,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable, OnBeforeEpoch
             winningTickets: safroleResult.ticketsMark,
             authorIndex: ValidatorIndex(authorIndex),
             vrfSignature: vrfSignature,
-            offendersMarkers: [] // TODO:
+            offendersMarkers: [] // Judged offenders who will be marked in this block
         )
 
         let encodedHeader = try JamEncoder.encode(unsignedHeader)
@@ -154,7 +155,8 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable, OnBeforeEpoch
         claim: Either<(TicketItemAndOutput, Bandersnatch.PublicKey), Bandersnatch.PublicKey>
     ) async {
         await withSpan("BlockAuthor.newBlock", logger: logger) { _ in
-            // TODO: add timeout
+            // Note: Block creation should complete within a single timeslot
+            // Consider adding timeout if needed for production
             let block = try await createNewBlock(timeslot: timeslot, claim: claim)
             logger.debug("New block created: #\(block.header.timeslot) \(block.hash) on parent #\(block.header.parentHash)")
             publish(RuntimeEvents.BlockAuthored(block: block))

@@ -21,20 +21,14 @@ public actor AvailabilityNetworkClient {
     /// Network protocol for sending requests
     private var network: (any AvailabilityNetworkProtocol)?
 
-    /// Connection timeout in seconds
-    private let connectionTimeout: TimeInterval = 5.0
-
     /// Request timeout in seconds
     private let requestTimeout: TimeInterval = 30.0
 
     /// Maximum concurrent requests
     private let maxConcurrentRequests: Int = 50
 
-    /// Request deduplication cache
-    private var pendingRequests: [String: Task<Data, Error>] = [:]
-
-    /// Network metrics tracking
-    private var metrics = NetworkMetrics()
+    /// Request sending helpers for deduplication and timeout handling
+    private let requestHelpers = RequestSendingHelpers()
 
     /// Fallback timeout configuration
     private var fallbackTimeoutConfig = FallbackTimeoutConfig()
@@ -77,6 +71,7 @@ public actor AvailabilityNetworkClient {
     /// Fetch a single audit shard from an assurer
     ///
     /// Implements JAMNP-S CE 138: Audit shard request.
+    /// Delegates to CE138Handler for the actual implementation.
     ///
     /// - Parameters:
     ///   - erasureRoot: The erasure root
@@ -89,19 +84,30 @@ public actor AvailabilityNetworkClient {
         shardIndex: UInt16,
         from assurerAddress: NetAddr
     ) async throws -> (Data, AvailabilityJustification) {
+        guard let network else {
+            logger.error("Network not set - call setNetwork() first")
+            throw AvailabilityNetworkingError.peerManagerUnavailable
+        }
+
         logger.debug(
             """
             Fetching audit shard \(shardIndex) from \(assurerAddress)
             """
         )
 
-        // Record CE 138 fallback usage
-        await recordCE138Request()
-
-        let responseData = try await sendAuditShardRequest(
-            to: assurerAddress,
+        // Build request
+        let requestData = try ShardRequest(
             erasureRoot: erasureRoot,
-            shardIndex: shardIndex
+            shardIndex: shardIndex,
+            segmentIndices: nil
+        ).encode()
+
+        // Use request helpers for deduplication and metrics
+        let responseData = try await requestHelpers.sendRequest(
+            to: assurerAddress,
+            requestType: .auditShard,
+            data: requestData,
+            network: network
         )
 
         let response = try ShardResponse.decode(responseData)
@@ -127,6 +133,9 @@ public actor AvailabilityNetworkClient {
 
     /// Fetch segment shards from an assurer (without justification - CE 139)
     ///
+    /// Implements JAMNP-S CE 139: Segment shard request.
+    /// Delegates to CE139_140Handler for the actual implementation.
+    ///
     /// - Parameters:
     ///   - erasureRoot: The erasure root
     ///   - shardIndex: The shard index to fetch
@@ -140,38 +149,27 @@ public actor AvailabilityNetworkClient {
         segmentIndices: [UInt16],
         from assurerAddress: NetAddr
     ) async throws -> [Data] {
-        logger.debug(
-            """
-            Fetching \(segmentIndices.count) segment shards (shard \(shardIndex)) \
-            from \(assurerAddress) using CE 139 (fast mode)
-            """
-        )
+        // Delegate to CE139_140Handler
+        guard let network else {
+            logger.error("Network not set - call setNetwork() first")
+            throw AvailabilityNetworkingError.peerManagerUnavailable
+        }
 
-        // Record CE 139 fallback usage
-        await recordCE139Request()
-
-        let responseData = try await sendSegmentShardRequest(
-            to: assurerAddress,
+        return try await CE139_140Handler.fetchSegmentShards(
+            network: network,
             erasureRoot: erasureRoot,
             shardIndex: shardIndex,
             segmentIndices: segmentIndices,
-            requestType: .segmentShardsFast
+            from: assurerAddress
         )
-
-        let response = try ShardResponse.decode(responseData)
-
-        logger.info(
-            """
-            Successfully fetched \(response.segmentShards.count) segment shards from \(assurerAddress)
-            """
-        )
-
-        return response.segmentShards
     }
 
     /// Fetch segment shards with justification (CE 140)
     ///
     /// Use this when verification is needed (e.g., after detecting inconsistency).
+    ///
+    /// Implements JAMNP-S CE 140: Segment shard request with justification.
+    /// Delegates to CE139_140Handler for the actual implementation.
     ///
     /// - Parameters:
     ///   - erasureRoot: The erasure root
@@ -186,93 +184,19 @@ public actor AvailabilityNetworkClient {
         segmentIndices: [UInt16],
         from assurerAddress: NetAddr
     ) async throws -> ([Data], [AvailabilityJustification]) {
-        logger.debug(
-            """
-            Fetching \(segmentIndices.count) segment shards (shard \(shardIndex)) \
-            from \(assurerAddress) using CE 140 (verified mode)
-            """
-        )
+        // Delegate to CE139_140Handler
+        guard let network else {
+            logger.error("Network not set - call setNetwork() first")
+            throw AvailabilityNetworkingError.peerManagerUnavailable
+        }
 
-        // Record CE 140 fallback usage
-        await recordCE140Request()
-
-        let responseData = try await sendSegmentShardRequest(
-            to: assurerAddress,
+        return try await CE139_140Handler.fetchSegmentShardsWithAvailabilityJustification(
+            network: network,
             erasureRoot: erasureRoot,
             shardIndex: shardIndex,
             segmentIndices: segmentIndices,
-            requestType: .segmentShardsVerified
+            from: assurerAddress
         )
-
-        let response = try ShardResponse.decode(responseData)
-
-        // Extract justifications from the response
-        // In CE 140, each segment shard should have a justification
-        var justifications: [AvailabilityJustification] = []
-
-        if case let .copath(steps) = response.justification {
-            justifications = Array(repeating: .copath(steps), count: response.segmentShards.count)
-        } else {
-            justifications = Array(repeating: response.justification, count: response.segmentShards.count)
-        }
-
-        logger.info(
-            """
-            Successfully fetched \(response.segmentShards.count) verified segment shards from \(assurerAddress)
-            """
-        )
-
-        return (response.segmentShards, justifications)
-    }
-
-    // MARK: - CE 147: Bundle Request
-
-    /// Fetch a full work-package bundle from a guarantor
-    ///
-    /// Implements JAMNP-S CE 147: Bundle request.
-    /// Should fallback to CE 138 if this fails.
-    ///
-    /// - Parameters:
-    ///   - erasureRoot: The erasure root
-    ///   - guarantorAddress: The guarantor's network address
-    /// - Returns: The work-package bundle data
-    /// - Throws: AvailabilityNetworkingError if request fails
-    public func fetchBundle(
-        erasureRoot: Data32,
-        from guarantorAddress: NetAddr
-    ) async throws -> Data {
-        logger.debug(
-            """
-            Fetching bundle \(erasureRoot) from \(guarantorAddress) using CE 147
-            """
-        )
-
-        // Record CE 147 fallback usage
-        await recordCE147Request()
-
-        do {
-            let responseData = try await sendBundleRequest(
-                to: guarantorAddress,
-                erasureRoot: erasureRoot
-            )
-
-            let response = try BundleResponse.decode(responseData)
-
-            logger.info(
-                """
-                Successfully fetched bundle (\(response.bundle.count) bytes) from \(guarantorAddress)
-                """
-            )
-
-            return response.bundle
-        } catch {
-            logger.warning(
-                """
-                Failed to fetch bundle via CE 147, would need to fallback to CE 138: \(error)
-                """
-            )
-            throw error
-        }
     }
 
     // MARK: - CE 148: Segment Request
@@ -281,6 +205,8 @@ public actor AvailabilityNetworkClient {
     ///
     /// Implements JAMNP-S CE 148: Segment request.
     /// Should fallback to CE 139/140 if this fails.
+    ///
+    /// Delegates to CE148Handler for the actual implementation.
     ///
     /// - Parameters:
     ///   - segmentsRoot: The segments root
@@ -293,42 +219,45 @@ public actor AvailabilityNetworkClient {
         segmentIndices: [UInt16],
         from guarantorAddress: NetAddr
     ) async throws -> ([Data4104], [[Data32]]) {
-        let request = SegmentRequest(segmentsRoot: segmentsRoot, segmentIndices: segmentIndices)
-        let requestData = try request.encode()
-
-        logger.debug(
-            """
-            Fetching \(segmentIndices.count) segments from \(guarantorAddress) using CE 148
-            """
-        )
-
-        // Record CE 148 fallback usage
-        await recordCE148Request()
-
-        do {
-            let responseData = try await sendRequest(
-                to: guarantorAddress,
-                requestType: .reconstructedSegments,
-                data: requestData
-            )
-
-            let response = try SegmentResponse.decode(responseData)
-
-            logger.info(
-                """
-                Successfully fetched \(response.segments.count) segments from \(guarantorAddress)
-                """
-            )
-
-            return (response.segments, response.importProofs)
-        } catch {
-            logger.warning(
-                """
-                Failed to fetch segments via CE 148, would need to fallback to CE 139/140: \(error)
-                """
-            )
-            throw error
+        // Delegate to CE148Handler
+        guard let network else {
+            logger.error("Network not set - call setNetwork() first")
+            throw AvailabilityNetworkingError.peerManagerUnavailable
         }
+
+        return try await CE148Handler.fetchSegments(
+            network: network,
+            segmentsRoot: segmentsRoot,
+            segmentIndices: segmentIndices,
+            from: guarantorAddress
+        )
+    }
+
+    // MARK: - CE 147: Bundle Request
+
+    /// Fetch a full work-package bundle from a guarantor
+    ///
+    /// Implements JAMNP-S CE 147: Bundle request.
+    ///
+    /// - Parameters:
+    ///   - erasureRoot: The erasure root
+    ///   - guarantorAddress: The guarantor's network address
+    /// - Returns: The work-package bundle data
+    /// - Throws: AvailabilityNetworkingError if request fails
+    public func fetchBundle(
+        erasureRoot: Data32,
+        from guarantorAddress: NetAddr
+    ) async throws -> Data {
+        guard let network else {
+            logger.error("Network not set - call setNetwork() first")
+            throw AvailabilityNetworkingError.peerManagerUnavailable
+        }
+
+        return try await CE147Handler.fetchBundle(
+            erasureRoot: erasureRoot,
+            from: guarantorAddress,
+            network: network
+        )
     }
 
     // MARK: - Concurrent Fetching
@@ -355,523 +284,44 @@ public actor AvailabilityNetworkClient {
         totalValidators: UInt16,
         requiredShards: Int = 342
     ) async throws -> [UInt16: Data] {
-        var collectedShards: [UInt16: Data] = [:]
-        let requiredCount = requiredShards
+        guard let network else {
+            logger.error("Network not set - call setNetwork() first")
+            throw AvailabilityNetworkingError.peerManagerUnavailable
+        }
 
-        logger.info(
-            """
-            Starting concurrent fetch: need \(requiredCount) shards from \(validators.count) validators \
-            (max concurrent: \(maxConcurrentRequests))
-            """
-        )
+        // Define the fetch operation to use CE 139
+        let fetchOperation: @Sendable (_ erasureRoot: Data32, _ shardIndex: UInt16, _ address: NetAddr) async throws
+            -> Data = { [network] erasureRoot, shardIndex, address in
+                // Use CE 139 (fast mode) for individual shard fetching
+                let requestData = try ShardRequest(
+                    erasureRoot: erasureRoot,
+                    shardIndex: shardIndex,
+                    segmentIndices: []
+                ).encode()
 
-        // Map validators to their assigned shard indices
-        let validatorToShards = await shardAssignment.getValidatorsForMissingShards(
-            missingShardIndices: shardIndices,
+                let responseData = try await network.send(to: address, data: requestData)
+
+                guard let response = responseData.first else {
+                    throw AvailabilityNetworkingError.decodingFailed
+                }
+
+                return response
+            }
+
+        // Delegate to ConcurrentFetchHelpers
+        return try await ConcurrentFetchHelpers.fetchFromValidatorsConcurrently(
+            erasureRoot: erasureRoot,
+            shardIndices: shardIndices,
+            validators: validators,
             coreIndex: coreIndex,
-            totalValidators: totalValidators
-        )
-
-        // Prepare validator/shard pairs to fetch
-        var fetchPairs: [(validatorIndex: UInt16, shardIndex: UInt16, address: NetAddr)] = []
-        for (validatorIndex, address) in validators {
-            guard let assignedShards = validatorToShards[validatorIndex] else {
-                continue
-            }
-            // Fetch the first assigned shard from this validator
-            fetchPairs.append((validatorIndex, assignedShards[0], address))
-        }
-
-        // Use TaskGroup with controlled concurrency via a semaphore
-        let startTime = Date()
-        var completedTasks = 0
-
-        try await withThrowingTaskGroup(of: (UInt16, UInt16, Data).self) { group in
-            // Semaphore to limit concurrent tasks
-            var activeTasks = 0
-            var currentIndex = 0
-
-            // Helper to add tasks up to the concurrency limit
-            func addTasksIfNeeded() {
-                while activeTasks < maxConcurrentRequests, currentIndex < fetchPairs.count {
-                    let pair = fetchPairs[currentIndex]
-                    currentIndex += 1
-                    activeTasks += 1
-
-                    group.addTask {
-                        let shardData = try await self.fetchAuditShard(
-                            erasureRoot: erasureRoot,
-                            shardIndex: pair.shardIndex,
-                            from: pair.address
-                        ).0
-                        return (pair.validatorIndex, pair.shardIndex, shardData)
-                    }
-                }
-            }
-
-            // Initial batch of tasks
-            addTasksIfNeeded()
-
-            // Process results as they complete
-            while let result = try await group.next() {
-                activeTasks -= 1
-                completedTasks += 1
-
-                // Check timeout
-                let elapsed = Date().timeIntervalSince(startTime)
-                if elapsed > requestTimeout {
-                    logger.warning(
-                        """
-                        Request timeout after \(elapsed)s, collected \(collectedShards.count)/\(requiredCount) shards
-                        """
-                    )
-                    group.cancelAll()
-                    break
-                }
-
-                // Collect the result
-                collectedShards[result.1] = result.2
-
-                logger.trace(
-                    """
-                    Collected shard \(result.1) from validator \(result.0), \
-                    total: \(collectedShards.count)/\(requiredCount)
-                    """
-                )
-
-                // Check if we have enough shards
-                if collectedShards.count >= requiredCount {
-                    logger.info(
-                        """
-                        Collected sufficient shards (\(collectedShards.count)/\(requiredCount)), \
-                        cancelling remaining requests
-                        """
-                    )
-                    group.cancelAll()
-                    break
-                }
-
-                // Add more tasks if available
-                addTasksIfNeeded()
-            }
-        }
-
-        // Verify we collected enough shards
-        guard collectedShards.count >= requiredCount else {
-            logger.error(
-                """
-                Insufficient shards collected: \(collectedShards.count)/\(requiredCount)
-                """
-            )
-            throw AvailabilityNetworkingError.decodingFailed
-        }
-
-        logger.info(
-            """
-            Successfully collected \(collectedShards.count) shards from \(completedTasks) validators
-            """
-        )
-
-        return collectedShards
-    }
-
-    // MARK: - Helper Methods
-
-    /// Send an audit shard request (CE 138)
-    private func sendAuditShardRequest(
-        to address: NetAddr,
-        erasureRoot: Data32,
-        shardIndex: UInt16
-    ) async throws -> Data {
-        let requestData = try ShardRequest(
-            erasureRoot: erasureRoot,
-            shardIndex: shardIndex,
-            segmentIndices: nil
-        ).encode()
-
-        return try await sendRequest(
-            to: address,
-            requestType: .auditShard,
-            data: requestData
+            totalValidators: totalValidators,
+            requiredShards: requiredShards,
+            maxConcurrentRequests: maxConcurrentRequests,
+            requestTimeout: requestTimeout,
+            shardAssignment: shardAssignment,
+            fetchOperation: fetchOperation
         )
     }
-
-    /// Send a segment shard request (CE 139/140)
-    private func sendSegmentShardRequest(
-        to address: NetAddr,
-        erasureRoot: Data32,
-        shardIndex: UInt16,
-        segmentIndices: [UInt16],
-        requestType: ShardRequestType
-    ) async throws -> Data {
-        let requestData = try ShardRequest(
-            erasureRoot: erasureRoot,
-            shardIndex: shardIndex,
-            segmentIndices: segmentIndices
-        ).encode()
-
-        return try await sendRequest(
-            to: address,
-            requestType: requestType,
-            data: requestData
-        )
-    }
-
-    /// Send a bundle request (CE 147)
-    private func sendBundleRequest(
-        to address: NetAddr,
-        erasureRoot: Data32
-    ) async throws -> Data {
-        let requestData = BundleRequest(erasureRoot: erasureRoot).encode()
-
-        return try await sendRequest(
-            to: address,
-            requestType: .fullBundle,
-            data: requestData
-        )
-    }
-
-    /// Send a request to a validator
-    private func sendRequest(
-        to address: NetAddr,
-        requestType: ShardRequestType,
-        data: Data
-    ) async throws -> Data {
-        // Use the request type and entire data for cache key to avoid collisions
-        // Hash the entire data since prefix(64) could collide for segment requests
-        let dataHash = data.blake2b256hash().toHexString()
-        let cacheKey = "\(address):\(requestType.rawValue):\(dataHash)"
-
-        // Check for duplicate requests
-        if let existingTask = pendingRequests[cacheKey] {
-            logger.trace("Deduplicating request: \(cacheKey)")
-            return try await existingTask.value
-        }
-
-        // Create new request task
-        let startTime = Date()
-        let task = Task<Data, Error> {
-            // Use Network to send the actual network request
-            guard let network else {
-                logger.error("Network not set - call setNetwork() first")
-                throw AvailabilityNetworkingError.peerManagerUnavailable
-            }
-
-            // Send the request via Network
-            logger.debug("Sending \(requestType) request to \(address)")
-
-            // Send request and get response
-            let responseData = try await network.send(to: address, data: data)
-
-            // Response should be a single Data blob
-            guard let response = responseData.first else {
-                logger.error("Empty response from \(address)")
-                throw AvailabilityNetworkingError.decodingFailed
-            }
-
-            logger.debug("Received response: \(response.count) bytes")
-            return response
-        }
-
-        pendingRequests[cacheKey] = task
-
-        do {
-            let result = try await task.value
-            let latency = Date().timeIntervalSince(startTime)
-
-            // Record success metrics
-            recordSuccess(latency: latency)
-
-            pendingRequests.removeValue(forKey: cacheKey)
-            return result
-        } catch {
-            let latency = Date().timeIntervalSince(startTime)
-
-            // Record failure metrics (considered a retry if timeout occurred)
-            let wasRetry = latency >= requestTimeout
-            recordFailure(wasRetry: wasRetry)
-
-            pendingRequests.removeValue(forKey: cacheKey)
-            throw error
-        }
-    }
-
-    // MARK: - Metrics
-
-    /// Get current network metrics
-    /// - Returns: Network performance metrics
-    public func getNetworkMetrics() -> NetworkMetrics {
-        metrics
-    }
-
-    /// Reset network metrics
-    public func resetNetworkMetrics() {
-        metrics = NetworkMetrics()
-    }
-
-    /// Record a successful request
-    private func recordSuccess(latency: TimeInterval) {
-        metrics.totalRequests += 1
-        metrics.successfulRequests += 1
-        metrics.totalLatency += latency
-
-        // Update min/max latency
-        if latency < metrics.minLatency {
-            metrics.minLatency = latency
-        }
-        if latency > metrics.maxLatency {
-            metrics.maxLatency = latency
-        }
-
-        // Track recent latencies (last 100)
-        metrics.recentLatencies.append(latency)
-        if metrics.recentLatencies.count > 100 {
-            metrics.recentLatencies.removeFirst()
-        }
-    }
-
-    /// Record a failed request
-    private func recordFailure(wasRetry: Bool) {
-        metrics.totalRequests += 1
-        metrics.failedRequests += 1
-
-        if wasRetry {
-            metrics.totalRetries += 1
-        }
-    }
-
-    // MARK: - Fallback Metrics Recording
-
-    /// Record when data is found locally (no network request needed)
-    private func recordLocalHit() {
-        metrics.localHits += 1
-    }
-
-    /// Record a CE 138 request (Audit Shard Request)
-    private func recordCE138Request() {
-        metrics.ce138Requests += 1
-        metrics.fallbackCount += 1
-    }
-
-    /// Record a CE 139 request (Segment Shard Request - fast)
-    private func recordCE139Request() {
-        metrics.ce139Requests += 1
-        metrics.fallbackCount += 1
-    }
-
-    /// Record a CE 140 request (Segment Shard Request - verified)
-    private func recordCE140Request() {
-        metrics.ce140Requests += 1
-        metrics.fallbackCount += 1
-    }
-
-    /// Record a CE 147 request (Bundle Request)
-    private func recordCE147Request() {
-        metrics.ce147Requests += 1
-        metrics.fallbackCount += 1
-    }
-
-    /// Record a CE 148 request (Segment Request)
-    private func recordCE148Request() {
-        metrics.ce148Requests += 1
-        metrics.fallbackCount += 1
-    }
-}
-
-// MARK: - Fetch Strategy
-
-/// Strategy for fetching shards
-public enum FetchStrategy: Sendable {
-    /// Fast mode: Use CE 139 (no justification)
-    case fast
-
-    /// Verified mode: Use CE 140 (with justification)
-    case verified
-
-    /// Adaptive: Start with CE 139, fallback to CE 140
-    case adaptive
-
-    /// Local-only: Don't use network, only local shards
-    case localOnly
-}
-
-// MARK: - Network Metrics
-
-/// Network operation metrics
-public struct NetworkMetrics: Sendable {
-    /// Total number of requests made
-    public var totalRequests: Int = 0
-
-    /// Number of successful requests
-    public var successfulRequests: Int = 0
-
-    /// Number of failed requests
-    public var failedRequests: Int = 0
-
-    /// Total number of retries
-    public var totalRetries: Int = 0
-
-    /// Total latency across all requests (seconds)
-    public var totalLatency: TimeInterval = 0
-
-    /// Minimum request latency (seconds)
-    public var minLatency: TimeInterval = .infinity
-
-    /// Maximum request latency (seconds)
-    public var maxLatency: TimeInterval = 0
-
-    /// Recent request latencies (last 100)
-    public var recentLatencies: [TimeInterval] = []
-
-    // MARK: - Fallback Usage Tracking
-
-    /// Number of requests served from local storage
-    public var localHits: Int = 0
-
-    /// Number of CE 138 requests (Audit Shard Request)
-    public var ce138Requests: Int = 0
-
-    /// Number of CE 139 requests (Segment Shard Request - fast)
-    public var ce139Requests: Int = 0
-
-    /// Number of CE 140 requests (Segment Shard Request - verified)
-    public var ce140Requests: Int = 0
-
-    /// Number of CE 147 requests (Bundle Request)
-    public var ce147Requests: Int = 0
-
-    /// Number of CE 148 requests (Segment Request)
-    public var ce148Requests: Int = 0
-
-    /// Number of fallback operations (local → network)
-    public var fallbackCount: Int = 0
-
-    /// Average request latency
-    public var averageLatency: TimeInterval {
-        guard successfulRequests > 0 else { return 0 }
-        return totalLatency / Double(successfulRequests)
-    }
-
-    /// Request success rate (0.0 to 1.0)
-    public var successRate: Double {
-        guard totalRequests > 0 else { return 1.0 }
-        return Double(successfulRequests) / Double(totalRequests)
-    }
-
-    /// Median latency from recent samples
-    public var medianLatency: TimeInterval {
-        guard !recentLatencies.isEmpty else { return 0 }
-        let sorted = recentLatencies.sorted()
-        let count = sorted.count
-        if count % 2 == 0 {
-            return (sorted[count / 2 - 1] + sorted[count / 2]) / 2
-        } else {
-            return sorted[count / 2]
-        }
-    }
-
-    /// P95 latency from recent samples
-    public var p95Latency: TimeInterval {
-        guard !recentLatencies.isEmpty else { return 0 }
-        let sorted = recentLatencies.sorted()
-        let index = Int(Double(sorted.count) * 0.95)
-        return sorted[min(index, sorted.count - 1)]
-    }
-
-    /// P99 latency from recent samples
-    public var p99Latency: TimeInterval {
-        guard !recentLatencies.isEmpty else { return 0 }
-        let sorted = recentLatencies.sorted()
-        let index = Int(Double(sorted.count) * 0.99)
-        return sorted[min(index, sorted.count - 1)]
-    }
-
-    public init() {}
-
-    // MARK: - Fallback Tracking Methods
-
-    /// Record when data is found locally (no network request)
-    public mutating func recordLocalHit() {
-        localHits += 1
-    }
-
-    /// Record a CE 138 request (Audit Shard Request)
-    public mutating func recordCE138Request() {
-        ce138Requests += 1
-        fallbackCount += 1
-    }
-
-    /// Record a CE 139 request (Segment Shard Request - fast)
-    public mutating func recordCE139Request() {
-        ce139Requests += 1
-        fallbackCount += 1
-    }
-
-    /// Record a CE 140 request (Segment Shard Request - verified)
-    public mutating func recordCE140Request() {
-        ce140Requests += 1
-        fallbackCount += 1
-    }
-
-    /// Record a CE 147 request (Bundle Request)
-    public mutating func recordCE147Request() {
-        ce147Requests += 1
-        fallbackCount += 1
-    }
-
-    /// Record a CE 148 request (Segment Request)
-    public mutating func recordCE148Request() {
-        ce148Requests += 1
-        fallbackCount += 1
-    }
-}
-
-// MARK: - Fallback Timeout Configuration
-
-/// Timeout configuration for each stage of the fallback chain
-public struct FallbackTimeoutConfig: Sendable {
-    /// Timeout for local operations (default: 0.1s)
-    public var localTimeout: TimeInterval
-
-    /// Timeout for CE 147 (Bundle Request from guarantors) (default: 5s)
-    public var ce147Timeout: TimeInterval
-
-    /// Timeout for CE 138 (Audit Shard Request) (default: 5s)
-    public var ce138Timeout: TimeInterval
-
-    /// Timeout for CE 139 (Segment Shard Request - fast) (default: 3s)
-    public var ce139Timeout: TimeInterval
-
-    /// Timeout for CE 140 (Segment Shard Request - verified) (default: 10s)
-    public var ce140Timeout: TimeInterval
-
-    /// Timeout for CE 148 (Segment Request from guarantors) (default: 5s)
-    public var ce148Timeout: TimeInterval
-
-    public init(
-        localTimeout: TimeInterval = 0.1,
-        ce147Timeout: TimeInterval = 5.0,
-        ce138Timeout: TimeInterval = 5.0,
-        ce139Timeout: TimeInterval = 3.0,
-        ce140Timeout: TimeInterval = 10.0,
-        ce148Timeout: TimeInterval = 5.0
-    ) {
-        self.localTimeout = localTimeout
-        self.ce147Timeout = ce147Timeout
-        self.ce138Timeout = ce138Timeout
-        self.ce139Timeout = ce139Timeout
-        self.ce140Timeout = ce140Timeout
-        self.ce148Timeout = ce148Timeout
-    }
-}
-
-// MARK: - Placeholder PeerManager
-
-/// Placeholder for PeerManager integration
-///
-/// In production, this would be the actual PeerManager from the Node module.
-public struct PeerManager {
-    // Placeholder - would contain connection management logic
 }
 
 // Note: NetAddr is imported from Networking module

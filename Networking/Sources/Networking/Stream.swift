@@ -167,7 +167,8 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         logger.debug("Closing stream \(id) in status \(status)")
         status = abort ? .aborted : .closed
         channel.close()
-        try? stream.shutdown(errorCode: abort ? 1 : 0) // TODO: define some error code
+        let code = abort ? QuicErrorCode(ConnectionErrorCode.abort.rawValue) : QuicErrorCode(ConnectionErrorCode.normalClosure.rawValue)
+        try? stream.shutdown(errorCode: code)
     }
 
     // remote initiated close

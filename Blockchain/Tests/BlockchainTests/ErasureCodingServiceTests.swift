@@ -349,7 +349,7 @@ struct ErasureCodingServiceTests {
             shards: shards
         )
 
-        let isValid = try await service.verifyMerkleProof(
+        let isValid = await service.verifyMerkleProof(
             shardHash: shardHashes[511],
             shardIndex: 511,
             proof: proof,
@@ -374,7 +374,7 @@ struct ErasureCodingServiceTests {
         // Create fake proof
         let fakeProof = Array(repeating: Data32.random(), count: 10)
 
-        let isValid = try await service.verifyMerkleProof(
+        let isValid = await service.verifyMerkleProof(
             shardHash: shardHashes[0],
             shardIndex: 0,
             proof: fakeProof,
@@ -399,7 +399,7 @@ struct ErasureCodingServiceTests {
         )
 
         // Try to verify shard 0 proof with shard 1 hash
-        let isValid = try await service.verifyMerkleProof(
+        let isValid = await service.verifyMerkleProof(
             shardHash: shardHashes[1],
             shardIndex: 0,
             proof: proof,

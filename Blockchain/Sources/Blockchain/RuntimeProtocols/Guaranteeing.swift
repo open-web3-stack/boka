@@ -179,7 +179,10 @@ extension Guaranteeing {
                 }
 
                 let coreAssignment = isCurrent ? currentCoreAssignment : previousCoreAssignment
-                guard coreAssignment[Int(credential.index)] == report.coreIndex else { // TODO: it should accepts the last core index?
+                // Verify credential's core index matches report's core index
+                // Note: This validation ensures the credential is for the correct core.
+                // Future consideration: Should this accept the last core index for edge cases?
+                guard coreAssignment[Int(credential.index)] == report.coreIndex else {
                     throw .invalidGuaranteeCore
                 }
 

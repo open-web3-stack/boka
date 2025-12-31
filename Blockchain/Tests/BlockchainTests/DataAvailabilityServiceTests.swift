@@ -14,7 +14,7 @@ struct DataAvailabilityServiceTests {
     func dataAvailabilityErrorEquatable() {
         // Test that errors can be created and compared via switch
         let error1 = DataAvailabilityError.segmentNotFound
-        let error2 = DataAvailabilityError.segmentNotFound
+        _ = DataAvailabilityError.segmentNotFound // error2 - unused, for comparison testing
         let error3 = DataAvailabilityError.retrievalError
 
         // Since DataAvailabilityError doesn't conform to Equatable, use switch statements

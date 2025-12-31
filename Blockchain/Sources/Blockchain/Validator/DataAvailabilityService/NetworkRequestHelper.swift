@@ -131,47 +131,25 @@ public actor NetworkRequestHelper {
 
             switch part {
             case "ip4":
-                guard index + 1 < parts.count else {
-                    logger.debug("Multiaddr ip4 missing address")
+                guard let parsedIP = parseIPv4(parts: parts, index: index) else {
                     return nil
                 }
-                let candidateIP = parts[index + 1]
-                guard isValidIPv4(candidateIP) else {
-                    logger.debug("Invalid IPv4 address: \(candidateIP)")
-                    return nil
-                }
-                ipAddress = candidateIP
-                index += 2
+                ipAddress = parsedIP.ip
+                index = parsedIP.nextIndex
 
             case "ip6":
-                guard index + 1 < parts.count else {
-                    logger.debug("Multiaddr ip6 missing address")
+                guard let parsedIP = parseIPv6(parts: parts, index: index) else {
                     return nil
                 }
-                let candidateIP = parts[index + 1]
-                guard isValidIPv6(candidateIP) else {
-                    logger.debug("Invalid IPv6 address: \(candidateIP)")
-                    return nil
-                }
-                ipAddress = candidateIP
-                index += 2
+                ipAddress = parsedIP.ip
+                index = parsedIP.nextIndex
 
             case "tcp", "udp":
-                guard index + 1 < parts.count else {
-                    logger.debug("Multiaddr \(part) missing port")
+                guard let parsedPort = parsePort(parts: parts, index: index, protocolName: part) else {
                     return nil
                 }
-                guard let portNum = UInt16(parts[index + 1]) else {
-                    logger.debug("Invalid port number: \(parts[index + 1])")
-                    return nil
-                }
-                // Validate port range (1-65535, 0 is reserved)
-                guard portNum > 0 else {
-                    logger.debug("Port must be > 0: \(portNum)")
-                    return nil
-                }
-                port = portNum
-                index += 2
+                port = parsedPort.port
+                index = parsedPort.nextIndex
 
             default:
                 // Unknown protocol component - skip
@@ -330,5 +308,81 @@ public actor NetworkRequestHelper {
 
         logger.info("Successfully fetched data from \(responses.count) validators")
         return responses
+    }
+
+    // MARK: - Multiaddr Parsing Helpers
+
+    /// Parse IPv4 address from multiaddr parts
+    ///
+    /// - Parameters:
+    ///   - parts: Array of multiaddr components
+    ///   - index: Current index in parts array
+    /// - Returns: ParsedIPResult with IP address and next index, or nil if parsing fails
+    private func parseIPv4(parts: [String], index: Int) -> ParsedIPResult? {
+        guard index + 1 < parts.count else {
+            logger.debug("Multiaddr ip4 missing address")
+            return nil
+        }
+        let candidateIP = parts[index + 1]
+        guard isValidIPv4(candidateIP) else {
+            logger.debug("Invalid IPv4 address: \(candidateIP)")
+            return nil
+        }
+        return ParsedIPResult(ip: candidateIP, nextIndex: index + 2)
+    }
+
+    /// Parse IPv6 address from multiaddr parts
+    ///
+    /// - Parameters:
+    ///   - parts: Array of multiaddr components
+    ///   - index: Current index in parts array
+    /// - Returns: ParsedIPResult with IP address and next index, or nil if parsing fails
+    private func parseIPv6(parts: [String], index: Int) -> ParsedIPResult? {
+        guard index + 1 < parts.count else {
+            logger.debug("Multiaddr ip6 missing address")
+            return nil
+        }
+        let candidateIP = parts[index + 1]
+        guard isValidIPv6(candidateIP) else {
+            logger.debug("Invalid IPv6 address: \(candidateIP)")
+            return nil
+        }
+        return ParsedIPResult(ip: candidateIP, nextIndex: index + 2)
+    }
+
+    /// Parse port from multiaddr parts
+    ///
+    /// - Parameters:
+    ///   - parts: Array of multiaddr components
+    ///   - index: Current index in parts array
+    ///   - protocolName: Protocol name ("tcp" or "udp")
+    /// - Returns: ParsedPortResult with port and next index, or nil if parsing fails
+    private func parsePort(parts: [String], index: Int, protocolName: String) -> ParsedPortResult? {
+        guard index + 1 < parts.count else {
+            logger.debug("Multiaddr \(protocolName) missing port")
+            return nil
+        }
+        guard let portNum = UInt16(parts[index + 1]) else {
+            logger.debug("Invalid port number: \(parts[index + 1])")
+            return nil
+        }
+        // Validate port range (1-65535, 0 is reserved)
+        guard portNum > 0 else {
+            logger.debug("Port must be > 0: \(portNum)")
+            return nil
+        }
+        return ParsedPortResult(port: portNum, nextIndex: index + 2)
+    }
+
+    /// Result type for IP address parsing
+    private struct ParsedIPResult {
+        let ip: String
+        let nextIndex: Int
+    }
+
+    /// Result type for port parsing
+    private struct ParsedPortResult {
+        let port: UInt16
+        let nextIndex: Int
     }
 }

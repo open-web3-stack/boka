@@ -2,7 +2,10 @@ import Utils
 
 public typealias Balance = Utils.Balance
 public typealias ServiceIndex = UInt32
-public typealias TimeslotIndex = UInt32 // TODO: use new type
+/// Timeslot index (global timeslot number across all epochs)
+/// Note: Currently a typealias for UInt32. Consider creating a struct for type safety
+/// to prevent confusion with other UInt32 values (EpochIndex, ServiceIndex, etc.)
+public typealias TimeslotIndex = UInt32
 public typealias Gas = Utils.Gas
 public typealias DataLength = UInt32
 
