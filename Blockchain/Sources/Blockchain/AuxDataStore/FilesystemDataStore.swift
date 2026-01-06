@@ -33,17 +33,47 @@ public actor FilesystemDataStore {
     private let d3lPath: URL
     private let fileManager: FileManager
 
-    public init(dataPath: URL) async throws {
+    /// Synchronous init to avoid actor contention when multiple tests create instances concurrently
+    public init(dataPath: URL) throws {
         self.dataPath = dataPath
         auditPath = dataPath.appendingPathComponent("audit")
         d3lPath = dataPath.appendingPathComponent("d3l")
         fileManager = FileManager.default
 
-        // Create directories if they don't exist
-        try await createDirectoryIfNeeded(auditPath)
-        try await createDirectoryIfNeeded(d3lPath)
+        // Create directories synchronously
+        try createDirectoryIfNeededSync(auditPath)
+        try createDirectoryIfNeededSync(d3lPath)
 
-        logger.info("FilesystemDataStore initialized at \(dataPath.path)")
+        // logger.info("FilesystemDataStore initialized at \(dataPath.path)")
+    }
+
+    /// Synchronous version for use in init to avoid actor contention
+    private nonisolated func createDirectoryIfNeededSync(_ url: URL) throws {
+        let fm = FileManager.default
+        var isDirectory: ObjCBool = false
+        let exists = fm.fileExists(atPath: url.path, isDirectory: &isDirectory)
+
+        if exists {
+            guard isDirectory.boolValue else {
+                throw FilesystemDataStoreError.directoryCreationFailed("Path exists but is not a directory: \(url.path)")
+            }
+        } else {
+            do {
+                try fm.createDirectory(
+                    at: url,
+                    withIntermediateDirectories: true,
+                    attributes: nil
+                )
+            } catch {
+                // Verify if it was created by another task
+                var isDir: ObjCBool = false
+                if fm.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
+                    return
+                }
+                throw FilesystemDataStoreError
+                    .directoryCreationFailed("Failed to create directory at \(url.path): \(error.localizedDescription)")
+            }
+        }
     }
 
     /// Store audit bundle (short-term storage)

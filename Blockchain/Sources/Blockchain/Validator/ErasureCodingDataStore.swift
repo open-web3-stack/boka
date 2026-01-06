@@ -462,7 +462,7 @@ public actor ErasureCodingDataStore {
 
         // Try network fallback if enabled
         if fetchStrategy != .localOnly,
-           let client = networkClient,
+           networkClient != nil,
            let validatorAddrs = validators,
            !validatorAddrs.isEmpty
         {

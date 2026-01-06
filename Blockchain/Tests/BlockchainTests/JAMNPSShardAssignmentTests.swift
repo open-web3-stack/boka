@@ -215,10 +215,7 @@ struct JAMNPSShardAssignmentTests {
         // Verify pattern
         #expect(shards[0] == 0)
         #expect(shards[1] == 342)
-        #expect(shards[7] == 7) // 7 * 342 mod 1023 = 2394 mod 1023 = 348... wait, 2394 - 2*1023 = 348
-        // Actually: 7 * 342 = 2394, 2394 mod 1023 = 2394 - 2*1023 = 2394 - 2046 = 348
-        // Hmm, let me recalculate
-        // 2394 / 1023 = 2.34..., so 2 * 1023 = 2046, 2394 - 2046 = 348
+        // 7 * 342 = 2394, 2394 mod 1023 = 2394 - 2*1023 = 2394 - 2046 = 348
         #expect(shards[7] == 348)
     }
 

@@ -50,7 +50,8 @@ public final class NetworkManager: Sendable {
         // Create network with handler
         let handler = HandlerImpl(
             blockchain: blockchain,
-            ceHandlers: ceHandlers
+            ceHandlers: ceHandlers,
+            peerManager: peerManager
         )
         network = try buildNetwork(handler)
 
@@ -301,10 +302,12 @@ public final class NetworkManager: Sendable {
 struct HandlerImpl: NetworkProtocolHandler {
     let blockchain: Blockchain
     let ceHandlers: CEProtocolHandlers
+    let peerManager: PeerManager
 
-    init(blockchain: Blockchain, ceHandlers: CEProtocolHandlers) {
+    init(blockchain: Blockchain, ceHandlers: CEProtocolHandlers, peerManager: PeerManager) {
         self.blockchain = blockchain
         self.ceHandlers = ceHandlers
+        self.peerManager = peerManager
     }
 
     func handle(ceRequest: CERequest) async throws -> [Data] {
@@ -343,24 +346,23 @@ struct HandlerImpl: NetworkProtocolHandler {
             let heads = try await blockchain.dataProvider.getHeads()
             var headsWithTimeslot: [HashAndSlot] = []
             for head in heads {
-                try await headsWithTimeslot.append(HashAndSlot(
+                let header = try await blockchain.dataProvider.getHeader(hash: head)
+                headsWithTimeslot.append(HashAndSlot(
                     hash: head,
-                    timeslot: blockchain.dataProvider.getHeader(hash: head).value.timeslot
+                    timeslot: header.value.timeslot
                 ))
             }
 
             try await stream.send(message: .blockAnnouncementHandshake(.init(
-                finalizedHead: finalized,
+                finalized: HashAndSlot(hash: finalized.hash, timeslot: finalized.timeslot),
                 heads: headsWithTimeslot
             )))
 
             for head in heads {
-                let header = blockchain.dataProvider.getHeader(hash: head).value
-                let block = blockchain.dataProvider.getBlock(header: header).value
+                let header = try await blockchain.dataProvider.getHeader(hash: head)
                 try await stream.send(message: .blockAnnouncement(.init(
-                    header: header.asRef(),
-                    finalized: HashAndSlot(hash: finalized.hash, timeslot: finalized.timeslot),
-                    body: block
+                    header: header,
+                    finalized: HashAndSlot(hash: finalized.hash, timeslot: finalized.timeslot)
                 )))
             }
         }

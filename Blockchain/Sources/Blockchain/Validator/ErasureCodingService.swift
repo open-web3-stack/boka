@@ -216,59 +216,92 @@ public enum ErasureCodingError: Error {
 
 extension ErasureCodingService {
     /// Generate Merkle proof for a shard
-    public func generateMerkleProof(shardIndex: UInt16, shardHashes: [Data32]) throws -> [Data32] {
+    public func generateMerkleProof(
+        shardIndex: UInt16,
+        shardHashes: [Data32],
+        segmentsRoot: Data32,
+        shards: [Data]
+    ) throws -> [Either<Data, Data32>] {
         guard shardIndex < UInt16(shardHashes.count) else {
             throw ErasureCodingError.invalidShardIndex
         }
 
+        // Reconstruct the same nodes used to build the Merkle tree in calculateErasureRoot
+        let encodedSegmentsRoot = try JamEncoder.encode(segmentsRoot)
+        var nodes: [Data] = []
+        nodes.reserveCapacity(shards.count)
+
+        for shard in shards {
+            let shardHash = shard.blake2b256hash()
+            let encodedShardHash = try JamEncoder.encode(shardHash)
+            let node = encodedShardHash + encodedSegmentsRoot
+            nodes.append(node)
+        }
+
         let proof = Merklization.trace(
-            shardHashes.map(\.data),
+            nodes,
             index: Int(shardIndex),
             hasher: Blake2b256.self
         )
 
-        var hashes: [Data32] = []
-        hashes.reserveCapacity(proof.count)
+        logger.debug("Generated Merkle proof for shard \(shardIndex) with \(proof.count) steps")
 
-        for step in proof {
-            switch step {
-            case let .left(data):
-                guard let hash = Data32(data) else {
-                    throw ErasureCodingError.invalidHash
-                }
-                hashes.append(hash)
-            case let .right(hash):
-                hashes.append(hash)
-            }
-        }
-
-        logger.debug("Generated Merkle proof for shard \(shardIndex) with \(hashes.count) steps")
-
-        return hashes
+        return proof
     }
 
     /// Verify Merkle proof for a shard
     public func verifyMerkleProof(
         shardHash: Data32,
         shardIndex: UInt16,
-        proof: [Data32],
-        erasureRoot: Data32
+        proof: [Either<Data, Data32>],
+        erasureRoot: Data32,
+        segmentsRoot: Data32
     ) -> Bool {
-        var currentValue = shardHash
+        // Reconstruct the leaf node
+        let encodedSegmentsRoot = try! JamEncoder.encode(segmentsRoot)
+        let encodedShardHash = try! JamEncoder.encode(shardHash)
+        let leafNode = encodedShardHash + encodedSegmentsRoot
 
-        for (i, proofElement) in proof.enumerated() {
-            let bitSet = (Int(shardIndex) >> i) & 1
+        // Build up the Merkle root by combining with proof elements
+        // The trace returns the result of binaryMerklizeHelper on the "other" partition
+        var currentValue: Either<Data, Data32> = .left(leafNode)
 
-            if bitSet == 0 {
-                let combined = currentValue.data + proofElement.data
-                currentValue = combined.blake2b256hash()
-            } else {
-                let combined = proofElement.data + currentValue.data
-                currentValue = combined.blake2b256hash()
+        for proofElement in proof {
+            // Extract the values to combine
+            let currentValueData: Data
+            let proofValueData: Data
+
+            switch currentValue {
+            case let .left(data):
+                currentValueData = data
+            case let .right(hash):
+                currentValueData = hash.data
             }
+
+            switch proofElement {
+            case let .left(data):
+                proofValueData = data
+            case let .right(hash):
+                proofValueData = hash.data
+            }
+
+            // Combine using binaryMerklizeHelper logic
+            let combined = Blake2b256.hash("node", currentValueData, proofValueData)
+
+            currentValue = .right(combined)
         }
 
-        let isValid = currentValue == erasureRoot
+        // After processing all proof elements, we should have .right(hash)
+        // Use the hash directly (no extra hashing needed after combination)
+        let result: Data32 = switch currentValue {
+        case let .left(data):
+            // This shouldn't happen if proof is correct, but handle it
+            Blake2b256.hash(data)
+        case let .right(hash):
+            hash
+        }
+
+        let isValid = result == erasureRoot
 
         if isValid {
             logger.trace("Merkle proof verified for shard \(shardIndex)")
