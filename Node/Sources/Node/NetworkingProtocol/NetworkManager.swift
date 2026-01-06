@@ -304,12 +304,6 @@ struct HandlerImpl: NetworkProtocolHandler {
     let ceHandlers: CEProtocolHandlers
     let peerManager: PeerManager
 
-    init(blockchain: Blockchain, ceHandlers: CEProtocolHandlers, peerManager: PeerManager) {
-        self.blockchain = blockchain
-        self.ceHandlers = ceHandlers
-        self.peerManager = peerManager
-    }
-
     func handle(ceRequest: CERequest) async throws -> [Data] {
         try await ceHandlers.handle(ceRequest: ceRequest)
     }

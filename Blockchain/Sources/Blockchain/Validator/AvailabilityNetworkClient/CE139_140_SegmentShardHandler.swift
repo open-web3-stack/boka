@@ -3,14 +3,14 @@ import Networking
 import TracingUtils
 import Utils
 
-private let logger = Logger(label: "CE139_140Handler")
+private let logger = Logger(label: "CESegmentShardHandler")
 
 /// Handler for CE 139/140: Segment Shard Request operations
 ///
 /// Implements JAMNP-S CE 139 and CE 140 protocols for fetching segment shards from assurers.
 /// CE 139: Fast mode - fetches segment shards without justification
 /// CE 140: Verified mode - fetches segment shards with availability justification
-public enum CE139_140Handler {
+public enum CESegmentShardHandler {
     // MARK: - CE 139: Segment Shard Request (Fast)
 
     /// Fetch segment shards from an assurer (without justification - CE 139)

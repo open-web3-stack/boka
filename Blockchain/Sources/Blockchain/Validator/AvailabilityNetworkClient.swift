@@ -134,7 +134,7 @@ public actor AvailabilityNetworkClient {
     /// Fetch segment shards from an assurer (without justification - CE 139)
     ///
     /// Implements JAMNP-S CE 139: Segment shard request.
-    /// Delegates to CE139_140Handler for the actual implementation.
+    /// Delegates to CESegmentShardHandler for the actual implementation.
     ///
     /// - Parameters:
     ///   - erasureRoot: The erasure root
@@ -149,13 +149,13 @@ public actor AvailabilityNetworkClient {
         segmentIndices: [UInt16],
         from assurerAddress: NetAddr
     ) async throws -> [Data] {
-        // Delegate to CE139_140Handler
+        // Delegate to CESegmentShardHandler
         guard let network else {
             logger.error("Network not set - call setNetwork() first")
             throw AvailabilityNetworkingError.peerManagerUnavailable
         }
 
-        return try await CE139_140Handler.fetchSegmentShards(
+        return try await CESegmentShardHandler.fetchSegmentShards(
             network: network,
             erasureRoot: erasureRoot,
             shardIndex: shardIndex,
@@ -169,7 +169,7 @@ public actor AvailabilityNetworkClient {
     /// Use this when verification is needed (e.g., after detecting inconsistency).
     ///
     /// Implements JAMNP-S CE 140: Segment shard request with justification.
-    /// Delegates to CE139_140Handler for the actual implementation.
+    /// Delegates to CESegmentShardHandler for the actual implementation.
     ///
     /// - Parameters:
     ///   - erasureRoot: The erasure root
@@ -184,13 +184,13 @@ public actor AvailabilityNetworkClient {
         segmentIndices: [UInt16],
         from assurerAddress: NetAddr
     ) async throws -> ([Data], [AvailabilityJustification]) {
-        // Delegate to CE139_140Handler
+        // Delegate to CESegmentShardHandler
         guard let network else {
             logger.error("Network not set - call setNetwork() first")
             throw AvailabilityNetworkingError.peerManagerUnavailable
         }
 
-        return try await CE139_140Handler.fetchSegmentShardsWithAvailabilityJustification(
+        return try await CESegmentShardHandler.fetchSegmentShardsWithAvailabilityJustification(
             network: network,
             erasureRoot: erasureRoot,
             shardIndex: shardIndex,

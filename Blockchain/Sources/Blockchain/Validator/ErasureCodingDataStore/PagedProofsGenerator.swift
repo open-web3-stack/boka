@@ -82,7 +82,7 @@ public actor PagedProofsGenerator {
 
         // For each segment in the page, generate its Merkle justification path
         var justificationPaths: [[Data32]] = []
-        for (localIndex, _) in pageSegments.enumerated() {
+        for localIndex in pageSegments.indices {
             _ = pageIndex * 64 + localIndex
 
             // Generate Merkle proof path from segment to root
