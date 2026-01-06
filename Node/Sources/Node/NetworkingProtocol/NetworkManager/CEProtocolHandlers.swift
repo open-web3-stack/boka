@@ -56,9 +56,12 @@ public struct CEProtocolHandlers: Sendable {
             return await handlePreimageAnnouncement(message)
         case let .preimageRequest(message):
             return await handlePreimageRequest(message)
-        case .auditAnnouncement, .judgementPublication, .workPackageBundleSubmission:
-            // TODO: Implement remaining handlers
-            return []
+        case let .auditAnnouncement(message):
+            return await handleAuditAnnouncement(message)
+        case let .judgementPublication(message):
+            return await handleJudgementPublication(message)
+        case let .workPackageBundleSubmission(message):
+            return await handleWorkPackageBundleSubmission(message)
         }
     }
 
@@ -143,7 +146,7 @@ public struct CEProtocolHandlers: Sendable {
             switch response.result {
             case let .success((_, _, keyValuePairs)):
                 // Encode the key-value pairs
-                var encoder = JamEncoder()
+                let encoder = JamEncoder()
                 try encoder.encode(UInt32(keyValuePairs.count))
                 for (key, value) in keyValuePairs {
                     try encoder.encode(key)
@@ -424,5 +427,47 @@ public struct CEProtocolHandlers: Sendable {
             logger.warning("Preimage request timed out or failed: \(error)")
             return []
         }
+    }
+
+    // MARK: - Audit Announcement
+
+    private func handleAuditAnnouncement(_ message: AuditAnnouncementMessage) async -> [Data] {
+        blockchain
+            .publish(
+                event: RuntimeEvents
+                    .AuditAnnouncementReceived(
+                        headerHash: message.headerHash,
+                        tranche: message.tranche,
+                        announcement: message.announcement,
+                        evidence: message.evidence
+                    )
+            )
+        return []
+    }
+
+    // MARK: - Judgement Publication
+
+    private func handleJudgementPublication(_ message: JudgementPublicationMessage) async -> [Data] {
+        blockchain
+            .publish(
+                event: RuntimeEvents
+                    .JudgementPublicationReceived(
+                        epochIndex: message.epochIndex,
+                        validatorIndex: message.validatorIndex,
+                        validity: message.validity,
+                        workReportHash: message.workReportHash,
+                        signature: message.signature
+                    )
+            )
+        return []
+    }
+
+    // MARK: - Work Package Bundle Submission
+
+    private func handleWorkPackageBundleSubmission(_ message: WorkPackageBundleSubmissionMessage) async -> [Data] {
+        // TODO: Implement work package bundle submission handler
+        // No corresponding RuntimeEvent exists yet
+        logger.debug("Received work package bundle submission from core \(message.coreIndex)")
+        return []
     }
 }

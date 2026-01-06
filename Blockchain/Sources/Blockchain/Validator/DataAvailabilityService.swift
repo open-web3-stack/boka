@@ -127,25 +127,48 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     }
 
     public func handleWorkReportReceived(_ event: RuntimeEvents.WorkReportReceived) async {
+        let workReportHash = event.workReport.hash()
         do {
             try await shardDistributionManager.workReportDistribution(
                 workReport: event.workReport,
                 slot: event.slot,
                 signatures: event.signatures
             )
+            // Publish success response
+            publish(RuntimeEvents.WorkReportReceivedResponse(
+                workReportHash: workReportHash
+            ))
         } catch {
             logger.error("Failed to handle work report: \(error)")
+            // Publish error response so the protocol handler doesn't timeout
+            publish(RuntimeEvents.WorkReportReceivedResponse(
+                workReportHash: workReportHash,
+                error: error
+            ))
         }
     }
 
     public func handleShardDistributionReceived(_ event: RuntimeEvents.ShardDistributionReceived) async {
+        let requestId = (try? event.generateRequestId()) ?? Data32()
         do {
-            _ = try await shardDistributionManager.shardDistribution(
+            let (bundleShard, segmentShards, justification) = try await shardDistributionManager.shardDistribution(
                 erasureRoot: event.erasureRoot,
                 shardIndex: event.shardIndex
             )
+            // Publish success response
+            publish(RuntimeEvents.ShardDistributionReceivedResponse(
+                requestId: requestId,
+                bundleShard: bundleShard,
+                segmentShards: segmentShards,
+                justification: justification
+            ))
         } catch {
             logger.error("Failed to handle shard distribution: \(error)")
+            // Publish error response so the protocol handler doesn't timeout
+            publish(RuntimeEvents.ShardDistributionReceivedResponse(
+                requestId: requestId,
+                error: error
+            ))
         }
     }
 
