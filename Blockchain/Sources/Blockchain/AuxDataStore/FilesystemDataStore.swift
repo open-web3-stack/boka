@@ -123,24 +123,33 @@ public actor FilesystemDataStore {
     }
 
     /// Get list of available shard indices for an erasure root
+    ///
+    /// Uses Task.detached to run blocking file I/O off the actor executor.
     public func getAvailableShardIndices(erasureRoot: Data32) async throws -> [UInt16] {
-        let shardsDir = d3lShardsDirectoryFor(erasureRoot: erasureRoot)
-        guard fileManager.fileExists(atPath: shardsDir.path) else {
-            return []
-        }
+        // Compute path before entering Task.detached to avoid concurrency issues
+        let shardsDirPath = d3lShardsDirectoryFor(erasureRoot: erasureRoot).path
 
-        let files = try fileManager.contentsOfDirectory(at: shardsDir, includingPropertiesForKeys: nil)
-        var indices: [UInt16] = []
-        indices.reserveCapacity(files.count)
-
-        for file in files {
-            guard file.pathExtension == "bin" else { continue }
-            if let index = UInt16(file.deletingPathExtension().lastPathComponent) {
-                indices.append(index)
+        return try await Task.detached {
+            guard FileManager.default.fileExists(atPath: shardsDirPath) else {
+                return []
             }
-        }
 
-        return indices.sorted()
+            let files = try FileManager.default.contentsOfDirectory(
+                at: URL(fileURLWithPath: shardsDirPath),
+                includingPropertiesForKeys: nil
+            )
+            var indices: [UInt16] = []
+            indices.reserveCapacity(files.count)
+
+            for file in files {
+                guard file.pathExtension == "bin" else { continue }
+                if let index = UInt16(file.deletingPathExtension().lastPathComponent) {
+                    indices.append(index)
+                }
+            }
+
+            return indices.sorted()
+        }.value
     }
 
     /// Get storage size for audit store
@@ -154,56 +163,74 @@ public actor FilesystemDataStore {
     }
 
     /// List all audit bundle erasure roots
+    ///
+    /// Uses Task.detached to run blocking file I/O off the actor executor.
     public func listAuditBundles() async throws -> [Data32] {
-        var erasureRoots: [Data32] = []
+        let auditPathString = auditPath.path
 
-        guard fileManager.fileExists(atPath: auditPath.path) else {
-            return []
-        }
+        return try await Task.detached {
+            var erasureRoots: [Data32] = []
 
-        let prefixDirs = try fileManager.contentsOfDirectory(at: auditPath, includingPropertiesForKeys: nil)
+            guard FileManager.default.fileExists(atPath: auditPathString) else {
+                return []
+            }
 
-        for prefixDir in prefixDirs {
-            guard prefixDir.isDirectoryExists else { continue }
+            let prefixDirs = try FileManager.default.contentsOfDirectory(
+                at: URL(fileURLWithPath: auditPathString),
+                includingPropertiesForKeys: nil
+            )
 
-            let files = try fileManager.contentsOfDirectory(at: prefixDir, includingPropertiesForKeys: nil)
+            for prefixDir in prefixDirs {
+                guard prefixDir.isDirectoryExists else { continue }
 
-            for file in files {
-                guard file.pathExtension == "bin" else { continue }
-                let filename = file.deletingPathExtension().lastPathComponent
-                if let erasureRoot = Data32(fromHexString: filename) {
-                    erasureRoots.append(erasureRoot)
+                let files = try FileManager.default.contentsOfDirectory(at: prefixDir, includingPropertiesForKeys: nil)
+
+                for file in files {
+                    guard file.pathExtension == "bin" else { continue }
+                    let filename = file.deletingPathExtension().lastPathComponent
+                    if let erasureRoot = Data32(fromHexString: filename) {
+                        erasureRoots.append(erasureRoot)
+                    }
                 }
             }
-        }
 
-        return erasureRoots.sorted()
+            return erasureRoots.sorted()
+        }.value
     }
 
     /// List all D³L erasure roots
+    ///
+    /// Uses Task.detached to run blocking file I/O off the actor executor.
     public func listD3LEntries() async throws -> [Data32] {
-        var erasureRoots: [Data32] = []
+        let d3lPathString = d3lPath.path
 
-        guard fileManager.fileExists(atPath: d3lPath.path) else {
-            return []
-        }
+        return try await Task.detached {
+            var erasureRoots: [Data32] = []
 
-        let prefixDirs = try fileManager.contentsOfDirectory(at: d3lPath, includingPropertiesForKeys: nil)
+            guard FileManager.default.fileExists(atPath: d3lPathString) else {
+                return []
+            }
 
-        for prefixDir in prefixDirs {
-            guard prefixDir.isDirectoryExists else { continue }
+            let prefixDirs = try FileManager.default.contentsOfDirectory(
+                at: URL(fileURLWithPath: d3lPathString),
+                includingPropertiesForKeys: nil
+            )
 
-            let erasureRootDirs = try fileManager.contentsOfDirectory(at: prefixDir, includingPropertiesForKeys: nil)
+            for prefixDir in prefixDirs {
+                guard prefixDir.isDirectoryExists else { continue }
 
-            for erasureRootDir in erasureRootDirs {
-                guard erasureRootDir.isDirectoryExists else { continue }
-                if let erasureRoot = Data32(fromHexString: erasureRootDir.lastPathComponent) {
-                    erasureRoots.append(erasureRoot)
+                let erasureRootDirs = try FileManager.default.contentsOfDirectory(at: prefixDir, includingPropertiesForKeys: nil)
+
+                for erasureRootDir in erasureRootDirs {
+                    guard erasureRootDir.isDirectoryExists else { continue }
+                    if let erasureRoot = Data32(fromHexString: erasureRootDir.lastPathComponent) {
+                        erasureRoots.append(erasureRoot)
+                    }
                 }
             }
-        }
 
-        return erasureRoots.sorted()
+            return erasureRoots.sorted()
+        }.value
     }
 }
 
@@ -253,24 +280,29 @@ extension FilesystemDataStore {
         let parentDir = url.deletingLastPathComponent()
         try await createDirectoryIfNeeded(parentDir)
 
-        // Capture paths to avoid capturing URL in Task.detached
-        let parentUrl = url.deletingLastPathComponent()
-        let tempUrl = parentUrl.appendingPathComponent("\(UUID().uuidString).tmp")
-        let targetUrl = url
-        let fileManager = FileManager.default
+        // Capture paths as Strings to avoid capturing URL in Task.detached
+        let tempPath = url.deletingLastPathComponent().appendingPathComponent("\(UUID().uuidString).tmp").path
+        let targetPath = url.path
 
         // Perform blocking file I/O off the actor executor
         try await Task.detached {
             // Ensure temp file is cleaned up even if an error occurs
             defer {
-                try? FileManager.default.removeItem(at: tempUrl)
+                try? FileManager.default.removeItem(atPath: tempPath)
             }
 
             // Create file and write data atomically
-            try data.write(to: tempUrl)
+            try data.write(to: URL(fileURLWithPath: tempPath))
 
-            // Atomic rename
-            try fileManager.moveItem(at: tempUrl, to: targetUrl)
+            // Atomic replace: replaces target if it exists, or moves if it doesn't
+            // This preserves atomicity better than remove+move
+            try FileManager.default.replaceItem(
+                at: URL(fileURLWithPath: targetPath),
+                withItemAt: URL(fileURLWithPath: tempPath),
+                backupItemName: nil,
+                options: .usingNewMetadataOnly,
+                resultingItemURL: nil
+            )
         }.value
     }
 
@@ -316,6 +348,7 @@ extension FilesystemDataStore {
     ///
     /// Uses Task.detached to run blocking file I/O enumeration off the actor executor.
     /// This prevents blocking the actor when directories contain many files.
+    /// Optimized with prefetching of file size attributes to avoid redundant stat calls.
     private func getTotalSize(of url: URL) async throws -> Int {
         // Capture path to avoid capturing URL in Task.detached
         let path = url.path
@@ -326,12 +359,15 @@ extension FilesystemDataStore {
             }
 
             var totalSize = 0
-            let enumerator = FileManager.default.enumerator(atPath: path)
+            let enumerator = FileManager.default.enumerator(
+                at: URL(fileURLWithPath: path),
+                includingPropertiesForKeys: [.fileSizeKey],
+                options: []
+            )
 
-            while let file = enumerator?.nextObject() as? String {
-                let fullPath = (path as NSString).appendingPathComponent(file)
-                let resourceValues = try? FileManager.default.attributesOfItem(atPath: fullPath)
-                if let fileSize = resourceValues?[.size] as? Int {
+            while let fileURL = enumerator?.nextObject() as? URL {
+                let resourceValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey])
+                if let fileSize = resourceValues?.fileSize {
                     totalSize += fileSize
                 }
             }

@@ -5,6 +5,9 @@ import Utils
 
 private let logger = Logger(label: "ShardDistributionManager")
 
+// GP spec constants from definitions.tex
+private let cEcRecoveryCount = 1023 /// Recovery shard count
+
 /// Manager for shard distribution and CE protocol message handlers
 ///
 /// Handles work report distribution (CE 135), shard distribution (CE 137),
@@ -136,8 +139,8 @@ public actor ShardDistributionManager {
 
             // According to GP spec (reporting_assurance.tex eq:guarantorsig):
             // The signature is over: Xguarantee || blake(encode(workReport))
-            // Where Xguarantee is the string "$jam_guarantee"
-            let guaranteePrefix = Data("\u{10}$jam_guarantee".utf8)
+            // Where Xguarantee is the string "$jam_guarantee" (14 bytes)
+            let guaranteePrefix = Data("\u{0E}$jam_guarantee".utf8)
             let signatureMessage = guaranteePrefix + workReportHash.data
 
             let isValid = publicKey.verify(signature: sig.signature, message: signatureMessage)
@@ -210,7 +213,7 @@ public actor ShardDistributionManager {
 
         // Generate justification T(s, i, H) using ErasureCodingService
         // Get all shard hashes for justification generation using batch operation
-        let allShardIndices = Array(0 ..< 1023).map { UInt16($0) }
+        let allShardIndices = Array(0 ..< UInt16(cEcRecoveryCount))
         let allShards = try await ecStore.getShards(
             erasureRoot: erasureRoot,
             shardIndices: allShardIndices
@@ -226,82 +229,6 @@ public actor ShardDistributionManager {
         let justification = AvailabilityJustification.copath(justificationSteps)
 
         return (bundleShard, segmentShards, justification)
-    }
-
-    private func generateJustification(
-        erasureRoot _: Data32,
-        shardIndex: UInt16,
-        bundleShard _: Data,
-        segmentShards: [Data]
-    ) async throws -> Justification {
-        guard !segmentShards.isEmpty else {
-            throw DataAvailabilityError.emptySegmentShards
-        }
-
-        // GP T(s,i,H) - Generate Merkle proof for segment shards
-        let merklePath = Merklization.trace(
-            segmentShards,
-            index: Int(shardIndex),
-            hasher: Blake2b256.self
-        )
-
-        // Generate Justification based on Merkle path length
-        return try generateJustificationFromMerklePath(from: merklePath, shardIndex: shardIndex, segmentShards: segmentShards)
-    }
-
-    /// Generate justification from Merkle path
-    private func generateJustificationFromMerklePath(
-        from merklePath: [Either<Data, Data32>],
-        shardIndex: UInt16,
-        segmentShards: [Data]
-    ) throws -> Justification {
-        switch merklePath.count {
-        case 1:
-            try generateSingleHashJustification(from: merklePath)
-        case 2:
-            try generateDoubleHashJustification(from: merklePath)
-        default:
-            try generateSegmentShardJustification(shardIndex: shardIndex, segmentShards: segmentShards)
-        }
-    }
-
-    /// Generate single hash justification for shallow trees
-    private func generateSingleHashJustification(from merklePath: [Either<Data, Data32>]) throws -> Justification {
-        guard case let .right(hash) = merklePath.first else {
-            throw DataAvailabilityError.invalidMerklePath
-        }
-        return .singleHash(hash)
-    }
-
-    /// Generate double hash justification for medium depth trees
-    private func generateDoubleHashJustification(from merklePath: [Either<Data, Data32>]) throws -> Justification {
-        guard case let .right(hash1) = merklePath[0],
-              case let .right(hash2) = merklePath[1]
-        else {
-            throw DataAvailabilityError.invalidMerklePath
-        }
-        return .doubleHash(hash1, hash2)
-    }
-
-    /// Generate segment shard justification for deep trees
-    private func generateSegmentShardJustification(
-        shardIndex: UInt16,
-        segmentShards: [Data]
-    ) throws -> Justification {
-        // The segment shard is the first 12 bytes of the erasure-coded data
-        guard shardIndex < UInt16(segmentShards.count) else {
-            throw DataAvailabilityError.invalidSegmentIndex
-        }
-
-        let shardData = segmentShards[Int(shardIndex)]
-        guard shardData.count >= 12 else {
-            throw DataAvailabilityError.invalidSegmentIndex
-        }
-
-        guard let segmentShard = Data12(Data(shardData[0 ..< 12])) else {
-            throw DataAvailabilityError.invalidDataLength
-        }
-        return .segmentShard(segmentShard)
     }
 
     // MARK: - Audit Shard Requests (CE 138)

@@ -155,12 +155,17 @@ public actor ShardDistributionProtocolHandlers {
         )
 
         // Generate justification using audit erasure root
-        let allShardHashes = try await getAllShardHashes(erasureRoot: auditErasureRoot)
+        // Get raw shard data (not hashes) for justification generation
+        let allShardIndices = Array(0 ..< UInt16(cEcRecoveryCount))
+        let allShards = try await dataStore.getShards(
+            erasureRoot: auditErasureRoot,
+            shardIndices: allShardIndices
+        )
 
         let justification = try await erasureCoding.generateJustification(
             shardIndex: message.shardIndex,
             segmentsRoot: segmentsRoot,
-            shards: allShardHashes.map(\.data)
+            shards: allShards.map(\.data)
         )
 
         logger.debug(

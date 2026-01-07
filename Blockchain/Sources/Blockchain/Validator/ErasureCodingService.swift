@@ -218,11 +218,10 @@ extension ErasureCodingService {
     /// Generate Merkle proof for a shard
     public func generateMerkleProof(
         shardIndex: UInt16,
-        shardHashes: [Data32],
         segmentsRoot: Data32,
         shards: [Data]
     ) throws -> [Either<Data, Data32>] {
-        guard shardIndex < UInt16(shardHashes.count) else {
+        guard shardIndex < UInt16(shards.count) else {
             throw ErasureCodingError.invalidShardIndex
         }
 
@@ -368,8 +367,26 @@ extension ErasureCodingService {
         for step in copath {
             switch step {
             case let .left(data):
-                guard let hash = Data32(data) else {
-                    throw ErasureCodingError.invalidHash
+                // IMPORTANT: We rely on data size to distinguish node types
+                // - Leaf nodes: 64 bytes (encodedShardHash[32] + encodedSegmentsRoot[32])
+                // - Internal nodes: 32 bytes (hashes produced by Blake2b256)
+                //
+                // This assumption holds because:
+                // 1. Leaf nodes are constructed as encodedHash + encodedSegmentsRoot (line 356)
+                // 2. Merkle tree hashing always produces 32-byte outputs
+                // 3. If tree structure changes, this logic must be updated
+                let hash: Data32
+                if data.count == 32 {
+                    // Internal node - already a hash
+                    guard let h = Data32(data) else {
+                        throw ErasureCodingError.invalidHash
+                    }
+                    hash = h
+                } else {
+                    // Leaf node or non-standard size - hash it to normalize
+                    // Note: Leaf nodes are 64 bytes (encodedShardHash + encodedSegmentsRoot)
+                    // or variable size for segment shards (~12 bytes)
+                    hash = data.blake2b256hash()
                 }
                 steps.append(.left(hash))
             case let .right(hash):
@@ -420,8 +437,26 @@ extension ErasureCodingService {
         for step in segmentCopath {
             switch step {
             case let .left(data):
-                guard let hash = Data32(data) else {
-                    throw ErasureCodingError.invalidHash
+                // IMPORTANT: We rely on data size to distinguish node types
+                // - Leaf nodes (segment shards): Variable size (~12 bytes each)
+                // - Internal nodes: 32 bytes (hashes produced by Blake2b256)
+                //
+                // This assumption holds because:
+                // 1. Segment shard nodes are constructed from variable-size data
+                // 2. Merkle tree hashing always produces 32-byte outputs
+                // 3. If tree structure changes, this logic must be updated
+                let hash: Data32
+                if data.count == 32 {
+                    // Internal node - already a hash
+                    guard let h = Data32(data) else {
+                        throw ErasureCodingError.invalidHash
+                    }
+                    hash = h
+                } else {
+                    // Leaf node or non-standard size - hash it to normalize
+                    // Note: Leaf nodes are 64 bytes (encodedShardHash + encodedSegmentsRoot)
+                    // or variable size for segment shards (~12 bytes)
+                    hash = data.blake2b256hash()
                 }
                 fullJustification.append(.left(hash))
             case let .right(hash):

@@ -124,6 +124,16 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         { [weak self] event in
             await self?.handleShardDistributionReceived(event)
         }
+        await subscribe(RuntimeEvents.AuditShardRequestReceived.self,
+                        id: "DataAvailabilityService.AuditShardRequestReceived")
+        { [weak self] event in
+            await self?.handleAuditShardRequestReceived(event)
+        }
+        await subscribe(RuntimeEvents.SegmentShardRequestReceived.self,
+                        id: "DataAvailabilityService.SegmentShardRequestReceived")
+        { [weak self] event in
+            await self?.handleSegmentShardRequestReceived(event)
+        }
     }
 
     public func handleWorkReportReceived(_ event: RuntimeEvents.WorkReportReceived) async {
@@ -170,6 +180,30 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
                 error: error
             ))
         }
+    }
+
+    public func handleAuditShardRequestReceived(_ event: RuntimeEvents.AuditShardRequestReceived) async {
+        let requestId = (try? event.generateRequestId()) ?? Data32()
+        // For now, return an error response - this feature is not yet fully implemented
+        let error = DataAvailabilityError.retrievalError
+        logger.error("Failed to handle audit shard request: \(error)")
+        // Publish error response so the protocol handler doesn't timeout
+        publish(RuntimeEvents.AuditShardRequestReceivedResponse(
+            requestId: requestId,
+            error: error
+        ))
+    }
+
+    public func handleSegmentShardRequestReceived(_ event: RuntimeEvents.SegmentShardRequestReceived) async {
+        let requestId = (try? event.generateRequestId()) ?? Data32()
+        // For now, return an error response - this feature is not yet fully implemented
+        let error = DataAvailabilityError.retrievalError
+        logger.error("Failed to handle segment shard request: \(error)")
+        // Publish error response so the protocol handler doesn't timeout
+        publish(RuntimeEvents.SegmentShardRequestReceivedResponse(
+            requestId: requestId,
+            error: error
+        ))
     }
 
     /// Purge old data from the data availability stores
