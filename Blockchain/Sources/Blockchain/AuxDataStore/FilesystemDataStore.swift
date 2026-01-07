@@ -296,13 +296,22 @@ extension FilesystemDataStore {
 
             // Atomic replace: replaces target if it exists, or moves if it doesn't
             // This preserves atomicity better than remove+move
-            try FileManager.default.replaceItem(
-                at: URL(fileURLWithPath: targetPath),
-                withItemAt: URL(fileURLWithPath: tempPath),
-                backupItemName: nil,
-                options: .usingNewMetadataOnly,
-                resultingItemURL: nil
-            )
+            #if os(Linux)
+                try FileManager.default.replaceItem(
+                    at: URL(fileURLWithPath: targetPath),
+                    withItemAt: URL(fileURLWithPath: tempPath),
+                    backupItemName: nil,
+                    options: .usingNewMetadataOnly
+                )
+            #else
+                try FileManager.default.replaceItem(
+                    at: URL(fileURLWithPath: targetPath),
+                    withItemAt: URL(fileURLWithPath: tempPath),
+                    backupItemName: nil,
+                    options: .usingNewMetadataOnly,
+                    resultingItemURL: nil
+                )
+            #endif
         }.value
     }
 
