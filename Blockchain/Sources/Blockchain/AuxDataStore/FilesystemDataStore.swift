@@ -312,23 +312,32 @@ extension FilesystemDataStore {
         }.value
     }
 
-    /// Calculate total size of directory
+    /// Get total size of directory (blocking I/O wrapped in Task.detached)
+    ///
+    /// Uses Task.detached to run blocking file I/O enumeration off the actor executor.
+    /// This prevents blocking the actor when directories contain many files.
     private func getTotalSize(of url: URL) async throws -> Int {
-        guard fileManager.fileExists(atPath: url.path) else {
-            return 0
-        }
+        // Capture path to avoid capturing URL in Task.detached
+        let path = url.path
 
-        var totalSize = 0
-        let enumerator = fileManager.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey])
-
-        while case let file as URL? = enumerator?.nextObject() {
-            let resourceValues = try file?.resourceValues(forKeys: [.fileSizeKey])
-            if let fileSize = resourceValues?.fileSize {
-                totalSize += fileSize
+        return await Task.detached {
+            guard FileManager.default.fileExists(atPath: path) else {
+                return 0
             }
-        }
 
-        return totalSize
+            var totalSize = 0
+            let enumerator = FileManager.default.enumerator(atPath: path)
+
+            while let file = enumerator?.nextObject() as? String {
+                let fullPath = (path as NSString).appendingPathComponent(file)
+                let resourceValues = try? FileManager.default.attributesOfItem(atPath: fullPath)
+                if let fileSize = resourceValues?[.size] as? Int {
+                    totalSize += fileSize
+                }
+            }
+
+            return totalSize
+        }.value
     }
 
     /// Path for audit bundle storage

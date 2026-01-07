@@ -342,6 +342,22 @@ public actor ShardDistributionProtocolHandlers {
     ) async throws -> [Data] {
         logger.debug("CE 147: Bundle request for erasureRoot=\(erasureRoot.toHexString())")
 
+        // First, try to get the full bundle from the audit store
+        // This is much faster than reconstruction and will succeed if we have the bundle
+        if let bundleData = try await dataStore.getAuditBundle(erasureRoot: erasureRoot) {
+            logger.debug("CE 147: Returning bundle from audit store (\(bundleData.count) bytes)")
+
+            // Wrap in BundleResponse as expected by the client
+            let encoder = JamEncoder()
+            try encoder.encode(bundleData)
+
+            return [encoder.data]
+        }
+
+        // If not in audit store, try reconstruction from available shards
+        // Note: This will typically fail since a validator only holds its assigned shards
+        logger.debug("CE 147: Bundle not in audit store, attempting reconstruction from shards")
+
         let metadata = try await dataStore.getAuditEntry(erasureRoot: erasureRoot)
 
         guard let metadata else {
@@ -370,7 +386,7 @@ public actor ShardDistributionProtocolHandlers {
             logger.warning(
                 """
                 CE 147: Insufficient shards for reconstruction: \
-                \(collectedShards.count)/342
+                \(collectedShards.count)/342. Bundle not available locally.
                 """
             )
             throw ShardDistributionError.insufficientShards
@@ -381,7 +397,7 @@ public actor ShardDistributionProtocolHandlers {
             originalLength: Int(metadata.bundleSize)
         )
 
-        logger.debug("CE 147: Returning bundle of \(bundleData.count) bytes")
+        logger.debug("CE 147: Returning reconstructed bundle of \(bundleData.count) bytes")
 
         // Wrap in BundleResponse as expected by the client
         let encoder = JamEncoder()

@@ -466,10 +466,16 @@ public actor ErasureCodingDataStore {
            let validatorAddrs = validators,
            !validatorAddrs.isEmpty
         {
-            logger.info("Attempting network fallback for segments")
+            logger.info("Network fallback for segments requested but not yet implemented")
 
-            // For now, throw an error - full implementation would use BatchOperations
-            throw ErasureCodingStoreError.segmentNotFound
+            // TODO: Implement network fallback using BatchOperations
+            // This would:
+            // 1. Group indices by validator assignments using JAMNPSShardAssignment
+            // 2. Create CE 148 (Segment Request) messages for each validator
+            // 3. Fetch segments in parallel from validators
+            // 4. Return combined results
+
+            throw ErasureCodingStoreError.networkFallbackNotImplemented
         }
 
         throw ErasureCodingStoreError.segmentNotFound
@@ -784,4 +790,5 @@ public enum ErasureCodingStoreError: Error {
     case segmentNotFound
     case segmentsRootMismatch(calculated: Data32, expected: Data32)
     case proofGenerationFailed
+    case networkFallbackNotImplemented
 }

@@ -257,59 +257,74 @@ extension ErasureCodingService {
         erasureRoot: Data32,
         segmentsRoot: Data32
     ) -> Bool {
-        // Reconstruct the leaf node
-        let encodedSegmentsRoot = try! JamEncoder.encode(segmentsRoot)
-        let encodedShardHash = try! JamEncoder.encode(shardHash)
-        let leafNode = encodedShardHash + encodedSegmentsRoot
+        do {
+            // Reconstruct the leaf node
+            let encodedSegmentsRoot = try JamEncoder.encode(segmentsRoot)
+            let encodedShardHash = try JamEncoder.encode(shardHash)
+            let leafNode = encodedShardHash + encodedSegmentsRoot
 
-        // Build up the Merkle root by combining with proof elements
-        // The trace returns the result of binaryMerklizeHelper on the "other" partition
-        var currentValue: Either<Data, Data32> = .left(leafNode)
+            // Build up the Merkle root by combining with proof elements
+            // The trace returns the result of binaryMerklizeHelper on the "other" partition
+            var currentValue: Either<Data, Data32> = .left(leafNode)
 
-        for proofElement in proof {
-            // Extract the values to combine
-            let currentValueData: Data
-            let proofValueData: Data
+            for (level, proofElement) in proof.enumerated() {
+                // Extract the values to combine
+                let currentValueData: Data
+                let proofValueData: Data
 
-            switch currentValue {
-            case let .left(data):
-                currentValueData = data
-            case let .right(hash):
-                currentValueData = hash.data
+                switch currentValue {
+                case let .left(data):
+                    currentValueData = data
+                case let .right(hash):
+                    currentValueData = hash.data
+                }
+
+                switch proofElement {
+                case let .left(data):
+                    proofValueData = data
+                case let .right(hash):
+                    proofValueData = hash.data
+                }
+
+                // Determine if current node is left or right child using shardIndex bits
+                // Bit at position `level` tells us: 0 = left child, 1 = right child
+                let isRightChild = (shardIndex >> level) & 1 == 1
+
+                // Combine using binaryMerklizeHelper logic
+                // If we're the right child, hash (sibling, current)
+                // If we're the left child, hash (current, sibling)
+                let combined: Data32 = if isRightChild {
+                    Blake2b256.hash("node", proofValueData, currentValueData)
+                } else {
+                    Blake2b256.hash("node", currentValueData, proofValueData)
+                }
+
+                currentValue = .right(combined)
             }
 
-            switch proofElement {
+            // After processing all proof elements, we should have .right(hash)
+            // Use the hash directly (no extra hashing needed after combination)
+            let result: Data32 = switch currentValue {
             case let .left(data):
-                proofValueData = data
+                // This shouldn't happen if proof is correct, but handle it
+                Blake2b256.hash(data)
             case let .right(hash):
-                proofValueData = hash.data
+                hash
             }
 
-            // Combine using binaryMerklizeHelper logic
-            let combined = Blake2b256.hash("node", currentValueData, proofValueData)
+            let isValid = result == erasureRoot
 
-            currentValue = .right(combined)
+            if isValid {
+                logger.trace("Merkle proof verified for shard \(shardIndex)")
+            } else {
+                logger.warning("Merkle proof verification failed for shard \(shardIndex)")
+            }
+
+            return isValid
+        } catch {
+            logger.error("Failed to encode data for Merkle proof verification: \(error)")
+            return false
         }
-
-        // After processing all proof elements, we should have .right(hash)
-        // Use the hash directly (no extra hashing needed after combination)
-        let result: Data32 = switch currentValue {
-        case let .left(data):
-            // This shouldn't happen if proof is correct, but handle it
-            Blake2b256.hash(data)
-        case let .right(hash):
-            hash
-        }
-
-        let isValid = result == erasureRoot
-
-        if isValid {
-            logger.trace("Merkle proof verified for shard \(shardIndex)")
-        } else {
-            logger.warning("Merkle proof verification failed for shard \(shardIndex)")
-        }
-
-        return isValid
     }
 
     // MARK: - JAMNP-S Justification Generation
