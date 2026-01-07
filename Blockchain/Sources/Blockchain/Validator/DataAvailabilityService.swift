@@ -107,12 +107,13 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     /// Set the network client for fetching missing shards
     public func setNetworkClient(_ client: AvailabilityNetworkClient) async {
         networkClient = client
+        await networkRequestHelper.setNetworkClient(client)
         // Note: ErasureCodingDataStore's network client should be set externally
     }
 
     /// Set the fetch strategy for network operations
-    public func setFetchStrategy(_: FetchStrategy) async {
-        // Note: ErasureCodingDataStore's fetch strategy should be set externally
+    public func setFetchStrategy(_ strategy: FetchStrategy) async {
+        await shardManager.setFetchStrategy(strategy)
     }
 
     public func onSyncCompleted() async {

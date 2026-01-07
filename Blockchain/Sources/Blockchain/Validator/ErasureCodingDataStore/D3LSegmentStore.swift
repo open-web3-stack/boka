@@ -75,13 +75,24 @@ public actor D3LSegmentStore {
             shards: shards
         )
 
-        // Store each shard's individual data
-        for (index, shard) in shards.enumerated() {
-            try await filesystemStore.storeD3LShard(
-                erasureRoot: erasureRoot,
-                shardIndex: UInt16(index),
-                data: shard
-            )
+        // Store each shard's individual data in parallel using TaskGroup
+        // This is much more efficient than sequential await for 1023 shards
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for (index, shard) in shards.enumerated() {
+                group.addTask { [weak self] in
+                    guard let self else {
+                        return
+                    }
+                    try await filesystemStore.storeD3LShard(
+                        erasureRoot: erasureRoot,
+                        shardIndex: UInt16(index),
+                        data: shard
+                    )
+                }
+            }
+
+            // Wait for all tasks to complete and rethrow any errors
+            try await group.waitForAll()
         }
 
         // Store metadata

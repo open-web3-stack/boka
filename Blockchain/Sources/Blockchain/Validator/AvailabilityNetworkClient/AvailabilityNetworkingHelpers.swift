@@ -69,7 +69,7 @@ public enum ConcurrentFetchHelpers {
         let startTime = Date()
         var completedTasks = 0
 
-        try await withThrowingTaskGroup(of: (UInt16, UInt16, Data).self) { group in
+        try await withThrowingTaskGroup(of: (UInt16, UInt16, Data)?.self) { group in
             // Semaphore to limit concurrent tasks
             var activeTasks = 0
             var currentIndex = 0
@@ -82,8 +82,14 @@ public enum ConcurrentFetchHelpers {
                     activeTasks += 1
 
                     group.addTask {
-                        let shardData = try await fetchOperation(erasureRoot, pair.shardIndex, pair.address)
-                        return (pair.validatorIndex, pair.shardIndex, shardData)
+                        do {
+                            let shardData = try await fetchOperation(erasureRoot, pair.shardIndex, pair.address)
+                            return (pair.validatorIndex, pair.shardIndex, shardData)
+                        } catch {
+                            logger.debug("Fetch failed from validator \(pair.validatorIndex): \(error)")
+                            // Return nil to indicate failure without cancelling the entire group
+                            return nil
+                        }
                     }
                 }
             }
@@ -108,12 +114,16 @@ public enum ConcurrentFetchHelpers {
                     break
                 }
 
-                // Collect the result
-                collectedShards[result.1] = result.2
+                // Collect the result (skip nil results from failed fetches)
+                guard let (validatorIndex, shardIndex, shardData) = result else {
+                    continue
+                }
+
+                collectedShards[shardIndex] = shardData
 
                 logger.trace(
                     """
-                    Collected shard \(result.1) from validator \(result.0), \
+                    Collected shard \(shardIndex) from validator \(validatorIndex), \
                     total: \(collectedShards.count)/\(requiredCount)
                     """
                 )

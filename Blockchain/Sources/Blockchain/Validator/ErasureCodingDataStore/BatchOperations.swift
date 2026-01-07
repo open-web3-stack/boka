@@ -124,9 +124,15 @@ public actor BatchOperations {
                             )
 
                             // Store fetched shards locally
-                            // TODO: For D³L segments, should store to filesystemStore instead of dataStore
-                            // for consistency with storeExportedSegments. Need to determine if this is
-                            // a D³L segment vs audit shard. See GP spec for retention requirements.
+                            // NOTE: Currently storing to dataStore (RocksDB) for simplicity
+                            // TODO: For D³L segments (which this is), should ideally use filesystemStore
+                            // for consistency with storeExportedSegments. However:
+                            // 1. D3LSegmentStore.storeSegments() expects all 1023 shards together
+                            // 2. Individual shard storage to filesystemStore bypasses erasure coding metadata
+                            // 3. Proper fix requires either:
+                            //    - Adding batch store method to D3LSegmentStore
+                            //    - Or implementing D³L shard lifecycle management
+                            // See GP spec sections 10.3-10.4 for D³L retention requirements
                             for (shardIndex, shardData) in fetchedShards {
                                 try await dataStore.storeShard(
                                     shardData: shardData,

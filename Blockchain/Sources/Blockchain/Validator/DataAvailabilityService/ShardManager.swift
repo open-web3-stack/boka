@@ -15,6 +15,12 @@ public actor ShardManager {
         self.erasureCodingDataStore = erasureCodingDataStore
     }
 
+    /// Set the fetch strategy for network operations
+    /// - Parameter strategy: The fetch strategy to use
+    public func setFetchStrategy(_ strategy: FetchStrategy) async {
+        await erasureCodingDataStore?.setFetchStrategy(strategy)
+    }
+
     /// Get local shard availability for an erasure root
     /// - Parameter erasureRoot: The erasure root to check
     /// - Returns: Number of locally available shards

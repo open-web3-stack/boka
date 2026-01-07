@@ -11,10 +11,16 @@ private let logger = Logger(label: "NetworkRequestHelper")
 /// validation of IP addresses, and concurrent fetching from validators
 public actor NetworkRequestHelper {
     private let dataProvider: BlockchainDataProvider
-    private let networkClient: AvailabilityNetworkClient?
+    private var networkClient: AvailabilityNetworkClient?
 
     public init(dataProvider: BlockchainDataProvider, networkClient: AvailabilityNetworkClient?) {
         self.dataProvider = dataProvider
+        self.networkClient = networkClient
+    }
+
+    /// Update the network client
+    /// - Parameter networkClient: The new network client to use
+    public func setNetworkClient(_ networkClient: AvailabilityNetworkClient?) {
         self.networkClient = networkClient
     }
 
@@ -263,39 +269,56 @@ public actor NetworkRequestHelper {
         validators validatorIndices: [ValidatorIndex],
         shardRequest: Data
     ) async throws -> [(validator: ValidatorIndex, data: Data)] {
-        // Fetch from validators concurrently with timeout
+        // Fetch from validators concurrently with bounded concurrency
         // We need at least minimumValidatorResponses validators to respond for successful reconstruction
         let requiredResponses = DataAvailabilityConstants.minimumValidatorResponses
 
-        logger.debug("Fetching from \(validatorIndices.count) validators concurrently (need \(requiredResponses) responses)")
+        // Limit concurrent tasks to avoid resource exhaustion
+        // Use 3x the required responses as a reasonable buffer for redundancy
+        let maxConcurrentTasks = min(validatorIndices.count, requiredResponses * 3)
+
+        logger.debug(
+            // swiftlint:disable:next line_length
+            "Fetching from \(validatorIndices.count) validators with max \(maxConcurrentTasks) concurrent tasks (need \(requiredResponses) responses)"
+        )
 
         var responses: [(validator: ValidatorIndex, data: Data)] = []
 
-        await withTaskGroup(of: (ValidatorIndex, Data?).self) { group in
-            for validator in validatorIndices {
-                group.addTask { [weak self] in
-                    guard let self else {
-                        return (validator, nil)
-                    }
-                    do {
-                        let data = try await fetchFromValidator(validator: validator, requestData: shardRequest)
-                        return (validator, data)
-                    } catch {
-                        logger.warning("Failed to fetch from validator \(validator): \(error)")
-                        return (validator, nil)
-                    }
-                }
+        // Process validators in batches to limit concurrent operations
+        let validatorBatches = validatorIndices.chunked(into: maxConcurrentTasks)
+
+        for batch in validatorBatches {
+            // Early exit if we already have enough responses
+            if responses.count >= requiredResponses {
+                break
             }
 
-            for await (validator, data) in group {
-                if let data {
-                    responses.append((validator, data))
-                    logger.debug("Received response from validator \(validator) (\(responses.count)/\(requiredResponses))")
+            await withTaskGroup(of: (ValidatorIndex, Data?).self) { group in
+                for validator in batch {
+                    group.addTask { [weak self] in
+                        guard let self else {
+                            return (validator, nil)
+                        }
+                        do {
+                            let data = try await fetchFromValidator(validator: validator, requestData: shardRequest)
+                            return (validator, data)
+                        } catch {
+                            logger.warning("Failed to fetch from validator \(validator): \(error)")
+                            return (validator, nil)
+                        }
+                    }
+                }
 
-                    // Early exit if we have enough responses
-                    if responses.count >= requiredResponses {
-                        group.cancelAll()
-                        break
+                for await (validator, data) in group {
+                    if let data {
+                        responses.append((validator, data))
+                        logger.debug("Received response from validator \(validator) (\(responses.count)/\(requiredResponses))")
+
+                        // Early exit if we have enough responses
+                        if responses.count >= requiredResponses {
+                            group.cancelAll()
+                            break
+                        }
                     }
                 }
             }

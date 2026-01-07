@@ -42,7 +42,7 @@ public final class SegmentCache: @unchecked Sendable {
     }
 
     /// Get a segment from cache
-    public func get(segment _: Data4104, erasureRoot: Data32, index: Int) -> Data4104? {
+    public func get(erasureRoot: Data32, index: Int) -> Data4104? {
         state.withLock { state in
             let key = CacheKey(erasureRoot: erasureRoot, index: index)
 

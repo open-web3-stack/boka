@@ -59,12 +59,15 @@ public actor ShardRetrieval {
         // Try RocksDB first (for audit shards)
         let rocksDBShards = try await dataStore.getShards(erasureRoot: erasureRoot, shardIndices: shardIndices)
 
+        // Convert to dictionary for O(1) lookups instead of O(N*M) nested loop
+        let rocksDBShardsDict = Dictionary(uniqueKeysWithValues: rocksDBShards.map { ($0.index, $0.data) })
+
         // For any missing shards, try filesystem (for D³L shards)
         var result: [(index: UInt16, data: Data)] = []
 
         for shardIndex in shardIndices {
-            if let shard = rocksDBShards.first(where: { $0.index == shardIndex }) {
-                result.append(shard)
+            if let shardData = rocksDBShardsDict[shardIndex] {
+                result.append((index: shardIndex, data: shardData))
             } else if let shardData = try await filesystemStore.getD3LShard(erasureRoot: erasureRoot, shardIndex: shardIndex) {
                 result.append((index: shardIndex, data: shardData))
             }
