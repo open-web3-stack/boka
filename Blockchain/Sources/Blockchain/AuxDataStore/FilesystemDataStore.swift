@@ -294,24 +294,33 @@ extension FilesystemDataStore {
             // Create file and write data atomically
             try data.write(to: URL(fileURLWithPath: tempPath))
 
-            // Atomic replace: replaces target if it exists, or moves if it doesn't
-            // This preserves atomicity better than remove+move
-            #if os(Linux)
-                try FileManager.default.replaceItem(
-                    at: URL(fileURLWithPath: targetPath),
-                    withItemAt: URL(fileURLWithPath: tempPath),
-                    backupItemName: nil,
-                    options: .usingNewMetadataOnly
+            // Atomic replace or move: use replaceItem if target exists, otherwise moveItem
+            let targetURL = URL(fileURLWithPath: targetPath)
+            if FileManager.default.fileExists(atPath: targetPath) {
+                // Target exists - use replaceItem for atomic replacement
+                #if os(Linux)
+                    try FileManager.default.replaceItem(
+                        at: targetURL,
+                        withItemAt: URL(fileURLWithPath: tempPath),
+                        backupItemName: nil,
+                        options: .usingNewMetadataOnly
+                    )
+                #else
+                    try FileManager.default.replaceItem(
+                        at: targetURL,
+                        withItemAt: URL(fileURLWithPath: tempPath),
+                        backupItemName: nil,
+                        options: .usingNewMetadataOnly,
+                        resultingItemURL: nil
+                    )
+                #endif
+            } else {
+                // Target doesn't exist - use moveItem
+                try FileManager.default.moveItem(
+                    at: URL(fileURLWithPath: tempPath),
+                    to: targetURL
                 )
-            #else
-                try FileManager.default.replaceItem(
-                    at: URL(fileURLWithPath: targetPath),
-                    withItemAt: URL(fileURLWithPath: tempPath),
-                    backupItemName: nil,
-                    options: .usingNewMetadataOnly,
-                    resultingItemURL: nil
-                )
-            #endif
+            }
         }.value
     }
 
