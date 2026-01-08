@@ -1,3 +1,9 @@
+/// Immutable reference wrapper for values
+///
+/// Thread-safety: @unchecked Sendable is safe here because:
+/// - All properties are immutable (let)
+/// - value property cannot be modified after initialization
+/// - mutate() returns new instances rather than modifying state
 open class Ref<T: Sendable>: @unchecked Sendable, CustomStringConvertible {
     public let value: T
 
@@ -40,6 +46,12 @@ extension Ref: Dummy where T: Dummy {
     }
 }
 
+/// Immutable reference wrapper with cached hash
+///
+/// Thread-safety: @unchecked Sendable is safe here because:
+/// - Inherits thread-safety from Ref<T> (all properties immutable)
+/// - Lazy is thread-safe for concurrent access
+/// - hash property is computed from immutable value
 open class RefWithHash<T: Hashable32 & Sendable>: Ref<T>, @unchecked Sendable {
     private let lazyHash: Lazy<Ref<Data32>>
 

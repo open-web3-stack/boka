@@ -96,6 +96,12 @@ public actor InMemoryBackend: StateBackendProtocol {
     }
 }
 
+/// Iterator over in-memory state backend entries
+///
+/// Thread-safety: @unchecked Sendable is safe here because:
+/// - Iterator is created from a snapshot (immutable array copy)
+/// - Each iterator instance is owned by a single caller
+/// - Not shared across concurrent operations
 public final class InMemoryStateIterator: StateBackendIterator, @unchecked Sendable {
     private var iterator: Array<(key: Data, value: Data)>.Iterator
 

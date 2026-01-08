@@ -204,6 +204,10 @@ extension Header {
     }
 }
 
+/// Thread-safe reference wrapper for Header with cached hash
+///
+/// Thread-safety: @unchecked Sendable is inherited from RefWithHash<T>
+/// which provides synchronization for immutable value access
 public final class HeaderRef: RefWithHash<Header>, @unchecked Sendable {
     override public var description: String {
         "Header(hash: \(hash), timeslot: \(value.timeslot))"

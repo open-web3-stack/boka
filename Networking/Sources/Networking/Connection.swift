@@ -24,6 +24,14 @@ enum ConnectionError: Error {
     case reconnect
 }
 
+/// QUIC/Network connection error codes for shutdown
+enum ConnectionErrorCode: UInt64 {
+    case normalClosure = 0
+    case abort = 1
+    case protocolError = 2
+    case internalError = 3
+}
+
 enum ConnectionState {
     case connecting(continuations: [CheckedContinuation<Void, Error>])
     case connected(publicKey: Data)
@@ -174,7 +182,8 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
 
     public func close(abort: Bool = false) {
         closing()
-        try? connection.shutdown(errorCode: abort ? 1 : 0) // TODO: define some error code
+        let code = abort ? QuicErrorCode(ConnectionErrorCode.abort.rawValue) : QuicErrorCode(ConnectionErrorCode.normalClosure.rawValue)
+        try? connection.shutdown(errorCode: code)
     }
 
     public func request(_ request: Handler.EphemeralHandler.Request) async throws -> [Data] {

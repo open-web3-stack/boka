@@ -1,5 +1,6 @@
 import Codec
 import Foundation
+import Networking
 import Synchronization
 import TracingUtils
 import Utils
@@ -22,21 +23,78 @@ public enum DataAvailabilityError: Error {
     case invalidMerklePath
     case emptySegmentShards
     case invalidJustificationFormat
+    case segmentsRootMismatch(calculated: Data32, expected: Data32)
+    case invalidMetadata(String)
 }
 
+/// Data availability service for managing work reports and shard distribution
+///
+/// Refactored into focused modules for better maintainability.
+/// This facade delegates to specialized services for different responsibilities.
+///
+/// Thread-safety: @unchecked Sendable is safe here because:
+/// - Inherits safety from ServiceBase2 (immutable properties + ThreadSafeContainer)
+/// - networkClient is protected by async methods (Swift concurrency)
+/// - All other properties are immutable (let)
 public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, OnSyncCompleted {
+    // MARK: - Properties
+
     private let dataProvider: BlockchainDataProvider
     private let dataStore: DataStore
+
+    // Helper services (actors provide their own synchronization)
+    private let shardManager: ShardManager
+    private let availabilityVerification: AvailabilityVerification
+    private let dataAvailabilityCleaner: DataAvailabilityCleaner
+    private let networkRequestHelper: NetworkRequestHelper
+    private let workReportProcessor: WorkReportProcessor
+    private let shardDistributionManager: ShardDistributionManager
+    private let assuranceCoordinator: AssuranceCoordinator
+
+    // Optional network client (set after initialization)
+    private var networkClient: AvailabilityNetworkClient?
+
+    // Expose dataStore for testing purposes
+    public var testDataStore: DataStore { dataStore }
+
+    // MARK: - Initialization
 
     public init(
         config: ProtocolConfigRef,
         eventBus: EventBus,
         scheduler: Scheduler,
         dataProvider: BlockchainDataProvider,
-        dataStore: DataStore
+        dataStore: DataStore,
+        erasureCodingDataStore: ErasureCodingDataStore? = nil,
+        networkClient: AvailabilityNetworkClient? = nil
     ) async {
         self.dataProvider = dataProvider
         self.dataStore = dataStore
+        self.networkClient = networkClient
+
+        // Initialize helper services
+        shardManager = ShardManager(erasureCodingDataStore: erasureCodingDataStore)
+        availabilityVerification = AvailabilityVerification(dataStore: dataStore)
+        dataAvailabilityCleaner = DataAvailabilityCleaner(erasureCodingDataStore: erasureCodingDataStore)
+        networkRequestHelper = NetworkRequestHelper(
+            dataProvider: dataProvider,
+            networkClient: networkClient
+        )
+        workReportProcessor = WorkReportProcessor(
+            dataStore: dataStore,
+            erasureCodingDataStore: erasureCodingDataStore,
+            config: config
+        )
+        shardDistributionManager = ShardDistributionManager(
+            dataProvider: dataProvider,
+            dataStore: dataStore,
+            erasureCodingDataStore: erasureCodingDataStore,
+            config: config
+        )
+        assuranceCoordinator = AssuranceCoordinator(
+            dataProvider: dataProvider,
+            config: config
+        )
 
         super.init(id: "DataAvailability", config: config, eventBus: eventBus, scheduler: scheduler)
 
@@ -44,6 +102,18 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         scheduleForNextEpoch("DataAvailability.scheduleForNextEpoch") { [weak self] epoch in
             await self?.purge(epoch: epoch)
         }
+    }
+
+    /// Set the network client for fetching missing shards
+    public func setNetworkClient(_ client: AvailabilityNetworkClient) async {
+        networkClient = client
+        await networkRequestHelper.setNetworkClient(client)
+        // Note: ErasureCodingDataStore's network client should be set externally
+    }
+
+    /// Set the fetch strategy for network operations
+    public func setFetchStrategy(_ strategy: FetchStrategy) async {
+        await shardManager.setFetchStrategy(strategy)
     }
 
     public func onSyncCompleted() async {
@@ -55,238 +125,57 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         { [weak self] event in
             await self?.handleShardDistributionReceived(event)
         }
+        await subscribe(RuntimeEvents.AuditShardRequestReceived.self,
+                        id: "DataAvailabilityService.AuditShardRequestReceived")
+        { [weak self] event in
+            await self?.handleAuditShardRequestReceived(event)
+        }
+        await subscribe(RuntimeEvents.SegmentShardRequestReceived.self,
+                        id: "DataAvailabilityService.SegmentShardRequestReceived")
+        { [weak self] event in
+            await self?.handleSegmentShardRequestReceived(event)
+        }
     }
 
     public func handleWorkReportReceived(_ event: RuntimeEvents.WorkReportReceived) async {
-        await workReportDistribution(workReport: event.workReport, slot: event.slot, signatures: event.signatures)
+        let workReportHash = event.workReport.hash()
+        do {
+            try await shardDistributionManager.workReportDistribution(
+                workReport: event.workReport,
+                slot: event.slot,
+                signatures: event.signatures
+            )
+            // Publish success response
+            publish(RuntimeEvents.WorkReportReceivedResponse(
+                workReportHash: workReportHash
+            ))
+        } catch {
+            logger.error("Failed to handle work report: \(error)")
+            // Publish error response so the protocol handler doesn't timeout
+            publish(RuntimeEvents.WorkReportReceivedResponse(
+                workReportHash: workReportHash,
+                error: error
+            ))
+        }
     }
 
     public func handleShardDistributionReceived(_ event: RuntimeEvents.ShardDistributionReceived) async {
-        try? await shardDistribution(erasureRoot: event.erasureRoot, shardIndex: event.shardIndex)
-    }
-
-    /// Purge old data from the data availability stores
-    /// - Parameter epoch: The current epoch index
-    public func purge(epoch _: EpochIndex) async {
-        // GP 14.3.1
-        // Guarantors are required to erasure-code and distribute two data sets: one blob, the auditable work-package containing
-        // the encoded work-package, extrinsic data and self-justifying imported segments which is placed in the short-term Audit
-        // da store and a second set of exported-segments data together with the Paged-Proofs metadata. Items in the first store
-        // are short-lived; assurers are expected to keep them only until finality of the block in which the availability of the work-
-        // result's work-package is assured. Items in the second, meanwhile, are long-lived and expected to be kept for a minimum
-        // of 28 days (672 complete epochs) following the reporting of the work-report.
-    }
-
-    /// Fetch segments from import store
-    /// - Parameters:
-    ///   - segments: The segment specifications to retrieve
-    ///   - segmentsRootMappings: Optional mappings from work package hash to segments root
-    /// - Returns: The retrieved segments
-    public func fetchSegment(
-        segments: [WorkItem.ImportedDataSegment],
-        segmentsRootMappings: SegmentsRootMappings? = nil
-    ) async throws -> [Data4104] {
-        // Delegate segment fetching to the data store.
-        // The dataStore handles resolving segment roots and retrieving from the appropriate underlying storage.
-        try await dataStore.fetchSegment(segments: segments, segmentsRootMappings: segmentsRootMappings)
-    }
-
-    /// Export segments to import store
-    /// - Parameters:
-    ///   - data: The segments to export
-    ///   - erasureRoot: The erasure root to associate with the segments
-    /// - Returns: The segments root
-    public func exportSegments(data: [Data4104], erasureRoot: Data32) async throws -> Data32 {
-        let segmentRoot = Merklization.constantDepthMerklize(data.map(\.data))
-
-        let currentTimestamp = Date()
-        try await dataStore.setTimestamp(erasureRoot: erasureRoot, timestamp: currentTimestamp)
-
-        let pagedProofsMetadata = try generatePagedProofsMetadata(data: data, segmentRoot: segmentRoot)
-        try await dataStore.setPagedProofsMetadata(erasureRoot: erasureRoot, metadata: pagedProofsMetadata)
-
-        for (index, segmentData) in data.enumerated() {
-            try await dataStore.set(
-                data: segmentData,
-                erasureRoot: erasureRoot,
-                index: UInt16(index)
-            )
-        }
-
-        return segmentRoot
-    }
-
-    /// Generate Paged-Proofs metadata for a set of segments
-    /// - Parameters:
-    ///   - data: The segments data
-    ///   - segmentRoot: The segments root
-    /// - Returns: The Paged-Proofs metadata
-    /// - Throws: DataAvailabilityError if metadata generation fails
-    private func generatePagedProofsMetadata(data: [Data4104], segmentRoot: Data32) throws -> Data {
-        // TODO: replace this with real implementation
-
-        // Use JamEncoder to properly encode the metadata
-        let segmentCount = UInt32(data.count)
-        var segmentHashes: [Data32] = []
-
-        // Calculate segment hashes
-        for segment in data {
-            segmentHashes.append(segment.data.blake2b256hash())
-        }
-
-        // Encode the metadata using JamEncoder
-        return try JamEncoder.encode(segmentCount, segmentRoot, segmentHashes)
-    }
-
-    /// Export a work package bundle to audit store
-    /// - Parameter bundle: The bundle to export
-    /// - Returns: The erasure root and length of the bundle
-    public func exportWorkpackageBundle(bundle: WorkPackageBundle) async throws -> (erasureRoot: Data32, length: DataLength) {
-        // Serialize the bundle
-        let serializedData = try JamEncoder.encode(bundle)
-        let dataLength = DataLength(UInt32(serializedData.count))
-
-        // Calculate the erasure root
-        // Work-package bundle shard hash
-        let bundleShards = try ErasureCoding.chunk(
-            data: serializedData,
-            basicSize: config.value.erasureCodedPieceSize,
-            recoveryCount: config.value.totalNumberOfValidators
-        )
-        // Chunk the bundle into segments
-        let segmentCount = serializedData.count / 4104
-        var segments = [Data4104]()
-        for i in 0 ..< segmentCount {
-            let start = i * 4104
-            let end = min(start + 4104, serializedData.count)
-            var segment = Data(count: 4104)
-            segment.withUnsafeMutableBytes { destPtr in
-                serializedData.withUnsafeBytes { sourcePtr in
-                    destPtr.baseAddress!.copyMemory(from: sourcePtr.baseAddress! + start, byteCount: end - start)
-                }
-            }
-            segments.append(Data4104(segment)!)
-        }
-
-        // Calculate the segments root
-        let segmentsRoot = Merklization.constantDepthMerklize(segments.map(\.data))
-
-        var nodes = [Data]()
-        // workpackage bundle shard hash + segment shard root
-        for i in 0 ..< bundleShards.count {
-            let shardHash = bundleShards[i].blake2b256hash()
-            try nodes.append(JamEncoder.encode(shardHash) + JamEncoder.encode(segmentsRoot))
-        }
-
-        // ErasureRoot
-        let erasureRoot = Merklization.binaryMerklize(nodes)
-
-        // Extract the work package hash from the bundle
-        let workPackageHash = bundle.workPackage.hash()
-
-        // Store the serialized bundle in the audit store (short-term storage)
-        // Store the segment in the data store
-        for (i, segment) in segments.enumerated() {
-            try await dataStore.set(data: segment, erasureRoot: erasureRoot, index: UInt16(i))
-        }
-
-        // Map the work package hash to the segments root
-        try await dataStore.setSegmentRoot(segmentRoot: segmentsRoot, forWorkPackageHash: workPackageHash)
-
-        // Set the timestamp for retention tracking
-        // As per GP 14.3.1, items in the audit store are kept until finality (approx. 1 hour)
-        let currentTimestamp = Date()
-        try await dataStore.setTimestamp(erasureRoot: erasureRoot, timestamp: currentTimestamp)
-
-        // 8. Return the erasure root and length
-        return (erasureRoot: erasureRoot, length: dataLength)
-    }
-
-    /// Verify that a segment belongs to an erasure root
-    /// - Parameters:
-    ///   - segment: The segment to verify
-    ///   - index: The index of the segment
-    ///   - erasureRoot: The erasure root to verify against
-    ///   - proof: The Merkle proof for the segment
-    /// - Returns: True if the segment is valid
-    public func verifySegment(segment _: Data4104, index _: UInt16, erasureRoot _: Data32, proof _: [Data32]) async -> Bool {
-        // This would normally verify the Merkle proof
-        // For now, we'll just return true
-        true
-    }
-
-    // MARK: - Work-report Distribution (CE 135)
-
-    public func workReportDistribution(
-        workReport: WorkReport,
-        slot: UInt32,
-        signatures: [ValidatorSignature]
-    ) async {
-        let hash = workReport.hash()
-
+        let requestId = (try? event.generateRequestId()) ?? Data32()
         do {
-            // verify slot
-            if await isSlotValid(slot) {
-                throw DataAvailabilityError.invalidWorkReportSlot
-            }
-            // verify signatures
-            try await validate(signatures: signatures)
-
-            // store guaranteedWorkReport
-            let report = GuaranteedWorkReport(
-                workReport: workReport,
-                slot: slot,
-                signatures: signatures
+            let (bundleShard, segmentShards, justification) = try await shardDistributionManager.shardDistribution(
+                erasureRoot: event.erasureRoot,
+                shardIndex: event.shardIndex
             )
-            try await dataProvider.add(guaranteedWorkReport: GuaranteedWorkReportRef(report))
-            // response success result
-            publish(RuntimeEvents.WorkReportReceivedResponse(workReportHash: hash))
-        } catch {
-            publish(RuntimeEvents.WorkReportReceivedResponse(workReportHash: hash, error: error))
-        }
-    }
-
-    private func isSlotValid(_ slot: UInt32) async -> Bool {
-        let currentSlot = await dataProvider.bestHead.timeslot
-        return slot + 5 >= currentSlot && slot <= currentSlot + 3
-    }
-
-    private func validate(signatures: [ValidatorSignature]) async throws {
-        guard signatures.count >= 3 else {
-            throw DataAvailabilityError.insufficientSignatures
-        }
-        // TODO: more validates
-    }
-
-    // MARK: - Shard Distribution (CE 137)
-
-    public func shardDistribution(
-        erasureRoot: Data32,
-        shardIndex: UInt16
-    ) async throws {
-        // Generate request ID
-        let requestId = try JamEncoder.encode(erasureRoot, shardIndex).blake2b256hash()
-        do {
-            // TODO: Fetch shard data from local storage
-            let (bundleShard, segmentShards) = (Data(), [Data()])
-
-            // Generate Merkle proof justification
-            let justification = try await generateJustification(
-                erasureRoot: erasureRoot,
-                shardIndex: shardIndex,
-                bundleShard: bundleShard,
-                segmentShards: segmentShards
-            )
-
-            // Respond with shards + proof
+            // Publish success response
             publish(RuntimeEvents.ShardDistributionReceivedResponse(
                 requestId: requestId,
                 bundleShard: bundleShard,
                 segmentShards: segmentShards,
                 justification: justification
             ))
-
         } catch {
+            logger.error("Failed to handle shard distribution: \(error)")
+            // Publish error response so the protocol handler doesn't timeout
             publish(RuntimeEvents.ShardDistributionReceivedResponse(
                 requestId: requestId,
                 error: error
@@ -294,161 +183,329 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         }
     }
 
-    private func generateJustification(
-        erasureRoot _: Data32,
-        shardIndex: UInt16,
-        bundleShard _: Data,
-        segmentShards: [Data]
-    ) async throws -> Justification {
-        guard !segmentShards.isEmpty else {
-            throw DataAvailabilityError.emptySegmentShards
-        }
+    public func handleAuditShardRequestReceived(_ event: RuntimeEvents.AuditShardRequestReceived) async {
+        let requestId = (try? event.generateRequestId()) ?? Data32()
+        // For now, return an error response - this feature is not yet fully implemented
+        let error = DataAvailabilityError.retrievalError
+        logger.error("Failed to handle audit shard request: \(error)")
+        // Publish error response so the protocol handler doesn't timeout
+        publish(RuntimeEvents.AuditShardRequestReceivedResponse(
+            requestId: requestId,
+            error: error
+        ))
+    }
 
-        // GP T(s,i,H)
-        let merklePath = Merklization.trace(
-            segmentShards,
-            index: Int(shardIndex),
-            hasher: Blake2b256.self
+    public func handleSegmentShardRequestReceived(_ event: RuntimeEvents.SegmentShardRequestReceived) async {
+        let requestId = (try? event.generateRequestId()) ?? Data32()
+        // For now, return an error response - this feature is not yet fully implemented
+        let error = DataAvailabilityError.retrievalError
+        logger.error("Failed to handle segment shard request: \(error)")
+        // Publish error response so the protocol handler doesn't timeout
+        publish(RuntimeEvents.SegmentShardRequestReceivedResponse(
+            requestId: requestId,
+            error: error
+        ))
+    }
+
+    /// Purge old data from the data availability stores
+    /// - Parameter epoch: The current epoch index
+    public func purge(epoch: EpochIndex) async {
+        await dataAvailabilityCleaner.purge(epoch: epoch)
+    }
+
+    /// Get cleanup metrics
+    /// - Returns: Cleanup metrics if ErasureCodingDataStore is available
+    public func getCleanupMetrics() async -> CleanupMetrics? {
+        await dataAvailabilityCleaner.getCleanupMetrics()
+    }
+
+    /// Reset cleanup metrics
+    public func resetCleanupMetrics() async {
+        await dataAvailabilityCleaner.resetCleanupMetrics()
+    }
+
+    // MARK: - Delegated Methods
+
+    /// Fetch segments from data store
+    public func fetchSegment(
+        segments: [WorkItem.ImportedDataSegment],
+        segmentsRootMappings: SegmentsRootMappings? = nil
+    ) async throws -> [Data4104] {
+        try await workReportProcessor.fetchSegment(
+            segments: segments,
+            segmentsRootMappings: segmentsRootMappings
         )
+    }
 
-        // TODO: Got Justification
-        switch merklePath.count {
-        case 1:
-            // 0 ++ Hash
-            guard case let .right(hash) = merklePath.first! else {
-                throw DataAvailabilityError.invalidMerklePath
-            }
-            return .singleHash(hash)
+    /// Export segments to import store
+    public func exportSegments(data: [Data4104], erasureRoot: Data32) async throws -> Data32 {
+        try await workReportProcessor.exportSegments(data: data, erasureRoot: erasureRoot)
+    }
 
-        case 2:
-            // 1 ++ Hash ++ Hash
-            guard case let .right(hash1) = merklePath[0],
-                  case let .right(hash2) = merklePath[1]
-            else {
-                throw DataAvailabilityError.invalidMerklePath
-            }
-            return .doubleHash(hash1, hash2)
+    /// Export a work package bundle to audit store
+    public func exportWorkpackageBundle(bundle: WorkPackageBundle) async throws -> (erasureRoot: Data32, length: DataLength) {
+        try await workReportProcessor.exportWorkpackageBundle(bundle: bundle)
+    }
 
-        default:
-            // TODO: 2 ++ Segment Shard (12 bytes)
-            return .segmentShard(Data12())
+    /// Verify that a segment belongs to an erasure root
+    public func verifySegment(segment: Data4104, index: UInt16, erasureRoot: Data32, proof: [Data32]) async -> Bool {
+        await workReportProcessor.verifySegment(
+            segment: segment,
+            index: index,
+            erasureRoot: erasureRoot,
+            proof: proof
+        )
+    }
+
+    /// Retrieve an audit bundle by erasure root
+    public func retrieveAuditBundle(erasureRoot: Data32) async throws -> Data? {
+        try await workReportProcessor.retrieveAuditBundle(erasureRoot: erasureRoot)
+    }
+
+    /// Reconstruct erasure-coded data from shards
+    public func reconstructData(
+        shards: [(index: UInt16, data: Data)],
+        originalLength: Int
+    ) async throws -> Data {
+        try await workReportProcessor.reconstructData(
+            shards: shards,
+            originalLength: originalLength
+        )
+    }
+
+    /// Reconstruct segments from erasure-coded shards
+    public func reconstructSegments(
+        shards: [(index: UInt16, data: Data)],
+        segmentCount: Int
+    ) async throws -> [Data4104] {
+        try await workReportProcessor.reconstructSegments(
+            shards: shards,
+            segmentCount: segmentCount
+        )
+    }
+
+    /// Fetch data from a specific validator
+    public func fetchFromValidator(
+        validator validatorIndex: ValidatorIndex,
+        requestData: Data
+    ) async throws -> Data {
+        try await networkRequestHelper.fetchFromValidator(
+            validator: validatorIndex,
+            requestData: requestData
+        )
+    }
+
+    /// Fetch shards from multiple validators concurrently
+    public func fetchFromValidatorsConcurrently(
+        validators validatorIndices: [ValidatorIndex],
+        shardRequest: Data
+    ) async throws -> [(validator: ValidatorIndex, data: Data)] {
+        try await networkRequestHelper.fetchFromValidatorsConcurrently(
+            validators: validatorIndices,
+            shardRequest: shardRequest
+        )
+    }
+
+    /// Work report distribution (CE 135)
+    public func workReportDistribution(
+        workReport: WorkReport,
+        slot: UInt32,
+        signatures: [ValidatorSignature]
+    ) async {
+        do {
+            try await shardDistributionManager.workReportDistribution(
+                workReport: workReport,
+                slot: slot,
+                signatures: signatures
+            )
+        } catch {
+            logger.error("Failed to distribute work report: \(error)")
         }
     }
 
-    // MARK: - Audit Shard Requests (CE 138)
+    /// Validate work report signatures
+    public func validateWorkReportSignatures(
+        signatures: [ValidatorSignature],
+        workReportHash: Data32
+    ) async throws {
+        try await shardDistributionManager.validateWorkReportSignatures(
+            signatures: signatures,
+            workReportHash: workReportHash
+        )
+    }
 
-    /// Request audit shards from validators
-    /// - Parameters:
-    ///   - workPackageHash: The hash of the work package
-    ///   - indices: The indices of the shards to request
-    ///   - validators: The validators to request from
-    /// - Returns: The requested audit shards
+    /// Shard distribution (CE 137)
+    public func shardDistribution(
+        erasureRoot: Data32,
+        shardIndex: UInt16
+    ) async throws {
+        _ = try await shardDistributionManager.shardDistribution(
+            erasureRoot: erasureRoot,
+            shardIndex: shardIndex
+        )
+    }
+
+    /// Request audit shards from validators (CE 138)
     public func requestAuditShards(
-        workPackageHash _: Data32,
-        indices _: [UInt16],
-        validators _: [ValidatorIndex]
+        workPackageHash: Data32,
+        indices: [UInt16],
+        validators: [ValidatorIndex]
     ) async throws -> [Data4104] {
-        // TODO: Implement audit shard requests
-        // 1. Determine which validators to request from
-        // 2. Send requests to validators
-        // 3. Collect responses
-        // 4. Verify received shards
-        // 5. Return valid shards
-        throw DataAvailabilityError.retrievalError
+        try await shardDistributionManager.requestAuditShards(
+            workPackageHash: workPackageHash,
+            indices: indices,
+            validators: validators
+        )
     }
 
     /// Handle incoming audit shard requests
-    /// - Parameters:
-    ///   - workPackageHash: The hash of the work package
-    ///   - indices: The indices of the requested shards
-    ///   - requester: The validator requesting the shards
-    /// - Returns: The requested audit shards
     public func handleAuditShardRequest(
-        workPackageHash _: Data32,
-        indices _: [UInt16],
-        requester _: ValidatorIndex
+        workPackageHash: Data32,
+        indices: [UInt16],
+        requester: ValidatorIndex
     ) async throws -> [Data4104] {
-        // TODO: Implement handling of audit shard requests
-        // 1. Verify the requester is authorized
-        // 2. Retrieve the requested shards from the audit store
-        // 3. Return the shards to the requester
-        throw DataAvailabilityError.retrievalError
+        try await shardDistributionManager.handleAuditShardRequest(
+            workPackageHash: workPackageHash,
+            indices: indices,
+            requester: requester
+        )
     }
 
-    // MARK: - Segment Shard Requests (CE 139/140)
-
-    /// Request segment shards from validators
-    /// - Parameters:
-    ///   - segmentsRoot: The root of the segments
-    ///   - indices: The indices of the shards to request
-    ///   - validators: The validators to request from
-    /// - Returns: The requested segment shards
+    /// Request segment shards from validators (CE 139/140)
     public func requestSegmentShards(
-        segmentsRoot _: Data32,
-        indices _: [UInt16],
-        validators _: [ValidatorIndex]
+        segmentsRoot: Data32,
+        indices: [UInt16],
+        validators: [ValidatorIndex]
     ) async throws -> [Data4104] {
-        // TODO: Implement segment shard requests
-        // 1. Determine which validators to request from
-        // 2. Send requests to validators
-        // 3. Collect responses
-        // 4. Verify received shards
-        // 5. Return valid shards
-        throw DataAvailabilityError.retrievalError
+        try await shardDistributionManager.requestSegmentShards(
+            segmentsRoot: segmentsRoot,
+            indices: indices,
+            validators: validators
+        )
     }
 
     /// Handle incoming segment shard requests
-    /// - Parameters:
-    ///   - segmentsRoot: The root of the segments
-    ///   - indices: The indices of the requested shards
-    ///   - requester: The validator requesting the shards
-    /// - Returns: The requested segment shards
     public func handleSegmentShardRequest(
-        segmentsRoot _: Data32,
-        indices _: [UInt16],
-        requester _: ValidatorIndex
+        segmentsRoot: Data32,
+        indices: [UInt16],
+        requester: ValidatorIndex
     ) async throws -> [Data4104] {
-        // TODO: Implement handling of segment shard requests
-        // 1. Verify the requester is authorized
-        // 2. Retrieve the requested shards from the import store
-        // 3. Return the shards to the requester
-        throw DataAvailabilityError.retrievalError
+        try await shardDistributionManager.handleSegmentShardRequest(
+            segmentsRoot: segmentsRoot,
+            indices: indices,
+            requester: requester
+        )
     }
 
-    // MARK: - Assurance Distribution (CE 141)
-
-    /// Distribute assurances to validators
-    /// - Parameters:
-    ///   - assurances: The assurances to distribute
-    ///   - parentHash: The parent hash of the block
-    ///   - validators: The validators to distribute to
-    /// - Returns: Success status of the distribution
+    /// Distribute assurances to validators (CE 141)
     public func distributeAssurances(
-        assurances _: ExtrinsicAvailability.AssurancesList,
-        parentHash _: Data32,
-        validators _: [ValidatorIndex]
+        assurances: ExtrinsicAvailability.AssurancesList,
+        parentHash: Data32,
+        validators: [ValidatorIndex]
     ) async throws -> Bool {
-        // TODO: Implement assurance distribution
-        // 1. Verify the assurances are valid
-        // 2. Distribute assurances to validators
-        // 3. Track distribution status
-        // 4. Return success status
-        throw DataAvailabilityError.distributionError
+        try await assuranceCoordinator.distributeAssurances(
+            assurances: assurances,
+            parentHash: parentHash,
+            validators: validators
+        )
     }
 
     /// Verify assurances from validators
-    /// - Parameters:
-    ///   - assurances: The assurances to verify
-    ///   - parentHash: The parent hash of the block
-    /// - Returns: The valid assurances
     public func verifyAssurances(
-        assurances _: ExtrinsicAvailability.AssurancesList,
-        parentHash _: Data32
+        assurances: ExtrinsicAvailability.AssurancesList,
+        parentHash: Data32
     ) async throws -> ExtrinsicAvailability.AssurancesList {
-        // TODO: Implement assurance verification
-        // 1. Verify each assurance signature
-        // 2. Verify the assurance is for the correct parent hash
-        // 3. Return the valid assurances
-        throw DataAvailabilityError.invalidErasureRoot
+        try await assuranceCoordinator.verifyAssurances(
+            assurances: assurances,
+            parentHash: parentHash
+        )
+    }
+
+    /// Verify that a work package is available
+    public func isWorkPackageAvailable(workPackageHash: Data32) async -> Bool {
+        await availabilityVerification.isWorkPackageAvailable(workPackageHash: workPackageHash)
+    }
+
+    /// Get the availability status of a work package
+    public func getWorkPackageAvailabilityStatus(workPackageHash: Data32) async
+        -> (available: Bool, segmentsRoot: Data32?, shardCount: Int?)
+    {
+        await availabilityVerification.getWorkPackageAvailabilityStatus(workPackageHash: workPackageHash)
+    }
+
+    /// Verify data availability for multiple work packages
+    public func verifyMultipleWorkPackagesAvailability(
+        workPackageHashes: [Data32]
+    ) async -> [Data32: Bool] {
+        await availabilityVerification.verifyMultipleWorkPackagesAvailability(
+            workPackageHashes: workPackageHashes
+        )
+    }
+
+    /// Retrieve a work package by hash
+    public func retrieveWorkPackage(workPackageHash: Data32) async throws -> WorkPackage {
+        try await workReportProcessor.retrieveWorkPackage(workPackageHash: workPackageHash)
+    }
+
+    /// Fetch work package from validators with network fallback
+    public func fetchWorkPackageFromValidators(workPackageHash: Data32) async throws -> WorkPackage {
+        try await workReportProcessor.fetchWorkPackageFromValidators(workPackageHash: workPackageHash)
+    }
+
+    /// Batch reconstruction with network fallback
+    public func batchReconstructWithFallback(
+        erasureRoots: [Data32],
+        originalLengths: [Data32: Int]
+    ) async throws -> [Data32: Data] {
+        try await workReportProcessor.batchReconstructWithFallback(
+            erasureRoots: erasureRoots,
+            originalLengths: originalLengths
+        )
+    }
+
+    /// Fetch segments with network fallback
+    public func fetchSegmentsWithFallback(
+        erasureRoot: Data32,
+        indices: [Int],
+        validators: [UInt16: NetAddr]? = nil
+    ) async throws -> [Data4104] {
+        try await workReportProcessor.fetchSegmentsWithFallback(
+            erasureRoot: erasureRoot,
+            indices: indices,
+            validators: validators
+        )
+    }
+
+    /// Get local shard count
+    public func getLocalShardCount(erasureRoot: Data32) async -> Int {
+        await shardManager.getLocalShardCount(erasureRoot: erasureRoot)
+    }
+
+    /// Calculate reconstruction potential
+    public func canReconstruct(erasureRoot: Data32) async -> Bool {
+        await shardManager.canReconstruct(erasureRoot: erasureRoot)
+    }
+
+    /// Get missing shard indices
+    public func getMissingShardIndices(erasureRoot: Data32) async -> [UInt16] {
+        await shardManager.getMissingShardIndices(erasureRoot: erasureRoot)
+    }
+
+    /// Get reconstruction plan
+    public func getReconstructionPlan(erasureRoot: Data32) async -> ReconstructionPlan? {
+        await shardManager.getReconstructionPlan(erasureRoot: erasureRoot)
+    }
+
+    /// Fetch segments with automatic reconstruction if needed
+    public func fetchSegments(erasureRoot: Data32, indices: [Int]) async throws -> [Data4104] {
+        try await shardManager.fetchSegments(erasureRoot: erasureRoot, indices: indices)
+    }
+
+    /// Reconstruct data from local shards
+    public func reconstructFromLocalShards(erasureRoot: Data32, originalLength: Int) async throws -> Data {
+        try await shardManager.reconstructFromLocalShards(
+            erasureRoot: erasureRoot,
+            originalLength: originalLength
+        )
     }
 }

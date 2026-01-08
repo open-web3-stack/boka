@@ -68,22 +68,14 @@ extension Authorization {
             var corePool = pool[coreIndex]
             let coreQueue = authorizationQueue[coreIndex]
 
-            if coreQueue.isEmpty {
+            guard !coreQueue.isEmpty else {
                 continue
             }
 
             let newItem = coreQueue[Int(timeslot) % coreQueue.count]
 
             // Remove used authorizers from pool
-            if let coreAuths = authsByCoreIndex[CoreIndex(coreIndex)] {
-                for (_, auth) in coreAuths {
-                    if let idx = corePool.firstIndex(of: auth) {
-                        _ = try corePool.remove(at: idx)
-                    } else {
-                        throw AuthorizationError.invalidReportAuthorizer
-                    }
-                }
-            }
+            try removeAuthorizers(from: &corePool, coreAuths: authsByCoreIndex[CoreIndex(coreIndex)])
 
             logger.trace("core index: \(coreIndex), newItem add to pool: \(newItem)")
 
@@ -93,5 +85,27 @@ extension Authorization {
         }
 
         return AuthorizationPostState(coreAuthorizationPool: pool)
+    }
+
+    /// Remove used authorizers from the core pool
+    ///
+    /// - Parameters:
+    ///   - corePool: The core pool to modify (inout)
+    ///   - coreAuths: Optional array of (core, auth) tuples for this core
+    /// - Throws: AuthorizationError.invalidReportAuthorizer if an auth is not found
+    private func removeAuthorizers(
+        from corePool: inout ConfigLimitedSizeArray<Data32, ProtocolConfig.Int0, ProtocolConfig.MaxAuthorizationsPoolItems>,
+        coreAuths: [(core: CoreIndex, auth: Data32)]?
+    ) throws {
+        guard let coreAuths else {
+            return
+        }
+
+        for (_, auth) in coreAuths {
+            guard let idx = corePool.firstIndex(of: auth) else {
+                throw AuthorizationError.invalidReportAuthorizer
+            }
+            _ = try corePool.remove(at: idx)
+        }
     }
 }

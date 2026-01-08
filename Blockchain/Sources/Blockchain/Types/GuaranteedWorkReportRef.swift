@@ -2,6 +2,10 @@ import Codec
 import Foundation
 import Utils
 
+/// Thread-safe reference wrapper for GuaranteedWorkReport with cached hash
+///
+/// Thread-safety: @unchecked Sendable is inherited from RefWithHash<T>
+/// which provides synchronization for immutable value access
 public final class GuaranteedWorkReportRef: RefWithHash<GuaranteedWorkReport>, @unchecked Sendable {
     public var workReport: WorkReport { value.workReport }
     public var slot: UInt32 { value.slot }

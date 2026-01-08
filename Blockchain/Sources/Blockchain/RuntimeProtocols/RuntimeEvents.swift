@@ -277,9 +277,9 @@ public enum RuntimeEvents {
     public struct ShardDistributionReceivedResponse: Event {
         public let requestId: Data32
 
-        public let result: Result<(bundleShard: Data, segmentShards: [Data], justification: Justification), Error>
+        public let result: Result<(bundleShard: Data, segmentShards: [Data], justification: AvailabilityJustification), Error>
 
-        public init(requestId: Data32, bundleShard: Data, segmentShards: [Data], justification: Justification) {
+        public init(requestId: Data32, bundleShard: Data, segmentShards: [Data], justification: AvailabilityJustification) {
             self.requestId = requestId
             result = .success((bundleShard, segmentShards, justification))
         }
@@ -292,9 +292,9 @@ public enum RuntimeEvents {
 
     public struct AuditShardRequestReceived: Event {
         public let erasureRoot: Data32
-        public let shardIndex: UInt32
+        public let shardIndex: UInt16
 
-        public init(erasureRoot: Data32, shardIndex: UInt32) {
+        public init(erasureRoot: Data32, shardIndex: UInt16) {
             self.erasureRoot = erasureRoot
             self.shardIndex = shardIndex
         }
@@ -307,9 +307,18 @@ public enum RuntimeEvents {
     public struct AuditShardRequestReceivedResponse: Event {
         public var requestId: Data32
 
-        public let result: Result<(erasureRoot: Data32, shardIndex: UInt32, bundleShard: Data, justification: Justification), Error>
+        public let result: Result<
+            (erasureRoot: Data32, shardIndex: UInt16, bundleShard: Data, justification: AvailabilityJustification),
+            Error
+        >
 
-        public init(requestId: Data32, erasureRoot: Data32, shardIndex: UInt32, bundleShard: Data, justification: Justification) {
+        public init(
+            requestId: Data32,
+            erasureRoot: Data32,
+            shardIndex: UInt16,
+            bundleShard: Data,
+            justification: AvailabilityJustification
+        ) {
             self.requestId = requestId
             result = .success((erasureRoot, shardIndex, bundleShard, justification))
         }
@@ -322,12 +331,12 @@ public enum RuntimeEvents {
 
     public struct SegmentShardRequestReceived: Event {
         public let erasureRoot: Data32
-        public let shardIndex: UInt32
+        public let shardIndex: UInt16
         public let segmentIndices: [UInt16]
 
         public init(
             erasureRoot: Data32,
-            shardIndex: UInt32,
+            shardIndex: UInt16,
             segmentIndices: [UInt16]
         ) {
             self.erasureRoot = erasureRoot
@@ -350,6 +359,81 @@ public enum RuntimeEvents {
         ) {
             self.requestId = requestId
             result = .success(segments)
+        }
+
+        public init(
+            requestId: Data32,
+            error: Error
+        ) {
+            self.requestId = requestId
+            result = .failure(error)
+        }
+    }
+
+    public struct BundleRequestReceived: Event {
+        public let erasureRoot: Data32
+
+        public init(erasureRoot: Data32) {
+            self.erasureRoot = erasureRoot
+        }
+
+        public func generateRequestId() throws -> Data32 {
+            try JamEncoder.encode(erasureRoot).blake2b256hash()
+        }
+    }
+
+    public struct BundleRequestReceivedResponse: Event {
+        public var requestId: Data32
+
+        public let result: Result<(erasureRoot: Data32, bundleData: Data), Error>
+
+        public init(
+            requestId: Data32,
+            erasureRoot: Data32,
+            bundleData: Data
+        ) {
+            self.requestId = requestId
+            result = .success((erasureRoot, bundleData))
+        }
+
+        public init(
+            requestId: Data32,
+            error: Error
+        ) {
+            self.requestId = requestId
+            result = .failure(error)
+        }
+    }
+
+    public struct SegmentRequestReceived: Event {
+        public let segmentsRoot: Data32
+        public let segmentIndices: [UInt16]
+
+        public init(
+            segmentsRoot: Data32,
+            segmentIndices: [UInt16]
+        ) {
+            self.segmentsRoot = segmentsRoot
+            self.segmentIndices = segmentIndices
+        }
+
+        public func generateRequestId() throws -> Data32 {
+            try JamEncoder.encode(segmentsRoot, segmentIndices).blake2b256hash()
+        }
+    }
+
+    public struct SegmentRequestReceivedResponse: Event {
+        public var requestId: Data32
+
+        public let result: Result<(segmentsRoot: Data32, segments: [Data]), Error>
+
+        public init(
+            requestId: Data32,
+            segmentsRoot: Data32,
+            segments: [Data]
+        ) {
+            self.requestId = requestId
+            result = .success((segmentsRoot, segments))
         }
 
         public init(

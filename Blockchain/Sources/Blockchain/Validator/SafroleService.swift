@@ -20,6 +20,12 @@ public struct TicketItemAndOutput: Comparable, Sendable, Codable {
     }
 }
 
+/// Service for managing Safrole protocol operations including ticket generation
+///
+/// Thread-safety: @unchecked Sendable is safe here because:
+/// - Inherits safety from ServiceBase (immutable properties + actors)
+/// - All properties are immutable (let)
+/// - No mutable shared state beyond base class
 public final class SafroleService: ServiceBase, @unchecked Sendable, OnGenesis, OnSyncCompleted {
     private let keystore: KeyStore
     private let ringContext: Bandersnatch.RingContext
