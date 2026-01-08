@@ -1,0 +1,302 @@
+import Foundation
+import Testing
+import TracingUtils
+import Utils
+
+@testable import Blockchain
+
+struct ErasureCodingServiceTests {
+    func makeService() -> ErasureCodingService {
+        ErasureCodingService(config: .dev)
+    }
+
+    // MARK: - Encoding Tests
+
+    @Test
+    func encodeSingleSegment() async throws {
+        let service = makeService()
+
+        // Create a test segment (4,104 bytes = 6 × 684 bytes)
+        var segmentData = Data(count: 4104)
+        for i in 0 ..< 4104 {
+            segmentData[i] = UInt8(truncatingIfNeeded: i)
+        }
+        let segment = Data4104(segmentData)!
+
+        // Encode
+        let shards = try await service.encodeSegments([segment])
+
+        // Should produce 1,023 shards
+        #expect(shards.count == 1023)
+
+        // Each shard should be smaller than original segment
+        // (original is 4,104 bytes, shards are approximately 1/3 after encoding overhead)
+        #expect(shards[0].count > 0)
+
+        // All shards should have same size
+        let firstShardSize = shards[0].count
+        for shard in shards {
+            #expect(shard.count == firstShardSize)
+        }
+    }
+
+    @Test
+    func encodeMultipleSegments() async throws {
+        let service = makeService()
+
+        // Create 3 test segments
+        var segments: [Data4104] = []
+        for segIndex in 0 ..< 3 {
+            var segmentData = Data(count: 4104)
+            for i in 0 ..< 4104 {
+                segmentData[i] = UInt8(truncatingIfNeeded: segIndex * 4104 + i)
+            }
+            segments.append(Data4104(segmentData)!)
+        }
+
+        // Encode
+        let shards = try await service.encodeSegments(segments)
+
+        // Should produce 1,023 shards
+        #expect(shards.count == 1023)
+    }
+
+    @Test
+    func encodeBlob() async throws {
+        let service = makeService()
+
+        // Create a test blob (must be multiple of 684 bytes)
+        let blobSize = 684 * 10 // 10 pieces
+        var blobData = Data(count: blobSize)
+        for i in 0 ..< blobSize {
+            blobData[i] = UInt8(truncatingIfNeeded: i)
+        }
+
+        // Encode
+        let shards = try await service.encodeBlob(blobData)
+
+        // Should produce 1,023 shards
+        #expect(shards.count == 1023)
+    }
+
+    @Test
+    func encodeEmptyInputThrowsError() async throws {
+        let service = makeService()
+
+        // Try to encode empty array
+        await #expect(throws: ErasureCodingError.self) {
+            try await service.encodeSegments([])
+        }
+
+        await #expect(throws: ErasureCodingError.self) {
+            try await service.encodeBlob(Data())
+        }
+    }
+
+    @Test
+    func encodeInvalidLengthThrowsError() async throws {
+        let service = makeService()
+
+        // Try to encode data that's not a multiple of 684 bytes
+        let invalidData = Data(count: 100) // Not divisible by 684
+
+        await #expect(throws: ErasureCodingError.self) {
+            try await service.encodeBlob(invalidData)
+        }
+    }
+
+    // MARK: - Decoding Tests
+
+    @Test
+    func reconstructFromAllShards() async throws {
+        let service = makeService()
+
+        // Create and encode test data
+        let originalData = Data(count: 684 * 10)
+        let shards = try await service.encodeBlob(originalData)
+
+        // Reconstruct from all shards
+        let shardTuples = shards.enumerated().map { index, data in
+            (index: UInt16(index), data: data)
+        }
+
+        let reconstructed = try await service.reconstruct(
+            shards: shardTuples,
+            originalLength: originalData.count
+        )
+
+        // Should reconstruct to original
+        #expect(reconstructed == originalData)
+    }
+
+    @Test
+    func reconstructFrom342Shards() async throws {
+        let service = makeService()
+
+        // Create and encode test data
+        let originalData = Data(count: 684 * 10)
+        let shards = try await service.encodeBlob(originalData)
+
+        // Take only first 342 shards (minimum required)
+        let partialShards = Array(shards.prefix(342))
+        let shardTuples = partialShards.enumerated().map { index, data in
+            (index: UInt16(index), data: data)
+        }
+
+        let reconstructed = try await service.reconstruct(
+            shards: shardTuples,
+            originalLength: originalData.count
+        )
+
+        // Should reconstruct to original
+        #expect(reconstructed == originalData)
+    }
+
+    @Test
+    func reconstructFrom500Shards() async throws {
+        let service = makeService()
+
+        // Create and encode test data
+        let originalData = Data(count: 684 * 20)
+        let shards = try await service.encodeBlob(originalData)
+
+        // Take 500 random shards
+        var randomShards = shards
+        randomShards.shuffle()
+        let partialShards = Array(randomShards.prefix(500))
+        let shardTuples = partialShards.enumerated().map { index, data in
+            (index: UInt16(index), data: data)
+        }
+
+        let reconstructed = try await service.reconstruct(
+            shards: shardTuples,
+            originalLength: originalData.count
+        )
+
+        // Should reconstruct to original
+        #expect(reconstructed == originalData)
+    }
+
+    @Test
+    func reconstructFromInsufficientShardsThrowsError() async throws {
+        let service = makeService()
+
+        // Create and encode test data
+        let originalData = Data(count: 684 * 10)
+        let shards = try await service.encodeBlob(originalData)
+
+        // Take only 300 shards (insufficient)
+        let partialShards = Array(shards.prefix(300))
+        let shardTuples = partialShards.enumerated().map { index, data in
+            (index: UInt16(index), data: data)
+        }
+
+        await #expect(throws: ErasureCodingError.self) {
+            try await service.reconstruct(
+                shards: shardTuples,
+                originalLength: originalData.count
+            )
+        }
+    }
+
+    @Test
+    func reconstructSegments() async throws {
+        let service = makeService()
+
+        // Create test segments
+        var segments: [Data4104] = []
+        for segIndex in 0 ..< 3 {
+            var segmentData = Data(count: 4104)
+            for i in 0 ..< 4104 {
+                segmentData[i] = UInt8(truncatingIfNeeded: segIndex * 4104 + i)
+            }
+            segments.append(Data4104(segmentData)!)
+        }
+
+        // Encode
+        let shards = try await service.encodeSegments(segments)
+        let shardTuples = shards.enumerated().map { index, data in
+            (index: UInt16(index), data: data)
+        }
+
+        // Reconstruct
+        let reconstructedSegments = try await service.reconstructSegments(
+            shards: shardTuples,
+            segmentCount: 3
+        )
+
+        // Should reconstruct to original
+        #expect(reconstructedSegments.count == 3)
+        for i in 0 ..< 3 {
+            #expect(reconstructedSegments[i] == segments[i])
+        }
+    }
+
+    // MARK: - Erasure Root Tests
+
+    @Test
+    func calculateErasureRoot() async throws {
+        let service = makeService()
+
+        // Create test data
+        let originalData = Data(count: 684 * 10)
+        let shards = try await service.encodeBlob(originalData)
+        let segmentsRoot = Data32.random()
+
+        // Calculate erasure root
+        let erasureRoot = try await service.calculateErasureRoot(
+            segmentsRoot: segmentsRoot,
+            shards: shards
+        )
+
+        // Should be a valid 32-byte hash
+        #expect(erasureRoot.data.count == 32)
+
+        // Same input should produce same erasure root
+        let erasureRoot2 = try await service.calculateErasureRoot(
+            segmentsRoot: segmentsRoot,
+            shards: shards
+        )
+        #expect(erasureRoot == erasureRoot2)
+    }
+
+    @Test
+    func calculateErasureRootDifferentSegmentsRoot() async throws {
+        let service = makeService()
+
+        let originalData = Data(count: 684 * 10)
+        let shards = try await service.encodeBlob(originalData)
+
+        let segmentsRoot1 = Data32.random()
+        let segmentsRoot2 = Data32.random()
+
+        let erasureRoot1 = try await service.calculateErasureRoot(
+            segmentsRoot: segmentsRoot1,
+            shards: shards
+        )
+        let erasureRoot2 = try await service.calculateErasureRoot(
+            segmentsRoot: segmentsRoot2,
+            shards: shards
+        )
+
+        // Different segments roots should produce different erasure roots
+        #expect(erasureRoot1 != erasureRoot2)
+    }
+
+    @Test
+    func calculateErasureRootInvalidShardCount() async throws {
+        let service = makeService()
+
+        let segmentsRoot = Data32.random()
+        let invalidShards = Array(repeating: Data(count: 100), count: 100)
+
+        await #expect(throws: ErasureCodingError.self) {
+            try await service.calculateErasureRoot(
+                segmentsRoot: segmentsRoot,
+                shards: invalidShards
+            )
+        }
+    }
+
+    // MARK: - Merkle Proof Tests
+}

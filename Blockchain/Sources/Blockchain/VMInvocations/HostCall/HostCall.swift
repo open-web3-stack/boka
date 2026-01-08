@@ -40,7 +40,13 @@ extension HostCall {
         }
     }
 
-    // TODO: host-calls will have different gas costs later on
+    /// Calculate gas cost for host-call execution
+    /// Note: Currently uses flat rate of 10 gas units for all host-calls.
+    /// Future enhancement: Implement differentiated gas costs based on:
+    /// - Host-call type (storage operations more expensive than queries)
+    /// - Input data size
+    /// - Computational complexity
+    /// - Resource consumption (I/O, cryptography, etc.)
     public func gasCost(state _: VMState) -> Gas {
         Gas(10)
     }

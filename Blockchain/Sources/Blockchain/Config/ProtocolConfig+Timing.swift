@@ -2,7 +2,10 @@ import Foundation
 import Utils
 
 extension ProtocolConfigRef {
-    // TODO: determine appropriate values
+    /// Time delta for block authoring start (relative to timeslot start)
+    /// Negative value means authoring begins before the timeslot starts
+    /// Current value: -1 slot period (authoring starts 1 timeslot early)
+    /// Note: These timing values are working parameters that may need tuning based on network conditions
     public var authoringStartTimeDelta: TimeInterval {
         -TimeInterval(value.slotPeriodSeconds)
     }

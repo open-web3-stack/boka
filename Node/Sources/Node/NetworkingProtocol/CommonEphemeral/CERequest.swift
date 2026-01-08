@@ -8,7 +8,7 @@ protocol CEMessage {
     static func decode(data: [Data], config: ProtocolConfigRef) throws -> Self
 }
 
-public enum CERequest: Sendable, Equatable, Hashable {
+public enum CERequest: Sendable {
     case blockRequest(BlockRequest)
     case stateRequest(StateRequest)
     case safroleTicket1(SafroleTicketMessage)
@@ -26,6 +26,7 @@ public enum CERequest: Sendable, Equatable, Hashable {
     case preimageRequest(PreimageRequestMessage)
     case auditAnnouncement(AuditAnnouncementMessage)
     case judgementPublication(JudgementPublicationMessage)
+    case workPackageBundleSubmission(WorkPackageBundleSubmissionMessage)
 }
 
 extension CERequest: RequestProtocol {
@@ -67,6 +68,8 @@ extension CERequest: RequestProtocol {
             try message.encode()
         case let .judgementPublication(message):
             try message.encode()
+        case let .workPackageBundleSubmission(message):
+            try message.encode()
         }
     }
 
@@ -106,6 +109,8 @@ extension CERequest: RequestProtocol {
             .auditAnnouncement
         case .judgementPublication:
             .judgementPublication
+        case .workPackageBundleSubmission:
+            .workPackageBundleSubmission
         }
     }
 
@@ -145,6 +150,12 @@ extension CERequest: RequestProtocol {
             AuditAnnouncementMessage.self
         case .judgementPublication:
             JudgementPublicationMessage.self
+        case .workPackageBundleSubmission:
+            WorkPackageBundleSubmissionMessage.self
+        case .fullBundle:
+            fatalError("fullBundle not implemented")
+        case .reconstructedSegments:
+            fatalError("reconstructedSegments not implemented")
         }
     }
 
@@ -201,6 +212,11 @@ extension CERequest: RequestProtocol {
         case .judgementPublication:
             guard let message = data as? JudgementPublicationMessage else { return nil }
             return .judgementPublication(message)
+        case .workPackageBundleSubmission:
+            guard let message = data as? WorkPackageBundleSubmissionMessage else { return nil }
+            return .workPackageBundleSubmission(message)
+        case .fullBundle, .reconstructedSegments:
+            return nil
         }
     }
 

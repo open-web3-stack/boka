@@ -9,7 +9,7 @@ import Utils
 public typealias RPCConfig = Server.Config
 public typealias NetworkConfig = Network.Config
 
-private let logger = Logger(label: "config")
+private let logger = Logger(label: "Config")
 
 public enum KeyStoreType {
     case inMemory
@@ -69,6 +69,7 @@ public struct Config {
     public var name: String?
     public var database: Database
     public var keystoreType: KeyStoreType
+    public var availability: AvailabilityConfig
 
     public init(
         rpc: RPCConfig?,
@@ -77,7 +78,8 @@ public struct Config {
         local: Bool = false,
         name: String? = nil,
         database: Database = .inMemory,
-        keystoreType: KeyStoreType = .inMemory
+        keystoreType: KeyStoreType = .inMemory,
+        availability: AvailabilityConfig = .default
     ) {
         self.rpc = rpc
         self.network = network
@@ -86,5 +88,38 @@ public struct Config {
         self.name = name
         self.database = database
         self.keystoreType = keystoreType
+        self.availability = availability
+    }
+}
+
+public struct AvailabilityConfig: Sendable {
+    /// Filesystem path for availability data storage
+    public var dataPath: URL
+
+    /// Audit store retention in epochs (default: 6 epochs = ~1 hour)
+    public var auditRetentionEpochs: UInt32
+
+    /// D3L store retention in epochs (default: 672 epochs = 28 days)
+    public var d3lRetentionEpochs: UInt32
+
+    /// Maximum number of segments to cache in memory
+    public var maxCachedSegments: Int
+
+    /// Maximum open files for availability storage
+    public var maxOpenFiles: Int
+
+    /// Enable filesystem storage (false for RocksDB-only storage)
+    public var enableFilesystemStorage: Bool
+
+    public static var `default`: AvailabilityConfig {
+        AvailabilityConfig(
+            dataPath: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("boka/availability"),
+            auditRetentionEpochs: 6,
+            d3lRetentionEpochs: 672,
+            maxCachedSegments: 1000,
+            maxOpenFiles: 1000,
+            enableFilesystemStorage: true
+        )
     }
 }

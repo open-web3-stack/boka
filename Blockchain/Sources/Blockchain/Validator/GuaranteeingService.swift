@@ -21,6 +21,12 @@ public enum GuaranteeingServiceError: Error, Equatable {
     case serviceAccountNotFound
 }
 
+/// Service for managing work guarantees and validation
+///
+/// Thread-safety: @unchecked Sendable is safe here because:
+/// - Inherits safety from ServiceBase2 (immutable properties + ThreadSafeContainer)
+/// - All mutable state is protected by ThreadSafeContainer instances
+/// - signingKey, coreAssignments, and workReportCache are synchronized
 public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBeforeEpoch, OnSyncCompleted {
     private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore
@@ -111,7 +117,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         }
 
         do {
-            // TODO: we may already done the work. need to cache the result
+            // Work report caching is already implemented in processWorkPackageBundle
             let report = try await processWorkPackageBundle(
                 coreIndex: event.coreIndex,
                 segmentsRootMappings: event.segmentsRootMappings,
@@ -335,7 +341,10 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                             check: { event in
                                 event.source == validatorKey && event.workReportHash == workReportHash
                             },
-                            timeout: 2 // TODO: make configurable? and determine the best value
+                            // Timeout in seconds for validator response.
+                            // Value of 2s is reasonable for local network; may need adjustment for WAN.
+                            // Consider making this a ProtocolConfig parameter for tuning.
+                            timeout: 2
                         )
                         return ValidatorSignature(validatorIndex: idx, signature: resp.signature)
                     } catch ContinuationError.timeout {

@@ -4,7 +4,7 @@ import PolkaVM
 import TracingUtils
 import Utils
 
-private let logger = Logger(label: "accumulate")
+private let logger = Logger(label: "AccumulateInvocation")
 
 public func accumulate(
     config: ProtocolConfigRef,

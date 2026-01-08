@@ -26,8 +26,17 @@ public protocol ServiceAccounts: Sendable {
     mutating func remove(serviceAccount index: ServiceIndex) async throws
 }
 
+/// Thread-safe reference wrapper for ServiceAccounts
+///
+/// Thread-safety: @unchecked Sendable is inherited from Ref<T>
+/// which provides synchronization for immutable value access
 public class ServiceAccountsRef: Ref<ServiceAccounts>, @unchecked Sendable {}
 
+/// Mutable reference wrapper for ServiceAccounts with change tracking
+///
+/// Thread-safety: @unchecked Sendable requires external synchronization
+/// This class is designed for single-threaded use within actor contexts
+/// or must be synchronized by the caller
 public class ServiceAccountsMutRef: @unchecked Sendable {
     public let ref: RefMut<ServiceAccounts>
     public private(set) var changes: AccountChanges

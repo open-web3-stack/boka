@@ -14,7 +14,9 @@ extension ProtocolConfig {
 }
 
 extension Ref where T == ProtocolConfig {
-    // TODO: pick some good numbers for dev env
+    /// Minimal preset for development and testing
+    /// Uses minimal resource requirements for fast local testing
+    /// Note: These values are optimized for development, not production
     public static let minimal = Ref(ProtocolConfig(
         auditTranchePeriod: 8,
         additionalMinBalancePerStateItem: 10,
@@ -60,7 +62,9 @@ extension Ref where T == ProtocolConfig {
         pvmMemoryPageSize: 1 << 12
     ))
 
-    // TODO: pick some good numbers for dev env
+    /// Development preset for local development
+    /// Uses moderate resource requirements for realistic local testing
+    /// Note: These values are optimized for development workflows, not production
     public static let dev = Ref(ProtocolConfig(
         auditTranchePeriod: 8,
         additionalMinBalancePerStateItem: 10,

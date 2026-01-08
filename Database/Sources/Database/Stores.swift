@@ -26,6 +26,22 @@ enum StoreId: UInt8, ColumnFamilyKey {
     // guaranteedWorkReports
     // workReportHash => guaranteedWorkReport
     case guaranteedWorkReports = 5
+    // availability metadata
+    // erasureRoot => (timestamp, pagedProofsHash, shardCount)
+    case availabilityMetadata = 6
+    // availability segments
+    // erasureRoot || index => segmentData
+    case availabilitySegments = 7
+    // availability mappings
+    // 0x01 || workPackageHash => segmentsRoot
+    // 0x02 || segmentsRoot => erasureRoot
+    case availabilityMappings = 8
+    // audit store entries
+    // erasureRoot => (workPackageHash, bundleSize, timestamp)
+    case availabilityAudit = 9
+    // D3L store entries
+    // erasureRoot => (segmentsRoot, segmentCount, timestamp)
+    case availabilityD3L = 10
 }
 
 enum MetaKey: UInt8 {

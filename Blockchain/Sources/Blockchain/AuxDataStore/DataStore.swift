@@ -5,6 +5,7 @@ enum DataStoreError: Error {
     case invalidPackageHash(Data32)
     case invalidSegmentRoot(Data32)
     case erasureCodingError
+    case networkFetchNotImplemented(Data32, UInt16)
 }
 
 public final class DataStore: Sendable {
@@ -32,10 +33,16 @@ public final class DataStore: Sendable {
             let erasureRoot = try await getErasureRootForSegment(segmentRoot: segmentRoot)
 
             if let localData = try await impl.get(erasureRoot: erasureRoot, index: segment.index) {
-                result.append(localData)
+                // Convert Data to Data4104
+                guard localData.count == 4104,
+                      let segmentData = Data4104(localData)
+                else {
+                    throw DataStoreError.erasureCodingError
+                }
+                result.append(segmentData)
             } else {
                 // TODO: use network for fetch shards and reconstruct the segment
-                fatalError("not implemented")
+                throw DataStoreError.networkFetchNotImplemented(erasureRoot, segment.index)
             }
         }
 
@@ -64,7 +71,7 @@ public final class DataStore: Sendable {
     }
 
     private func getErasureRootForSegment(segmentRoot: Data32) async throws -> Data32 {
-        try await impl.getEasureRoot(forSegmentRoot: segmentRoot)
+        try await impl.getErasureRoot(forSegmentRoot: segmentRoot)
             .unwrap(orError: DataStoreError.invalidSegmentRoot(segmentRoot))
     }
 
@@ -77,7 +84,8 @@ public final class DataStore: Sendable {
     ///
     /// As per GP 14.3.1, this method implements erasure coding for data availability and resilience
     public func set(data: Data4104, erasureRoot: Data32, index: UInt16) async throws {
-        try await impl.set(data: data, erasureRoot: erasureRoot, index: index)
+        // Convert Data4104 to Data for storage
+        try await impl.set(data: data.data, erasureRoot: erasureRoot, index: index)
 
         // TODO: Implement erasure coding as per GP 14.3.1
         // The current implementation of ErasureCoding in Utils is not yet compatible with GP

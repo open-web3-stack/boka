@@ -2,7 +2,7 @@ import Foundation
 import TracingUtils
 import Utils
 
-private let logger = Logger(label: "invokePVM")
+private let logger = Logger(label: "InvokePVM")
 
 /// common PVM program-argument invocation function
 public func invokePVM(

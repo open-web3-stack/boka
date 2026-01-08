@@ -6,7 +6,7 @@ import RPC
 import TracingUtils
 import Utils
 
-private let logger = Logger(label: "node")
+private let logger = Logger(label: "Node")
 
 public class Node {
     public let config: Config

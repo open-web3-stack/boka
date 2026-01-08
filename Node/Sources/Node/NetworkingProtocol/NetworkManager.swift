@@ -7,42 +7,27 @@ import Utils
 
 private let logger = Logger(label: "NetworkManager")
 
-let MAX_BLOCKS_PER_REQUEST: UInt32 = 50
-
-enum BroadcastTarget {
-    case safroleStep1Validator
-    case currentValidators
-}
-
-enum NetworkManagerError: Error {
-    case peerNotFound
-}
-
-private actor NetworkManagerStorage {
-    var peerIdByPublicKey: [Data32: PeerId] = [:]
-
-    func getPeerId(publicKey: Data32) -> PeerId? {
-        peerIdByPublicKey[publicKey]
-    }
-
-    func set(_ dict: [Data32: PeerId]) {
-        peerIdByPublicKey = dict
-    }
-}
-
-// TODO: move validator only code to a separate class
+/// Network manager for validator communication and protocol handling
+///
+/// This file serves as the main entry point for networking operations.
+/// Networking logic is organized into separate files:
+/// - NetworkManagerHelpers.swift - Shared utilities and types
+/// - NetworkManagerStorage.swift - Thread-safe peer storage
+/// - ValidatorEventHandlers.swift - Validator event handlers
+/// - CEProtocolHandlers.swift - Common Ephemeral protocol handlers
 public final class NetworkManager: Sendable {
     public let peerManager: PeerManager
     public let network: any NetworkProtocol
     public let syncManager: SyncManager
     public let blockchain: Blockchain
-    private let subscriptions: EventSubscriptions
 
-    // This is for development only
-    // Those peers will receive all the messages regardless the target
+    // Development-only peers that receive all messages
     private let devPeers: Set<Either<PeerId, NetAddr>>
 
-    private let storage = NetworkManagerStorage()
+    // Extracted modules
+    private let storage: NetworkManagerStorage
+    private let ceHandlers: CEProtocolHandlers
+    private let subscriptions: EventSubscriptions
 
     public init(
         buildNetwork: (NetworkProtocolHandler) throws -> any NetworkProtocol,
@@ -50,17 +35,36 @@ public final class NetworkManager: Sendable {
         eventBus: EventBus,
         devPeers: Set<NetAddr>
     ) async throws {
-        peerManager = PeerManager(eventBus: eventBus)
-        network = try buildNetwork(HandlerImpl(blockchain: blockchain, peerManager: peerManager))
-        syncManager = SyncManager(
-            blockchain: blockchain, network: network, peerManager: peerManager, eventBus: eventBus
-        )
         self.blockchain = blockchain
+        peerManager = PeerManager(eventBus: eventBus)
 
+        // Initialize subscriptions early
         subscriptions = EventSubscriptions(eventBus: eventBus)
 
-        var selfDevPeers = Set<Either<PeerId, NetAddr>>()
+        // Initialize storage
+        storage = NetworkManagerStorage()
 
+        // Initialize CE protocol handlers
+        ceHandlers = CEProtocolHandlers(blockchain: blockchain)
+
+        // Create network with handler
+        let handler = HandlerImpl(
+            blockchain: blockchain,
+            ceHandlers: ceHandlers,
+            peerManager: peerManager
+        )
+        network = try buildNetwork(handler)
+
+        // Initialize sync manager
+        syncManager = SyncManager(
+            blockchain: blockchain,
+            network: network,
+            peerManager: peerManager,
+            eventBus: eventBus
+        )
+
+        // Setup development peers first
+        var selfDevPeers = Set<Either<PeerId, NetAddr>>()
         logger.info("P2P Listening on \(try! network.listenAddress())")
 
         for peer in devPeers {
@@ -77,6 +81,13 @@ public final class NetworkManager: Sendable {
 
         self.devPeers = selfDevPeers
 
+        // Setup event subscriptions
+        await setupEventSubscriptions()
+    }
+
+    // MARK: - Event Subscriptions
+
+    private func setupEventSubscriptions() async {
         Task {
             await subscriptions.subscribe(
                 RuntimeEvents.SafroleTicketsGenerated.self,
@@ -122,67 +133,7 @@ public final class NetworkManager: Sendable {
         }
     }
 
-    private func getAddresses(target: BroadcastTarget) -> Set<Either<PeerId, NetAddr>> {
-        // TODO: get target from onchain state
-        switch target {
-        case .safroleStep1Validator:
-            // TODO: only send to the selected validator in the spec
-            devPeers
-        case .currentValidators:
-            // TODO: read onchain state for validators
-            devPeers
-        }
-    }
-
-    private func send(to: Ed25519PublicKey, message: CERequest) async throws -> [Data] {
-        guard let peerId = await storage.getPeerId(publicKey: to) else {
-            throw NetworkManagerError.peerNotFound
-        }
-        return try await network.send(to: peerId, message: message)
-    }
-
-    private func send(to: PeerId, message: CERequest) async throws -> [Data] {
-        try await network.send(to: to, message: message)
-    }
-
-    private func broadcast(
-        to: BroadcastTarget,
-        message: CERequest,
-        responseHandler: @Sendable @escaping (Result<[Data], Error>) async -> Void
-    ) async {
-        let targets = getAddresses(target: to)
-        for target in targets {
-            Task {
-                logger.trace("sending message", metadata: ["target": "\(target)", "message": "\(message)"])
-                let res = await Result {
-                    switch target {
-                    case let .left(peerId):
-                        try await network.send(to: peerId, message: message)
-                    case let .right(address):
-                        try await network.send(to: address, message: message)
-                    }
-                }
-                await responseHandler(res)
-            }
-        }
-    }
-
-    private func broadcast(to: BroadcastTarget, message: CERequest) async {
-        let targets = getAddresses(target: to)
-        for target in targets {
-            Task {
-                logger.trace("sending message", metadata: ["target": "\(target)", "message": "\(message)"])
-                // not expecting a response
-                // TODO: handle errors and ensure no data is returned
-                switch target {
-                case let .left(peerId):
-                    _ = try await network.send(to: peerId, message: message)
-                case let .right(address):
-                    _ = try await network.send(to: address, message: message)
-                }
-            }
-        }
-    }
+    // MARK: - Event Handlers
 
     private func on(safroleTicketsGenerated event: RuntimeEvents.SafroleTicketsGenerated) async {
         logger.trace("sending tickets1", metadata: ["epochIndex": "\(event.epochIndex)"])
@@ -223,7 +174,7 @@ public final class NetworkManager: Sendable {
     }
 
     private func on(workPackageBundleReady event: RuntimeEvents.WorkPackageBundleReady) async {
-        await withSpan("NetworkManager.on(workPackageBundleReady)", logger: logger) { _ in
+        await withSpan("NetworkManager.on(workPackageBundleReady)", logger: logger) { @Sendable _ in
             let target = event.target
 
             let resp = try await send(to: target, message: .workPackageSharing(.init(
@@ -232,7 +183,6 @@ public final class NetworkManager: Sendable {
                 bundle: event.bundle
             )))
 
-            // <-- Work-Report Hash ++ Ed25519 Signature
             guard resp.count == 1, let data = resp.first else {
                 logger.warning("WorkPackageSharing response is invalid", metadata: ["resp": "\(resp)", "target": "\(target)"])
                 return
@@ -250,24 +200,16 @@ public final class NetworkManager: Sendable {
         }
     }
 
-    // Note: This is only called when under as validator mode
     private func on(beforeEpochChange event: RuntimeEvents.BeforeEpochChange) async {
-        await withSpan("NetworkManager.onBeforeEpoch", logger: logger) { _ in
+        await withSpan("NetworkManager.onBeforeEpoch", logger: logger) { @Sendable _ in
             let currentValidators = event.state.currentValidators
             let nextValidators = event.state.nextValidators
             let allValidators = Set([currentValidators.array, nextValidators.array].joined())
             print("NetworkManager.onBeforeEpoch \(allValidators)")
-            var peerIdByPublicKey: [Data32: PeerId] = [:]
-            for validator in allValidators {
-                if let addr = NetAddr(address: validator.metadataString) {
-                    peerIdByPublicKey[validator.ed25519] = PeerId(
-                        publicKey: validator.ed25519.data,
-                        address: addr
-                    )
-                }
-            }
 
-            await storage.set(peerIdByPublicKey)
+            // Update peer mappings for both current and next validators
+            await storage.updateValidatorPeerMappings(validators: currentValidators)
+            await storage.updateValidatorPeerMappings(validators: nextValidators)
         }
     }
 
@@ -285,242 +227,91 @@ public final class NetworkManager: Sendable {
         )
     }
 
+    // MARK: - Core Networking
+
+    /// Get addresses for broadcast target
+    ///
+    /// **Note**: Currently returns development peers for testing.
+    /// **Future**: Should query onchain state to get actual validator addresses.
+    ///
+    /// - Parameter target: The broadcast target (safrole validators or current validators)
+    /// - Returns: Set of peer addresses for the target
+    private func getAddresses(target: BroadcastTarget) -> Set<Either<PeerId, NetAddr>> {
+        // For production: query blockchain.dataProvider for current/next validators
+        // and convert validator metadata to PeerId/NetAddr
+        switch target {
+        case .safroleStep1Validator:
+            // Future: Get the specific validator assigned to step 1 from Safrole state
+            devPeers
+        case .currentValidators:
+            // Future: Get all current validators from blockchain.dataProvider.currentValidators
+            // and convert their metadataString to NetAddr
+            devPeers
+        }
+    }
+
+    /// Send message to public key
+    private func send(to: Ed25519PublicKey, message: CERequest) async throws -> [Data] {
+        guard let peerId = await storage.getPeerId(publicKey: to) else {
+            logger.error("Peer not found for public key")
+            throw NetworkManagerError.peerNotFound
+        }
+
+        return try await send(to: peerId, message: message)
+    }
+
+    /// Send message to peer ID
+    private func send(to: PeerId, message: CERequest) async throws -> [Data] {
+        try await network.send(to: to, message: message)
+    }
+
+    /// Broadcast message to addresses
+    private func broadcast(to addresses: Set<Either<PeerId, NetAddr>>, message: CERequest) async {
+        for address in addresses {
+            Task {
+                do {
+                    switch address {
+                    case let .left(peerId):
+                        _ = try await network.send(to: peerId, message: message)
+                    case let .right(netAddr):
+                        _ = try await network.send(to: netAddr, message: message)
+                    }
+                } catch {
+                    logger.warning("Failed to broadcast to \(address): \(error)")
+                }
+            }
+        }
+    }
+
+    /// Broadcast message to target
+    private func broadcast(to: BroadcastTarget, message: CERequest) async {
+        let addresses = getAddresses(target: to)
+        await broadcast(to: addresses, message: message)
+    }
+
+    // MARK: - Public API
+
+    /// Get current peer count
     public var peersCount: Int {
         network.peersCount
     }
 }
 
+// MARK: - Network Protocol Handler
+
 struct HandlerImpl: NetworkProtocolHandler {
     let blockchain: Blockchain
+    let ceHandlers: CEProtocolHandlers
     let peerManager: PeerManager
 
     func handle(ceRequest: CERequest) async throws -> [Data] {
-        logger.trace("handling request", metadata: ["request": "\(ceRequest)"])
-        switch ceRequest {
-        case let .blockRequest(message):
-            let dataProvider = blockchain.dataProvider
-            let count = min(MAX_BLOCKS_PER_REQUEST, message.maxBlocks)
-            let encoder = JamEncoder()
-            switch message.direction {
-            case .ascendingExcludsive:
-                let number = try await dataProvider.getBlockNumber(hash: message.hash)
-                var currentHash = message.hash
-                for i in 1 ... count {
-                    let hashes = try await dataProvider.getBlockHash(byNumber: number + i)
-                    var found = false
-                    for hash in hashes {
-                        let block = try await dataProvider.getBlock(hash: hash)
-                        if block.header.parentHash == currentHash {
-                            try encoder.encode(block)
-                            found = true
-                            currentHash = hash
-                            break
-                        }
-                    }
-                    if !found {
-                        break
-                    }
-                }
-            case .descendingInclusive:
-                var hash = message.hash
-                for _ in 0 ..< count {
-                    let block = try await dataProvider.getBlock(hash: hash)
-                    try encoder.encode(block)
-                    if hash == dataProvider.genesisBlockHash {
-                        break
-                    }
-                    hash = block.header.parentHash
-                }
-            }
-            return [encoder.data]
-        case let .stateRequest(message):
-            blockchain
-                .publish(
-                    event: RuntimeEvents
-                        .StateRequestReceived(
-                            headerHash: message.headerHash,
-                            startKey: message.startKey,
-                            endKey: message.endKey,
-                            maxSize: message.maxSize
-                        )
-                )
-            // TODO: waitfor StateRequestReceivedResponse
-            // let resp = try await blockchain.waitFor(RuntimeEvents.StateRequestReceivedResponse.self) { event in
-            //
-            // }
-            return []
-        case let .safroleTicket1(message):
-            blockchain.publish(event: RuntimeEvents.SafroleTicketsReceived(
-                items: [
-                    ExtrinsicTickets.TicketItem(
-                        attempt: message.attempt,
-                        signature: message.proof
-                    ),
-                ]
-            ))
-            // TODO: rebroadcast to other peers after some time
-            return []
-        case let .safroleTicket2(message):
-            blockchain.publish(event: RuntimeEvents.SafroleTicketsReceived(
-                items: [
-                    ExtrinsicTickets.TicketItem(
-                        attempt: message.attempt,
-                        signature: message.proof
-                    ),
-                ]
-            ))
-            return []
-        case let .workPackageSubmission(message):
-            blockchain
-                .publish(
-                    event: RuntimeEvents
-                        .WorkPackagesReceived(
-                            coreIndex: message.coreIndex,
-                            workPackage: message.workPackage.asRef(),
-                            extrinsics: message.extrinsics
-                        )
-                )
-            return []
-        case let .workPackageSharing(message):
-            let hash = message.bundle.hash()
-            blockchain
-                .publish(
-                    event: RuntimeEvents
-                        .WorkPackageBundleReceived(
-                            coreIndex: message.coreIndex,
-                            bundle: message.bundle,
-                            segmentsRootMappings: message.segmentsRootMappings
-                        )
-                )
-            let resp = try await blockchain.waitFor(RuntimeEvents.WorkPackageBundleReceivedResponse.self) { event in
-                hash == event.workBundleHash
-            }
-            let (workReportHash, signature) = try resp.result.get()
-            return try [JamEncoder.encode(workReportHash, signature)]
-        case let .workReportDistribution(message):
-            let hash = message.workReport.hash()
-            blockchain
-                .publish(
-                    event: RuntimeEvents
-                        .WorkReportReceived(
-                            workReport: message.workReport,
-                            slot: message.slot,
-                            signatures: message.signatures
-                        )
-                )
-
-            let resp = try await blockchain.waitFor(RuntimeEvents.WorkReportReceivedResponse.self) { event in
-                hash == event.workReportHash
-            }
-            _ = try resp.result.get()
-            return []
-        case let .workReportRequest(message):
-            let workReportRef = try await blockchain.dataProvider.getGuaranteedWorkReport(hash: message.workReportHash)
-            if let workReport = workReportRef {
-                return try [JamEncoder.encode(workReport.value)]
-            }
-            return []
-        case let .shardDistribution(message):
-            let receivedEvent = RuntimeEvents.ShardDistributionReceived(erasureRoot: message.erasureRoot, shardIndex: message.shardIndex)
-            let requestId = try receivedEvent.generateRequestId()
-
-            blockchain.publish(event: receivedEvent)
-
-            let resp = try await blockchain.waitFor(RuntimeEvents.ShardDistributionReceivedResponse.self) { event in
-                requestId == event.requestId
-            }
-            let (bundleShard, segmentShards, justification) = try resp.result.get()
-            return try [JamEncoder.encode(bundleShard, segmentShards, justification)]
-        case let .auditShardRequest(message):
-            blockchain
-                .publish(event: RuntimeEvents.AuditShardRequestReceived(erasureRoot: message.erasureRoot, shardIndex: message.shardIndex))
-            // TODO: waitfor AuditShardRequestReceivedResponse
-            // let resp = try await blockchain.waitFor(RuntimeEvents.AuditShardRequestReceivedResponse.self) { event in
-            //
-            // }
-            return []
-        case let .segmentShardRequest1(message):
-            blockchain
-                .publish(
-                    event: RuntimeEvents
-                        .SegmentShardRequestReceived(
-                            erasureRoot: message.erasureRoot,
-                            shardIndex: message.shardIndex,
-                            segmentIndices: message.segmentIndices
-                        )
-                )
-            // TODO: waitfor AuditShardRequestReceivedResponse
-            // let resp = try await blockchain.waitFor(RuntimeEvents.AuditShardRequestReceivedResponse.self) { event in
-            //
-            // }
-            return []
-        case let .segmentShardRequest2(message):
-            blockchain
-                .publish(
-                    event: RuntimeEvents
-                        .SegmentShardRequestReceived(
-                            erasureRoot: message.erasureRoot,
-                            shardIndex: message.shardIndex,
-                            segmentIndices: message.segmentIndices
-                        )
-                )
-            // TODO: waitfor AuditShardRequestReceivedResponse
-            return []
-        case let .assuranceDistribution(message):
-            blockchain
-                .publish(
-                    event: RuntimeEvents
-                        .AssuranceDistributionReceived(
-                            headerHash: message.headerHash,
-                            bitfield: message.bitfield,
-                            signature: message.signature
-                        )
-                )
-            return []
-        case let .preimageAnnouncement(message):
-            blockchain
-                .publish(
-                    event: RuntimeEvents
-                        .PreimageAnnouncementReceived(
-                            serviceID: message.serviceID,
-                            hash: message.hash,
-                            preimageLength: message.preimageLength
-                        )
-                )
-            return []
-        case let .preimageRequest(message):
-            blockchain.publish(event: RuntimeEvents.PreimageRequestReceived(hash: message.hash))
-            // TODO: waitfor PreimageRequestReceivedResponse
-            return []
-        case let .judgementPublication(message):
-            blockchain
-                .publish(
-                    event: RuntimeEvents
-                        .JudgementPublicationReceived(
-                            epochIndex: message.epochIndex,
-                            validatorIndex: message.validatorIndex,
-                            validity: message.validity,
-                            workReportHash: message.workReportHash,
-                            signature: message.signature
-                        )
-                )
-            return []
-        case let .auditAnnouncement(message):
-            blockchain
-                .publish(
-                    event: RuntimeEvents
-                        .AuditAnnouncementReceived(
-                            headerHash: message.headerHash,
-                            tranche: message.tranche,
-                            announcement: message.announcement,
-                            evidence: message.evidence
-                        )
-                )
-            return []
-        }
+        try await ceHandlers.handle(ceRequest: ceRequest)
     }
 
-    func handle(connection: some ConnectionInfoProtocol, upMessage: UPMessage) async throws {
+    func handle(
+        connection: some ConnectionInfoProtocol,
+        upMessage: UPMessage
+    ) async throws {
         switch upMessage {
         case let .blockAnnouncementHandshake(message):
             logger.trace("received block announcement handshake: \(message)")
@@ -538,7 +329,9 @@ struct HandlerImpl: NetworkProtocolHandler {
     }
 
     func handle(
-        connection _: some ConnectionInfoProtocol, stream: some StreamProtocol<UPMessage>, kind: UniquePresistentStreamKind
+        connection _: some ConnectionInfoProtocol,
+        stream: some StreamProtocol<UPMessage>,
+        kind: UniquePresistentStreamKind
     ) async throws {
         switch kind {
         case .blockAnnouncement:
@@ -547,18 +340,25 @@ struct HandlerImpl: NetworkProtocolHandler {
             let heads = try await blockchain.dataProvider.getHeads()
             var headsWithTimeslot: [HashAndSlot] = []
             for head in heads {
-                try await headsWithTimeslot.append(HashAndSlot(
+                let header = try await blockchain.dataProvider.getHeader(hash: head)
+                headsWithTimeslot.append(HashAndSlot(
                     hash: head,
-                    timeslot: blockchain.dataProvider.getHeader(hash: head).value.timeslot
+                    timeslot: header.value.timeslot
                 ))
             }
 
-            let handshake = BlockAnnouncementHandshake(
+            try await stream.send(message: .blockAnnouncementHandshake(.init(
                 finalized: HashAndSlot(hash: finalized.hash, timeslot: finalized.timeslot),
                 heads: headsWithTimeslot
-            )
+            )))
 
-            try await stream.send(message: .blockAnnouncementHandshake(handshake))
+            for head in heads {
+                let header = try await blockchain.dataProvider.getHeader(hash: head)
+                try await stream.send(message: .blockAnnouncement(.init(
+                    header: header,
+                    finalized: HashAndSlot(hash: finalized.hash, timeslot: finalized.timeslot)
+                )))
+            }
         }
     }
 }
