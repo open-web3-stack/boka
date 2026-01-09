@@ -165,7 +165,8 @@ extension Guaranteeing {
             // Check that the guarantee's rotation period is not too old
             let guaranteeRotationPeriod = guarantee.timeslot / coreAssignmentRotationPeriod
             let currentRotationPeriod = timeslot / coreAssignmentRotationPeriod
-            guard guaranteeRotationPeriod >= currentRotationPeriod - 1 else {
+            let minimumAcceptablePeriod = currentRotationPeriod > 0 ? currentRotationPeriod - 1 : 0
+            guard guaranteeRotationPeriod >= minimumAcceptablePeriod else {
                 throw GuaranteeingError.coreNotAvailable
             }
 
