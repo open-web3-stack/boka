@@ -162,6 +162,13 @@ extension Guaranteeing {
                 throw .futureReportSlot
             }
 
+            // Check that the guarantee's rotation period is not too old
+            let guaranteeRotationPeriod = guarantee.timeslot / coreAssignmentRotationPeriod
+            let currentRotationPeriod = timeslot / coreAssignmentRotationPeriod
+            guard guaranteeRotationPeriod >= currentRotationPeriod - 1 else {
+                throw GuaranteeingError.coreNotAvailable
+            }
+
             oldLookups[report.packageSpecification.workPackageHash] = report.packageSpecification.segmentRoot
 
             for credential in guarantee.credential {
