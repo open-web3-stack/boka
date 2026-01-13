@@ -59,6 +59,26 @@
 			"preLaunchTask": "swift: Build Release BenchmarkTestVectors (JAMTests)",
 			"target": "BenchmarkTestVectors",
 			"configuration": "release"
+		},
+		{
+			"type": "swift",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:boka}/JAMTests",
+			"name": "Debug Benchmarks (JAMTests)",
+			"target": "Benchmarks",
+			"configuration": "debug",
+			"preLaunchTask": "swift: Build Debug Benchmarks (JAMTests)"
+		},
+		{
+			"type": "swift",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:boka}/JAMTests",
+			"name": "Release Benchmarks (JAMTests)",
+			"target": "Benchmarks",
+			"configuration": "release",
+			"preLaunchTask": "swift: Build Release Benchmarks (JAMTests)"
 		}
 	]
 }

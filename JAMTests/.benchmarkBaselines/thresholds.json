@@ -1,0 +1,439 @@
+{
+  "info": "Benchmark regression thresholds for Boka blockchain performance tests",
+  "lastUpdated": "2025-01-13",
+  "thresholds": {
+    "comments": "5% regression threshold for most operations, 10% for I/O heavy operations",
+
+    "runtime.apply.empty": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Empty block application should not regress more than 5%"
+    },
+    "runtime.apply.single": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Single extrinsic block application"
+    },
+    "runtime.apply.mixed": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Mixed extrinsics (more variance acceptable due to batch operations)"
+    },
+    "runtime.apply.complex": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Complex block operations with contracts"
+    },
+    "runtime.validate.header": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Header validation logic"
+    },
+    "runtime.validate.body": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Block body validation"
+    },
+    "runtime.validate.uncles": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Uncle/authorship validation"
+    },
+    "runtime.state.root": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "State root computation (computationally intensive)"
+    },
+    "runtime.state.root.incremental": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Incremental state root updates"
+    },
+    "runtime.epoch.change": {
+      "maxRegression": 0.15,
+      "maxImprovement": 0.50,
+      "description": "Epoch change (complex operation, higher threshold)"
+    },
+
+    "block.import.single": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Single block import (involves I/O)"
+    },
+    "block.import.batch": {
+      "maxRegression": 0.15,
+      "maxImprovement": 0.50,
+      "description": "Batch block import (higher variance acceptable)"
+    },
+    "block.import.fork": {
+      "maxRegression": 0.15,
+      "maxImprovement": 0.50,
+      "description": "Fork handling and reorganization"
+    },
+    "ancestry.verify": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Ancestry verification for deep chains"
+    },
+    "ancestry.build": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Building ancestry chains"
+    },
+    "chain.select": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Chain selection logic"
+    },
+    "chain.reorg": {
+      "maxRegression": 0.15,
+      "maxImprovement": 0.50,
+      "description": "Chain reorganization (complex operation)"
+    },
+    "block.validate.complex": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Full block validation"
+    },
+    "header.validation.chain": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Chain of header validations"
+    },
+    "finalization.prove": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Finalization proof generation"
+    },
+
+    "trie.insert.single": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Single trie node insertion"
+    },
+    "trie.insert.batch": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Batch trie insertion"
+    },
+    "trie.update.single": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Single trie update"
+    },
+    "trie.update.batch": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Batch trie updates"
+    },
+    "trie.delete.single": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Single trie deletion"
+    },
+    "trie.delete.batch": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Batch trie deletions"
+    },
+    "trie.get.single": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Single trie read"
+    },
+    "trie.get.batch": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Batch trie reads"
+    },
+    "trie.compute.root": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Full trie root computation"
+    },
+    "trie.compute.root.incremental": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Incremental root computation"
+    },
+    "trie.iterate.prefix": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Prefix iteration through trie"
+    },
+    "trie.encode.node": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Trie node encoding"
+    },
+    "trie.decode.node": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Trie node decoding"
+    },
+    "trie.insert.small": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Small value insertion (embedded leaf)"
+    },
+    "trie.insert.large": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Large value insertion (regular leaf)"
+    },
+
+    "statebackend.get.node.hit": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "State backend node read (cache hit)"
+    },
+    "statebackend.get.node.miss": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "State backend node read (cache miss - I/O involved)"
+    },
+    "statebackend.get.batch": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Batch state backend reads"
+    },
+    "statebackend.put.node": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Single state backend write"
+    },
+    "statebackend.put.batch": {
+      "maxRegression": 0.15,
+      "maxImprovement": 0.50,
+      "description": "Batch state backend writes (I/O intensive)"
+    },
+    "statebackend.cache.hit": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Cache hit operations"
+    },
+    "statebackend.cache.miss": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Cache miss operations"
+    },
+    "statebackend.storage.query": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Single storage query"
+    },
+    "statebackend.storage.prefix": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Prefix-based storage query"
+    },
+    "statebackend.read.single": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "State backend read operation"
+    },
+    "statebackend.write.single": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "State backend write operation"
+    },
+    "statebackend.write.batch": {
+      "maxRegression": 0.15,
+      "maxImprovement": 0.50,
+      "description": "Batch state backend writes"
+    },
+    "statebackend.getkeys.prefix": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Get keys with prefix"
+    },
+    "statebackend.getkeys.startkey": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Get keys with start key"
+    },
+    "statebackend.getkeys.limit": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Get keys with limit"
+    },
+    "statebackend.getkeys.complex": {
+      "maxRegression": 0.15,
+      "maxImprovement": 0.50,
+      "description": "Complex key queries with multiple filters"
+    },
+    "statebackend.batchupdate.write": {
+      "maxRegression": 0.15,
+      "maxImprovement": 0.50,
+      "description": "Batch update writes"
+    },
+    "statebackend.batchupdate.mixed": {
+      "maxRegression": 0.15,
+      "maxImprovement": 0.50,
+      "description": "Mixed batch update operations"
+    },
+
+    "rocksdb.init": {
+      "maxRegression": 0.15,
+      "maxImprovement": 0.50,
+      "description": "RocksDB initialization (I/O intensive)"
+    },
+    "rocksdb.block.write.single": {
+      "maxRegression": 0.20,
+      "maxImprovement": 0.50,
+      "description": "RocksDB single block write (disk I/O)"
+    },
+    "rocksdb.block.write.batch": {
+      "maxRegression": 0.25,
+      "maxImprovement": 0.50,
+      "description": "RocksDB batch block writes (high I/O variance)"
+    },
+    "rocksdb.state.read.single": {
+      "maxRegression": 0.15,
+      "maxImprovement": 0.50,
+      "description": "RocksDB single state read"
+    },
+    "rocksdb.state.read.batch": {
+      "maxRegression": 0.20,
+      "maxImprovement": 0.50,
+      "description": "RocksDB batch state reads"
+    },
+    "rocksdb.block.read.single": {
+      "maxRegression": 0.15,
+      "maxImprovement": 0.50,
+      "description": "RocksDB single block read"
+    },
+    "rocksdb.block.read.batch": {
+      "maxRegression": 0.20,
+      "maxImprovement": 0.50,
+      "description": "RocksDB batch block reads"
+    },
+    "rocksdb.trie.node.read": {
+      "maxRegression": 0.15,
+      "maxImprovement": 0.50,
+      "description": "RocksDB trie node read"
+    },
+    "rocksdb.ancestry.track": {
+      "maxRegression": 0.20,
+      "maxImprovement": 0.50,
+      "description": "RocksDB ancestry tracking with I/O"
+    },
+    "rocksdb.getkeys.prefix": {
+      "maxRegression": 0.20,
+      "maxImprovement": 0.50,
+      "description": "RocksDB prefix query with I/O"
+    },
+    "rocksdb.finalize": {
+      "maxRegression": 0.15,
+      "maxImprovement": 0.50,
+      "description": "RocksDB finalization operation"
+    },
+
+    "vm.contract.transfer": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Simple VM contract (transfer)"
+    },
+    "vm.contract.dex": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "VM contract with computation (DEX)"
+    },
+    "vm.contract.nft": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "VM contract with memory operations (NFT)"
+    },
+    "vm.batch.contracts": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Batch VM contract executions"
+    },
+    "vm.state.access.heavy": {
+      "maxRegression": 0.15,
+      "maxImprovement": 0.50,
+      "description": "Heavy VM state access patterns"
+    },
+    "vm.execution.repeated": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Repeated VM execution overhead (10 iterations)"
+    },
+    "vm.execution.sequential": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Sequential VM execution overhead (5 iterations)"
+    },
+    "vm.throughput.instructions": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "VM instruction throughput"
+    },
+    "vm.memory.operations": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "VM memory operations"
+    },
+
+    "authoring.build.block": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Block authoring (build block with transactions)"
+    },
+    "authoring.pre.runtime": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Pre-runtime data preparation for authoring"
+    },
+    "authoring.finalize": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Block finalization"
+    },
+    "data.chunk": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Data slicing (baseline for availability chunking)"
+    },
+    "data.reconstruct": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Data concatenation (baseline for availability reconstruction)"
+    },
+    "hash.stateroot": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "State root computation and hashing (baseline for proof generation)"
+    },
+    "hash.compare": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Hash comparison (baseline for proof verification)"
+    },
+    "erasure.encode.logic": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Erasure encoding logic (business logic, not math)"
+    },
+    "erasure.decode.logic": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Erasure decoding logic"
+    },
+    "validator.committee": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Validator committee selection"
+    },
+    "validator.ticket.selection": {
+      "maxRegression": 0.05,
+      "maxImprovement": 0.50,
+      "description": "Validator ticket selection"
+    },
+    "validator.epoch.change": {
+      "maxRegression": 0.10,
+      "maxImprovement": 0.50,
+      "description": "Validator epoch change calculation"
+    }
+  }
+}

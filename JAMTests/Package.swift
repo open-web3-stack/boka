@@ -21,6 +21,7 @@ let package = Package(
         .package(path: "../TracingUtils"),
         .package(path: "../Blockchain"),
         .package(path: "../PolkaVM"),
+        .package(path: "../Database"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "6.0.0"),
         .package(url: "https://github.com/ordo-one/package-benchmark.git", .upToNextMajor(from: "1.29.4")),
     ],
@@ -58,14 +59,17 @@ let package = Package(
             ]
         ),
         .executableTarget(
-            name: "BenchmarkTestVectors",
+            name: "Benchmarks",
             dependencies: [
                 .product(name: "Benchmark", package: "package-benchmark"),
-                "JAMTests",
-                "Utils",
+                "Blockchain",
                 "Codec",
+                "Database",
+                "JAMTests",
+                "PolkaVM",
+                "Utils",
             ],
-            path: "Benchmarks/TestVectors",
+            path: "Benchmarks/Benchmarks",
             cxxSettings: [
                 .unsafeFlags(["-Wno-incomplete-umbrella"]),
             ],
