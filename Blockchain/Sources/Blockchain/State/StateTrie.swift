@@ -144,6 +144,7 @@ public actor StateTrie {
     public private(set) var rootHash: Data32
     private var nodes: [Data: TrieNode] = [:]
     private var deleted: Set<Data> = []
+    private var lastSavedRootHash: Data32 // Track last saved root for proper ref counting
 
     // Performance optimization: LRU cache for frequently accessed nodes
     private let nodeCache: LRUCache<Data, TrieNode>?
@@ -170,6 +171,7 @@ public actor StateTrie {
     ) {
         self.rootHash = rootHash
         self.backend = backend
+        lastSavedRootHash = rootHash // Initialize with current root
         nodeCache = enableCache ? LRUCache(capacity: cacheSize) : nil
         cacheStats = enableCache ? CacheStatsTracker() : nil
         self.enableWriteBuffer = enableWriteBuffer
@@ -423,6 +425,11 @@ public actor StateTrie {
         var ops = [StateBackendOperation]()
         var refChanges = [Data: Int]()
 
+        // Decrement reference count of old root hash if it changed
+        if lastSavedRootHash != rootHash {
+            refChanges[lastSavedRootHash.data.suffix(31), default: 0] -= 1
+        }
+
         // process deleted nodes
         for id in deleted {
             guard let node = nodes[id] else {
@@ -487,6 +494,9 @@ public actor StateTrie {
         }
 
         try await backend.batchUpdate(ops)
+
+        // Update last saved root hash after successful batch update
+        lastSavedRootHash = rootHash
     }
 
     /// Get cache statistics for monitoring and debugging

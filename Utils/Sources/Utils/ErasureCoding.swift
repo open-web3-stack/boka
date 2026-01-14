@@ -343,7 +343,8 @@ public enum ErasureCoding {
         guard shards.count >= originalCount else { throw Error.invalidShardsCount }
 
         // Fast path: all original shards are available
-        let originalMap = Dictionary(uniqueKeysWithValues: shards.map { (Int($0.index), $0.data) })
+        // Use uniquingKeysWith to handle duplicate indices gracefully (keep first occurrence)
+        let originalMap = Dictionary(shards.map { (Int($0.index), $0.data) }, uniquingKeysWith: { first, _ in first })
         let availableOriginals = (0 ..< originalCount).compactMap { originalMap[$0] }
         if availableOriginals.count == originalCount {
             let reconstructed = join(arr: availableOriginals)
