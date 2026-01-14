@@ -429,9 +429,12 @@ public actor StateTrie {
                 continue
             }
             if node.isBranch {
-                // Decrement reference counts for deleted branch nodes
+                // Decrement reference counts for children of deleted branch nodes
+                // Note: We don't decrement the node's own ref count here - that's
+                // handled by its parent when the parent is processed (or when the
+                // root changes). We only decrement the children that this node
+                // was referencing.
                 // Use -= to properly accumulate if multiple deleted nodes share children
-                refChanges[node.hash.data.suffix(31), default: 0] -= 1
                 refChanges[node.left.data.suffix(31), default: 0] -= 1
                 refChanges[node.right.data.suffix(31), default: 0] -= 1
             }

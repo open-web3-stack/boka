@@ -309,7 +309,8 @@ mod tests {
 
         let mut recovery_shards: Vec<*mut Shard> = Vec::new();
         for (i, buf) in recovery_buffers.iter().enumerate() {
-            let shard = make_shard(buf, i as u32);
+            // Parity shards should have indices starting from original_count
+            let shard = make_shard(buf, (original_count + i) as u32);
             recovery_shards.push(shard);
         }
         let recovery_shards_const: Vec<*const Shard> =

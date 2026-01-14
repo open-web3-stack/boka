@@ -62,9 +62,11 @@ public actor InMemoryBackend: StateBackendProtocol {
 
     public func gc(callback: @Sendable (Data) -> Data32?) async throws {
         // check ref counts and remove keys with 0 ref count
+        var keysToRemove: [Data] = []
         for (key, count) in refCounts where count == 0 {
             if let value = store[key] {
                 store.removeValue(forKey: key)
+                keysToRemove.append(key)
                 if let rawValueKey = callback(value) {
                     rawValueRefCounts[rawValueKey, default: 0] -= 1
                     if rawValueRefCounts[rawValueKey] == 0 {
@@ -73,6 +75,10 @@ public actor InMemoryBackend: StateBackendProtocol {
                     }
                 }
             }
+        }
+        // Remove keys from refCounts to prevent unbounded growth
+        for key in keysToRemove {
+            refCounts.removeValue(forKey: key)
         }
     }
 
