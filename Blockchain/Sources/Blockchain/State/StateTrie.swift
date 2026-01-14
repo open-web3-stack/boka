@@ -149,14 +149,36 @@ public actor StateTrie {
     private let nodeCache: LRUCache<Data, TrieNode>?
     private let cacheStats: CacheStatsTracker?
 
-    public init(rootHash: Data32, backend: StateBackendProtocol, enableCache: Bool = true, cacheSize: Int = 1000) {
+    // Performance optimization: Write buffering for batched I/O
+    private let writeBuffer: WriteBuffer?
+    private let enableWriteBuffer: Bool
+
+    public init(
+        rootHash: Data32,
+        backend: StateBackendProtocol,
+        enableCache: Bool = true,
+        cacheSize: Int = 1000,
+        enableWriteBuffer: Bool = true,
+        writeBufferSize: Int = 1000,
+        writeBufferFlushInterval: TimeInterval = 1.0
+    ) {
         self.rootHash = rootHash
         self.backend = backend
         nodeCache = enableCache ? LRUCache(capacity: cacheSize) : nil
         cacheStats = enableCache ? CacheStatsTracker() : nil
+        self.enableWriteBuffer = enableWriteBuffer
+        writeBuffer = enableWriteBuffer ? WriteBuffer(
+            maxBufferSize: writeBufferSize,
+            flushInterval: writeBufferFlushInterval
+        ) : nil
     }
 
+    /// Read a value from the trie
+    /// Phase 2: Flushes write buffer before read to ensure consistency
     public func read(key: Data31) async throws -> Data? {
+        // Flush buffer to ensure we read latest data
+        try await flushWriteBuffer()
+
         let node = try await find(hash: rootHash, key: key, depth: 0)
         guard let node else {
             return nil
@@ -344,18 +366,43 @@ public actor StateTrie {
     }
 
     /// Update trie with multiple key-value pairs
-    /// Note: Currently processes updates sequentially.
-    /// Performance improvement opportunities:
-    /// - Batch updates: Group inserts/deletes by tree depth to minimize I/O
-    /// - Parallel processing: Use TaskGroup for independent updates
-    /// - Write batching: Collect all operations before committing to backend
+    /// Performance optimizations:
+    /// - Write buffering: Phase 2 - Buffer updates before batch I/O
+    /// - Parallel processing: Use TaskGroup for independent updates (future)
     /// - Cache optimization: Keep recently accessed nodes in memory
     public func update(_ updates: [(key: Data31, value: Data?)]) async throws {
+        // If write buffering is enabled, use buffered updates
+        if enableWriteBuffer, let buffer = writeBuffer {
+            try await updateBuffered(updates, buffer: buffer)
+        } else {
+            // Original immediate update path
+            for (key, value) in updates {
+                if let value {
+                    rootHash = try await insert(hash: rootHash, key: key, value: value, depth: 0)
+                } else {
+                    rootHash = try await delete(hash: rootHash, key: key, depth: 0)
+                }
+            }
+        }
+    }
+
+    /// Phase 2: Buffered update implementation
+    /// Accumulates updates in buffer and flushes when necessary
+    private func updateBuffered(_ updates: [(key: Data31, value: Data?)], buffer: WriteBuffer) async throws {
         for (key, value) in updates {
+            // Add to buffer
+            let shouldFlush = await buffer.add(key: key, value: value)
+
+            // Apply update to in-memory trie
             if let value {
                 rootHash = try await insert(hash: rootHash, key: key, value: value, depth: 0)
             } else {
                 rootHash = try await delete(hash: rootHash, key: key, depth: 0)
+            }
+
+            // Flush if buffer is full or time interval elapsed
+            if shouldFlush {
+                try await flushWriteBuffer()
             }
         }
     }
@@ -432,6 +479,49 @@ public actor StateTrie {
     public func clearCache() async {
         await nodeCache?.removeAll()
         cacheStats?.reset()
+    }
+
+    // MARK: - Phase 2: Write Buffering Methods
+
+    /// Flush the write buffer, persisting all buffered updates to storage
+    /// This is called automatically when buffer is full or flush interval elapses
+    /// Can also be called manually for immediate persistence
+    public func flushWriteBuffer() async throws {
+        guard enableWriteBuffer, let buffer = writeBuffer else {
+            return
+        }
+
+        // Only flush if there's something to flush
+        let isEmpty = await buffer.isEmpty
+        guard !isEmpty else {
+            return
+        }
+
+        // Save current state (this is where actual I/O happens)
+        try await save()
+
+        // Clear the buffer after successful save
+        _ = await buffer.flush()
+    }
+
+    /// Manually trigger a flush of the write buffer
+    /// Use this to ensure all updates are persisted before critical operations
+    public func flush() async throws {
+        try await flushWriteBuffer()
+    }
+
+    /// Get write buffer statistics for monitoring and debugging
+    public func getWriteBufferStats() async -> WriteBufferStats? {
+        guard let buffer = writeBuffer else {
+            return nil
+        }
+        return await buffer.stats
+    }
+
+    /// Clear the write buffer without flushing (use with caution - data loss!)
+    /// Only useful for testing or error recovery
+    public func clearWriteBuffer() async {
+        await writeBuffer?.clear()
     }
 
     private func insert(
