@@ -71,8 +71,6 @@ func validatorBenchmarks() {
     // MARK: - Data operations (baseline for availability chunking)
 
     Benchmark("data.chunk") { benchmark in
-        let _ = try await createGenesis(config: config)
-
         // Create 1MB of data to chunk
         let data = Data(repeating: 0x42, count: 1_048_576) // 1MB
 
@@ -90,8 +88,6 @@ func validatorBenchmarks() {
     }
 
     Benchmark("data.reconstruct") { benchmark in
-        let _ = try await createGenesis(config: config)
-
         // Create chunks
         let originalData = Data(repeating: 0x42, count: 1_048_576) // 1MB
         let chunkSize = 1024
@@ -141,12 +137,10 @@ func validatorBenchmarks() {
     // MARK: - Erasure coding operations
 
     Benchmark("erasure.encode.logic") { benchmark in
-        let _ = try await createGenesis(config: config)
-
-        // Create data to encode
+        // Create data to encode using actual config values
         let data = Data(repeating: 0x42, count: 1024)
-        let basicSize = 128
-        let recoveryCount = 4
+        let basicSize = config.value.erasureCodedPieceSize
+        let recoveryCount = config.value.totalNumberOfValidators
 
         benchmark.startMeasurement()
         // Use actual erasure encoding from Utils
@@ -156,12 +150,12 @@ func validatorBenchmarks() {
     }
 
     Benchmark("erasure.decode.logic") { benchmark in
-        let _ = try await createGenesis(config: config)
+        _ = try await createGenesis(config: config)
 
-        // Create encoded shards for reconstruction
+        // Create encoded shards for reconstruction using actual config values
         let originalData = Data(repeating: 0x42, count: 1024)
-        let basicSize = 128
-        let recoveryCount = 4
+        let basicSize = config.value.erasureCodedPieceSize
+        let recoveryCount = config.value.totalNumberOfValidators
         let originalCount = basicSize / 2
 
         let shardsData = try ErasureCoding.chunk(data: originalData, basicSize: basicSize, recoveryCount: recoveryCount)
@@ -173,7 +167,8 @@ func validatorBenchmarks() {
             shards: Array(typed.prefix(originalCount)),
             basicSize: basicSize,
             originalCount: originalCount,
-            recoveryCount: recoveryCount
+            recoveryCount: recoveryCount,
+            originalLength: originalData.count
         )
         benchmark.stopMeasurement()
         blackHole(reconstructed.count)

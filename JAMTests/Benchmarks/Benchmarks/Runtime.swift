@@ -10,6 +10,8 @@ func runtimeBenchmarks() {
 
     func createGenesis(config: ProtocolConfigRef) async throws -> (BlockRef, StateRef) {
         let (state, block) = try State.devGenesis(config: config)
+        // Save the state to persist layer changes to the backend
+        _ = try await state.value.save()
         return (block, state)
     }
 
@@ -29,10 +31,13 @@ func runtimeBenchmarks() {
 
     Benchmark("runtime.validate.header") { benchmark in
         let (parentBlock, parentState) = try await createGenesis(config: config)
-        let block = BlockRef.dummy(config: config, parent: parentBlock)
+        let stateRoot = await parentState.value.stateRoot
+        // Create a block with the correct priorStateRoot matching parent state
+        let block = BlockRef.dummy(config: config, parent: parentBlock).mutate { b in
+            b.header.unsigned.priorStateRoot = stateRoot
+        }
         let runtime = Runtime(config: config, ancestry: nil)
         let validatedBlock = try block.toValidated(config: config)
-        let stateRoot = await parentState.value.stateRoot
         let context = Runtime.ApplyContext(timeslot: block.header.timeslot, stateRoot: stateRoot)
 
         benchmark.startMeasurement()
@@ -42,10 +47,13 @@ func runtimeBenchmarks() {
 
     Benchmark("runtime.validate.block") { benchmark in
         let (parentBlock, parentState) = try await createGenesis(config: config)
-        let block = BlockRef.dummy(config: config, parent: parentBlock)
+        let stateRoot = await parentState.value.stateRoot
+        // Create a block with the correct priorStateRoot matching parent state
+        let block = BlockRef.dummy(config: config, parent: parentBlock).mutate { b in
+            b.header.unsigned.priorStateRoot = stateRoot
+        }
         let runtime = Runtime(config: config, ancestry: nil)
         let validatedBlock = try block.toValidated(config: config)
-        let stateRoot = await parentState.value.stateRoot
         let context = Runtime.ApplyContext(timeslot: block.header.timeslot, stateRoot: stateRoot)
 
         benchmark.startMeasurement()

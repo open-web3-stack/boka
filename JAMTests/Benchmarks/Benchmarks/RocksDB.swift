@@ -29,6 +29,8 @@ func rocksdbBenchmarks() {
 
     func createGenesis(config: ProtocolConfigRef) async throws -> (BlockRef, StateRef) {
         let (state, block) = try State.devGenesis(config: config)
+        // Save the state to persist layer changes to the backend
+        _ = try await state.value.save()
         return (block, state)
     }
 
@@ -267,19 +269,8 @@ func rocksdbBenchmarks() {
     Benchmark("rocksdb.getkeys.prefix") { benchmark in
         let tempDir = try createTempDirectory()
         defer { tempDir.cleanup() }
-        let (genesisBlock, _) = try await createGenesis(config: config)
-
-        // Create state with some test data that shares a common prefix
-        var stateData: [Data31: Data] = [:]
-        for i in 0 ..< 100 {
-            // Create 31-byte keys with common prefix (0x00) + varying second byte
-            // This allows proper prefix scanning benchmarking
-            let data = Data([0x00, UInt8(i)] + Data(repeating: 0, count: 29))
-            if let key = Data31(data) {
-                let value = Data([UInt8(i), UInt8(i + 1), UInt8(i + 2)])
-                stateData[key] = value
-            }
-        }
+        let (genesisBlock, genesisState) = try await createGenesis(config: config)
+        let stateData = try await extractStateData(from: genesisState)
 
         let rocksDB = try await RocksDBBackend(
             path: tempDir.url,
@@ -289,7 +280,8 @@ func rocksdbBenchmarks() {
         )
 
         benchmark.startMeasurement()
-        let results = try await rocksDB.getKeys(prefix: Data([0x00]), count: 100, startKey: nil, blockHash: genesisBlock.hash)
+        // Query all keys with empty prefix to test full key scanning
+        let results = try await rocksDB.getKeys(prefix: Data(), count: 100, startKey: nil, blockHash: genesisBlock.hash)
         benchmark.stopMeasurement()
         blackHole(results)
     }
