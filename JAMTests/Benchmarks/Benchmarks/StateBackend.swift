@@ -280,11 +280,11 @@ func stateBackendBenchmarks() {
         let backend = InMemoryBackend()
         let testData = createTestData(count: 1000)
 
-        // Create mixed operations: writes, ref increments, ref decrements
+        // Create mixed operations: writes, ref updates
         var ops: [StateBackendOperation] = []
         for data in testData {
             ops.append(.write(key: data.key.data, value: data.value))
-            ops.append(.refIncrement(key: data.key.data))
+            ops.append(.refUpdate(key: data.key.data, delta: 1))
         }
 
         benchmark.startMeasurement()

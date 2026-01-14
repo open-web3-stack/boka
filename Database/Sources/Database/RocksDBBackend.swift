@@ -310,31 +310,34 @@ extension RocksDBBackend: StateBackendProtocol {
     public func batchUpdate(_ updates: [StateBackendOperation]) async throws {
         logger.trace("batchUpdate() \(updates.count) operations")
 
-        // CRITICAL TODO: This performs updates sequentially without atomic batch guarantees.
-        // If the process crashes mid-loop, the state will be inconsistent (e.g., trie updated
-        // but ref counts not). This should use RocksDB's WriteBatch atomic operations or
-        // a merge operator for atomic reference count updates. Production safety requires
-        // either: 1) Use db.batch() for atomic commits, 2) Implement crash recovery logic,
-        // or 3) Use a merge operator for read-modify-write operations on ref counts.
-        //
-        // Current workaround: Operations are ordered to minimize inconsistency window
-        // (writes before ref changes), but this is NOT crash-safe.
+        // Phase 1: Separate write operations from ref updates
+        var writeOps: [BatchOperation] = []
+        var refDeltas: [Data: Int64] = [:]
+
         for update in updates {
             switch update {
             case let .write(key, value):
-                try stateTrie.put(key: key, value: value)
+                try writeOps.append(stateTrie.putOperation(key: key, value: value))
             case let .writeRawValue(key, value):
-                try stateValue.put(key: key, value: value)
+                try writeOps.append(stateValue.putOperation(key: key, value: value))
+                // Raw value refs are incremented by 1 on write, so track separately
                 let refCount = try stateRefsRaw.get(key: key) ?? 0
-                try stateRefsRaw.put(key: key, value: refCount + 1)
-            case let .refIncrement(key):
-                let refCount = try stateRefs.get(key: key) ?? 0
-                try stateRefs.put(key: key, value: refCount + 1)
-            case let .refDecrement(key):
-                let refCount = try stateRefs.get(key: key) ?? 0
-                try stateRefs.put(key: key, value: refCount - 1)
+                try writeOps.append(stateRefsRaw.putOperation(key: key, value: refCount + 1))
+            case let .refUpdate(key, delta):
+                // Accumulate deltas to apply in batch
+                refDeltas[key, default: 0] += delta
             }
         }
+
+        // Phase 2: Apply accumulated ref deltas with single read-modify-write per key
+        for (key, delta) in refDeltas {
+            let currentRefCount = try stateRefs.get(key: key) ?? 0
+            let newRefCount = UInt32(Int64(currentRefCount) + delta)
+            try writeOps.append(stateRefs.putOperation(key: key, value: newRefCount))
+        }
+
+        // Phase 3: Execute all operations atomically using db.batch()
+        try db.batch(operations: writeOps)
     }
 
     public func readValue(hash: Data32) async throws -> Data? {

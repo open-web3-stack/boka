@@ -4,8 +4,7 @@ import Utils
 public enum StateBackendOperation: Sendable {
     case write(key: Data, value: Data)
     case writeRawValue(key: Data32, value: Data)
-    case refIncrement(key: Data)
-    case refDecrement(key: Data)
+    case refUpdate(key: Data, delta: Int64) // Apply delta to reference count (can be positive or negative)
 }
 
 public protocol StateBackendIterator: Sendable {

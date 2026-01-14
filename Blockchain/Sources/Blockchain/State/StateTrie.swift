@@ -466,17 +466,9 @@ public actor StateTrie {
             if key == zeros {
                 continue
             }
-            // Emit multiple operations for deltas with magnitude > 1
-            // since each refIncrement/refDecrement only changes count by 1
-            if value > 0 {
-                for _ in 0 ..< value {
-                    ops.append(.refIncrement(key: key.suffix(31)))
-                }
-            } else if value < 0 {
-                for _ in 0 ..< -value {
-                    ops.append(.refDecrement(key: key.suffix(31)))
-                }
-            }
+            // Emit single refUpdate operation with delta
+            // This is much more efficient than unrolling into individual increments/decrements
+            ops.append(.refUpdate(key: key.suffix(31), delta: Int64(value)))
         }
 
         try await backend.batchUpdate(ops)
