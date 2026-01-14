@@ -8,7 +8,7 @@ public final class LRUCache<Key: Hashable, Value> {
     private class CacheNode {
         let key: Key
         var value: Value
-        var previous: CacheNode?
+        weak var previous: CacheNode? // Prevent retain cycle
         var next: CacheNode?
 
         init(key: Key, value: Value) {

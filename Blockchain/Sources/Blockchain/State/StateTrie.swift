@@ -184,15 +184,9 @@ public actor StateTrie {
     }
 
     /// Read a value from the trie
-    /// Phase 2: Flushes write buffer before read to ensure consistency
+    /// Phase 2: Reads from in-memory buffer and backend
+    /// Note: Does not flush write buffer - reads see pending updates via in-memory 'nodes' map
     public func read(key: Data31) async throws -> Data? {
-        // Flush buffer to ensure we read latest data
-        // Note: While StateTrie checks the in-memory 'nodes' map first, flushing ensures
-        // we see all updates including those that might have been partially applied.
-        // This is conservative but ensures correctness. For read-heavy workloads,
-        // consider increasing write buffer size or using separate read/write tries.
-        try await flushWriteBuffer()
-
         let node = try await find(hash: rootHash, key: key, depth: 0)
         guard let node else {
             return nil
