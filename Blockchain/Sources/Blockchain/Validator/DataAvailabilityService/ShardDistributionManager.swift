@@ -257,6 +257,24 @@ public actor ShardDistributionManager {
         throw DataAvailabilityError.retrievalError
     }
 
+    /// Process an incoming audit shard request (CE 138)
+    /// - Parameters:
+    ///   - erasureRoot: The erasure root
+    ///   - shardIndex: The shard index
+    /// - Returns: The bundle shard and justification
+    public func processAuditShardRequest(
+        erasureRoot: Data32,
+        shardIndex: UInt16
+    ) async throws -> (bundleShard: Data, justification: AvailabilityJustification) {
+        // Reuse shardDistribution logic to get the shard and justification
+        let (bundleShard, _, justification) = try await shardDistribution(
+            erasureRoot: erasureRoot,
+            shardIndex: shardIndex
+        )
+
+        return (bundleShard, justification)
+    }
+
     /// Handle incoming audit shard requests
     /// - Parameters:
     ///   - workPackageHash: The hash of the work package
@@ -327,6 +345,76 @@ public actor ShardDistributionManager {
         // This requires network layer integration
         // Note: Implement CE 139→140 fallback pattern in NetworkManager
         throw DataAvailabilityError.retrievalError
+    }
+
+    /// Process an incoming segment shard request (CE 139/140)
+    /// - Parameters:
+    ///   - erasureRoot: The erasure root
+    ///   - shardIndex: The shard index
+    ///   - segmentIndices: The segment indices to fetch
+    /// - Returns: The requested segment shards with justifications
+    public func processSegmentShardRequest(
+        erasureRoot: Data32,
+        shardIndex: UInt16,
+        segmentIndices: [UInt16]
+    ) async throws -> [SegmentShard] {
+        // 1. Get the full shard and base justification
+        let (bundleShard, segmentShards, baseJustification) = try await shardDistribution(
+            erasureRoot: erasureRoot,
+            shardIndex: shardIndex
+        )
+
+        // 2. Extract requested segment shards and generate their justifications
+        var result: [SegmentShard] = []
+
+        // We need the bundle shard hash for segment justification
+        let bundleShardHash = bundleShard.blake2b256hash()
+
+        // We need base justification steps
+        guard case let .copath(baseSteps) = baseJustification else {
+            // If base justification is not copath, we might have a problem or it's a trivial case
+            // For now assume copath
+            throw DataAvailabilityError.invalidJustificationFormat
+        }
+
+        // Get D3L metadata for segments root
+        guard let ecStore = erasureCodingDataStore,
+              let d3lMetadata = try await ecStore.getD3LEntry(erasureRoot: erasureRoot)
+        else {
+            throw DataAvailabilityError.segmentsRootMappingNotFound
+        }
+
+        for segmentIndex in segmentIndices {
+            // Find the segment shard for this segment index
+            guard Int(segmentIndex) < segmentShards.count else {
+                throw DataAvailabilityError.invalidSegmentIndex
+            }
+
+            let shardData = segmentShards[Int(segmentIndex)]
+
+            let steps = try await erasureCodingService.generateSegmentJustification(
+                segmentIndex: segmentIndex,
+                bundleShardHash: bundleShardHash,
+                shardIndex: shardIndex,
+                segmentsRoot: d3lMetadata.segmentsRoot,
+                shards: segmentShards,
+                baseJustification: baseSteps
+            )
+
+            // Convert steps to JustificationStep
+            let justificationSteps = steps.map { step -> JustificationStep in
+                switch step {
+                case let .left(hash): .left(hash)
+                case let .right(hash): .right(hash)
+                }
+            }
+
+            let justification = Justification.copath(justificationSteps)
+
+            result.append(SegmentShard(shard: shardData, justification: justification))
+        }
+
+        return result
     }
 
     /// Handle incoming segment shard requests

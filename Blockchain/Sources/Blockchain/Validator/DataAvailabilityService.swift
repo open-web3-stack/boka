@@ -173,26 +173,50 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
     public func handleAuditShardRequestReceived(_ event: RuntimeEvents.AuditShardRequestReceived) async {
         let requestId = (try? event.generateRequestId()) ?? Data32()
-        // For now, return an error response - this feature is not yet fully implemented
-        let error = DataAvailabilityError.retrievalError
-        logger.error("Failed to handle audit shard request: \(error)")
-        // Publish error response so the protocol handler doesn't timeout
-        publish(RuntimeEvents.AuditShardRequestReceivedResponse(
-            requestId: requestId,
-            error: error
-        ))
+        do {
+            let (bundleShard, justification) = try await shardDistributionManager.processAuditShardRequest(
+                erasureRoot: event.erasureRoot,
+                shardIndex: event.shardIndex
+            )
+
+            publish(RuntimeEvents.AuditShardRequestReceivedResponse(
+                requestId: requestId,
+                erasureRoot: event.erasureRoot,
+                shardIndex: event.shardIndex,
+                bundleShard: bundleShard,
+                justification: justification
+            ))
+        } catch {
+            logger.error("Failed to handle audit shard request: \(error)")
+            // Publish error response so the protocol handler doesn't timeout
+            publish(RuntimeEvents.AuditShardRequestReceivedResponse(
+                requestId: requestId,
+                error: error
+            ))
+        }
     }
 
     public func handleSegmentShardRequestReceived(_ event: RuntimeEvents.SegmentShardRequestReceived) async {
         let requestId = (try? event.generateRequestId()) ?? Data32()
-        // For now, return an error response - this feature is not yet fully implemented
-        let error = DataAvailabilityError.retrievalError
-        logger.error("Failed to handle segment shard request: \(error)")
-        // Publish error response so the protocol handler doesn't timeout
-        publish(RuntimeEvents.SegmentShardRequestReceivedResponse(
-            requestId: requestId,
-            error: error
-        ))
+        do {
+            let segments = try await shardDistributionManager.processSegmentShardRequest(
+                erasureRoot: event.erasureRoot,
+                shardIndex: event.shardIndex,
+                segmentIndices: event.segmentIndices
+            )
+
+            publish(RuntimeEvents.SegmentShardRequestReceivedResponse(
+                requestId: requestId,
+                segments: segments
+            ))
+        } catch {
+            logger.error("Failed to handle segment shard request: \(error)")
+            // Publish error response so the protocol handler doesn't timeout
+            publish(RuntimeEvents.SegmentShardRequestReceivedResponse(
+                requestId: requestId,
+                error: error
+            ))
+        }
     }
 
     /// Purge old data from the data availability stores
