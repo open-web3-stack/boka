@@ -4,10 +4,10 @@ import Utils
 
 private let logger = Logger(label: "StateTrie")
 
-private enum TrieNodeType {
-    case branch
-    case embeddedLeaf
-    case regularLeaf
+private enum TrieNodeType: UInt8 {
+    case branch = 0
+    case embeddedLeaf = 1
+    case regularLeaf = 2
 }
 
 private struct TrieNode {
@@ -17,40 +17,28 @@ private struct TrieNode {
     let type: TrieNodeType
     let isNew: Bool
     let rawValue: Data?
-    let hashVersion: UInt64 // Track hash version for cache invalidation
 
     // Constructor for loading from storage (65-byte format: [type][left-32][right-32])
-    init(hash: Data32, data: Data, isNew: Bool = false, hashVersion: UInt64 = 0) {
+    init(hash: Data32, data: Data, isNew: Bool = false) {
         self.hash = hash
         self.isNew = isNew
-        self.hashVersion = hashVersion
         rawValue = nil
 
         let typeByte = data[relative: 0]
-        switch typeByte {
-        case 0:
-            type = .branch
-        case 1:
-            type = .embeddedLeaf
-        case 2:
-            type = .regularLeaf
-        default:
-            type = .branch
-        }
+        type = TrieNodeType(rawValue: typeByte) ?? .branch
 
         left = Data32(data[relative: 1 ..< 33])! // bytes 1-32
         right = Data32(data[relative: 33 ..< 65])! // bytes 33-64
     }
 
     // Constructor for pure trie operations
-    private init(left: Data32, right: Data32, type: TrieNodeType, isNew: Bool, rawValue: Data?, hashVersion: UInt64 = 0) {
+    private init(left: Data32, right: Data32, type: TrieNodeType, isNew: Bool, rawValue: Data?) {
         hash = Self.calculateHash(left: left, right: right, type: type)
         self.left = left // Store original data
         self.right = right // Store original data
         self.type = type
         self.isNew = isNew
         self.rawValue = rawValue
-        self.hashVersion = hashVersion
     }
 
     // JAM spec compliant hash calculation
@@ -75,16 +63,9 @@ private struct TrieNode {
     // New 65-byte storage format: [type:1][left:32][right:32]
     var storageData: Data {
         var data = Data(capacity: 65)
-
-        switch type {
-        case .branch: data.append(0)
-        case .embeddedLeaf: data.append(1)
-        case .regularLeaf: data.append(2)
-        }
-
+        data.append(type.rawValue)
         data.append(left.data)
         data.append(right.data)
-
         return data
     }
 
@@ -108,8 +89,9 @@ private struct TrieNode {
             return nil
         }
         // For embedded leaves: length is stored in first byte
-        let len = left.data[relative: 0]
-        return right.data[relative: 0 ..< Int(len)]
+        let len = Int(left.data[relative: 0])
+        let safeLen = min(len, 32)
+        return right.data[relative: 0 ..< safeLen]
     }
 
     static func leaf(key: Data31, value: Data) -> TrieNode {
@@ -154,9 +136,6 @@ public actor StateTrie {
     private let writeBuffer: WriteBuffer?
     private let enableWriteBuffer: Bool
 
-    // Performance optimization: Node pooling to reduce allocation overhead (Phase 2 Week 5)
-    private let nodePool: NodePool?
-
     public init(
         rootHash: Data32,
         backend: StateBackendProtocol,
@@ -164,8 +143,7 @@ public actor StateTrie {
         cacheSize: Int = 1000,
         enableWriteBuffer: Bool = true,
         writeBufferSize: Int = 1000,
-        writeBufferFlushInterval: TimeInterval = 1.0,
-        enableNodePool: Bool = true
+        writeBufferFlushInterval: TimeInterval = 1.0
     ) {
         self.rootHash = rootHash
         self.backend = backend
@@ -177,7 +155,6 @@ public actor StateTrie {
             maxBufferSize: writeBufferSize,
             flushInterval: writeBufferFlushInterval
         ) : nil
-        nodePool = enableNodePool ? NodePool() : nil
     }
 
     /// Read a value from the trie
@@ -232,7 +209,7 @@ public actor StateTrie {
         guard let node = try await get(hash: hash, bypassCache: true) else { return nil }
 
         if node.isBranch {
-            let bitValue = bitAt(prefix, position: depth)
+            let bitValue = Self.bitAt(prefix, position: depth)
             let childHash = bitValue ? node.right : node.left
             return try await findByPrefix(hash: childHash, prefix: prefix, bitsCount: bitsCount, depth: depth + 1)
         } else {
@@ -264,14 +241,11 @@ public actor StateTrie {
         if node.isBranch {
             var result: [Data31] = []
 
-            // Parallel async: Load both children concurrently
-            async let leftTask = get(hash: node.left, bypassCache: true)
-            async let rightTask = get(hash: node.right, bypassCache: true)
-
-            if let leftNode = try await leftTask {
+            // Sequential processing to prevent task explosion
+            if let leftNode = try await get(hash: node.left, bypassCache: true) {
                 result += try await getLeaves(node: leftNode)
             }
-            if let rightNode = try await rightTask {
+            if let rightNode = try await get(hash: node.right, bypassCache: true) {
                 result += try await getLeaves(node: rightNode)
             }
             return result
@@ -287,14 +261,11 @@ public actor StateTrie {
         if node.isBranch {
             var result: [(key: Data31, value: Data)] = []
 
-            // Parallel async: Load both children concurrently
-            async let leftTask = get(hash: node.left, bypassCache: true)
-            async let rightTask = get(hash: node.right, bypassCache: true)
-
-            if let leftNode = try await leftTask {
+            // Sequential processing to prevent task explosion
+            if let leftNode = try await get(hash: node.left, bypassCache: true) {
                 result += try await getLeavesValues(node: leftNode)
             }
-            if let rightNode = try await rightTask {
+            if let rightNode = try await get(hash: node.right, bypassCache: true) {
                 result += try await getLeavesValues(node: rightNode)
             }
             return result
@@ -324,7 +295,7 @@ public actor StateTrie {
             return nil
         }
         if node.isBranch {
-            let bitValue = bitAt(key.data, position: depth)
+            let bitValue = Self.bitAt(key.data, position: depth)
             if bitValue {
                 return try await find(hash: node.right, key: key, depth: depth + 1)
             } else {
@@ -351,8 +322,8 @@ public actor StateTrie {
             if prefetchSiblings, node.isBranch {
                 // Prefetch both children asynchronously (don't await)
                 Task {
-                    _ = try? await get(hash: node.left, bypassCache: true, prefetchSiblings: false)
-                    _ = try? await get(hash: node.right, bypassCache: true, prefetchSiblings: false)
+                    _ = try? await get(hash: node.left, bypassCache: false, prefetchSiblings: false)
+                    _ = try? await get(hash: node.right, bypassCache: false, prefetchSiblings: false)
                 }
             }
             return node
@@ -365,8 +336,8 @@ public actor StateTrie {
             if prefetchSiblings, cachedNode.isBranch {
                 // Prefetch both children asynchronously (don't await)
                 Task {
-                    _ = try? await get(hash: cachedNode.left, bypassCache: true, prefetchSiblings: false)
-                    _ = try? await get(hash: cachedNode.right, bypassCache: true, prefetchSiblings: false)
+                    _ = try? await get(hash: cachedNode.left, bypassCache: false, prefetchSiblings: false)
+                    _ = try? await get(hash: cachedNode.right, bypassCache: false, prefetchSiblings: false)
                 }
             }
             return cachedNode
@@ -396,91 +367,14 @@ public actor StateTrie {
         if prefetchSiblings, node.isBranch {
             // Prefetch both children asynchronously (don't await)
             Task {
-                _ = try? await get(hash: node.left, bypassCache: true, prefetchSiblings: false)
-                _ = try? await get(hash: node.right, bypassCache: true, prefetchSiblings: false)
+                _ = try? await get(hash: node.left, bypassCache: false, prefetchSiblings: false)
+                _ = try? await get(hash: node.right, bypassCache: false, prefetchSiblings: false)
             }
         }
 
         // Don't save loaded nodes to nodes map - they're already persisted
         // and don't need ref count updates (only new nodes do)
         return node
-    }
-
-    /// Load multiple nodes in a single batch operation
-    /// Phase 2 Week 3: Batch node loading optimization
-    /// - Parameter hashes: List of node hashes to load
-    /// - Returns: Dictionary mapping hashes to their TrieNodes
-    /// - Note: Missing hashes are omitted from result (not an error)
-    private func batchGet(hashes: [Data32], bypassCache: Bool = false) async throws -> [Data32: TrieNode] {
-        var result: [Data32: TrieNode] = [:]
-        var keysToLoad: [Data] = []
-        var hashesByKey: [Data: Data32] = [:]
-
-        // Check in-memory nodes and cache first
-        for hash in hashes {
-            if hash == Data32() {
-                continue
-            }
-            let id = hash.data.suffix(31)
-
-            // Skip deleted nodes
-            if deleted.contains(id) {
-                continue
-            }
-
-            // Check in-memory nodes first (current operation)
-            if let node = nodes[id] {
-                result[hash] = node
-                continue
-            }
-
-            // Check LRU cache for previously loaded nodes (unless bypassed)
-            if !bypassCache, let cache = nodeCache, let cachedNode = cache.get(id) {
-                cacheStats?.recordHit()
-                result[hash] = cachedNode
-                continue
-            }
-
-            // Mark for batch loading from backend
-            keysToLoad.append(id)
-            hashesByKey[id] = hash
-        }
-
-        // Batch load from backend if there are keys to load
-        if !keysToLoad.isEmpty {
-            let batchData = try await backend.batchRead(keys: keysToLoad)
-
-            // Process batch results
-            for (key, data) in batchData {
-                guard data.count == 65 else {
-                    throw StateTrieError.invalidData
-                }
-
-                // Get the original hash from our mapping
-                guard let hash = hashesByKey[key] else {
-                    continue
-                }
-
-                let node = TrieNode(hash: hash, data: data)
-
-                // Cache the node for future access
-                if let cache = nodeCache {
-                    cache.put(key, value: node)
-                }
-
-                result[hash] = node
-            }
-
-            // Record cache misses for keys we tried to load
-            if !bypassCache {
-                let missCount = keysToLoad.count - batchData.count
-                for _ in 0 ..< missCount {
-                    cacheStats?.recordMiss()
-                }
-            }
-        }
-
-        return result
     }
 
     /// Update trie with multiple key-value pairs
@@ -663,7 +557,7 @@ public actor StateTrie {
         if parent.isBranch {
             removeNode(hash: hash)
 
-            let bitValue = bitAt(key.data, position: depth)
+            let bitValue = Self.bitAt(key.data, position: depth)
             var left = parent.left
             var right = parent.right
             if bitValue {
@@ -688,8 +582,8 @@ public actor StateTrie {
             return newLeaf.hash
         }
 
-        let existingKeyBit = bitAt(existing.left.data[relative: 1...], position: depth)
-        let newKeyBit = bitAt(newKey.data, position: depth)
+        let existingKeyBit = Self.bitAt(existing.left.data[relative: 1...], position: depth)
+        let newKeyBit = Self.bitAt(newKey.data, position: depth)
 
         if existingKeyBit == newKeyBit {
             // need to go deeper
@@ -725,7 +619,7 @@ public actor StateTrie {
         if node.isBranch {
             removeNode(hash: hash)
 
-            let bitValue = bitAt(key.data, position: depth)
+            let bitValue = Self.bitAt(key.data, position: depth)
             var left = node.left
             var right = node.right
 
@@ -825,46 +719,12 @@ public actor StateTrie {
         logger.info("Root hash: \(rootHash.toHexString())")
         try await printNode(rootHash, depth: 0)
     }
-}
 
-/// Node allocation statistics for monitoring
-/// Phase 2 Week 5: Track node allocation patterns
-private actor NodePool {
-    /// Statistics for monitoring node allocations
-    private var branchAllocations: Int = 0
-    private var leafAllocations: Int = 0
-
-    init() {}
-
-    /// Record a branch node allocation
-    func recordBranchAllocation() {
-        branchAllocations += 1
+    /// bit at i, returns true if it is 1
+    private static func bitAt(_ data: Data, position: UInt8) -> Bool {
+        let byteIndex = position / 8
+        let bitIndex = 7 - (position % 8)
+        let byte = data[safeRelative: Int(byteIndex)] ?? 0
+        return (byte & (1 << bitIndex)) != 0
     }
-
-    /// Record a leaf node allocation
-    func recordLeafAllocation() {
-        leafAllocations += 1
-    }
-
-    /// Get allocation statistics
-    func getStats() -> (branchAllocations: Int, leafAllocations: Int) {
-        (
-            branchAllocations: branchAllocations,
-            leafAllocations: leafAllocations
-        )
-    }
-
-    /// Reset statistics
-    func reset() {
-        branchAllocations = 0
-        leafAllocations = 0
-    }
-}
-
-/// bit at i, returns true if it is 1
-private func bitAt(_ data: Data, position: UInt8) -> Bool {
-    let byteIndex = position / 8
-    let bitIndex = 7 - (position % 8)
-    let byte = data[safeRelative: Int(byteIndex)] ?? 0
-    return (byte & (1 << bitIndex)) != 0
 }
