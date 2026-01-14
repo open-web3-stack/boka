@@ -258,10 +258,15 @@ public actor StateTrie {
     private func getLeaves(node: TrieNode) async throws -> [Data31] {
         if node.isBranch {
             var result: [Data31] = []
-            if let leftNode = try await get(hash: node.left, bypassCache: true) {
+
+            // Parallel async: Load both children concurrently
+            async let leftTask = get(hash: node.left, bypassCache: true)
+            async let rightTask = get(hash: node.right, bypassCache: true)
+
+            if let leftNode = try await leftTask {
                 result += try await getLeaves(node: leftNode)
             }
-            if let rightNode = try await get(hash: node.right, bypassCache: true) {
+            if let rightNode = try await rightTask {
                 result += try await getLeaves(node: rightNode)
             }
             return result
@@ -276,10 +281,15 @@ public actor StateTrie {
     private func getLeavesValues(node: TrieNode) async throws -> [(key: Data31, value: Data)] {
         if node.isBranch {
             var result: [(key: Data31, value: Data)] = []
-            if let leftNode = try await get(hash: node.left, bypassCache: true) {
+
+            // Parallel async: Load both children concurrently
+            async let leftTask = get(hash: node.left, bypassCache: true)
+            async let rightTask = get(hash: node.right, bypassCache: true)
+
+            if let leftNode = try await leftTask {
                 result += try await getLeavesValues(node: leftNode)
             }
-            if let rightNode = try await get(hash: node.right, bypassCache: true) {
+            if let rightNode = try await rightTask {
                 result += try await getLeavesValues(node: rightNode)
             }
             return result
