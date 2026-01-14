@@ -161,7 +161,7 @@ public enum ErasureCoding {
                 reed_solomon_encode(
                     originalBuffer.baseAddress,
                     UInt(originalCount),
-                    UInt(recoveryCount), // FFI expects total shard count, not just parity
+                    UInt(parityCount), // Number of parity shards to generate
                     UInt(shardSize),
                     recoveryBuffer.baseAddress
                 )
@@ -210,14 +210,14 @@ public enum ErasureCoding {
                 continue
             }
 
-            // Parity shard: use absolute index (not relative)
-            // FFI expects absolute indices: 0..(originalCount-1) for original,
-            // originalCount..(recoveryCount-1) for parity
-            guard rawIndex < UInt32(recoveryCount) else {
+            // Parity shard: convert to relative index for FFI
+            // FFI expects parity shards to be indexed 0..(parityCount-1)
+            let parityIndex = rawIndex - UInt32(originalCount)
+            guard parityIndex < UInt32(parityCount) else {
                 throw Error.invalidShardIndex(rawIndex)
             }
 
-            try parityShards.append(InnerShard(data: data, index: rawIndex))
+            try parityShards.append(InnerShard(data: data, index: parityIndex))
         }
 
         // output original shards
@@ -263,7 +263,7 @@ public enum ErasureCoding {
                 originalPtrs.withUnsafeMutableBufferPointer { outputBuffer in
                     reed_solomon_recovery(
                         UInt(originalCount),
-                        UInt(recoveryCount), // FFI expects total shard count, not just parity
+                        UInt(parityCount), // Number of parity shards available
                         originalBuffer.baseAddress,
                         UInt(originalOpaquePtrs.count),
                         recoveryBuffer.baseAddress,
