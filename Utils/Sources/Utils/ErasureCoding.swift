@@ -210,17 +210,14 @@ public enum ErasureCoding {
                 continue
             }
 
-            let parityIndex: UInt32 = if rawIndex >= UInt32(originalCount) {
-                rawIndex - UInt32(originalCount)
-            } else {
-                rawIndex
-            }
-
-            guard parityIndex < UInt32(parityCount) else {
+            // Parity shard: use absolute index (not relative)
+            // FFI expects absolute indices: 0..(originalCount-1) for original,
+            // originalCount..(recoveryCount-1) for parity
+            guard rawIndex < UInt32(recoveryCount) else {
                 throw Error.invalidShardIndex(rawIndex)
             }
 
-            try parityShards.append(InnerShard(data: data, index: parityIndex))
+            try parityShards.append(InnerShard(data: data, index: rawIndex))
         }
 
         // output original shards

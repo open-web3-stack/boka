@@ -465,7 +465,7 @@ public actor StateTrie {
 
         nodes.removeAll()
 
-        let zeros = Data(repeating: 0, count: 32)
+        let zeros = Data(repeating: 0, count: 31) // Keys are 31 bytes (suffix of Data32)
         for (key, value) in refChanges {
             if key == zeros {
                 continue

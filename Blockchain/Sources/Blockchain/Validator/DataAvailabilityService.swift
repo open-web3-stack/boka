@@ -66,7 +66,6 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     ) async {
         self.dataProvider = dataProvider
         self.dataStore = dataStore
-        self.networkClient = networkClient
 
         // Initialize helper services
         shardManager = ShardManager(erasureCodingDataStore: erasureCodingDataStore)
