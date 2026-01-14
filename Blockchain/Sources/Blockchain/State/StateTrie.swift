@@ -376,6 +376,83 @@ public actor StateTrie {
         return node
     }
 
+    /// Load multiple nodes in a single batch operation
+    /// Phase 2 Week 3: Batch node loading optimization
+    /// - Parameter hashes: List of node hashes to load
+    /// - Returns: Dictionary mapping hashes to their TrieNodes
+    /// - Note: Missing hashes are omitted from result (not an error)
+    private func batchGet(hashes: [Data32], bypassCache: Bool = false) async throws -> [Data32: TrieNode] {
+        var result: [Data32: TrieNode] = [:]
+        var keysToLoad: [Data] = []
+        var hashesByKey: [Data: Data32] = [:]
+
+        // Check in-memory nodes and cache first
+        for hash in hashes {
+            if hash == Data32() {
+                continue
+            }
+            let id = hash.data.suffix(31)
+
+            // Skip deleted nodes
+            if deleted.contains(id) {
+                continue
+            }
+
+            // Check in-memory nodes first (current operation)
+            if let node = nodes[id] {
+                result[hash] = node
+                continue
+            }
+
+            // Check LRU cache for previously loaded nodes (unless bypassed)
+            if !bypassCache, let cache = nodeCache, let cachedNode = cache.get(id) {
+                cacheStats?.recordHit()
+                result[hash] = cachedNode
+                continue
+            }
+
+            // Mark for batch loading from backend
+            keysToLoad.append(id)
+            hashesByKey[id] = hash
+        }
+
+        // Batch load from backend if there are keys to load
+        if !keysToLoad.isEmpty {
+            let batchData = try await backend.batchRead(keys: keysToLoad)
+
+            // Process batch results
+            for (key, data) in batchData {
+                guard data.count == 65 else {
+                    throw StateTrieError.invalidData
+                }
+
+                // Get the original hash from our mapping
+                guard let hash = hashesByKey[key] else {
+                    continue
+                }
+
+                let node = TrieNode(hash: hash, data: data)
+
+                // Cache the node for future access
+                if let cache = nodeCache {
+                    cache.put(key, value: node)
+                }
+
+                result[hash] = node
+            }
+
+            // Record cache misses for keys we tried to load
+            if !bypassCache {
+                let missCount = keysToLoad.count - batchData.count
+                for _ in 0 ..< missCount {
+                    cacheStats?.recordMiss()
+                }
+            }
+        }
+
+        return result
+    }
+
     /// Update trie with multiple key-value pairs
     /// Performance optimizations:
     /// - Write buffering: Phase 2 - Buffer updates before batch I/O
