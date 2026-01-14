@@ -12,7 +12,7 @@ public final class WriteBuffer {
     // Configuration
     private let maxBufferSize: Int
     private let flushInterval: TimeInterval
-    private var lastFlush: Date = .init()
+    private var lastFlushTime: DispatchTime // Use monotonic clock
 
     // Statistics
     private var totalUpdates: Int = 0
@@ -27,6 +27,7 @@ public final class WriteBuffer {
     public init(maxBufferSize: Int = 1000, flushInterval: TimeInterval = 1.0) {
         self.maxBufferSize = max(1, maxBufferSize)
         self.flushInterval = max(0.1, flushInterval)
+        lastFlushTime = .now()
     }
 
     /// Add an update to the buffer
@@ -40,8 +41,7 @@ public final class WriteBuffer {
         totalUpdates += 1
 
         // Check if we should auto-flush
-        let shouldFlush = count >= maxBufferSize ||
-            Date().timeIntervalSince(lastFlush) >= flushInterval
+        let shouldFlush = count >= maxBufferSize || shouldFlushByTime
 
         if shouldFlush {
             autoFlushes += 1
@@ -56,7 +56,7 @@ public final class WriteBuffer {
     public func flush() -> Bool {
         let wasNotEmpty = count > 0
         count = 0
-        lastFlush = Date()
+        lastFlushTime = .now()
         if wasNotEmpty {
             totalFlushes += 1
             manualFlushes += 1
@@ -81,7 +81,8 @@ public final class WriteBuffer {
 
     /// Check if buffer should be flushed based on time
     public var shouldFlushByTime: Bool {
-        Date().timeIntervalSince(lastFlush) >= flushInterval
+        let elapsed = lastFlushTime.upstreamTimeIntervalSinceNow
+        return -elapsed >= flushInterval
     }
 
     /// Check if buffer should be flushed based on size
@@ -108,13 +109,13 @@ public final class WriteBuffer {
         totalFlushes = 0
         autoFlushes = 0
         manualFlushes = 0
-        lastFlush = Date()
+        lastFlushTime = .now()
     }
 
     /// Clear buffer without flushing
     public func clear() {
         count = 0
-        lastFlush = Date()
+        lastFlushTime = .now()
     }
 }
 

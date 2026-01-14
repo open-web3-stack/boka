@@ -154,10 +154,6 @@ public actor StateTrie {
     private let writeBuffer: WriteBuffer?
     private let enableWriteBuffer: Bool
 
-    // Performance optimization: Parallel hash computation for batch operations
-    private let enableParallelHash: Bool
-    private let maxParallelism: Int
-
     public init(
         rootHash: Data32,
         backend: StateBackendProtocol,
@@ -165,9 +161,7 @@ public actor StateTrie {
         cacheSize: Int = 1000,
         enableWriteBuffer: Bool = true,
         writeBufferSize: Int = 1000,
-        writeBufferFlushInterval: TimeInterval = 1.0,
-        enableParallelHash: Bool = true,
-        maxParallelism: Int = ProcessInfo.processInfo.processorCount
+        writeBufferFlushInterval: TimeInterval = 1.0
     ) {
         self.rootHash = rootHash
         self.backend = backend
@@ -179,8 +173,6 @@ public actor StateTrie {
             maxBufferSize: writeBufferSize,
             flushInterval: writeBufferFlushInterval
         ) : nil
-        self.enableParallelHash = enableParallelHash
-        self.maxParallelism = maxParallelism
     }
 
     /// Read a value from the trie

@@ -237,12 +237,30 @@ extension RocksDBBackend: BlockchainDataProviderProtocol {
 
         try operations.append(blocks.deleteOperation(key: hash))
 
+        // Update timeslot index - remove hash from set
         if let block = try await getBlock(hash: hash) {
-            try operations.append(blockHashByTimeslot.deleteOperation(key: block.header.timeslot))
+            var timeslotHashes = try await getBlockHash(byTimeslot: block.header.timeslot)
+            timeslotHashes.remove(hash)
+            if timeslotHashes.isEmpty {
+                // Delete the index entry if no more blocks at this timeslot
+                try operations.append(blockHashByTimeslot.deleteOperation(key: block.header.timeslot))
+            } else {
+                // Update the set with remaining hashes
+                try operations.append(blockHashByTimeslot.putOperation(key: block.header.timeslot, value: timeslotHashes))
+            }
         }
 
+        // Update number index - remove hash from set
         if let blockNumber = try await getBlockNumber(hash: hash) {
-            try operations.append(blockHashByNumber.deleteOperation(key: blockNumber))
+            var numberHashes = try await getBlockHash(byNumber: blockNumber)
+            numberHashes.remove(hash)
+            if numberHashes.isEmpty {
+                // Delete the index entry if no more blocks at this number
+                try operations.append(blockHashByNumber.deleteOperation(key: blockNumber))
+            } else {
+                // Update the set with remaining hashes
+                try operations.append(blockHashByNumber.putOperation(key: blockNumber, value: numberHashes))
+            }
         }
 
         try operations.append(blockNumberByHash.deleteOperation(key: hash))

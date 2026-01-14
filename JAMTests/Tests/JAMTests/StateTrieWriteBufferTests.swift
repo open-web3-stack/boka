@@ -81,7 +81,7 @@ struct StateTrieWriteBufferIntegrationTests {
             (makeKey(1), "test".data(using: .utf8)!),
         ])
 
-        // Read should still return the value (buffer was auto-flushed)
+        // Read should still return the value (read sees in-memory updates, no flush needed)
         let result = try await trie.read(key: makeKey(1))
         #expect(result == "test".data(using: .utf8)!)
     }
@@ -236,7 +236,7 @@ struct StateTrieWriteBufferIntegrationTests {
             (key1, "value1".data(using: .utf8)!),
         ])
 
-        // Read (should trigger flush)
+        // Read (sees in-memory updates, no flush needed)
         let result1 = try await trie.read(key: key1)
         #expect(result1 == "value1".data(using: .utf8)!)
 
@@ -245,7 +245,7 @@ struct StateTrieWriteBufferIntegrationTests {
             (key2, "value2".data(using: .utf8)!),
         ])
 
-        // Read both
+        // Read both (reads see in-memory updates)
         let result2 = try await trie.read(key: key1)
         let result3 = try await trie.read(key: key2)
 
