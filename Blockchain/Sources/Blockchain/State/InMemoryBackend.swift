@@ -58,6 +58,17 @@ public actor InMemoryBackend: StateBackendProtocol {
         rawValues[hash]
     }
 
+    public func batchRead(keys: [Data]) async throws -> [Data: Data] {
+        var result: [Data: Data] = [:]
+        // In-memory implementation: direct dictionary lookup
+        for key in keys {
+            if let value = store[key] {
+                result[key] = value
+            }
+        }
+        return result
+    }
+
     public func gc(callback: @Sendable (Data) -> Data32?) async throws {
         // check ref counts and remove keys with 0 ref count
         var keysToRemove: [Data] = []
