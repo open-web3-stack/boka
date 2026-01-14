@@ -154,6 +154,9 @@ public actor StateTrie {
     private let writeBuffer: WriteBuffer?
     private let enableWriteBuffer: Bool
 
+    // Performance optimization: Node pooling to reduce allocation overhead (Phase 2 Week 5)
+    private let nodePool: NodePool?
+
     public init(
         rootHash: Data32,
         backend: StateBackendProtocol,
@@ -161,7 +164,8 @@ public actor StateTrie {
         cacheSize: Int = 1000,
         enableWriteBuffer: Bool = true,
         writeBufferSize: Int = 1000,
-        writeBufferFlushInterval: TimeInterval = 1.0
+        writeBufferFlushInterval: TimeInterval = 1.0,
+        enableNodePool: Bool = true
     ) {
         self.rootHash = rootHash
         self.backend = backend
@@ -173,6 +177,7 @@ public actor StateTrie {
             maxBufferSize: writeBufferSize,
             flushInterval: writeBufferFlushInterval
         ) : nil
+        nodePool = enableNodePool ? NodePool() : nil
     }
 
     /// Read a value from the trie
@@ -331,7 +336,7 @@ public actor StateTrie {
         return nil
     }
 
-    private func get(hash: Data32, bypassCache: Bool = false) async throws -> TrieNode? {
+    private func get(hash: Data32, bypassCache: Bool = false, prefetchSiblings: Bool = true) async throws -> TrieNode? {
         if hash == Data32() {
             return nil
         }
@@ -342,12 +347,28 @@ public actor StateTrie {
 
         // Check in-memory nodes first (current operation)
         if let node = nodes[id] {
+            // Phase 2 Week 4: Prefetch siblings when returning cached node
+            if prefetchSiblings, node.isBranch {
+                // Prefetch both children asynchronously (don't await)
+                Task {
+                    _ = try? await get(hash: node.left, bypassCache: true, prefetchSiblings: false)
+                    _ = try? await get(hash: node.right, bypassCache: true, prefetchSiblings: false)
+                }
+            }
             return node
         }
 
         // Check LRU cache for previously loaded nodes (unless bypassed)
         if !bypassCache, let cache = nodeCache, let cachedNode = cache.get(id) {
             cacheStats?.recordHit()
+            // Phase 2 Week 4: Prefetch siblings when returning cached node
+            if prefetchSiblings, cachedNode.isBranch {
+                // Prefetch both children asynchronously (don't await)
+                Task {
+                    _ = try? await get(hash: cachedNode.left, bypassCache: true, prefetchSiblings: false)
+                    _ = try? await get(hash: cachedNode.right, bypassCache: true, prefetchSiblings: false)
+                }
+            }
             return cachedNode
         }
 
@@ -369,6 +390,15 @@ public actor StateTrie {
         // Cache the node for future access
         if let cache = nodeCache {
             cache.put(id, value: node)
+        }
+
+        // Phase 2 Week 4: Prefetch siblings after loading from backend
+        if prefetchSiblings, node.isBranch {
+            // Prefetch both children asynchronously (don't await)
+            Task {
+                _ = try? await get(hash: node.left, bypassCache: true, prefetchSiblings: false)
+                _ = try? await get(hash: node.right, bypassCache: true, prefetchSiblings: false)
+            }
         }
 
         // Don't save loaded nodes to nodes map - they're already persisted
@@ -794,6 +824,40 @@ public actor StateTrie {
 
         logger.info("Root hash: \(rootHash.toHexString())")
         try await printNode(rootHash, depth: 0)
+    }
+}
+
+/// Node allocation statistics for monitoring
+/// Phase 2 Week 5: Track node allocation patterns
+private actor NodePool {
+    /// Statistics for monitoring node allocations
+    private var branchAllocations: Int = 0
+    private var leafAllocations: Int = 0
+
+    init() {}
+
+    /// Record a branch node allocation
+    func recordBranchAllocation() {
+        branchAllocations += 1
+    }
+
+    /// Record a leaf node allocation
+    func recordLeafAllocation() {
+        leafAllocations += 1
+    }
+
+    /// Get allocation statistics
+    func getStats() -> (branchAllocations: Int, leafAllocations: Int) {
+        (
+            branchAllocations: branchAllocations,
+            leafAllocations: leafAllocations
+        )
+    }
+
+    /// Reset statistics
+    func reset() {
+        branchAllocations = 0
+        leafAllocations = 0
     }
 }
 
