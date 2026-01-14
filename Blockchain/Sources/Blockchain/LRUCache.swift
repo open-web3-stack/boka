@@ -172,50 +172,71 @@ public actor LRUCache<Key: Hashable, Value> {
     }
 }
 
-/// Statistics tracking for cache performance
-public actor CacheStatsTracker {
+/// Fast statistics tracking for cache performance
+/// Uses atomic operations for thread-safety without actor isolation overhead
+public class CacheStatsTracker: @unchecked Sendable {
     private var hits: Int = 0
     private var misses: Int = 0
     private var evictions: Int = 0
+    private let lock = NSLock()
 
     public func recordHit() {
+        lock.lock()
         hits += 1
+        lock.unlock()
     }
 
     public func recordMiss() {
+        lock.lock()
         misses += 1
+        lock.unlock()
     }
 
     public func recordEviction() {
+        lock.lock()
         evictions += 1
+        lock.unlock()
     }
 
     public var hitRate: Double {
-        let total = hits + misses
+        lock.lock()
+        let currentHits = hits
+        let currentMisses = misses
+        lock.unlock()
+
+        let total = currentHits + currentMisses
         guard total > 0 else {
             return 0
         }
-        return Double(hits) / Double(total)
+        return Double(currentHits) / Double(total)
     }
 
     public var totalAccesses: Int {
-        hits + misses
+        lock.lock()
+        let total = hits + misses
+        lock.unlock()
+        return total
     }
 
     public func reset() {
+        lock.lock()
         hits = 0
         misses = 0
         evictions = 0
+        lock.unlock()
     }
 
     public var current: CacheStatistics {
-        CacheStatistics(
+        lock.lock()
+        let stats = CacheStatistics(
             hits: hits,
             misses: misses,
             evictions: evictions,
-            hitRate: hitRate,
-            totalAccesses: totalAccesses
+            hitRate: Double(hits) / Double(max(1, hits + misses)),
+            totalAccesses: hits + misses
         )
+        lock.unlock()
+        return stats
     }
 
     public struct CacheStatistics: Sendable {

@@ -199,10 +199,10 @@ public actor StateTrie {
     private func findByPrefix(hash: Data32, prefix: Data, bitsCount: UInt8, depth: UInt8) async throws -> TrieNode? {
         guard depth < bitsCount else {
             // Reached the end of prefix, return this node
-            return try await get(hash: hash)
+            return try await get(hash: hash, bypassCache: true)
         }
 
-        guard let node = try await get(hash: hash) else { return nil }
+        guard let node = try await get(hash: hash, bypassCache: true) else { return nil }
 
         if node.isBranch {
             let bitValue = bitAt(prefix, position: depth)
@@ -236,10 +236,10 @@ public actor StateTrie {
     private func getLeaves(node: TrieNode) async throws -> [Data31] {
         if node.isBranch {
             var result: [Data31] = []
-            if let leftNode = try await get(hash: node.left) {
+            if let leftNode = try await get(hash: node.left, bypassCache: true) {
                 result += try await getLeaves(node: leftNode)
             }
-            if let rightNode = try await get(hash: node.right) {
+            if let rightNode = try await get(hash: node.right, bypassCache: true) {
                 result += try await getLeaves(node: rightNode)
             }
             return result
@@ -254,10 +254,10 @@ public actor StateTrie {
     private func getLeavesValues(node: TrieNode) async throws -> [(key: Data31, value: Data)] {
         if node.isBranch {
             var result: [(key: Data31, value: Data)] = []
-            if let leftNode = try await get(hash: node.left) {
+            if let leftNode = try await get(hash: node.left, bypassCache: true) {
                 result += try await getLeavesValues(node: leftNode)
             }
-            if let rightNode = try await get(hash: node.right) {
+            if let rightNode = try await get(hash: node.right, bypassCache: true) {
                 result += try await getLeavesValues(node: rightNode)
             }
             return result
@@ -299,7 +299,7 @@ public actor StateTrie {
         return nil
     }
 
-    private func get(hash: Data32) async throws -> TrieNode? {
+    private func get(hash: Data32, bypassCache: Bool = false) async throws -> TrieNode? {
         if hash == Data32() {
             return nil
         }
@@ -313,18 +313,22 @@ public actor StateTrie {
             return node
         }
 
-        // Check LRU cache for previously loaded nodes
-        if let cache = nodeCache, let cachedNode = await cache.get(id) {
-            await cacheStats?.recordHit()
+        // Check LRU cache for previously loaded nodes (unless bypassed)
+        if !bypassCache, let cache = nodeCache, let cachedNode = await cache.get(id) {
+            cacheStats?.recordHit()
             return cachedNode
         }
 
         // Load from backend
         guard let data = try await backend.read(key: id) else {
-            await cacheStats?.recordMiss()
+            if !bypassCache {
+                cacheStats?.recordMiss()
+            }
             return nil
         }
-        await cacheStats?.recordMiss()
+        if !bypassCache {
+            cacheStats?.recordMiss()
+        }
         guard data.count == 65 else {
             throw StateTrieError.invalidData
         }
@@ -421,13 +425,13 @@ public actor StateTrie {
         guard let stats = cacheStats else {
             return nil
         }
-        return await stats.current
+        return stats.current
     }
 
     /// Clear the LRU cache (useful for testing or memory management)
     public func clearCache() async {
         await nodeCache?.removeAll()
-        await cacheStats?.reset()
+        cacheStats?.reset()
     }
 
     private func insert(
