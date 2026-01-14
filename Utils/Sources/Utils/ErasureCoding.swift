@@ -161,7 +161,7 @@ public enum ErasureCoding {
                 reed_solomon_encode(
                     originalBuffer.baseAddress,
                     UInt(originalCount),
-                    UInt(parityCount),
+                    UInt(recoveryCount), // FFI expects total shard count, not just parity
                     UInt(shardSize),
                     recoveryBuffer.baseAddress
                 )
@@ -266,7 +266,7 @@ public enum ErasureCoding {
                 originalPtrs.withUnsafeMutableBufferPointer { outputBuffer in
                     reed_solomon_recovery(
                         UInt(originalCount),
-                        UInt(parityCount),
+                        UInt(recoveryCount), // FFI expects total shard count, not just parity
                         originalBuffer.baseAddress,
                         UInt(originalOpaquePtrs.count),
                         recoveryBuffer.baseAddress,

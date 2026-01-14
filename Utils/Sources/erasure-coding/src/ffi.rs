@@ -105,12 +105,22 @@ pub extern "C" fn reed_solomon_encode(
 
     match reed_solomon_simd::encode(original_count, recovery_count, original_slices) {
         Ok(recovery_vecs) => {
+            // reed_solomon_simd::encode returns ALL shards (original + parity)
+            // We only need to copy the PARITY shards to the output buffer
+            // Skip the first 'original_count' shards and copy only parity shards
+            let parity_count = recovery_count.saturating_sub(original_count);
             for (i, recovery_data) in recovery_vecs.iter().enumerate() {
-                if i >= recovery_count {
+                // Skip original shards, only copy parity shards
+                if i < original_count {
+                    continue;
+                }
+                if i >= original_count + parity_count {
                     break;
                 }
 
-                let out_ptr = unsafe { *out_recovery.add(i) };
+                // Output buffer index (0-based for parity shards only)
+                let out_index = i - original_count;
+                let out_ptr = unsafe { *out_recovery.add(out_index) };
                 if out_ptr.is_null() {
                     return 4;
                 }

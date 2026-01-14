@@ -34,8 +34,7 @@ public enum DataAvailabilityError: Error {
 ///
 /// Thread-safety: @unchecked Sendable is safe here because:
 /// - Inherits safety from ServiceBase2 (immutable properties + ThreadSafeContainer)
-/// - networkClient is protected by async methods (Swift concurrency)
-/// - All other properties are immutable (let)
+/// - All properties are immutable (let), providing thread-safe access
 public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, OnSyncCompleted {
     // MARK: - Properties
 
@@ -50,9 +49,6 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     private let workReportProcessor: WorkReportProcessor
     private let shardDistributionManager: ShardDistributionManager
     private let assuranceCoordinator: AssuranceCoordinator
-
-    // Optional network client (set after initialization)
-    private var networkClient: AvailabilityNetworkClient?
 
     // Expose dataStore for testing purposes
     public var testDataStore: DataStore { dataStore }
@@ -102,13 +98,6 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         scheduleForNextEpoch("DataAvailability.scheduleForNextEpoch") { [weak self] epoch in
             await self?.purge(epoch: epoch)
         }
-    }
-
-    /// Set the network client for fetching missing shards
-    public func setNetworkClient(_ client: AvailabilityNetworkClient) async {
-        networkClient = client
-        await networkRequestHelper.setNetworkClient(client)
-        // Note: ErasureCodingDataStore's network client should be set externally
     }
 
     /// Set the fetch strategy for network operations

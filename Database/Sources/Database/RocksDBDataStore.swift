@@ -394,6 +394,11 @@ extension RocksDBDataStore {
     public func storeShard(shardData: Data, erasureRoot: Data32, shardIndex: UInt16) async throws {
         let key = makeShardKey(erasureRoot: erasureRoot, shardIndex: shardIndex)
 
+        // TODO: Atomicity issue - these two writes should be in a single batch
+        // If the process crashes between them, the shard exists but shardCount is incorrect
+        // Should use RocksDB's WriteBatch to ensure atomicity:
+        // db.batch { |batch| batch.put(key, shardData); batch.put(erasureRoot, meta) }
+
         // Store variable-length shard data directly (no longer constrained to 4104 bytes)
         // This supports both audit bundle shards (variable-sized) and D³L segment shards (4104 bytes)
         try segments.put(key: key, value: shardData)
