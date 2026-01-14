@@ -17,11 +17,13 @@ private struct TrieNode {
     let type: TrieNodeType
     let isNew: Bool
     let rawValue: Data?
+    let hashVersion: UInt64 // Track hash version for cache invalidation
 
     // Constructor for loading from storage (65-byte format: [type][left-32][right-32])
-    init(hash: Data32, data: Data, isNew: Bool = false) {
+    init(hash: Data32, data: Data, isNew: Bool = false, hashVersion: UInt64 = 0) {
         self.hash = hash
         self.isNew = isNew
+        self.hashVersion = hashVersion
         rawValue = nil
 
         let typeByte = data[relative: 0]
@@ -41,13 +43,14 @@ private struct TrieNode {
     }
 
     // Constructor for pure trie operations
-    private init(left: Data32, right: Data32, type: TrieNodeType, isNew: Bool, rawValue: Data?) {
+    private init(left: Data32, right: Data32, type: TrieNodeType, isNew: Bool, rawValue: Data?, hashVersion: UInt64 = 0) {
         hash = Self.calculateHash(left: left, right: right, type: type)
         self.left = left // Store original data
         self.right = right // Store original data
         self.type = type
         self.isNew = isNew
         self.rawValue = rawValue
+        self.hashVersion = hashVersion
     }
 
     // JAM spec compliant hash calculation
@@ -142,9 +145,15 @@ public actor StateTrie {
     private var nodes: [Data: TrieNode] = [:]
     private var deleted: Set<Data> = []
 
-    public init(rootHash: Data32, backend: StateBackendProtocol) {
+    // Performance optimization: LRU cache for frequently accessed nodes
+    private let nodeCache: LRUCache<Data, TrieNode>?
+    private let cacheStats: CacheStatsTracker?
+
+    public init(rootHash: Data32, backend: StateBackendProtocol, enableCache: Bool = true, cacheSize: Int = 1000) {
         self.rootHash = rootHash
         self.backend = backend
+        nodeCache = enableCache ? LRUCache(capacity: cacheSize) : nil
+        cacheStats = enableCache ? CacheStatsTracker() : nil
     }
 
     public func read(key: Data31) async throws -> Data? {
@@ -298,16 +307,34 @@ public actor StateTrie {
         if deleted.contains(id) {
             return nil
         }
+
+        // Check in-memory nodes first (current operation)
         if let node = nodes[id] {
             return node
         }
+
+        // Check LRU cache for previously loaded nodes
+        if let cache = nodeCache, let cachedNode = await cache.get(id) {
+            await cacheStats?.recordHit()
+            return cachedNode
+        }
+
+        // Load from backend
         guard let data = try await backend.read(key: id) else {
+            await cacheStats?.recordMiss()
             return nil
         }
+        await cacheStats?.recordMiss()
         guard data.count == 65 else {
             throw StateTrieError.invalidData
         }
         let node = TrieNode(hash: hash, data: data)
+
+        // Cache the node for future access
+        if let cache = nodeCache {
+            await cache.put(id, value: node)
+        }
+
         saveNode(node: node)
         return node
     }
@@ -345,6 +372,11 @@ public actor StateTrie {
                 refChanges[node.right.data.suffix(31)] = -1
             }
             nodes.removeValue(forKey: id)
+
+            // Invalidate from cache when deleted
+            if let cache = nodeCache {
+                await cache.remove(id)
+            }
         }
         deleted.removeAll()
 
@@ -356,6 +388,11 @@ public actor StateTrie {
             if node.isBranch {
                 refChanges[node.left.data.suffix(31), default: 0] += 1
                 refChanges[node.right.data.suffix(31), default: 0] += 1
+            }
+
+            // Update cache with new nodes
+            if let cache = nodeCache {
+                await cache.put(node.hash.data.suffix(31), value: node)
             }
         }
 
@@ -377,6 +414,20 @@ public actor StateTrie {
         }
 
         try await backend.batchUpdate(ops)
+    }
+
+    /// Get cache statistics for monitoring and debugging
+    public func getCacheStats() async -> CacheStatsTracker.CacheStatistics? {
+        guard let stats = cacheStats else {
+            return nil
+        }
+        return await stats.current
+    }
+
+    /// Clear the LRU cache (useful for testing or memory management)
+    public func clearCache() async {
+        await nodeCache?.removeAll()
+        await cacheStats?.reset()
     }
 
     private func insert(
