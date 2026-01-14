@@ -313,6 +313,7 @@ extension RocksDBBackend: StateBackendProtocol {
         // Phase 1: Separate write operations from ref updates
         var writeOps: [BatchOperation] = []
         var refDeltas: [Data: Int64] = [:]
+        var rawValueRefDeltas: [Data32: Int64] = [:] // Track raw value ref deltas separately
 
         for update in updates {
             switch update {
@@ -320,19 +321,25 @@ extension RocksDBBackend: StateBackendProtocol {
                 try writeOps.append(stateTrie.putOperation(key: key, value: value))
             case let .writeRawValue(key, value):
                 try writeOps.append(stateValue.putOperation(key: key, value: value))
-                // Raw value refs are incremented by 1 on write, so track separately
-                let refCount = try stateRefsRaw.get(key: key) ?? 0
-                try writeOps.append(stateRefsRaw.putOperation(key: key, value: refCount + 1))
+                // Track raw value ref increment (each writeRawValue increments by 1)
+                rawValueRefDeltas[key, default: 0] += 1
             case let .refUpdate(key, delta):
                 // Accumulate deltas to apply in batch
                 refDeltas[key, default: 0] += delta
             }
         }
 
-        // Phase 2: Apply accumulated ref deltas with single read-modify-write per key
+        // Phase 2a: Apply accumulated raw value ref deltas with single read-modify-write per key
+        for (key, delta) in rawValueRefDeltas {
+            let currentRefCount = try stateRefsRaw.get(key: key) ?? 0
+            let newRefCount = UInt32(max(0, min(Int64(Int32.max), Int64(currentRefCount) + delta)))
+            try writeOps.append(stateRefsRaw.putOperation(key: key, value: newRefCount))
+        }
+
+        // Phase 2b: Apply accumulated ref deltas with single read-modify-write per key
         for (key, delta) in refDeltas {
             let currentRefCount = try stateRefs.get(key: key) ?? 0
-            let newRefCount = UInt32(Int64(currentRefCount) + delta)
+            let newRefCount = UInt32(max(0, min(Int64(Int32.max), Int64(currentRefCount) + delta)))
             try writeOps.append(stateRefs.putOperation(key: key, value: newRefCount))
         }
 

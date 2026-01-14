@@ -361,7 +361,8 @@ public actor StateTrie {
             cache.put(id, value: node)
         }
 
-        saveNode(node: node)
+        // Don't save loaded nodes to nodes map - they're already persisted
+        // and don't need ref count updates (only new nodes do)
         return node
     }
 
