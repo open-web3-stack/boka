@@ -79,6 +79,26 @@
 			"target": "Benchmarks",
 			"configuration": "release",
 			"preLaunchTask": "swift: Build Release Benchmarks (JAMTests)"
+		},
+		{
+			"type": "swift",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:boka}/JAMTests",
+			"name": "Debug SimpleWriteBufferBenchmark (JAMTests)",
+			"target": "SimpleWriteBufferBenchmark",
+			"configuration": "debug",
+			"preLaunchTask": "swift: Build Debug SimpleWriteBufferBenchmark (JAMTests)"
+		},
+		{
+			"type": "swift",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:boka}/JAMTests",
+			"name": "Release SimpleWriteBufferBenchmark (JAMTests)",
+			"target": "SimpleWriteBufferBenchmark",
+			"configuration": "release",
+			"preLaunchTask": "swift: Build Release SimpleWriteBufferBenchmark (JAMTests)"
 		}
 	]
 }

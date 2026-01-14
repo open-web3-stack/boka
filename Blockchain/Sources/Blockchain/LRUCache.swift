@@ -1,8 +1,10 @@
 import Foundation
 
-/// Thread-safe LRU (Least Recently Used) cache implementation
+/// LRU (Least Recently Used) cache implementation
 /// Optimized for caching trie nodes with automatic eviction
-public actor LRUCache<Key: Hashable, Value> {
+/// NOTE: This is a non-actor class because it's owned exclusively by StateTrie (which is an actor)
+/// Making it a class avoids suspension overhead and maintains atomicity of cache operations
+public final class LRUCache<Key: Hashable, Value> {
     private class CacheNode {
         let key: Key
         var value: Value

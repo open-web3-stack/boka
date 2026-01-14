@@ -3,9 +3,11 @@ import Utils
 
 /// Write buffer for batching trie updates before I/O
 /// Reduces I/O operations by accumulating updates and flushing in batches
-public actor WriteBuffer {
-    // Buffered updates waiting to be flushed
-    private var buffer: [(key: Data31, value: Data?)] = []
+/// NOTE: This is a non-actor class because it's owned exclusively by StateTrie (which is an actor)
+/// Making it a class avoids suspension overhead and maintains atomicity of batch operations
+public final class WriteBuffer {
+    // Count of buffered updates (we don't store the actual data since StateTrie maintains it)
+    private var count: Int = 0
 
     // Configuration
     private let maxBufferSize: Int
@@ -29,16 +31,16 @@ public actor WriteBuffer {
 
     /// Add an update to the buffer
     /// - Parameters:
-    ///   - key: The key to update
-    ///   - value: The value to set (nil for delete)
+    ///   - key: The key to update (not stored, only counted)
+    ///   - value: The value to set (not stored, only counted)
     /// - Returns: Whether buffer should be flushed
     @discardableResult
-    public func add(key: Data31, value: Data?) -> Bool {
-        buffer.append((key, value))
+    public func add(key _: Data31, value _: Data?) -> Bool {
+        count += 1
         totalUpdates += 1
 
         // Check if we should auto-flush
-        let shouldFlush = buffer.count >= maxBufferSize ||
+        let shouldFlush = count >= maxBufferSize ||
             Date().timeIntervalSince(lastFlush) >= flushInterval
 
         if shouldFlush {
@@ -48,30 +50,33 @@ public actor WriteBuffer {
         return shouldFlush
     }
 
-    /// Get all buffered updates and clear the buffer
-    /// - Returns: Array of buffered updates
-    public func flush() -> [(key: Data31, value: Data?)] {
-        let updates = buffer
-        buffer.removeAll()
+    /// Clear the buffer count and mark as flushed
+    /// - Returns: Whether the flush was performed (false if already empty)
+    @discardableResult
+    public func flush() -> Bool {
+        let wasNotEmpty = count > 0
+        count = 0
         lastFlush = Date()
-        totalFlushes += 1
-        manualFlushes += 1
-        return updates
+        if wasNotEmpty {
+            totalFlushes += 1
+            manualFlushes += 1
+        }
+        return wasNotEmpty
     }
 
     /// Check if buffer is empty
     public var isEmpty: Bool {
-        buffer.isEmpty
+        count == 0
     }
 
     /// Get current buffer size
     public var size: Int {
-        buffer.count
+        count
     }
 
     /// Get buffer utilization (0.0 to 1.0)
     public var utilization: Double {
-        Double(buffer.count) / Double(maxBufferSize)
+        Double(count) / Double(maxBufferSize)
     }
 
     /// Check if buffer should be flushed based on time
@@ -81,13 +86,13 @@ public actor WriteBuffer {
 
     /// Check if buffer should be flushed based on size
     public var shouldFlushBySize: Bool {
-        buffer.count >= maxBufferSize
+        count >= maxBufferSize
     }
 
     /// Get buffer statistics
     public var stats: WriteBufferStats {
         WriteBufferStats(
-            currentSize: buffer.count,
+            currentSize: count,
             maxBufferSize: maxBufferSize,
             totalUpdates: totalUpdates,
             totalFlushes: totalFlushes,
@@ -108,7 +113,7 @@ public actor WriteBuffer {
 
     /// Clear buffer without flushing
     public func clear() {
-        buffer.removeAll()
+        count = 0
         lastFlush = Date()
     }
 }

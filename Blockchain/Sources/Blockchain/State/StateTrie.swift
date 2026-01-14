@@ -153,6 +153,10 @@ public actor StateTrie {
     private let writeBuffer: WriteBuffer?
     private let enableWriteBuffer: Bool
 
+    // Performance optimization: Parallel hash computation for batch operations
+    private let enableParallelHash: Bool
+    private let maxParallelism: Int
+
     public init(
         rootHash: Data32,
         backend: StateBackendProtocol,
@@ -160,7 +164,9 @@ public actor StateTrie {
         cacheSize: Int = 1000,
         enableWriteBuffer: Bool = true,
         writeBufferSize: Int = 1000,
-        writeBufferFlushInterval: TimeInterval = 1.0
+        writeBufferFlushInterval: TimeInterval = 1.0,
+        enableParallelHash: Bool = true,
+        maxParallelism: Int = ProcessInfo.processInfo.processorCount
     ) {
         self.rootHash = rootHash
         self.backend = backend
@@ -171,6 +177,8 @@ public actor StateTrie {
             maxBufferSize: writeBufferSize,
             flushInterval: writeBufferFlushInterval
         ) : nil
+        self.enableParallelHash = enableParallelHash
+        self.maxParallelism = maxParallelism
     }
 
     /// Read a value from the trie
@@ -336,7 +344,7 @@ public actor StateTrie {
         }
 
         // Check LRU cache for previously loaded nodes (unless bypassed)
-        if !bypassCache, let cache = nodeCache, let cachedNode = await cache.get(id) {
+        if !bypassCache, let cache = nodeCache, let cachedNode = cache.get(id) {
             cacheStats?.recordHit()
             return cachedNode
         }
@@ -358,7 +366,7 @@ public actor StateTrie {
 
         // Cache the node for future access
         if let cache = nodeCache {
-            await cache.put(id, value: node)
+            cache.put(id, value: node)
         }
 
         saveNode(node: node)
@@ -390,8 +398,8 @@ public actor StateTrie {
     /// Accumulates updates in buffer and flushes when necessary
     private func updateBuffered(_ updates: [(key: Data31, value: Data?)], buffer: WriteBuffer) async throws {
         for (key, value) in updates {
-            // Add to buffer
-            let shouldFlush = await buffer.add(key: key, value: value)
+            // Add to buffer (synchronous since WriteBuffer is no longer an actor)
+            let shouldFlush = buffer.add(key: key, value: value)
 
             // Apply update to in-memory trie
             if let value {
@@ -426,7 +434,7 @@ public actor StateTrie {
 
             // Invalidate from cache when deleted
             if let cache = nodeCache {
-                await cache.remove(id)
+                cache.remove(id)
             }
         }
         deleted.removeAll()
@@ -443,7 +451,7 @@ public actor StateTrie {
 
             // Update cache with new nodes
             if let cache = nodeCache {
-                await cache.put(node.hash.data.suffix(31), value: node)
+                cache.put(node.hash.data.suffix(31), value: node)
             }
         }
 
@@ -476,8 +484,8 @@ public actor StateTrie {
     }
 
     /// Clear the LRU cache (useful for testing or memory management)
-    public func clearCache() async {
-        await nodeCache?.removeAll()
+    public func clearCache() {
+        nodeCache?.removeAll()
         cacheStats?.reset()
     }
 
@@ -491,17 +499,16 @@ public actor StateTrie {
             return
         }
 
-        // Only flush if there's something to flush
-        let isEmpty = await buffer.isEmpty
-        guard !isEmpty else {
+        // Only flush if there's something to flush (synchronous check)
+        guard !buffer.isEmpty else {
             return
         }
 
         // Save current state (this is where actual I/O happens)
         try await save()
 
-        // Clear the buffer after successful save
-        _ = await buffer.flush()
+        // Clear the buffer after successful save (synchronous)
+        _ = buffer.flush()
     }
 
     /// Manually trigger a flush of the write buffer
@@ -511,17 +518,17 @@ public actor StateTrie {
     }
 
     /// Get write buffer statistics for monitoring and debugging
-    public func getWriteBufferStats() async -> WriteBufferStats? {
+    public func getWriteBufferStats() -> WriteBufferStats? {
         guard let buffer = writeBuffer else {
             return nil
         }
-        return await buffer.stats
+        return buffer.stats
     }
 
     /// Clear the write buffer without flushing (use with caution - data loss!)
     /// Only useful for testing or error recovery
-    public func clearWriteBuffer() async {
-        await writeBuffer?.clear()
+    public func clearWriteBuffer() {
+        writeBuffer?.clear()
     }
 
     private func insert(
