@@ -206,7 +206,7 @@ public actor StateTrie {
             return try await get(hash: hash, bypassCache: true)
         }
 
-        guard let node = try await get(hash: hash, bypassCache: true) else { return nil }
+        guard let node = try await get(hash: hash, bypassCache: true, prefetchSiblings: false) else { return nil }
 
         if node.isBranch {
             let bitValue = Self.bitAt(prefix, position: depth)
@@ -242,10 +242,10 @@ public actor StateTrie {
             var result: [Data31] = []
 
             // Sequential processing to prevent task explosion
-            if let leftNode = try await get(hash: node.left, bypassCache: true) {
+            if let leftNode = try await get(hash: node.left, bypassCache: true, prefetchSiblings: false) {
                 result += try await getLeaves(node: leftNode)
             }
-            if let rightNode = try await get(hash: node.right, bypassCache: true) {
+            if let rightNode = try await get(hash: node.right, bypassCache: true, prefetchSiblings: false) {
                 result += try await getLeaves(node: rightNode)
             }
             return result
@@ -262,10 +262,10 @@ public actor StateTrie {
             var result: [(key: Data31, value: Data)] = []
 
             // Sequential processing to prevent task explosion
-            if let leftNode = try await get(hash: node.left, bypassCache: true) {
+            if let leftNode = try await get(hash: node.left, bypassCache: true, prefetchSiblings: false) {
                 result += try await getLeavesValues(node: leftNode)
             }
-            if let rightNode = try await get(hash: node.right, bypassCache: true) {
+            if let rightNode = try await get(hash: node.right, bypassCache: true, prefetchSiblings: false) {
                 result += try await getLeavesValues(node: rightNode)
             }
             return result
@@ -555,7 +555,7 @@ public actor StateTrie {
         }
 
         if parent.isBranch {
-            removeNode(hash: hash)
+            removeNode(node: parent)
 
             let bitValue = Self.bitAt(key.data, position: depth)
             var left = parent.left
@@ -577,6 +577,7 @@ public actor StateTrie {
     private func insertLeafNode(existing: TrieNode, newKey: Data31, newValue: Data, depth: UInt8) async throws -> Data32 {
         if existing.isLeaf(key: newKey) {
             // update existing leaf
+            removeNode(node: existing)
             let newLeaf = TrieNode.leaf(key: newKey, value: newValue)
             saveNode(node: newLeaf)
             return newLeaf.hash
@@ -617,7 +618,7 @@ public actor StateTrie {
         }
 
         if node.isBranch {
-            removeNode(hash: hash)
+            removeNode(node: node)
 
             let bitValue = Self.bitAt(key.data, position: depth)
             var left = node.left
@@ -664,7 +665,7 @@ public actor StateTrie {
         } else {
             // leaf - only remove if the leaf matches the key we're deleting
             if node.isLeaf(key: key) {
-                removeNode(hash: hash)
+                removeNode(node: node)
                 return Data32()
             } else {
                 return hash
@@ -672,15 +673,17 @@ public actor StateTrie {
         }
     }
 
-    private func removeNode(hash: Data32) {
-        let id = hash.data.suffix(31)
+    private func removeNode(node: TrieNode) {
+        let id = node.hash.data.suffix(31)
         deleted.insert(id)
 
         // Only remove from nodes map if it's a new node (never persisted)
         // For persisted nodes, we need to keep them in memory until save() processes
         // their reference counts (decrementing children's ref counts)
-        if let node = nodes[id], node.isNew {
+        if node.isNew {
             nodes.removeValue(forKey: id)
+        } else {
+            nodes[id] = node
         }
     }
 
