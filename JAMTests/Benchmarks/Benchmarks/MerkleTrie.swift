@@ -164,7 +164,7 @@ func merkleTrieBenchmarks() {
 
     Benchmark("trie.compute.root.incremental", configuration: .init(timeUnits: .milliseconds)) { benchmark in
         let backend = InMemoryBackend()
-        var trie = StateTrie(rootHash: Data32(), backend: backend)
+        let trie = StateTrie(rootHash: Data32(), backend: backend)
         let testData = createTestData(count: 100)
 
         // Initial population

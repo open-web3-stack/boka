@@ -9,7 +9,7 @@ func validatorBenchmarks() {
     // MARK: - Setup helpers
 
     func createGenesis(config: ProtocolConfigRef) async throws -> (BlockRef, StateRef) {
-        let (state, block) = try await State.devGenesis(config: config)
+        let (state, block) = try State.devGenesis(config: config)
         return (block, state)
     }
 
@@ -35,7 +35,7 @@ func validatorBenchmarks() {
     }
 
     Benchmark("authoring.pre.runtime") { benchmark in
-        let (genesisBlock, genesisState) = try await createGenesis(config: config)
+        let (_, genesisState) = try await createGenesis(config: config)
 
         benchmark.startMeasurement()
         // Prepare data for runtime before block authoring
@@ -57,7 +57,7 @@ func validatorBenchmarks() {
 
     Benchmark("authoring.finalize") { benchmark in
         let (genesisBlock, genesisState) = try await createGenesis(config: config)
-        var block = BlockRef.dummy(config: config, parent: genesisBlock)
+        let block = BlockRef.dummy(config: config, parent: genesisBlock)
 
         benchmark.startMeasurement()
         // Simulate finalization by creating block header seal
@@ -71,7 +71,7 @@ func validatorBenchmarks() {
     // MARK: - Data operations (baseline for availability chunking)
 
     Benchmark("data.chunk") { benchmark in
-        let (genesisBlock, _) = try await createGenesis(config: config)
+        let _ = try await createGenesis(config: config)
 
         // Create 1MB of data to chunk
         let data = Data(repeating: 0x42, count: 1_048_576) // 1MB
@@ -90,7 +90,7 @@ func validatorBenchmarks() {
     }
 
     Benchmark("data.reconstruct") { benchmark in
-        let (genesisBlock, _) = try await createGenesis(config: config)
+        let _ = try await createGenesis(config: config)
 
         // Create chunks
         let originalData = Data(repeating: 0x42, count: 1_048_576) // 1MB
@@ -116,7 +116,7 @@ func validatorBenchmarks() {
     // MARK: - Hash operations (baseline for proof operations)
 
     Benchmark("hash.stateroot") { benchmark in
-        let (genesisBlock, genesisState) = try await createGenesis(config: config)
+        let (_, genesisState) = try await createGenesis(config: config)
 
         benchmark.startMeasurement()
         // Benchmark state root computation and hashing (baseline for proof generation)
@@ -127,7 +127,7 @@ func validatorBenchmarks() {
     }
 
     Benchmark("hash.compare") { benchmark in
-        let (genesisBlock, genesisState) = try await createGenesis(config: config)
+        let (_, genesisState) = try await createGenesis(config: config)
         let stateRoot = await genesisState.value.stateRoot
         let proofHash = stateRoot.blake2b256hash()
 
@@ -141,7 +141,7 @@ func validatorBenchmarks() {
     // MARK: - Erasure coding operations
 
     Benchmark("erasure.encode.logic") { benchmark in
-        let (genesisBlock, _) = try await createGenesis(config: config)
+        let _ = try await createGenesis(config: config)
 
         // Create data to encode
         let data = Data(repeating: 0x42, count: 1024)
@@ -156,7 +156,7 @@ func validatorBenchmarks() {
     }
 
     Benchmark("erasure.decode.logic") { benchmark in
-        let (genesisBlock, _) = try await createGenesis(config: config)
+        let _ = try await createGenesis(config: config)
 
         // Create encoded shards for reconstruction
         let originalData = Data(repeating: 0x42, count: 1024)
@@ -172,7 +172,8 @@ func validatorBenchmarks() {
         let reconstructed = try ErasureCoding.reconstruct(
             shards: Array(typed.prefix(originalCount)),
             basicSize: basicSize,
-            originalCount: originalCount
+            originalCount: originalCount,
+            recoveryCount: recoveryCount
         )
         benchmark.stopMeasurement()
         blackHole(reconstructed.count)
@@ -181,7 +182,7 @@ func validatorBenchmarks() {
     // MARK: - Validator committee operations
 
     Benchmark("validator.committee") { benchmark in
-        let (genesisBlock, genesisState) = try await createGenesis(config: config)
+        let (_, genesisState) = try await createGenesis(config: config)
         let validators = genesisState.value.currentValidators
 
         benchmark.startMeasurement()
@@ -193,7 +194,7 @@ func validatorBenchmarks() {
     }
 
     Benchmark("validator.ticket.selection") { benchmark in
-        let (genesisBlock, genesisState) = try await createGenesis(config: config)
+        let (_, genesisState) = try await createGenesis(config: config)
 
         benchmark.startMeasurement()
         // Benchmark ticket selection (Array.first access)
@@ -204,7 +205,7 @@ func validatorBenchmarks() {
     }
 
     Benchmark("validator.epoch.change") { benchmark in
-        let (genesisBlock, genesisState) = try await createGenesis(config: config)
+        let (_, genesisState) = try await createGenesis(config: config)
 
         benchmark.startMeasurement()
         // Benchmark epoch calculation (arithmetic and timeslotToEpochIndex)

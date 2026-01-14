@@ -28,7 +28,7 @@ func rocksdbBenchmarks() {
     }
 
     func createGenesis(config: ProtocolConfigRef) async throws -> (BlockRef, StateRef) {
-        let (state, block) = try await State.devGenesis(config: config)
+        let (state, block) = try State.devGenesis(config: config)
         return (block, state)
     }
 
@@ -267,7 +267,7 @@ func rocksdbBenchmarks() {
     Benchmark("rocksdb.getkeys.prefix") { benchmark in
         let tempDir = try createTempDirectory()
         defer { tempDir.cleanup() }
-        let (genesisBlock, genesisState) = try await createGenesis(config: config)
+        let (genesisBlock, _) = try await createGenesis(config: config)
 
         // Create state with some test data that shares a common prefix
         var stateData: [Data31: Data] = [:]

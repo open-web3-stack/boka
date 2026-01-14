@@ -167,24 +167,34 @@ extension RocksDBBackend: BlockchainDataProviderProtocol {
     public func add(block: BlockRef) async throws {
         logger.debug("add(block:) \(block.hash)")
 
-        // TODO: batch put
+        // Use batch operations for atomic, efficient writes
+        var operations: [BatchOperation] = []
 
-        try blocks.put(key: block.hash, value: block)
+        // Add block data
+        try operations.append(blocks.putOperation(key: block.hash, value: block))
+
+        // Update timeslot index
         var timeslotHashes = try await getBlockHash(byTimeslot: block.header.timeslot)
         timeslotHashes.insert(block.hash)
-        try blockHashByTimeslot.put(key: block.header.timeslot, value: timeslotHashes)
+        try operations.append(blockHashByTimeslot.putOperation(key: block.header.timeslot, value: timeslotHashes))
 
+        // Calculate block number
         let blockNumber = if let number = try await getBlockNumber(hash: block.header.parentHash) {
             number + 1
         } else {
             UInt32(0)
         }
 
+        // Update number index
         var numberHashes = try await getBlockHash(byNumber: blockNumber)
         numberHashes.insert(block.hash)
-        try blockHashByNumber.put(key: blockNumber, value: numberHashes)
+        try operations.append(blockHashByNumber.putOperation(key: blockNumber, value: numberHashes))
 
-        try blockNumberByHash.put(key: block.hash, value: blockNumber)
+        // Add hash->number mapping
+        try operations.append(blockNumberByHash.putOperation(key: block.hash, value: blockNumber))
+
+        // Execute all operations atomically
+        try db.batch(operations: operations)
     }
 
     public func add(state: StateRef) async throws {
@@ -222,17 +232,23 @@ extension RocksDBBackend: BlockchainDataProviderProtocol {
     public func remove(hash: Data32) async throws {
         logger.trace("remove() \(hash)")
 
-        // TODO: batch delete
+        // Use batch operations for atomic, efficient deletes
+        var operations: [BatchOperation] = []
 
-        try blocks.delete(key: hash)
+        try operations.append(blocks.deleteOperation(key: hash))
+
         if let block = try await getBlock(hash: hash) {
-            try blockHashByTimeslot.delete(key: block.header.timeslot)
+            try operations.append(blockHashByTimeslot.deleteOperation(key: block.header.timeslot))
         }
 
         if let blockNumber = try await getBlockNumber(hash: hash) {
-            try blockHashByNumber.delete(key: blockNumber)
+            try operations.append(blockHashByNumber.deleteOperation(key: blockNumber))
         }
-        try blockNumberByHash.delete(key: hash)
+
+        try operations.append(blockNumberByHash.deleteOperation(key: hash))
+
+        // Execute all operations atomically
+        try db.batch(operations: operations)
     }
 
     public func remove(workReportHash: Data32) async throws {

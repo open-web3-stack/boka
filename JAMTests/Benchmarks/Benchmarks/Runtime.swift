@@ -9,7 +9,7 @@ func runtimeBenchmarks() {
     // MARK: - Setup helpers
 
     func createGenesis(config: ProtocolConfigRef) async throws -> (BlockRef, StateRef) {
-        let (state, block) = try await State.devGenesis(config: config)
+        let (state, block) = try State.devGenesis(config: config)
         return (block, state)
     }
 
