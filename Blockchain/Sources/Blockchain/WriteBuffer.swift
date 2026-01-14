@@ -81,8 +81,10 @@ public final class WriteBuffer {
 
     /// Check if buffer should be flushed based on time
     public var shouldFlushByTime: Bool {
-        let elapsed = lastFlushTime.upstreamTimeIntervalSinceNow
-        return -elapsed >= flushInterval
+        let now = DispatchTime.now().uptimeNanoseconds
+        let last = lastFlushTime.uptimeNanoseconds
+        let elapsed = TimeInterval(now - last) / 1_000_000_000 // Convert nanoseconds to seconds
+        return elapsed >= flushInterval
     }
 
     /// Check if buffer should be flushed based on size

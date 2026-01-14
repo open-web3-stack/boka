@@ -60,7 +60,7 @@ struct StateTrieWriteBufferIntegrationTests {
         try await trie.update(updates)
 
         // Check buffer stats
-        let stats = trie.getWriteBufferStats()
+        let stats = await trie.getWriteBufferStats()
         #expect(stats != nil)
         #expect(stats!.totalFlushes >= 1) // Should have auto-flushed
     }
@@ -106,7 +106,7 @@ struct StateTrieWriteBufferIntegrationTests {
         try await trie.update(updates)
 
         // Check statistics
-        let stats = trie.getWriteBufferStats()
+        let stats = await trie.getWriteBufferStats()
         #expect(stats != nil)
         #expect(stats!.currentSize == 10)
         #expect(stats!.totalUpdates == 10)
@@ -135,7 +135,7 @@ struct StateTrieWriteBufferIntegrationTests {
         try await trie.flush()
 
         // Buffer should be empty after flush
-        let stats = trie.getWriteBufferStats()
+        let stats = await trie.getWriteBufferStats()
         #expect(stats!.currentSize == 0)
     }
 
@@ -156,7 +156,7 @@ struct StateTrieWriteBufferIntegrationTests {
         try await trie.update(updates)
 
         // Should have no write buffer stats
-        let stats = trie.getWriteBufferStats()
+        let stats = await trie.getWriteBufferStats()
         #expect(stats == nil)
     }
 
@@ -213,7 +213,7 @@ struct StateTrieWriteBufferIntegrationTests {
         await trie.clearWriteBuffer()
 
         // Buffer should be empty
-        let stats = trie.getWriteBufferStats()
+        let stats = await trie.getWriteBufferStats()
         #expect(stats!.currentSize == 0)
     }
 
