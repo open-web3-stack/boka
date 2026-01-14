@@ -89,6 +89,11 @@ public actor InMemoryBackend: StateBackendProtocol {
         }
     }
 
+    /// Get reference count for a key (for testing purposes)
+    public func getRefCount(key: Data) async -> Int {
+        refCounts[key] ?? 0
+    }
+
     public func createIterator(prefix: Data, startKey: Data?) async throws -> StateBackendIterator {
         // Create sorted array of matching items
         let searchKey = startKey ?? prefix
