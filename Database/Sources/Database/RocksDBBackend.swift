@@ -292,8 +292,15 @@ extension RocksDBBackend: StateBackendProtocol {
     public func batchUpdate(_ updates: [StateBackendOperation]) async throws {
         logger.trace("batchUpdate() \(updates.count) operations")
 
-        // TODO: implement this using merge operator to perform atomic increment
-        // so we can do the whole thing in a single batch
+        // CRITICAL TODO: This performs updates sequentially without atomic batch guarantees.
+        // If the process crashes mid-loop, the state will be inconsistent (e.g., trie updated
+        // but ref counts not). This should use RocksDB's WriteBatch atomic operations or
+        // a merge operator for atomic reference count updates. Production safety requires
+        // either: 1) Use db.batch() for atomic commits, 2) Implement crash recovery logic,
+        // or 3) Use a merge operator for read-modify-write operations on ref counts.
+        //
+        // Current workaround: Operations are ordered to minimize inconsistency window
+        // (writes before ref changes), but this is NOT crash-safe.
         for update in updates {
             switch update {
             case let .write(key, value):

@@ -185,6 +185,10 @@ public actor StateTrie {
     /// Phase 2: Flushes write buffer before read to ensure consistency
     public func read(key: Data31) async throws -> Data? {
         // Flush buffer to ensure we read latest data
+        // Note: While StateTrie checks the in-memory 'nodes' map first, flushing ensures
+        // we see all updates including those that might have been partially applied.
+        // This is conservative but ensures correctness. For read-heavy workloads,
+        // consider increasing write buffer size or using separate read/write tries.
         try await flushWriteBuffer()
 
         let node = try await find(hash: rootHash, key: key, depth: 0)
@@ -425,10 +429,11 @@ public actor StateTrie {
                 continue
             }
             if node.isBranch {
-                // assign -1 to not worry about duplicates
-                refChanges[node.hash.data.suffix(31)] = -1
-                refChanges[node.left.data.suffix(31)] = -1
-                refChanges[node.right.data.suffix(31)] = -1
+                // Decrement reference counts for deleted branch nodes
+                // Use -= to properly accumulate if multiple deleted nodes share children
+                refChanges[node.hash.data.suffix(31), default: 0] -= 1
+                refChanges[node.left.data.suffix(31), default: 0] -= 1
+                refChanges[node.right.data.suffix(31), default: 0] -= 1
             }
             nodes.removeValue(forKey: id)
 
@@ -465,10 +470,16 @@ public actor StateTrie {
             if key == zeros {
                 continue
             }
+            // Emit multiple operations for deltas with magnitude > 1
+            // since each refIncrement/refDecrement only changes count by 1
             if value > 0 {
-                ops.append(.refIncrement(key: key.suffix(31)))
+                for _ in 0 ..< value {
+                    ops.append(.refIncrement(key: key.suffix(31)))
+                }
             } else if value < 0 {
-                ops.append(.refDecrement(key: key.suffix(31)))
+                for _ in 0 ..< -value {
+                    ops.append(.refDecrement(key: key.suffix(31)))
+                }
             }
         }
 
