@@ -33,16 +33,20 @@ public final class RocksDB<CFKey: ColumnFamilyKey>: Sendable {
 
         let dbOptions = Options()
 
-        // TODO: starting from options here
-        // https://github.com/paritytech/parity-common/blob/e3787dc768b08e10809834c65419ad3c255b5cac/kvdb-rocksdb/src/lib.rs#L339
+        // Phase 3: Optimized RocksDB settings for state trie workload
+        // Reference: https://github.com/paritytech/parity-common/blob/e3787dc768b08e10809834c65419ad3c255b5cac/kvdb-rocksdb/src/lib.rs#L339
 
         let cpus = sysconf(Int32(_SC_NPROCESSORS_ONLN))
-        dbOptions.increaseParallelism(cpus: cpus)
+
+        // Performance optimizations for state trie workload
+        dbOptions.increaseParallelism(cpus: cpus) // Use all available cores
         dbOptions.optimizeLevelStyleCompaction(memtableMemoryBudget: 512 * 1024 * 1024) // 512 MB
         dbOptions.setCreateIfMissing(true)
         dbOptions.setCreateIfMissingColumnFamilies(true)
 
         let cfOptions = Options()
+
+        // Phase 3: Column family optimizations for state trie access patterns
         cfOptions.setLevelCompactionDynamicLevelBytes(true)
 
         var names = CFKey.allCases.map { "\($0)" }
@@ -197,6 +201,89 @@ extension RocksDB {
         }
 
         return ret.map { Data(bytesNoCopy: $0, count: len, deallocator: .free) }
+    }
+
+    /// Phase 3: Batch read multiple keys in a single operation using RocksDB MultiGet API
+    /// - Parameters:
+    ///   - column: Column family to read from
+    ///   - keys: Array of keys to read
+    /// - Returns: Dictionary mapping keys to their values (missing keys are omitted)
+    /// - Note: Much more efficient than individual get() calls for multiple keys
+    public func multiGet(column: CFKey, keys: [Data]) throws -> [Data: Data] {
+        logger.trace("multiGet() \(column) count: \(keys.count)")
+
+        guard !keys.isEmpty else { return [:] }
+
+        let handle = getHandle(column: column)
+        let numKeys = keys.count
+
+        // Prepare C arrays for RocksDB API
+        var keysPointers = [UnsafePointer<CChar>?](repeating: nil, count: numKeys)
+        var keysSizes = [Int](repeating: 0, count: numKeys)
+
+        // Convert keys to C strings
+        for (index, key) in keys.enumerated() {
+            keysPointers[index] = key.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) -> UnsafePointer<CChar>? in
+                buffer.baseAddress?.assumingMemoryBound(to: CChar.self)
+            }
+            keysSizes[index] = key.count
+        }
+
+        // Prepare output arrays
+        var valuesPointers = [UnsafeMutablePointer<CChar>?](repeating: nil, count: numKeys)
+        var valuesSizes = [Int](repeating: 0, count: numKeys)
+        var errors = [UnsafeMutablePointer<CChar>?](repeating: nil, count: numKeys)
+
+        // Prepare column families array (all same for this operation)
+        let cfHandles = [OpaquePointer?](repeating: handle, count: numKeys)
+
+        // Call RocksDB multi_get
+        keysPointers.withUnsafeMutableBufferPointer { keysPtr in
+            keysSizes.withUnsafeMutableBufferPointer { sizesPtr in
+                valuesPointers.withUnsafeMutableBufferPointer { valuesPtr in
+                    valuesSizes.withUnsafeMutableBufferPointer { valuesSizesPtr in
+                        errors.withUnsafeMutableBufferPointer { errorsPtr in
+                            cfHandles.withUnsafeBufferPointer { cfPtr in
+                                rocksdb_multi_get_cf(
+                                    db.value,
+                                    readOptions.value,
+                                    cfPtr.baseAddress,
+                                    numKeys,
+                                    keysPtr.baseAddress,
+                                    sizesPtr.baseAddress,
+                                    valuesPtr.baseAddress,
+                                    valuesSizesPtr.baseAddress,
+                                    errorsPtr.baseAddress
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Process results
+        var result: [Data: Data] = [:]
+
+        for index in 0 ..< numKeys {
+            // Free error if any
+            if let error = errors[index] {
+                let message = String(cString: error)
+                rocksdb_free(error)
+                if !message.isEmpty {
+                    logger.error("multiGet() error at index \(index): \(message)")
+                }
+                continue
+            }
+
+            // Extract value if present
+            if let valuePtr = valuesPointers[index] {
+                let valueData = Data(bytesNoCopy: valuePtr, count: valuesSizes[index], deallocator: .free)
+                result[keys[index]] = valueData
+            }
+        }
+
+        return result
     }
 
     public func delete(column: CFKey, key: Data) throws {
