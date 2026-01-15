@@ -123,12 +123,12 @@ struct RefCountDeltaTests {
 
         // Insert two keys
         try await trie.update([
-            (key1, "value1".data(using: .utf8)!),
+            (key1, Data("value1".utf8)),
         ])
         try await trie.save()
 
         try await trie.update([
-            (key2, "value2".data(using: .utf8)!),
+            (key2, Data("value2".utf8)),
         ])
         try await trie.save()
 
@@ -137,8 +137,8 @@ struct RefCountDeltaTests {
         let result1 = try await trie.read(key: key1)
         let result2 = try await trie.read(key: key2)
 
-        #expect(result1 == "value1".data(using: .utf8)!)
-        #expect(result2 == "value2".data(using: .utf8)!)
+        #expect(result1 == Data("value1".utf8))
+        #expect(result2 == Data("value2".utf8))
     }
 
     @Test("StateTrie decrements old root ref count")
@@ -153,12 +153,12 @@ struct RefCountDeltaTests {
         let key = makeKey(1)
 
         // First save - creates initial root
-        try await trie.update([(key, "value1".data(using: .utf8)!)])
+        try await trie.update([(key, Data("value1".utf8))])
         let root1 = await trie.rootHash
         try await trie.save()
 
         // Second save - changes root
-        try await trie.update([(key, "value2".data(using: .utf8)!)])
+        try await trie.update([(key, Data("value2".utf8))])
         let root2 = await trie.rootHash
         try await trie.save()
 
@@ -182,11 +182,11 @@ struct RefCountDeltaTests {
 
         // Multiple save cycles
         for i in 0 ..< 5 {
-            try await trie.update([(key, "value\(i)".data(using: .utf8)!)])
+            try await trie.update([(key, Data("value\(i)".utf8))])
             try await trie.save()
 
             let result = try await trie.read(key: key)
-            #expect(result == "value\(i)".data(using: .utf8)!)
+            #expect(result == Data("value\(i)".utf8))
         }
 
         // All operations should succeed without corruption
@@ -360,7 +360,7 @@ struct RefCountDeltaTests {
         let key = makeKey(1)
 
         // Insert and save
-        try await trie.update([(key, "value1".data(using: .utf8)!)])
+        try await trie.update([(key, Data("value1".utf8))])
         try await trie.save()
 
         // Delete and save
@@ -384,17 +384,17 @@ struct RefCountDeltaTests {
         let key = makeKey(1)
 
         // Insert, delete, insert again
-        try await trie.update([(key, "value1".data(using: .utf8)!)])
+        try await trie.update([(key, Data("value1".utf8))])
         try await trie.save()
 
         try await trie.update([(key, nil)])
         try await trie.save()
 
-        try await trie.update([(key, "value2".data(using: .utf8)!)])
+        try await trie.update([(key, Data("value2".utf8))])
         try await trie.save()
 
         let result = try await trie.read(key: key)
-        #expect(result == "value2".data(using: .utf8)!)
+        #expect(result == Data("value2".utf8))
     }
 }
 

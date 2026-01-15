@@ -80,17 +80,6 @@ let package = Package(
                 .plugin(name: "BenchmarkPlugin", package: "package-benchmark"),
             ],
         ),
-        .executableTarget(
-            name: "SimpleWriteBufferBenchmark",
-            dependencies: [
-                "Blockchain",
-                "Utils",
-            ],
-            path: "SimpleWriteBufferBenchmark",
-            swiftSettings: [
-                .interoperabilityMode(.Cxx),
-            ],
-        ),
     ],
     swiftLanguageModes: [.version("6")]
 )

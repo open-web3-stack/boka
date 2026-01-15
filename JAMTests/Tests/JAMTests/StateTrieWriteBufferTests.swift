@@ -25,9 +25,9 @@ struct StateTrieWriteBufferIntegrationTests {
 
         // Perform updates
         let updates = [
-            (makeKey(1), "value1".data(using: .utf8)!),
-            (makeKey(2), "value2".data(using: .utf8)!),
-            (makeKey(3), "value3".data(using: .utf8)!),
+            (makeKey(1), Data("value1".utf8)),
+            (makeKey(2), Data("value2".utf8)),
+            (makeKey(3), Data("value3".utf8)),
         ]
 
         try await trie.update(updates)
@@ -37,7 +37,7 @@ struct StateTrieWriteBufferIntegrationTests {
 
         // Verify we can read back
         let result1 = try await trie.read(key: makeKey(1))
-        #expect(result1 == "value1".data(using: .utf8)!)
+        #expect(result1 == Data("value1".utf8))
     }
 
     @Test("State trie auto-flushes when buffer is full")
@@ -54,7 +54,7 @@ struct StateTrieWriteBufferIntegrationTests {
         // Add 6 items (buffer size is 5, so should auto-flush)
         var updates: [(Data31, Data?)] = []
         for i in 0 ..< 6 {
-            updates.append((makeKey(UInt8(i)), "value\(i)".data(using: .utf8)!))
+            updates.append((makeKey(UInt8(i)), Data("value\(i)".utf8)))
         }
 
         try await trie.update(updates)
@@ -78,12 +78,12 @@ struct StateTrieWriteBufferIntegrationTests {
 
         // Add an item without manual flush
         try await trie.update([
-            (makeKey(1), "test".data(using: .utf8)!),
+            (makeKey(1), Data("test".utf8)),
         ])
 
         // Read should still return the value (read sees in-memory updates, no flush needed)
         let result = try await trie.read(key: makeKey(1))
-        #expect(result == "test".data(using: .utf8)!)
+        #expect(result == Data("test".utf8))
     }
 
     @Test("State trie write buffer statistics")
@@ -100,7 +100,7 @@ struct StateTrieWriteBufferIntegrationTests {
         // Perform some updates
         var updates: [(Data31, Data?)] = []
         for i in 0 ..< 10 {
-            updates.append((makeKey(UInt8(i)), "value\(i)".data(using: .utf8)!))
+            updates.append((makeKey(UInt8(i)), Data("value\(i)".utf8)))
         }
 
         try await trie.update(updates)
@@ -126,7 +126,7 @@ struct StateTrieWriteBufferIntegrationTests {
         // Add items
         var updates: [(Data31, Data?)] = []
         for i in 0 ..< 5 {
-            updates.append((makeKey(UInt8(i)), "value\(i)".data(using: .utf8)!))
+            updates.append((makeKey(UInt8(i)), Data("value\(i)".utf8)))
         }
 
         try await trie.update(updates)
@@ -150,7 +150,7 @@ struct StateTrieWriteBufferIntegrationTests {
 
         // Perform updates
         let updates = [
-            (makeKey(1), "value1".data(using: .utf8)!),
+            (makeKey(1), Data("value1".utf8)),
         ]
 
         try await trie.update(updates)
@@ -175,7 +175,7 @@ struct StateTrieWriteBufferIntegrationTests {
 
         // Insert
         try await trie.update([
-            (key, "value1".data(using: .utf8)!),
+            (key, Data("value1".utf8)),
         ])
 
         // Delete
@@ -204,7 +204,7 @@ struct StateTrieWriteBufferIntegrationTests {
         // Add items to buffer
         var updates: [(Data31, Data?)] = []
         for i in 0 ..< 10 {
-            updates.append((makeKey(UInt8(i)), "value\(i)".data(using: .utf8)!))
+            updates.append((makeKey(UInt8(i)), Data("value\(i)".utf8)))
         }
 
         try await trie.update(updates)
@@ -233,23 +233,23 @@ struct StateTrieWriteBufferIntegrationTests {
 
         // Insert
         try await trie.update([
-            (key1, "value1".data(using: .utf8)!),
+            (key1, Data("value1".utf8)),
         ])
 
         // Read (sees in-memory updates, no flush needed)
         let result1 = try await trie.read(key: key1)
-        #expect(result1 == "value1".data(using: .utf8)!)
+        #expect(result1 == Data("value1".utf8))
 
         // Insert another
         try await trie.update([
-            (key2, "value2".data(using: .utf8)!),
+            (key2, Data("value2".utf8)),
         ])
 
         // Read both (reads see in-memory updates)
         let result2 = try await trie.read(key: key1)
         let result3 = try await trie.read(key: key2)
 
-        #expect(result2 == "value1".data(using: .utf8)!)
-        #expect(result3 == "value2".data(using: .utf8)!)
+        #expect(result2 == Data("value1".utf8))
+        #expect(result3 == Data("value2".utf8))
     }
 }

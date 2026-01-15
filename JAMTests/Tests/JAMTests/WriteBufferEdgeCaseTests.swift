@@ -20,7 +20,7 @@ struct WriteBufferEdgeCaseTests {
 
         // Add single item
         try await trie.update([
-            (makeKey(1), "value1".data(using: .utf8)!),
+            (makeKey(1), Data("value1".utf8)),
         ])
 
         // Wait for auto-flush interval to pass
@@ -28,7 +28,7 @@ struct WriteBufferEdgeCaseTests {
 
         // Add another item - this should trigger time-based flush
         try await trie.update([
-            (makeKey(2), "value2".data(using: .utf8)!),
+            (makeKey(2), Data("value2".utf8)),
         ])
 
         // Buffer should have been flushed
@@ -72,7 +72,7 @@ struct WriteBufferEdgeCaseTests {
         // Add exactly max buffer size items
         var updates: [(Data31, Data?)] = []
         for i in 0 ..< bufferSize {
-            updates.append((makeKey(UInt8(i)), "value\(i)".data(using: .utf8)!))
+            updates.append((makeKey(UInt8(i)), Data("value\(i)".utf8)))
         }
 
         try await trie.update(updates)
@@ -201,7 +201,7 @@ struct WriteBufferEdgeCaseTests {
         // Add 4 items (buffer size is 3, should auto-flush)
         var updates: [(Data31, Data?)] = []
         for i in 0 ..< 4 {
-            updates.append((makeKey(UInt8(i)), "value\(i)".data(using: .utf8)!))
+            updates.append((makeKey(UInt8(i)), Data("value\(i)".utf8)))
         }
 
         try await trie.update(updates)
@@ -245,7 +245,7 @@ struct WriteBufferEdgeCaseTests {
         // Add items
         var updates: [(Data31, Data?)] = []
         for i in 0 ..< 10 {
-            updates.append((makeKey(UInt8(i)), "value\(i)".data(using: .utf8)!))
+            updates.append((makeKey(UInt8(i)), Data("value\(i)".utf8)))
         }
 
         try await trie.update(updates)
@@ -330,7 +330,7 @@ struct WriteBufferEdgeCaseTests {
         // Rapid additions
         var updates: [(Data31, Data?)] = []
         for i in 0 ..< 100 {
-            updates.append((makeKey(UInt8(i)), "value\(i)".data(using: .utf8)!))
+            updates.append((makeKey(UInt8(i)), Data("value\(i)".utf8)))
         }
 
         try await trie.update(updates)
@@ -355,21 +355,21 @@ struct WriteBufferEdgeCaseTests {
         // Add items to buffer
         var updates: [(Data31, Data?)] = []
         for i in 0 ..< 10 {
-            updates.append((makeKey(UInt8(i)), "value\(i)".data(using: .utf8)!))
+            updates.append((makeKey(UInt8(i)), Data("value\(i)".utf8)))
         }
 
         try await trie.update(updates)
 
         // Verify data is readable (in-memory trie works)
         let result = try await trie.read(key: makeKey(5))
-        #expect(result == "value5".data(using: .utf8)!)
+        #expect(result == Data("value5".utf8))
 
         // Save should persist data
         try await trie.save()
 
         // Data should still be readable after save
         let result2 = try await trie.read(key: makeKey(5))
-        #expect(result2 == "value5".data(using: .utf8)!)
+        #expect(result2 == Data("value5".utf8))
     }
 
     @Test("Write buffer works correctly when disabled")
@@ -384,7 +384,7 @@ struct WriteBufferEdgeCaseTests {
         // Add items
         var updates: [(Data31, Data?)] = []
         for i in 0 ..< 10 {
-            updates.append((makeKey(UInt8(i)), "value\(i)".data(using: .utf8)!))
+            updates.append((makeKey(UInt8(i)), Data("value\(i)".utf8)))
         }
 
         try await trie.update(updates)
