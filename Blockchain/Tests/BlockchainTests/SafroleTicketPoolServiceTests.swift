@@ -24,8 +24,13 @@ struct SafroleTicketPoolServiceTests {
         let (genesisState, genesisBlock) = try State.devGenesis(config: config)
         dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
 
+        let logger = Logger(label: "SafroleTicketPoolServiceTests")
         storeMiddleware = StoreMiddleware()
-        eventBus = EventBus(eventMiddleware: .serial(Middleware(storeMiddleware), .noError), handlerMiddleware: .noError)
+        let logMiddleware = LogMiddleware(logger: logger, propagateError: true)
+        eventBus = EventBus(
+            eventMiddleware: .serial(Middleware(storeMiddleware), Middleware(logMiddleware)),
+            handlerMiddleware: Middleware(logMiddleware)
+        )
 
         keystore = try await DevKeyStore(devKeysCount: config.value.totalNumberOfValidators)
 
