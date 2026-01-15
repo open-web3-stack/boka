@@ -14,9 +14,9 @@ struct JSONTests {
     ])
     func debugDescription(jsonString: String) throws {
         let decoder = JSONDecoder()
-        let json = try decoder.decode(JSON.self, from: jsonString.data(using: .utf8)!)
+        let json = try decoder.decode(JSON.self, from: Data(jsonString.utf8))
         let debugDescription = json.debugDescription
-        let parsedJSON = try decoder.decode(JSON.self, from: debugDescription.data(using: .utf8)!)
+        let parsedJSON = try decoder.decode(JSON.self, from: Data(debugDescription.utf8))
         #expect(json == parsedJSON)
     }
 
@@ -30,7 +30,7 @@ struct JSONTests {
     ])
     func decoding(jsonString: String, expectedJSON: JSON) throws {
         let decoder = JSONDecoder()
-        let json = try decoder.decode(JSON.self, from: jsonString.data(using: .utf8)!)
+        let json = try decoder.decode(JSON.self, from: Data(jsonString.utf8))
         #expect(json == expectedJSON)
     }
 

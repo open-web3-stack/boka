@@ -56,6 +56,60 @@ The Boka CLI supports the following arguments:
 - Run Rust tests: `make test-cargo`
 - Run tests with coverage: `make test-coverage`
 
+## Benchmarking
+
+Boka includes comprehensive performance benchmarks covering core blockchain operations:
+
+### Run Benchmarks
+
+```bash
+# Run all benchmarks
+make benchmark
+
+# List all available benchmarks
+make benchmark-list
+
+# Run specific benchmarks by filter pattern
+make benchmark-filter FILTER=trie
+make benchmark-filter FILTER=runtime
+make benchmark-filter FILTER=rocksdb
+
+# Common filter patterns:
+# - trie: Merkle trie operations
+# - runtime: Runtime state transition functions
+# - blockchain: Block import and chain management
+# - rocksdb: Persistent storage operations
+# - state: State backend operations
+# - polkavm: PVM contract execution
+# - validator: Validator operations
+# - w3f: Test vector processing
+```
+
+### Benchmark Baselines
+
+Baselines are used to track performance over time and detect regressions:
+
+```bash
+# Create/update a baseline
+make benchmark-baseline BASELINE=master
+make benchmark-baseline BASELINE=pull_request
+
+# Compare two baselines
+make benchmark-compare BASELINE1=master BASELINE2=pull_request
+
+# Check for performance regressions against thresholds
+make benchmark-check BASELINE1=master BASELINE2=pull_request
+```
+
+### CI/CD Integration
+
+Benchmarks run automatically in CI:
+
+- **PR Benchmarks**: Compare PR changes against master branch, fail on regressions
+- **Nightly Benchmarks**: Track performance over time, stored as artifacts for 90 days
+
+Regression thresholds are configured in `JAMTests/.benchmarkBaselines/thresholds.json`.
+
 ## Packages
 
 - Boka

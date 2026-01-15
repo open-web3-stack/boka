@@ -4,10 +4,10 @@ import Utils
 
 private let logger = Logger(label: "StateTrie")
 
-private enum TrieNodeType {
-    case branch
-    case embeddedLeaf
-    case regularLeaf
+private enum TrieNodeType: UInt8 {
+    case branch = 0
+    case embeddedLeaf = 1
+    case regularLeaf = 2
 }
 
 private struct TrieNode {
@@ -25,16 +25,7 @@ private struct TrieNode {
         rawValue = nil
 
         let typeByte = data[relative: 0]
-        switch typeByte {
-        case 0:
-            type = .branch
-        case 1:
-            type = .embeddedLeaf
-        case 2:
-            type = .regularLeaf
-        default:
-            type = .branch
-        }
+        type = TrieNodeType(rawValue: typeByte) ?? .branch
 
         left = Data32(data[relative: 1 ..< 33])! // bytes 1-32
         right = Data32(data[relative: 33 ..< 65])! // bytes 33-64
@@ -72,16 +63,9 @@ private struct TrieNode {
     // New 65-byte storage format: [type:1][left:32][right:32]
     var storageData: Data {
         var data = Data(capacity: 65)
-
-        switch type {
-        case .branch: data.append(0)
-        case .embeddedLeaf: data.append(1)
-        case .regularLeaf: data.append(2)
-        }
-
+        data.append(type.rawValue)
         data.append(left.data)
         data.append(right.data)
-
         return data
     }
 
@@ -105,8 +89,9 @@ private struct TrieNode {
             return nil
         }
         // For embedded leaves: length is stored in first byte
-        let len = left.data[relative: 0]
-        return right.data[relative: 0 ..< Int(len)]
+        let len = Int(left.data[relative: 0])
+        let safeLen = min(len, 32)
+        return right.data[relative: 0 ..< safeLen]
     }
 
     static func leaf(key: Data31, value: Data) -> TrieNode {
@@ -141,12 +126,40 @@ public actor StateTrie {
     public private(set) var rootHash: Data32
     private var nodes: [Data: TrieNode] = [:]
     private var deleted: Set<Data> = []
+    private var lastSavedRootHash: Data32 // Track last saved root for proper ref counting
 
-    public init(rootHash: Data32, backend: StateBackendProtocol) {
+    // Performance optimization: LRU cache for frequently accessed nodes
+    private let nodeCache: LRUCache<Data, TrieNode>?
+    private let cacheStats: CacheStatsTracker?
+
+    // Performance optimization: Write buffering for batched I/O
+    private let writeBuffer: WriteBuffer?
+    private let enableWriteBuffer: Bool
+
+    public init(
+        rootHash: Data32,
+        backend: StateBackendProtocol,
+        enableCache: Bool = true,
+        cacheSize: Int = 1000,
+        enableWriteBuffer: Bool = true,
+        writeBufferSize: Int = 1000,
+        writeBufferFlushInterval: TimeInterval = 1.0
+    ) {
         self.rootHash = rootHash
         self.backend = backend
+        lastSavedRootHash = rootHash // Initialize with current root
+        nodeCache = enableCache ? LRUCache(capacity: cacheSize) : nil
+        cacheStats = enableCache ? CacheStatsTracker() : nil
+        self.enableWriteBuffer = enableWriteBuffer
+        writeBuffer = enableWriteBuffer ? WriteBuffer(
+            maxBufferSize: writeBufferSize,
+            flushInterval: writeBufferFlushInterval
+        ) : nil
     }
 
+    /// Read a value from the trie
+    /// Phase 2: Reads from in-memory buffer and backend
+    /// Note: Does not flush write buffer - reads see pending updates via in-memory 'nodes' map
     public func read(key: Data31) async throws -> Data? {
         let node = try await find(hash: rootHash, key: key, depth: 0)
         guard let node else {
@@ -190,13 +203,13 @@ public actor StateTrie {
     private func findByPrefix(hash: Data32, prefix: Data, bitsCount: UInt8, depth: UInt8) async throws -> TrieNode? {
         guard depth < bitsCount else {
             // Reached the end of prefix, return this node
-            return try await get(hash: hash)
+            return try await get(hash: hash, bypassCache: true)
         }
 
-        guard let node = try await get(hash: hash) else { return nil }
+        guard let node = try await get(hash: hash, bypassCache: true, prefetchSiblings: false) else { return nil }
 
         if node.isBranch {
-            let bitValue = bitAt(prefix, position: depth)
+            let bitValue = Self.bitAt(prefix, position: depth)
             let childHash = bitValue ? node.right : node.left
             return try await findByPrefix(hash: childHash, prefix: prefix, bitsCount: bitsCount, depth: depth + 1)
         } else {
@@ -227,10 +240,12 @@ public actor StateTrie {
     private func getLeaves(node: TrieNode) async throws -> [Data31] {
         if node.isBranch {
             var result: [Data31] = []
-            if let leftNode = try await get(hash: node.left) {
+
+            // Sequential processing to prevent task explosion
+            if let leftNode = try await get(hash: node.left, bypassCache: true, prefetchSiblings: false) {
                 result += try await getLeaves(node: leftNode)
             }
-            if let rightNode = try await get(hash: node.right) {
+            if let rightNode = try await get(hash: node.right, bypassCache: true, prefetchSiblings: false) {
                 result += try await getLeaves(node: rightNode)
             }
             return result
@@ -245,10 +260,12 @@ public actor StateTrie {
     private func getLeavesValues(node: TrieNode) async throws -> [(key: Data31, value: Data)] {
         if node.isBranch {
             var result: [(key: Data31, value: Data)] = []
-            if let leftNode = try await get(hash: node.left) {
+
+            // Sequential processing to prevent task explosion
+            if let leftNode = try await get(hash: node.left, bypassCache: true, prefetchSiblings: false) {
                 result += try await getLeavesValues(node: leftNode)
             }
-            if let rightNode = try await get(hash: node.right) {
+            if let rightNode = try await get(hash: node.right, bypassCache: true, prefetchSiblings: false) {
                 result += try await getLeavesValues(node: rightNode)
             }
             return result
@@ -278,7 +295,7 @@ public actor StateTrie {
             return nil
         }
         if node.isBranch {
-            let bitValue = bitAt(key.data, position: depth)
+            let bitValue = Self.bitAt(key.data, position: depth)
             if bitValue {
                 return try await find(hash: node.right, key: key, depth: depth + 1)
             } else {
@@ -290,7 +307,7 @@ public actor StateTrie {
         return nil
     }
 
-    private func get(hash: Data32) async throws -> TrieNode? {
+    private func get(hash: Data32, bypassCache: Bool = false, prefetchSiblings: Bool = true) async throws -> TrieNode? {
         if hash == Data32() {
             return nil
         }
@@ -298,33 +315,106 @@ public actor StateTrie {
         if deleted.contains(id) {
             return nil
         }
+
+        // Check in-memory nodes first (current operation)
         if let node = nodes[id] {
+            // Phase 2 Week 4: Prefetch siblings when returning cached node
+            if prefetchSiblings, node.isBranch {
+                // Prefetch both children asynchronously (don't await)
+                Task {
+                    _ = try? await get(hash: node.left, bypassCache: false, prefetchSiblings: false)
+                    _ = try? await get(hash: node.right, bypassCache: false, prefetchSiblings: false)
+                }
+            }
             return node
         }
+
+        // Check LRU cache for previously loaded nodes (unless bypassed)
+        if !bypassCache, let cache = nodeCache, let cachedNode = cache.get(id) {
+            cacheStats?.recordHit()
+            // Phase 2 Week 4: Prefetch siblings when returning cached node
+            if prefetchSiblings, cachedNode.isBranch {
+                // Prefetch both children asynchronously (don't await)
+                Task {
+                    _ = try? await get(hash: cachedNode.left, bypassCache: false, prefetchSiblings: false)
+                    _ = try? await get(hash: cachedNode.right, bypassCache: false, prefetchSiblings: false)
+                }
+            }
+            return cachedNode
+        }
+
+        // Load from backend
         guard let data = try await backend.read(key: id) else {
+            if !bypassCache {
+                cacheStats?.recordMiss()
+            }
             return nil
+        }
+        if !bypassCache {
+            cacheStats?.recordMiss()
         }
         guard data.count == 65 else {
             throw StateTrieError.invalidData
         }
         let node = TrieNode(hash: hash, data: data)
-        saveNode(node: node)
+
+        // Cache the node for future access
+        if let cache = nodeCache {
+            cache.put(id, value: node)
+        }
+
+        // Phase 2 Week 4: Prefetch siblings after loading from backend
+        if prefetchSiblings, node.isBranch {
+            // Prefetch both children asynchronously (don't await)
+            Task {
+                _ = try? await get(hash: node.left, bypassCache: false, prefetchSiblings: false)
+                _ = try? await get(hash: node.right, bypassCache: false, prefetchSiblings: false)
+            }
+        }
+
+        // Don't save loaded nodes to nodes map - they're already persisted
+        // and don't need ref count updates (only new nodes do)
         return node
     }
 
     /// Update trie with multiple key-value pairs
-    /// Note: Currently processes updates sequentially.
-    /// Performance improvement opportunities:
-    /// - Batch updates: Group inserts/deletes by tree depth to minimize I/O
-    /// - Parallel processing: Use TaskGroup for independent updates
-    /// - Write batching: Collect all operations before committing to backend
+    /// Performance optimizations:
+    /// - Write buffering: Phase 2 - Buffer updates before batch I/O
+    /// - Parallel processing: Use TaskGroup for independent updates (future)
     /// - Cache optimization: Keep recently accessed nodes in memory
     public func update(_ updates: [(key: Data31, value: Data?)]) async throws {
+        // If write buffering is enabled, use buffered updates
+        if enableWriteBuffer, let buffer = writeBuffer {
+            try await updateBuffered(updates, buffer: buffer)
+        } else {
+            // Original immediate update path
+            for (key, value) in updates {
+                if let value {
+                    rootHash = try await insert(hash: rootHash, key: key, value: value, depth: 0)
+                } else {
+                    rootHash = try await delete(hash: rootHash, key: key, depth: 0)
+                }
+            }
+        }
+    }
+
+    /// Phase 2: Buffered update implementation
+    /// Accumulates updates in buffer and flushes when necessary
+    private func updateBuffered(_ updates: [(key: Data31, value: Data?)], buffer: WriteBuffer) async throws {
         for (key, value) in updates {
+            // Add to buffer (synchronous since WriteBuffer is no longer an actor)
+            let shouldFlush = buffer.add(key: key, value: value)
+
+            // Apply update to in-memory trie
             if let value {
                 rootHash = try await insert(hash: rootHash, key: key, value: value, depth: 0)
             } else {
                 rootHash = try await delete(hash: rootHash, key: key, depth: 0)
+            }
+
+            // Flush if buffer is full or time interval elapsed
+            if shouldFlush {
+                try await flushWriteBuffer()
             }
         }
     }
@@ -333,18 +423,32 @@ public actor StateTrie {
         var ops = [StateBackendOperation]()
         var refChanges = [Data: Int]()
 
+        // Decrement reference count of old root hash if it changed
+        if lastSavedRootHash != rootHash {
+            refChanges[lastSavedRootHash.data.suffix(31), default: 0] -= 1
+        }
+
         // process deleted nodes
         for id in deleted {
             guard let node = nodes[id] else {
                 continue
             }
             if node.isBranch {
-                // assign -1 to not worry about duplicates
-                refChanges[node.hash.data.suffix(31)] = -1
-                refChanges[node.left.data.suffix(31)] = -1
-                refChanges[node.right.data.suffix(31)] = -1
+                // Decrement reference counts for children of deleted branch nodes
+                // Note: We don't decrement the node's own ref count here - that's
+                // handled by its parent when the parent is processed (or when the
+                // root changes). We only decrement the children that this node
+                // was referencing.
+                // Use -= to properly accumulate if multiple deleted nodes share children
+                refChanges[node.left.data.suffix(31), default: 0] -= 1
+                refChanges[node.right.data.suffix(31), default: 0] -= 1
             }
             nodes.removeValue(forKey: id)
+
+            // Invalidate from cache when deleted
+            if let cache = nodeCache {
+                cache.remove(id)
+            }
         }
         deleted.removeAll()
 
@@ -357,6 +461,11 @@ public actor StateTrie {
                 refChanges[node.left.data.suffix(31), default: 0] += 1
                 refChanges[node.right.data.suffix(31), default: 0] += 1
             }
+
+            // Update cache with new nodes
+            if let cache = nodeCache {
+                cache.put(node.hash.data.suffix(31), value: node)
+            }
         }
 
         // pin root node
@@ -364,19 +473,76 @@ public actor StateTrie {
 
         nodes.removeAll()
 
-        let zeros = Data(repeating: 0, count: 32)
+        let zeros = Data(repeating: 0, count: 31) // Keys are 31 bytes (suffix of Data32)
         for (key, value) in refChanges {
             if key == zeros {
                 continue
             }
-            if value > 0 {
-                ops.append(.refIncrement(key: key.suffix(31)))
-            } else if value < 0 {
-                ops.append(.refDecrement(key: key.suffix(31)))
-            }
+            // Emit single refUpdate operation with delta
+            // This is much more efficient than unrolling into individual increments/decrements
+            ops.append(.refUpdate(key: key.suffix(31), delta: Int64(value)))
         }
 
         try await backend.batchUpdate(ops)
+
+        // Update last saved root hash after successful batch update
+        lastSavedRootHash = rootHash
+    }
+
+    /// Get cache statistics for monitoring and debugging
+    public func getCacheStats() async -> CacheStatsTracker.CacheStatistics? {
+        guard let stats = cacheStats else {
+            return nil
+        }
+        return stats.current
+    }
+
+    /// Clear the LRU cache (useful for testing or memory management)
+    public func clearCache() {
+        nodeCache?.removeAll()
+        cacheStats?.reset()
+    }
+
+    // MARK: - Phase 2: Write Buffering Methods
+
+    /// Flush the write buffer, persisting all buffered updates to storage
+    /// This is called automatically when buffer is full or flush interval elapses
+    /// Can also be called manually for immediate persistence
+    public func flushWriteBuffer() async throws {
+        guard enableWriteBuffer, let buffer = writeBuffer else {
+            return
+        }
+
+        // Only flush if there's something to flush (synchronous check)
+        guard !buffer.isEmpty else {
+            return
+        }
+
+        // Save current state (this is where actual I/O happens)
+        try await save()
+
+        // Clear the buffer after successful save (synchronous)
+        _ = buffer.flush()
+    }
+
+    /// Manually trigger a flush of the write buffer
+    /// Use this to ensure all updates are persisted before critical operations
+    public func flush() async throws {
+        try await flushWriteBuffer()
+    }
+
+    /// Get write buffer statistics for monitoring and debugging
+    public func getWriteBufferStats() -> WriteBufferStats? {
+        guard let buffer = writeBuffer else {
+            return nil
+        }
+        return buffer.stats
+    }
+
+    /// Clear the write buffer without flushing (use with caution - data loss!)
+    /// Only useful for testing or error recovery
+    public func clearWriteBuffer() {
+        writeBuffer?.clear()
     }
 
     private func insert(
@@ -389,9 +555,9 @@ public actor StateTrie {
         }
 
         if parent.isBranch {
-            removeNode(hash: hash)
+            removeNode(node: parent)
 
-            let bitValue = bitAt(key.data, position: depth)
+            let bitValue = Self.bitAt(key.data, position: depth)
             var left = parent.left
             var right = parent.right
             if bitValue {
@@ -411,13 +577,14 @@ public actor StateTrie {
     private func insertLeafNode(existing: TrieNode, newKey: Data31, newValue: Data, depth: UInt8) async throws -> Data32 {
         if existing.isLeaf(key: newKey) {
             // update existing leaf
+            removeNode(node: existing)
             let newLeaf = TrieNode.leaf(key: newKey, value: newValue)
             saveNode(node: newLeaf)
             return newLeaf.hash
         }
 
-        let existingKeyBit = bitAt(existing.left.data[relative: 1...], position: depth)
-        let newKeyBit = bitAt(newKey.data, position: depth)
+        let existingKeyBit = Self.bitAt(existing.left.data[relative: 1...], position: depth)
+        let newKeyBit = Self.bitAt(newKey.data, position: depth)
 
         if existingKeyBit == newKeyBit {
             // need to go deeper
@@ -451,9 +618,9 @@ public actor StateTrie {
         }
 
         if node.isBranch {
-            removeNode(hash: hash)
+            removeNode(node: node)
 
-            let bitValue = bitAt(key.data, position: depth)
+            let bitValue = Self.bitAt(key.data, position: depth)
             var left = node.left
             var right = node.right
 
@@ -498,7 +665,7 @@ public actor StateTrie {
         } else {
             // leaf - only remove if the leaf matches the key we're deleting
             if node.isLeaf(key: key) {
-                removeNode(hash: hash)
+                removeNode(node: node)
                 return Data32()
             } else {
                 return hash
@@ -506,10 +673,18 @@ public actor StateTrie {
         }
     }
 
-    private func removeNode(hash: Data32) {
-        let id = hash.data.suffix(31)
+    private func removeNode(node: TrieNode) {
+        let id = node.hash.data.suffix(31)
         deleted.insert(id)
-        nodes.removeValue(forKey: id)
+
+        // Only remove from nodes map if it's a new node (never persisted)
+        // For persisted nodes, we need to keep them in memory until save() processes
+        // their reference counts (decrementing children's ref counts)
+        if node.isNew {
+            nodes.removeValue(forKey: id)
+        } else {
+            nodes[id] = node
+        }
     }
 
     private func saveNode(node: TrieNode) {
@@ -547,12 +722,12 @@ public actor StateTrie {
         logger.info("Root hash: \(rootHash.toHexString())")
         try await printNode(rootHash, depth: 0)
     }
-}
 
-/// bit at i, returns true if it is 1
-private func bitAt(_ data: Data, position: UInt8) -> Bool {
-    let byteIndex = position / 8
-    let bitIndex = 7 - (position % 8)
-    let byte = data[safeRelative: Int(byteIndex)] ?? 0
-    return (byte & (1 << bitIndex)) != 0
+    /// bit at i, returns true if it is 1
+    private static func bitAt(_ data: Data, position: UInt8) -> Bool {
+        let byteIndex = position / 8
+        let bitIndex = 7 - (position % 8)
+        let byte = data[safeRelative: Int(byteIndex)] ?? 0
+        return (byte & (1 << bitIndex)) != 0
+    }
 }

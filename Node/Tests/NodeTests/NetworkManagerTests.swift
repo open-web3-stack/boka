@@ -451,7 +451,7 @@ struct NetworkManagerTests {
         let testErasureRoot = Data32(repeating: 1)
         let testShardIndex: UInt16 = 2
         let testSegmentIndices: [UInt16] = [1, 2, 3]
-        let testSegments = [SegmentShard(shard: Data12(repeating: 0), justification: nil)]
+        let testSegments = [SegmentShard(shard: Data12(repeating: 0).data, justification: nil)]
         let testError = NSError(domain: "test", code: 404)
 
         let requestMessage = try SegmentShardRequestMessage(

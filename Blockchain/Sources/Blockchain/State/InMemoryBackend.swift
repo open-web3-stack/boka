@@ -48,10 +48,8 @@ public actor InMemoryBackend: StateBackendProtocol {
             case let .writeRawValue(key, value):
                 rawValues[key] = value
                 rawValueRefCounts[key, default: 0] += 1
-            case let .refIncrement(key):
-                refCounts[key, default: 0] += 1
-            case let .refDecrement(key):
-                refCounts[key, default: 0] -= 1
+            case let .refUpdate(key, delta):
+                refCounts[key, default: 0] += Int(delta)
             }
         }
     }
@@ -60,11 +58,24 @@ public actor InMemoryBackend: StateBackendProtocol {
         rawValues[hash]
     }
 
+    public func batchRead(keys: [Data]) async throws -> [Data: Data] {
+        var result: [Data: Data] = [:]
+        // In-memory implementation: direct dictionary lookup
+        for key in keys {
+            if let value = store[key] {
+                result[key] = value
+            }
+        }
+        return result
+    }
+
     public func gc(callback: @Sendable (Data) -> Data32?) async throws {
         // check ref counts and remove keys with 0 ref count
+        var keysToRemove: [Data] = []
         for (key, count) in refCounts where count == 0 {
             if let value = store[key] {
                 store.removeValue(forKey: key)
+                keysToRemove.append(key)
                 if let rawValueKey = callback(value) {
                     rawValueRefCounts[rawValueKey, default: 0] -= 1
                     if rawValueRefCounts[rawValueKey] == 0 {
@@ -73,6 +84,10 @@ public actor InMemoryBackend: StateBackendProtocol {
                     }
                 }
             }
+        }
+        // Remove keys from refCounts to prevent unbounded growth
+        for key in keysToRemove {
+            refCounts.removeValue(forKey: key)
         }
     }
 
@@ -83,6 +98,11 @@ public actor InMemoryBackend: StateBackendProtocol {
             logger.info("value: \(value.toHexString())")
             logger.info("ref count: \(refCount)")
         }
+    }
+
+    /// Get reference count for a key (for testing purposes)
+    public func getRefCount(key: Data) async -> Int {
+        refCounts[key] ?? 0
     }
 
     public func createIterator(prefix: Data, startKey: Data?) async throws -> StateBackendIterator {

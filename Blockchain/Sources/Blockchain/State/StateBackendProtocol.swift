@@ -4,8 +4,7 @@ import Utils
 public enum StateBackendOperation: Sendable {
     case write(key: Data, value: Data)
     case writeRawValue(key: Data32, value: Data)
-    case refIncrement(key: Data)
-    case refDecrement(key: Data)
+    case refUpdate(key: Data, delta: Int64) // Apply delta to reference count (can be positive or negative)
 }
 
 public protocol StateBackendIterator: Sendable {
@@ -30,7 +29,27 @@ public protocol StateBackendProtocol: Sendable {
     // hash is the blake2b256 hash of the value
     func readValue(hash: Data32) async throws -> Data?
 
+    /// Read multiple nodes in a single batch operation
+    /// - Parameter keys: List of node keys to read (31 bytes each)
+    /// - Returns: Dictionary mapping keys to their node data (65 bytes each)
+    /// - Note: Missing keys are omitted from result (not an error)
+    func batchRead(keys: [Data]) async throws -> [Data: Data]
+
     /// remove entries with zero ref count
     /// callback returns a dependent raw value key if the data is regular leaf node
     func gc(callback: @Sendable (Data) -> Data32?) async throws
+}
+
+/// Default implementation of batchRead using sequential reads
+extension StateBackendProtocol {
+    public func batchRead(keys: [Data]) async throws -> [Data: Data] {
+        var result: [Data: Data] = [:]
+        // Fallback: sequential reads for backends that don't implement batch loading
+        for key in keys {
+            if let data = try await read(key: key) {
+                result[key] = data
+            }
+        }
+        return result
+    }
 }

@@ -161,7 +161,7 @@ public enum ErasureCoding {
                 reed_solomon_encode(
                     originalBuffer.baseAddress,
                     UInt(originalCount),
-                    UInt(parityCount),
+                    UInt(parityCount), // Number of parity shards to generate
                     UInt(shardSize),
                     recoveryBuffer.baseAddress
                 )
@@ -210,12 +210,9 @@ public enum ErasureCoding {
                 continue
             }
 
-            let parityIndex: UInt32 = if rawIndex >= UInt32(originalCount) {
-                rawIndex - UInt32(originalCount)
-            } else {
-                rawIndex
-            }
-
+            // Parity shard: convert to relative index for FFI
+            // FFI expects parity shards to be indexed 0..(parityCount-1)
+            let parityIndex = rawIndex - UInt32(originalCount)
             guard parityIndex < UInt32(parityCount) else {
                 throw Error.invalidShardIndex(rawIndex)
             }
@@ -266,7 +263,7 @@ public enum ErasureCoding {
                 originalPtrs.withUnsafeMutableBufferPointer { outputBuffer in
                     reed_solomon_recovery(
                         UInt(originalCount),
-                        UInt(parityCount),
+                        UInt(parityCount), // Number of parity shards available
                         originalBuffer.baseAddress,
                         UInt(originalOpaquePtrs.count),
                         recoveryBuffer.baseAddress,
@@ -346,7 +343,8 @@ public enum ErasureCoding {
         guard shards.count >= originalCount else { throw Error.invalidShardsCount }
 
         // Fast path: all original shards are available
-        let originalMap = Dictionary(uniqueKeysWithValues: shards.map { (Int($0.index), $0.data) })
+        // Use uniquingKeysWith to handle duplicate indices gracefully (keep first occurrence)
+        let originalMap = Dictionary(shards.map { (Int($0.index), $0.data) }, uniquingKeysWith: { first, _ in first })
         let availableOriginals = (0 ..< originalCount).compactMap { originalMap[$0] }
         if availableOriginals.count == originalCount {
             let reconstructed = join(arr: availableOriginals)

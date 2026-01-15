@@ -89,3 +89,56 @@ run: githooks
 .PHONY: devnet
 devnet:
 	./scripts/devnet.sh
+
+# Benchmark targets
+.PHONY: benchmark
+benchmark: githooks deps
+	cd JAMTests && swift package benchmark
+
+.PHONY: benchmark-list
+benchmark-list: githooks deps
+	cd JAMTests && swift package benchmark list
+
+.PHONY: benchmark-filter
+benchmark-filter: githooks deps
+	@echo "Usage: make benchmark-filter FILTER=<pattern>"
+	@echo "Example: make benchmark-filter FILTER=trie"
+	@if [ -z "$(FILTER)" ]; then \
+		echo "Error: FILTER parameter is required"; \
+		exit 1; \
+	fi
+	cd JAMTests && swift package benchmark --filter $(FILTER)
+
+.PHONY: benchmark-baseline
+benchmark-baseline: githooks deps
+	@echo "Usage: make benchmark-baseline BASELINE=<name>"
+	@echo "Example: make benchmark-baseline BASELINE=master"
+	@if [ -z "$(BASELINE)" ]; then \
+		echo "Error: BASELINE parameter is required"; \
+		exit 1; \
+	fi
+	cd JAMTests && swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update $(BASELINE)
+
+.PHONY: benchmark-compare
+benchmark-compare: githooks deps
+	@echo "Usage: make benchmark-compare BASELINE1=<name1> BASELINE2=<name2>"
+	@echo "Example: make benchmark-compare BASELINE1=master BASELINE2=pull_request"
+	@if [ -z "$(BASELINE1)" ] || [ -z "$(BASELINE2)" ]; then \
+		echo "Error: BASELINE1 and BASELINE2 parameters are required"; \
+		exit 1; \
+	fi
+	cd JAMTests && swift package benchmark baseline compare $(BASELINE1) $(BASELINE2)
+
+.PHONY: benchmark-check
+benchmark-check: githooks deps
+	@echo "Usage: make benchmark-check BASELINE1=<name1> BASELINE2=<name2>"
+	@echo "Example: make benchmark-check BASELINE1=master BASELINE2=pull_request"
+	@if [ -z "$(BASELINE1)" ] || [ -z "$(BASELINE2)" ]; then \
+		echo "Error: BASELINE1 and BASELINE2 parameters are required"; \
+		exit 1; \
+	fi
+	cd JAMTests && swift package benchmark baseline check $(BASELINE1) $(BASELINE2) --thresholds .benchmarkBaselines/thresholds.json
+
+.PHONY: benchmark-all
+benchmark-all: githooks deps
+	cd JAMTests && swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update all
