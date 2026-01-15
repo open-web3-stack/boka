@@ -56,7 +56,11 @@ public class BlockchainServices: @unchecked Sendable {
         dataStore = DataStore(dataStoreBackend, dataStoreBackend)
 
         storeMiddleware = StoreMiddleware()
-        eventBus = EventBus(eventMiddleware: .serial(Middleware(storeMiddleware), .noError), handlerMiddleware: .noError)
+        let logMiddleware = LogMiddleware(logger: logger, propagateError: true)
+        eventBus = EventBus(
+            eventMiddleware: .serial(Middleware(storeMiddleware), Middleware(logMiddleware)),
+            handlerMiddleware: Middleware(logMiddleware)
+        )
 
         scheduler = MockScheduler(timeProvider: timeProvider)
 
