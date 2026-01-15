@@ -33,7 +33,8 @@ public actor ErasureCodingService {
 
         logger.debug("Encoding \(segments.count) segments into shards")
 
-        // Pre-allocate capacity to avoid O(N^2) copies from repeated concatenation
+        // Concatenate all segment data efficiently
+        // Data with pre-allocated capacity avoids repeated allocations during appends
         var totalData = Data(capacity: segments.count * 4104)
         for segment in segments {
             totalData.append(segment.data)
@@ -367,25 +368,20 @@ extension ErasureCodingService {
         for step in copath {
             switch step {
             case let .left(data):
-                // IMPORTANT: We rely on data size to distinguish node types
-                // - Leaf nodes: 64 bytes (encodedShardHash[32] + encodedSegmentsRoot[32])
-                // - Internal nodes: 32 bytes (hashes produced by Blake2b256)
-                //
-                // This assumption holds because:
-                // 1. Leaf nodes are constructed as encodedHash + encodedSegmentsRoot (line 356)
-                // 2. Merkle tree hashing always produces 32-byte outputs
-                // 3. If tree structure changes, this logic must be updated
+                // Determine if this is an internal node (already hashed) or leaf node (needs hashing)
+                // Internal nodes from merkle tree are always 32 bytes (Blake2b256 output)
+                // Leaf nodes contain concatenated data: encodedShardHash[32] + encodedSegmentsRoot[32] = 64 bytes
+                // Segment shards are variable size (~12 bytes depending on encoding)
                 let hash: Data32
                 if data.count == 32 {
-                    // Internal node - already a hash
+                    // Internal node - already a 32-byte hash from merkle tree
                     guard let h = Data32(data) else {
                         throw ErasureCodingError.invalidHash
                     }
                     hash = h
                 } else {
-                    // Leaf node or non-standard size - hash it to normalize
-                    // Note: Leaf nodes are 64 bytes (encodedShardHash + encodedSegmentsRoot)
-                    // or variable size for segment shards (~12 bytes)
+                    // Leaf node (64 bytes) or segment shard (variable size) - hash to normalize
+                    // This ensures all data is converted to 32-byte hashes for justification
                     hash = data.blake2b256hash()
                 }
                 steps.append(.left(hash))

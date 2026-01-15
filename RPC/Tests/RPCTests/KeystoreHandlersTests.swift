@@ -77,7 +77,7 @@ final class KeystoreHandlersTests {
     func hasKey() async throws {
         let ed25519PubKey = try await dummyKeystoreDataSource.create(keyType: .Ed25519)
 
-        let params = JSON.array([.string(ed25519PubKey.type), .string(ed25519PubKey.key.data(using: .utf8)!.toHexString())])
+        let params = JSON.array([.string(ed25519PubKey.type), .string(Data(ed25519PubKey.key.utf8).toHexString())])
         let req = JSONRequest(jsonrpc: "2.0", method: "keys_hasKey", params: params, id: 0)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)

@@ -31,6 +31,4 @@ tmp
 
 *.pvm
 
-.benchmarkBaselines
-
 spec/
