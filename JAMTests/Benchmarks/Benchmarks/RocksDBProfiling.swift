@@ -85,7 +85,7 @@ func rocksdbProfilingBenchmarks() {
         var blocks: [BlockRef] = []
         var stateHashes: [Data32] = []
 
-        for i in 0 ..< 100 {
+        for _ in 0 ..< 100 {
             let prevBlock = blocks.last ?? genesisBlock
             let block = BlockRef.dummy(config: config, parent: prevBlock)
             blocks.append(block)
@@ -98,7 +98,7 @@ func rocksdbProfilingBenchmarks() {
 
         benchmark.startMeasurement()
         // Read different states (cache misses)
-        for hash in stateHashes {
+        for _ in stateHashes {
             _ = try await rocksDB.getState(hash: genesisBlock.hash)
         }
         benchmark.stopMeasurement()
@@ -179,7 +179,7 @@ func rocksdbProfilingBenchmarks() {
         let tempDir = try createTempDirectory()
         defer { tempDir.cleanup() }
 
-        let (genesisBlock, genesisState, stateData) = try await createGenesis(config: config)
+        let (genesisBlock, _, stateData) = try await createGenesis(config: config)
 
         let rocksDB = try await RocksDBBackend(
             path: tempDir.url,
@@ -310,8 +310,7 @@ func rocksdbProfilingBenchmarks() {
         benchmark.startMeasurement()
         var totalAllocations = 0
         for _ in 0 ..< 100 {
-            let state = try await rocksDB.getState(hash: genesisBlock.hash)
-            if let state {
+            if let _ = try await rocksDB.getState(hash: genesisBlock.hash) {
                 totalAllocations += 1 // Count state objects
             }
         }
