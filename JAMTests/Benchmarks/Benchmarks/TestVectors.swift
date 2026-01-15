@@ -50,7 +50,7 @@ func testVectorsBenchmarks() {
     } else if shuffleTests.isEmpty {
         print("⚠️  Warning: Shuffle test file found but failed to decode. Skipping w3f.shuffle benchmark.")
     }
-    if let _ = shuffleData, !shuffleTests.isEmpty {
+    if shuffleData != nil, !shuffleTests.isEmpty {
         // Pre-convert entropy strings to Data32 to avoid hex parsing in benchmark
         let shuffleCasesWithEntropy = shuffleTests.compactMap { test -> (input: Array<Int>, entropy: Data32)? in
             guard let entropy = Data32(fromHexString: test.entropy) else { return nil }

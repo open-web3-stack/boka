@@ -69,7 +69,7 @@ extension Genesis {
     private func readFile(from filePath: String) throws -> Data {
         do {
             let fileContents = try String(contentsOfFile: filePath, encoding: .utf8)
-            return fileContents.data(using: .utf8)!
+            return Data(fileContents.utf8)
         } catch {
             throw GenesisError.fileReadError(error)
         }

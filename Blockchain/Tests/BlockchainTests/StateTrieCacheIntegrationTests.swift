@@ -20,7 +20,7 @@ struct StateTrieCacheIntegrationTests {
         let key = makeKey(1)
 
         // Insert value
-        try await trie.update([(key, "value1".data(using: .utf8)!)])
+        try await trie.update([(key, Data("value1".utf8))])
         try await trie.save()
 
         // Read multiple times (should hit cache)
@@ -48,7 +48,7 @@ struct StateTrieCacheIntegrationTests {
 
         let key = makeKey(1)
 
-        try await trie.update([(key, "value1".data(using: .utf8)!)])
+        try await trie.update([(key, Data("value1".utf8))])
         try await trie.save()
 
         _ = try await trie.read(key: key)
@@ -73,7 +73,7 @@ struct StateTrieCacheIntegrationTests {
         // Insert multiple values
         var updates: [(Data31, Data?)] = []
         for i in 0 ..< 100 {
-            updates.append((makeKey(UInt8(i)), "value\(i)".data(using: .utf8)!))
+            updates.append((makeKey(UInt8(i)), Data("value\(i)".utf8)))
         }
 
         try await trie.update(updates)
@@ -104,7 +104,7 @@ struct StateTrieCacheIntegrationTests {
         // Insert more items than cache size
         var updates: [(Data31, Data?)] = []
         for i in 0 ..< 10 {
-            updates.append((makeKey(UInt8(i)), "value\(i)".data(using: .utf8)!))
+            updates.append((makeKey(UInt8(i)), Data("value\(i)".utf8)))
         }
 
         try await trie.update(updates)
@@ -136,19 +136,19 @@ struct StateTrieCacheIntegrationTests {
         let key = makeKey(1)
 
         // Insert initial value
-        try await trie.update([(key, "value1".data(using: .utf8)!)])
+        try await trie.update([(key, Data("value1".utf8))])
         try await trie.save()
 
         // Read to populate cache
         _ = try await trie.read(key: key)
 
         // Update value
-        try await trie.update([(key, "value2".data(using: .utf8)!)])
+        try await trie.update([(key, Data("value2".utf8))])
         try await trie.save()
 
         // Read updated value
         let result = try await trie.read(key: key)
-        #expect(result == "value2".data(using: .utf8)!)
+        #expect(result == Data("value2".utf8))
     }
 
     @Test("StateTrie cache handles deletions correctly")
@@ -164,12 +164,12 @@ struct StateTrieCacheIntegrationTests {
         let key = makeKey(1)
 
         // Insert value
-        try await trie.update([(key, "value1".data(using: .utf8)!)])
+        try await trie.update([(key, Data("value1".utf8))])
         try await trie.save()
 
         // Read to populate cache
         let result1 = try await trie.read(key: key)
-        #expect(result1 == "value1".data(using: .utf8)!)
+        #expect(result1 == Data("value1".utf8))
 
         // Delete value
         try await trie.update([(key, nil)])
@@ -196,7 +196,7 @@ struct StateTrieCacheIntegrationTests {
         // Insert more items than cache size
         var updates: [(Data31, Data?)] = []
         for i in 0 ..< 50 {
-            updates.append((makeKey(UInt8(i)), "value\(i)".data(using: .utf8)!))
+            updates.append((makeKey(UInt8(i)), Data("value\(i)".utf8)))
         }
 
         try await trie.update(updates)
@@ -223,12 +223,12 @@ struct StateTrieCacheIntegrationTests {
 
         // Insert two values
         try await trie.update([
-            (key1, "value1".data(using: .utf8)!),
+            (key1, Data("value1".utf8)),
         ])
         try await trie.save()
 
         try await trie.update([
-            (key2, "value2".data(using: .utf8)!),
+            (key2, Data("value2".utf8)),
         ])
         try await trie.save()
 
@@ -258,7 +258,7 @@ struct StateTrieCacheIntegrationTests {
         // Insert many items
         var updates: [(Data31, Data?)] = []
         for i in 0 ..< 1000 {
-            updates.append((makeKey(UInt8(i & 0xFF)), "value\(i)".data(using: .utf8)!))
+            updates.append((makeKey(UInt8(i & 0xFF)), Data("value\(i)".utf8)))
         }
 
         try await trie.update(updates)
@@ -293,7 +293,7 @@ struct StateTrieCacheIntegrationTests {
         let key = makeKey(1)
 
         // Insert value
-        try await trie.update([(key, "value1".data(using: .utf8)!)])
+        try await trie.update([(key, Data("value1".utf8))])
         try await trie.flush() // Flush write buffer
 
         // Reset cache stats
@@ -327,7 +327,7 @@ struct StateTrieCacheIntegrationTests {
         // Insert values
         var updates: [(Data31, Data?)] = []
         for i in 0 ..< 50 {
-            updates.append((makeKey(UInt8(i)), "value\(i)".data(using: .utf8)!))
+            updates.append((makeKey(UInt8(i)), Data("value\(i)".utf8)))
         }
 
         try await trie.update(updates)
@@ -364,7 +364,7 @@ struct StateTrieCacheIntegrationTests {
             cacheSize: 100
         )
 
-        try await trie1.update([(key, "value1".data(using: .utf8)!)])
+        try await trie1.update([(key, Data("value1".utf8))])
         try await trie1.save()
 
         // Read to populate cache
@@ -403,7 +403,7 @@ struct StateTrieCacheIntegrationTests {
         // Add and remove many items
         for i in 0 ..< 1000 {
             let key = makeKey(UInt8(i & 0xFF))
-            try await trie.update([(key, "value\(i)".data(using: .utf8)!)])
+            try await trie.update([(key, Data("value\(i)".utf8))])
             try await trie.save()
 
             _ = try await trie.read(key: key)
@@ -435,7 +435,7 @@ struct StateTrieCacheIntegrationTests {
         // Insert values
         var updates: [(Data31, Data?)] = []
         for i in 0 ..< 50 {
-            updates.append((makeKey(UInt8(i)), "value\(i)".data(using: .utf8)!))
+            updates.append((makeKey(UInt8(i)), Data("value\(i)".utf8)))
         }
 
         try await trie.update(updates)
