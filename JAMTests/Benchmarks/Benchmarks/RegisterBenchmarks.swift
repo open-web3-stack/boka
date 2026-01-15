@@ -13,6 +13,7 @@ let benchmarks: @Sendable () -> Void = {
     runtimeBenchmarks()
     blockchainBenchmarks()
     rocksdbBenchmarks()
+    rocksdbProfilingBenchmarks()
     polkaVMBenchmarks()
     validatorBenchmarks()
     testVectorsBenchmarks()
