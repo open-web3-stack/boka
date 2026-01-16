@@ -81,25 +81,24 @@ func rocksdbProfilingBenchmarks() {
             genesisStateData: stateData
         )
 
-        // Create multiple blocks to create different state hashes
+        // Create multiple blocks with unique states to test cache misses
         var blocks: [BlockRef] = []
-        var stateHashes: [Data32] = []
 
         for _ in 0 ..< 100 {
             let prevBlock = blocks.last ?? genesisBlock
             let block = BlockRef.dummy(config: config, parent: prevBlock)
             blocks.append(block)
             try await rocksDB.add(block: block)
-            try await rocksDB.add(state: genesisState)
-            if let rootHash = try await rocksDB.getState(hash: block.hash) {
-                await stateHashes.append(rootHash.value.stateRoot)
-            }
+
+            // Create a unique state for this block
+            let state = StateRef.dummy(config: config, block: block)
+            try await rocksDB.add(state: state)
         }
 
         benchmark.startMeasurement()
         // Read different states (cache misses)
-        for _ in stateHashes {
-            _ = try await rocksDB.getState(hash: genesisBlock.hash)
+        for block in blocks {
+            _ = try await rocksDB.getState(hash: block.hash)
         }
         benchmark.stopMeasurement()
     }
@@ -197,22 +196,11 @@ func rocksdbProfilingBenchmarks() {
     }
 
     Benchmark("rocksdb.profile.stateroot.hash.computation") { benchmark in
-        let tempDir = try createTempDirectory()
-        defer { tempDir.cleanup() }
-
-        let (genesisBlock, genesisState, stateData) = try await createGenesis(config: config)
-
-        _ = try await RocksDBBackend(
-            path: tempDir.url,
-            config: config,
-            genesisBlock: genesisBlock,
-            genesisStateData: stateData
-        )
+        let (genesisBlock, genesisState, _) = try await createGenesis(config: config)
 
         benchmark.startMeasurement()
-        // Just compute hash without database reads
-        let state = genesisState
-        let root = await state.value.stateRoot
+        // Just compute hash without database reads (in-memory baseline)
+        let root = await genesisState.value.stateRoot
         benchmark.stopMeasurement()
         blackHole(root)
     }
@@ -280,14 +268,15 @@ func rocksdbProfilingBenchmarks() {
 
         benchmark.startMeasurement()
         // Simulate concurrent reads
-        await withTaskGroup(of: Void.self) { group in
+        try await withThrowingTaskGroup(of: Void.self) { group in
             for _ in 0 ..< 10 {
                 group.addTask {
                     for _ in 0 ..< 10 {
-                        _ = try? await rocksDB.getState(hash: genesisBlock.hash)
+                        _ = try await rocksDB.getState(hash: genesisBlock.hash)
                     }
                 }
             }
+            try await group.waitForAll()
         }
         benchmark.stopMeasurement()
     }
@@ -310,7 +299,7 @@ func rocksdbProfilingBenchmarks() {
         benchmark.startMeasurement()
         var totalAllocations = 0
         for _ in 0 ..< 100 {
-            if let _ = try await rocksDB.getState(hash: genesisBlock.hash) {
+            if try await rocksDB.getState(hash: genesisBlock.hash) != nil {
                 totalAllocations += 1 // Count state objects
             }
         }
