@@ -159,7 +159,10 @@ jobs:
           # Compare nightly-new against nightly-previous if available
           if [ -f ".benchmarkBaselines/Benchmarks/nightly-previous/results.json" ]; then
             if [ -f ".benchmarkBaselines/thresholds.json" ]; then
-              swift package benchmark baseline check nightly-new nightly-previous --thresholds .benchmarkBaselines/thresholds.json --format markdown >> $GITHUB_STEP_SUMMARY 2>&1 || true
+              swift package benchmark baseline check nightly-new nightly-previous --thresholds .benchmarkBaselines/thresholds.json --format markdown >> $GITHUB_STEP_SUMMARY 2>&1 || echo "⚠️ Regression check completed with warnings" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "⚠️ No thresholds.json found - skipping detailed regression check" >> $GITHUB_STEP_SUMMARY
+              swift package benchmark baseline check nightly-new nightly-previous --format markdown >> $GITHUB_STEP_SUMMARY 2>&1 || true
             fi
           else
             echo "No previous nightly baseline available for regression check." >> $GITHUB_STEP_SUMMARY
