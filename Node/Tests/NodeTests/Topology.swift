@@ -27,10 +27,15 @@ struct Topology {
     func build(genesis: Genesis) async throws -> ([(Node, StoreMiddleware)], MockScheduler) {
         let timeProvider = MockTimeProvider(time: 1000)
         let scheduler = MockScheduler(timeProvider: timeProvider)
+        let logger = Logger(label: "TopologyTest")
         var ret: [(Node, StoreMiddleware)] = []
         for desc in nodes {
             let storeMiddleware = StoreMiddleware()
-            let eventBus = EventBus(eventMiddleware: .serial(Middleware(storeMiddleware), .noError), handlerMiddleware: .noError)
+            let logMiddleware = LogMiddleware(logger: logger, propagateError: true)
+            let eventBus = EventBus(
+                eventMiddleware: .serial(Middleware(storeMiddleware), Middleware(logMiddleware)),
+                handlerMiddleware: Middleware(logMiddleware)
+            )
             let keystore = try await DevKeyStore(devKeysCount: 0)
             let keys = try await keystore.addDevKeys(seed: desc.devSeed)
             let nodeConfig = await Config(
