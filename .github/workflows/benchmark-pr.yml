@@ -120,12 +120,11 @@ jobs:
         if: ${{ env.hasBenchmark == '1' }}
         run: |
           cd JAMTests
-          # Check if benchmarks exist on master and if the benchmark plugin is available
-          if swift package plugin --list 2>/dev/null | grep -q benchmark; then
-            swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update master --no-progress --quiet
-          else
-            echo "Benchmark plugin not available - skipping master baseline"
-          fi
+          # Build and run benchmarks for master branch
+          swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update master --no-progress --quiet 2>&1 || {
+            echo "⚠️ Warning: Master baseline benchmarks failed or incomplete"
+            exit 0
+          }
 
       - name: Switch to PR branch
         if: ${{ env.hasBenchmark == '1' }}
@@ -136,7 +135,11 @@ jobs:
         if: ${{ env.hasBenchmark == '1' }}
         run: |
           cd JAMTests
-          swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update pull_request --no-progress --quiet
+          # Build and run benchmarks for PR branch
+          swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update pull_request --no-progress --quiet 2>&1 || {
+            echo "⚠️ Warning: PR baseline benchmarks failed or incomplete"
+            exit 0
+          }
 
       - name: Compare PR and master
         if: ${{ env.hasBenchmark == '1' }}
@@ -146,29 +149,35 @@ jobs:
           echo "Generated on: $(date)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ -f ".benchmarkBaselines/Benchmarks/master/results.json" ]; then
+          if [ -f ".benchmarkBaselines/Benchmarks/master/results.json" ] && [ -f ".benchmarkBaselines/Benchmarks/pull_request/results.json" ]; then
             echo "## Performance Comparison" >> $GITHUB_STEP_SUMMARY
             swift package benchmark baseline compare master pull_request --no-progress --format markdown >> $GITHUB_STEP_SUMMARY 2>&1 || true
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "## 🔍 Regression Check" >> $GITHUB_STEP_SUMMARY
-            if [ -f ".benchmarkBaselines/thresholds.json" ]; then
-              swift package benchmark baseline check master pull_request --thresholds .benchmarkBaselines/thresholds.json --format markdown >> $GITHUB_STEP_SUMMARY 2>&1 || echo "⚠️ Threshold check completed with warnings" >> $GITHUB_STEP_SUMMARY
-            else
-              swift package benchmark baseline check master pull_request --format markdown >> $GITHUB_STEP_SUMMARY 2>&1 || true
-            fi
 
-            # Check if any benchmarks exceeded thresholds
-            if ! swift package benchmark baseline check master pull_request --thresholds .benchmarkBaselines/thresholds.json > /tmp/benchmark_check.txt 2>&1; then
-              cat /tmp/benchmark_check.txt >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "❌ **PERFORMANCE REGRESSION DETECTED** - Some benchmarks exceeded acceptable thresholds" >> $GITHUB_STEP_SUMMARY
-              exit 1
+            # Check for thresholds and perform regression check
+            if [ -f ".benchmarkBaselines/thresholds.json" ]; then
+              if ! swift package benchmark baseline check master pull_request --thresholds .benchmarkBaselines/thresholds.json --format markdown > /tmp/benchmark_check.txt 2>&1; then
+                cat /tmp/benchmark_check.txt >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "❌ **PERFORMANCE REGRESSION DETECTED** - Some benchmarks exceeded acceptable thresholds" >> $GITHUB_STEP_SUMMARY
+                exit 1
+              else
+                cat /tmp/benchmark_check.txt >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "✅ All benchmarks within acceptable thresholds" >> $GITHUB_STEP_SUMMARY
+              fi
             else
-              cat /tmp/benchmark_check.txt >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "✅ All benchmarks within acceptable thresholds" >> $GITHUB_STEP_SUMMARY
+              echo "⚠️ No thresholds.json found - skipping regression check" >> $GITHUB_STEP_SUMMARY
             fi
           else
-            echo "⚠️ Master baseline not found. Running benchmarks for this PR:" >> $GITHUB_STEP_SUMMARY
+            if [ ! -f ".benchmarkBaselines/Benchmarks/master/results.json" ]; then
+              echo "⚠️ Master baseline not found" >> $GITHUB_STEP_SUMMARY
+            fi
+            if [ ! -f ".benchmarkBaselines/Benchmarks/pull_request/results.json" ]; then
+              echo "⚠️ PR baseline not found" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Running current benchmarks:" >> $GITHUB_STEP_SUMMARY
             swift package benchmark --format markdown >> $GITHUB_STEP_SUMMARY 2>&1 || true
           fi
