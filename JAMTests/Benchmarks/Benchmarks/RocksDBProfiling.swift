@@ -81,7 +81,10 @@ func rocksdbProfilingBenchmarks() {
             genesisStateData: stateData
         )
 
-        // Create multiple blocks with unique states to test cache misses
+        // Create multiple blocks to test cache behavior
+        // TODO: This currently tests cache hits since all blocks share genesis state.
+        // To test true cache misses, we need to create unique states for each block
+        // and ensure they're properly linked via lastBlockHash.
         var blocks: [BlockRef] = []
 
         for _ in 0 ..< 100 {
@@ -89,14 +92,10 @@ func rocksdbProfilingBenchmarks() {
             let block = BlockRef.dummy(config: config, parent: prevBlock)
             blocks.append(block)
             try await rocksDB.add(block: block)
-
-            // Create a unique state for this block
-            let state = StateRef.dummy(config: config, block: block)
-            try await rocksDB.add(state: state)
         }
 
         benchmark.startMeasurement()
-        // Read different states (cache misses)
+        // Read states for each block (currently measures cache hits)
         for block in blocks {
             _ = try await rocksDB.getState(hash: block.hash)
         }
@@ -105,7 +104,7 @@ func rocksdbProfilingBenchmarks() {
 
     // MARK: - Profiling: Read Amplification Analysis
 
-    Benchmark("rocksdb.profile.read.single.key") { benchmark in
+    Benchmark("rocksdb.profile.load.state") { benchmark in
         let tempDir = try createTempDirectory()
         defer { tempDir.cleanup() }
 
@@ -119,9 +118,12 @@ func rocksdbProfilingBenchmarks() {
         )
 
         benchmark.startMeasurement()
-        let state = try await rocksDB.getState(hash: genesisBlock.hash)
+        // Measure state loading performance
+        for _ in 0 ..< 1000 {
+            let state = try await rocksDB.getState(hash: genesisBlock.hash)
+            blackHole(state)
+        }
         benchmark.stopMeasurement()
-        blackHole(state)
     }
 
     Benchmark("rocksdb.profile.read.trie.nodes") { benchmark in
@@ -144,7 +146,7 @@ func rocksdbProfilingBenchmarks() {
         benchmark.startMeasurement()
         // Read all trie nodes individually
         for key in keys {
-            _ = try await rocksDB.read(key: key)
+            try await blackHole(rocksDB.read(key: key))
         }
         benchmark.stopMeasurement()
     }
@@ -168,8 +170,9 @@ func rocksdbProfilingBenchmarks() {
 
         benchmark.startMeasurement()
         // Read all trie nodes in batch
-        _ = try await rocksDB.batchRead(keys: keys)
+        let results = try await rocksDB.batchRead(keys: keys)
         benchmark.stopMeasurement()
+        blackHole(results)
     }
 
     // MARK: - Profiling: State Root Computation Breakdown
@@ -189,14 +192,14 @@ func rocksdbProfilingBenchmarks() {
 
         benchmark.startMeasurement()
         let state = try await rocksDB.getState(hash: genesisBlock.hash)
-        guard let state else { return }
+        guard let state else { fatalError("Unable to get state for genesis block") }
         let root = await state.value.stateRoot
         benchmark.stopMeasurement()
         blackHole(root)
     }
 
     Benchmark("rocksdb.profile.stateroot.hash.computation") { benchmark in
-        let (genesisBlock, genesisState, _) = try await createGenesis(config: config)
+        let (_, genesisState, _) = try await createGenesis(config: config)
 
         benchmark.startMeasurement()
         // Just compute hash without database reads (in-memory baseline)
@@ -222,11 +225,12 @@ func rocksdbProfilingBenchmarks() {
 
         // Get a shallow key (few hops)
         let keysValues = try await genesisState.value.backend.getKeys(nil, nil, nil)
-        guard let firstKey = keysValues.first?.key else { return }
+        guard let firstKey = keysValues.first?.key else { fatalError("No keys found in genesis state") }
 
         benchmark.startMeasurement()
-        _ = try await rocksDB.read(key: firstKey)
+        let result = try await rocksDB.read(key: firstKey)
         benchmark.stopMeasurement()
+        blackHole(result)
     }
 
     Benchmark("rocksdb.profile.trie.deep") { benchmark in
@@ -244,11 +248,12 @@ func rocksdbProfilingBenchmarks() {
 
         // Get a deep key (many hops) - use last key which likely has longer path
         let keysValues = try await genesisState.value.backend.getKeys(nil, nil, nil)
-        guard let lastKey = keysValues.last?.key else { return }
+        guard let lastKey = keysValues.last?.key else { fatalError("No keys found in genesis state") }
 
         benchmark.startMeasurement()
-        _ = try await rocksDB.read(key: lastKey)
+        let result = try await rocksDB.read(key: lastKey)
         benchmark.stopMeasurement()
+        blackHole(result)
     }
 
     // MARK: - Profiling: Concurrent Read Impact
@@ -283,7 +288,7 @@ func rocksdbProfilingBenchmarks() {
 
     // MARK: - Profiling: Memory Allocation Impact
 
-    Benchmark("rocksdb.profile.allocation.overhead") { benchmark in
+    Benchmark("rocksdb.profile.throughput") { benchmark in
         let tempDir = try createTempDirectory()
         defer { tempDir.cleanup() }
 
@@ -297,13 +302,10 @@ func rocksdbProfilingBenchmarks() {
         )
 
         benchmark.startMeasurement()
-        var totalAllocations = 0
-        for _ in 0 ..< 100 {
-            if try await rocksDB.getState(hash: genesisBlock.hash) != nil {
-                totalAllocations += 1 // Count state objects
-            }
+        // Measure throughput of 100 state loads
+        for _ in 0 ..< 100 where try await rocksDB.getState(hash: genesisBlock.hash) != nil {
+            // State loaded successfully
         }
         benchmark.stopMeasurement()
-        blackHole(totalAllocations)
     }
 }
