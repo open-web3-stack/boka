@@ -1,0 +1,1040 @@
+// Comprehensive Instruction Decoder and Dispatcher for JIT
+// This file provides the integration layer between Swift bytecode and C++ emitters
+
+#include "jit_instructions.hh"
+#include <asmjit/asmjit.h>
+
+using namespace asmjit;
+using namespace asmjit::x86;
+
+namespace jit_emitter {
+
+// Decoded instruction with all possible operands
+struct DecodedInstruction {
+    uint8_t opcode;
+    uint8_t dest_reg;
+    uint8_t src1_reg;
+    uint8_t src2_reg;
+    uint64_t immediate;
+    uint32_t target_pc;
+    uint32_t address;
+    uint16_t offset;
+    uint8_t size;
+};
+
+// Decode LoadImm64 instruction
+bool decode_load_imm_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+
+    // Format: [opcode][reg_index][value_64bit]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.immediate = *reinterpret_cast<const uint64_t*>(&bytecode[pc + 2]);
+    decoded.size = 10; // 1 + 1 + 8 = 10 bytes
+
+    return true;
+}
+
+// Decode LoadImm instruction
+bool decode_load_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+
+    // Format: [opcode][reg_index][value_32bit]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.immediate = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
+    decoded.size = 6; // 1 + 1 + 4 = 6 bytes
+
+    return true;
+}
+
+// Decode LoadU8 instruction
+bool decode_load_u8(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+
+    // Format: [opcode][reg_index][address_32bit]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
+    decoded.size = 6;
+
+    return true;
+}
+
+// Decode LoadI8 instruction
+bool decode_load_i8(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+
+    // Format: [opcode][reg_index][address_32bit]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
+    decoded.size = 6;
+
+    return true;
+}
+
+// Decode LoadU16 instruction
+bool decode_load_u16(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+
+    // Format: [opcode][reg_index][address_32bit]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
+    decoded.size = 6;
+
+    return true;
+}
+
+// Decode LoadI16 instruction
+bool decode_load_i16(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+
+    // Format: [opcode][reg_index][address_32bit]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
+    decoded.size = 6;
+
+    return true;
+}
+
+// Decode LoadU32 instruction
+bool decode_load_u32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+
+    // Format: [opcode][reg_index][address_32bit]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
+    decoded.size = 6;
+
+    return true;
+}
+
+// Decode LoadI32 instruction
+bool decode_load_i32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+
+    // Format: [opcode][reg_index][address_32bit]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
+    decoded.size = 6;
+
+    return true;
+}
+
+// Decode LoadU64 instruction
+bool decode_load_u64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+
+    // Format: [opcode][reg_index][address_32bit]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
+    decoded.size = 6;
+
+    return true;
+}
+
+// Decode Add32 instruction
+bool decode_add_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+
+    // Format: [opcode][dest_reg][src_reg]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.src1_reg = bytecode[pc + 2];
+    decoded.size = 3;
+
+    return true;
+}
+
+// Decode Sub32 instruction
+bool decode_sub_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+
+    // Format: [opcode][dest_reg][src_reg]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.src1_reg = bytecode[pc + 2];
+    decoded.size = 3;
+
+    return true;
+}
+
+// Decode Jump instruction
+bool decode_jump(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+
+    // Format: [opcode][offset_32bit]
+    decoded.offset = *reinterpret_cast<const int32_t*>(&bytecode[pc + 1]);
+    decoded.target_pc = pc + 4 + static_cast<uint32_t>(decoded.offset); // PC-relative
+    decoded.size = 5;
+
+    return true;
+}
+
+// Decode Trap instruction
+bool decode_trap(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.size = 1;
+    return true;
+}
+
+// Decode Fallthrough instruction
+bool decode_fallthrough(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.size = 1;
+    return true;
+}
+
+// Decode StoreImmU8 instruction (opcode 30)
+bool decode_store_imm_u8(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][value_8bit][address_32bit]
+    decoded.immediate = bytecode[pc + 1];
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
+    decoded.size = 6; // 1 + 1 + 4 = 6 bytes
+    return true;
+}
+
+// Decode StoreImmU16 instruction (opcode 31)
+bool decode_store_imm_u16(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][value_16bit][address_32bit]
+    decoded.immediate = *reinterpret_cast<const uint16_t*>(&bytecode[pc + 1]);
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 3]);
+    decoded.size = 7; // 1 + 2 + 4 = 7 bytes
+    return true;
+}
+
+// Decode StoreImmU32 instruction (opcode 32)
+bool decode_store_imm_u32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][value_32bit][address_32bit]
+    decoded.immediate = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 1]);
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 5]);
+    decoded.size = 9; // 1 + 4 + 4 = 9 bytes
+    return true;
+}
+
+// Decode StoreImmU64 instruction (opcode 33)
+bool decode_store_imm_u64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][value_64bit][address_32bit]
+    decoded.immediate = *reinterpret_cast<const uint64_t*>(&bytecode[pc + 1]);
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 9]);
+    decoded.size = 13; // 1 + 8 + 4 = 13 bytes
+    return true;
+}
+
+// Decode JumpInd instruction (opcode 50)
+bool decode_jump_ind(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][reg_index]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.size = 2;
+    return true;
+}
+
+// Decode StoreU8 instruction (opcode 59)
+bool decode_store_u8(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][src_reg][address_32bit]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
+    decoded.size = 6;
+    return true;
+}
+
+// Decode StoreU16 instruction (opcode 60)
+bool decode_store_u16(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][src_reg][address_32bit]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
+    decoded.size = 6;
+    return true;
+}
+
+// Decode StoreU32 instruction (opcode 61)
+bool decode_store_u32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][src_reg][address_32bit]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
+    decoded.size = 6;
+    return true;
+}
+
+// Decode StoreU64 instruction (opcode 62)
+bool decode_store_u64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][src_reg][address_32bit]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
+    decoded.size = 6;
+    return true;
+}
+
+// Decode Mul32 instruction (opcode 192)
+bool decode_mul_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][dest_reg][src_reg]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.src1_reg = bytecode[pc + 2];
+    decoded.size = 3;
+    return true;
+}
+
+// Decode DivU32 instruction (opcode 193)
+bool decode_div_u32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][dest_reg][src_reg]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.src1_reg = bytecode[pc + 2];
+    decoded.size = 3;
+    return true;
+}
+
+// Decode DivS32 instruction (opcode 194)
+bool decode_div_s32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][dest_reg][src_reg]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.src1_reg = bytecode[pc + 2];
+    decoded.size = 3;
+    return true;
+}
+
+// Decode RemU32 instruction (opcode 195)
+bool decode_rem_u32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][dest_reg][src_reg]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.src1_reg = bytecode[pc + 2];
+    decoded.size = 3;
+    return true;
+}
+
+// Decode RemS32 instruction (opcode 196)
+bool decode_rem_s32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][dest_reg][src_reg]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.src1_reg = bytecode[pc + 2];
+    decoded.size = 3;
+    return true;
+}
+
+// Decode Add64 instruction (opcode 200)
+bool decode_add_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][dest_reg][src_reg]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.src1_reg = bytecode[pc + 2];
+    decoded.size = 3;
+    return true;
+}
+
+// Decode Sub64 instruction (opcode 201)
+bool decode_sub_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][dest_reg][src_reg]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.src1_reg = bytecode[pc + 2];
+    decoded.size = 3;
+    return true;
+}
+
+// Decode Mul64 instruction (opcode 202)
+bool decode_mul_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][dest_reg][src_reg]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.src1_reg = bytecode[pc + 2];
+    decoded.size = 3;
+    return true;
+}
+
+// Decode And instruction (opcode 210)
+bool decode_and(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][dest_reg][src_reg]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.src1_reg = bytecode[pc + 2];
+    decoded.size = 3;
+    return true;
+}
+
+// Decode Xor instruction (opcode 211)
+bool decode_xor(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][dest_reg][src_reg]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.src1_reg = bytecode[pc + 2];
+    decoded.size = 3;
+    return true;
+}
+
+// Decode Or instruction (opcode 212)
+bool decode_or(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][dest_reg][src_reg]
+    decoded.dest_reg = bytecode[pc + 1];
+    decoded.src1_reg = bytecode[pc + 2];
+    decoded.size = 3;
+    return true;
+}
+
+// Decode BranchEq instruction (opcode 170)
+bool decode_branch_eq(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][reg1][reg2][offset_32bit]
+    decoded.src1_reg = bytecode[pc + 1];
+    decoded.src2_reg = bytecode[pc + 2];
+    decoded.offset = *reinterpret_cast<const int32_t*>(&bytecode[pc + 3]);
+    decoded.target_pc = pc + 6 + static_cast<uint32_t>(decoded.offset);
+    decoded.size = 7;
+    return true;
+}
+
+// Decode BranchNe instruction (opcode 171)
+bool decode_branch_ne(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][reg1][reg2][offset_32bit]
+    decoded.src1_reg = bytecode[pc + 1];
+    decoded.src2_reg = bytecode[pc + 2];
+    decoded.offset = *reinterpret_cast<const int32_t*>(&bytecode[pc + 3]);
+    decoded.target_pc = pc + 6 + static_cast<uint32_t>(decoded.offset);
+    decoded.size = 7;
+    return true;
+}
+
+// Generic instruction dispatcher using opcode table
+bool emit_instruction_decoded(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    const DecodedInstruction& decoded)
+{
+    auto* a = static_cast<x86::Assembler*>(assembler);
+
+    // Dispatch based on opcode
+    // Note: These opcode numbers match the Swift instruction opcodes from instructions.cpp
+    switch (decoded.opcode) {
+        case 0: // Trap
+            return jit_instruction::jit_emit_trap(assembler, target_arch);
+
+        case 1: // Fallthrough
+            // No emission needed for fallthrough
+            return true;
+
+        case 10: // Ecalli
+            // TODO: Need to extract call_index from instruction
+            return jit_instruction::jit_emit_ecalli(assembler, target_arch, 0);
+
+        case 20: // LoadImm64
+            return jit_instruction::jit_emit_load_imm_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.immediate
+            );
+
+        case 30: // StoreImmU8
+            // TODO: Implement store immediate - need to load immediate into temp reg then store
+            // For now, skip this instruction
+            a->nop();
+            return true;
+
+        case 31: // StoreImmU16
+            // TODO: Implement store immediate - need to load immediate into temp reg then store
+            a->nop();
+            return true;
+
+        case 32: // StoreImmU32
+            // TODO: Implement store immediate - need to load immediate into temp reg then store
+            a->nop();
+            return true;
+
+        case 33: // StoreImmU64
+            // TODO: Implement store immediate - need to load immediate into temp reg then store
+            a->nop();
+            return true;
+
+        case 40: // Jump
+            // TODO: Handle jump target with label
+            return jit_instruction::jit_emit_jump(
+                assembler, target_arch,
+                decoded.target_pc  // Use target_pc instead of offset
+            );
+
+        case 50: // JumpInd
+            return jit_instruction::jit_emit_jump_ind(
+                assembler, target_arch,
+                decoded.dest_reg,  // ptr_reg
+                0  // offset (TODO: extract from instruction)
+            );
+
+        case 51: // LoadImm (32-bit)
+            return jit_instruction::jit_emit_load_imm_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint32_t>(decoded.immediate)
+            );
+
+        case 52: // LoadU8
+            return jit_instruction::jit_emit_load_u8(
+                assembler, target_arch,
+                decoded.dest_reg,
+                0,  // ptr_reg
+                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+            );
+
+        case 53: // LoadI8
+            return jit_instruction::jit_emit_load_i8(
+                assembler, target_arch,
+                decoded.dest_reg,
+                0,  // ptr_reg
+                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+            );
+
+        case 54: // LoadU16
+            return jit_instruction::jit_emit_load_u16(
+                assembler, target_arch,
+                decoded.dest_reg,
+                0,  // ptr_reg
+                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+            );
+
+        case 55: // LoadI16
+            return jit_instruction::jit_emit_load_i16(
+                assembler, target_arch,
+                decoded.dest_reg,
+                0,  // ptr_reg
+                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+            );
+
+        case 56: // LoadU32
+            return jit_instruction::jit_emit_load_u32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                0,  // ptr_reg
+                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+            );
+
+        case 57: // LoadI32
+            return jit_instruction::jit_emit_load_i32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                0,  // ptr_reg
+                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+            );
+
+        case 58: // LoadU64
+            return jit_instruction::jit_emit_load_u64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                0,  // ptr_reg
+                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+            );
+
+        case 59: // StoreU8
+            return jit_instruction::jit_emit_store_8(
+                assembler, target_arch,
+                0,  // TODO: ptr_reg - need to decode properly
+                decoded.dest_reg,
+                decoded.address
+            );
+
+        case 60: // StoreU16
+            return jit_instruction::jit_emit_store_16(
+                assembler, target_arch,
+                0,  // TODO: ptr_reg
+                decoded.dest_reg,
+                decoded.address
+            );
+
+        case 61: // StoreU32
+            return jit_instruction::jit_emit_store_32(
+                assembler, target_arch,
+                0,  // TODO: ptr_reg
+                decoded.dest_reg,
+                decoded.address
+            );
+
+        case 62: // StoreU64
+            return jit_instruction::jit_emit_store_64(
+                assembler, target_arch,
+                0,  // TODO: ptr_reg
+                decoded.dest_reg,
+                decoded.address
+            );
+
+        case 100: // MoveReg
+            return jit_instruction::jit_emit_copy(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 101: // Sbrk
+            return jit_instruction::jit_emit_sbrk(
+                assembler, target_arch,
+                decoded.dest_reg,  // ptr_reg
+                0  // offset (TODO: extract from instruction)
+            );
+
+        case 102: // CountSetBits64
+            return jit_instruction::jit_emit_pop_count(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 103: // CountSetBits32
+            return jit_instruction::jit_emit_pop_count(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 104: // LeadingZeroBits64
+            return jit_instruction::jit_emit_clz_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 105: // LeadingZeroBits32
+            return jit_instruction::jit_emit_clz(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 106: // TrailingZeroBits64
+            return jit_instruction::jit_emit_ctz_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 107: // TrailingZeroBits32
+            return jit_instruction::jit_emit_ctz(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 108: // SignExtend8
+            return jit_instruction::jit_emit_sext_8(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 109: // SignExtend16
+            return jit_instruction::jit_emit_sext_16(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 110: // ZeroExtend16
+            return jit_instruction::jit_emit_zext_16(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 111: // ReverseBytes
+            return jit_instruction::jit_emit_bswap(
+                assembler, target_arch,
+                decoded.dest_reg  // bswap only takes dest_reg
+            );
+
+        case 170: // BranchEq
+            // TODO: Handle branch target with label
+            return jit_instruction::jit_emit_branch_eq(
+                assembler, target_arch,
+                decoded.src1_reg,
+                decoded.src2_reg,
+                decoded.target_pc  // Use target_pc instead of offset
+            );
+
+        case 171: // BranchNe
+            // TODO: Handle branch target with label
+            return jit_instruction::jit_emit_branch_ne(
+                assembler, target_arch,
+                decoded.src1_reg,
+                decoded.src2_reg,
+                decoded.target_pc  // Use target_pc instead of offset
+            );
+
+        case 190: // Add32
+            return jit_instruction::jit_emit_add_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 191: // Sub32
+            return jit_instruction::jit_emit_sub_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 192: // Mul32
+            return jit_instruction::jit_emit_mul_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 193: // DivU32
+            return jit_instruction::jit_emit_div_u32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 194: // DivS32
+            return jit_instruction::jit_emit_div_s32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 195: // RemU32
+            return jit_instruction::jit_emit_rem_u32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 196: // RemS32
+            return jit_instruction::jit_emit_rem_s32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 200: // Add64
+            return jit_instruction::jit_emit_add_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 201: // Sub64
+            return jit_instruction::jit_emit_sub_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 202: // Mul64
+            return jit_instruction::jit_emit_mul_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 203: // DivU64
+            return jit_instruction::jit_emit_div_u_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 204: // DivS64
+            return jit_instruction::jit_emit_div_s_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 205: // RemU64
+            return jit_instruction::jit_emit_rem_u_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 206: // RemS64
+            return jit_instruction::jit_emit_rem_s_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 210: // And
+            return jit_instruction::jit_emit_and(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 211: // Xor
+            return jit_instruction::jit_emit_xor(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 212: // Or
+            return jit_instruction::jit_emit_or(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 213: // MulUpperSS
+            // TODO: Implement jit_emit_mul_upper_s_s
+            a->nop();
+            return true;
+
+        // TODO: Implement MulUpperUU (214), MulUpperSU (215), SetLtU (216), SetLtS (217)
+        // TODO: Implement CmovIz (218), CmovNz (219), RotL64 (220), RotR64 (222)
+        // These functions need to be added to instructions.cpp or are already implemented with different names
+
+        case 224: // AndInv
+            return jit_instruction::jit_emit_and_inv(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 225: // OrInv
+            return jit_instruction::jit_emit_or_inv(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 226: // Xnor
+            return jit_instruction::jit_emit_xnor(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 227: // Max
+            return jit_instruction::jit_emit_max(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 228: // MaxU
+            return jit_instruction::jit_emit_max_u(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 229: // Min
+            return jit_instruction::jit_emit_min(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        case 230: // MinU
+            return jit_instruction::jit_emit_min_u(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg
+            );
+
+        default:
+            // Unknown opcode - emit nop for now
+            // TODO: Should return false or log error
+            a->nop();
+            return true;
+    }
+}
+
+// Emit a basic block of instructions
+bool emit_basic_block_instructions(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    const uint8_t* _Nonnull bytecode,
+    uint32_t block_start_pc,
+    uint32_t block_end_pc)
+{
+    uint32_t current_pc = block_start_pc;
+
+    while (current_pc < block_end_pc) {
+        DecodedInstruction decoded;
+
+        // Decode instruction based on opcode
+        uint8_t opcode = bytecode[current_pc];
+
+        // Dispatch to appropriate decoder based on opcode
+        bool decoded_ok = false;
+
+        // Use switch for efficient opcode dispatch
+        switch (opcode) {
+            case 0:  // Trap
+                decoded_ok = decode_trap(bytecode, current_pc, decoded);
+                break;
+
+            case 1:  // Fallthrough
+                decoded_ok = decode_fallthrough(bytecode, current_pc, decoded);
+                break;
+
+            case 20: // LoadImm64
+                decoded_ok = decode_load_imm_64(bytecode, current_pc, decoded);
+                break;
+
+            case 30: // StoreImmU8
+                decoded_ok = decode_store_imm_u8(bytecode, current_pc, decoded);
+                break;
+
+            case 31: // StoreImmU16
+                decoded_ok = decode_store_imm_u16(bytecode, current_pc, decoded);
+                break;
+
+            case 32: // StoreImmU32
+                decoded_ok = decode_store_imm_u32(bytecode, current_pc, decoded);
+                break;
+
+            case 33: // StoreImmU64
+                decoded_ok = decode_store_imm_u64(bytecode, current_pc, decoded);
+                break;
+
+            case 40: // Jump
+                decoded_ok = decode_jump(bytecode, current_pc, decoded);
+                break;
+
+            case 50: // JumpInd
+                decoded_ok = decode_jump_ind(bytecode, current_pc, decoded);
+                break;
+
+            case 51: // LoadImm
+                decoded_ok = decode_load_imm(bytecode, current_pc, decoded);
+                break;
+
+            case 52: // LoadU8
+                decoded_ok = decode_load_u8(bytecode, current_pc, decoded);
+                break;
+
+            case 53: // LoadI8
+                decoded_ok = decode_load_i8(bytecode, current_pc, decoded);
+                break;
+
+            case 54: // LoadU16
+                decoded_ok = decode_load_u16(bytecode, current_pc, decoded);
+                break;
+
+            case 55: // LoadI16
+                decoded_ok = decode_load_i16(bytecode, current_pc, decoded);
+                break;
+
+            case 56: // LoadU32
+                decoded_ok = decode_load_u32(bytecode, current_pc, decoded);
+                break;
+
+            case 57: // LoadI32
+                decoded_ok = decode_load_i32(bytecode, current_pc, decoded);
+                break;
+
+            case 58: // LoadU64
+                decoded_ok = decode_load_u64(bytecode, current_pc, decoded);
+                break;
+
+            case 59: // StoreU8
+                decoded_ok = decode_store_u8(bytecode, current_pc, decoded);
+                break;
+
+            case 60: // StoreU16
+                decoded_ok = decode_store_u16(bytecode, current_pc, decoded);
+                break;
+
+            case 61: // StoreU32
+                decoded_ok = decode_store_u32(bytecode, current_pc, decoded);
+                break;
+
+            case 62: // StoreU64
+                decoded_ok = decode_store_u64(bytecode, current_pc, decoded);
+                break;
+
+            case 170: // BranchEq
+                decoded_ok = decode_branch_eq(bytecode, current_pc, decoded);
+                break;
+
+            case 171: // BranchNe
+                decoded_ok = decode_branch_ne(bytecode, current_pc, decoded);
+                break;
+
+            case 190: // Add32
+                decoded_ok = decode_add_32(bytecode, current_pc, decoded);
+                break;
+
+            case 191: // Sub32
+                decoded_ok = decode_sub_32(bytecode, current_pc, decoded);
+                break;
+
+            case 192: // Mul32
+                decoded_ok = decode_mul_32(bytecode, current_pc, decoded);
+                break;
+
+            case 193: // DivU32
+                decoded_ok = decode_div_u32(bytecode, current_pc, decoded);
+                break;
+
+            case 194: // DivS32
+                decoded_ok = decode_div_s32(bytecode, current_pc, decoded);
+                break;
+
+            case 195: // RemU32
+                decoded_ok = decode_rem_u32(bytecode, current_pc, decoded);
+                break;
+
+            case 196: // RemS32
+                decoded_ok = decode_rem_s32(bytecode, current_pc, decoded);
+                break;
+
+            case 200: // Add64
+                decoded_ok = decode_add_64(bytecode, current_pc, decoded);
+                break;
+
+            case 201: // Sub64
+                decoded_ok = decode_sub_64(bytecode, current_pc, decoded);
+                break;
+
+            case 202: // Mul64
+                decoded_ok = decode_mul_64(bytecode, current_pc, decoded);
+                break;
+
+            case 210: // And
+                decoded_ok = decode_and(bytecode, current_pc, decoded);
+                break;
+
+            case 211: // Xor
+                decoded_ok = decode_xor(bytecode, current_pc, decoded);
+                break;
+
+            case 212: // Or
+                decoded_ok = decode_or(bytecode, current_pc, decoded);
+                break;
+
+            default:
+                // Unknown opcode - skip for now
+                current_pc++;
+                continue;
+        }
+
+        if (!decoded_ok) {
+            // Failed to decode, skip
+            current_pc++;
+            continue;
+        }
+
+        // Emit the decoded instruction
+        if (!emit_instruction_decoded(assembler, target_arch, decoded)) {
+            return false;
+        }
+
+        // Move to next instruction
+        current_pc += decoded.size;
+    }
+
+    return true;
+}
+
+} // namespace jit_emitter
