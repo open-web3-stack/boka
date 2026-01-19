@@ -32,3 +32,4 @@ tmp
 *.pvm
 
 spec/
+plans/
