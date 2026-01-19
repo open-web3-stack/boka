@@ -11,11 +11,25 @@ final class JITCompiler {
     private let logger = Logger(label: "JITCompiler")
 
     // Errors that can occur during JIT compilation
-    enum CompilationError: Error {
+    enum CompilationError: Error, Equatable {
         case invalidBlob
         case compilationFailed(Int32)
         case unsupportedArchitecture
         case allocationFailed
+
+        // Equatable conformance
+        static func == (lhs: CompilationError, rhs: CompilationError) -> Bool {
+            switch (lhs, rhs) {
+            case (.invalidBlob, .invalidBlob),
+                 (.unsupportedArchitecture, .unsupportedArchitecture),
+                 (.allocationFailed, .allocationFailed):
+                return true
+            case (.compilationFailed(let lhsCode), .compilationFailed(let rhsCode)):
+                return lhsCode == rhsCode
+            default:
+                return false
+            }
+        }
     }
 
     /// Compile VM code into executable machine code

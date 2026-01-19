@@ -8,7 +8,9 @@ import TracingUtils
 ///
 /// This is a simplified version that works without direct AsmJit dependencies.
 /// The actual AsmJit labels will be managed in the C++ layer.
-final class LabelManager {
+///
+/// **Thread Safety:** This actor provides safe concurrent access to label state.
+actor LabelManager {
     private let logger = Logger(label: "LabelManager")
     private var pcToLabelId: [UInt32: UInt32] = [:]
     private var definedLabels: Set<UInt32> = []
