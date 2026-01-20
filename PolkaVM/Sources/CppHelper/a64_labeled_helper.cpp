@@ -93,8 +93,9 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     // Create label manager
     LabelManager labelManager;
 
-    // Create exit label
+    // Create exit label and epilogue label
     Label exitLabel = a.newLabel();
+    Label epilogueLabel = a.newLabel();
 
     // === PRE-PASS: Identify all jump targets ===
     // This is necessary to handle backward jumps (loops)
@@ -117,9 +118,9 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             labelManager.markJumpTarget(targetPC);
         } else if (opcode == 80) { // LoadImmJump
             uint8_t destReg = codeBuffer[pc + 1];
-            uint32_t immediate;
-            memcpy(&immediate, &codeBuffer[pc + 2], 4);
-            uint32_t targetPC = pc + instrSize + int32_t(immediate);
+            uint32_t jumpOffset;
+            memcpy(&jumpOffset, &codeBuffer[pc + 2], 4);   // Jump offset is at bytes 2-5
+            uint32_t targetPC = pc + instrSize + int32_t(jumpOffset);
             labelManager.markJumpTarget(targetPC);
         }
 
@@ -179,9 +180,11 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
         if (opcode == 80) { // LoadImmJump
             uint8_t destReg = codeBuffer[pc + 1];
+            uint32_t jumpOffset;
             uint32_t immediate;
-            memcpy(&immediate, &codeBuffer[pc + 2], 4);
-            uint32_t targetPC = pc + instrSize + int32_t(immediate);
+            memcpy(&jumpOffset, &codeBuffer[pc + 2], 4);   // Jump offset is at bytes 2-5
+            memcpy(&immediate, &codeBuffer[pc + 6], 4);    // Immediate value is at bytes 6-9
+            uint32_t targetPC = pc + instrSize + int32_t(jumpOffset);
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "aarch64");
             jit_emit_load_imm_jump_labeled(&a, "aarch64", destReg, immediate, targetLabel);
@@ -191,9 +194,9 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         }
 
         if (opcode == 0) { // Trap
-            // Set return value to -1 (trap) in w0, then jump to exit
+            // Set return value to -1 (trap) in w0, then jump to epilogue
             a.mov(a64::w0, -1);
-            a.b(exitLabel);
+            a.b(epilogueLabel);
             pc += instrSize;
             continue;
         }
@@ -217,8 +220,10 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     a.bind(exitLabel);
 
     // Set return value to 0 (halt) in w0
-    // Note: Trap instructions should have already set w0 to -1 before jumping here
     a.mov(a64::w0, 0);
+
+    // Bind epilogue label (for Trap - already has w0=-1 set)
+    a.bind(epilogueLabel);
 
     // Epilogue: restore callee-saved registers and return
     a.ldp(x29, x30, ptr(a64::sp, 80));

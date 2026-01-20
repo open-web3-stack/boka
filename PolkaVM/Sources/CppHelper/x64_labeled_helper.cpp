@@ -90,8 +90,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     // Create label manager
     LabelManager labelManager;
 
-    // Create exit label
+    // Create exit label and epilogue label
     Label exitLabel = a.newLabel();
+    Label epilogueLabel = a.newLabel();
 
     // === PRE-PASS: Identify all jump targets ===
     // This is necessary to handle backward jumps (loops)
@@ -114,9 +115,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             labelManager.markJumpTarget(targetPC);
         } else if (opcode == 80) { // LoadImmJump
             uint8_t destReg = codeBuffer[pc + 1];
-            uint32_t immediate;
-            memcpy(&immediate, &codeBuffer[pc + 2], 4);
-            uint32_t targetPC = pc + instrSize + int32_t(immediate);
+            uint32_t jumpOffset;
+            memcpy(&jumpOffset, &codeBuffer[pc + 2], 4);   // Jump offset is at bytes 2-5
+            uint32_t targetPC = pc + instrSize + int32_t(jumpOffset);
             labelManager.markJumpTarget(targetPC);
         }
 
@@ -177,9 +178,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
         if (opcode == 80) { // LoadImmJump
             uint8_t destReg = codeBuffer[pc + 1];
+            uint32_t jumpOffset;
             uint32_t immediate;
-            memcpy(&immediate, &codeBuffer[pc + 2], 4);
-            uint32_t targetPC = pc + instrSize + int32_t(immediate);
+            memcpy(&jumpOffset, &codeBuffer[pc + 2], 4);   // Jump offset is at bytes 2-5
+            memcpy(&immediate, &codeBuffer[pc + 6], 4);    // Immediate value is at bytes 6-9
+            uint32_t targetPC = pc + instrSize + int32_t(jumpOffset);
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "x86_64");
             jit_emit_load_imm_jump_labeled(&a, "x86_64", destReg, immediate, targetLabel);
@@ -189,9 +192,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
         if (opcode == 0) { // Trap
-            // Set return value to -1 (trap) in eax, then jump to exit
+            // Set return value to -1 (trap) in eax, then jump to epilogue
             a.mov(x86::eax, -1);
-            a.jmp(exitLabel);
+            a.jmp(epilogueLabel);
             pc += instrSize;
             continue;
         }
@@ -216,8 +219,10 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     a.bind(exitLabel);
 
     // Set return value to 0 (halt) in eax
-    // Note: Trap instructions should have already set eax to -1 before jumping here
     a.xor_(x86::eax, x86::eax);
+
+    // Bind epilogue label (for Trap - already has eax=-1 set)
+    a.bind(epilogueLabel);
 
     // Epilogue: restore callee-saved registers and return
     a.pop(r15);
