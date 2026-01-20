@@ -66,17 +66,8 @@ extension JITIntegrationTests {
 
 // MARK: - Opcodes
 
-extension JITIntegrationTests {
-    /// PVM instruction opcodes
-    enum Opcode: UInt8 {
-        case trap = 0
-        case halt = 1
-        case jump = 40
-        case loadImm = 51
-        case add32 = 190
-        case divU32 = 193
-    }
-}
+// Use centralized PVM opcode definitions
+typealias Opcode = PVMOpcodes
 
 @Suite(.serialized)
 struct JITIntegrationTests {
