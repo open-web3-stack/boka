@@ -72,10 +72,12 @@ final class JITCompiler {
         }
 
         // Compile based on architecture
+        // Using label-based compilation for maximum performance
+        // This enables proper control flow (branches, loops) with direct jumps
         switch targetArchitecture {
         case .x86_64:
-            logger.debug("Compiling for x86_64 architecture")
-            resultCode = compilePolkaVMCode_x64(
+            logger.debug("Compiling for x86_64 architecture (labeled compilation)")
+            resultCode = compilePolkaVMCode_x64_labeled(
                 basePointer,
                 blob.count,
                 initialPC,
@@ -84,8 +86,8 @@ final class JITCompiler {
             )
 
         case .arm64:
-            logger.debug("Compiling for Arm64 architecture")
-            resultCode = compilePolkaVMCode_a64(
+            logger.debug("Compiling for Arm64 architecture (labeled compilation)")
+            resultCode = compilePolkaVMCode_a64_labeled(
                 basePointer,
                 blob.count,
                 initialPC,

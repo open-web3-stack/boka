@@ -111,29 +111,31 @@ bool jit_emitGasAccounting(
 }
 
 // Generate trap instruction
-bool jit_generateTrap(void *assembler, const char *target_arch)
-{
-    std::string arch(target_arch);
+namespace jit_instruction {
+    bool jit_generateTrap(void *assembler, const char *target_arch)
+    {
+        std::string arch(target_arch);
 
-    if (arch.compare("x86_64") == 0) {
-        auto *a = getTypedAssembler<x86::Assembler>(assembler, target_arch);
-        if (!a)
-            return false;
+        if (arch.compare("x86_64") == 0) {
+            auto *a = getTypedAssembler<x86::Assembler>(assembler, target_arch);
+            if (!a)
+                return false;
 
-        // x86 trap instruction (causes SIGTRAP)
-        a->int3();
-        return true;
-    } else if (arch.compare("aarch64") == 0) {
-        auto *a = getTypedAssembler<a64::Assembler>(assembler, target_arch);
-        if (!a)
-            return false;
+            // x86 trap instruction (causes SIGTRAP)
+            a->int3();
+            return true;
+        } else if (arch.compare("aarch64") == 0) {
+            auto *a = getTypedAssembler<a64::Assembler>(assembler, target_arch);
+            if (!a)
+                return false;
 
-        // ARM breakpoint instruction (causes SIGTRAP)
-        a->brk(0);
-        return true;
+            // ARM breakpoint instruction (causes SIGTRAP)
+            a->brk(0);
+            return true;
+        }
+
+        return false;
     }
-
-    return false;
 }
 
 // Generate jump instruction (direct)

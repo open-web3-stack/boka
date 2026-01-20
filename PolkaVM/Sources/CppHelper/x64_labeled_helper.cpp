@@ -159,8 +159,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
         if (opcode == 0) { // Trap
-            // Emit trap and jump to exit
-            jit_instruction::jit_generateTrap(&a, "x86_64");
+            // In labeled compilation, we jump directly to exit
+            // rather than emitting a trap instruction
             a.jmp(exitLabel);
             pc += instrSize;
             continue;
