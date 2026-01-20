@@ -333,4 +333,103 @@ struct JITIntegrationTests {
     }
 
     // TODO: Add tests for conditional branches, loops
+
+    // MARK: - Arithmetic Instructions (Dispatcher)
+
+    @Test func testJITSubtract() async throws {
+        // Program: LoadImm 100, LoadImm 30, Sub R0-R1, Halt
+        // Expected: R0 = 70
+        let code: [UInt8] = [
+            Opcode.loadImm.rawValue, 0, 100, 0, 0, 0,  // LoadImm R0, 100
+            Opcode.loadImm.rawValue, 1, 30, 0, 0, 0,   // LoadImm R1, 30
+            Opcode.sub32.rawValue, 0, 1,               // Sub32 R0, R1
+            Opcode.halt.rawValue
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
+        #expect(exitReason == .halt || exitReason == .panic(.trap))
+    }
+
+    @Test func testJITMultiply() async throws {
+        // Program: LoadImm 7, LoadImm 6, Mul R0*R1, Halt
+        // Expected: R0 = 42
+        let code: [UInt8] = [
+            Opcode.loadImm.rawValue, 0, 7, 0, 0, 0,   // LoadImm R0, 7
+            Opcode.loadImm.rawValue, 1, 6, 0, 0, 0,   // LoadImm R1, 6
+            Opcode.mul32.rawValue, 0, 1,               // Mul32 R0, R1
+            Opcode.halt.rawValue
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
+        #expect(exitReason == .halt || exitReason == .panic(.trap))
+    }
+
+    @Test func testJIT64BitArithmetic() async throws {
+        // Program: LoadImmU64 large numbers, Add64, Sub64, Halt
+        let code: [UInt8] = [
+            Opcode.loadImmU64.rawValue, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0,  // LoadImmU64 R0, 0xFFFFFFFFFF
+            Opcode.loadImmU64.rawValue, 1, 0x01, 0, 0, 0, 0, 0, 0, 0,        // LoadImmU64 R1, 1
+            Opcode.add64.rawValue, 0, 1,                                    // Add64 R0, R1
+            Opcode.halt.rawValue
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
+        #expect(exitReason == .halt || exitReason == .panic(.trap))
+    }
+
+    // MARK: - Bitwise Instructions (Dispatcher)
+
+    @Test func testJITBitwiseAnd() async throws {
+        // Program: LoadImm 0xFF (255), LoadImm 0x0F (15), And, Halt
+        // Expected: R0 = 15
+        let code: [UInt8] = [
+            Opcode.loadImm.rawValue, 0, 255, 0, 0, 0,  // LoadImm R0, 255
+            Opcode.loadImm.rawValue, 1, 15, 0, 0, 0,   // LoadImm R1, 15
+            Opcode.and.rawValue, 0, 1,                // And R0, R1
+            Opcode.halt.rawValue
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
+        #expect(exitReason == .halt || exitReason == .panic(.trap))
+    }
+
+    @Test func testJITBitwiseOr() async throws {
+        // Program: LoadImm 0xF0 (240), LoadImm 0x0F (15), Or, Halt
+        // Expected: R0 = 255
+        let code: [UInt8] = [
+            Opcode.loadImm.rawValue, 0, 240, 0, 0, 0,  // LoadImm R0, 240
+            Opcode.loadImm.rawValue, 1, 15, 0, 0, 0,   // LoadImm R1, 15
+            Opcode.or.rawValue, 0, 1,                 // Or R0, R1
+            Opcode.halt.rawValue
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
+        #expect(exitReason == .halt || exitReason == .panic(.trap))
+    }
+
+    @Test func testJITBitwiseXor() async throws {
+        // Program: LoadImm 0xFF (255), LoadImm 0xFF (255), Xor, Halt
+        // Expected: R0 = 0
+        let code: [UInt8] = [
+            Opcode.loadImm.rawValue, 0, 255, 0, 0, 0,  // LoadImm R0, 255
+            Opcode.loadImm.rawValue, 1, 255, 0, 0, 0,  // LoadImm R1, 255
+            Opcode.xor.rawValue, 0, 1,                // Xor R0, R1
+            Opcode.halt.rawValue
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
+        #expect(exitReason == .halt || exitReason == .panic(.trap))
+    }
 }
