@@ -243,29 +243,30 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // If we get here, address is valid - inline the load instruction
             // Load from memory into register, then store to VM register
-            // Use Mem::build() to create [r12 + rax] addressing mode
+            // IMPORTANT: Use movzx for unsigned loads to avoid rcx corruption
+            // (rcx was used for bounds checking and still contains memory_size)
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
 
             if (opcode_is(opcode, Opcode::LoadU8)) {
-                a.mov(x86::cl, mem);
+                a.movzx(x86::ecx, mem);  // Zero-extend to avoid rcx corruption
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
             } else if (opcode_is(opcode, Opcode::LoadI8)) {
-                a.movsx(x86::rcx, mem);
+                a.movsx(x86::rcx, mem);  // Sign-extend is fine for signed loads
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
             } else if (opcode_is(opcode, Opcode::LoadU16)) {
-                a.mov(x86::cx, mem);
+                a.movzx(x86::ecx, mem);  // Zero-extend to avoid rcx corruption
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
             } else if (opcode_is(opcode, Opcode::LoadI16)) {
-                a.movsx(x86::rcx, mem);
+                a.movsx(x86::rcx, mem);  // Sign-extend is fine for signed loads
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
             } else if (opcode_is(opcode, Opcode::LoadU32)) {
-                a.mov(x86::ecx, mem);
+                a.mov(x86::ecx, mem);  // 32-bit mov zero-extends automatically
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
             } else if (opcode_is(opcode, Opcode::LoadI32)) {
-                a.movsxd(x86::rcx, mem);
+                a.movsxd(x86::rcx, mem);  // Sign-extend is fine for signed loads
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
             } else if (opcode_is(opcode, Opcode::LoadU64)) {
-                a.mov(x86::rcx, mem);
+                a.mov(x86::rcx, mem);  // 64-bit load, no corruption possible
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
             }
 

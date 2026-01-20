@@ -213,6 +213,109 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             continue;
         }
 
+        // === Load Instructions with Bounds Checking ===
+        // PVM Spec: addresses < 2^16 (65536) → panic, addresses >= memory_size → page fault
+        if (opcode_is(opcode, Opcode::LoadU8) ||
+            opcode_is(opcode, Opcode::LoadI8) ||
+            opcode_is(opcode, Opcode::LoadU16) ||
+            opcode_is(opcode, Opcode::LoadI16) ||
+            opcode_is(opcode, Opcode::LoadU32) ||
+            opcode_is(opcode, Opcode::LoadI32) ||
+            opcode_is(opcode, Opcode::LoadU64)) {
+            // Decode instruction: [opcode][dest_reg][ptr_reg][offset_16bit]
+            uint8_t dest_reg = codeBuffer[pc + 1];
+            uint8_t ptr_reg = codeBuffer[pc + 2];
+            int16_t offset;
+            memcpy(&offset, &codeBuffer[pc + 3], 2);
+
+            // Load pointer register into x0
+            a.ldr(a64::x0, a64::ptr(a64::x19, ptr_reg * 8));
+
+            // Add offset to get final address
+            a.add(a64::x0, a64::x0, offset);
+
+            // Bounds check: address < 65536 → panic
+            a.cmp(a64::x0, 65536);
+            a.b_lo(panicLabel);
+
+            // Runtime check: address >= memory_size → page fault
+            a.mov(a64::w1, a64::w21);  // Load memory_size into w1
+            a.cmp(a64::x0, a64::x1);
+            a.b_hs(pagefaultLabel);
+
+            // If we get here, address is valid - inline the load instruction
+            // Load from memory into register, then store to VM register
+            if (opcode_is(opcode, Opcode::LoadU8)) {
+                a.ldrb(a64::w1, a64::ptr(a64::x20, a64::x0));
+                a.str(a64::x1, a64::ptr(a64::x19, dest_reg * 8));
+            } else if (opcode_is(opcode, Opcode::LoadI8)) {
+                a.ldrsb(a64::x1, a64::ptr(a64::x20, a64::x0));
+                a.str(a64::x1, a64::ptr(a64::x19, dest_reg * 8));
+            } else if (opcode_is(opcode, Opcode::LoadU16)) {
+                a.ldrh(a64::w1, a64::ptr(a64::x20, a64::x0));
+                a.str(a64::x1, a64::ptr(a64::x19, dest_reg * 8));
+            } else if (opcode_is(opcode, Opcode::LoadI16)) {
+                a.ldrsh(a64::x1, a64::ptr(a64::x20, a64::x0));
+                a.str(a64::x1, a64::ptr(a64::x19, dest_reg * 8));
+            } else if (opcode_is(opcode, Opcode::LoadU32)) {
+                a.ldr(a64::w1, a64::ptr(a64::x20, a64::x0));
+                a.str(a64::x1, a64::ptr(a64::x19, dest_reg * 8));
+            } else if (opcode_is(opcode, Opcode::LoadI32)) {
+                a.ldrsw(a64::x1, a64::ptr(a64::x20, a64::x0));
+                a.str(a64::x1, a64::ptr(a64::x19, dest_reg * 8));
+            } else if (opcode_is(opcode, Opcode::LoadU64)) {
+                a.ldr(a64::x1, a64::ptr(a64::x20, a64::x0));
+                a.str(a64::x1, a64::ptr(a64::x19, dest_reg * 8));
+            }
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === Store Instructions with Bounds Checking ===
+        if (opcode_is(opcode, Opcode::StoreU8) ||
+            opcode_is(opcode, Opcode::StoreU16) ||
+            opcode_is(opcode, Opcode::StoreU32) ||
+            opcode_is(opcode, Opcode::StoreU64)) {
+            // Decode instruction: [opcode][ptr_reg][src_reg][offset_16bit]
+            uint8_t ptr_reg = codeBuffer[pc + 1];
+            uint8_t src_reg = codeBuffer[pc + 2];
+            int16_t offset;
+            memcpy(&offset, &codeBuffer[pc + 3], 2);
+
+            // Load pointer register into x0
+            a.ldr(a64::x0, a64::ptr(a64::x19, ptr_reg * 8));
+
+            // Add offset to get final address
+            a.add(a64::x0, a64::x0, offset);
+
+            // Bounds check: address < 65536 → panic
+            a.cmp(a64::x0, 65536);
+            a.b_lo(panicLabel);
+
+            // Runtime check: address >= memory_size → page fault
+            a.mov(a64::w1, a64::w21);  // Load memory_size into w1
+            a.cmp(a64::x0, a64::x1);
+            a.b_hs(pagefaultLabel);
+
+            // If we get here, address is valid - inline the store instruction
+            // Load value from VM register, then store to memory
+            a.ldr(a64::x1, a64::ptr(a64::x19, src_reg * 8));  // Load source value
+
+            if (opcode_is(opcode, Opcode::StoreU8)) {
+                a.strb(a64::w1, a64::ptr(a64::x20, a64::x0));
+            } else if (opcode_is(opcode, Opcode::StoreU16)) {
+                a.strh(a64::w1, a64::ptr(a64::x20, a64::x0));
+            } else if (opcode_is(opcode, Opcode::StoreU32)) {
+                a.str(a64::w1, a64::ptr(a64::x20, a64::x0));
+            } else if (opcode_is(opcode, Opcode::StoreU64)) {
+                a.str(a64::x1, a64::ptr(a64::x20, a64::x0));
+            }
+
+            pc += instrSize;
+            continue;
+        }
+
         // === StoreImm Instructions with Bounds Checking ===
         // PVM Spec: addresses < 2^16 (65536) → panic, addresses >= memory_size → page fault
         // Format: [opcode][value_Xbit][address_32bit]

@@ -252,8 +252,9 @@ struct JITIntegrationTests {
 
     @Test func testJITStoreImmU32() async throws {
         // Program: StoreImmU32 0xDEADBEEF to address 100000, then Halt
+        // 100000 in hex = 0x000186A0, bytes: [0xA0, 0x86, 0x01, 0x00]
         let code: [UInt8] = [
-            Opcode.storeImmU32.rawValue, 0xEF, 0xBE, 0xAD, 0xDE, 0, 0, 0, 0,  // StoreImmU32 0xDEADBEEF, address=100000 (9 bytes)
+            Opcode.storeImmU32.rawValue, 0xEF, 0xBE, 0xAD, 0xDE, 160, 134, 1, 0,  // StoreImmU32 0xDEADBEEF, address=100000 (9 bytes)
             Opcode.halt.rawValue                                                        // Halt (1 byte)
         ]
 
@@ -266,8 +267,9 @@ struct JITIntegrationTests {
 
     @Test func testJITStoreImmU64() async throws {
         // Program: StoreImmU64 0x123456789ABCDEF0 to address 100000, then Halt
+        // 100000 in hex = 0x000186A0, bytes: [0xA0, 0x86, 0x01, 0x00]
         let code: [UInt8] = [
-            Opcode.storeImmU64.rawValue, 0xF0, 0xDE, 0xBC, 0x9A, 0x78, 0x56, 0x34, 0x12, 0, 0, 0, 0,  // StoreImmU64, address=100000 (13 bytes)
+            Opcode.storeImmU64.rawValue, 0xF0, 0xDE, 0xBC, 0x9A, 0x78, 0x56, 0x34, 0x12, 160, 134, 1, 0,  // StoreImmU64, address=100000 (13 bytes)
             Opcode.halt.rawValue                                                                            // Halt (1 byte)
         ]
 
