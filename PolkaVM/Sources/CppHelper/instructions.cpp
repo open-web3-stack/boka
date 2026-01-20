@@ -1859,27 +1859,50 @@ bool jit_emit_branch_eq(
     uint8_t src2_reg,
     uint32_t target_pc)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load src1 from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src1_reg * 8));
+
+        // Load src2 from VM array
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src2_reg * 8));
+
+        // Compare registers
+        a->cmp(x86::rax, x86::rdx);
+
+        // If equal, jump to target (update PC)
+        // TODO: This needs proper label handling
+        // For now, just update PC unconditionally (stub)
+        a->mov(x86::r15d, target_pc);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load src1 from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp src1 = a64::x0;
+        a64::Gp src2 = a64::x1;
+        a64::Gp pcReg = a64::w23; // PC
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(src1, a64::ptr(regPtr, src1_reg * 8));
+        a->ldr(src2, a64::ptr(regPtr, src2_reg * 8));
+
+        // Compare registers
+        a->cmp(src1, src2);
+
+        // If equal, jump to target (update PC)
+        // TODO: This needs proper label handling
+        // For now, just update PC unconditionally (stub)
+        a->mov(pcReg, target_pc);
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load src1 from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src1_reg * 8));
-
-    // Load src2 from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, src2_reg * 8));
-
-    // Compare registers
-    a->cmp(x86::rax, x86::rdx);
-
-    // If equal, jump to target (update PC)
-    // TODO: This needs proper label handling
-    // For now, just update PC unconditionally (stub)
-    a->mov(x86::r15d, target_pc);
-
-    return true;
+    return false;
 }
 
 // BranchNe: Branch if not equal (register-register)
@@ -1890,27 +1913,50 @@ bool jit_emit_branch_ne(
     uint8_t src2_reg,
     uint32_t target_pc)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load src1 from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src1_reg * 8));
+
+        // Load src2 from VM array
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src2_reg * 8));
+
+        // Compare registers
+        a->cmp(x86::rax, x86::rdx);
+
+        // If not equal, jump to target (update PC)
+        // TODO: This needs proper label handling
+        // For now, just update PC unconditionally (stub)
+        a->mov(x86::r15d, target_pc);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load src1 from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp src1 = a64::x0;
+        a64::Gp src2 = a64::x1;
+        a64::Gp pcReg = a64::w23; // PC
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(src1, a64::ptr(regPtr, src1_reg * 8));
+        a->ldr(src2, a64::ptr(regPtr, src2_reg * 8));
+
+        // Compare registers
+        a->cmp(src1, src2);
+
+        // If not equal, jump to target (update PC)
+        // TODO: This needs proper label handling
+        // For now, just update PC unconditionally (stub)
+        a->mov(pcReg, target_pc);
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load src1 from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src1_reg * 8));
-
-    // Load src2 from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, src2_reg * 8));
-
-    // Compare registers
-    a->cmp(x86::rax, x86::rdx);
-
-    // If not equal, jump to target (update PC)
-    // TODO: This needs proper label handling
-    // For now, just update PC unconditionally (stub)
-    a->mov(x86::r15d, target_pc);
-
-    return true;
+    return false;
 }
 
 // LoadImmJump: Load immediate and jump
