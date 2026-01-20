@@ -102,8 +102,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         uint32_t instrSize = getInstructionSize(codeBuffer, pc, codeSize);
 
         if (instrSize == 0) {
-            // Unknown opcode - stop pre-pass
-            break;
+            // Unknown opcode - compilation error
+            return 3; // Compilation error
         }
 
         // Mark jump targets for control flow instructions
@@ -133,8 +133,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         uint32_t instrSize = getInstructionSize(codeBuffer, pc, codeSize);
 
         if (instrSize == 0) {
-            // Unknown opcode - stop compilation
-            break;
+            // Unknown opcode - compilation error
+            return 3; // Compilation error
         }
 
         // Check if this PC is a jump target (from pre-pass or previous branch)
