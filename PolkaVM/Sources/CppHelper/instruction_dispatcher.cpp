@@ -435,23 +435,11 @@ bool emit_instruction_decoded(
             );
 
         case static_cast<uint8_t>(Opcode::StoreImmU8):
-            // TODO: Implement store immediate - need to load immediate into temp reg then store
-            // For now, skip this instruction
-            a->nop();
-            return true;
-
         case static_cast<uint8_t>(Opcode::StoreImmU16):
-            // TODO: Implement store immediate - need to load immediate into temp reg then store
-            a->nop();
-            return true;
-
         case static_cast<uint8_t>(Opcode::StoreImmU32):
-            // TODO: Implement store immediate - need to load immediate into temp reg then store
-            a->nop();
-            return true;
-
         case static_cast<uint8_t>(Opcode::StoreImmU64):
-            // TODO: Implement store immediate - need to load immediate into temp reg then store
+            // StoreImm instructions are handled explicitly in x64_labeled_helper.cpp
+            // before calling the dispatcher, so these cases should never be reached.
             a->nop();
             return true;
 
