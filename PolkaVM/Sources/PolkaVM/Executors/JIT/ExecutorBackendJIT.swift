@@ -72,7 +72,12 @@ final class ExecutorBackendJIT: ExecutorBackend {
         jitHostFunctionTableStorage = JITHostFunctionTable(
             dispatchHostCall: unsafeBitCast(fnPtr, to: JITHostFunctionFn.self),
             ownerContext: Unmanaged.passUnretained(self).toOpaque(),
-            invocationContext: nil
+            invocationContext: nil,
+            jumpTableData: nil,
+            jumpTableSize: 0,
+            jumpTableEntrySize: 0,
+            jumpTableEntriesCount: 0,
+            alignmentFactor: 0
         )
 
         // Create a wrapper for the table
@@ -239,6 +244,27 @@ final class ExecutorBackendJIT: ExecutorBackend {
 
             // Update the invocation context in the JIT host function table
             jitHostFunctionTableWrapper.table.invocationContext = nil // We're using the syncHandler now
+
+            // Populate jump table data for JumpInd instruction support
+            if let programCode = currentProgramCode {
+                // Get jump table data as a pointer
+                let jumpTableData = programCode.jumpTable.withUnsafeBytes { rawBufferPointer in
+                    rawBufferPointer.baseAddress
+                }
+
+                jitHostFunctionTableWrapper.table.jumpTableData = jumpTableData?.assumingMemoryBound(to: UInt8.self)
+                jitHostFunctionTableWrapper.table.jumpTableSize = UInt32(programCode.jumpTable.count)
+                jitHostFunctionTableWrapper.table.jumpTableEntrySize = programCode.jumpTableEntrySize
+                jitHostFunctionTableWrapper.table.jumpTableEntriesCount = UInt32(programCode.jumpTable.count / Int(programCode.jumpTableEntrySize))
+                jitHostFunctionTableWrapper.table.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
+            } else {
+                // No jump table available
+                jitHostFunctionTableWrapper.table.jumpTableData = nil
+                jitHostFunctionTableWrapper.table.jumpTableSize = 0
+                jitHostFunctionTableWrapper.table.jumpTableEntrySize = 0
+                jitHostFunctionTableWrapper.table.jumpTableEntriesCount = 0
+                jitHostFunctionTableWrapper.table.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
+            }
 
             // Get a pointer to the JITHostFunctionTableWrapper
             let invocationContextPointer = Unmanaged.passUnretained(jitHostFunctionTableWrapper).toOpaque()

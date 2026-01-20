@@ -85,6 +85,13 @@ struct JITHostFunctionTable {
     JITHostFunctionFn dispatchHostCall;
     void* _Nonnull ownerContext; // Opaque pointer to Swift ExecutorBackendJIT
     void* _Nullable invocationContext; // Opaque pointer to InvocationContext
+
+    // Jump table support for JumpInd instruction
+    const uint8_t* _Nullable jumpTableData; // Pointer to jump table data
+    uint32_t jumpTableSize; // Total size of jump table in bytes
+    uint8_t jumpTableEntrySize; // Size of each entry in bytes (1, 2, 3, or 4)
+    uint32_t jumpTableEntriesCount; // Number of entries in the jump table
+    uint32_t alignmentFactor; // Dynamic address alignment factor
 };
 
 // Trampoline for JIT code to call Swift host functions

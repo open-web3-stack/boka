@@ -221,14 +221,103 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // JumpInd: [opcode][reg_index] - jump to address stored in register
             uint8_t ptr_reg = codeBuffer[pc + 1];
 
-            // Load target address from register and update PC
+            // Load target address from register
             a.mov(x86::eax, x86::dword_ptr(x86::rbx, ptr_reg * 8));
-            a.mov(x86::r15d, x86::eax);  // Update VM_PC
 
-            // JumpInd requires dynamic jump targets which need a jump table.
-            // For now, exit to interpreter to handle it.
-            a.bind(unsupportedLabel);
-            a.mov(x86::eax, 2);  // Exit code 2 = unsupported/exit to interpreter
+            // Special case: check for halt address (0xFFFFFFFF)
+            // This is the djumpHaltAddress constant
+            a.cmp(x86::eax, 0xFFFFFFFF);
+            a.je(exitLabel);  // Jump to halt exit
+
+            // Check if jump table is available
+            a.mov(x86::rdx, x86::qword_ptr(x86::rbp, offsetof(JITHostFunctionTable, jumpTableData)));
+            a.test(x86::rdx, x86::rdx);
+            a.jz(unsupportedLabel);  // No jump table, fall back to interpreter
+
+            // Load jump table parameters
+            a.mov(x86::ecx, x86::dword_ptr(x86::rbp, offsetof(JITHostFunctionTable, alignmentFactor)));
+            a.mov(x86::r8d, x86::dword_ptr(x86::rbp, offsetof(JITHostFunctionTable, jumpTableEntrySize)));
+            a.mov(x86::r9d, x86::dword_ptr(x86::rbp, offsetof(JITHostFunctionTable, jumpTableEntriesCount)));
+
+            // Validate target != 0
+            a.test(x86::eax, x86::eax);
+            a.jz(pagefaultLabel);  // Invalid target (0)
+
+            // Validate target alignment
+            a.mov(x86::r10d, x86::eax);  // Copy target
+            a.mov(x86::edx, 0);   // Clear edx for division
+            a.div(x86::ecx);  // Divide by alignmentFactor, quotient in eax, remainder in edx
+            a.cmp(x86::edx, 0);  // Check if remainder is 0 (aligned)
+            a.jne(pagefaultLabel);  // Not aligned, invalid jump
+
+            // Calculate entry index: (target / alignmentFactor) - 1
+            a.dec(x86::eax);  // Decrement to get entry index
+            a.cmp(x86::eax, x86::r9d);  // Compare with entriesCount
+            a.jae(pagefaultLabel);  // Index >= entriesCount, invalid jump
+
+            // Calculate byte offset: entryIndex * entrySize
+            a.mov(x86::edx, x86::eax);  // Copy entry index
+            a.imul(x86::edx, x86::r8d);  // Multiply by entry size
+
+            // Load jump table data pointer
+            a.mov(x86::r11, x86::qword_ptr(x86::rbp, offsetof(JITHostFunctionTable, jumpTableData)));
+
+            // Read entry based on entrySize
+            // For now, support entry sizes 1, 2, 3, 4
+            Label entrySize1 = a.newLabel();
+            Label entrySize2 = a.newLabel();
+            Label entrySize3 = a.newLabel();
+            Label entrySize4 = a.newLabel();
+            Label readDone = a.newLabel();
+
+            a.cmp(x86::r8d, 1);
+            a.je(entrySize1);
+            a.cmp(x86::r8d, 2);
+            a.je(entrySize2);
+            a.cmp(x86::r8d, 3);
+            a.je(entrySize3);
+            a.cmp(x86::r8d, 4);
+            a.je(entrySize4);
+            // Invalid entry size, fall back to interpreter
+            a.jmp(unsupportedLabel);
+
+            // Entry size 1: Read UInt8
+            a.bind(entrySize1);
+            a.movzx(x86::eax, x86::byte_ptr(x86::r11, x86::rdx));
+            a.jmp(readDone);
+
+            // Entry size 2: Read UInt16
+            a.bind(entrySize2);
+            a.movzx(x86::eax, x86::word_ptr(x86::r11, x86::rdx));
+            a.jmp(readDone);
+
+            // Entry size 3: Read UInt24
+            a.bind(entrySize3);
+            a.movzx(x86::eax, x86::byte_ptr(x86::r11, x86::rdx));  // Read byte 0
+            a.mov(x86::r10d, x86::eax);  // Save byte 0
+            a.movzx(x86::eax, x86::word_ptr(x86::r11, x86::rdx, 1));  // Read bytes 1-2
+            a.shl(x86::eax, 8);  // Shift to make room for byte 0
+            a.or_(x86::eax, x86::r10d);  // Combine byte 0
+            a.jmp(readDone);
+
+            // Entry size 4: Read UInt32
+            a.bind(entrySize4);
+            a.mov(x86::eax, x86::dword_ptr(x86::r11, x86::rdx));
+            a.jmp(readDone);
+
+            a.bind(readDone);
+
+            // Update PC with the looked-up address
+            a.mov(x86::r15d, x86::eax);
+
+            // Jump to the new PC
+            // First, check if the new PC is within valid range
+            a.cmp(x86::eax, codeSize);
+            a.jae(pagefaultLabel);  // PC out of bounds
+
+            // For now, fall back to interpreter with the updated PC
+            // This is safe because the jump table lookup validated the target
+            a.mov(x86::eax, 2);  // Exit code 2 = exit to interpreter with updated PC
             a.jmp(epilogueLabel);
 
             pc += instrSize;
