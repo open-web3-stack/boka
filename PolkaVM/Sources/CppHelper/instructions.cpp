@@ -1270,29 +1270,49 @@ bool jit_emit_div_u32(
     uint8_t dest_reg,
     uint8_t src_reg)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array (divisor)
+        a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+
+        // Load dest register from VM array (dividend)
+        a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
+
+        // Clear upper bits for division
+        a->mov(x86::ecx, x86::edx);
+        a->xor_(x86::edx, x86::edx);
+
+        // Divide: edx:eax / ecx -> eax (quotient), edx (remainder)
+        a->div(x86::ecx);
+
+        // Store quotient back to VM register array
+        a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // ARM64 registers
+        a64::Gp dividend = a64::w0;  // Dividend
+        a64::Gp divisor = a64::w1;   // Divisor
+        a64::Gp quotient = a64::w2;  // Quotient result
+        a64::Gp regPtr = a64::x19;   // VM_REGISTERS_PTR
+
+        // Load dividend (dest_reg) and divisor (src_reg)
+        a->ldr(dividend, a64::ptr(regPtr, dest_reg * 8));
+        a->ldr(divisor, a64::ptr(regPtr, src_reg * 8));
+
+        // Unsigned divide: quotient = dividend / divisor
+        a->udiv(quotient, dividend, divisor);
+
+        // Store quotient back to VM register array
+        a->str(quotient, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array (divisor)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
-
-    // Load dest register from VM array (dividend)
-    a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
-
-    // Clear upper bits for division
-    a->mov(x86::ecx, x86::edx);
-    a->xor_(x86::edx, x86::edx);
-
-    // Divide: edx:eax / ecx -> eax (quotient), edx (remainder)
-    a->div(x86::ecx);
-
-    // Store quotient back to VM register array
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
-
-    return true;
+    return false;
 }
 
 // DivS32: Signed division (32-bit)
@@ -1302,28 +1322,48 @@ bool jit_emit_div_s32(
     uint8_t dest_reg,
     uint8_t src_reg)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array (divisor)
+        a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+
+        // Load dest register from VM array (dividend)
+        a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
+
+        // Sign extend dividend to edx:eax
+        a->cdq();
+
+        // Divide: edx:eax / eax -> eax (quotient), edx (remainder)
+        a->idiv(x86::eax);
+
+        // Store quotient back to VM register array
+        a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // ARM64 registers
+        a64::Gp dividend = a64::w0;  // Dividend
+        a64::Gp divisor = a64::w1;   // Divisor
+        a64::Gp quotient = a64::w2;  // Quotient result
+        a64::Gp regPtr = a64::x19;   // VM_REGISTERS_PTR
+
+        // Load dividend (dest_reg) and divisor (src_reg)
+        a->ldr(dividend, a64::ptr(regPtr, dest_reg * 8));
+        a->ldr(divisor, a64::ptr(regPtr, src_reg * 8));
+
+        // Signed divide: quotient = dividend / divisor
+        a->sdiv(quotient, dividend, divisor);
+
+        // Store quotient back to VM register array
+        a->str(quotient, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array (divisor)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
-
-    // Load dest register from VM array (dividend)
-    a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
-
-    // Sign extend dividend to edx:eax
-    a->cdq();
-
-    // Divide: edx:eax / eax -> eax (quotient), edx (remainder)
-    a->idiv(x86::eax);
-
-    // Store quotient back to VM register array
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
-
-    return true;
+    return false;
 }
 
 // RemU32: Unsigned remainder (32-bit)
@@ -1333,29 +1373,54 @@ bool jit_emit_rem_u32(
     uint8_t dest_reg,
     uint8_t src_reg)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array (divisor)
+        a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+
+        // Load dest register from VM array (dividend)
+        a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
+
+        // Clear upper bits for division
+        a->mov(x86::ecx, x86::edx);
+        a->xor_(x86::edx, x86::edx);
+
+        // Divide: edx:eax / ecx -> eax (quotient), edx (remainder)
+        a->div(x86::ecx);
+
+        // Store remainder back to VM register array
+        a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::edx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // ARM64 registers
+        a64::Gp dividend = a64::w0;  // Dividend
+        a64::Gp divisor = a64::w1;   // Divisor
+        a64::Gp quotient = a64::w2;  // Quotient (temporary)
+        a64::Gp remainder = a64::w3; // Remainder result
+        a64::Gp regPtr = a64::x19;   // VM_REGISTERS_PTR
+
+        // Load dividend (dest_reg) and divisor (src_reg)
+        a->ldr(dividend, a64::ptr(regPtr, dest_reg * 8));
+        a->ldr(divisor, a64::ptr(regPtr, src_reg * 8));
+
+        // Unsigned divide to get quotient
+        a->udiv(quotient, dividend, divisor);
+
+        // Calculate remainder: remainder = dividend - (quotient * divisor)
+        // Using msub: remainder = dividend - quotient * divisor
+        a->msub(remainder, quotient, divisor, dividend);
+
+        // Store remainder back to VM register array
+        a->str(remainder, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array (divisor)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
-
-    // Load dest register from VM array (dividend)
-    a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
-
-    // Clear upper bits for division
-    a->mov(x86::ecx, x86::edx);
-    a->xor_(x86::edx, x86::edx);
-
-    // Divide: edx:eax / ecx -> eax (quotient), edx (remainder)
-    a->div(x86::ecx);
-
-    // Store remainder back to VM register array
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::edx);
-
-    return true;
+    return false;
 }
 
 // RemS32: Signed remainder (32-bit)
@@ -1365,28 +1430,53 @@ bool jit_emit_rem_s32(
     uint8_t dest_reg,
     uint8_t src_reg)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array (divisor)
+        a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+
+        // Load dest register from VM array (dividend)
+        a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
+
+        // Sign extend dividend to edx:eax
+        a->cdq();
+
+        // Divide: edx:eax / eax -> eax (quotient), edx (remainder)
+        a->idiv(x86::eax);
+
+        // Store remainder back to VM register array
+        a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::edx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // ARM64 registers
+        a64::Gp dividend = a64::w0;  // Dividend
+        a64::Gp divisor = a64::w1;   // Divisor
+        a64::Gp quotient = a64::w2;  // Quotient (temporary)
+        a64::Gp remainder = a64::w3; // Remainder result
+        a64::Gp regPtr = a64::x19;   // VM_REGISTERS_PTR
+
+        // Load dividend (dest_reg) and divisor (src_reg)
+        a->ldr(dividend, a64::ptr(regPtr, dest_reg * 8));
+        a->ldr(divisor, a64::ptr(regPtr, src_reg * 8));
+
+        // Signed divide to get quotient
+        a->sdiv(quotient, dividend, divisor);
+
+        // Calculate remainder: remainder = dividend - (quotient * divisor)
+        // Using msub: remainder = dividend - quotient * divisor
+        a->msub(remainder, quotient, divisor, dividend);
+
+        // Store remainder back to VM register array
+        a->str(remainder, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array (divisor)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
-
-    // Load dest register from VM array (dividend)
-    a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
-
-    // Sign extend dividend to edx:eax
-    a->cdq();
-
-    // Divide: edx:eax / eax -> eax (quotient), edx (remainder)
-    a->idiv(x86::eax);
-
-    // Store remainder back to VM register array
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::edx);
-
-    return true;
+    return false;
 }
 
 // ShloL32: Shift left logical (32-bit)
@@ -1874,9 +1964,11 @@ bool jit_emit_branch_eq(
         a->cmp(x86::rax, x86::rdx);
 
         // If equal, jump to target (update PC)
-        // TODO: This needs proper label handling
-        // For now, just update PC unconditionally (stub)
-        a->mov(x86::r15d, target_pc);
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->newLabel();
+        a->jne(skipLabel);  // Skip PC update if not equal
+        a->mov(x86::r15d, target_pc);  // Only update PC if equal
+        a->bind(skipLabel);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -1895,9 +1987,11 @@ bool jit_emit_branch_eq(
         a->cmp(src1, src2);
 
         // If equal, jump to target (update PC)
-        // TODO: This needs proper label handling
-        // For now, just update PC unconditionally (stub)
-        a->mov(pcReg, target_pc);
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->newLabel();
+        a->b_ne(skipLabel);  // Skip PC update if not equal
+        a->mov(pcReg, target_pc);  // Only update PC if equal
+        a->bind(skipLabel);
 
         return true;
     }
@@ -1928,9 +2022,11 @@ bool jit_emit_branch_ne(
         a->cmp(x86::rax, x86::rdx);
 
         // If not equal, jump to target (update PC)
-        // TODO: This needs proper label handling
-        // For now, just update PC unconditionally (stub)
-        a->mov(x86::r15d, target_pc);
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->newLabel();
+        a->je(skipLabel);  // Skip PC update if equal
+        a->mov(x86::r15d, target_pc);  // Only update PC if not equal
+        a->bind(skipLabel);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -1949,9 +2045,11 @@ bool jit_emit_branch_ne(
         a->cmp(src1, src2);
 
         // If not equal, jump to target (update PC)
-        // TODO: This needs proper label handling
-        // For now, just update PC unconditionally (stub)
-        a->mov(pcReg, target_pc);
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->newLabel();
+        a->b_eq(skipLabel);  // Skip PC update if equal
+        a->mov(pcReg, target_pc);  // Only update PC if not equal
+        a->bind(skipLabel);
 
         return true;
     }
