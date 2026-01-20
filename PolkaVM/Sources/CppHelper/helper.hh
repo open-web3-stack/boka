@@ -95,3 +95,22 @@ uint32_t pvm_host_call_trampoline(
     uint8_t* _Nonnull guest_memory_base_ptr,
     uint32_t guest_memory_size,
     uint64_t* _Nonnull guest_gas_ptr);
+
+// Compile a range of bytecode instructions to machine code
+// This is the main entry point for JIT compilation from the C++ layer
+// - Parameters:
+//   - assembler: The AsmJit assembler instance
+//   - target_arch: Target architecture ("x86_64" or "aarch64")
+//   - bytecode: Pointer to the bytecode buffer
+//   - bytecode_size: Size of the bytecode buffer
+//   - start_pc: Starting program counter
+//   - end_pc: Ending program counter (exclusive)
+// - Returns: true if successful, false otherwise
+bool compile_bytecode_range(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    const uint8_t* _Nonnull bytecode,
+    size_t bytecode_size,
+    uint32_t start_pc,
+    uint32_t end_pc
+);

@@ -1038,3 +1038,15 @@ bool emit_basic_block_instructions(
 }
 
 } // namespace jit_emitter
+
+// Extern "C" wrapper to allow calling from helper.cpp
+// This function provides the main entry point for compiling a range of bytecode
+extern "C" bool jit_emitter_emit_basic_block_instructions(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    const uint8_t* _Nonnull bytecode,
+    uint32_t start_pc,
+    uint32_t end_pc)
+{
+    return jit_emitter::emit_basic_block_instructions(assembler, target_arch, bytecode, start_pc, end_pc);
+}

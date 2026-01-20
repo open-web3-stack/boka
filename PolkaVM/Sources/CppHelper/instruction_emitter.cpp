@@ -7,6 +7,15 @@
 
 namespace jit_emitter {
 
+// Declare the extern C function from instruction_dispatcher.cpp
+extern "C" bool jit_emitter_emit_basic_block_instructions(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    const uint8_t* _Nonnull bytecode,
+    uint32_t start_pc,
+    uint32_t end_pc
+);
+
 // Emit a single instruction to the assembler
 // Returns true if successful, false if instruction is not supported
 bool emit_instruction(
@@ -18,24 +27,9 @@ bool emit_instruction(
     uint32_t current_pc,
     const LabelManager* _Nullable label_manager)
 {
-    // Call the appropriate instruction emitter based on opcode
-    // TODO: This is a simplified stub that needs to be expanded to handle all 194 instructions
-
-    switch (opcode) {
-        // Load Immediate instructions
-        case 1: // LoadImmU8 (example - adjust based on actual opcode mapping)
-            return jit_instruction::jit_emit_load_imm_u8(
-                assembler, target_arch,
-                instruction_data[0],  // dest_reg
-                instruction_data[1]   // immediate
-            );
-
-        // Add more instruction cases here...
-
-        default:
-            // Unsupported instruction - return false
-            return false;
-    }
+    // Call the comprehensive instruction dispatcher from instruction_dispatcher.cpp
+    // This dispatcher handles all 194 implemented instructions
+    return jit_emitter_emit_basic_block_instructions(assembler, target_arch, instruction_data, current_pc, current_pc + static_cast<uint32_t>(instruction_size));
 }
 
 // Emit all instructions from a basic block
@@ -48,38 +42,8 @@ bool emit_basic_block(
     uint32_t block_end_pc,
     const LabelManager* _Nullable label_manager)
 {
-    // Validate inputs
-    if (!code_buffer || code_size == 0) {
-        return false;
-    }
-
-    if (block_start_pc >= block_end_pc) {
-        return false;
-    }
-
-    // Iterate through instructions in the basic block
-    uint32_t current_pc = block_start_pc;
-
-    while (current_pc < block_end_pc && current_pc < code_size) {
-        uint8_t opcode = code_buffer[current_pc];
-
-        // Calculate instruction size (simplified - needs proper instruction decoding)
-        size_t instruction_size = 4; // Placeholder - actual size varies by instruction
-
-        // Emit the instruction
-        if (!emit_instruction(
-            assembler, target_arch, opcode,
-            &code_buffer[current_pc], instruction_size,
-            current_pc, label_manager)) {
-            // Failed to emit instruction
-            return false;
-        }
-
-        // Move to next instruction
-        current_pc += instruction_size;
-    }
-
-    return true;
+    // Use the comprehensive instruction dispatcher
+    return jit_emitter_emit_basic_block_instructions(assembler, target_arch, code_buffer, block_start_pc, block_end_pc);
 }
 
 } // namespace jit_emitter
