@@ -38,3 +38,14 @@ int32_t compilePolkaVMCode_a64(
     uint32_t initialPC,
     uint32_t jitMemorySize,
     void* _Nullable * _Nonnull funcOut);
+
+// Label-based compilation with direct jumps for maximum performance
+// Uses single-pass compilation with lazy label creation
+// Same interface as compilePolkaVMCode_a64 but uses labels for control flow
+int32_t compilePolkaVMCode_a64_labeled(
+    const uint8_t* _Nonnull codeBuffer,
+    size_t codeSize,
+    uint32_t initialPC,
+    uint32_t jitMemorySize,
+    void* _Nullable * _Nonnull funcOut);
+
