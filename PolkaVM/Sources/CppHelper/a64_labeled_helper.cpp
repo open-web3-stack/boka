@@ -232,7 +232,15 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             a.ldr(a64::x0, a64::ptr(a64::x19, ptr_reg * 8));
 
             // Add offset to get final address
-            a.add(a64::x0, a64::x0, offset);
+            // ARM64 add immediate only supports 12-bit values (-4095 to 4095)
+            // For larger offsets, load into temporary register (x5) and add
+            // Note: x5 is safe to use here (invocation_context_ptr is in x24)
+            if (offset >= -4095 && offset <= 4095) {
+                a.add(a64::x0, a64::x0, offset);
+            } else {
+                a.mov(a64::x5, offset);  // Load offset into temporary register
+                a.add(a64::x0, a64::x0, a64::x5);
+            }
 
             // Bounds check: address < 65536 → panic
             a.cmp(a64::x0, 65536);
@@ -287,7 +295,15 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             a.ldr(a64::x0, a64::ptr(a64::x19, ptr_reg * 8));
 
             // Add offset to get final address
-            a.add(a64::x0, a64::x0, offset);
+            // ARM64 add immediate only supports 12-bit values (-4095 to 4095)
+            // For larger offsets, load into temporary register (x5) and add
+            // Note: x5 is safe to use here (invocation_context_ptr is in x24)
+            if (offset >= -4095 && offset <= 4095) {
+                a.add(a64::x0, a64::x0, offset);
+            } else {
+                a.mov(a64::x5, offset);  // Load offset into temporary register
+                a.add(a64::x0, a64::x0, a64::x5);
+            }
 
             // Bounds check: address < 65536 → panic
             a.cmp(a64::x0, 65536);
