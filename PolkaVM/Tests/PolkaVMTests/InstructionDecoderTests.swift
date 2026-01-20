@@ -38,7 +38,7 @@ struct InstructionDecoderTests {
         #expect(bytecode[1] == 0x05)
 
         let immediate = bytecode.withUnsafeBytes { ptr -> UInt64 in
-            return ptr.load(fromByteOffset: 2, as: UInt64.self)
+            return ptr.loadUnaligned(fromByteOffset: 2, as: UInt64.self)
         }
         #expect(immediate == 0xDEADBEEF)
     }
@@ -61,7 +61,7 @@ struct InstructionDecoderTests {
         // - size: 6
 
         let immediate = bytecode.withUnsafeBytes { ptr -> UInt32 in
-            return ptr.load(fromByteOffset: 2, as: UInt32.self)
+            return ptr.loadUnaligned(fromByteOffset: 2, as: UInt32.self)
         }
         #expect(immediate == 0x12345678)
     }
@@ -86,7 +86,7 @@ struct InstructionDecoderTests {
         // - size: 6
 
         let address = bytecode.withUnsafeBytes { ptr -> UInt32 in
-            return ptr.load(fromByteOffset: 2, as: UInt32.self)
+            return ptr.loadUnaligned(fromByteOffset: 2, as: UInt32.self)
         }
         #expect(address == 0x1000)
     }
@@ -103,7 +103,7 @@ struct InstructionDecoderTests {
         ]
 
         let address = bytecode.withUnsafeBytes { ptr -> UInt32 in
-            return ptr.load(fromByteOffset: 2, as: UInt32.self)
+            return ptr.loadUnaligned(fromByteOffset: 2, as: UInt32.self)
         }
         #expect(address == 0x2000)
     }
@@ -120,7 +120,7 @@ struct InstructionDecoderTests {
         ]
 
         let address = bytecode.withUnsafeBytes { ptr -> UInt32 in
-            return ptr.load(fromByteOffset: 2, as: UInt32.self)
+            return ptr.loadUnaligned(fromByteOffset: 2, as: UInt32.self)
         }
         #expect(address == 0x3000)
     }
@@ -137,7 +137,7 @@ struct InstructionDecoderTests {
         ]
 
         let address = bytecode.withUnsafeBytes { ptr -> UInt32 in
-            return ptr.load(fromByteOffset: 2, as: UInt32.self)
+            return ptr.loadUnaligned(fromByteOffset: 2, as: UInt32.self)
         }
         #expect(address == 0x4000)
     }
@@ -154,7 +154,7 @@ struct InstructionDecoderTests {
         ]
 
         let address = bytecode.withUnsafeBytes { ptr -> UInt32 in
-            return ptr.load(fromByteOffset: 2, as: UInt32.self)
+            return ptr.loadUnaligned(fromByteOffset: 2, as: UInt32.self)
         }
         #expect(address == 0x5000)
     }
@@ -218,7 +218,7 @@ struct InstructionDecoderTests {
         // - target_pc: current_pc + 5 + 16
 
         let offset = bytecode.withUnsafeBytes { ptr -> Int32 in
-            return ptr.load(fromByteOffset: 1, as: Int32.self)
+            return ptr.loadUnaligned(fromByteOffset: 1, as: Int32.self)
         }
         #expect(offset == 16)
 
@@ -237,7 +237,7 @@ struct InstructionDecoderTests {
         ]
 
         let offset = bytecode.withUnsafeBytes { ptr -> Int32 in
-            return ptr.load(fromByteOffset: 1, as: Int32.self)
+            return ptr.loadUnaligned(fromByteOffset: 1, as: Int32.self)
         }
         #expect(offset == -16)
 
@@ -299,7 +299,7 @@ struct InstructionDecoderTests {
         #expect(bytecode[1] == 0x42)
 
         let address = bytecode.withUnsafeBytes { ptr -> UInt32 in
-            return ptr.load(fromByteOffset: 2, as: UInt32.self)
+            return ptr.loadUnaligned(fromByteOffset: 2, as: UInt32.self)
         }
         #expect(address == 0x6000)
     }
@@ -318,12 +318,12 @@ struct InstructionDecoderTests {
         #expect(bytecode.count == 7)
 
         let value = bytecode.withUnsafeBytes { ptr -> UInt16 in
-            return ptr.load(fromByteOffset: 1, as: UInt16.self)
+            return ptr.loadUnaligned(fromByteOffset: 1, as: UInt16.self)
         }
         #expect(value == 0x1234)
 
         let address = bytecode.withUnsafeBytes { ptr -> UInt32 in
-            return ptr.load(fromByteOffset: 3, as: UInt32.self)
+            return ptr.loadUnaligned(fromByteOffset: 3, as: UInt32.self)
         }
         #expect(address == 0x7000)
     }
@@ -372,7 +372,7 @@ struct InstructionDecoderTests {
         ]
 
         let immediate = bytecode.withUnsafeBytes { ptr -> UInt64 in
-            return ptr.load(fromByteOffset: 2, as: UInt64.self)
+            return ptr.loadUnaligned(fromByteOffset: 2, as: UInt64.self)
         }
         #expect(immediate == UInt64.max)
     }

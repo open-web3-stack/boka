@@ -8,6 +8,7 @@ namespace Instructions {
 
     const uint8_t Trap::opcode = static_cast<uint8_t>(PVM::Opcode::Trap);
     const uint8_t Fallthrough::opcode = static_cast<uint8_t>(PVM::Opcode::Halt);
+    const uint8_t Ecalli::opcode = 10;
     const uint8_t LoadImm64::opcode = static_cast<uint8_t>(PVM::Opcode::LoadImmU64);
     const uint8_t StoreImmU8::opcode = static_cast<uint8_t>(PVM::Opcode::StoreImmU8);
     const uint8_t StoreImmU16::opcode = static_cast<uint8_t>(PVM::Opcode::StoreImmU16);
