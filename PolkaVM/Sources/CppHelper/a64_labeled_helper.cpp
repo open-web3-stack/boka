@@ -225,14 +225,14 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             // Load address into x0 for bounds checking
             a.mov(a64::x0, address);
 
-            // Bounds check: address < 65536 → panic
+            // Bounds check: address < 65536 → panic (use b.lo for unsigned <)
             a.cmp(a64::x0, 65536);
-            a.b(panicLabel);
+            a.b_lo(panicLabel);
 
-            // Runtime check: address >= memory_size → page fault
+            // Runtime check: address >= memory_size → page fault (use b.hs for unsigned >=)
             a.mov(a64::w1, a64::w21);  // Load memory_size into w1
             a.cmp(a64::x0, a64::x1);
-            a.b(pagefaultLabel);
+            a.b_hs(pagefaultLabel);
 
             // Store value to memory
             a.mov(a64::w8, value);
@@ -254,12 +254,12 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
             // Bounds check: address < 65536 → panic
             a.cmp(a64::x0, 65536);
-            a.b(panicLabel);
+            a.b_lo(panicLabel);
 
             // Runtime check: address >= memory_size → page fault
             a.mov(a64::w1, a64::w21);  // Load memory_size into w1
             a.cmp(a64::x0, a64::x1);
-            a.b(pagefaultLabel);
+            a.b_hs(pagefaultLabel);
 
             // Store value to memory
             a.mov(a64::w8, value);
@@ -281,12 +281,12 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
             // Bounds check: address < 65536 → panic
             a.cmp(a64::x0, 65536);
-            a.b(panicLabel);
+            a.b_lo(panicLabel);
 
             // Runtime check: address >= memory_size → page fault
             a.mov(a64::w1, a64::w21);  // Load memory_size into w1
             a.cmp(a64::x0, a64::x1);
-            a.b(pagefaultLabel);
+            a.b_hs(pagefaultLabel);
 
             // Store value to memory
             a.mov(a64::w8, value);
@@ -308,12 +308,12 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
             // Bounds check: address < 65536 → panic
             a.cmp(a64::x0, 65536);
-            a.b(panicLabel);
+            a.b_lo(panicLabel);
 
             // Runtime check: address >= memory_size → page fault
             a.mov(a64::w1, a64::w21);  // Load memory_size into w1
             a.cmp(a64::x0, a64::x1);
-            a.b(pagefaultLabel);
+            a.b_hs(pagefaultLabel);
 
             // Store value to memory
             a.mov(a64::x8, value);
