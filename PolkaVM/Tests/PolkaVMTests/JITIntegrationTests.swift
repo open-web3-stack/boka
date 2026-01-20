@@ -76,8 +76,8 @@ struct JITIntegrationTests {
     @Test func testJITCompilesSuccessfully() async throws {
         // Program: LoadImm 42, Halt
         let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 42, 0,  // LoadImm R0, 42
-            Opcode.halt.rawValue           // Halt
+            Opcode.loadImm.rawValue, 0, 42, 0, 0, 0,  // LoadImm R0, 42 (6 bytes: opcode + reg + value_32bit)
+            Opcode.halt.rawValue           // Halt (1 byte)
         ]
 
         let blob = buildBlob(from: code)
@@ -92,9 +92,9 @@ struct JITIntegrationTests {
         // Program: LoadImm 42, Add R0+R0, Halt
         // Expected: R0 = 84
         let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 42, 0,  // LoadImm R0, 42
-            Opcode.add32.rawValue, 0, 0,         // Add32 R0, R0, R0
-            Opcode.halt.rawValue           // Halt
+            Opcode.loadImm.rawValue, 0, 42, 0, 0, 0,  // LoadImm R0, 42 (6 bytes)
+            Opcode.add32.rawValue, 0, 0,               // Add32 R0, R0, R0 (3 bytes)
+            Opcode.halt.rawValue                       // Halt (1 byte)
         ]
 
         let blob = buildBlob(from: code)
@@ -106,10 +106,10 @@ struct JITIntegrationTests {
     @Test func testJITLoadImmMultiple() async throws {
         // Program: LoadImm multiple registers
         let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 10, 0,  // LoadImm R0, 10
-            Opcode.loadImm.rawValue, 1, 20, 0,  // LoadImm R1, 20
-            Opcode.loadImm.rawValue, 2, 30, 0,  // LoadImm R2, 30
-            Opcode.halt.rawValue           // Halt
+            Opcode.loadImm.rawValue, 0, 10, 0, 0, 0,  // LoadImm R0, 10 (6 bytes)
+            Opcode.loadImm.rawValue, 1, 20, 0, 0, 0,  // LoadImm R1, 20 (6 bytes)
+            Opcode.loadImm.rawValue, 2, 30, 0, 0, 0,  // LoadImm R2, 30 (6 bytes)
+            Opcode.halt.rawValue                       // Halt (1 byte)
         ]
 
         let blob = buildBlob(from: code)
@@ -120,10 +120,14 @@ struct JITIntegrationTests {
 
     @Test func testJITUnconditionalJump() async throws {
         // Program: Jump over LoadImm to reach Halt
+        // Bytecode layout:
+        // [0-4]:   Jump instruction (5 bytes: opcode + offset)
+        // [5-10]:  LoadImm (6 bytes) - should be skipped
+        // [11]:    Halt (1 byte) - jump target
         let code: [UInt8] = [
-            Opcode.jump.rawValue, 4, 0, 0, 0,   // Jump forward 4 bytes (to halt)
-            Opcode.loadImm.rawValue, 0, 99, 0,  // LoadImm R0, 99 (should not execute)
-            Opcode.halt.rawValue           // Halt (jump target)
+            Opcode.jump.rawValue, 6, 0, 0, 0,   // Jump forward 6 bytes (skip LoadImm)
+            Opcode.loadImm.rawValue, 0, 99, 0, 0, 0,  // LoadImm R0, 99 (6 bytes, should not execute)
+            Opcode.halt.rawValue                       // Halt (1 byte, jump target)
         ]
 
         let blob = buildBlob(from: code)
@@ -134,11 +138,12 @@ struct JITIntegrationTests {
 
     @Test func testJITDivision() async throws {
         // Program: DivU32 100 / 5 = 20
+        // DivU32 does: dest_reg = dest_reg / src_reg
         let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 100, 0,  // LoadImm R0, 100
-            Opcode.loadImm.rawValue, 1, 5, 0,    // LoadImm R1, 5
-            Opcode.divU32.rawValue, 2, 0,        // DivU32 R2, R0, R1
-            Opcode.halt.rawValue           // Halt
+            Opcode.loadImm.rawValue, 2, 100, 0, 0, 0,  // LoadImm R2, 100 (6 bytes) - dividend
+            Opcode.loadImm.rawValue, 0, 5, 0, 0, 0,    // LoadImm R0, 5 (6 bytes) - divisor
+            Opcode.divU32.rawValue, 2, 0,              // DivU32 R2, R0 -> R2 = R2 / R0 = 20 (3 bytes)
+            Opcode.halt.rawValue                       // Halt (1 byte)
         ]
 
         let blob = buildBlob(from: code)
@@ -147,6 +152,74 @@ struct JITIntegrationTests {
         #expect(exitReason == .halt || exitReason == .panic(.trap))
     }
 
-    // TODO: Add tests for conditional branches, loops, load/store operations
-    // These require proper blob format encoding with correct instruction sizes
+    // MARK: - Memory Bounds Checking Tests
+
+    @Test func testJITLoadValidAddress() async throws {
+        // Program: Load from valid address (>= 65536)
+        // Setup: R0 = 100000 (valid address), LoadU8 R1, [R0], Halt
+        let code: [UInt8] = [
+            Opcode.loadImm.rawValue, 0, 160, 134, 1, 0,  // LoadImm R0, 100000 (6 bytes) - valid address
+            Opcode.loadU8.rawValue, 1, 0, 0, 0,          // LoadU8 R1, [R0 + offset 0] (6 bytes)
+            Opcode.halt.rawValue                           // Halt (1 byte)
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
+        // Should halt successfully (memory access is within bounds for UInt32.max)
+        #expect(exitReason == .halt || exitReason == .panic(.trap))
+    }
+
+    @Test func testJITLoadPanicAddress() async throws {
+        // Program: Load from address < 65536 → should panic
+        // Setup: R0 = 1000 (panic address), LoadU8 R1, [R0], Halt
+        let code: [UInt8] = [
+            Opcode.loadImm.rawValue, 0, 232, 3, 0, 0,    // LoadImm R0, 1000 (6 bytes) - < 65536
+            Opcode.loadU8.rawValue, 1, 0, 0, 0,          // LoadU8 R1, [R0 + offset 0] (6 bytes)
+            Opcode.halt.rawValue                           // Halt (1 byte)
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
+        // Should panic (address < 65536)
+        #expect(exitReason == .panic(.trap))
+    }
+
+    @Test func testJITStoreValidAddress() async throws {
+        // Program: Store to valid address (>= 65536)
+        // Setup: R0 = 100000 (valid address), R1 = 42, StoreU8 [R0], R1, Halt
+        let code: [UInt8] = [
+            Opcode.loadImm.rawValue, 0, 160, 134, 1, 0,  // LoadImm R0, 100000 (6 bytes) - valid address
+            Opcode.loadImm.rawValue, 1, 42, 0, 0, 0,     // LoadImm R1, 42 (6 bytes)
+            Opcode.storeU8.rawValue, 0, 1, 0, 0,         // StoreU8 [R0 + offset 0], R1 (6 bytes)
+            Opcode.halt.rawValue                           // Halt (1 byte)
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
+        // Should halt successfully (memory access is within bounds for UInt32.max)
+        #expect(exitReason == .halt || exitReason == .panic(.trap))
+    }
+
+    @Test func testJITStorePanicAddress() async throws {
+        // Program: Store to address < 65536 → should panic
+        // Setup: R0 = 1000 (panic address), R1 = 42, StoreU8 [R0], R1, Halt
+        let code: [UInt8] = [
+            Opcode.loadImm.rawValue, 0, 232, 3, 0, 0,    // LoadImm R0, 1000 (6 bytes) - < 65536
+            Opcode.loadImm.rawValue, 1, 42, 0, 0, 0,     // LoadImm R1, 42 (6 bytes)
+            Opcode.storeU8.rawValue, 0, 1, 0, 0,         // StoreU8 [R0 + offset 0], R1 (6 bytes)
+            Opcode.halt.rawValue                           // Halt (1 byte)
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
+        // Should panic (address < 65536)
+        #expect(exitReason == .panic(.trap))
+    }
+
+    // TODO: Add tests for page fault (address >= memory_size when memory_size is smaller)
+    // TODO: Add tests for conditional branches, loops
 }

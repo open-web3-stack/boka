@@ -143,10 +143,21 @@ final class ExecutorBackendJIT: ExecutorBackend {
             let targetArchitecture = JITPlatform.getCurrentTargetArchitecture()
             logger.debug("Target architecture for JIT: \(targetArchitecture)")
 
+            // Set up program code first (needed to extract bytecode for JIT compiler)
+            do {
+                currentProgramCode = try ProgramCode(blob)
+            } catch {
+                logger.error("Failed to create ProgramCode: \(error)")
+                return .panic(.invalidInstructionIndex)
+            }
+
             // TODO: lookup from cache
 
+            // CRITICAL FIX: Pass the extracted bytecode, not the raw blob!
+            // The blob contains headers (jump table count, encode size, code length, etc.)
+            // but the JIT compiler expects just the bytecode portion.
             let compiledFuncPtr = try jitCompiler.compile(
-                blob: blob,
+                blob: currentProgramCode!.code,
                 initialPC: pc,
                 config: config,
                 targetArchitecture: targetArchitecture,
@@ -156,14 +167,6 @@ final class ExecutorBackendJIT: ExecutorBackend {
             var registers = Registers(config: config, argumentData: argumentData)
 
             let jitTotalMemorySize = UInt32.max
-
-            // Set up program code for host function calls
-            do {
-                currentProgramCode = try ProgramCode(blob)
-            } catch {
-                logger.error("Failed to create ProgramCode: \(error)")
-                return .panic(.invalidInstructionIndex)
-            }
 
             // Set up the synchronous handler that will bridge to async context if invoked
             // We're capturing the invocationContext into a closure that will be called synchronously

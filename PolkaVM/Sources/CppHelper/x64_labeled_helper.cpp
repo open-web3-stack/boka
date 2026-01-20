@@ -92,9 +92,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     // Create label manager
     LabelManager labelManager;
 
-    // Create exit label and epilogue label
-    Label exitLabel = a.newLabel();
-    Label epilogueLabel = a.newLabel();
+    // Create exit labels for different exit conditions
+    Label exitLabel = a.newLabel();       // Normal exit (halt) - eax = 0
+    Label panicLabel = a.newLabel();      // Panic exit (trap, address < 65536) - eax = -1
+    Label pagefaultLabel = a.newLabel();  // Page fault exit (address >= memory_size) - eax = 3
+    Label epilogueLabel = a.newLabel();   // Epilogue (restore registers and return)
 
     // === PRE-PASS: Identify all jump targets ===
     // This is necessary to handle backward jumps (loops)
@@ -209,6 +211,84 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             continue;
         }
 
+        // === Load Instructions with Bounds Checking ===
+        // PVM Spec: addresses < 2^16 (65536) → panic, addresses >= memory_size → page fault
+        if (opcode_is(opcode, Opcode::LoadU8) ||
+            opcode_is(opcode, Opcode::LoadI8) ||
+            opcode_is(opcode, Opcode::LoadU16) ||
+            opcode_is(opcode, Opcode::LoadI16) ||
+            opcode_is(opcode, Opcode::LoadU32) ||
+            opcode_is(opcode, Opcode::LoadI32) ||
+            opcode_is(opcode, Opcode::LoadU64)) {
+            // Decode instruction: [opcode][dest_reg][ptr_reg][offset_16bit]
+            uint8_t dest_reg = codeBuffer[pc + 1];
+            uint8_t ptr_reg = codeBuffer[pc + 2];
+            int16_t offset;
+            memcpy(&offset, &codeBuffer[pc + 3], 2);
+
+            // Load pointer register into rax
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
+
+            // Add offset to get final address
+            a.mov(x86::ecx, offset);
+            a.add(x86::rax, x86::rcx);
+
+            // Bounds check: address < 65536 → panic
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            // Runtime check: address >= memory_size → page fault
+            a.mov(x86::ecx, x86::r13d);  // Load memory_size into ecx
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+
+            // If we get here, address is valid - proceed with load instruction
+            // Use the existing dispatcher for the actual load
+            if (!jit_emitter_emit_basic_block_instructions(&a, "x86_64", codeBuffer, pc, pc + instrSize)) {
+                return 3; // Compilation error
+            }
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === Store Instructions with Bounds Checking ===
+        if (opcode_is(opcode, Opcode::StoreU8) ||
+            opcode_is(opcode, Opcode::StoreU16) ||
+            opcode_is(opcode, Opcode::StoreU32) ||
+            opcode_is(opcode, Opcode::StoreU64)) {
+            // Decode instruction: [opcode][ptr_reg][src_reg][offset_16bit]
+            uint8_t ptr_reg = codeBuffer[pc + 1];
+            uint8_t src_reg = codeBuffer[pc + 2];
+            int16_t offset;
+            memcpy(&offset, &codeBuffer[pc + 3], 2);
+
+            // Load pointer register into rax
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
+
+            // Add offset to get final address
+            a.mov(x86::ecx, offset);
+            a.add(x86::rax, x86::rcx);
+
+            // Bounds check: address < 65536 → panic
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            // Runtime check: address >= memory_size → page fault
+            a.mov(x86::ecx, x86::r13d);  // Load memory_size into ecx
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+
+            // If we get here, address is valid - proceed with store instruction
+            // Use the existing dispatcher for the actual store
+            if (!jit_emitter_emit_basic_block_instructions(&a, "x86_64", codeBuffer, pc, pc + instrSize)) {
+                return 3; // Compilation error
+            }
+
+            pc += instrSize;
+            continue;
+        }
+
         // For all other instructions, use the existing dispatcher
         // but only for this single instruction
         if (!jit_emitter_emit_basic_block_instructions(&a, "x86_64", codeBuffer, pc, pc + instrSize)) {
@@ -217,6 +297,16 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
         pc += instrSize;
     }
+
+    // Bind panic label
+    a.bind(panicLabel);
+    a.mov(x86::eax, -1);  // Exit code -1 = panic(.trap)
+    a.jmp(epilogueLabel);
+
+    // Bind pagefault label
+    a.bind(pagefaultLabel);
+    a.mov(x86::eax, 3);   // Exit code 3 = pageFault
+    a.jmp(epilogueLabel);
 
     // Bind exit label
     a.bind(exitLabel);
