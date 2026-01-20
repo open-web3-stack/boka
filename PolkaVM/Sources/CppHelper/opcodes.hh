@@ -21,9 +21,7 @@ enum class Opcode : uint8_t {
     LoadImmJump = 80,    // Load immediate and jump
 
     // Load Immediate Instructions
-    LoadImmU8 = 51,      // LoadImm (32-bit immediate)
-    LoadImmU16 = 52,     // (Reserved for future use)
-    LoadImmU32 = 53,     // (Reserved for future use)
+    LoadImm = 51,       // LoadImm (32-bit immediate)
     LoadImmU64 = 20,     // LoadImm64 (64-bit immediate)
 
     // Load Instructions

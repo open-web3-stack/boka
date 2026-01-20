@@ -96,13 +96,13 @@ uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytec
             return InstructionSize::LoadImm64;
 
         // StoreImmU8/U16/U32/U64
-        case static_cast<Opcode>(30):  // StoreImmU8
+        case Opcode::StoreImmU8:
             return InstructionSize::StoreImmU8;
-        case static_cast<Opcode>(31):  // StoreImmU16
+        case Opcode::StoreImmU16:
             return InstructionSize::StoreImmU16;
-        case static_cast<Opcode>(32):  // StoreImmU32
+        case Opcode::StoreImmU32:
             return InstructionSize::StoreImmU32;
-        case static_cast<Opcode>(33):  // StoreImmU64
+        case Opcode::StoreImmU64:
             return InstructionSize::StoreImmU64;
 
         // Jump: [opcode][offset_32bit] = 5 bytes
@@ -114,7 +114,7 @@ uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytec
             return InstructionSize::JumpInd;
 
         // LoadImm: [opcode][reg_index][value_32bit] = 6 bytes
-        case Opcode::LoadImmU8:
+        case Opcode::LoadImm:
             return InstructionSize::LoadImm;
 
         // LoadImmJump: [opcode][reg_index][offset_32bit][value_32bit] = 10 bytes
