@@ -132,10 +132,10 @@ uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytec
         case 62:  // StoreU64
             return 6;
 
-        // Branch instructions: [opcode][reg_index1][reg_index2][offset_32bit] = 9 bytes
+        // Branch instructions: [opcode][reg1][reg2][offset_32bit] = 7 bytes
         case 170:  // BranchEq
         case 171:  // BranchNe
-            return 9;
+            return 7;
 
         // 32-bit arithmetic: [opcode][dest_reg][src_reg] = 3 bytes
         case 190: // Add32

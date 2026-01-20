@@ -118,14 +118,17 @@ bool compile_bytecode_range(
 // Basic block boundary detection
 // Returns true if the given opcode ends a basic block
 inline bool is_block_ending_instruction(uint8_t opcode) {
-    // Block-ending instructions (matching BASIC_BLOCK_INSTRUCTIONS from Instructions.swift)
-    // 0: Trap, 1: Fallthrough, 4: Jump, 5: JumpInd, 6: LoadImmJump, 80-90: Branch instructions
+    // Block-ending instructions (matching instruction_dispatcher.cpp implementation)
+    // 0: Trap, 1: Fallthrough, 4: Jump, 5: JumpInd, 6: LoadImmJump
+    // 170-171: BranchEq, BranchNe
+    // Note: 80-90 range commented out as branches are actually at 170-171
     return opcode == 0 ||  // Trap
            opcode == 1 ||  // Fallthrough
            opcode == 4 ||  // Jump
            opcode == 5 ||  // JumpInd
            opcode == 6 ||  // LoadImmJump
-           (opcode >= 80 && opcode <= 90);  // Branch instructions (Eq, Ne, Lt, Le, Gt for signed/unsigned)
+           opcode == 170 ||  // BranchEq
+           opcode == 171;  // BranchNe
 }
 
 // Get the size of an instruction in bytes

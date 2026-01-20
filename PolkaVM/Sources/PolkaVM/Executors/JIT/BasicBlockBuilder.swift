@@ -39,8 +39,9 @@ final class BasicBlockBuilder {
 
         // Get basic block ending instructions - cache opcodes as constants to avoid C++ layer access
         // TODO: Import BASIC_BLOCK_INSTRUCTIONS from Instructions.swift properly
-        let blockEndingOpcodes: Set<UInt8> = [0, 4, 5, 6, 80, 81, 82, 83]
-        // 0: Trap, 4: Jump, 5: JumpInd, 6: LoadImmJump, 80: BranchEqImm, 81: BranchNeImm, 82: BranchEq, 83: BranchNe
+        // Block-ending opcodes matching instruction_dispatcher.cpp implementation
+        let blockEndingOpcodes: Set<UInt8> = [0, 4, 5, 6, 170, 171]
+        // 0: Trap, 4: Jump, 5: JumpInd, 6: LoadImmJump, 170: BranchEq, 171: BranchNe
 
         // First pass: identify all blocks and their instructions
         while currentPC < program.code.count {
@@ -75,8 +76,8 @@ final class BasicBlockBuilder {
                 currentBlock = nil
 
                 // If this is a branch, record the target as a jump target
-                if opcode >= 80, opcode <= 90 {
-                    // BranchImm instructions - target is encoded in instruction
+                if opcode >= 170, opcode <= 171 {
+                    // BranchEq/Ne instructions - target is encoded in instruction
                     // For now, we'll mark all subsequent PCs as potential targets
                     // TODO: Parse branch target from instruction data
                 }
@@ -134,7 +135,7 @@ final class BasicBlockBuilder {
         // 51: LoadImm = 6 bytes
         // 52-58: Load[U8/I8/U16/I16/U32/I32/U64] = 6 bytes each
         // 59-62: Store[U8/U16/U32/U64] = 6 bytes each
-        // 170-171: Branch[Eq/Ne] = 9 bytes each
+        // 170-171: Branch[Eq/Ne] = 7 bytes each (1 opcode + 2 regs + 4 offset)
         // 190-196: 32-bit arithmetic = 3 bytes each
         // 200-202: 64-bit arithmetic = 3 bytes each
         // 210-212: And/Xor/Or = 3 bytes each
@@ -162,8 +163,8 @@ final class BasicBlockBuilder {
             return 6
         case 59, 60, 61, 62:  // StoreU8, StoreU16, StoreU32, StoreU64
             return 6
-        case 170, 171:  // BranchEq, BranchNe
-            return 9
+        case 170, 171:  // BranchEq, BranchNe (7 bytes: 1 opcode + 2 regs + 4 offset)
+            return 7
         case 190, 191, 192, 193, 194, 195, 196:  // 32-bit arithmetic
             return 3
         case 200, 201, 202:  // 64-bit arithmetic
