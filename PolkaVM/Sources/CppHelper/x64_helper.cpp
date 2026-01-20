@@ -30,7 +30,9 @@ int32_t compilePolkaVMCode_x64(
     }
 
     // Initialize asmjit runtime for code generation
-    JitRuntime runtime;
+    // IMPORTANT: JitRuntime must persist as long as generated code is used
+    // Using static to ensure runtime lifetime exceeds function pointer usage
+    static JitRuntime runtime;
     CodeHolder code;
     code.init(runtime.environment());
 

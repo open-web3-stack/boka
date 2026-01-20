@@ -1014,15 +1014,15 @@ bool emit_basic_block_instructions(
                 break;
 
             default:
-                // Unknown opcode - skip for now
-                current_pc++;
-                continue;
+                // Unknown opcode - fail compilation to prevent unsafe execution
+                // Skipping bytes could land us in the middle of multi-byte instructions
+                return false;
         }
 
         if (!decoded_ok) {
-            // Failed to decode, skip
-            current_pc++;
-            continue;
+            // Failed to decode - fail compilation to prevent unsafe execution
+            // Decode failure indicates we're misinterpreting the instruction stream
+            return false;
         }
 
         // Emit the decoded instruction

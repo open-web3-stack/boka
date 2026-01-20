@@ -315,8 +315,10 @@ uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytec
         case 16:
             return 6;
 
-        // For any unknown opcode, assume 1 byte to avoid infinite loops
+        // For any unknown opcode, return 0 to signal error
+        // This prevents instruction stream desynchronization that could occur
+        // if we incorrectly assume 1 byte for multi-byte instructions
         default:
-            return 1;
+            return 0;
     }
 }
