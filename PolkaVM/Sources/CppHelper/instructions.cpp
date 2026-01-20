@@ -197,11 +197,11 @@ bool jit_emit_trap(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Trap: Load 0 into rax and return
-    // This matches the stub implementation in x64_helper.cpp
+    // Trap: Return -1 to indicate trap/panic
+    // Matches Swift exit code mapping: case -1 => .panic(.trap)
 
     // Set return value to indicate trap
-    a->mov(x86::eax, 0);  // Exit reason: trap
+    a->mov(x86::eax, -1);  // Exit reason: trap
 
     // Jump to exit handler (will be implemented later)
     // For now, just return to caller

@@ -139,8 +139,10 @@ bool jit_emit_load_imm_jump_labeled(
     if (strcmp(target_arch, "x86_64") == 0) {
         auto* a = static_cast<x86::Assembler*>(assembler);
 
-        // Load immediate into destination register
-        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), immediate);
+        // Load immediate into destination register (zero-extended)
+        // Use mov to register first to ensure zero-extension (not sign-extension)
+        a->mov(x86::rax, immediate);
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
         // Unconditional jump to target
         a->jmp(target_label);
