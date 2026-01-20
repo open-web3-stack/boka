@@ -121,13 +121,13 @@ bool compile_bytecode_range(
 inline bool is_block_ending_instruction(uint8_t opcode) {
     // Block-ending instructions (matching instruction_dispatcher.cpp implementation)
     using namespace PVM;
-    return static_cast<Opcode>(opcode) == Opcode::Trap ||
-           static_cast<Opcode>(opcode) == Opcode::Halt ||
-           static_cast<Opcode>(opcode) == Opcode::Jump ||
-           static_cast<Opcode>(opcode) == Opcode::JumpInd ||
-           static_cast<Opcode>(opcode) == Opcode::LoadImmJump ||
-           static_cast<Opcode>(opcode) == Opcode::BranchEq ||
-           static_cast<Opcode>(opcode) == Opcode::BranchNe;
+    return opcode_is(opcode, Opcode::Trap) ||
+           opcode_is(opcode, Opcode::Halt) ||
+           opcode_is(opcode, Opcode::Jump) ||
+           opcode_is(opcode, Opcode::JumpInd) ||
+           opcode_is(opcode, Opcode::LoadImmJump) ||
+           opcode_is(opcode, Opcode::BranchEq) ||
+           opcode_is(opcode, Opcode::BranchNe);
 }
 
 // Get the size of an instruction in bytes

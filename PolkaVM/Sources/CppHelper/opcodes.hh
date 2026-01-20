@@ -108,4 +108,10 @@ namespace InstructionSize {
     constexpr uint32_t Bitwise = 3;        // [opcode][dest_reg][src_reg]
 }
 
+// Helper functions for opcode comparison
+// These avoid repetitive static_cast<Opcode>(opcode) in the code
+inline bool opcode_is(uint8_t opcode, Opcode target) {
+    return static_cast<Opcode>(opcode) == target;
+}
+
 } // namespace PVM
