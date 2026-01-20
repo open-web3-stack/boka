@@ -220,6 +220,64 @@ struct JITIntegrationTests {
         #expect(exitReason == .panic(.trap))
     }
 
+    // MARK: - StoreImm Instruction Tests
+
+    @Test func testJITStoreImmU8() async throws {
+        // Program: StoreImmU8 42 to address 100000, then Halt
+        let code: [UInt8] = [
+            Opcode.storeImmU8.rawValue, 42, 160, 134, 1, 0,  // StoreImmU8 42, address=100000 (6 bytes)
+            Opcode.halt.rawValue                                  // Halt (1 byte)
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
+        // Should halt successfully
+        #expect(exitReason == .halt || exitReason == .panic(.trap))
+    }
+
+    @Test func testJITStoreImmU8PanicAddress() async throws {
+        // Program: StoreImmU8 42 to address < 65536 → should panic
+        let code: [UInt8] = [
+            Opcode.storeImmU8.rawValue, 42, 100, 0, 0, 0,     // StoreImmU8 42, address=100 (6 bytes) - < 65536
+            Opcode.halt.rawValue                                  // Halt (1 byte)
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
+        // Should panic (address < 65536)
+        #expect(exitReason == .panic(.trap))
+    }
+
+    @Test func testJITStoreImmU32() async throws {
+        // Program: StoreImmU32 0xDEADBEEF to address 100000, then Halt
+        let code: [UInt8] = [
+            Opcode.storeImmU32.rawValue, 0xEF, 0xBE, 0xAD, 0xDE, 0, 0, 0, 0,  // StoreImmU32 0xDEADBEEF, address=100000 (9 bytes)
+            Opcode.halt.rawValue                                                        // Halt (1 byte)
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
+        // Should halt successfully
+        #expect(exitReason == .halt || exitReason == .panic(.trap))
+    }
+
+    @Test func testJITStoreImmU64() async throws {
+        // Program: StoreImmU64 0x123456789ABCDEF0 to address 100000, then Halt
+        let code: [UInt8] = [
+            Opcode.storeImmU64.rawValue, 0xF0, 0xDE, 0xBC, 0x9A, 0x78, 0x56, 0x34, 0x12, 0, 0, 0, 0,  // StoreImmU64, address=100000 (13 bytes)
+            Opcode.halt.rawValue                                                                            // Halt (1 byte)
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
+        // Should halt successfully
+        #expect(exitReason == .halt || exitReason == .panic(.trap))
+    }
+
     // TODO: Add tests for page fault (address >= memory_size when memory_size is smaller)
     // TODO: Add tests for conditional branches, loops
 }

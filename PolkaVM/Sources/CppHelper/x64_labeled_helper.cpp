@@ -289,6 +289,116 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             continue;
         }
 
+        // === StoreImm Instructions with Bounds Checking ===
+        // PVM Spec: addresses < 2^16 (65536) → panic, addresses >= memory_size → page fault
+        // Format: [opcode][value_Xbit][address_32bit]
+        if (opcode_is(opcode, Opcode::StoreImmU8)) {
+            // StoreImmU8: [opcode][value_8bit][address_32bit] = 6 bytes
+            uint8_t value = codeBuffer[pc + 1];
+            uint32_t address;
+            memcpy(&address, &codeBuffer[pc + 2], 4);
+
+            // Load address into eax for bounds checking
+            a.mov(x86::eax, address);
+
+            // Bounds check: address < 65536 → panic
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            // Runtime check: address >= memory_size → page fault
+            a.mov(x86::ecx, x86::r13d);  // Load memory_size into ecx
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+
+            // Store value to memory
+            a.mov(x86::cl, value);
+            a.mov(x86::byte_ptr(x86::r12, x86::rax, 1, 0), x86::cl);
+
+            pc += instrSize;
+            continue;
+        }
+
+        if (opcode_is(opcode, Opcode::StoreImmU16)) {
+            // StoreImmU16: [opcode][value_16bit][address_32bit] = 7 bytes
+            uint16_t value;
+            uint32_t address;
+            memcpy(&value, &codeBuffer[pc + 1], 2);
+            memcpy(&address, &codeBuffer[pc + 3], 4);
+
+            // Load address into eax for bounds checking
+            a.mov(x86::eax, address);
+
+            // Bounds check: address < 65536 → panic
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            // Runtime check: address >= memory_size → page fault
+            a.mov(x86::ecx, x86::r13d);  // Load memory_size into ecx
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+
+            // Store value to memory
+            a.mov(x86::cx, value);
+            a.mov(x86::word_ptr(x86::r12, x86::rax, 1, 0), x86::cx);
+
+            pc += instrSize;
+            continue;
+        }
+
+        if (opcode_is(opcode, Opcode::StoreImmU32)) {
+            // StoreImmU32: [opcode][value_32bit][address_32bit] = 9 bytes
+            uint32_t value;
+            uint32_t address;
+            memcpy(&value, &codeBuffer[pc + 1], 4);
+            memcpy(&address, &codeBuffer[pc + 5], 4);
+
+            // Load address into eax for bounds checking
+            a.mov(x86::eax, address);
+
+            // Bounds check: address < 65536 → panic
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            // Runtime check: address >= memory_size → page fault
+            a.mov(x86::ecx, x86::r13d);  // Load memory_size into ecx
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+
+            // Store value to memory
+            a.mov(x86::ecx, value);
+            a.mov(x86::dword_ptr(x86::r12, x86::rax, 1, 0), x86::ecx);
+
+            pc += instrSize;
+            continue;
+        }
+
+        if (opcode_is(opcode, Opcode::StoreImmU64)) {
+            // StoreImmU64: [opcode][value_64bit][address_32bit] = 13 bytes
+            uint64_t value;
+            uint32_t address;
+            memcpy(&value, &codeBuffer[pc + 1], 8);
+            memcpy(&address, &codeBuffer[pc + 9], 4);
+
+            // Load address into eax for bounds checking
+            a.mov(x86::eax, address);
+
+            // Bounds check: address < 65536 → panic
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            // Runtime check: address >= memory_size → page fault
+            a.mov(x86::ecx, x86::r13d);  // Load memory_size into ecx
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+
+            // Store value to memory
+            a.mov(x86::rcx, value);
+            a.mov(x86::qword_ptr(x86::r12, x86::rax, 1, 0), x86::rcx);
+
+            pc += instrSize;
+            continue;
+        }
+
         // For all other instructions, use the existing dispatcher
         // but only for this single instruction
         if (!jit_emitter_emit_basic_block_instructions(&a, "x86_64", codeBuffer, pc, pc + instrSize)) {
