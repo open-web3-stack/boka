@@ -239,25 +239,45 @@ bool jit_emit_add_32(
     uint8_t dest_reg,
     uint8_t src_reg)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
+
+        // Load dest register from VM array
+        a->mov(x86::edx, x86::dword_ptr(x86::rbx, dest_reg * 8));
+
+        // Add: dest = dest + src
+        a->add(x86::edx, x86::eax);
+
+        // Store result back to VM register array
+        a->mov(x86::dword_ptr(x86::rbx, dest_reg * 8), x86::edx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp temp = a64::w0;
+        a64::Gp dest = a64::w1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(dest, a64::ptr(regPtr, dest_reg * 8));
+        a->ldr(temp, a64::ptr(regPtr, src_reg * 8));
+
+        // Add: dest = dest + src
+        a->add(dest, dest, temp);
+
+        // Store result back to VM register array
+        a->str(dest, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
-
-    // Load dest register from VM array
-    a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
-
-    // Add: dest = dest + src
-    a->add(x86::edx, x86::eax);
-
-    // Store result back to VM register array
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::edx);
-
-    return true;
+    return false;
 }
 
 // LoadImmU8: Load 8-bit unsigned immediate
@@ -356,25 +376,45 @@ bool jit_emit_sub_32(
     uint8_t dest_reg,
     uint8_t src_reg)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
+
+        // Load dest register from VM array
+        a->mov(x86::edx, x86::dword_ptr(x86::rbx, dest_reg * 8));
+
+        // Subtract: dest = dest - src
+        a->sub(x86::edx, x86::eax);
+
+        // Store result back to VM register array
+        a->mov(x86::dword_ptr(x86::rbx, dest_reg * 8), x86::edx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp temp = a64::w0;
+        a64::Gp dest = a64::w1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(dest, a64::ptr(regPtr, dest_reg * 8));
+        a->ldr(temp, a64::ptr(regPtr, src_reg * 8));
+
+        // Subtract: dest = dest - src
+        a->sub(dest, dest, temp);
+
+        // Store result back to VM register array
+        a->str(dest, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
-
-    // Load dest register from VM array
-    a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
-
-    // Subtract: dest = dest - src
-    a->sub(x86::edx, x86::eax);
-
-    // Store result back to VM register array
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::edx);
-
-    return true;
+    return false;
 }
 
 // Mul32: Multiplication (32-bit)
@@ -384,25 +424,45 @@ bool jit_emit_mul_32(
     uint8_t dest_reg,
     uint8_t src_reg)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
+
+        // Load dest register from VM array
+        a->mov(x86::edx, x86::dword_ptr(x86::rbx, dest_reg * 8));
+
+        // Multiply: dest = dest * src
+        a->imul(x86::edx, x86::eax);
+
+        // Store result back to VM register array
+        a->mov(x86::dword_ptr(x86::rbx, dest_reg * 8), x86::edx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp temp = a64::w0;
+        a64::Gp dest = a64::w1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(dest, a64::ptr(regPtr, dest_reg * 8));
+        a->ldr(temp, a64::ptr(regPtr, src_reg * 8));
+
+        // Multiply: dest = dest * src
+        a->mul(dest, dest, temp);
+
+        // Store result back to VM register array
+        a->str(dest, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
-
-    // Load dest register from VM array
-    a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
-
-    // Multiply: dest = dest * src
-    a->imul(x86::edx, x86::eax);
-
-    // Store result back to VM register array
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::edx);
-
-    return true;
+    return false;
 }
 
 // LoadU8: Load unsigned 8-bit from memory
@@ -646,25 +706,45 @@ bool jit_emit_add_64(
     uint8_t dest_reg,
     uint8_t src_reg)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Load dest register from VM array
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
+
+        // Add: dest = dest + src
+        a->add(x86::rdx, x86::rax);
+
+        // Store result back to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp temp = a64::x0;
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(dest, a64::ptr(regPtr, dest_reg * 8));
+        a->ldr(temp, a64::ptr(regPtr, src_reg * 8));
+
+        // Add: dest = dest + src
+        a->add(dest, dest, temp);
+
+        // Store result back to VM register array
+        a->str(dest, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
-
-    // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
-
-    // Add: dest = dest + src
-    a->add(x86::rdx, x86::rax);
-
-    // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
-
-    return true;
+    return false;
 }
 
 // Sub64: Subtraction (64-bit)
@@ -674,25 +754,45 @@ bool jit_emit_sub_64(
     uint8_t dest_reg,
     uint8_t src_reg)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Load dest register from VM array
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
+
+        // Subtract: dest = dest - src
+        a->sub(x86::rdx, x86::rax);
+
+        // Store result back to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp temp = a64::x0;
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(dest, a64::ptr(regPtr, dest_reg * 8));
+        a->ldr(temp, a64::ptr(regPtr, src_reg * 8));
+
+        // Subtract: dest = dest - src
+        a->sub(dest, dest, temp);
+
+        // Store result back to VM register array
+        a->str(dest, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
-
-    // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
-
-    // Subtract: dest = dest - src
-    a->sub(x86::rdx, x86::rax);
-
-    // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
-
-    return true;
+    return false;
 }
 
 // Mul64: Multiplication (64-bit)
@@ -702,25 +802,45 @@ bool jit_emit_mul_64(
     uint8_t dest_reg,
     uint8_t src_reg)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Load dest register from VM array
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
+
+        // Multiply: dest = dest * src
+        a->imul(x86::rdx, x86::rax);
+
+        // Store result back to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp temp = a64::x0;
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(dest, a64::ptr(regPtr, dest_reg * 8));
+        a->ldr(temp, a64::ptr(regPtr, src_reg * 8));
+
+        // Multiply: dest = dest * src
+        a->mul(dest, dest, temp);
+
+        // Store result back to VM register array
+        a->str(dest, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
-
-    // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
-
-    // Multiply: dest = dest * src
-    a->imul(x86::rdx, x86::rax);
-
-    // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
-
-    return true;
+    return false;
 }
 
 // And: Bitwise AND
@@ -730,25 +850,45 @@ bool jit_emit_and(
     uint8_t dest_reg,
     uint8_t src_reg)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Load dest register from VM array
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
+
+        // AND: dest = dest & src
+        a->and_(x86::rdx, x86::rax);
+
+        // Store result back to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp temp = a64::x0;
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(dest, a64::ptr(regPtr, dest_reg * 8));
+        a->ldr(temp, a64::ptr(regPtr, src_reg * 8));
+
+        // AND: dest = dest & src
+        a->and_(dest, dest, temp);
+
+        // Store result back to VM register array
+        a->str(dest, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
-
-    // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
-
-    // AND: dest = dest & src
-    a->and_(x86::rdx, x86::rax);
-
-    // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
-
-    return true;
+    return false;
 }
 
 // Or: Bitwise OR
@@ -758,25 +898,45 @@ bool jit_emit_or(
     uint8_t dest_reg,
     uint8_t src_reg)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Load dest register from VM array
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
+
+        // OR: dest = dest | src
+        a->or_(x86::rdx, x86::rax);
+
+        // Store result back to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp temp = a64::x0;
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(dest, a64::ptr(regPtr, dest_reg * 8));
+        a->ldr(temp, a64::ptr(regPtr, src_reg * 8));
+
+        // OR: dest = dest | src
+        a->orr(dest, dest, temp);
+
+        // Store result back to VM register array
+        a->str(dest, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
-
-    // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
-
-    // OR: dest = dest | src
-    a->or_(x86::rdx, x86::rax);
-
-    // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
-
-    return true;
+    return false;
 }
 
 // Xor: Bitwise XOR
@@ -786,25 +946,45 @@ bool jit_emit_xor(
     uint8_t dest_reg,
     uint8_t src_reg)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Load dest register from VM array
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
+
+        // XOR: dest = dest ^ src
+        a->xor_(x86::rdx, x86::rax);
+
+        // Store result back to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp temp = a64::x0;
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(dest, a64::ptr(regPtr, dest_reg * 8));
+        a->ldr(temp, a64::ptr(regPtr, src_reg * 8));
+
+        // XOR: dest = dest ^ src
+        a->eor(dest, dest, temp);
+
+        // Store result back to VM register array
+        a->str(dest, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
-
-    // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
-
-    // XOR: dest = dest ^ src
-    a->xor_(x86::rdx, x86::rax);
-
-    // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
-
-    return true;
+    return false;
 }
 
 // Jump: Unconditional jump
