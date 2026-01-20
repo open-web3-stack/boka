@@ -40,8 +40,8 @@ final class BasicBlockBuilder {
         // Get basic block ending instructions - cache opcodes as constants to avoid C++ layer access
         // TODO: Import BASIC_BLOCK_INSTRUCTIONS from Instructions.swift properly
         // Block-ending opcodes matching instruction_dispatcher.cpp implementation
-        let blockEndingOpcodes: Set<UInt8> = [0, 4, 5, 6, 170, 171]
-        // 0: Trap, 4: Jump, 5: JumpInd, 6: LoadImmJump, 170: BranchEq, 171: BranchNe
+        let blockEndingOpcodes: Set<UInt8> = [0, 40, 50, 6, 170, 171]
+        // 0: Trap, 40: Jump, 50: JumpInd, 6: LoadImmJump, 170: BranchEq, 171: BranchNe
 
         // First pass: identify all blocks and their instructions
         while currentPC < program.code.count {
@@ -94,11 +94,12 @@ final class BasicBlockBuilder {
         // Second pass: mark jump targets
         for (_, block) in blocks {
             for (opcode, _) in block.instructions {
-                if opcode == 80 || // BranchEqImm
-                    opcode == 81 || // BranchNeImm
-                    opcode == 4 || // Jump
-                    opcode == 6
-                { // LoadImmJump
+                if opcode == 170 ||  // BranchEq
+                    opcode == 171 ||  // BranchNe
+                    opcode == 40 ||  // Jump
+                    opcode == 50 ||  // JumpInd
+                    opcode == 6      // LoadImmJump
+                {
                     // TODO: Parse target offset and mark as jump target
                     // For now, skip this as we need to implement instruction parsing
                 }

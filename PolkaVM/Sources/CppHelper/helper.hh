@@ -119,13 +119,12 @@ bool compile_bytecode_range(
 // Returns true if the given opcode ends a basic block
 inline bool is_block_ending_instruction(uint8_t opcode) {
     // Block-ending instructions (matching instruction_dispatcher.cpp implementation)
-    // 0: Trap, 1: Fallthrough, 4: Jump, 5: JumpInd, 6: LoadImmJump
+    // 0: Trap, 1: Fallthrough, 40: Jump, 50: JumpInd, 6: LoadImmJump
     // 170-171: BranchEq, BranchNe
-    // Note: 80-90 range commented out as branches are actually at 170-171
     return opcode == 0 ||  // Trap
            opcode == 1 ||  // Fallthrough
-           opcode == 4 ||  // Jump
-           opcode == 5 ||  // JumpInd
+           opcode == 40 ||  // Jump
+           opcode == 50 ||  // JumpInd
            opcode == 6 ||  // LoadImmJump
            opcode == 170 ||  // BranchEq
            opcode == 171;  // BranchNe
