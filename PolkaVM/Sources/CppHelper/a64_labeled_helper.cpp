@@ -337,7 +337,10 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     a.b(epilogueLabel);
 
     // Bind pagefault label
+    // Note: Faulting address should be in x0 (from bounds checking code)
+    // Save it to VM register R0 before setting exit code
     a.bind(pagefaultLabel);
+    a.str(a64::x0, a64::ptr(a64::x19, 0));  // Save faulting address to VM R0
     a.mov(a64::w0, 3);   // Exit code 3 = pageFault
     a.b(epilogueLabel);
 

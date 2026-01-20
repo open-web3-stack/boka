@@ -313,6 +313,22 @@ struct JITIntegrationTests {
         #expect(exitReason == .halt || exitReason == .panic(.trap))
     }
 
-    // TODO: Add tests for page fault (address >= memory_size when memory_size is smaller)
+    @Test func testJITStoreImmPageFault() async throws {
+        // Program: StoreImmU8 42 to address beyond memory size
+        // With default config: 16 heap + 16 stack pages = 32 pages * 4096 bytes = 131072 bytes
+        // Address 132000 should trigger page fault
+        // 132000 in hex = 0x000203A0, bytes: [0xA0, 0x03, 0x02, 0x00]
+        let code: [UInt8] = [
+            Opcode.storeImmU8.rawValue, 42, 160, 3, 2, 0,  // StoreImmU8 42, address=132000 (beyond 131072)
+            Opcode.halt.rawValue
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
+        // Should page fault (address >= memory_size)
+        #expect(exitReason == .pageFault(132000))
+    }
+
     // TODO: Add tests for conditional branches, loops
 }

@@ -156,17 +156,17 @@ final class ExecutorBackendJIT: ExecutorBackend {
             // CRITICAL FIX: Pass the extracted bytecode, not the raw blob!
             // The blob contains headers (jump table count, encode size, code length, etc.)
             // but the JIT compiler expects just the bytecode portion.
+            // Calculate total memory size from config for proper bounds checking
+            let totalMemorySize = (config.initialHeapPages + config.stackPages) * UInt32(config.pvmMemoryPageSize)
             let compiledFuncPtr = try jitCompiler.compile(
                 blob: currentProgramCode!.code,
                 initialPC: pc,
                 config: config,
                 targetArchitecture: targetArchitecture,
-                jitMemorySize: UInt32.max // TODO:
+                jitMemorySize: totalMemorySize
             )
 
             var registers = Registers(config: config, argumentData: argumentData)
-
-            let jitTotalMemorySize = UInt32.max
 
             // Set up the synchronous handler that will bridge to async context if invoked
             // We're capturing the invocationContext into a closure that will be called synchronously
@@ -248,7 +248,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
             let exitReason = try jitExecutor.execute(
                 functionPtr: compiledFuncPtr,
                 registers: &registers,
-                jitMemorySize: jitTotalMemorySize,
+                jitMemorySize: totalMemorySize,
                 gas: &currentGas,
                 initialPC: pc,
                 invocationContext: invocationContextPointer

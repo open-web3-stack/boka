@@ -241,10 +241,32 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.cmp(x86::rax, x86::rcx);
             a.jae(pagefaultLabel);
 
-            // If we get here, address is valid - proceed with load instruction
-            // Use the existing dispatcher for the actual load
-            if (!jit_emitter_emit_basic_block_instructions(&a, "x86_64", codeBuffer, pc, pc + instrSize)) {
-                return 3; // Compilation error
+            // If we get here, address is valid - inline the load instruction
+            // Load from memory into register, then store to VM register
+            // Use Mem::build() to create [r12 + rax] addressing mode
+            x86::Mem mem(x86::r12, x86::rax, 0, 0);
+
+            if (opcode_is(opcode, Opcode::LoadU8)) {
+                a.mov(x86::cl, mem);
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+            } else if (opcode_is(opcode, Opcode::LoadI8)) {
+                a.movsx(x86::rcx, mem);
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+            } else if (opcode_is(opcode, Opcode::LoadU16)) {
+                a.mov(x86::cx, mem);
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+            } else if (opcode_is(opcode, Opcode::LoadI16)) {
+                a.movsx(x86::rcx, mem);
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+            } else if (opcode_is(opcode, Opcode::LoadU32)) {
+                a.mov(x86::ecx, mem);
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+            } else if (opcode_is(opcode, Opcode::LoadI32)) {
+                a.movsxd(x86::rcx, mem);
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+            } else if (opcode_is(opcode, Opcode::LoadU64)) {
+                a.mov(x86::rcx, mem);
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
             }
 
             pc += instrSize;
@@ -277,10 +299,21 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.cmp(x86::rax, x86::rcx);
             a.jae(pagefaultLabel);
 
-            // If we get here, address is valid - proceed with store instruction
-            // Use the existing dispatcher for the actual store
-            if (!jit_emitter_emit_basic_block_instructions(&a, "x86_64", codeBuffer, pc, pc + instrSize)) {
-                return 3; // Compilation error
+            // If we get here, address is valid - inline the store instruction
+            // Load value from VM register, then store to memory
+            a.mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));  // Load source value
+
+            // Use Mem::build() to create [r12 + rax] addressing mode
+            x86::Mem mem(x86::r12, x86::rax, 0, 0);
+
+            if (opcode_is(opcode, Opcode::StoreU8)) {
+                a.mov(mem, x86::dl);
+            } else if (opcode_is(opcode, Opcode::StoreU16)) {
+                a.mov(mem, x86::dx);
+            } else if (opcode_is(opcode, Opcode::StoreU32)) {
+                a.mov(mem, x86::edx);
+            } else if (opcode_is(opcode, Opcode::StoreU64)) {
+                a.mov(mem, x86::rdx);
             }
 
             pc += instrSize;
@@ -310,7 +343,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // Store value to memory
             a.mov(x86::cl, value);
-            a.mov(x86::byte_ptr(x86::r12, x86::rax, 1, 0), x86::cl);
+            x86::Mem mem(x86::r12, x86::rax, 0, 0);
+            a.mov(mem, x86::cl);
 
             pc += instrSize;
             continue;
@@ -337,7 +371,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // Store value to memory
             a.mov(x86::cx, value);
-            a.mov(x86::word_ptr(x86::r12, x86::rax, 1, 0), x86::cx);
+            x86::Mem mem(x86::r12, x86::rax, 0, 0);
+            a.mov(mem, x86::cx);
 
             pc += instrSize;
             continue;
@@ -364,7 +399,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // Store value to memory
             a.mov(x86::ecx, value);
-            a.mov(x86::dword_ptr(x86::r12, x86::rax, 1, 0), x86::ecx);
+            x86::Mem mem(x86::r12, x86::rax, 0, 0);
+            a.mov(mem, x86::ecx);
 
             pc += instrSize;
             continue;
@@ -391,7 +427,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // Store value to memory
             a.mov(x86::rcx, value);
-            a.mov(x86::qword_ptr(x86::r12, x86::rax, 1, 0), x86::rcx);
+            x86::Mem mem(x86::r12, x86::rax, 0, 0);
+            a.mov(mem, x86::rcx);
 
             pc += instrSize;
             continue;
@@ -412,7 +449,10 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     a.jmp(epilogueLabel);
 
     // Bind pagefault label
+    // Note: Faulting address should be in eax (from bounds checking code)
+    // Save it to VM register R0 before setting exit code
     a.bind(pagefaultLabel);
+    a.mov(x86::qword_ptr(x86::rbx, 0), x86::rax);  // Save faulting address to VM R0
     a.mov(x86::eax, 3);   // Exit code 3 = pageFault
     a.jmp(epilogueLabel);
 
