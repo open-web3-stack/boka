@@ -39,6 +39,8 @@ enum PVMOpcodes: UInt8 {
     case storeImmU32 = 32
     case storeImmU64 = 33
 
+    case ecalli = 10       // External call interface (host call)
+
     // Branch Instructions
     case branchEq = 170
     case branchNe = 171

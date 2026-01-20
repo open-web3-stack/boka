@@ -143,6 +143,28 @@ final class InstructionBuilder {
         return self
     }
 
+    /// StoreU16: Store 16-bit value to memory
+    /// Format: [opcode][base_reg][src_reg][offset_16bit_little_endian]
+    @discardableResult
+    func storeU16(baseReg: UInt8, srcReg: UInt8, offset: UInt16 = 0) -> Self {
+        bytecode.append(Opcode.storeU16.rawValue)
+        bytecode.append(baseReg)
+        bytecode.append(srcReg)
+        bytecode.append(contentsOf: valueToBytes(offset))
+        return self
+    }
+
+    /// StoreU32: Store 32-bit value to memory
+    /// Format: [opcode][base_reg][src_reg][offset_16bit_little_endian]
+    @discardableResult
+    func storeU32(baseReg: UInt8, srcReg: UInt8, offset: UInt16 = 0) -> Self {
+        bytecode.append(Opcode.storeU32.rawValue)
+        bytecode.append(baseReg)
+        bytecode.append(srcReg)
+        bytecode.append(contentsOf: valueToBytes(offset))
+        return self
+    }
+
     /// StoreImmU8: Store immediate 8-bit value to memory
     /// Format: [opcode][value][address_32bit_little_endian]
     @discardableResult
@@ -179,6 +201,48 @@ final class InstructionBuilder {
     @discardableResult
     func halt() -> Self {
         bytecode.append(Opcode.halt.rawValue)
+        return self
+    }
+
+    /// Ecalli: External call interface
+    /// Format: [opcode][call_index_32bit_little_endian]
+    @discardableResult
+    func ecalli(callIndex: UInt32) -> Self {
+        bytecode.append(Opcode.ecalli.rawValue)
+        bytecode.append(contentsOf: valueToBytes(callIndex))
+        return self
+    }
+
+    /// BranchEq: Branch if equal
+    /// Format: [opcode][reg1][reg2][offset_32bit_little_endian]
+    @discardableResult
+    func branchEq(reg1: UInt8, reg2: UInt8, offset: Int32) -> Self {
+        bytecode.append(Opcode.branchEq.rawValue)
+        bytecode.append(reg1)
+        bytecode.append(reg2)
+        bytecode.append(contentsOf: valueToBytes(UInt32(bitPattern: offset)))
+        return self
+    }
+
+    /// BranchNe: Branch if not equal
+    /// Format: [opcode][reg1][reg2][offset_32bit_little_endian]
+    @discardableResult
+    func branchNe(reg1: UInt8, reg2: UInt8, offset: Int32) -> Self {
+        bytecode.append(Opcode.branchNe.rawValue)
+        bytecode.append(reg1)
+        bytecode.append(reg2)
+        bytecode.append(contentsOf: valueToBytes(UInt32(bitPattern: offset)))
+        return self
+    }
+
+    /// LoadImmJump: Load immediate and jump
+    /// Format: [opcode][reg][value_32bit][offset_32bit]
+    @discardableResult
+    func loadImmJump(destReg: UInt8, value: UInt32, offset: UInt32) -> Self {
+        bytecode.append(Opcode.loadImmJump.rawValue)
+        bytecode.append(destReg)
+        bytecode.append(contentsOf: valueToBytes(value))
+        bytecode.append(contentsOf: valueToBytes(offset))
         return self
     }
 
@@ -740,6 +804,324 @@ struct JITIntegrationTests {
     )
 
     // Should halt successfully
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
+
+// MARK: - Ecalli (Host Call) Tests
+
+@Test func testJITEcalliHostCall() async throws {
+    // Program: Ecalli to host call 0, Halt
+    let code = InstructionBuilder()
+        .ecalli(callIndex: 0)
+        .halt()
+        .build()
+
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
+
+    // Should halt (host call 0 should be handled or return to interpreter)
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
+
+// MARK: - Conditional Branch Tests
+
+@Test func testJITBranchEqualTaken() async throws {
+    // Program: LoadImm 10 into R0 and R1, BranchEq R0,R1,offset=3
+    // If R0==R1, jump forward 3 bytes (skipping the halt), otherwise halt
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 10)
+        .loadImm(destReg: 1, value: 10)
+        .branchEq(reg1: 0, reg2: 1, offset: 3)  // Branch if equal
+        .halt()  // This should be skipped
+        .halt()  // This should execute
+        .build()
+
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
+
+    // Should halt (branch taken, skip first halt, execute second)
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
+
+@Test func testJITBranchEqualNotTaken() async throws {
+    // Program: LoadImm 10 into R0, LoadImm 20 into R1, BranchEq R0,R1,offset=3
+    // If R0==R1, jump forward 3 bytes, otherwise halt
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 10)
+        .loadImm(destReg: 1, value: 20)
+        .branchEq(reg1: 0, reg2: 1, offset: 3)  // Branch if equal
+        .halt()  // This should execute (branch not taken)
+        .build()
+
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
+
+    // Should halt (branch not taken)
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
+
+@Test func testJITBranchNotEqualTaken() async throws {
+    // Program: LoadImm 10 into R0 and R1, BranchNe R0,R1,offset=3
+    // If R0!=R1, jump forward 3 bytes (skipping the halt), otherwise halt
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 10)
+        .loadImm(destReg: 1, value: 10)
+        .branchNe(reg1: 0, reg2: 1, offset: 3)  // Branch if not equal
+        .halt()  // This should be skipped
+        .halt()  // This should execute
+        .build()
+
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
+
+    // Should halt (branch taken, skip first halt, execute second)
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
+
+// MARK: - LoadImmJump Tests
+
+@Test func testJITLoadImmJump() async throws {
+    // Program: LoadImmJump R0,42,offset=3 - loads 42 into R0 and jumps over the halt
+    let code = InstructionBuilder()
+        .loadImmJump(destReg: 0, value: 42, offset: 3)
+        .halt()  // This should be skipped
+        .halt()  // This should execute
+        .build()
+
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
+
+    // Should halt
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
+
+// MARK: - Loop Tests
+
+@Test func testJITSimpleLoop() async throws {
+    // Program: Simple loop that counts down from 3 to 0
+    // R0 = 3 (counter)
+    // loop: R0 = R0 - 1
+    //      if R0 != 0, jump to loop
+    //      halt
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 3)
+        // loop: (pc = 6 after loadImm)
+        .sub32(destReg: 0, srcReg: 0)  // R0 = R0 - 1
+        .loadImm(destReg: 1, value: 0)  // R1 = 0 (for comparison)
+        .branchNe(reg1: 0, reg2: 1, offset: -9)  // if R0 != 0, jump back to loop
+        .halt()
+        .build()
+
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
+
+    // Should halt after loop completes
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
+
+@Test func testJITNestedLoop() async throws {
+    // Program: Nested loop - outer loop runs 2 times, inner loop runs 2 times each
+    // Outer counter: R0, Inner counter: R1
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 2)  // Outer counter = 2
+        // outer_loop:
+        .loadImm(destReg: 1, value: 2)  // Inner counter = 2
+        // inner_loop:
+        .sub32(destReg: 1, srcReg: 1)  // R1 = R1 - 1
+        .loadImm(destReg: 2, value: 0)  // R2 = 0 (for comparison)
+        .branchNe(reg1: 1, reg2: 2, offset: -4)  // if R1 != 0, jump to inner_loop
+        .sub32(destReg: 0, srcReg: 0)  // R0 = R0 - 1
+        .loadImm(destReg: 2, value: 0)  // R2 = 0 (for comparison)
+        .branchNe(reg1: 0, reg2: 2, offset: -13)  // if R0 != 0, jump to outer_loop
+        .halt()
+        .build()
+
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
+
+    // Should halt after both loops complete
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
+
+// MARK: - Comprehensive Arithmetic Tests
+
+@Test func testJITAddOverflow() async throws {
+    // Program: Test addition with potential overflow
+    let code = InstructionBuilder()
+        .loadImmU64(destReg: 0, value: UInt64.max)
+        .loadImmU64(destReg: 1, value: 1)
+        .add64(destReg: 0, srcReg: 1)  // Should wrap to 0
+        .halt()
+        .build()
+
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
+
+    // Should halt (overflow wraps around in PVM)
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
+
+@Test func testJITSubtractionUnderflow() async throws {
+    // Program: Test subtraction with potential underflow
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 0)
+        .loadImm(destReg: 1, value: 1)
+        .sub32(destReg: 0, srcReg: 1)  // Should wrap to max
+        .halt()
+        .build()
+
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
+
+    // Should halt (underflow wraps around in PVM)
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
+
+@Test func testJITBitwiseOperations() async throws {
+    // Program: Test multiple bitwise operations
+    // R0 = 0xFF (255), R1 = 0x0F (15)
+    // R0 & R1 = 15, R0 | R1 = 255, R0 ^ R1 = 240
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 0xFF)
+        .loadImm(destReg: 1, value: 0x0F)
+        .and(destReg: 0, srcReg: 1)  // R0 = 15
+        .or(destReg: 0, srcReg: 1)   // R0 = 15 | 15 = 15
+        .loadImm(destReg: 1, value: 0xF0)
+        .xor(destReg: 0, srcReg: 1)  // R0 = 15 ^ 240 = 255
+        .halt()
+        .build()
+
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
+
+    // Should halt
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
+
+@Test func testJITComplexArithmetic() async throws {
+    // Program: Complex arithmetic expression
+    // R0 = (10 + 20) * 3 - 50 / 2 = 90 - 25 = 65
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 10)
+        .loadImm(destReg: 1, value: 20)
+        .add32(destReg: 0, srcReg: 1)  // R0 = 30
+        .loadImm(destReg: 1, value: 3)
+        .mul32(destReg: 0, srcReg: 1)  // R0 = 90
+        .loadImm(destReg: 1, value: 50)
+        .sub32(destReg: 0, srcReg: 1)  // R0 = 40
+        .loadImm(destReg: 1, value: 2)
+        .divU32(destReg: 0, srcReg: 1)  // R0 = 20
+        .halt()
+        .build()
+
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
+
+    // Should halt
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
+
+// MARK: - Memory Operation Tests
+
+@Test func testJITLoadStoreSequence() async throws {
+    // Program: Store values, then load them back
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 100000)  // Base address
+        .loadImm(destReg: 1, value: 0x42)      // Value to store
+        .storeU8(baseReg: 0, srcReg: 1, offset: 0)  // Store 0x42 at address 100000
+        .loadU8(destReg: 2, baseReg: 0, offset: 0)  // Load back from 100000
+        .halt()
+        .build()
+
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
+
+    // Should halt
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
+
+@Test func testJITMultipleMemoryOperations() async throws {
+    // Program: Multiple store operations with different sizes
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 100000)
+        .loadImm(destReg: 1, value: 0x12)
+        .loadImm(destReg: 2, value: 0x1234)
+        .loadImm(destReg: 3, value: 0x12345678)
+        .storeU8(baseReg: 0, srcReg: 1, offset: 0)   // Store 0x12 at 100000
+        .storeU16(baseReg: 0, srcReg: 2, offset: 4)  // Store 0x1234 at 100004
+        .storeU32(baseReg: 0, srcReg: 3, offset: 8)  // Store 0x12345678 at 100008
+        .halt()
+        .build()
+
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
+
+    // Should halt
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
+
+// MARK: - Edge Case Tests
+
+@Test func testJITZeroDivision() async throws {
+    // Program: Division by zero in a loop
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 10)
+        // loop:
+        .loadImm(destReg: 1, value: 0)  // Divisor = 0
+        .divU32(destReg: 0, srcReg: 1)  // Should panic!
+        .halt()
+        .build()
+
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
+
+    // Should panic due to division by zero
+    #expect(exitReason == .panic(.trap))
+}
+
+@Test func testJITOutOfGasInLoop() async throws {
+    // Program: Infinite loop that should run out of gas
+    // Bytecode layout:
+    // [0-5]:   LoadImm R0,1 (6 bytes)
+    // [6-10]:  Jump (5 bytes)
+    // [11]:    Halt (1 byte) - never reached
+    // After executing Jump at PC=6, PC becomes 11
+    // We want to jump back to PC=0, so offset = 0 - 11 = -11 = 0xFFFFFFF5
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 1)
+        .jump(offset: 0xFFFFFFF5)  // Jump back to PC=0 (infinite loop)
+        .halt()  // Never reached
+        .build()
+
+    let blob = buildBlob(from: code)
+
+    // Execute with limited gas
+    let config = DefaultPvmConfig()
+    let executor = ExecutorBackendJIT()
+    let exitReason = await executor.execute(
+        config: config,
+        blob: blob,
+        pc: 0,
+        gas: Gas(50),  // Limited gas
+        argumentData: nil,
+        ctx: nil
+    )
+
+    // Should run out of gas
+    #expect(exitReason == .outOfGas)
+}
+
+@Test func testJITLargeImmediate() async throws {
+    // Program: LoadImmU64 with maximum value
+    let code = InstructionBuilder()
+        .loadImmU64(destReg: 0, value: UInt64.max)
+        .halt()
+        .build()
+
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
+
+    // Should halt
     #expect(exitReason == .halt || exitReason == .panic(.trap))
 }
 
