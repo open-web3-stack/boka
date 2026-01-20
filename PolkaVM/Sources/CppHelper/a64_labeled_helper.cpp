@@ -191,8 +191,8 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         }
 
         if (opcode == 0) { // Trap
-            // In labeled compilation, we jump directly to exit
-            // rather than emitting a trap instruction
+            // Set return value to -1 (trap) in w0, then jump to exit
+            a.mov(a64::w0, -1);
             a.b(exitLabel);
             pc += instrSize;
             continue;
@@ -215,6 +215,10 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
     // Bind exit label
     a.bind(exitLabel);
+
+    // Set return value to 0 (halt) in w0
+    // Note: Trap instructions should have already set w0 to -1 before jumping here
+    a.mov(a64::w0, 0);
 
     // Epilogue: restore callee-saved registers and return
     a.ldp(x29, x30, ptr(a64::sp, 80));

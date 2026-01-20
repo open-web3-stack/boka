@@ -189,8 +189,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
         if (opcode == 0) { // Trap
-            // In labeled compilation, we jump directly to exit
-            // rather than emitting a trap instruction
+            // Set return value to -1 (trap) in eax, then jump to exit
+            a.mov(x86::eax, -1);
             a.jmp(exitLabel);
             pc += instrSize;
             continue;
@@ -214,6 +214,10 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
     // Bind exit label
     a.bind(exitLabel);
+
+    // Set return value to 0 (halt) in eax
+    // Note: Trap instructions should have already set eax to -1 before jumping here
+    a.xor_(x86::eax, x86::eax);
 
     // Epilogue: restore callee-saved registers and return
     a.pop(r15);
