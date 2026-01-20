@@ -196,6 +196,26 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             continue;
         }
 
+        if (opcode_is(opcode, Opcode::JumpInd)) {
+            // JumpInd: [opcode][reg_index] - jump to address stored in register
+            uint8_t ptr_reg = codeBuffer[pc + 1];
+
+            // Load target address from register
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
+
+            // For JumpInd, we need to jump to a dynamic address.
+            // This is complex with label-based compilation. For now, we'll use
+            // a computed jump via jump table or dispatch through the bytecode.
+            // TODO: Implement proper jump table support for JumpInd
+            // For now, treat it as unsupported and fall through to dispatcher
+            if (!jit_emitter_emit_basic_block_instructions(&a, "x86_64", codeBuffer, pc, pc + instrSize)) {
+                return 3; // Compilation error
+            }
+
+            pc += instrSize;
+            continue;
+        }
+
         if (opcode_is(opcode, Opcode::Trap)) {
             // Set return value to -1 (trap) in eax, then jump to epilogue
             a.mov(x86::eax, -1);
