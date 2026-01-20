@@ -46,6 +46,8 @@ enum class Opcode : uint8_t {
     // Branch Instructions
     BranchEq = 170,     // Branch if equal
     BranchNe = 171,     // Branch if not equal
+    BranchEqImm = 173,  // Branch if equal (immediate)
+    BranchNeImm = 174,  // Branch if not equal (immediate)
 
     // 32-bit Arithmetic Instructions
     Add32 = 190,        // Add 32-bit
@@ -99,6 +101,8 @@ namespace InstructionSize {
 
     constexpr uint32_t BranchEq = 7;       // [opcode][reg1][reg2][offset_32bit]
     constexpr uint32_t BranchNe = 7;
+    constexpr uint32_t BranchEqImm = 7;   // [opcode][offset_32bit]
+    constexpr uint32_t BranchNeImm = 7;   // [opcode][offset_32bit]
 
     constexpr uint32_t Arithmetic32 = 3;  // [opcode][dest_reg][src_reg]
     constexpr uint32_t Arithmetic64 = 3;

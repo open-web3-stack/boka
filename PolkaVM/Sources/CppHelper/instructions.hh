@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include "opcodes.hh"
 
 struct RegisterIndex {
     uint8_t value;
