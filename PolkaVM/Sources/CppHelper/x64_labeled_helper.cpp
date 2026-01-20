@@ -136,14 +136,12 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     auto deductGas = [&](uint64_t gasCost) -> void {
         // Load current gas value from r14 (VM_GAS_PTR)
         a.mov(x86::rax, x86::qword_ptr(x86::r14));
-        // Subtract gas cost
+        // Subtract gas cost (sets CF if borrow/underflow occurred)
         a.sub(x86::rax, gasCost);
-        // Store updated value back
+        // Store updated value back (preserves flags)
         a.mov(x86::qword_ptr(x86::r14), x86::rax);
-        // Check if gas < 0 (signed comparison)
-        a.cmp(x86::rax, 0);
-        // Jump to outOfGasLabel if negative (signed less than)
-        a.js(outOfGasLabel);
+        // Jump if borrow occurred (unsigned underflow)
+        a.jb(outOfGasLabel);
     };
 
     // === MAIN COMPILATION PASS ===

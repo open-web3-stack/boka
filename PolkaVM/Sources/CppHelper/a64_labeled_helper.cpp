@@ -141,16 +141,12 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     auto deductGas = [&](uint64_t gasCost) -> void {
         // Load current gas value from x22 (VM_GAS_PTR)
         a.ldr(a64::x0, a64::ptr(a64::x22));
-        // Subtract gas cost
-        a.sub(x0, x0, gasCost);
-        // Store updated value back
+        // Subtract gas cost and set flags
+        a.subs(x0, x0, gasCost);
+        // Store updated value back (does not affect flags)
         a.str(x0, a64::ptr(a64::x22));
-        // Check if gas < 0 (signed comparison)
-        // For signed comparison, we need to check the sign bit
-        // Since we're using 64-bit gas, negative values have the sign bit set
-        a.cmp(x0, 0);
-        // Branch to outOfGasLabel if negative (signed less than)
-        a.b_lt(outOfGasLabel);
+        // Jump if borrow occurred (unsigned underflow)
+        a.b_lo(outOfGasLabel);
     };
 
     while (pc < codeSize) {
