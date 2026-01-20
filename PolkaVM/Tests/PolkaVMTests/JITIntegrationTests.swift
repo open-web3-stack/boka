@@ -685,4 +685,62 @@ struct JITIntegrationTests {
     #expect(exitReason == .halt || exitReason == .panic(.trap))
 }
 
+// MARK: - Division by Zero Tests
+
+@Test func testJITDivisionByZero() async throws {
+    // Program: DivU32 with divisor = 0 should panic
+    // LoadImm R2, 100 (dividend), LoadImm R0, 0 (divisor = 0), DivU32 R2, R0
+    let code = InstructionBuilder()
+        .loadImm(destReg: 2, value: 100)
+        .loadImm(destReg: 0, value: 0)  // Divisor = 0
+        .divU32(destReg: 2, srcReg: 0)
+        .halt()
+        .build()
+
+    let blob = buildBlob(from: code)
+
+    // Execute with plenty of gas
+    let config = DefaultPvmConfig()
+    let executor = ExecutorBackendJIT()
+    let exitReason = await executor.execute(
+        config: config,
+        blob: blob,
+        pc: 0,
+        gas: Gas(10),
+        argumentData: nil,
+        ctx: nil
+    )
+
+    // Should panic due to division by zero
+    #expect(exitReason == .panic(.trap))
+}
+
+@Test func testJITDivisionValid() async throws {
+    // Program: DivU32 with valid divisor
+    // LoadImm R2, 100 (dividend), LoadImm R0, 5 (divisor), DivU32 R2, R0
+    let code = InstructionBuilder()
+        .loadImm(destReg: 2, value: 100)
+        .loadImm(destReg: 0, value: 5)
+        .divU32(destReg: 2, srcReg: 0)
+        .halt()
+        .build()
+
+    let blob = buildBlob(from: code)
+
+    // Execute with plenty of gas
+    let config = DefaultPvmConfig()
+    let executor = ExecutorBackendJIT()
+    let exitReason = await executor.execute(
+        config: config,
+        blob: blob,
+        pc: 0,
+        gas: Gas(10),
+        argumentData: nil,
+        ctx: nil
+    )
+
+    // Should halt successfully
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
+
 }

@@ -253,6 +253,37 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             continue;
         }
 
+        // === Division Instructions with Zero-Check ===
+        // Division by zero causes hardware exception - must check explicitly
+        // Format: [opcode][dest_reg][src_reg] = 3 bytes
+        if (opcode_is(opcode, Opcode::DivU32) ||
+            opcode_is(opcode, Opcode::DivS32) ||
+            opcode_is(opcode, Opcode::RemU32) ||
+            opcode_is(opcode, Opcode::RemS32) ||
+            opcode_is(opcode, Opcode::DivU64) ||
+            opcode_is(opcode, Opcode::DivS64) ||
+            opcode_is(opcode, Opcode::RemU64) ||
+            opcode_is(opcode, Opcode::RemS64)) {
+            // Decode instruction: [opcode][dest_reg][src_reg]
+            uint8_t dest_reg = codeBuffer[pc + 1];
+            uint8_t src_reg = codeBuffer[pc + 2];
+
+            // Load divisor into ecx for check
+            a.mov(x86::rcx, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+            // Check if divisor is zero
+            a.test(x86::rcx, x86::rcx);  // Fast way to check if rcx == 0
+            a.jz(panicLabel);  // If zero, jump to panic (division by zero)
+
+            // Not zero - proceed with division using dispatcher
+            if (!jit_emitter_emit_basic_block_instructions(&a, "x86_64", codeBuffer, pc, pc + instrSize)) {
+                return 3; // Compilation error
+            }
+
+            pc += instrSize;
+            continue;
+        }
+
         // === Load Instructions with Bounds Checking ===
         // PVM Spec: addresses < 2^16 (65536) → panic, addresses >= memory_size → page fault
         if (opcode_is(opcode, Opcode::LoadU8) ||

@@ -256,6 +256,37 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             continue;
         }
 
+        // === Division Instructions with Zero-Check ===
+        // Division by zero causes undefined behavior - must check explicitly
+        // Format: [opcode][dest_reg][src_reg] = 3 bytes
+        if (opcode_is(opcode, Opcode::DivU32) ||
+            opcode_is(opcode, Opcode::DivS32) ||
+            opcode_is(opcode, Opcode::RemU32) ||
+            opcode_is(opcode, Opcode::RemS32) ||
+            opcode_is(opcode, Opcode::DivU64) ||
+            opcode_is(opcode, Opcode::DivS64) ||
+            opcode_is(opcode, Opcode::RemU64) ||
+            opcode_is(opcode, Opcode::RemS64)) {
+            // Decode instruction: [opcode][dest_reg][src_reg]
+            uint8_t dest_reg = codeBuffer[pc + 1];
+            uint8_t src_reg = codeBuffer[pc + 2];
+
+            // Load divisor into x1 for check
+            a.ldr(a64::x1, a64::ptr(a64::x19, src_reg * 8));
+
+            // Check if divisor is zero
+            a.cmp(a64::x1, 0);
+            a.b_eq(panicLabel);  // If zero, jump to panic (division by zero)
+
+            // Not zero - proceed with division using dispatcher
+            if (!jit_emitter_emit_basic_block_instructions(&a, "aarch64", codeBuffer, pc, pc + instrSize)) {
+                return 3; // Compilation error
+            }
+
+            pc += instrSize;
+            continue;
+        }
+
         // === Load Instructions with Bounds Checking ===
         // PVM Spec: addresses < 2^16 (65536) → panic, addresses >= memory_size → page fault
         if (opcode_is(opcode, Opcode::LoadU8) ||
