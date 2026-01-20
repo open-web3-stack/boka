@@ -39,7 +39,7 @@ struct JITComponentTests {
         return blob
     }
 
-    // MARK: - BasicBlockBuilder Tests (INVESTIGATING SIGTRAP)
+    // MARK: - BasicBlockBuilder Tests
 
     @Test func basicBlockBuilderSingleInstruction() throws {
         // Trap instruction (opcode 0, 1 byte)
@@ -47,15 +47,183 @@ struct JITComponentTests {
         let blob = createBlob(code: code)
 
         let program = try ProgramCode(blob)
-
-        // Simply test that we can access program.code.count
-        let _ = program.code.count
-
         let builder = BasicBlockBuilder(program: program)
         let blocks = builder.build()
 
         // Should have one block starting at PC 0
         #expect(blocks.count == 1)
+        #expect(blocks[0]?.startPC == 0)
+        #expect(blocks[0]?.instructions.count == 1)
+        #expect(blocks[0]?.instructions.first?.opcode == 0)
+    }
+
+    @Test func basicBlockBuilderEmptyProgram() throws {
+        // Empty program
+        let code = Data()
+        let blob = createBlob(code: code)
+
+        let program = try ProgramCode(blob)
+        let builder = BasicBlockBuilder(program: program)
+        let blocks = builder.build()
+
+        // Should have no blocks
+        #expect(blocks.isEmpty)
+    }
+
+    @Test func basicBlockBuilderMultipleInstructions() throws {
+        // Multiple trap instructions
+        // Trap = opcode 0 (1 byte each)
+        // NOTE: Trap ends basic blocks, so we get 3 separate blocks
+        let code = Data([0, 0, 0])
+        let blob = createBlob(code: code)
+
+        let program = try ProgramCode(blob)
+        let builder = BasicBlockBuilder(program: program)
+        let blocks = builder.build()
+
+        // Trap ends each block, so we get 3 blocks
+        #expect(blocks.count == 3)
+        #expect(blocks[0]?.instructions.count == 1)
+        #expect(blocks[1]?.instructions.count == 1)
+        #expect(blocks[2]?.instructions.count == 1)
+
+        // All should be trap instructions
+        for block in blocks.values {
+            #expect(block.instructions.first?.opcode == 0)
+        }
+    }
+
+    @Test func basicBlockBuilderBlockEndingInstructions() throws {
+        // Test that block-ending instructions create separate blocks
+        // Trap (0), Jump (4) - both end blocks
+        let code = Data([0, 4, 0])
+        let blob = createBlob(code: code)
+
+        let program = try ProgramCode(blob)
+        let builder = BasicBlockBuilder(program: program)
+        let blocks = builder.build()
+
+        // Jump instruction creates separate block
+        // We should have blocks at PC 0 and PC 1
+        #expect(blocks.count >= 2)
+        #expect(blocks[0] != nil)
+        #expect(blocks[1] != nil)
+    }
+
+    @Test func basicBlockBuilderConsecutiveTraps() throws {
+        // Test many consecutive trap instructions
+        // NOTE: Trap ends basic blocks, so each Trap creates a new block
+        let trapCount = 100
+        let code = Data(repeating: 0, count: trapCount)
+        let blob = createBlob(code: code)
+
+        let program = try ProgramCode(blob)
+        let builder = BasicBlockBuilder(program: program)
+        let blocks = builder.build()
+
+        // Each trap creates a separate block
+        #expect(blocks.count == trapCount)
+
+        // Verify all are traps
+        for block in blocks.values {
+            #expect(block.instructions.count == 1)
+            #expect(block.instructions.first?.opcode == 0)
+        }
+    }
+
+    @Test func basicBlockBuilderInstructionData() throws {
+        // Verify instruction data is correctly extracted
+        // NOTE: Trap ends basic blocks, so two Traps create two blocks
+        let code = Data([0, 0])
+        let blob = createBlob(code: code)
+
+        let program = try ProgramCode(blob)
+        let builder = BasicBlockBuilder(program: program)
+        let blocks = builder.build()
+
+        #expect(blocks.count == 2)
+
+        // Each block should have one instruction with data
+        for (pc, block) in blocks {
+            #expect(block.instructions.count == 1)
+            let instruction = block.instructions.first!
+            #expect(instruction.opcode == 0)
+            #expect(!instruction.data.isEmpty)
+            // First byte should be the opcode
+            #expect(instruction.data[0] == 0)
+        }
+    }
+
+    @Test func basicBlockBuilderBranchInstructions() throws {
+        // Test block detection with different block-ending instructions
+        // Using only argless instructions for now (Trap, Fallthrough)
+        // TODO: Update when instruction length calculation is fixed for branches
+        let code = Data([0, 1, 0, 1, 0])  // Trap, Fallthrough, Trap, Fallthrough, Trap
+        let blob = createBlob(code: code)
+
+        let program = try ProgramCode(blob)
+        let builder = BasicBlockBuilder(program: program)
+        let blocks = builder.build()
+
+        // Trap (0) ends blocks, Fallthrough (1) does not
+        // Block 0: [Trap] - ends at Trap
+        // Block 1: [Fallthrough, Trap] - Fallthrough continues, Trap ends
+        // Block 3: [Fallthrough, Trap] - Fallthrough continues, Trap ends
+        #expect(blocks.count == 3)
+        #expect(blocks[0]?.instructions.first?.opcode == 0)
+        #expect(blocks[1]?.instructions.count == 2)
+        #expect(blocks[3]?.instructions.count == 2)
+    }
+
+    @Test func basicBlockBuilderMixedInstructions() throws {
+        // Test mix of Trap and Fallthrough instructions
+        // Trap (0) ends blocks, Fallthrough (1) does not
+        let code = Data([0, 1, 1, 0])
+        let blob = createBlob(code: code)
+
+        let program = try ProgramCode(blob)
+        let builder = BasicBlockBuilder(program: program)
+        let blocks = builder.build()
+
+        // Block 0: [Trap] - ends at Trap
+        // Block 1: [Fallthrough, Fallthrough, Trap] - Fallthroughs continue, Trap ends
+        #expect(blocks.count == 2)
+        #expect(blocks[0]?.instructions.first?.opcode == 0)
+        #expect(blocks[1]?.instructions.count == 3) // Two Fallthroughs + Trap
+        #expect(blocks[1]?.instructions[0].opcode == 1) // First Fallthrough
+        #expect(blocks[1]?.instructions[1].opcode == 1) // Second Fallthrough
+        #expect(blocks[1]?.instructions[2].opcode == 0) // Trap
+    }
+
+    @Test func basicBlockBuilderBlockStartPCs() throws {
+        // Verify block start PCs are correctly tracked
+        let code = Data([0, 4, 0, 4, 0])
+        let blob = createBlob(code: code)
+
+        let program = try ProgramCode(blob)
+        let builder = BasicBlockBuilder(program: program)
+        let blocks = builder.build()
+
+        // All blocks should have valid start PCs
+        for (pc, block) in blocks {
+            #expect(block.startPC == pc)
+            #expect(pc < UInt32(code.count))
+        }
+    }
+
+    @Test func basicBlockBuilderLargeProgram() throws {
+        // Test with a larger program
+        let instructionCount = 1000
+        let code = Data(repeating: 0, count: instructionCount)
+        let blob = createBlob(code: code)
+
+        let program = try ProgramCode(blob)
+        let builder = BasicBlockBuilder(program: program)
+        let blocks = builder.build()
+
+        // Should successfully process all instructions
+        let totalInstructions = blocks.values.reduce(0) { $0 + $1.instructions.count }
+        #expect(totalInstructions == instructionCount)
     }
 
     // MARK: - LabelManager Tests
