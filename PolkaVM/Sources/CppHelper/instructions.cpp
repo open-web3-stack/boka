@@ -2122,16 +2122,8 @@ bool jit_emit_ecalli(
     const char* _Nonnull target_arch,
     uint32_t call_index)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
-    }
-
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // TODO: Implement external call interface
-    // For now, just set return value to indicate not implemented
-    a->mov(x86::eax, 0xFFFFFFFF);  // Error: not implemented
-
+    // Ecalli is handled directly in the labeled helpers
+    // This is a stub for the dispatcher
     return true;
 }
 

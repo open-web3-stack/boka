@@ -236,6 +236,39 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             continue;
         }
 
+        // === Ecalli (Host Call) ===
+        // Ecalli format: [opcode][call_index_32bit] = 5 bytes
+        if (opcode == 10) {  // Ecalli opcode is 10
+            // Extract call_index from instruction bytes
+            uint32_t call_index;
+            memcpy(&call_index, &codeBuffer[pc + 1], 4);
+
+            // Emit host call using the pvm_host_call_trampoline
+            // ARM64 calling convention:
+            // x0 = context (x24), x1 = func_idx, x2 = registers (x19),
+            // x3 = memory (x20), x4 = memory_size (w21), x5 = gas (x22)
+            a.mov(a64::x0, a64::x24);       // context pointer
+            a.mov(a64::w1, call_index);      // function index
+            a.mov(a64::x2, a64::x19);        // registers pointer
+            a.mov(a64::x3, a64::x20);        // memory pointer
+            a.mov(a64::w4, a64::w21);        // memory size
+            a.mov(a64::x5, a64::x22);        // gas pointer
+
+            // Call the trampoline
+            a.mov(a64::x9, reinterpret_cast<uint64_t>(&pvm_host_call_trampoline));
+            a.blr(a64::x9);
+
+            // Check result (w0 contains error code or return value)
+            a.cmp(a64::w0, 0xFFFFFFFF);
+            a.b_eq(panicLabel);  // Error -> panic
+
+            // Store result in R0
+            a.str(a64::x0, a64::ptr(a64::x19, 0));
+
+            pc += instrSize;
+            continue;
+        }
+
         if (opcode_is(opcode, Opcode::Trap)) {
             // Set return value to -1 (trap) in w0, then jump to epilogue
             a.mov(a64::w0, -1);

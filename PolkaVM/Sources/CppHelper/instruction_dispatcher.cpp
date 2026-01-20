@@ -405,6 +405,15 @@ bool decode_branch_ne(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& 
     return true;
 }
 
+// Decode Ecalli instruction (opcode 10)
+bool decode_ecalli(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][call_index_32bit]
+    decoded.immediate = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 1]);
+    decoded.size = 5; // 1 + 4 = 5 bytes
+    return true;
+}
+
 // Generic instruction dispatcher using opcode table
 bool emit_instruction_decoded(
     void* _Nonnull assembler,
@@ -423,9 +432,10 @@ bool emit_instruction_decoded(
             // No emission needed for fallthrough
             return true;
 
-        case 10: // Ecalli
-            // TODO: Need to extract call_index from instruction
-            return jit_instruction::jit_emit_ecalli(assembler, target_arch, 0);
+        case 10: // Ecalli - opcode 10
+            // Ecalli uses decoded.immediate for call_index
+            return jit_instruction::jit_emit_ecalli(assembler, target_arch,
+                static_cast<uint32_t>(decoded.immediate));
 
         case static_cast<uint8_t>(Opcode::LoadImmU64):
             return jit_instruction::jit_emit_load_imm_64(
