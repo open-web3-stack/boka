@@ -115,6 +115,10 @@ uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytec
         case 51:
             return 6;
 
+        // LoadImmJump: [opcode][reg_index][offset_32bit][value_32bit] = 10 bytes
+        case 80:
+            return 10;
+
         // Load instructions: [opcode][reg_index][address_32bit] = 6 bytes
         case 52:  // LoadU8
         case 53:  // LoadI8

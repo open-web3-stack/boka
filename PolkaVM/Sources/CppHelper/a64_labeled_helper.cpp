@@ -115,7 +115,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         } else if (opcode == 170 || opcode == 171) { // BranchEq, BranchNe
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
             labelManager.markJumpTarget(targetPC);
-        } else if (opcode == 6) { // LoadImmJump
+        } else if (opcode == 80) { // LoadImmJump
             uint8_t destReg = codeBuffer[pc + 1];
             uint32_t immediate;
             memcpy(&immediate, &codeBuffer[pc + 2], 4);
@@ -177,7 +177,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             continue;
         }
 
-        if (opcode == 6) { // LoadImmJump
+        if (opcode == 80) { // LoadImmJump
             uint8_t destReg = codeBuffer[pc + 1];
             uint32_t immediate;
             memcpy(&immediate, &codeBuffer[pc + 2], 4);
