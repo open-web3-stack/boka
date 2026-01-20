@@ -1273,14 +1273,13 @@ bool jit_emit_div_u32(
     if (strcmp(target_arch, "x86_64") == 0) {
         auto* a = static_cast<x86::Assembler*>(assembler);
 
-        // Load source register from VM array (divisor)
-        a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+        // Load dividend (dest_reg) into eax
+        a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
 
-        // Load dest register from VM array (dividend)
-        a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
+        // Load divisor (src_reg) into ecx
+        a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
 
-        // Clear upper bits for division
-        a->mov(x86::ecx, x86::edx);
+        // Zero-extend eax into edx:eax (dividend)
         a->xor_(x86::edx, x86::edx);
 
         // Divide: edx:eax / ecx -> eax (quotient), edx (remainder)
@@ -1325,17 +1324,17 @@ bool jit_emit_div_s32(
     if (strcmp(target_arch, "x86_64") == 0) {
         auto* a = static_cast<x86::Assembler*>(assembler);
 
-        // Load source register from VM array (divisor)
-        a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+        // Load dividend (dest_reg) into eax
+        a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
 
-        // Load dest register from VM array (dividend)
-        a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
+        // Load divisor (src_reg) into ecx
+        a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
 
-        // Sign extend dividend to edx:eax
+        // Sign extend dividend in eax to edx:eax
         a->cdq();
 
-        // Divide: edx:eax / eax -> eax (quotient), edx (remainder)
-        a->idiv(x86::eax);
+        // Divide: edx:eax / ecx -> eax (quotient), edx (remainder)
+        a->idiv(x86::ecx);
 
         // Store quotient back to VM register array
         a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
@@ -1376,14 +1375,13 @@ bool jit_emit_rem_u32(
     if (strcmp(target_arch, "x86_64") == 0) {
         auto* a = static_cast<x86::Assembler*>(assembler);
 
-        // Load source register from VM array (divisor)
-        a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+        // Load dividend (dest_reg) into eax
+        a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
 
-        // Load dest register from VM array (dividend)
-        a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
+        // Load divisor (src_reg) into ecx
+        a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
 
-        // Clear upper bits for division
-        a->mov(x86::ecx, x86::edx);
+        // Zero-extend eax into edx:eax (dividend)
         a->xor_(x86::edx, x86::edx);
 
         // Divide: edx:eax / ecx -> eax (quotient), edx (remainder)
@@ -1433,17 +1431,17 @@ bool jit_emit_rem_s32(
     if (strcmp(target_arch, "x86_64") == 0) {
         auto* a = static_cast<x86::Assembler*>(assembler);
 
-        // Load source register from VM array (divisor)
-        a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+        // Load dividend (dest_reg) into eax
+        a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
 
-        // Load dest register from VM array (dividend)
-        a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
+        // Load divisor (src_reg) into ecx
+        a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
 
-        // Sign extend dividend to edx:eax
+        // Sign extend dividend in eax to edx:eax
         a->cdq();
 
-        // Divide: edx:eax / eax -> eax (quotient), edx (remainder)
-        a->idiv(x86::eax);
+        // Divide: edx:eax / ecx -> eax (quotient), edx (remainder)
+        a->idiv(x86::ecx);
 
         // Store remainder back to VM register array
         a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::edx);
@@ -4589,14 +4587,14 @@ bool jit_emit_div_u_64(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register (dividend) from VM array
+    // Load dividend (dest_reg) into rax
     a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
 
     // Zero-extend to rdx:rax
     a->xor_(x86::edx, x86::edx);
 
-    // Load source register (divisor) from VM array
-    a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
+    // Load divisor (src_reg) into rcx (use qword_ptr for 64-bit)
+    a->mov(x86::rcx, x86::qword_ptr(rbx, src_reg * 8));
 
     // Divide unsigned: rax = rdx:rax / rcx
     a->div(x86::rcx);

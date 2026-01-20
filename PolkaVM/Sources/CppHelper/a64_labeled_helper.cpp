@@ -96,8 +96,38 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     // Create exit label
     Label exitLabel = a.newLabel();
 
-    // === SINGLE-PASS COMPILATION ===
+    // === PRE-PASS: Identify all jump targets ===
+    // This is necessary to handle backward jumps (loops)
     uint32_t pc = 0;
+    while (pc < codeSize) {
+        uint8_t opcode = codeBuffer[pc];
+        uint32_t instrSize = getInstructionSize(codeBuffer, pc, codeSize);
+
+        if (instrSize == 0) {
+            // Unknown opcode - stop pre-pass
+            break;
+        }
+
+        // Mark jump targets for control flow instructions
+        if (opcode == 40) { // Jump
+            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
+            labelManager.markJumpTarget(targetPC);
+        } else if (opcode == 170 || opcode == 171) { // BranchEq, BranchNe
+            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
+            labelManager.markJumpTarget(targetPC);
+        } else if (opcode == 6) { // LoadImmJump
+            uint8_t destReg = codeBuffer[pc + 1];
+            uint32_t immediate;
+            memcpy(&immediate, &codeBuffer[pc + 2], 4);
+            uint32_t targetPC = pc + instrSize + int32_t(immediate);
+            labelManager.markJumpTarget(targetPC);
+        }
+
+        pc += instrSize;
+    }
+
+    // === MAIN COMPILATION PASS ===
+    pc = 0;
 
     while (pc < codeSize) {
         uint8_t opcode = codeBuffer[pc];
@@ -108,7 +138,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             break;
         }
 
-        // Check if this PC is a jump target (from previous branch)
+        // Check if this PC is a jump target (from pre-pass or previous branch)
         // Bind label here if so
         if (labelManager.isMarkedTarget(pc) || labelManager.isJumpTarget(pc)) {
             labelManager.bindLabel(&a, pc, "aarch64");
