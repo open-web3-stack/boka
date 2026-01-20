@@ -63,8 +63,9 @@ int32_t compilePolkaVMCode_x64(
     a.mov(rbp, r9);   // invocation_context_ptr -> rbp
 
     // Compile bytecode using instruction dispatcher
-    // This replaces the old stub loop with actual instruction compilation
-    // The dispatcher handles all 194 implemented instructions
+    // Compiles the entire bytecode range as a single unit
+    // TODO: Future enhancement: Implement block-by-block compilation with label/fixup resolution
+    // for better optimization and proper control flow handling
     if (!compile_bytecode_range(&a, "x86_64", codeBuffer, codeSize, initialPC, static_cast<uint32_t>(codeSize))) {
         // Compilation failed - return error code
         return 3; // Compilation error
