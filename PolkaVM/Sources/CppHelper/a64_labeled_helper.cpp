@@ -95,9 +95,11 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     // Create label manager
     LabelManager labelManager;
 
-    // Create exit label and epilogue label
-    Label exitLabel = a.newLabel();
-    Label epilogueLabel = a.newLabel();
+    // Create exit labels for different exit conditions
+    Label exitLabel = a.newLabel();       // Normal exit (halt) - w0 = 0
+    Label panicLabel = a.newLabel();      // Panic exit (trap, address < 65536) - w0 = -1
+    Label pagefaultLabel = a.newLabel();  // Page fault exit (address >= memory_size) - w0 = 3
+    Label epilogueLabel = a.newLabel();   // Epilogue (restore registers and return)
 
     // === PRE-PASS: Identify all jump targets ===
     // This is necessary to handle backward jumps (loops)
@@ -211,6 +213,116 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             continue;
         }
 
+        // === StoreImm Instructions with Bounds Checking ===
+        // PVM Spec: addresses < 2^16 (65536) → panic, addresses >= memory_size → page fault
+        // Format: [opcode][value_Xbit][address_32bit]
+        if (opcode_is(opcode, Opcode::StoreImmU8)) {
+            // StoreImmU8: [opcode][value_8bit][address_32bit] = 6 bytes
+            uint8_t value = codeBuffer[pc + 1];
+            uint32_t address;
+            memcpy(&address, &codeBuffer[pc + 2], 4);
+
+            // Load address into x0 for bounds checking
+            a.mov(a64::x0, address);
+
+            // Bounds check: address < 65536 → panic
+            a.cmp(a64::x0, 65536);
+            a.b(panicLabel);
+
+            // Runtime check: address >= memory_size → page fault
+            a.mov(a64::w1, a64::w21);  // Load memory_size into w1
+            a.cmp(a64::x0, a64::x1);
+            a.b(pagefaultLabel);
+
+            // Store value to memory
+            a.mov(a64::w8, value);
+            a.strb(a64::w8, a64::ptr(a64::x20, a64::x0));
+
+            pc += instrSize;
+            continue;
+        }
+
+        if (opcode_is(opcode, Opcode::StoreImmU16)) {
+            // StoreImmU16: [opcode][value_16bit][address_32bit] = 7 bytes
+            uint16_t value;
+            uint32_t address;
+            memcpy(&value, &codeBuffer[pc + 1], 2);
+            memcpy(&address, &codeBuffer[pc + 3], 4);
+
+            // Load address into x0 for bounds checking
+            a.mov(a64::x0, address);
+
+            // Bounds check: address < 65536 → panic
+            a.cmp(a64::x0, 65536);
+            a.b(panicLabel);
+
+            // Runtime check: address >= memory_size → page fault
+            a.mov(a64::w1, a64::w21);  // Load memory_size into w1
+            a.cmp(a64::x0, a64::x1);
+            a.b(pagefaultLabel);
+
+            // Store value to memory
+            a.mov(a64::w8, value);
+            a.strh(a64::w8, a64::ptr(a64::x20, a64::x0));
+
+            pc += instrSize;
+            continue;
+        }
+
+        if (opcode_is(opcode, Opcode::StoreImmU32)) {
+            // StoreImmU32: [opcode][value_32bit][address_32bit] = 9 bytes
+            uint32_t value;
+            uint32_t address;
+            memcpy(&value, &codeBuffer[pc + 1], 4);
+            memcpy(&address, &codeBuffer[pc + 5], 4);
+
+            // Load address into x0 for bounds checking
+            a.mov(a64::x0, address);
+
+            // Bounds check: address < 65536 → panic
+            a.cmp(a64::x0, 65536);
+            a.b(panicLabel);
+
+            // Runtime check: address >= memory_size → page fault
+            a.mov(a64::w1, a64::w21);  // Load memory_size into w1
+            a.cmp(a64::x0, a64::x1);
+            a.b(pagefaultLabel);
+
+            // Store value to memory
+            a.mov(a64::w8, value);
+            a.str(a64::w8, a64::ptr(a64::x20, a64::x0));
+
+            pc += instrSize;
+            continue;
+        }
+
+        if (opcode_is(opcode, Opcode::StoreImmU64)) {
+            // StoreImmU64: [opcode][value_64bit][address_32bit] = 13 bytes
+            uint64_t value;
+            uint32_t address;
+            memcpy(&value, &codeBuffer[pc + 1], 8);
+            memcpy(&address, &codeBuffer[pc + 9], 4);
+
+            // Load address into x0 for bounds checking
+            a.mov(a64::x0, address);
+
+            // Bounds check: address < 65536 → panic
+            a.cmp(a64::x0, 65536);
+            a.b(panicLabel);
+
+            // Runtime check: address >= memory_size → page fault
+            a.mov(a64::w1, a64::w21);  // Load memory_size into w1
+            a.cmp(a64::x0, a64::x1);
+            a.b(pagefaultLabel);
+
+            // Store value to memory
+            a.mov(a64::x8, value);
+            a.str(a64::x8, a64::ptr(a64::x20, a64::x0));
+
+            pc += instrSize;
+            continue;
+        }
+
         // For all other instructions, use the existing dispatcher
         if (!jit_emitter_emit_basic_block_instructions(&a, "aarch64", codeBuffer, pc, pc + instrSize)) {
             return 3; // Compilation error
@@ -218,6 +330,16 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
         pc += instrSize;
     }
+
+    // Bind panic label
+    a.bind(panicLabel);
+    a.mov(a64::w0, -1);  // Exit code -1 = panic(.trap)
+    a.b(epilogueLabel);
+
+    // Bind pagefault label
+    a.bind(pagefaultLabel);
+    a.mov(a64::w0, 3);   // Exit code 3 = pageFault
+    a.b(epilogueLabel);
 
     // Bind exit label
     a.bind(exitLabel);

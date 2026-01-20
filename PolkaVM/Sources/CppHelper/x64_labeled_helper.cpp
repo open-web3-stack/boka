@@ -229,9 +229,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Load pointer register into rax
             a.mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
-            // Add offset to get final address
-            a.mov(x86::ecx, offset);
-            a.add(x86::rax, x86::rcx);
+            // Add offset to get final address (sign-extended 32-bit immediate)
+            a.add(x86::rax, int32_t(offset));
 
             // Bounds check: address < 65536 → panic
             a.cmp(x86::rax, 65536);
@@ -266,9 +265,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Load pointer register into rax
             a.mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
-            // Add offset to get final address
-            a.mov(x86::ecx, offset);
-            a.add(x86::rax, x86::rcx);
+            // Add offset to get final address (sign-extended 32-bit immediate)
+            a.add(x86::rax, int32_t(offset));
 
             // Bounds check: address < 65536 → panic
             a.cmp(x86::rax, 65536);

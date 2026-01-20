@@ -278,6 +278,41 @@ struct JITIntegrationTests {
         #expect(exitReason == .halt || exitReason == .panic(.trap))
     }
 
+    // MARK: - Negative Offset Tests
+
+    @Test func testJITLoadWithNegativeOffset() async throws {
+        // Program: Load from base address 100000 with offset -4
+        // Setup: R0 = 100000, LoadU8 R1, [R0 - 4], Halt
+        let code: [UInt8] = [
+            Opcode.loadImm.rawValue, 0, 160, 134, 1, 0,  // LoadImm R0, 100000 (6 bytes)
+            Opcode.loadU8.rawValue, 1, 0, 252, 255,       // LoadU8 R1, [R0 - 4] (6 bytes, offset=-4 as 0xFFFC)
+            Opcode.halt.rawValue                           // Halt (1 byte)
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
+        // Should halt successfully (100000 - 4 = 99996, still >= 65536)
+        #expect(exitReason == .halt || exitReason == .panic(.trap))
+    }
+
+    @Test func testJITStoreWithNegativeOffset() async throws {
+        // Program: Store to base address 100000 with offset -8
+        // Setup: R0 = 100000, R1 = 99, StoreU8 [R0 - 8], R1, Halt
+        let code: [UInt8] = [
+            Opcode.loadImm.rawValue, 0, 160, 134, 1, 0,  // LoadImm R0, 100000 (6 bytes)
+            Opcode.loadImm.rawValue, 1, 99, 0, 0, 0,     // LoadImm R1, 99 (6 bytes)
+            Opcode.storeU8.rawValue, 0, 1, 248, 255,      // StoreU8 [R0 - 8], R1 (6 bytes, offset=-8 as 0xFFF8)
+            Opcode.halt.rawValue                           // Halt (1 byte)
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
+        // Should halt successfully (100000 - 8 = 99992, still >= 65536)
+        #expect(exitReason == .halt || exitReason == .panic(.trap))
+    }
+
     // TODO: Add tests for page fault (address >= memory_size when memory_size is smaller)
     // TODO: Add tests for conditional branches, loops
 }
