@@ -211,6 +211,7 @@ public final class Runtime {
             // accumulate
             let (accumulateRoot, commitments, accumulateStats) = try await newState.update(
                 config: config,
+                executionMode: executionMode,
                 availableReports: availableReports,
                 timeslot: block.header.timeslot,
                 prevTimeslot: prevState.value.timeslot,
