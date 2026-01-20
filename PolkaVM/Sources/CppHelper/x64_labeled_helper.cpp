@@ -347,8 +347,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.call(x86::rax);
 
             // Check result (eax contains error code or return value)
-            a.cmp(x86::eax, 0xFFFFFFFF);
-            a.je(panicLabel);  // Error -> panic
+            // Any value >= 0xFFFF_FFFC is an error (internalError, hostFunctionNotFound, hostFunctionThrewError, gasExhausted, etc.)
+            a.cmp(x86::eax, 0xFFFFFFFC);
+            a.jae(panicLabel);  // Jump if above or equal (error range)
 
             // Store result in R0
             a.mov(x86::qword_ptr(x86::rbx, 0), x86::rax);

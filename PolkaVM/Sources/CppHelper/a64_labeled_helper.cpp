@@ -349,8 +349,9 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             a.blr(a64::x9);
 
             // Check result (w0 contains error code or return value)
-            a.cmp(a64::w0, 0xFFFFFFFF);
-            a.b_eq(panicLabel);  // Error -> panic
+            // Any value >= 0xFFFF_FFFC is an error (internalError, hostFunctionNotFound, hostFunctionThrewError, gasExhausted, etc.)
+            a.cmp(a64::w0, 0xFFFFFFFC);
+            a.b_ge(panicLabel);  // Branch if >= (error range)
 
             // Store result in R0
             a.str(a64::x0, a64::ptr(a64::x19, 0));
