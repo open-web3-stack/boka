@@ -1,18 +1,13 @@
 import Foundation
 import TracingUtils
+import PolkaVM
 
-// This will be imported once we create the module
-// import PolkaVM
-
-private let logger = Logger(label: "Boka-VMSandbox")
+private let logger = Logger(label: "Boka-Sandbox")
 
 @main
 struct SandboxMain {
     static func main() async {
         logger.info("Boka VM Sandbox starting...")
-
-        // TODO: Import PolkaVM and set up IPC server
-        // For now, just demonstrate the structure
 
         // Set up signal handlers for clean shutdown
         setupSignalHandlers()
@@ -20,18 +15,16 @@ struct SandboxMain {
         // TODO: Apply security restrictions
         // applySandboxSecurity()
 
-        // TODO: Create and run IPC server
-        // let server = IPCServer()
-        // server.setFileDescriptor(STDIN_FILENO)
-        //
-        // await server.run { request in
-        //     // Execute VM program
-        //     return await executeProgram(request)
-        // }
+        // Create and run IPC server
+        let server = IPCServer()
+        server.setFileDescriptor(STDIN_FILENO)
 
-        // Placeholder: Keep process alive
-        logger.info("Sandbox process ready")
-        RunLoop.current.run()
+        logger.info("Sandbox process ready, listening for IPC messages")
+
+        await server.run { request in
+            // Handle execute request
+            await handleExecuteRequest(request)
+        }
 
         logger.info("Sandbox process exiting")
     }
@@ -56,37 +49,54 @@ struct SandboxMain {
         }
     }
 
+    private static func handleExecuteRequest(_ request: IPCExecuteRequest) async -> IPCExecuteResponse {
+        do {
+            logger.debug("Received execute request: PC=\(request.pc), Gas=\(request.gas)")
+
+            // Decode execution mode
+            let mode = ExecutionMode(rawValue: request.executionMode)
+
+            // Create ExecutorFrontendInProcess
+            let executor = ExecutorFrontendInProcess(mode: mode)
+
+            // Create config
+            let config = PvmConfig(memorySize: 16 * 1024 * 1024) // 16 MB default
+
+            // Execute
+            let exitReason = await executor.execute(
+                config: config,
+                blob: request.blob,
+                pc: request.pc,
+                gas: Gas(request.gas),
+                argumentData: request.argumentData,
+                ctx: nil  // TODO: Handle context serialization in Phase 4
+            )
+
+            logger.debug("Execution completed: \(exitReason)")
+
+            return IPCExecuteResponse(
+                exitReasonCode: exitReason.toUInt64(),
+                gasUsed: request.gas,  // TODO: Track actual gas used
+                outputData: nil,  // TODO: Read output from state
+                errorMessage: nil
+            )
+
+        } catch {
+            logger.error("Execution failed: \(error)")
+
+            return IPCExecuteResponse(
+                exitReasonCode: ExitReason.panic(.trap).toUInt64(),
+                gasUsed: 0,
+                outputData: nil,
+                errorMessage: "\(error)"
+            )
+        }
+    }
+
     // TODO: Apply security restrictions
     // private static func applySandboxSecurity() {
     //     // Apply resource limits
     //     // Apply seccomp filter
     //     // Drop capabilities
-    // }
-
-    // TODO: Execute VM program
-    // private static func executeProgram(_ request: IPCExecuteRequest) async -> IPCExecuteResponse {
-    //     // Decode execution mode
-    //     let mode = ExecutionMode(rawValue: request.executionMode)
-    //
-    //     // Create executor
-    //     let executor = ExecutorFrontendInProcess(mode: mode)
-    //
-    //     // Execute
-    //     let exitReason = await executor.execute(
-    //         config: config,
-    //         blob: request.blob,
-    //         pc: request.pc,
-    //         gas: Gas(request.gas),
-    //         argumentData: request.argumentData,
-    //         ctx: nil  // TODO: Handle context
-    //     )
-    //
-    //     // Return response
-    //     return IPCExecuteResponse(
-    //         exitReasonCode: exitReason.toUInt64(),
-    //         gasUsed: 0,  // TODO: Track gas used
-    //         outputData: nil,  // TODO: Read output
-    //         errorMessage: nil
-    //     )
     // }
 }

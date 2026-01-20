@@ -13,6 +13,10 @@ let package = Package(
             name: "PolkaVM",
             targets: ["PolkaVM"]
         ),
+        .executable(
+            name: "boka-sandbox",
+            targets: ["Sandbox"]
+        ),
     ],
     dependencies: [
         .package(path: "../Utils"),
@@ -32,6 +36,23 @@ let package = Package(
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
             ]
+        ),
+        .executableTarget(
+            name: "Sandbox",
+            dependencies: [
+                "PolkaVM",
+                "Utils",
+                "TracingUtils",
+                .product(name: "Logging", package: "swift-log"),
+            ],
+            exclude: [
+                "IPCMessages.swift",
+                "IPCProtocol.swift",
+                "IPCClient.swift",
+                "IPCServer.swift",
+                "ChildProcessManager.swift"
+            ],
+            sources: ["main.swift"]
         ),
         .testTarget(
             name: "PolkaVMTests",
