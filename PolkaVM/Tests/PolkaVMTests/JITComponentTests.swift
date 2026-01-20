@@ -11,6 +11,53 @@ import Utils
 @testable import PolkaVM
 
 struct JITComponentTests {
+    // Helper function to create a valid blob with given code
+    private func createBlob(code: Data) -> Data {
+        var blob = Data()
+
+        // Jump table entries count (0)
+        let count = Data(UInt64(0).encode(method: .variableWidth))
+        blob.append(contentsOf: count)
+
+        // Encode size (0)
+        blob.append(0)
+
+        // Code length
+        let codeLength = Data(UInt64(code.count).encode(method: .variableWidth))
+        blob.append(contentsOf: codeLength)
+
+        // Jump table (empty)
+        // No jump table entries
+
+        // Code
+        blob.append(contentsOf: code)
+
+        // Bitmask (one byte per 8 code bytes, rounded up)
+        let bitmaskSize = (code.count + 7) / 8
+        blob.append(contentsOf: Data(repeating: 0, count: bitmaskSize))
+
+        return blob
+    }
+
+    // MARK: - BasicBlockBuilder Tests (INVESTIGATING SIGTRAP)
+
+    @Test func basicBlockBuilderSingleInstruction() throws {
+        // Trap instruction (opcode 0, 1 byte)
+        let code = Data([0])
+        let blob = createBlob(code: code)
+
+        let program = try ProgramCode(blob)
+
+        // Simply test that we can access program.code.count
+        let _ = program.code.count
+
+        let builder = BasicBlockBuilder(program: program)
+        let blocks = builder.build()
+
+        // Should have one block starting at PC 0
+        #expect(blocks.count == 1)
+    }
+
     // MARK: - LabelManager Tests
 
     @Test func labelManagerCreation() async {

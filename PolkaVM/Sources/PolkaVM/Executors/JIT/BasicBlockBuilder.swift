@@ -34,7 +34,8 @@ final class BasicBlockBuilder {
         var currentPC = 0
 
         // Track which PCs are jump targets (will be filled in second pass)
-        var jumpTargets: Set<UInt32> = []
+        // TODO: Implement jump target parsing from instruction data
+        // var jumpTargets: Set<UInt32> = []
 
         // Get basic block ending instructions - cache opcodes as constants to avoid C++ layer access
         // TODO: Import BASIC_BLOCK_INSTRUCTIONS from Instructions.swift properly
@@ -43,7 +44,7 @@ final class BasicBlockBuilder {
 
         // First pass: identify all blocks and their instructions
         while currentPC < program.code.count {
-            let opcode = program.code[currentPC]
+            let opcode = program.code[relative: currentPC]
 
             // Start a new block if needed
             if currentBlock == nil {
@@ -56,7 +57,7 @@ final class BasicBlockBuilder {
 
             // Read instruction data
             let endPC = min(currentPC + instructionLength, program.code.count)
-            let instructionData = Data(program.code[currentPC ..< endPC])
+            let instructionData = Data(program.code[relative: currentPC ..< endPC])
             currentBlock!.instructions.append((opcode, instructionData))
 
             // Check if this ends a basic block
@@ -82,7 +83,7 @@ final class BasicBlockBuilder {
         }
 
         // Second pass: mark jump targets
-        for (pc, block) in blocks {
+        for (_, block) in blocks {
             for (opcode, _) in block.instructions {
                 if opcode == 80 || // BranchEqImm
                     opcode == 81 || // BranchNeImm
