@@ -5,6 +5,7 @@
 #include "helper.hh"
 #include "jit_label_manager.hh"
 #include "jit_control_flow.hh"
+#include "opcodes.hh"
 #include <asmjit/asmjit.h>
 #include <cstddef>
 #include <cstdint>
@@ -15,6 +16,7 @@
 using namespace asmjit;
 using namespace asmjit::a64;
 using namespace JIT;
+using namespace PVM;
 
 // External declaration for the instruction emitter
 extern "C" bool jit_emitter_emit_basic_block_instructions(
@@ -110,13 +112,14 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         }
 
         // Mark jump targets for control flow instructions
-        if (opcode == 40) { // Jump
+        if (static_cast<Opcode>(opcode) == Opcode::Jump) {
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
             labelManager.markJumpTarget(targetPC);
-        } else if (opcode == 170 || opcode == 171) { // BranchEq, BranchNe
+        } else if (static_cast<Opcode>(opcode) == Opcode::BranchEq ||
+                   static_cast<Opcode>(opcode) == Opcode::BranchNe) {
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
             labelManager.markJumpTarget(targetPC);
-        } else if (opcode == 80) { // LoadImmJump
+        } else if (static_cast<Opcode>(opcode) == Opcode::LoadImmJump) {
             uint8_t destReg = codeBuffer[pc + 1];
             uint32_t jumpOffset;
             memcpy(&jumpOffset, &codeBuffer[pc + 2], 4);   // Jump offset is at bytes 2-5
@@ -146,7 +149,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         }
 
         // Handle control flow instructions with labels
-        if (opcode == 40) { // Jump
+        if (static_cast<Opcode>(opcode) == Opcode::Jump) {
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "aarch64");
             jit_emit_jump_labeled(&a, "aarch64", targetLabel);
@@ -154,7 +157,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             continue;
         }
 
-        if (opcode == 170) { // BranchEq
+        if (static_cast<Opcode>(opcode) == Opcode::BranchEq) {
             uint8_t reg1 = codeBuffer[pc + 1];
             uint8_t reg2 = codeBuffer[pc + 2];
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
@@ -166,7 +169,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             continue;
         }
 
-        if (opcode == 171) { // BranchNe
+        if (static_cast<Opcode>(opcode) == Opcode::BranchNe) {
             uint8_t reg1 = codeBuffer[pc + 1];
             uint8_t reg2 = codeBuffer[pc + 2];
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
@@ -178,7 +181,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             continue;
         }
 
-        if (opcode == 80) { // LoadImmJump
+        if (static_cast<Opcode>(opcode) == Opcode::LoadImmJump) {
             uint8_t destReg = codeBuffer[pc + 1];
             uint32_t jumpOffset;
             uint32_t immediate;
@@ -193,7 +196,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             continue;
         }
 
-        if (opcode == 0) { // Trap
+        if (static_cast<Opcode>(opcode) == Opcode::Trap) {
             // Set return value to -1 (trap) in w0, then jump to epilogue
             a.mov(a64::w0, -1);
             a.b(epilogueLabel);
@@ -201,7 +204,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             continue;
         }
 
-        if (opcode == 1) { // Fallthrough (halt)
+        if (static_cast<Opcode>(opcode) == Opcode::Halt) {
             // Jump to exit
             a.b(exitLabel);
             pc += instrSize;

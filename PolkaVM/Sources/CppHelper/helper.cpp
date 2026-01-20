@@ -157,6 +157,10 @@ uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytec
         case Opcode::Add64:
         case Opcode::Sub64:
         case Opcode::Mul64:
+        case Opcode::DivU64:
+        case Opcode::DivS64:
+        case Opcode::RemU64:
+        case Opcode::RemS64:
             return InstructionSize::Arithmetic64;
 
         // Bitwise operations: [opcode][dest_reg][src_reg] = 3 bytes
