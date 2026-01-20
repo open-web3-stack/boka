@@ -85,41 +85,52 @@ uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytec
     // Instruction size lookup table - MUST match instruction_dispatcher.cpp exactly
     // Only includes opcodes that are actually implemented in the dispatcher's switch statement
     // Sizes are extracted from the decode functions in instruction_dispatcher.cpp
+    uint32_t instrSize = 0;
     switch (static_cast<Opcode>(opcode)) {
         // 1-byte instructions
         case Opcode::Trap:
         case Opcode::Halt:
-            return InstructionSize::Trap;
+            instrSize = InstructionSize::Trap;
+            break;
 
         // LoadImm64: [opcode][reg_index][value_64bit] = 10 bytes
         case Opcode::LoadImmU64:
-            return InstructionSize::LoadImm64;
+            instrSize = InstructionSize::LoadImm64;
+            break;
 
         // StoreImmU8/U16/U32/U64
         case Opcode::StoreImmU8:
-            return InstructionSize::StoreImmU8;
+            instrSize = InstructionSize::StoreImmU8;
+            break;
         case Opcode::StoreImmU16:
-            return InstructionSize::StoreImmU16;
+            instrSize = InstructionSize::StoreImmU16;
+            break;
         case Opcode::StoreImmU32:
-            return InstructionSize::StoreImmU32;
+            instrSize = InstructionSize::StoreImmU32;
+            break;
         case Opcode::StoreImmU64:
-            return InstructionSize::StoreImmU64;
+            instrSize = InstructionSize::StoreImmU64;
+            break;
 
         // Jump: [opcode][offset_32bit] = 5 bytes
         case Opcode::Jump:
-            return InstructionSize::Jump;
+            instrSize = InstructionSize::Jump;
+            break;
 
         // JumpInd: [opcode][reg_index] = 2 bytes
         case Opcode::JumpInd:
-            return InstructionSize::JumpInd;
+            instrSize = InstructionSize::JumpInd;
+            break;
 
         // LoadImm: [opcode][reg_index][value_32bit] = 6 bytes
         case Opcode::LoadImm:
-            return InstructionSize::LoadImm;
+            instrSize = InstructionSize::LoadImm;
+            break;
 
         // LoadImmJump: [opcode][reg_index][offset_32bit][value_32bit] = 10 bytes
         case Opcode::LoadImmJump:
-            return InstructionSize::LoadImmJump;
+            instrSize = InstructionSize::LoadImmJump;
+            break;
 
         // Load instructions: [opcode][reg_index][address_32bit] = 6 bytes
         case Opcode::LoadU8:
@@ -129,19 +140,22 @@ uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytec
         case Opcode::LoadU32:
         case Opcode::LoadI32:
         case Opcode::LoadU64:
-            return InstructionSize::LoadU8;
+            instrSize = InstructionSize::LoadU8;
+            break;
 
         // Store instructions: [opcode][reg_index][address_32bit] = 6 bytes
         case Opcode::StoreU8:
         case Opcode::StoreU16:
         case Opcode::StoreU32:
         case Opcode::StoreU64:
-            return InstructionSize::StoreU8;
+            instrSize = InstructionSize::StoreU8;
+            break;
 
         // Branch instructions: [opcode][reg1][reg2][offset_32bit] = 7 bytes
         case Opcode::BranchEq:
         case Opcode::BranchNe:
-            return InstructionSize::BranchEq;
+            instrSize = InstructionSize::BranchEq;
+            break;
 
         // 32-bit arithmetic: [opcode][dest_reg][src_reg] = 3 bytes
         case Opcode::Add32:
@@ -151,7 +165,8 @@ uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytec
         case Opcode::DivS32:
         case Opcode::RemU32:
         case Opcode::RemS32:
-            return InstructionSize::Arithmetic32;
+            instrSize = InstructionSize::Arithmetic32;
+            break;
 
         // 64-bit arithmetic: [opcode][dest_reg][src_reg] = 3 bytes
         case Opcode::Add64:
@@ -161,16 +176,25 @@ uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytec
         case Opcode::DivS64:
         case Opcode::RemU64:
         case Opcode::RemS64:
-            return InstructionSize::Arithmetic64;
+            instrSize = InstructionSize::Arithmetic64;
+            break;
 
         // Bitwise operations: [opcode][dest_reg][src_reg] = 3 bytes
         case Opcode::And:
         case Opcode::Xor:
         case Opcode::Or:
-            return InstructionSize::Bitwise;
+            instrSize = InstructionSize::Bitwise;
+            break;
 
         // For unimplemented opcodes, return 0 to signal error
         default:
             return 0;
     }
+
+    // Verify the full instruction fits within the bytecode buffer
+    if (instrSize > 0 && (bytecode_size - pc) < instrSize) {
+        return 0; // Instruction extends beyond buffer bounds
+    }
+
+    return instrSize;
 }
