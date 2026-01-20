@@ -100,6 +100,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     Label panicLabel = a.newLabel();      // Panic exit (trap, address < 65536) - w0 = -1
     Label pagefaultLabel = a.newLabel();  // Page fault exit (address >= memory_size) - w0 = 3
     Label outOfGasLabel = a.newLabel();   // Out of gas exit - w0 = 1
+    Label unsupportedLabel = a.newLabel();// Unsupported instruction - exit to interpreter - w0 = 2
     Label epilogueLabel = a.newLabel();   // Epilogue (restore registers and return)
 
     // === PRE-PASS: Identify all jump targets ===
@@ -221,17 +222,15 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             // JumpInd: [opcode][reg_index] - jump to address stored in register
             uint8_t ptr_reg = codeBuffer[pc + 1];
 
-            // Load target address from register
-            a.ldr(a64::x0, a64::ptr(a64::x19, ptr_reg * 8));
+            // Load target address from register and update PC
+            a.ldr(a64::w0, a64::ptr(a64::x19, ptr_reg * 8));
+            a.mov(a64::w23, a64::w0);  // Update VM_PC
 
-            // For JumpInd, we need to jump to a dynamic address.
-            // This is complex with label-based compilation. For now, we'll use
-            // a computed jump via jump table or dispatch through the bytecode.
-            // TODO: Implement proper jump table support for JumpInd
-            // For now, treat it as unsupported and fall through to dispatcher
-            if (!jit_emitter_emit_basic_block_instructions(&a, "aarch64", codeBuffer, pc, pc + instrSize)) {
-                return 3; // Compilation error
-            }
+            // JumpInd requires dynamic jump targets which need a jump table.
+            // For now, exit to interpreter to handle it.
+            a.bind(unsupportedLabel);
+            a.mov(a64::w0, 2);  // Exit code 2 = unsupported/exit to interpreter
+            a.b(epilogueLabel);
 
             pc += instrSize;
             continue;
