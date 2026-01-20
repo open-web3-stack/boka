@@ -2,6 +2,7 @@ import Blockchain
 import Database
 import Foundation
 import Networking
+import PolkaVM
 import RPC
 import TracingUtils
 import Utils
@@ -70,6 +71,7 @@ public struct Config {
     public var database: Database
     public var keystoreType: KeyStoreType
     public var availability: AvailabilityConfig
+    public var executionMode: ExecutionMode
 
     public init(
         rpc: RPCConfig?,
@@ -79,7 +81,8 @@ public struct Config {
         name: String? = nil,
         database: Database = .inMemory,
         keystoreType: KeyStoreType = .inMemory,
-        availability: AvailabilityConfig = .default
+        availability: AvailabilityConfig = .default,
+        executionMode: ExecutionMode = []
     ) {
         self.rpc = rpc
         self.network = network
@@ -89,6 +92,7 @@ public struct Config {
         self.database = database
         self.keystoreType = keystoreType
         self.availability = availability
+        self.executionMode = executionMode
     }
 }
 

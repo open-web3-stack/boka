@@ -1,4 +1,5 @@
 import Codec
+import PolkaVM
 import TracingUtils
 import Utils
 
@@ -200,6 +201,7 @@ extension Accumulation {
     /// single-service accumulate function ∆1
     private static func singleAccumulate(
         config: ProtocolConfigRef,
+        executionMode: ExecutionMode = [],
         state: AccumulateState,
         transfers: [DeferredTransfers],
         workReports: [WorkReport],
@@ -238,6 +240,7 @@ extension Accumulation {
 
         let result = try await accumulate(
             config: config,
+            executionMode: executionMode,
             state: state,
             serviceIndex: service,
             gas: gas,
@@ -253,6 +256,7 @@ extension Accumulation {
     /// parallelized accumulate function ∆*
     private func parallelizedAccumulate(
         config: ProtocolConfigRef,
+        executionMode: ExecutionMode = [],
         state: AccumulateState,
         transfers: [DeferredTransfers],
         workReports: [WorkReport],
@@ -294,6 +298,7 @@ extension Accumulation {
                 group.addTask { [batchState] in
                     return try await Self.singleAccumulate(
                         config: config,
+                        executionMode: executionMode,
                         state: batchState.copy(),
                         transfers: transfers,
                         workReports: workReports,
@@ -402,6 +407,7 @@ extension Accumulation {
     /// outer accumulate function ∆+
     private func outerAccumulate(
         config: ProtocolConfigRef,
+        executionMode: ExecutionMode = [],
         state: AccumulateState,
         transfers: [DeferredTransfers],
         workReports: [WorkReport],
@@ -442,6 +448,7 @@ extension Accumulation {
 
             let parallelOutput = try await parallelizedAccumulate(
                 config: config,
+                executionMode: executionMode,
                 state: state,
                 transfers: transfers,
                 workReports: Array(workReports[0 ..< i]),
@@ -452,6 +459,7 @@ extension Accumulation {
             let transfersGas = transfers.reduce(Gas(0)) { $0 + $1.gasLimit }
             let outerOutput = try await outerAccumulate(
                 config: config,
+                executionMode: executionMode,
                 state: parallelOutput.state,
                 transfers: parallelOutput.transfers,
                 workReports: Array(workReports[i ..< workReports.count]),
@@ -563,6 +571,7 @@ extension Accumulation {
     // accumulate execution
     private func execution(
         config: ProtocolConfigRef,
+        executionMode: ExecutionMode = [],
         workReports: [WorkReport],
         state: AccumulateState,
         timeslot: TimeslotIndex
@@ -573,6 +582,7 @@ extension Accumulation {
 
         return try await outerAccumulate(
             config: config,
+            executionMode: executionMode,
             state: state,
             transfers: [],
             workReports: workReports,
@@ -585,6 +595,7 @@ extension Accumulation {
     /// Accumulate execution, state integration and deferred transfers
     public mutating func update(
         config: ProtocolConfigRef,
+        executionMode: ExecutionMode = [],
         availableReports: [WorkReport],
         timeslot: TimeslotIndex,
         prevTimeslot: TimeslotIndex,
@@ -617,6 +628,7 @@ extension Accumulation {
 
         let accumulateOutput = try await execution(
             config: config,
+            executionMode: executionMode,
             workReports: accumulatableReports,
             state: initialAccState,
             timeslot: timeslot

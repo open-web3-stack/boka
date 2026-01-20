@@ -1,4 +1,5 @@
 import Foundation
+import PolkaVM
 import TracingUtils
 import Utils
 
@@ -11,15 +12,18 @@ import Utils
 public final class Blockchain: ServiceBase, @unchecked Sendable {
     public let dataProvider: BlockchainDataProvider
     public let timeProvider: TimeProvider
+    public let executionMode: ExecutionMode
 
     public init(
         config: ProtocolConfigRef,
         dataProvider: BlockchainDataProvider,
         timeProvider: TimeProvider,
-        eventBus: EventBus
+        eventBus: EventBus,
+        executionMode: ExecutionMode = []
     ) async throws {
         self.dataProvider = dataProvider
         self.timeProvider = timeProvider
+        self.executionMode = executionMode
 
         super.init(id: "Blockchain", config: config, eventBus: eventBus)
 
@@ -46,7 +50,7 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
         try await withSpan("importBlock") { span in
             span.attributes.blockHash = block.hash.description
 
-            let runtime = try Runtime(config: config, ancestry: .init(config: config))
+            let runtime = try Runtime(config: config, ancestry: .init(config: config), executionMode: executionMode)
             let parent = try await dataProvider.getState(hash: block.header.parentHash)
             let stateRoot = await parent.value.stateRoot
             let timeslot = timeProvider.getTime().timeToTimeslot(config: config)

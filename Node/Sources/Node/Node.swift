@@ -39,7 +39,8 @@ public class Node {
             config: protocolConfig,
             dataProvider: dataProvider,
             timeProvider: scheduler.timeProvider,
-            eventBus: eventBus
+            eventBus: eventBus,
+            executionMode: config.executionMode
         )
         self.blockchain = blockchain
 

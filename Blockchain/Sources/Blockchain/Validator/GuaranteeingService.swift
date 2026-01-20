@@ -1,5 +1,6 @@
 import Codec
 import Foundation
+import PolkaVM
 import Synchronization
 import TracingUtils
 import Utils
@@ -31,6 +32,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
     private let dataProvider: BlockchainDataProvider
     private let keystore: KeyStore
     private let dataAvailability: DataAvailabilityService
+    private let executionMode: ExecutionMode
 
     // Stores the current signing key and validator index
     let signingKey: ThreadSafeContainer<(ValidatorIndex, Ed25519.SecretKey)?> = .init(nil)
@@ -47,10 +49,12 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         scheduler: Scheduler,
         dataProvider: BlockchainDataProvider,
         keystore: KeyStore,
-        dataStore: DataStore
+        dataStore: DataStore,
+        executionMode: ExecutionMode = []
     ) async {
         self.dataProvider = dataProvider
         self.keystore = keystore
+        self.executionMode = executionMode
         dataAvailability = await DataAvailabilityService(
             config: config,
             eventBus: eventBus,
@@ -681,6 +685,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         logger.debug("Authorizing work package", metadata: ["workPackageHash": "\(packageHash)"])
         let (authRes, authGasUsed) = try await isAuthorized(
             config: config,
+            executionMode: executionMode,
             serviceAccounts: state.value,
             package: workPackage.value,
             coreIndex: coreIndex
@@ -705,6 +710,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
 
             let (refineRes, refineExports, refineGasUsed) = try await refine(
                 config: config,
+                executionMode: executionMode,
                 serviceAccounts: state.value,
                 workItemIndex: i,
                 workPackage: workPackage.value,

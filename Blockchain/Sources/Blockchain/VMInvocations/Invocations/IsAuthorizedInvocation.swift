@@ -4,6 +4,7 @@ import PolkaVM
 
 public func isAuthorized(
     config: ProtocolConfigRef,
+    executionMode: ExecutionMode = [],
     serviceAccounts: some ServiceAccounts,
     package: WorkPackage,
     coreIndex: CoreIndex
@@ -20,6 +21,7 @@ public func isAuthorized(
     let ctx = IsAuthorizedContext(config: config, package: package)
     let (exitReason, gasUsed, output) = await invokePVM(
         config: config,
+        executionMode: executionMode,
         blob: codeBlob,
         pc: 0,
         gas: config.value.workPackageIsAuthorizedGas,

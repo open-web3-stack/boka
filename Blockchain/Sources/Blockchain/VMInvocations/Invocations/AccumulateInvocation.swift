@@ -8,6 +8,7 @@ private let logger = Logger(label: "AccumulateInvocation")
 
 public func accumulate(
     config: ProtocolConfigRef,
+    executionMode: ExecutionMode = [],
     state: AccumulateState,
     serviceIndex: ServiceIndex,
     gas: Gas,
@@ -69,6 +70,7 @@ public func accumulate(
 
     let (exitReason, gas, output) = await invokePVM(
         config: config,
+        executionMode: executionMode,
         blob: codeBlob,
         pc: 5,
         gas: gas,

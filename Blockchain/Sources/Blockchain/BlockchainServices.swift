@@ -1,4 +1,5 @@
 import Foundation
+import PolkaVM
 import TracingUtils
 import Utils
 
@@ -25,6 +26,7 @@ public class BlockchainServices: @unchecked Sendable {
     public let storeMiddleware: StoreMiddleware
     public let genesisBlock: BlockRef
     public let genesisState: StateRef
+    public let executionMode: ExecutionMode
 
     private var _blockchain: Blockchain?
     private weak var _blockchainRef: Blockchain?
@@ -43,10 +45,12 @@ public class BlockchainServices: @unchecked Sendable {
     public init(
         config: ProtocolConfigRef = .dev,
         timeProvider: MockTimeProvider = MockTimeProvider(time: 988),
-        keysCount: Int = 12
+        keysCount: Int = 12,
+        executionMode: ExecutionMode = []
     ) async {
         self.config = config
         self.timeProvider = timeProvider
+        self.executionMode = executionMode
 
         let (genesisState, genesisBlock) = try! State.devGenesis(config: config)
         self.genesisBlock = genesisBlock
@@ -155,7 +159,8 @@ public class BlockchainServices: @unchecked Sendable {
                 scheduler: scheduler,
                 dataProvider: dataProvider,
                 keystore: keystore,
-                dataStore: dataStore
+                dataStore: dataStore,
+                executionMode: executionMode
             )
             _guaranteeingServiceRef = _guaranteeingService
 

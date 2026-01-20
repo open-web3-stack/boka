@@ -88,6 +88,9 @@ struct Boka: AsyncParsableCommand {
     @Flag(name: .long, help: "Enable dev mode. This is equivalent to --local --validator")
     var dev: Bool = false
 
+    @Flag(name: .long, help: "Enable JIT execution mode for PolkaVM (default: interpreter mode).")
+    var jit: Bool = false
+
     mutating func run() async throws {
         let services = try await Tracing.bootstrap("Boka", loggerOnly: true)
         for service in services {
@@ -114,6 +117,12 @@ struct Boka: AsyncParsableCommand {
 
         if let name {
             logger.info("Node name: \(name)")
+        }
+
+        if jit {
+            logger.info("PolkaVM JIT mode enabled")
+        } else {
+            logger.info("PolkaVM interpreter mode")
         }
 
         let database: Database = basePath.map {
@@ -177,7 +186,8 @@ struct Boka: AsyncParsableCommand {
             local: local,
             name: name,
             database: database,
-            keystoreType: keysotreType
+            keystoreType: keysotreType,
+            executionMode: jit ? .jit : []
         )
 
         let node: Node = if validator {

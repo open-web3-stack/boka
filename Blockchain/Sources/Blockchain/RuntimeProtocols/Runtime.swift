@@ -1,5 +1,6 @@
 import Codec
 import Foundation
+import PolkaVM
 import TracingUtils
 import Utils
 
@@ -49,16 +50,19 @@ public final class Runtime {
     }
 
     public let config: ProtocolConfigRef
+    public let executionMode: ExecutionMode
 
     // nil means no ancestry tracking and checking
     public var ancestry: ConfigLimitedSizeArray<AncestryItem, ProtocolConfig.Int0, ProtocolConfig.MaxLookupAnchorAge>?
 
     public init(
         config: ProtocolConfigRef,
-        ancestry: ConfigLimitedSizeArray<AncestryItem, ProtocolConfig.Int0, ProtocolConfig.MaxLookupAnchorAge>? = nil
+        ancestry: ConfigLimitedSizeArray<AncestryItem, ProtocolConfig.Int0, ProtocolConfig.MaxLookupAnchorAge>? = nil,
+        executionMode: ExecutionMode = []
     ) {
         self.config = config
         self.ancestry = ancestry
+        self.executionMode = executionMode
     }
 
     public func updateAncestry(with block: BlockRef) {

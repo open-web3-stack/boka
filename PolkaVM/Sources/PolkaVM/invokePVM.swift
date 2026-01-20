@@ -7,6 +7,7 @@ private let logger = Logger(label: "InvokePVM")
 /// common PVM program-argument invocation function
 public func invokePVM(
     config: PvmConfig,
+    executionMode: ExecutionMode = [],
     blob: Data,
     pc: UInt32,
     gas: Gas,
@@ -15,8 +16,23 @@ public func invokePVM(
 ) async -> (ExitReason, Gas, Data?) {
     do {
         let state = try VMStateInterpreter(standardProgramBlob: blob, pc: pc, gas: gas, argumentData: argumentData)
-        let engine = Engine(config: config, invocationContext: ctx)
-        let exitReason = await engine.execute(state: state)
+
+        // Use JIT Executor if requested, otherwise use Engine (interpreter)
+        let exitReason: ExitReason
+        if executionMode.contains(.jit) {
+            let executor = Executor(mode: executionMode, config: config)
+            exitReason = await executor.execute(
+                blob: blob,
+                pc: pc,
+                gas: gas,
+                argumentData: argumentData,
+                ctx: ctx
+            )
+        } else {
+            let engine = Engine(config: config, invocationContext: ctx)
+            exitReason = await engine.execute(state: state)
+        }
+
         let postGas = state.getGas()
         let gasUsed = postGas >= GasInt(0) ? gas - Gas(postGas) : gas
 
