@@ -65,7 +65,7 @@ extern "C" bool jit_emit_jump_indirect_labeled(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t reg_index,
-    JIT::LabelManager* label_manager,
+    JIT::LabelManager* _Nullable label_manager,
     const uint8_t* _Nonnull bytecode,
     uint32_t bytecode_size
 );

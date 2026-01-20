@@ -8,11 +8,13 @@
 #include <cstdint>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 namespace JIT {
 
 // Label manager for JIT compilation
 // Implements single-pass compilation with lazy label creation and backpatching
+// Works with void* assembler pointers (cast to specific types as needed)
 class LabelManager {
 public:
     LabelManager() = default;
@@ -21,33 +23,58 @@ public:
     // Get or create label for a PC (lazy creation)
     // Returns the label associated with this PC
     // Creates a new label if one doesn't exist
-    asmjit::Label getOrCreateLabel(asmjit::Assembler* assembler, uint32_t pc) {
+    asmjit::Label getOrCreateLabel(void* assembler, uint32_t pc, const char* arch) {
         auto it = labels.find(pc);
         if (it != labels.end()) {
             return it->second;
         }
 
         // Create new label (forward declaration)
-        asmjit::Label label = assembler->newLabel();
+        asmjit::Label label;
+
+        if (strcmp(arch, "x86_64") == 0) {
+            auto* a = static_cast<asmjit::x86::Assembler*>(assembler);
+            label = a->newLabel();
+        } else if (strcmp(arch, "aarch64") == 0) {
+            auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
+            label = a->newLabel();
+        }
+
         labels[pc] = label;
         return label;
     }
 
     // Bind label at current position if it exists
     // Marks this location as the target for jumps to this PC
-    void bindLabel(asmjit::Assembler* assembler, uint32_t pc) {
+    void bindLabel(void* assembler, uint32_t pc, const char* arch) {
         auto it = labels.find(pc);
+        asmjit::Label label;
+
         if (it != labels.end()) {
             // Label already created (forward reference), now bind it
-            assembler->bind(it->second);
-            definedLabels.insert(pc);
+            label = it->second;
         } else {
             // Create and bind label immediately (no forward reference)
-            asmjit::Label label = assembler->newLabel();
+            if (strcmp(arch, "x86_64") == 0) {
+                auto* a = static_cast<asmjit::x86::Assembler*>(assembler);
+                label = a->newLabel();
+            } else if (strcmp(arch, "aarch64") == 0) {
+                auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
+                label = a->newLabel();
+            }
             labels[pc] = label;
-            assembler->bind(label);
-            definedLabels.insert(pc);
         }
+
+        // Bind the label
+        if (strcmp(arch, "x86_64") == 0) {
+            auto* a = static_cast<asmjit::x86::Assembler*>(assembler);
+            a->bind(label);
+        } else if (strcmp(arch, "aarch64") == 0) {
+            auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
+            a->bind(label);
+        }
+
+        definedLabels.insert(pc);
     }
 
     // Check if a PC is a jump target
