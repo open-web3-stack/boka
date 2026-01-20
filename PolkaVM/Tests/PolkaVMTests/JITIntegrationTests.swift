@@ -10,6 +10,202 @@ import Utils
 
 @testable import PolkaVM
 
+// MARK: - Instruction Builder
+
+/// Fluent builder for PVM bytecode instructions
+/// Makes tests more readable and maintainable by encoding instructions
+/// with named parameters instead of hardcoded byte arrays.
+final class InstructionBuilder {
+    private var bytecode: [UInt8] = []
+
+    /// LoadImm: Load 32-bit immediate value into register
+    /// Format: [opcode][reg][value_32bit_little_endian]
+    @discardableResult
+    func loadImm(destReg: UInt8, value: UInt32) -> Self {
+        bytecode.append(Opcode.loadImm.rawValue)
+        bytecode.append(destReg)
+        bytecode.append(contentsOf: valueToBytes(value))
+        return self
+    }
+
+    /// LoadImmU64: Load 64-bit immediate value into register
+    /// Format: [opcode][reg][value_64bit_little_endian]
+    @discardableResult
+    func loadImmU64(destReg: UInt8, value: UInt64) -> Self {
+        bytecode.append(Opcode.loadImmU64.rawValue)
+        bytecode.append(destReg)
+        bytecode.append(contentsOf: valueToBytes(UInt32(truncatingIfNeeded: value)))
+        bytecode.append(contentsOf: valueToBytes(UInt32(truncatingIfNeeded: value >> 32)))
+        return self
+    }
+
+    /// Add32: Add 32-bit registers
+    /// Format: [opcode][dest_reg][src_reg]
+    @discardableResult
+    func add32(destReg: UInt8, srcReg: UInt8) -> Self {
+        bytecode.append(Opcode.add32.rawValue)
+        bytecode.append(destReg)
+        bytecode.append(srcReg)
+        return self
+    }
+
+    /// Add64: Add 64-bit registers
+    @discardableResult
+    func add64(destReg: UInt8, srcReg: UInt8) -> Self {
+        bytecode.append(Opcode.add64.rawValue)
+        bytecode.append(destReg)
+        bytecode.append(srcReg)
+        return self
+    }
+
+    /// Sub32: Subtract 32-bit registers
+    @discardableResult
+    func sub32(destReg: UInt8, srcReg: UInt8) -> Self {
+        bytecode.append(Opcode.sub32.rawValue)
+        bytecode.append(destReg)
+        bytecode.append(srcReg)
+        return self
+    }
+
+    /// Mul32: Multiply 32-bit registers
+    @discardableResult
+    func mul32(destReg: UInt8, srcReg: UInt8) -> Self {
+        bytecode.append(Opcode.mul32.rawValue)
+        bytecode.append(destReg)
+        bytecode.append(srcReg)
+        return self
+    }
+
+    /// DivU32: Unsigned divide 32-bit registers
+    @discardableResult
+    func divU32(destReg: UInt8, srcReg: UInt8) -> Self {
+        bytecode.append(Opcode.divU32.rawValue)
+        bytecode.append(destReg)
+        bytecode.append(srcReg)
+        return self
+    }
+
+    /// And: Bitwise AND
+    @discardableResult
+    func and(destReg: UInt8, srcReg: UInt8) -> Self {
+        bytecode.append(Opcode.and.rawValue)
+        bytecode.append(destReg)
+        bytecode.append(srcReg)
+        return self
+    }
+
+    /// Or: Bitwise OR
+    @discardableResult
+    func or(destReg: UInt8, srcReg: UInt8) -> Self {
+        bytecode.append(Opcode.or.rawValue)
+        bytecode.append(destReg)
+        bytecode.append(srcReg)
+        return self
+    }
+
+    /// Xor: Bitwise XOR
+    @discardableResult
+    func xor(destReg: UInt8, srcReg: UInt8) -> Self {
+        bytecode.append(Opcode.xor.rawValue)
+        bytecode.append(destReg)
+        bytecode.append(srcReg)
+        return self
+    }
+
+    /// Jump: Unconditional jump with offset
+    /// Format: [opcode][offset_32bit_little_endian]
+    @discardableResult
+    func jump(offset: UInt32) -> Self {
+        bytecode.append(Opcode.jump.rawValue)
+        bytecode.append(contentsOf: valueToBytes(offset))
+        return self
+    }
+
+    /// LoadU8: Load unsigned 8-bit value from memory
+    /// Format: [opcode][dest_reg][base_reg][offset_16bit_little_endian]
+    @discardableResult
+    func loadU8(destReg: UInt8, baseReg: UInt8, offset: UInt16 = 0) -> Self {
+        bytecode.append(Opcode.loadU8.rawValue)
+        bytecode.append(destReg)
+        bytecode.append(baseReg)
+        bytecode.append(contentsOf: valueToBytes(offset))
+        return self
+    }
+
+    /// StoreU8: Store 8-bit value to memory
+    /// Format: [opcode][base_reg][src_reg][offset_16bit_little_endian]
+    @discardableResult
+    func storeU8(baseReg: UInt8, srcReg: UInt8, offset: UInt16 = 0) -> Self {
+        bytecode.append(Opcode.storeU8.rawValue)
+        bytecode.append(baseReg)
+        bytecode.append(srcReg)
+        bytecode.append(contentsOf: valueToBytes(offset))
+        return self
+    }
+
+    /// StoreImmU8: Store immediate 8-bit value to memory
+    /// Format: [opcode][value][address_32bit_little_endian]
+    @discardableResult
+    func storeImmU8(value: UInt8, address: UInt32) -> Self {
+        bytecode.append(Opcode.storeImmU8.rawValue)
+        bytecode.append(value)
+        bytecode.append(contentsOf: valueToBytes(address))
+        return self
+    }
+
+    /// StoreImmU32: Store immediate 32-bit value to memory
+    /// Format: [opcode][value_32bit_le][address_32bit_le]
+    @discardableResult
+    func storeImmU32(value: UInt32, address: UInt32) -> Self {
+        bytecode.append(Opcode.storeImmU32.rawValue)
+        bytecode.append(contentsOf: valueToBytes(value))
+        bytecode.append(contentsOf: valueToBytes(address))
+        return self
+    }
+
+    /// StoreImmU64: Store immediate 64-bit value to memory
+    /// Format: [opcode][value_64bit_le][address_32bit_le]
+    @discardableResult
+    func storeImmU64(value: UInt64, address: UInt32) -> Self {
+        bytecode.append(Opcode.storeImmU64.rawValue)
+        bytecode.append(contentsOf: valueToBytes(UInt32(truncatingIfNeeded: value)))
+        bytecode.append(contentsOf: valueToBytes(UInt32(truncatingIfNeeded: value >> 32)))
+        bytecode.append(contentsOf: valueToBytes(address))
+        return self
+    }
+
+    /// Halt: Stop execution
+    /// Format: [opcode]
+    @discardableResult
+    func halt() -> Self {
+        bytecode.append(Opcode.halt.rawValue)
+        return self
+    }
+
+    /// Build and return the bytecode array
+    func build() -> [UInt8] {
+        bytecode
+    }
+
+    /// Helper: Convert UInt32 to little-endian bytes
+    private func valueToBytes(_ value: UInt32) -> [UInt8] {
+        [
+            UInt8(truncatingIfNeeded: value & 0xFF),
+            UInt8(truncatingIfNeeded: (value >> 8) & 0xFF),
+            UInt8(truncatingIfNeeded: (value >> 16) & 0xFF),
+            UInt8(truncatingIfNeeded: (value >> 24) & 0xFF)
+        ]
+    }
+
+    /// Helper: Convert UInt16 to little-endian bytes
+    private func valueToBytes(_ value: UInt16) -> [UInt8] {
+        [
+            UInt8(truncatingIfNeeded: value & 0xFF),
+            UInt8(truncatingIfNeeded: (value >> 8) & 0xFF)
+        ]
+    }
+}
+
 // MARK: - Test Helpers
 
 extension JITIntegrationTests {
@@ -75,10 +271,10 @@ struct JITIntegrationTests {
 
     @Test func testJITCompilesSuccessfully() async throws {
         // Program: LoadImm 42, Halt
-        let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 42, 0, 0, 0,  // LoadImm R0, 42 (6 bytes: opcode + reg + value_32bit)
-            Opcode.halt.rawValue           // Halt (1 byte)
-        ]
+        let code = InstructionBuilder()
+            .loadImm(destReg: 0, value: 42)
+            .halt()
+            .build()
 
         let blob = buildBlob(from: code)
         let exitReason = try await executeJIT(blob: blob)
@@ -91,11 +287,11 @@ struct JITIntegrationTests {
     @Test func testJITLoadImmAdd() async throws {
         // Program: LoadImm 42, Add R0+R0, Halt
         // Expected: R0 = 84
-        let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 42, 0, 0, 0,  // LoadImm R0, 42 (6 bytes)
-            Opcode.add32.rawValue, 0, 0,               // Add32 R0, R0, R0 (3 bytes)
-            Opcode.halt.rawValue                       // Halt (1 byte)
-        ]
+        let code = InstructionBuilder()
+            .loadImm(destReg: 0, value: 42)
+            .add32(destReg: 0, srcReg: 0)
+            .halt()
+            .build()
 
         let blob = buildBlob(from: code)
         let exitReason = try await executeJIT(blob: blob)
@@ -105,12 +301,12 @@ struct JITIntegrationTests {
 
     @Test func testJITLoadImmMultiple() async throws {
         // Program: LoadImm multiple registers
-        let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 10, 0, 0, 0,  // LoadImm R0, 10 (6 bytes)
-            Opcode.loadImm.rawValue, 1, 20, 0, 0, 0,  // LoadImm R1, 20 (6 bytes)
-            Opcode.loadImm.rawValue, 2, 30, 0, 0, 0,  // LoadImm R2, 30 (6 bytes)
-            Opcode.halt.rawValue                       // Halt (1 byte)
-        ]
+        let code = InstructionBuilder()
+            .loadImm(destReg: 0, value: 10)
+            .loadImm(destReg: 1, value: 20)
+            .loadImm(destReg: 2, value: 30)
+            .halt()
+            .build()
 
         let blob = buildBlob(from: code)
         let exitReason = try await executeJIT(blob: blob)
@@ -124,11 +320,11 @@ struct JITIntegrationTests {
         // [0-4]:   Jump instruction (5 bytes: opcode + offset)
         // [5-10]:  LoadImm (6 bytes) - should be skipped
         // [11]:    Halt (1 byte) - jump target
-        let code: [UInt8] = [
-            Opcode.jump.rawValue, 6, 0, 0, 0,   // Jump forward 6 bytes (skip LoadImm)
-            Opcode.loadImm.rawValue, 0, 99, 0, 0, 0,  // LoadImm R0, 99 (6 bytes, should not execute)
-            Opcode.halt.rawValue                       // Halt (1 byte, jump target)
-        ]
+        let code = InstructionBuilder()
+            .jump(offset: 6)
+            .loadImm(destReg: 0, value: 99)
+            .halt()
+            .build()
 
         let blob = buildBlob(from: code)
         let exitReason = try await executeJIT(blob: blob)
@@ -139,12 +335,12 @@ struct JITIntegrationTests {
     @Test func testJITDivision() async throws {
         // Program: DivU32 100 / 5 = 20
         // DivU32 does: dest_reg = dest_reg / src_reg
-        let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 2, 100, 0, 0, 0,  // LoadImm R2, 100 (6 bytes) - dividend
-            Opcode.loadImm.rawValue, 0, 5, 0, 0, 0,    // LoadImm R0, 5 (6 bytes) - divisor
-            Opcode.divU32.rawValue, 2, 0,              // DivU32 R2, R0 -> R2 = R2 / R0 = 20 (3 bytes)
-            Opcode.halt.rawValue                       // Halt (1 byte)
-        ]
+        let code = InstructionBuilder()
+            .loadImm(destReg: 2, value: 100)
+            .loadImm(destReg: 0, value: 5)
+            .divU32(destReg: 2, srcReg: 0)
+            .halt()
+            .build()
 
         let blob = buildBlob(from: code)
         let exitReason = try await executeJIT(blob: blob)
@@ -152,284 +348,341 @@ struct JITIntegrationTests {
         #expect(exitReason == .halt || exitReason == .panic(.trap))
     }
 
-    // MARK: - Memory Bounds Checking Tests
+// This file contains the refactored test methods that will replace the old ones
 
-    @Test func testJITLoadValidAddress() async throws {
-        // Program: Load from valid address (>= 65536)
-        // Setup: R0 = 100000 (valid address), LoadU8 R1, [R0], Halt
-        let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 160, 134, 1, 0,  // LoadImm R0, 100000 (6 bytes) - valid address
-            Opcode.loadU8.rawValue, 1, 0, 0, 0,          // LoadU8 R1, [R0 + offset 0] (6 bytes)
-            Opcode.halt.rawValue                           // Halt (1 byte)
-        ]
+// MARK: - Memory Bounds Checking Tests
 
-        let blob = buildBlob(from: code)
-        let exitReason = try await executeJIT(blob: blob)
+@Test func testJITLoadValidAddress() async throws {
+    // Program: Load from valid address (>= 65536)
+    // Setup: R0 = 100000 (valid address), LoadU8 R1, [R0], Halt
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 100000)
+        .loadU8(destReg: 1, baseReg: 0, offset: 0)
+        .halt()
+        .build()
 
-        // Should halt successfully (memory access is within bounds for UInt32.max)
-        #expect(exitReason == .halt || exitReason == .panic(.trap))
-    }
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
 
-    @Test func testJITLoadPanicAddress() async throws {
-        // Program: Load from address < 65536 → should panic
-        // Setup: R0 = 1000 (panic address), LoadU8 R1, [R0], Halt
-        let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 232, 3, 0, 0,    // LoadImm R0, 1000 (6 bytes) - < 65536
-            Opcode.loadU8.rawValue, 1, 0, 0, 0,          // LoadU8 R1, [R0 + offset 0] (6 bytes)
-            Opcode.halt.rawValue                           // Halt (1 byte)
-        ]
+    // Should halt successfully (memory access is within bounds for UInt32.max)
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
 
-        let blob = buildBlob(from: code)
-        let exitReason = try await executeJIT(blob: blob)
+@Test func testJITLoadPanicAddress() async throws {
+    // Program: Load from address < 65536 → should panic
+    // Setup: R0 = 1000 (panic address), LoadU8 R1, [R0], Halt
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 1000)
+        .loadU8(destReg: 1, baseReg: 0, offset: 0)
+        .halt()
+        .build()
 
-        // Should panic (address < 65536)
-        #expect(exitReason == .panic(.trap))
-    }
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
 
-    @Test func testJITStoreValidAddress() async throws {
-        // Program: Store to valid address (>= 65536)
-        // Setup: R0 = 100000 (valid address), R1 = 42, StoreU8 [R0], R1, Halt
-        let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 160, 134, 1, 0,  // LoadImm R0, 100000 (6 bytes) - valid address
-            Opcode.loadImm.rawValue, 1, 42, 0, 0, 0,     // LoadImm R1, 42 (6 bytes)
-            Opcode.storeU8.rawValue, 0, 1, 0, 0,         // StoreU8 [R0 + offset 0], R1 (6 bytes)
-            Opcode.halt.rawValue                           // Halt (1 byte)
-        ]
+    // Should panic (address < 65536)
+    #expect(exitReason == .panic(.trap))
+}
 
-        let blob = buildBlob(from: code)
-        let exitReason = try await executeJIT(blob: blob)
+@Test func testJITStoreValidAddress() async throws {
+    // Program: Store to valid address (>= 65536)
+    // Setup: R0 = 100000 (valid address), R1 = 42, StoreU8 [R0], R1, Halt
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 100000)
+        .loadImm(destReg: 1, value: 42)
+        .storeU8(baseReg: 0, srcReg: 1, offset: 0)
+        .halt()
+        .build()
 
-        // Should halt successfully (memory access is within bounds for UInt32.max)
-        #expect(exitReason == .halt || exitReason == .panic(.trap))
-    }
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
 
-    @Test func testJITStorePanicAddress() async throws {
-        // Program: Store to address < 65536 → should panic
-        // Setup: R0 = 1000 (panic address), R1 = 42, StoreU8 [R0], R1, Halt
-        let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 232, 3, 0, 0,    // LoadImm R0, 1000 (6 bytes) - < 65536
-            Opcode.loadImm.rawValue, 1, 42, 0, 0, 0,     // LoadImm R1, 42 (6 bytes)
-            Opcode.storeU8.rawValue, 0, 1, 0, 0,         // StoreU8 [R0 + offset 0], R1 (6 bytes)
-            Opcode.halt.rawValue                           // Halt (1 byte)
-        ]
+    // Should halt successfully (memory access is within bounds for UInt32.max)
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
 
-        let blob = buildBlob(from: code)
-        let exitReason = try await executeJIT(blob: blob)
+@Test func testJITStorePanicAddress() async throws {
+    // Program: Store to address < 65536 → should panic
+    // Setup: R0 = 1000 (panic address), R1 = 42, StoreU8 [R0], R1, Halt
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 1000)
+        .loadImm(destReg: 1, value: 42)
+        .storeU8(baseReg: 0, srcReg: 1, offset: 0)
+        .halt()
+        .build()
 
-        // Should panic (address < 65536)
-        #expect(exitReason == .panic(.trap))
-    }
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
 
-    // MARK: - StoreImm Instruction Tests
+    // Should panic (address < 65536)
+    #expect(exitReason == .panic(.trap))
+}
 
-    @Test func testJITStoreImmU8() async throws {
-        // Program: StoreImmU8 42 to address 100000, then Halt
-        let code: [UInt8] = [
-            Opcode.storeImmU8.rawValue, 42, 160, 134, 1, 0,  // StoreImmU8 42, address=100000 (6 bytes)
-            Opcode.halt.rawValue                                  // Halt (1 byte)
-        ]
+// MARK: - StoreImm Instruction Tests
 
-        let blob = buildBlob(from: code)
-        let exitReason = try await executeJIT(blob: blob)
+@Test func testJITStoreImmU8() async throws {
+    // Program: StoreImmU8 42 to address 100000, then Halt
+    let code = InstructionBuilder()
+        .storeImmU8(value: 42, address: 100000)
+        .halt()
+        .build()
 
-        // Should halt successfully
-        #expect(exitReason == .halt || exitReason == .panic(.trap))
-    }
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
 
-    @Test func testJITStoreImmU8PanicAddress() async throws {
-        // Program: StoreImmU8 42 to address < 65536 → should panic
-        let code: [UInt8] = [
-            Opcode.storeImmU8.rawValue, 42, 100, 0, 0, 0,     // StoreImmU8 42, address=100 (6 bytes) - < 65536
-            Opcode.halt.rawValue                                  // Halt (1 byte)
-        ]
+    // Should halt successfully
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
 
-        let blob = buildBlob(from: code)
-        let exitReason = try await executeJIT(blob: blob)
+@Test func testJITStoreImmU8PanicAddress() async throws {
+    // Program: StoreImmU8 42 to address < 65536 → should panic
+    let code = InstructionBuilder()
+        .storeImmU8(value: 42, address: 100)
+        .halt()
+        .build()
 
-        // Should panic (address < 65536)
-        #expect(exitReason == .panic(.trap))
-    }
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
 
-    @Test func testJITStoreImmU32() async throws {
-        // Program: StoreImmU32 0xDEADBEEF to address 100000, then Halt
-        // 100000 in hex = 0x000186A0, bytes: [0xA0, 0x86, 0x01, 0x00]
-        let code: [UInt8] = [
-            Opcode.storeImmU32.rawValue, 0xEF, 0xBE, 0xAD, 0xDE, 160, 134, 1, 0,  // StoreImmU32 0xDEADBEEF, address=100000 (9 bytes)
-            Opcode.halt.rawValue                                                        // Halt (1 byte)
-        ]
+    // Should panic (address < 65536)
+    #expect(exitReason == .panic(.trap))
+}
 
-        let blob = buildBlob(from: code)
-        let exitReason = try await executeJIT(blob: blob)
+@Test func testJITStoreImmU32() async throws {
+    // Program: StoreImmU32 0xDEADBEEF to address 100000, then Halt
+    let code = InstructionBuilder()
+        .storeImmU32(value: 0xDEADBEEF, address: 100000)
+        .halt()
+        .build()
 
-        // Should halt successfully
-        #expect(exitReason == .halt || exitReason == .panic(.trap))
-    }
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
 
-    @Test func testJITStoreImmU64() async throws {
-        // Program: StoreImmU64 0x123456789ABCDEF0 to address 100000, then Halt
-        // 100000 in hex = 0x000186A0, bytes: [0xA0, 0x86, 0x01, 0x00]
-        let code: [UInt8] = [
-            Opcode.storeImmU64.rawValue, 0xF0, 0xDE, 0xBC, 0x9A, 0x78, 0x56, 0x34, 0x12, 160, 134, 1, 0,  // StoreImmU64, address=100000 (13 bytes)
-            Opcode.halt.rawValue                                                                            // Halt (1 byte)
-        ]
+    // Should halt successfully
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
 
-        let blob = buildBlob(from: code)
-        let exitReason = try await executeJIT(blob: blob)
+@Test func testJITStoreImmU64() async throws {
+    // Program: StoreImmU64 0x123456789ABCDEF0 to address 100000, then Halt
+    let code = InstructionBuilder()
+        .storeImmU64(value: 0x123456789ABCDEF0, address: 100000)
+        .halt()
+        .build()
 
-        // Should halt successfully
-        #expect(exitReason == .halt || exitReason == .panic(.trap))
-    }
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
 
-    // MARK: - Negative Offset Tests
+    // Should halt successfully
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
 
-    @Test func testJITLoadWithNegativeOffset() async throws {
-        // Program: Load from base address 100000 with offset -4
-        // Setup: R0 = 100000, LoadU8 R1, [R0 - 4], Halt
-        let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 160, 134, 1, 0,  // LoadImm R0, 100000 (6 bytes)
-            Opcode.loadU8.rawValue, 1, 0, 252, 255,       // LoadU8 R1, [R0 - 4] (6 bytes, offset=-4 as 0xFFFC)
-            Opcode.halt.rawValue                           // Halt (1 byte)
-        ]
+// MARK: - Negative Offset Tests
 
-        let blob = buildBlob(from: code)
-        let exitReason = try await executeJIT(blob: blob)
+@Test func testJITLoadWithNegativeOffset() async throws {
+    // Program: Load from base address 100000 with offset -4
+    // Setup: R0 = 100000, LoadU8 R1, [R0 - 4], Halt
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 100000)
+        .loadU8(destReg: 1, baseReg: 0, offset: 0xFFFC)  // -4 as unsigned
+        .halt()
+        .build()
 
-        // Should halt successfully (100000 - 4 = 99996, still >= 65536)
-        #expect(exitReason == .halt || exitReason == .panic(.trap))
-    }
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
 
-    @Test func testJITStoreWithNegativeOffset() async throws {
-        // Program: Store to base address 100000 with offset -8
-        // Setup: R0 = 100000, R1 = 99, StoreU8 [R0 - 8], R1, Halt
-        let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 160, 134, 1, 0,  // LoadImm R0, 100000 (6 bytes)
-            Opcode.loadImm.rawValue, 1, 99, 0, 0, 0,     // LoadImm R1, 99 (6 bytes)
-            Opcode.storeU8.rawValue, 0, 1, 248, 255,      // StoreU8 [R0 - 8], R1 (6 bytes, offset=-8 as 0xFFF8)
-            Opcode.halt.rawValue                           // Halt (1 byte)
-        ]
+    // Should halt successfully (100000 - 4 = 99996, still >= 65536)
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
 
-        let blob = buildBlob(from: code)
-        let exitReason = try await executeJIT(blob: blob)
+@Test func testJITStoreWithNegativeOffset() async throws {
+    // Program: Store to base address 100000 with offset -8
+    // Setup: R0 = 100000, R1 = 99, StoreU8 [R0 - 8], R1, Halt
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 100000)
+        .loadImm(destReg: 1, value: 99)
+        .storeU8(baseReg: 0, srcReg: 1, offset: 0xFFF8)  // -8 as unsigned
+        .halt()
+        .build()
 
-        // Should halt successfully (100000 - 8 = 99992, still >= 65536)
-        #expect(exitReason == .halt || exitReason == .panic(.trap))
-    }
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
 
-    @Test func testJITStoreImmPageFault() async throws {
-        // Program: StoreImmU8 42 to address beyond memory size
-        // With default config: 16 heap + 16 stack pages = 32 pages * 4096 bytes = 131072 bytes
-        // Address 132000 should trigger page fault
-        // 132000 in hex = 0x000203A0, bytes: [0xA0, 0x03, 0x02, 0x00]
-        let code: [UInt8] = [
-            Opcode.storeImmU8.rawValue, 42, 160, 3, 2, 0,  // StoreImmU8 42, address=132000 (beyond 131072)
-            Opcode.halt.rawValue
-        ]
+    // Should halt successfully (100000 - 8 = 99992, still >= 65536)
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
 
-        let blob = buildBlob(from: code)
-        let exitReason = try await executeJIT(blob: blob)
+@Test func testJITStoreImmPageFault() async throws {
+    // Program: StoreImmU8 42 to address beyond memory size
+    // With default config: 16 heap + 16 stack pages = 32 pages * 4096 bytes = 131072 bytes
+    // Address 132000 should trigger page fault
+    let code = InstructionBuilder()
+        .storeImmU8(value: 42, address: 132000)
+        .halt()
+        .build()
 
-        // Should page fault (address >= memory_size)
-        #expect(exitReason == .pageFault(132000))
-    }
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
 
-    // TODO: Add tests for conditional branches, loops
+    // Should page fault (address >= memory_size)
+    #expect(exitReason == .pageFault(132000))
+}
 
-    // MARK: - Arithmetic Instructions (Dispatcher)
+// TODO: Add tests for conditional branches, loops
 
-    @Test func testJITSubtract() async throws {
-        // Program: LoadImm 100, LoadImm 30, Sub R0-R1, Halt
-        // Expected: R0 = 70
-        let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 100, 0, 0, 0,  // LoadImm R0, 100
-            Opcode.loadImm.rawValue, 1, 30, 0, 0, 0,   // LoadImm R1, 30
-            Opcode.sub32.rawValue, 0, 1,               // Sub32 R0, R1
-            Opcode.halt.rawValue
-        ]
+// MARK: - Arithmetic Instructions (Dispatcher)
 
-        let blob = buildBlob(from: code)
-        let exitReason = try await executeJIT(blob: blob)
+@Test func testJITSubtract() async throws {
+    // Program: LoadImm 100, LoadImm 30, Sub R0-R1, Halt
+    // Expected: R0 = 70
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 100)
+        .loadImm(destReg: 1, value: 30)
+        .sub32(destReg: 0, srcReg: 1)
+        .halt()
+        .build()
 
-        #expect(exitReason == .halt || exitReason == .panic(.trap))
-    }
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
 
-    @Test func testJITMultiply() async throws {
-        // Program: LoadImm 7, LoadImm 6, Mul R0*R1, Halt
-        // Expected: R0 = 42
-        let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 7, 0, 0, 0,   // LoadImm R0, 7
-            Opcode.loadImm.rawValue, 1, 6, 0, 0, 0,   // LoadImm R1, 6
-            Opcode.mul32.rawValue, 0, 1,               // Mul32 R0, R1
-            Opcode.halt.rawValue
-        ]
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
 
-        let blob = buildBlob(from: code)
-        let exitReason = try await executeJIT(blob: blob)
+@Test func testJITMultiply() async throws {
+    // Program: LoadImm 7, LoadImm 6, Mul R0*R1, Halt
+    // Expected: R0 = 42
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 7)
+        .loadImm(destReg: 1, value: 6)
+        .mul32(destReg: 0, srcReg: 1)
+        .halt()
+        .build()
 
-        #expect(exitReason == .halt || exitReason == .panic(.trap))
-    }
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
 
-    @Test func testJIT64BitArithmetic() async throws {
-        // Program: LoadImmU64 large numbers, Add64, Sub64, Halt
-        let code: [UInt8] = [
-            Opcode.loadImmU64.rawValue, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0,  // LoadImmU64 R0, 0xFFFFFFFFFF
-            Opcode.loadImmU64.rawValue, 1, 0x01, 0, 0, 0, 0, 0, 0, 0,        // LoadImmU64 R1, 1
-            Opcode.add64.rawValue, 0, 1,                                    // Add64 R0, R1
-            Opcode.halt.rawValue
-        ]
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
 
-        let blob = buildBlob(from: code)
-        let exitReason = try await executeJIT(blob: blob)
+@Test func testJIT64BitArithmetic() async throws {
+    // Program: LoadImmU64 large numbers, Add64, Sub64, Halt
+    let code = InstructionBuilder()
+        .loadImmU64(destReg: 0, value: 0xFFFFFFFFFF)
+        .loadImmU64(destReg: 1, value: 1)
+        .add64(destReg: 0, srcReg: 1)
+        .halt()
+        .build()
 
-        #expect(exitReason == .halt || exitReason == .panic(.trap))
-    }
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
 
-    // MARK: - Bitwise Instructions (Dispatcher)
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
 
-    @Test func testJITBitwiseAnd() async throws {
-        // Program: LoadImm 0xFF (255), LoadImm 0x0F (15), And, Halt
-        // Expected: R0 = 15
-        let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 255, 0, 0, 0,  // LoadImm R0, 255
-            Opcode.loadImm.rawValue, 1, 15, 0, 0, 0,   // LoadImm R1, 15
-            Opcode.and.rawValue, 0, 1,                // And R0, R1
-            Opcode.halt.rawValue
-        ]
+// MARK: - Bitwise Instructions (Dispatcher)
 
-        let blob = buildBlob(from: code)
-        let exitReason = try await executeJIT(blob: blob)
+@Test func testJITBitwiseAnd() async throws {
+    // Program: LoadImm 0xFF (255), LoadImm 0x0F (15), And, Halt
+    // Expected: R0 = 15
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 255)
+        .loadImm(destReg: 1, value: 15)
+        .and(destReg: 0, srcReg: 1)
+        .halt()
+        .build()
 
-        #expect(exitReason == .halt || exitReason == .panic(.trap))
-    }
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
 
-    @Test func testJITBitwiseOr() async throws {
-        // Program: LoadImm 0xF0 (240), LoadImm 0x0F (15), Or, Halt
-        // Expected: R0 = 255
-        let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 240, 0, 0, 0,  // LoadImm R0, 240
-            Opcode.loadImm.rawValue, 1, 15, 0, 0, 0,   // LoadImm R1, 15
-            Opcode.or.rawValue, 0, 1,                 // Or R0, R1
-            Opcode.halt.rawValue
-        ]
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
 
-        let blob = buildBlob(from: code)
-        let exitReason = try await executeJIT(blob: blob)
+@Test func testJITBitwiseOr() async throws {
+    // Program: LoadImm 0xF0 (240), LoadImm 0x0F (15), Or, Halt
+    // Expected: R0 = 255
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 240)
+        .loadImm(destReg: 1, value: 15)
+        .or(destReg: 0, srcReg: 1)
+        .halt()
+        .build()
 
-        #expect(exitReason == .halt || exitReason == .panic(.trap))
-    }
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
 
-    @Test func testJITBitwiseXor() async throws {
-        // Program: LoadImm 0xFF (255), LoadImm 0xFF (255), Xor, Halt
-        // Expected: R0 = 0
-        let code: [UInt8] = [
-            Opcode.loadImm.rawValue, 0, 255, 0, 0, 0,  // LoadImm R0, 255
-            Opcode.loadImm.rawValue, 1, 255, 0, 0, 0,  // LoadImm R1, 255
-            Opcode.xor.rawValue, 0, 1,                // Xor R0, R1
-            Opcode.halt.rawValue
-        ]
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
 
-        let blob = buildBlob(from: code)
-        let exitReason = try await executeJIT(blob: blob)
+@Test func testJITBitwiseXor() async throws {
+    // Program: LoadImm 0xFF (255), LoadImm 0xFF (255), Xor, Halt
+    // Expected: R0 = 0
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 255)
+        .loadImm(destReg: 1, value: 255)
+        .xor(destReg: 0, srcReg: 1)
+        .halt()
+        .build()
 
-        #expect(exitReason == .halt || exitReason == .panic(.trap))
-    }
+    let blob = buildBlob(from: code)
+    let exitReason = try await executeJIT(blob: blob)
+
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
+
+// MARK: - Gas Accounting Tests
+
+@Test func testJITGasExhaustion() async throws {
+    // Program: Execute with limited gas (3 instructions, but only 2 gas available)
+    // LoadImm R0, 42 (1 gas) + LoadImm R1, 10 (1 gas) + Halt (1 gas) = 3 gas needed
+    // But we only provide 2 gas, so should run out of gas
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 42)
+        .loadImm(destReg: 1, value: 10)
+        .halt()
+        .build()
+
+    let blob = buildBlob(from: code)
+
+    // Execute with only 2 gas (should exhaust after 2 instructions)
+    let config = DefaultPvmConfig()
+    let executor = ExecutorBackendJIT()
+    let exitReason = await executor.execute(
+        config: config,
+        blob: blob,
+        pc: 0,
+        gas: Gas(2),  // Only 2 gas available
+        argumentData: nil,
+        ctx: nil
+    )
+
+    // Should exit with outOfGas
+    #expect(exitReason == .outOfGas)
+}
+
+@Test func testJITGasSufficient() async throws {
+    // Program: Execute with sufficient gas
+    // LoadImm R0, 42 (1 gas) + LoadImm R1, 10 (1 gas) + Halt (1 gas) = 3 gas needed
+    let code = InstructionBuilder()
+        .loadImm(destReg: 0, value: 42)
+        .loadImm(destReg: 1, value: 10)
+        .halt()
+        .build()
+
+    let blob = buildBlob(from: code)
+
+    // Execute with 10 gas (more than enough)
+    let config = DefaultPvmConfig()
+    let executor = ExecutorBackendJIT()
+    let exitReason = await executor.execute(
+        config: config,
+        blob: blob,
+        pc: 0,
+        gas: Gas(10),  // Plenty of gas
+        argumentData: nil,
+        ctx: nil
+    )
+
+    // Should halt successfully
+    #expect(exitReason == .halt || exitReason == .panic(.trap))
+}
+
 }

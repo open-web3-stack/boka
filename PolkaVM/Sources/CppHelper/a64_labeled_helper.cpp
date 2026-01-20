@@ -99,6 +99,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     Label exitLabel = a.newLabel();       // Normal exit (halt) - w0 = 0
     Label panicLabel = a.newLabel();      // Panic exit (trap, address < 65536) - w0 = -1
     Label pagefaultLabel = a.newLabel();  // Page fault exit (address >= memory_size) - w0 = 3
+    Label outOfGasLabel = a.newLabel();   // Out of gas exit - w0 = 1
     Label epilogueLabel = a.newLabel();   // Epilogue (restore registers and return)
 
     // === PRE-PASS: Identify all jump targets ===
@@ -135,6 +136,23 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     // === MAIN COMPILATION PASS ===
     pc = 0;
 
+    // === GAS ACCOUNTING HELPER ===
+    // Lambda to deduct gas and check for exhaustion
+    auto deductGas = [&](uint64_t gasCost) -> void {
+        // Load current gas value from x22 (VM_GAS_PTR)
+        a.ldr(a64::x0, a64::ptr(a64::x22));
+        // Subtract gas cost
+        a.sub(x0, x0, gasCost);
+        // Store updated value back
+        a.str(x0, a64::ptr(a64::x22));
+        // Check if gas < 0 (signed comparison)
+        // For signed comparison, we need to check the sign bit
+        // Since we're using 64-bit gas, negative values have the sign bit set
+        a.cmp(x0, 0);
+        // Branch to outOfGasLabel if negative (signed less than)
+        a.b_lt(outOfGasLabel);
+    };
+
     while (pc < codeSize) {
         uint8_t opcode = codeBuffer[pc];
         uint32_t instrSize = getInstructionSize(codeBuffer, pc, codeSize);
@@ -149,6 +167,11 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         if (labelManager.isMarkedTarget(pc) || labelManager.isJumpTarget(pc)) {
             labelManager.bindLabel(&a, pc, "aarch64");
         }
+
+        // === GAS ACCOUNTING ===
+        // Deduct 1 gas for this instruction (default gas cost per PVM spec)
+        // Check AFTER binding labels so jump targets don't double-deduct
+        deductGas(1);
 
         // Handle control flow instructions with labels
         if (opcode_is(opcode, Opcode::Jump)) {
@@ -481,6 +504,11 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     a.bind(pagefaultLabel);
     a.str(a64::x0, a64::ptr(a64::x19, 0));  // Save faulting address to VM R0
     a.mov(a64::w0, 3);   // Exit code 3 = pageFault
+    a.b(epilogueLabel);
+
+    // Bind out-of-gas label
+    a.bind(outOfGasLabel);
+    a.mov(a64::w0, 1);   // Exit code 1 = outOfGas
     a.b(epilogueLabel);
 
     // Bind exit label

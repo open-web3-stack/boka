@@ -96,6 +96,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     Label exitLabel = a.newLabel();       // Normal exit (halt) - eax = 0
     Label panicLabel = a.newLabel();      // Panic exit (trap, address < 65536) - eax = -1
     Label pagefaultLabel = a.newLabel();  // Page fault exit (address >= memory_size) - eax = 3
+    Label outOfGasLabel = a.newLabel();   // Out of gas exit - eax = 1
     Label epilogueLabel = a.newLabel();   // Epilogue (restore registers and return)
 
     // === PRE-PASS: Identify all jump targets ===
@@ -129,6 +130,22 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         pc += instrSize;
     }
 
+    // === GAS ACCOUNTING HELPER ===
+    // Lambda to deduct gas and check for exhaustion
+    // Returns true if gas was deducted successfully, false if out of gas
+    auto deductGas = [&](uint64_t gasCost) -> void {
+        // Load current gas value from r14 (VM_GAS_PTR)
+        a.mov(x86::rax, x86::qword_ptr(x86::r14));
+        // Subtract gas cost
+        a.sub(x86::rax, gasCost);
+        // Store updated value back
+        a.mov(x86::qword_ptr(x86::r14), x86::rax);
+        // Check if gas < 0 (signed comparison)
+        a.cmp(x86::rax, 0);
+        // Jump to outOfGasLabel if negative (signed less than)
+        a.js(outOfGasLabel);
+    };
+
     // === MAIN COMPILATION PASS ===
     pc = 0;
     std::vector<uint32_t> compiledPCs;
@@ -147,6 +164,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         if (labelManager.isMarkedTarget(pc) || labelManager.isJumpTarget(pc)) {
             labelManager.bindLabel(&a, pc, "x86_64");
         }
+
+        // === GAS ACCOUNTING ===
+        // Deduct 1 gas for this instruction (default gas cost per PVM spec)
+        // Check AFTER binding labels so jump targets don't double-deduct
+        deductGas(1);
 
         // Handle control flow instructions with labels
         if (opcode_is(opcode, Opcode::Jump)) {
@@ -475,6 +497,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     a.bind(pagefaultLabel);
     a.mov(x86::qword_ptr(x86::rbx, 0), x86::rax);  // Save faulting address to VM R0
     a.mov(x86::eax, 3);   // Exit code 3 = pageFault
+    a.jmp(epilogueLabel);
+
+    // Bind out-of-gas label
+    a.bind(outOfGasLabel);
+    a.mov(x86::eax, 1);   // Exit code 1 = outOfGas
     a.jmp(epilogueLabel);
 
     // Bind exit label
