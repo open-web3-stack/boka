@@ -71,7 +71,8 @@ bool compile_bytecode_range(
 }
 
 // Get the size of an instruction in bytes
-// This is a simplified decoder that extracts size information for block boundary detection
+// This matches ONLY the opcodes actually implemented in instruction_dispatcher.cpp
+// For unimplemented opcodes, returns 0 to signal an error
 uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytecode_size) {
     if (pc >= bytecode_size) {
         return 0;
@@ -79,8 +80,9 @@ uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytec
 
     uint8_t opcode = bytecode[pc];
 
-    // Instruction size lookup table (extracted from instruction_dispatcher.cpp decode functions)
-    // For unknown opcodes, default to 1 byte to avoid infinite loops
+    // Instruction size lookup table - MUST match instruction_dispatcher.cpp exactly
+    // Only includes opcodes that are actually implemented in the dispatcher's switch statement
+    // Sizes are extracted from the decode functions in instruction_dispatcher.cpp
     switch (opcode) {
         // 1-byte instructions
         case 0:  // Trap
@@ -91,20 +93,14 @@ uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytec
         case 20:
             return 10;
 
-        // StoreImmU8: [opcode][value_8bit][address_32bit] = 6 bytes
-        case 30:
+        // StoreImmU8/U16/U32/U64
+        case 30:  // StoreImmU8: [opcode][value_8bit][address_32bit] = 6 bytes
             return 6;
-
-        // StoreImmU16: [opcode][value_16bit][address_32bit] = 7 bytes
-        case 31:
+        case 31:  // StoreImmU16: [opcode][value_16bit][address_32bit] = 7 bytes
             return 7;
-
-        // StoreImmU32: [opcode][value_32bit][address_32bit] = 9 bytes
-        case 32:
+        case 32:  // StoreImmU32: [opcode][value_32bit][address_32bit] = 9 bytes
             return 9;
-
-        // StoreImmU64: [opcode][value_64bit][address_32bit] = 13 bytes
-        case 33:
+        case 33:  // StoreImmU64: [opcode][value_64bit][address_32bit] = 13 bytes
             return 13;
 
         // Jump: [opcode][offset_32bit] = 5 bytes
@@ -119,7 +115,7 @@ uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytec
         case 51:
             return 6;
 
-        // Load U8/I8/U16/I16/U32/I32/U64: [opcode][reg_index][address_32bit] = 6 bytes
+        // Load instructions: [opcode][reg_index][address_32bit] = 6 bytes
         case 52:  // LoadU8
         case 53:  // LoadI8
         case 54:  // LoadU16
@@ -129,195 +125,41 @@ uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytec
         case 58:  // LoadU64
             return 6;
 
-        // Store U8/U16/U32/U64: [opcode][reg_index][address_32bit] = 6 bytes
+        // Store instructions: [opcode][reg_index][address_32bit] = 6 bytes
         case 59:  // StoreU8
         case 60:  // StoreU16
         case 61:  // StoreU32
         case 62:  // StoreU64
             return 6;
 
-        // Add/Sub/And/Or/Xor/Sar/Shl/Shr 32-bit: [opcode][dest_reg][src_reg] = 3 bytes
-        case 64:  // Add32
-        case 65:  // Sub32
-        case 66:  // And32
-        case 67:  // Or32
-        case 68:  // Xor32
-        case 69:  // Sar32
-        case 70:  // Shl32
-        case 71:  // Shr32
-            return 3;
-
-        // Add/Sub/And/Or/Xor/Sar/Shl/Shr 64-bit: [opcode][dest_reg][src_reg] = 3 bytes
-        case 72:  // Add64
-        case 73:  // Sub64
-        case 74:  // And64
-        case 75:  // Or64
-        case 76:  // Xor64
-        case 77:  // Sar64
-        case 78:  // Shl64
-        case 79:  // Shr64
-            return 3;
-
         // Branch instructions: [opcode][reg_index1][reg_index2][offset_32bit] = 9 bytes
-        case 80:  // Eq
-        case 81:  // Ne
-        case 82:  // Lt
-        case 83:  // Le
-        case 84:  // Gt
-        case 85:  // Ge
-        case 86:  // EqU
-        case 87:  // NeU
-        case 88:  // LtU
-        case 89:  // LeU
-        case 90:  // GtU
+        case 170:  // BranchEq
+        case 171:  // BranchNe
             return 9;
 
-        // Mul32/Mul64: [opcode][dest_reg][src_reg] = 3 bytes
-        case 91:
-        case 92:
+        // 32-bit arithmetic: [opcode][dest_reg][src_reg] = 3 bytes
+        case 190: // Add32
+        case 191: // Sub32
+        case 192: // Mul32
+        case 193: // DivU32
+        case 194: // DivS32
+        case 195: // RemU32
+        case 196: // RemS32
             return 3;
 
-        // DivU32/DivU64: [opcode][dest_reg][src_reg] = 3 bytes
-        case 93:
-        case 94:
+        // 64-bit arithmetic: [opcode][dest_reg][src_reg] = 3 bytes
+        case 200: // Add64
+        case 201: // Sub64
+        case 202: // Mul64
             return 3;
 
-        // RemU32/RemU64: [opcode][dest_reg][src_reg] = 3 bytes
-        case 95:
-        case 96:
+        // Bitwise operations: [opcode][dest_reg][src_reg] = 3 bytes
+        case 210: // And
+        case 211: // Xor
+        case 212: // Or
             return 3;
 
-        // LoadImmJump: [opcode][dest_reg][immediate_32bit][target_32bit] = 10 bytes
-        case 6:
-            return 10;
-
-        // LoadImmJumpInd: [opcode][dest_reg][immediate_32bit][jump_reg] = 7 bytes
-        case 7:
-            return 7;
-
-        // Extend instructions: [opcode][dest_reg][src_reg] = 3 bytes
-        case 100: // Clz32
-        case 101: // Clz64
-        case 102: // Ctz32
-        case 103: // Ctz64
-        case 104: // Popcnt32
-        case 105: // Popcnt64
-        case 106: // Abs32
-        case 107: // Abs64
-        case 108: // Neg32
-        case 109: // Neg64
-            return 3;
-
-        // Extend ops: [opcode][dest_reg][src_reg] = 3 bytes
-        case 110: // ExtendU8
-        case 111: // ExtendU16
-        case 112: // ExtendU32
-        case 113: // ExtendI8
-        case 114: // ExtendI16
-        case 115: // ExtendI32
-        case 116: // ExtendU8_64
-        case 117: // ExtendU16_64
-        case 118: // ExtendU32_64
-        case 119: // ExtendI8_64
-        case 120: // ExtendI16_64
-        case 121: // ExtendI32_64
-            return 3;
-
-        // Float operations: [opcode][dest_reg][src_reg] = 3 bytes
-        case 122: // FAdd32
-        case 123: // FSub32
-        case 124: // FMul32
-        case 125: // FDiv32
-        case 126: // FMin32
-        case 127: // FMax32
-        case 128: // FAdd64
-        case 129: // FSub64
-        case 130: // FMul64
-        case 131: // FDiv64
-        case 132: // FMin64
-        case 133: // FMax64
-            return 3;
-
-        // Float comparisons: [opcode][dest_reg][src_reg] = 3 bytes
-        case 134: // FEq32
-        case 135: // FNe32
-        case 136: // FLt32
-        case 137: // FLe32
-        case 138: // FGt32
-        case 139: // FGe32
-        case 140: // FEq64
-        case 141: // FNe64
-        case 142: // FLt64
-        case 143: // FLe64
-        case 144: // FGt64
-        case 145: // FGe64
-            return 3;
-
-        // Float conversions: [opcode][dest_reg][src_reg] = 3 bytes
-        case 146: // FToI32
-        case 147: // FToI64
-        case 148: // FToU32
-        case 149: // FToU64
-        case 150: // IToF32
-        case 151: // IToF64
-        case 152: // UToF32
-        case 153: // UToF64
-            return 3;
-
-        // Ecalli: [opcode][func_index_32bit] = 5 bytes
-        case 3:
-            return 5;
-
-        // LoadImmI8/I16/I32/I64: [opcode][reg_index][value_Nbit] (varies)
-        case 10: // LoadImmI8: 1 + 1 + 1 = 3 bytes
-            return 3;
-        case 11: // LoadImmI16: 1 + 1 + 2 = 4 bytes
-            return 4;
-        case 12: // LoadImmI32: 1 + 1 + 4 = 6 bytes
-            return 6;
-        case 13: // LoadImmI64: 1 + 1 + 8 = 10 bytes
-            return 10;
-
-        // CopyToSPOP/CopyFromSPOP: [opcode][reg_index] = 2 bytes
-        case 14:
-        case 15:
-            return 2;
-
-        // Rotate operations: [opcode][dest_reg][src_reg] = 3 bytes
-        case 160: // Rol32
-        case 161: // Ror32
-        case 162: // Rol64
-        case 163: // Ror64
-            return 3;
-
-        // Byte swap: [opcode][dest_reg][src_reg] = 3 bytes
-        case 164: // Bswap32
-        case 165: // Bswap64
-            return 3;
-
-        // Float sqrt: [opcode][dest_reg][src_reg] = 3 bytes
-        case 166: // FSqrt32
-        case 167: // FSqrt64
-            return 3;
-
-        // Float ceil/floor/round/trunc: [opcode][dest_reg][src_reg] = 3 bytes
-        case 168: // FCeil32
-        case 169: // FCeil64
-        case 170: // FFloor32
-        case 171: // FFloor64
-        case 172: // FTrunc32
-        case 173: // FTrunc64
-        case 174: // FNearest32
-        case 175: // FNearest64
-            return 3;
-
-        // LoadImmI32U: [opcode][reg_index][value_32bit] = 6 bytes
-        case 16:
-            return 6;
-
-        // For any unknown opcode, return 0 to signal error
-        // This prevents instruction stream desynchronization that could occur
-        // if we incorrectly assume 1 byte for multi-byte instructions
+        // For unimplemented opcodes, return 0 to signal error
         default:
             return 0;
     }

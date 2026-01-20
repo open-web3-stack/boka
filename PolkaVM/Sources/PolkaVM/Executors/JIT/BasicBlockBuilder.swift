@@ -55,6 +55,14 @@ final class BasicBlockBuilder {
             // Get instruction length using C++ implementation
             let instructionLength = getInstructionLength(opcode: opcode, at: currentPC, in: program)
 
+            // Handle unknown opcodes - return 0 signals error
+            if instructionLength == 0 {
+                // Unknown opcode - stop parsing at this point
+                // This is safer than continuing with incorrect sizes
+                // logger.warning("Unknown opcode \(opcode) at PC \(currentPC), stopping block parsing")
+                break
+            }
+
             // Read instruction data
             let endPC = min(currentPC + instructionLength, program.code.count)
             let instructionData = Data(program.code[relative: currentPC ..< endPC])
@@ -101,30 +109,71 @@ final class BasicBlockBuilder {
     }
 
     /// Gets the length of an instruction in bytes
-    /// - Parameter opcode: The instruction opcode
-    /// - Returns: Instruction length in bytes
+    /// - Parameters:
+    ///   - opcode: The instruction opcode
+    ///   - pc: The program counter
+    ///   - program: The program code
+    /// - Returns: Instruction length in bytes, or 0 if unknown
     private func getInstructionLength(opcode: UInt8, at pc: Int, in program: ProgramCode) -> Int {
         // Simplified instruction length calculation
-        // TODO: Use proper instruction parsing from ProgramCode or C++ layer
+        // WARNING: This is a basic implementation with limited opcode support.
+        // It is NOT suitable for production use with arbitrary bytecode.
         //
-        // NOTE: This is a simplified implementation that may be incorrect for
-        // multi-byte instructions. For accurate size detection, use the C++
-        // get_instruction_size() function. This implementation is only suitable
-        // for basic testing and analysis of simple programs.
+        // CRITICAL LIMITATIONS:
+        // - Only handles a small subset of known opcodes
+        // - Returns 0 for unknown opcodes (signals error)
+        // - For accurate size detection, use the C++ get_instruction_size() function
+        //
+        // Known opcodes and their sizes:
+        // 0: Trap = 1 byte
+        // 1: Fallthrough = 1 byte
+        // 20: LoadImm64 = 10 bytes
+        // 30-33: StoreImm[U8/U16/U32/U64] = 6/7/9/13 bytes
+        // 40: Jump = 5 bytes (IMPORTANT: block-ending instruction)
+        // 50: JumpInd = 2 bytes
+        // 51: LoadImm = 6 bytes
+        // 52-58: Load[U8/I8/U16/I16/U32/I32/U64] = 6 bytes each
+        // 59-62: Store[U8/U16/U32/U64] = 6 bytes each
+        // 170-171: Branch[Eq/Ne] = 9 bytes each
+        // 190-196: 32-bit arithmetic = 3 bytes each
+        // 200-202: 64-bit arithmetic = 3 bytes each
+        // 210-212: And/Xor/Or = 3 bytes each
 
-        // Argless instructions (1 byte) - use hardcoded opcodes to avoid C++ access
-        // 0: Trap, 1: Fallthrough
-        let argless: Set<UInt8> = [0, 1]
-
-        // Immediate instructions (variable length)
-        // For now, return a conservative estimate
-        if argless.contains(opcode) {
+        switch opcode {
+        case 0, 1:  // Trap, Fallthrough
             return 1
+        case 20:  // LoadImm64
+            return 10
+        case 30:  // StoreImmU8
+            return 6
+        case 31:  // StoreImmU16
+            return 7
+        case 32:  // StoreImmU32
+            return 9
+        case 33:  // StoreImmU64
+            return 13
+        case 40:  // Jump (CRITICAL: 5 bytes, block-ending)
+            return 5
+        case 50:  // JumpInd
+            return 2
+        case 51:  // LoadImm
+            return 6
+        case 52, 53, 54, 55, 56, 57, 58:  // LoadU8, LoadI8, LoadU16, LoadI16, LoadU32, LoadI32, LoadU64
+            return 6
+        case 59, 60, 61, 62:  // StoreU8, StoreU16, StoreU32, StoreU64
+            return 6
+        case 170, 171:  // BranchEq, BranchNe
+            return 9
+        case 190, 191, 192, 193, 194, 195, 196:  // 32-bit arithmetic
+            return 3
+        case 200, 201, 202:  // 64-bit arithmetic
+            return 3
+        case 210, 211, 212:  // And, Xor, Or
+            return 3
+        default:
+            // Unknown opcode - return 0 to signal error
+            // This is safer than guessing a wrong size
+            return 0
         }
-
-        // Most instructions are 3-10 bytes (1 opcode + args)
-        // Return a conservative estimate that's safer than the old 5-byte default
-        // For production use, proper instruction decoding is required
-        return 3  // Conservative estimate for register-to-register instructions
     }
 }
