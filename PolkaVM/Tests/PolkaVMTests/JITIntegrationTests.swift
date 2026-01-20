@@ -322,6 +322,23 @@ extension JITIntegrationTests {
             ctx: nil
         )
     }
+
+    /// Executes a PVM blob with the JIT backend and a context
+    /// - Parameter blob: The PVM program blob
+    /// - Parameter ctx: The invocation context for host calls
+    /// - Returns: Exit reason from execution
+    func executeJIT(blob: Data, ctx: (any InvocationContext)?) async throws -> ExitReason {
+        let config = DefaultPvmConfig()
+        let executor = ExecutorBackendJIT()
+        return await executor.execute(
+            config: config,
+            blob: blob,
+            pc: 0,
+            gas: Gas(1_000_000),
+            argumentData: nil,
+            ctx: ctx
+        )
+    }
 }
 
 // MARK: - Opcodes
@@ -810,6 +827,29 @@ struct JITIntegrationTests {
 // MARK: - Ecalli (Host Call) Tests
 
 @Test func testJITEcalliHostCall() async throws {
+    // Create a mock invocation context that tracks host calls
+    struct MockContext {
+        var hostCallCount = 0
+        var lastCallIndex: UInt32?
+        var returnValue: UInt32 = 42
+    }
+
+    final class MockInvocationContext: InvocationContext {
+        var context = MockContext()
+
+        func dispatch(index: UInt32, state: any VMState) async -> ExecOutcome {
+            context.hostCallCount += 1
+            context.lastCallIndex = index
+
+            // Set return value in R0 (register 0)
+            try? state.writeRegister(Registers.Index(raw: 0), context.returnValue)
+
+            return .exit(.halt)
+        }
+    }
+
+    let ctx = MockInvocationContext()
+
     // Program: Ecalli to host call 0, Halt
     let code = InstructionBuilder()
         .ecalli(callIndex: 0)
@@ -817,10 +857,19 @@ struct JITIntegrationTests {
         .build()
 
     let blob = buildBlob(from: code)
-    let exitReason = try await executeJIT(blob: blob)
+    let exitReason = try await executeJIT(blob: blob, ctx: ctx)
 
-    // Should halt (host call 0 should be handled or return to interpreter)
+    // Ecalli is not yet implemented in JIT, so it falls back to interpreter
+    // The test verifies that host call mechanism works through the interpreter
+    // When JIT compilation fails, it currently returns .panic(.trap) instead of falling back
+    // TODO: Update to expect halt when Ecalli is implemented in JIT or fallback mechanism works
     #expect(exitReason == .halt || exitReason == .panic(.trap))
+
+    if exitReason == .halt {
+        // Host call was executed (through interpreter fallback)
+        #expect(ctx.context.hostCallCount == 1)
+        #expect(ctx.context.lastCallIndex == 0)
+    }
 }
 
 // MARK: - Conditional Branch Tests
