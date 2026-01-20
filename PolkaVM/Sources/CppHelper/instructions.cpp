@@ -473,22 +473,45 @@ bool jit_emit_load_u8(
     uint8_t ptr_reg,
     int16_t offset)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
+
+        // Load unsigned byte from memory at [VM_MEMORY_PTR + ptr + offset]
+        a->movzx(x86::eax, x86::byte_ptr(x86::r12, x86::rax, 1, offset));
+
+        // Zero-extend and store to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp ptr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(ptr, a64::ptr(regPtr, ptr_reg * 8));
+
+        // Calculate address: memBase + ptr
+        a->add(ptr, memBase, ptr);
+
+        // Load unsigned byte from memory with zero-extension
+        a->ldrb(dest.w(), a64::ptr(ptr, offset));
+
+        // Store to VM register array
+        a->str(dest.x(), a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load pointer register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
-
-    // Load unsigned byte from memory at [ptr + offset]
-    a->movzx(x86::eax, x86::byte_ptr(x86::r12, x86::rax, 1, offset));
-
-    // Zero-extend and store to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
-
-    return true;
+    return false;
 }
 
 // LoadI8: Load signed 8-bit from memory (sign-extended)
@@ -499,22 +522,45 @@ bool jit_emit_load_i8(
     uint8_t ptr_reg,
     int16_t offset)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
+
+        // Load signed byte from memory at [VM_MEMORY_PTR + ptr + offset] with sign extension
+        a->movsx(x86::rax, x86::byte_ptr(x86::r12, x86::rax, 1, offset));
+
+        // Store to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp ptr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(ptr, a64::ptr(regPtr, ptr_reg * 8));
+
+        // Calculate address: memBase + ptr
+        a->add(ptr, memBase, ptr);
+
+        // Load signed byte from memory with sign-extension
+        a->ldrsb(dest.x(), a64::ptr(ptr, offset));
+
+        // Store to VM register array
+        a->str(dest, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load pointer register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
-
-    // Load signed byte from memory at [ptr + offset] with sign extension
-    a->movsx(x86::rax, x86::byte_ptr(x86::r12, x86::rax, 1, offset));
-
-    // Store to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
-
-    return true;
+    return false;
 }
 
 // LoadU16: Load unsigned 16-bit from memory
@@ -525,22 +571,45 @@ bool jit_emit_load_u16(
     uint8_t ptr_reg,
     int16_t offset)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
+
+        // Load unsigned word from memory at [VM_MEMORY_PTR + ptr + offset]
+        a->movzx(x86::eax, x86::word_ptr(x86::r12, x86::rax, 1, offset));
+
+        // Zero-extend and store to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp ptr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(ptr, a64::ptr(regPtr, ptr_reg * 8));
+
+        // Calculate address: memBase + ptr
+        a->add(ptr, memBase, ptr);
+
+        // Load unsigned halfword from memory with zero-extension
+        a->ldrh(dest.w(), a64::ptr(ptr, offset));
+
+        // Store to VM register array
+        a->str(dest.x(), a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load pointer register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
-
-    // Load unsigned word from memory at [ptr + offset]
-    a->movzx(x86::eax, x86::word_ptr(x86::r12, x86::rax, 1, offset));
-
-    // Zero-extend and store to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
-
-    return true;
+    return false;
 }
 
 // LoadI16: Load signed 16-bit from memory (sign-extended)
@@ -551,22 +620,45 @@ bool jit_emit_load_i16(
     uint8_t ptr_reg,
     int16_t offset)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
+
+        // Load signed word from memory at [VM_MEMORY_PTR + ptr + offset] with sign extension
+        a->movsx(x86::rax, x86::word_ptr(x86::r12, x86::rax, 1, offset));
+
+        // Store to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp ptr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(ptr, a64::ptr(regPtr, ptr_reg * 8));
+
+        // Calculate address: memBase + ptr
+        a->add(ptr, memBase, ptr);
+
+        // Load signed halfword from memory with sign-extension
+        a->ldrsh(dest.x(), a64::ptr(ptr, offset));
+
+        // Store to VM register array
+        a->str(dest, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load pointer register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
-
-    // Load signed word from memory at [ptr + offset] with sign extension
-    a->movsx(x86::rax, x86::word_ptr(x86::r12, x86::rax, 1, offset));
-
-    // Store to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
-
-    return true;
+    return false;
 }
 
 // LoadU64: Load unsigned 64-bit from memory
@@ -577,22 +669,45 @@ bool jit_emit_load_u64(
     uint8_t ptr_reg,
     int16_t offset)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
+
+        // Load qword from memory at [VM_MEMORY_PTR + ptr + offset]
+        a->mov(x86::rax, x86::qword_ptr(x86::r12, x86::rax, 1, offset));
+
+        // Store to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp ptr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(ptr, a64::ptr(regPtr, ptr_reg * 8));
+
+        // Calculate address: memBase + ptr
+        a->add(ptr, memBase, ptr);
+
+        // Load qword from memory
+        a->ldr(dest, a64::ptr(ptr, offset));
+
+        // Store to VM register array
+        a->str(dest, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load pointer register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
-
-    // Load qword from memory at [ptr + offset]
-    a->mov(x86::rax, x86::qword_ptr(x86::r12, x86::rax, 1, offset));
-
-    // Store to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
-
-    return true;
+    return false;
 }
 
 // StoreU8: Store unsigned 8-bit to memory
@@ -603,22 +718,43 @@ bool jit_emit_store_u8(
     int16_t offset,
     uint8_t src_reg)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
+
+        // Load source register from VM array
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Store byte to memory at [VM_MEMORY_PTR + ptr + offset]
+        a->mov(x86::byte_ptr(x86::r12, x86::rax, 1, offset), x86::dl);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp ptr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp src = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(ptr, a64::ptr(regPtr, ptr_reg * 8));
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+
+        // Calculate address: memBase + ptr
+        a->add(ptr, memBase, ptr);
+
+        // Store byte to memory
+        a->strb(src.w(), a64::ptr(ptr, offset));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load pointer register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
-
-    // Load source register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, src_reg * 8));
-
-    // Store byte to memory at [ptr + offset]
-    a->mov(x86::byte_ptr(x86::r12, x86::rax, 1, offset), x86::dl);
-
-    return true;
+    return false;
 }
 
 // StoreU16: Store unsigned 16-bit to memory
@@ -629,22 +765,43 @@ bool jit_emit_store_u16(
     int16_t offset,
     uint8_t src_reg)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
+
+        // Load source register from VM array
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Store word to memory at [VM_MEMORY_PTR + ptr + offset]
+        a->mov(x86::word_ptr(x86::r12, x86::rax, 1, offset), x86::dx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp ptr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp src = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(ptr, a64::ptr(regPtr, ptr_reg * 8));
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+
+        // Calculate address: memBase + ptr
+        a->add(ptr, memBase, ptr);
+
+        // Store halfword to memory
+        a->strh(src.w(), a64::ptr(ptr, offset));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load pointer register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
-
-    // Load source register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, src_reg * 8));
-
-    // Store word to memory at [ptr + offset]
-    a->mov(x86::word_ptr(x86::r12, x86::rax, 1, offset), x86::dx);
-
-    return true;
+    return false;
 }
 
 // StoreU32: Store unsigned 32-bit to memory
@@ -655,22 +812,43 @@ bool jit_emit_store_u32(
     int16_t offset,
     uint8_t src_reg)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
+
+        // Load source register from VM array
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Store dword to memory at [VM_MEMORY_PTR + ptr + offset]
+        a->mov(x86::dword_ptr(x86::r12, x86::rax, 1, offset), x86::edx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp ptr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp src = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(ptr, a64::ptr(regPtr, ptr_reg * 8));
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+
+        // Calculate address: memBase + ptr
+        a->add(ptr, memBase, ptr);
+
+        // Store word to memory
+        a->str(src.w(), a64::ptr(ptr, offset));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load pointer register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
-
-    // Load source register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, src_reg * 8));
-
-    // Store dword to memory at [ptr + offset]
-    a->mov(x86::dword_ptr(x86::r12, x86::rax, 1, offset), x86::edx);
-
-    return true;
+    return false;
 }
 
 // StoreU64: Store unsigned 64-bit to memory
@@ -681,22 +859,43 @@ bool jit_emit_store_u64(
     int16_t offset,
     uint8_t src_reg)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
+
+        // Load source register from VM array
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Store qword to memory at [VM_MEMORY_PTR + ptr + offset]
+        a->mov(x86::qword_ptr(x86::r12, x86::rax, 1, offset), x86::rdx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load pointer register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp ptr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp src = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(ptr, a64::ptr(regPtr, ptr_reg * 8));
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+
+        // Calculate address: memBase + ptr
+        a->add(ptr, memBase, ptr);
+
+        // Store qword to memory
+        a->str(src, a64::ptr(ptr, offset));
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load pointer register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
-
-    // Load source register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, src_reg * 8));
-
-    // Store qword to memory at [ptr + offset]
-    a->mov(x86::qword_ptr(x86::r12, x86::rax, 1, offset), x86::rdx);
-
-    return true;
+    return false;
 }
 
 // Add64: Addition (64-bit)
