@@ -10,37 +10,50 @@ import Utils
 
 @testable import PolkaVM
 
-@Suite(.serialized)
-struct JITIntegrationTests {
-    // MARK: - Simple Compilation Test
+// MARK: - Test Helpers
 
-    @Test func testJITCompilesSuccessfully() async throws {
-        // Minimal test: just verify JIT compilation doesn't crash
-        // Program: LoadImm 42, Halt
+extension JITIntegrationTests {
+    /// Builds a PVM blob from bytecode instructions
+    /// - Parameter code: Array of bytecode instructions
+    /// - Returns: Properly formatted PVM blob
+    func buildBlob(from code: [UInt8]) -> Data {
+        var blob = Data()
 
-        // Blob format:
-        // - jumpTableEntriesCount (ULEB128): 0
-        // - encodeSize: 8
-        // - codeLength (ULEB128): 5
-        // - jumpTable: (empty)
-        // - code: [51, 0, 42, 0, 1] (LoadImm R0, 42, Halt)
-        // - bitmask: 1 byte (since codeLength is 5, need 1 byte for bitmask)
+        // jumpTableEntriesCount (ULEB128): 0
+        blob.append(0)
 
-        let blob = Data([
-            0,              // jumpTableEntriesCount = 0
-            8,              // encodeSize = 8
-            5,              // codeLength = 5
-            // No jump table data (0 entries * 8 bytes = 0 bytes)
-            51, 0, 42, 0,   // LoadImm R0, 42
-            1,              // Fallthrough (Halt)
-            0               // bitmask (1 byte, all zeros = no instructions with special encoding)
-        ])
+        // encodeSize: 8
+        blob.append(8)
 
+        // codeLength (ULEB128)
+        var codeLength = code.count
+        while codeLength > 0 {
+            let byte = UInt8(codeLength & 0x7F)
+            codeLength >>= 7
+            blob.append(codeLength > 0 ? (byte | 0x80) : byte)
+        }
+
+        // No jump table data
+
+        // Code
+        blob.append(Data(code))
+
+        // bitmask: calculate number of bytes needed
+        let bitmaskSize = (code.count + 7) / 8
+        for _ in 0..<bitmaskSize {
+            blob.append(0)
+        }
+
+        return blob
+    }
+
+    /// Executes a PVM blob with the JIT backend
+    /// - Parameter blob: The PVM program blob
+    /// - Returns: Exit reason from execution
+    func executeJIT(blob: Data) async throws -> ExitReason {
         let config = DefaultPvmConfig()
-
-        // Execute with JIT backend
         let executor = ExecutorBackendJIT()
-        let exitReason = await executor.execute(
+        return await executor.execute(
             config: config,
             blob: blob,
             pc: 0,
@@ -48,8 +61,37 @@ struct JITIntegrationTests {
             argumentData: nil,
             ctx: nil
         )
+    }
+}
 
-        // We expect the program to halt or trap
+// MARK: - Opcodes
+
+extension JITIntegrationTests {
+    /// PVM instruction opcodes
+    enum Opcode: UInt8 {
+        case trap = 0
+        case halt = 1
+        case jump = 40
+        case loadImm = 51
+        case add32 = 190
+        case divU32 = 193
+    }
+}
+
+@Suite(.serialized)
+struct JITIntegrationTests {
+    // MARK: - Simple Compilation Test
+
+    @Test func testJITCompilesSuccessfully() async throws {
+        // Program: LoadImm 42, Halt
+        let code: [UInt8] = [
+            Opcode.loadImm.rawValue, 0, 42, 0,  // LoadImm R0, 42
+            Opcode.halt.rawValue           // Halt
+        ]
+
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
+
         #expect(exitReason == .halt || exitReason == .panic(.trap))
     }
 
@@ -58,116 +100,58 @@ struct JITIntegrationTests {
     @Test func testJITLoadImmAdd() async throws {
         // Program: LoadImm 42, Add R0+R0, Halt
         // Expected: R0 = 84
+        let code: [UInt8] = [
+            Opcode.loadImm.rawValue, 0, 42, 0,  // LoadImm R0, 42
+            Opcode.add32.rawValue, 0, 0,         // Add32 R0, R0, R0
+            Opcode.halt.rawValue           // Halt
+        ]
 
-        // Blob format: [jumpCount=0][encodeSize=8][codeLen=7][code][bitmask=0]
-        let blob = Data([
-            0,              // jumpTableEntriesCount = 0
-            8,              // encodeSize = 8
-            7,              // codeLength = 7
-            // Code:
-            51, 0, 42, 0,  // LoadImm R0, 42
-            190, 0, 0,      // Add32 R0, R0, R0
-            1,              // Fallthrough (Halt)
-            0               // bitmask
-        ])
-
-        let config = DefaultPvmConfig()
-        let executor = ExecutorBackendJIT()
-        let exitReason = await executor.execute(
-            config: config,
-            blob: blob,
-            pc: 0,
-            gas: Gas(1_000_000),
-            argumentData: nil,
-            ctx: nil
-        )
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
 
         #expect(exitReason == .halt || exitReason == .panic(.trap))
     }
 
     @Test func testJITLoadImmMultiple() async throws {
         // Program: LoadImm multiple registers
-        // Blob: [jumpCount=0][encodeSize=8][codeLen=13][code][bitmask=0]
-        let blob = Data([
-            0,              // jumpTableEntriesCount = 0
-            8,              // encodeSize = 8
-            13,             // codeLength = 13
-            // Code:
-            51, 0, 10, 0,   // LoadImm R0, 10
-            51, 1, 20, 0,   // LoadImm R1, 20
-            51, 2, 30, 0,   // LoadImm R2, 30
-            1,              // Fallthrough (Halt)
-            0               // bitmask
-        ])
+        let code: [UInt8] = [
+            Opcode.loadImm.rawValue, 0, 10, 0,  // LoadImm R0, 10
+            Opcode.loadImm.rawValue, 1, 20, 0,  // LoadImm R1, 20
+            Opcode.loadImm.rawValue, 2, 30, 0,  // LoadImm R2, 30
+            Opcode.halt.rawValue           // Halt
+        ]
 
-        let config = DefaultPvmConfig()
-        let executor = ExecutorBackendJIT()
-        let exitReason = await executor.execute(
-            config: config,
-            blob: blob,
-            pc: 0,
-            gas: Gas(1_000_000),
-            argumentData: nil,
-            ctx: nil
-        )
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
 
         #expect(exitReason == .halt || exitReason == .panic(.trap))
     }
 
     @Test func testJITUnconditionalJump() async throws {
-        // Program: Test Jump
-        // Blob: [jumpCount=0][encodeSize=8][codeLen=10][code][bitmask=0]
-        let blob = Data([
-            0,              // jumpTableEntriesCount = 0
-            8,              // encodeSize = 8
-            10,             // codeLength = 10
-            // Code:
-            40, 4, 0, 0, 0,  // Jump to PC 8 (halt instruction)
-            51, 0, 99, 0,    // LoadImm R0, 99 (should not execute)
-            1,                // Fallthrough (Halt) - target of jump
-            0                 // bitmask
-        ])
+        // Program: Jump over LoadImm to reach Halt
+        let code: [UInt8] = [
+            Opcode.jump.rawValue, 4, 0, 0, 0,   // Jump forward 4 bytes (to halt)
+            Opcode.loadImm.rawValue, 0, 99, 0,  // LoadImm R0, 99 (should not execute)
+            Opcode.halt.rawValue           // Halt (jump target)
+        ]
 
-        let config = DefaultPvmConfig()
-        let executor = ExecutorBackendJIT()
-        let exitReason = await executor.execute(
-            config: config,
-            blob: blob,
-            pc: 0,
-            gas: Gas(1_000_000),
-            argumentData: nil,
-            ctx: nil
-        )
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
 
         #expect(exitReason == .halt || exitReason == .panic(.trap))
     }
 
     @Test func testJITDivision() async throws {
-        // Program: Test DivU32
-        // 100 / 5 = 20
-        // Blob: [jumpCount=0][encodeSize=8][codeLen=10][code][bitmask=0]
-        let blob = Data([
-            0,              // jumpTableEntriesCount = 0
-            8,              // encodeSize = 8
-            10,             // codeLength = 10
-            // Code:
-            51, 0, 100, 0,  // LoadImm R0, 100
-            51, 1, 5, 0,    // LoadImm R1, 5
-            193, 2, 0,      // DivU32 R2, R0, R1 (R2 = 100 / 5 = 20)
-            1,              // Fallthrough (Halt)
-            0               // bitmask
-        ])
+        // Program: DivU32 100 / 5 = 20
+        let code: [UInt8] = [
+            Opcode.loadImm.rawValue, 0, 100, 0,  // LoadImm R0, 100
+            Opcode.loadImm.rawValue, 1, 5, 0,    // LoadImm R1, 5
+            Opcode.divU32.rawValue, 2, 0,        // DivU32 R2, R0, R1
+            Opcode.halt.rawValue           // Halt
+        ]
 
-        let config = DefaultPvmConfig()
-        let executor = ExecutorBackendJIT()
-        let exitReason = await executor.execute(
-            config: config,
-            blob: blob,
-            pc: 0,
-            gas: Gas(1_000_000),
-            argumentData: nil,
-            ctx: nil
-        )
+        let blob = buildBlob(from: code)
+        let exitReason = try await executeJIT(blob: blob)
 
         #expect(exitReason == .halt || exitReason == .panic(.trap))
     }
