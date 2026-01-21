@@ -127,7 +127,18 @@ final class JITExecutor {
         logger.debug("JIT execution completed with exit code: \(exitCode)")
 
         // Translate exit code to ExitReason
-        // TODO: Define proper exit codes in the C++ side and ensure they match with Swift expectations
+        // Exit codes:
+        // - 0 = halt
+        // - 1 = outOfGas
+        // - 2 = fallback to interpreter
+        // - 3 = pageFault
+        // - -1 = trap (panic)
+        // - 0xFFFFFFFA = hostRequestedHalt
+        // - 0xFFFFFFFB = pageFault (from host call)
+        // - 0xFFFFFFFC = gasExhausted
+        // - 0xFFFFFFFD = internalError
+        // - 0xFFFFFFFE = hostFunctionNotFound
+        // - 0xFFFFFFFF = hostFunctionThrewError
         let exitReason: ExitReason
         switch exitCode {
         case 0:
@@ -145,10 +156,27 @@ final class JITExecutor {
             let gasUsed = gas.value  // Gas remaining after JIT execution
             exitReason = .fallback(pc: initialPC, registers: fallbackRegisters, gasUsed: gasUsed)
         case 3:
+            // Page fault from bounds checking
             // For a page fault, we would need to extract the faulting address from registers
             exitReason = .pageFault(UInt32(registers[Registers.Index(raw: 0)]))
         case -1:
             exitReason = .panic(.trap)
+        case Int32(bitPattern: JITHostCallError.hostRequestedHalt.rawValue):
+            exitReason = .halt
+        case Int32(bitPattern: JITHostCallError.pageFault.rawValue):
+            // Page fault from host call - extract faulting address from R0
+            exitReason = .pageFault(UInt32(registers[Registers.Index(raw: 0)]))
+        case Int32(bitPattern: JITHostCallError.gasExhausted.rawValue):
+            exitReason = .outOfGas
+        case Int32(bitPattern: JITHostCallError.internalErrorInvalidContext.rawValue):
+            // Map internalErrorInvalidContext to jitExecutionError
+            exitReason = .panic(.jitExecutionError)
+        case Int32(bitPattern: JITHostCallError.hostFunctionNotFound.rawValue):
+            // Map to jitInvalidFunctionPointer
+            exitReason = .panic(.jitInvalidFunctionPointer)
+        case Int32(bitPattern: JITHostCallError.hostFunctionThrewError.rawValue):
+            // Map to jitExecutionError
+            exitReason = .panic(.jitExecutionError)
         default:
             logger.error("Unknown JIT exit code: \(exitCode)")
             exitReason = .panic(.trap)
