@@ -875,12 +875,10 @@ bool emit_instruction_decoded(
             );
 
         case 221: // RotL32
-            // Use 64-bit rotate for now (PVM registers are 64-bit)
-            return jit_instruction::jit_emit_rol_64(
+            return jit_instruction::jit_emit_rot_l_32(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
-                decoded.src1_reg,  // rb
-                decoded.src2_reg   // rd
+                decoded.src1_reg   // rb
             );
 
         case 222: // RotR64
@@ -892,12 +890,10 @@ bool emit_instruction_decoded(
             );
 
         case 223: // RotR32
-            // Use 64-bit rotate for now (PVM registers are 64-bit)
-            return jit_instruction::jit_emit_ror_64(
+            return jit_instruction::jit_emit_rot_r_32(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
-                decoded.src1_reg,  // rb
-                decoded.src2_reg   // rd
+                decoded.src1_reg   // rb
             );
 
         case 224: // AndInv
