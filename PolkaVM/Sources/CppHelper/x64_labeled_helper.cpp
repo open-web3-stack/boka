@@ -792,6 +792,13 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
         // Resolve label addresses and populate the jump table
         for (uint32_t pc : labeledPCs) {
+            // CRITICAL: Bounds check to prevent heap buffer overflow
+            // labeledPCs may contain out-of-bounds values from markJumpTarget
+            if (pc >= codeSize) {
+                // Skip out-of-bounds PC values silently
+                continue;
+            }
+
             Label label = labelManager.getLabel(pc);
             if (!label.isValid()) {
                 continue;  // Skip invalid labels

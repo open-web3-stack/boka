@@ -515,7 +515,15 @@ final class ExecutorBackendJIT: ExecutorBackend {
 
                     let resultBox = ResultBox()
 
-                    // TODO: consider make InvocationContext Sendable
+                    // ⚠️ Thread-safety requirement: InvocationContext must be thread-safe
+                    // The context is passed to a detached task that may run on a different thread.
+                    // Implementations MUST ensure:
+                    // 1. Context is NOT shared across concurrent executions (use separate instances)
+                    // 2. Context internally synchronizes access to mutable state (locks/actors)
+                    // 3. Context does NOT rely on thread-local storage
+                    //
+                    // The UncheckedSendableBox wrapper allows passing non-Sendable contexts
+                    // across concurrency boundaries, but safety depends on proper implementation.
                     let boxedCtx = UncheckedSendableBox(invocationContext)
 
                     // Kick off the async operation on a detached task
