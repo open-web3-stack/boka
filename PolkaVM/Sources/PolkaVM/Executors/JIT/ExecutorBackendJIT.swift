@@ -203,16 +203,18 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     let boxedCtx = UncheckedSendableBox(invocationContext)
 
                     // Kick off the async operation on a detached task to avoid pool starvation
-                    Task.detached { @Sendable in
+                    // Propagate priority from current task
+                    Task.detached(priority: Task.currentPriority) { @Sendable in
                         asyncResult = await boxedCtx.value.dispatch(index: hostCallIndex, state: vmState)
                         semaphore.signal()
                     }
 
-                    // Wait for the async operation to complete (on a DispatchQueue to avoid blocking pool)
-                    let waitResult = DispatchSemaphore.wait(timeout: .now() + 30) // 30 second timeout
+                    // Wait for the async operation to complete
+                    // Host calls should complete quickly; use conservative timeout
+                    let waitResult = DispatchSemaphore.wait(timeout: .now() + 60) // 60 second timeout
                     if waitResult == .timedOut {
-                        self.logger.error("Host call timed out")
-                        return JITHostCallError.internalErrorInvalidContext.rawValue
+                        self.logger.error("Host call timed out after 60 seconds")
+                        return JITHostCallError.hostFunctionThrewError.rawValue
                     }
 
                     // Process the async result and return appropriate status
@@ -313,10 +315,15 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 let outputLen = UInt32(truncatingIfNeeded: registers[Registers.Index(raw: 8)])
 
                 // Validate and read from JIT memory (prevent integer overflow)
-                if outputLen > 0 && UInt64(outputAddr) + UInt64(outputLen) <= UInt64(totalMemorySize) {
+                if outputLen == 0 {
+                    // Empty output is valid
+                    outputData = Data()
+                } else if UInt64(outputAddr) + UInt64(outputLen) <= UInt64(totalMemorySize) {
                     outputData = Data(bytes: memoryBuffer.advanced(by: Int(outputAddr)), count: Int(outputLen))
                 } else {
-                    outputData = Data()
+                    // Invalid memory access - return nil to indicate error
+                    logger.warning("Invalid output memory range: addr=\(outputAddr), len=\(outputLen), memorySize=\(totalMemorySize)")
+                    outputData = nil
                 }
             default:
                 outputData = nil
