@@ -12,6 +12,12 @@ import Utils
 final class ExecutorBackendJIT: ExecutorBackend {
     private let logger = Logger(label: "ExecutorBackendJIT")
 
+    // WARNING: This class is NOT thread-safe for concurrent execute() calls.
+    // The syncHostCallHandler and currentProgramCode are mutable instance state
+    // that must not be shared across concurrent executions.
+    // TODO: Refactor to pass execution-specific state through context object
+    // instead of storing in instance properties.
+
     private let jitCompiler = JITCompiler()
     private let jitExecutor = JITExecutor()
 
@@ -186,7 +192,12 @@ final class ExecutorBackendJIT: ExecutorBackend {
             // We're capturing the invocationContext into a closure that will be called synchronously
             if let invocationContext = ctx {
                 // Initialize the synchronous handler
-                syncHostCallHandler = { hostCallIndex, guestRegistersPtr, guestMemoryBasePtr, guestMemorySize, guestGasPtr -> UInt32 in
+                // Use [weak self] to avoid retain cycle (cleanup happens in defer block)
+                syncHostCallHandler = { [weak self] hostCallIndex, guestRegistersPtr, guestMemoryBasePtr, guestMemorySize, guestGasPtr -> UInt32 in
+                    guard let self else {
+                        return JITHostCallError.internalErrorInvalidContext.rawValue
+                    }
+
                     guard let programCode = self.currentProgramCode else {
                         self.logger.error("No program code available for host call")
                         return JITHostCallError.internalErrorInvalidContext.rawValue
@@ -235,6 +246,11 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     }
 
                     // Block until async operation completes
+                    // WARNING: This blocks a Swift Concurrency thread. If too many JIT
+                    // executions block concurrently, the thread pool may be exhausted,
+                    // causing deadlock (detached task never gets to run).
+                    // Mitigation: Ensure ExecutorFrontendInProcess serializes JIT execution
+                    // or limits concurrent executions to a small number (< thread pool size).
                     semaphore.wait()
 
                     // Process the result
