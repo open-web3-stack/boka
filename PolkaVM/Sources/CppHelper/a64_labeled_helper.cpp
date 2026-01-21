@@ -6,7 +6,7 @@
 #include "jit_label_manager.hh"
 #include "jit_control_flow.hh"
 #include "opcodes.hh"
-#include <asmjit/asmjit.h>
+#include "asmjit/asmjit.h"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>

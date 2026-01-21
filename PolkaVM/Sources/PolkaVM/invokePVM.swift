@@ -25,6 +25,62 @@ public func invokePVM(
                 argumentData: argumentData,
                 ctx: ctx
             )
+
+            // Handle JIT fallback to interpreter
+            if case .fallback = result.exitReason,
+               let fallbackState = result.fallbackState {
+                logger.debug("JIT falling back to interpreter at PC: \(fallbackState.pc)")
+
+                // Create new interpreter state with JIT state
+                let interpreterState = try VMStateInterpreter(
+                    standardProgramBlob: blob,
+                    pc: fallbackState.pc,
+                    gas: Gas(fallbackState.gasUsed),
+                    argumentData: argumentData
+                )
+
+                // Copy JIT memory to interpreter using writeMemory
+                if let jitMemory = result.outputData {
+                    // Write memory in chunks to avoid potential issues with large writes
+                    let chunkSize = 4096
+                    var offset = 0
+                    while offset < jitMemory.count {
+                        let end = min(offset + chunkSize, jitMemory.count)
+                        let chunk = jitMemory[offset..<end]
+                        try? interpreterState.writeMemory(address: UInt32(offset), values: chunk)
+                        offset = end
+                    }
+                }
+
+                // Restore JIT registers using writeRegister
+                for (index, value) in fallbackState.registers.enumerated() {
+                    let regIndex = Registers.Index(raw: UInt8(truncatingIfNeeded: index))
+                    interpreterState.writeRegister(regIndex, value)
+                }
+
+                // Execute remaining bytecode with interpreter
+                let engine = Engine(config: config, invocationContext: ctx)
+                let interpreterExitReason = await engine.execute(state: interpreterState)
+
+                let postGas = interpreterState.getGas()
+                let interpreterGasUsed = postGas >= GasInt(0) ? Gas(fallbackState.gasUsed) - Gas(postGas) : Gas(fallbackState.gasUsed)
+
+                // Calculate total gas used
+                let totalGasUsed = result.gasUsed + interpreterGasUsed
+
+                // Return interpreter result
+                switch interpreterExitReason {
+                case .outOfGas:
+                    return (.outOfGas, totalGasUsed, nil)
+                case .halt:
+                    let (addr, len): (UInt32, UInt32) = interpreterState.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
+                    let output = try? interpreterState.readMemory(address: addr, length: Int(len))
+                    return (.halt, totalGasUsed, output ?? Data())
+                default:
+                    return (.panic(.trap), totalGasUsed, nil)
+                }
+            }
+
             return (result.exitReason, result.gasUsed, result.outputData)
         } else {
             let state = try VMStateInterpreter(standardProgramBlob: blob, pc: pc, gas: gas, argumentData: argumentData)

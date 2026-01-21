@@ -135,8 +135,15 @@ final class JITExecutor {
         case 1:
             exitReason = .outOfGas
         case 2:
-            // For a host call, we would need to extract the host call index from registers
-            exitReason = .hostCall(UInt32(registers[Registers.Index(raw: 0)]))
+            // Fallback to interpreter with current state
+            // Extract PC (r15) and all register values
+            let fallbackPC = UInt32(registers[Registers.Index(raw: 15)])  // r15 = PC
+            var fallbackRegisters: [UInt64] = []
+            for i: UInt8 in 0..<16 {
+                fallbackRegisters.append(registers[Registers.Index(raw: i)])
+            }
+            let gasUsed = gas.value  // Gas remaining after JIT execution
+            exitReason = .fallback(pc: fallbackPC, registers: fallbackRegisters, gasUsed: gasUsed)
         case 3:
             // For a page fault, we would need to extract the faulting address from registers
             exitReason = .pageFault(UInt32(registers[Registers.Index(raw: 0)]))

@@ -175,14 +175,24 @@ class IPCClient {
     /// Convert errno to string (thread-safe)
     private func errnoToString(_ err: Int32) -> String {
         var buffer = [Int8](repeating: 0, count: 256)
-        // Use strerror_r for thread safety (XSI-compliant version)
-        // Both Linux (glibc) and macOS support the XSI-compliant strerror_r that returns Int32
+        // Use strerror_r for thread safety
+        #if os(Linux)
+        // GNU version: returns Int* (pointer to buffer on success, NULL on error)
+        let result = strerror_r(err, &buffer, buffer.count)
+        if result != nil {
+            return String(cString: &buffer)
+        } else {
+            return "Unknown error \(err)"
+        }
+        #else
+        // XSI version (macOS): returns Int32 (0 on success, error code on failure)
         let result = strerror_r(err, &buffer, buffer.count)
         if result == 0 {
             return String(cString: &buffer)
         } else {
             return "Unknown error \(err)"
         }
+        #endif
     }
 
     deinit {

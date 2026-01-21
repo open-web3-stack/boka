@@ -5,7 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <asmjit/asmjit.h>
+#include "asmjit/asmjit.h"
 #include "opcodes.hh"
 
 // JIT instruction generation interface

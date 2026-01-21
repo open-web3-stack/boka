@@ -11,7 +11,7 @@ public enum IPCMessageType: UInt8, Codable {
 }
 
 /// Request to execute a PolkaVM program
-public struct IPCExecuteRequest: Codable {
+public struct IPCExecuteRequest: Codable, Sendable {
     public let blob: Data
     public let pc: UInt32
     public let gas: UInt64
@@ -28,7 +28,7 @@ public struct IPCExecuteRequest: Codable {
 }
 
 /// Response from VM execution
-public struct IPCExecuteResponse: Codable {
+public struct IPCExecuteResponse: Codable, Sendable {
     public let exitReasonCode: UInt64  // ExitReason.toUInt64()
     public let gasUsed: UInt64
     public let outputData: Data?

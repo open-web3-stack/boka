@@ -1,5 +1,6 @@
 import Foundation
 import TracingUtils
+import Utils
 import PolkaVM
 #if canImport(Glibc)
 import Glibc
@@ -55,47 +56,35 @@ struct SandboxMain {
     }
 
     private static func handleExecuteRequest(_ request: IPCExecuteRequest) async -> IPCExecuteResponse {
-        do {
-            logger.debug("Received execute request: PC=\(request.pc), Gas=\(request.gas)")
+        logger.debug("Received execute request: PC=\(request.pc), Gas=\(request.gas)")
 
-            // Decode execution mode
-            let mode = ExecutionMode(rawValue: request.executionMode)
+        // Decode execution mode
+        let mode = ExecutionMode(rawValue: request.executionMode)
 
-            // Create ExecutorFrontendInProcess
-            let executor = ExecutorFrontendInProcess(mode: mode)
+        // Create ExecutorFrontendInProcess
+        let executor = ExecutorFrontendInProcess(mode: mode)
 
-            // Create config
-            let config = PvmConfig(memorySize: 16 * 1024 * 1024) // 16 MB default
+        // Create config
+        let config = DefaultPvmConfig()
 
-            // Execute
-            let result = await executor.execute(
-                config: config,
-                blob: request.blob,
-                pc: request.pc,
-                gas: Gas(request.gas),
-                argumentData: request.argumentData,
-                ctx: nil  // TODO: Handle context serialization in Phase 4
-            )
+        // Execute
+        let result = await executor.execute(
+            config: config,
+            blob: request.blob,
+            pc: request.pc,
+            gas: Gas(request.gas),
+            argumentData: request.argumentData,
+            ctx: nil as (any InvocationContext)?  // TODO: Handle context serialization in Phase 4
+        )
 
-            logger.debug("Execution completed: \(result.exitReason), gas used: \(result.gasUsed.value)")
+        logger.debug("Execution completed: \(result.exitReason), gas used: \(result.gasUsed.value)")
 
-            return IPCExecuteResponse(
-                exitReasonCode: result.exitReason.toUInt64(),
-                gasUsed: result.gasUsed.value,
-                outputData: result.outputData,
-                errorMessage: nil
-            )
-
-        } catch {
-            logger.error("Execution failed: \(error)")
-
-            return IPCExecuteResponse(
-                exitReasonCode: ExitReason.panic(.trap).toUInt64(),
-                gasUsed: 0,
-                outputData: nil,
-                errorMessage: "\(error)"
-            )
-        }
+        return IPCExecuteResponse(
+            exitReasonCode: result.exitReason.toUInt64(),
+            gasUsed: result.gasUsed.value,
+            outputData: result.outputData,
+            errorMessage: nil
+        )
     }
 
     // TODO: Apply security restrictions
