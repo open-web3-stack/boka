@@ -96,6 +96,10 @@ class IPCClient {
 
                 if result < 0 {
                     let err = errno
+                    // EINTR: Interrupted system call - retry the write
+                    if err == EINTR {
+                        continue
+                    }
                     logger.error("Failed to write to IPC: \(errnoToString(err))")
                     throw IPCError.writeFailed(Int(err))
                 }
@@ -162,6 +166,10 @@ class IPCClient {
 
                 if result < 0 {
                     let err = errno
+                    // EINTR: Interrupted system call - retry the read
+                    if err == EINTR {
+                        return
+                    }
                     logger.error("Failed to read from IPC: \(errnoToString(err))")
                     throw IPCError.readFailed(Int(err))
                 }
