@@ -192,13 +192,28 @@ class IPCClient {
         var buffer = [Int8](repeating: 0, count: 256)
         // Use strerror_r for thread safety
         #if os(Linux)
-        // GNU version: returns pointer to error string (may be static or our buffer)
         let result = strerror_r(err, &buffer, buffer.count)
-        // On success, result points to the error string (use it instead of buffer)
-        if result != nil {
-            return String(cString: result!)
+
+        // Check if result is a valid pointer (GNU version) or error code (XSI version)
+        // Valid pointers are either:
+        // 1. Pointing to our buffer (stack address, typically very high)
+        // 2. Pointing to static memory (high address > 4096)
+        // Invalid: XSI error codes are small positive integers (1-4095)
+        if let ptr = result {
+            // Get the numeric address value via UInt for correct bitPattern conversion
+            let addr = Int(bitPattern: UInt(bitPattern: ptr))
+
+            if addr > 4096 {
+                // Valid pointer: use it (GNU version)
+                return String(cString: ptr)
+            } else {
+                // Invalid pointer: must be XSI error code, use buffer
+                // Buffer was populated even on error in XSI version
+                return String(cString: &buffer)
+            }
         } else {
-            return "Unknown error \(err)"
+            // nil result: use buffer
+            return String(cString: &buffer)
         }
         #else
         // XSI version (macOS): returns Int32 (0 on success, error code on failure)
