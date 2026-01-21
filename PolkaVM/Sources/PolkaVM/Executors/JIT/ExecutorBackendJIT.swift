@@ -4,7 +4,6 @@
 import AsmJitLib
 import CppHelper
 import Foundation
-import Synchronization
 import TracingUtils
 import Utils
 
@@ -16,23 +15,13 @@ final class ExecutorBackendJIT: ExecutorBackend {
     private let jitCompiler = JITCompiler()
     private let jitExecutor = JITExecutor()
 
-    // This will hold the JITHostFunctionTable struct itself, and we'll pass a pointer to it.
-    private var jitHostFunctionTableStorage: JITHostFunctionTable! // force unwrapped so we can have cyclic reference
+    // Heap-allocated JITHostFunctionTable for C++ interop
+    // Allocate as C-compatible struct directly on heap (not wrapped in Swift class)
+    // to avoid passing Swift object header to C++ code
+    private var jitHostFunctionTablePtr: UnsafeMutablePointer<JITHostFunctionTable>!
 
     // Store the program code during execution for VMStateJIT
     private var currentProgramCode: ProgramCode?
-
-    // We need a class wrapper for JITHostFunctionTable to avoid dangling pointer issues
-    private class JITHostFunctionTableWrapper {
-        var table: JITHostFunctionTable
-
-        init(table: JITHostFunctionTable) {
-            self.table = table
-        }
-    }
-
-    // Wrapper to store the JITHostFunctionTable in a class for proper reference semantics
-    private var jitHostFunctionTableWrapper: JITHostFunctionTableWrapper!
 
     // Using a simpler approach to handle host calls that doesn't require async/await
     private var syncHostCallHandler: ((
@@ -70,7 +59,10 @@ final class ExecutorBackendJIT: ExecutorBackend {
             dispatchHostCall_C_Trampoline as JITHostFunctionFnSwift,
             to: UnsafeRawPointer.self
         )
-        jitHostFunctionTableStorage = JITHostFunctionTable(
+
+        // Allocate JITHostFunctionTable on heap as C-compatible struct
+        jitHostFunctionTablePtr = UnsafeMutablePointer<JITHostFunctionTable>.allocate(capacity: 1)
+        jitHostFunctionTablePtr.initialize(to: JITHostFunctionTable(
             dispatchHostCall: unsafeBitCast(fnPtr, to: JITHostFunctionFn.self),
             ownerContext: Unmanaged.passUnretained(self).toOpaque(),
             invocationContext: nil,
@@ -79,10 +71,13 @@ final class ExecutorBackendJIT: ExecutorBackend {
             jumpTableEntrySize: 0,
             jumpTableEntriesCount: 0,
             alignmentFactor: 0
-        )
+        ))
+    }
 
-        // Create a wrapper for the table
-        jitHostFunctionTableWrapper = JITHostFunctionTableWrapper(table: jitHostFunctionTableStorage)
+    deinit {
+        // Clean up heap-allocated struct
+        jitHostFunctionTablePtr.deinitialize(count: 1)
+        jitHostFunctionTablePtr.deallocate()
     }
 
     // Simple synchronous handler for host functions
@@ -210,9 +205,24 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         initialPC: 0
                     )
 
-                    // Convert async operation to sync using semaphore + mutex
+                    // Convert async operation to sync using semaphore + lock
                     let semaphore = DispatchSemaphore(value: 0)
-                    let resultBox: Mutex<ExecOutcome?> = .init(nil)
+
+                    // Thread-safe result box using class wrapper (required for escaping closure)
+                    final class ResultBox: @unchecked Sendable {
+                        private let lock = Utils.ReadWriteLock()
+                        private var _value: ExecOutcome?
+
+                        func set(_ value: ExecOutcome) {
+                            lock.withWriteLock { _value = value }
+                        }
+
+                        func get() -> ExecOutcome? {
+                            lock.withReadLock { _value }
+                        }
+                    }
+
+                    let resultBox = ResultBox()
 
                     // TODO: consider make InvocationContext Sendable
                     let boxedCtx = UncheckedSendableBox(invocationContext)
@@ -220,7 +230,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     // Kick off the async operation on a detached task
                     Task.detached(priority: Task.currentPriority) {
                         let r = await boxedCtx.value.dispatch(index: hostCallIndex, state: vmState)
-                        resultBox.withLock { $0 = r }
+                        resultBox.set(r)
                         semaphore.signal()
                     }
 
@@ -228,7 +238,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     semaphore.wait()
 
                     // Process the result
-                    guard let result = resultBox.value else {
+                    guard let result = resultBox.get() else {
                         self.logger.error("No result from async host function call")
                         return JITHostCallError.hostFunctionThrewError.rawValue
                     }
@@ -262,7 +272,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
             }
 
             // Update the invocation context in the JIT host function table
-            jitHostFunctionTableWrapper.table.invocationContext = nil // We're using the syncHandler now
+            jitHostFunctionTablePtr.pointee.invocationContext = nil // We're using the syncHandler now
 
             // Populate jump table data for JumpInd instruction support
             if let programCode = currentProgramCode {
@@ -271,22 +281,22 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     rawBufferPointer.baseAddress
                 }
 
-                jitHostFunctionTableWrapper.table.jumpTableData = jumpTableData?.assumingMemoryBound(to: UInt8.self)
-                jitHostFunctionTableWrapper.table.jumpTableSize = UInt32(programCode.jumpTable.count)
-                jitHostFunctionTableWrapper.table.jumpTableEntrySize = programCode.jumpTableEntrySize
-                jitHostFunctionTableWrapper.table.jumpTableEntriesCount = UInt32(programCode.jumpTable.count / Int(programCode.jumpTableEntrySize))
-                jitHostFunctionTableWrapper.table.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
+                jitHostFunctionTablePtr.pointee.jumpTableData = jumpTableData?.assumingMemoryBound(to: UInt8.self)
+                jitHostFunctionTablePtr.pointee.jumpTableSize = UInt32(programCode.jumpTable.count)
+                jitHostFunctionTablePtr.pointee.jumpTableEntrySize = programCode.jumpTableEntrySize
+                jitHostFunctionTablePtr.pointee.jumpTableEntriesCount = UInt32(programCode.jumpTable.count / Int(programCode.jumpTableEntrySize))
+                jitHostFunctionTablePtr.pointee.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
             } else {
                 // No jump table available
-                jitHostFunctionTableWrapper.table.jumpTableData = nil
-                jitHostFunctionTableWrapper.table.jumpTableSize = 0
-                jitHostFunctionTableWrapper.table.jumpTableEntrySize = 0
-                jitHostFunctionTableWrapper.table.jumpTableEntriesCount = 0
-                jitHostFunctionTableWrapper.table.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
+                jitHostFunctionTablePtr.pointee.jumpTableData = nil
+                jitHostFunctionTablePtr.pointee.jumpTableSize = 0
+                jitHostFunctionTablePtr.pointee.jumpTableEntrySize = 0
+                jitHostFunctionTablePtr.pointee.jumpTableEntriesCount = 0
+                jitHostFunctionTablePtr.pointee.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
             }
 
-            // Get a pointer to the JITHostFunctionTableWrapper
-            let invocationContextPointer = Unmanaged.passUnretained(jitHostFunctionTableWrapper).toOpaque()
+            // Get pointer to heap-allocated JITHostFunctionTable
+            let invocationContextPointer = UnsafeMutableRawPointer(jitHostFunctionTablePtr)
 
             // Execute the JIT-compiled function
             // The JIT function will use our syncHostCallHandler via the C trampoline
@@ -305,7 +315,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
             }
 
             // Clear the invocation context reference after execution
-            jitHostFunctionTableWrapper.table.invocationContext = nil
+            jitHostFunctionTablePtr.pointee.invocationContext = nil
 
             // Calculate gas used (handle saturating Gas type correctly)
             let gasUsed: Gas
