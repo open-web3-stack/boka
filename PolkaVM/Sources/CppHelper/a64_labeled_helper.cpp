@@ -353,6 +353,10 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             // internalError, hostFunctionNotFound, hostFunctionThrewError, etc.)
             a.cmp(a64::w0, 0xFFFFFFFA);
             a.b_hs(panicLabel);  // Branch if Higher or Same (unsigned comparison)
+            // TODO: This loses specific error codes (e.g., hostRequestedHalt, pageFault)
+            // All errors are treated as panic(.trap) with exit code -1
+            // Should preserve specific error codes by not jumping to panicLabel
+            // or by jumping to a common error handler that preserves w0
 
             // Store result in R0
             a.str(a64::x0, a64::ptr(a64::x19, 0));
