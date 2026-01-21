@@ -169,8 +169,15 @@ final class ExecutorBackendJIT: ExecutorBackend {
             // but the JIT compiler expects just the bytecode portion.
             // Calculate total memory size from config for proper bounds checking
             let totalMemorySize = (config.initialHeapPages + config.stackPages) * UInt32(config.pvmMemoryPageSize)
+
+            // Safely unwrap programCode with proper error handling
+            guard let programCode = currentProgramCode else {
+                logger.error("ProgramCode not available for JIT compilation")
+                return VMExecutionResult(exitReason: .panic(.trap), gasUsed: gas, outputData: nil)
+            }
+
             let compiledFuncPtr = try jitCompiler.compile(
-                blob: currentProgramCode!.code,
+                blob: programCode.code,
                 initialPC: pc,
                 config: config,
                 targetArchitecture: targetArchitecture,
@@ -189,21 +196,43 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         return JITHostCallError.internalErrorInvalidContext.rawValue
                     }
 
-                    // Create a VMStateJIT adapter
+                    // Read current PC from register r15 (PC register in JIT-compiled code)
+                    let currentPC = UInt32(truncatingIfNeeded: guestRegistersPtr[Int(15)])
+
+                    // Create a VMStateJIT adapter with the current PC from JIT execution
                     let vmState = VMStateJIT(
                         jitMemoryBasePtr: guestMemoryBasePtr,
                         jitMemorySize: guestMemorySize,
                         jitRegistersPtr: guestRegistersPtr,
                         jitGasPtr: guestGasPtr,
                         programCode: programCode,
-                        initialPC: 0 // TODO: track real PC
+                        initialPC: currentPC
                     )
 
                     // We need to convert the async operation to sync
                     // Use DispatchQueue to avoid blocking the cooperative pool
                     let semaphore = DispatchSemaphore(value: 0)
-                    // FIXME: `nonisolated(unsafe)` due to swift 6.2 check, figure out a better way to handle this
-                    nonisolated(unsafe) var asyncResult: ExecOutcome?
+
+                    // Thread-safe wrapper for async result using a class
+                    final class AsyncResultBox: @unchecked Sendable {
+                        var result: ExecOutcome?
+                        let lock = NSLock()
+
+                        func set(_ value: ExecOutcome) {
+                            lock.lock()
+                            result = value
+                            lock.unlock()
+                        }
+
+                        func get() -> ExecOutcome? {
+                            lock.lock()
+                            let r = result
+                            lock.unlock()
+                            return r
+                        }
+                    }
+
+                    let resultBox = AsyncResultBox()
 
                     // TODO: consider make InvocationContext Sendable
                     let boxedCtx = UncheckedSendableBox(invocationContext)
@@ -211,7 +240,8 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     // Kick off the async operation on a detached task to avoid pool starvation
                     // Propagate priority from current task
                     Task.detached(priority: Task.currentPriority) { @Sendable in
-                        asyncResult = await boxedCtx.value.dispatch(index: hostCallIndex, state: vmState)
+                        let result = await boxedCtx.value.dispatch(index: hostCallIndex, state: vmState)
+                        resultBox.set(result)
                         semaphore.signal()
                     }
 
@@ -223,7 +253,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     semaphore.wait()
 
                     // Process the async result and return appropriate status
-                    if let result = asyncResult {
+                    if let result = resultBox.get() {
                         switch result {
                         case .continued:
                             return 0 // Success
@@ -343,9 +373,13 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 } else if UInt64(outputAddr) + UInt64(outputLen) <= UInt64(totalMemorySize) {
                     outputData = Data(bytes: memoryBuffer.advanced(by: Int(outputAddr)), count: Int(outputLen))
                 } else {
-                    // Invalid memory access - return nil to indicate error
-                    logger.warning("Invalid output memory range: addr=\(outputAddr), len=\(outputLen), memorySize=\(totalMemorySize)")
-                    outputData = nil
+                    // Invalid memory access - treat as panic to signal the error
+                    logger.error("Invalid output memory range: addr=\(outputAddr), len=\(outputLen), memorySize=\(totalMemorySize)")
+                    return VMExecutionResult(
+                        exitReason: .panic(.jitMemoryError),
+                        gasUsed: gasUsed,
+                        outputData: nil
+                    )
                 }
             default:
                 outputData = nil
