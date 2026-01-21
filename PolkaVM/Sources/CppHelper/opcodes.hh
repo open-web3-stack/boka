@@ -16,38 +16,126 @@ enum class Opcode : uint8_t {
     // Control Flow Instructions
     Trap = 0,           // Trap - stop execution with error
     Halt = 1,           // Fallthrough - normal termination
+    Ecalli = 10,        // Environment call with immediate
+
+    // Store Immediate Indirect
+    StoreImmIndU8 = 70,
+    StoreImmIndU16 = 71,
+    StoreImmIndU32 = 72,
+    StoreImmIndU64 = 73,
+
+    // Jump Instructions
     Jump = 40,          // Unconditional jump to offset
     JumpInd = 50,       // Indirect jump through register
-    LoadImmJump = 80,    // Load immediate and jump
+    LoadImmJump = 80,   // Load immediate and jump
+    LoadImmJumpInd = 180, // Load immediate and jump indirect
 
     // Load Immediate Instructions
     LoadImm = 51,       // LoadImm (32-bit immediate)
-    LoadImmU64 = 20,     // LoadImm64 (64-bit immediate)
+    LoadImmU64 = 20,    // LoadImm64 (64-bit immediate)
 
     // Load Instructions
-    LoadU8 = 52,         // Load unsigned 8-bit
-    LoadI8 = 53,         // Load signed 8-bit
-    LoadU16 = 54,        // Load unsigned 16-bit
-    LoadI16 = 55,        // Load signed 16-bit
-    LoadU32 = 56,        // Load unsigned 32-bit
-    LoadI32 = 57,        // Load signed 32-bit
-    LoadU64 = 58,        // Load unsigned 64-bit
+    LoadU8 = 52,        // Load unsigned 8-bit
+    LoadI8 = 53,        // Load signed 8-bit
+    LoadU16 = 54,       // Load unsigned 16-bit
+    LoadI16 = 55,       // Load signed 16-bit
+    LoadU32 = 56,       // Load unsigned 32-bit
+    LoadI32 = 57,       // Load signed 32-bit
+    LoadU64 = 58,       // Load unsigned 64-bit
 
     // Store Instructions
-    StoreU8 = 59,        // Store unsigned 8-bit
-    StoreU16 = 60,       // Store unsigned 16-bit
-    StoreU32 = 61,       // Store unsigned 32-bit
-    StoreU64 = 62,       // Store unsigned 64-bit
-    StoreImmU8 = 30,     // Store immediate unsigned 8-bit
-    StoreImmU16 = 31,    // Store immediate unsigned 16-bit
-    StoreImmU32 = 32,    // Store immediate unsigned 32-bit
-    StoreImmU64 = 33,    // Store immediate unsigned 64-bit
+    StoreU8 = 59,       // Store unsigned 8-bit
+    StoreU16 = 60,      // Store unsigned 16-bit
+    StoreU32 = 61,      // Store unsigned 32-bit
+    StoreU64 = 62,      // Store unsigned 64-bit
+    StoreImmU8 = 30,    // Store immediate unsigned 8-bit
+    StoreImmU16 = 31,   // Store immediate unsigned 16-bit
+    StoreImmU32 = 32,   // Store immediate unsigned 32-bit
+    StoreImmU64 = 33,   // Store immediate unsigned 64-bit
+
+    // Branch Immediate Instructions
+    BranchEqImm = 81,   // Branch if equal (immediate)
+    BranchNeImm = 82,   // Branch if not equal (immediate)
+    BranchLtUImm = 83,
+    BranchLeUImm = 84,
+    BranchGeUImm = 85,
+    BranchGtUImm = 86,
+    BranchLtSImm = 87,
+    BranchLeSImm = 88,
+    BranchGeSImm = 89,
+    BranchGtSImm = 90,
+
+    // Register Operations
+    MoveReg = 100,
+    Sbrk = 101,
+    CountSetBits64 = 102,
+    CountSetBits32 = 103,
+    LeadingZeroBits64 = 104,
+    LeadingZeroBits32 = 105,
+    TrailingZeroBits64 = 106,
+    TrailingZeroBits32 = 107,
+    SignExtend8 = 108,
+    SignExtend16 = 109,
+    ZeroExtend16 = 110,
+    ReverseBytes = 111,
+
+    // Store Indirect Instructions
+    StoreIndU8 = 120,
+    StoreIndU16 = 121,
+    StoreIndU32 = 122,
+    StoreIndU64 = 123,
+
+    // Load Indirect Instructions
+    LoadIndU8 = 124,
+    LoadIndI8 = 125,
+    LoadIndU16 = 126,
+    LoadIndI16 = 127,
+    LoadIndU32 = 128,
+    LoadIndI32 = 129,
+    LoadIndU64 = 130,
+
+    // 32-bit Immediate Instructions
+    AddImm32 = 131,
+    AndImm = 132,
+    XorImm = 133,
+    OrImm = 134,
+    MulImm32 = 135,
+    SetLtUImm = 136,
+    SetLtSImm = 137,
+    ShloLImm32 = 138,
+    ShloRImm32 = 139,
+    SharRImm32 = 140,
+    NegAddImm32 = 141,
+    SetGtUImm = 142,
+    SetGtSImm = 143,
+    ShloLImmAlt32 = 144,
+    ShloRImmAlt32 = 145,
+    SharRImmAlt32 = 146,
+    CmovIzImm = 147,
+    CmovNzImm = 148,
+
+    // 64-bit Immediate Instructions
+    AddImm64 = 149,
+    MulImm64 = 150,
+    ShloLImm64 = 151,
+    ShloRImm64 = 152,
+    SharRImm64 = 153,
+    NegAddImm64 = 154,
+    ShloLImmAlt64 = 155,
+    ShloRImmAlt64 = 156,
+    SharRImmAlt64 = 157,
+    RotR64Imm = 158,
+    RotR64ImmAlt = 159,
+    RotR32Imm = 160,
+    RotR32ImmAlt = 161,
 
     // Branch Instructions
     BranchEq = 170,     // Branch if equal
     BranchNe = 171,     // Branch if not equal
-    BranchEqImm = 173,  // Branch if equal (immediate)
-    BranchNeImm = 174,  // Branch if not equal (immediate)
+    BranchLtU = 172,
+    BranchLtS = 173,
+    BranchGeU = 174,
+    BranchGeS = 175,
 
     // 32-bit Arithmetic Instructions
     Add32 = 190,        // Add 32-bit
@@ -57,15 +145,21 @@ enum class Opcode : uint8_t {
     DivS32 = 194,       // Divide signed 32-bit
     RemU32 = 195,       // Remainder unsigned 32-bit
     RemS32 = 196,       // Remainder signed 32-bit
+    ShloL32 = 197,      // Shift left logical 32-bit
+    ShloR32 = 198,      // Shift right logical 32-bit
+    SharR32 = 199,      // Shift right arithmetic 32-bit
 
     // 64-bit Arithmetic Instructions
     Add64 = 200,        // Add 64-bit
     Sub64 = 201,        // Subtract 64-bit
     Mul64 = 202,        // Multiply 64-bit
-    DivU64 = 203,       // Divide unsigned 64-bit (Note: implementation uses different opcode)
+    DivU64 = 203,       // Divide unsigned 64-bit
     DivS64 = 204,       // Divide signed 64-bit
     RemU64 = 205,       // Remainder unsigned 64-bit
     RemS64 = 206,       // Remainder signed 64-bit
+    ShloL64 = 207,      // Shift left logical 64-bit
+    ShloR64 = 208,      // Shift right logical 64-bit
+    SharR64 = 209,      // Shift right arithmetic 64-bit
 
     // Bitwise Operations
     And = 210,          // Bitwise AND
@@ -84,6 +178,9 @@ enum class Opcode : uint8_t {
     RotL32 = 221,       // Rotate left 32-bit (2-register format)
     RotR64 = 222,       // Rotate right 64-bit
     RotR32 = 223,       // Rotate right 32-bit (2-register format)
+    AndInv = 224,       // Bitwise AND with inverted operand
+    OrInv = 225,        // Bitwise OR with inverted operand
+    Xnor = 226,         // Bitwise XNOR
     Max = 227,          // Maximum signed
     MaxU = 228,         // Maximum unsigned
     Min = 229,          // Minimum signed
