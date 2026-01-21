@@ -4,6 +4,7 @@
 import AsmJitLib
 import CppHelper
 import Foundation
+import Synchronization
 import TracingUtils
 import Utils
 
@@ -213,26 +214,8 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     // Use DispatchQueue to avoid blocking the cooperative pool
                     let semaphore = DispatchSemaphore(value: 0)
 
-                    // Thread-safe wrapper for async result using a class
-                    final class AsyncResultBox: @unchecked Sendable {
-                        var result: ExecOutcome?
-                        let lock = NSLock()
-
-                        func set(_ value: ExecOutcome) {
-                            lock.lock()
-                            result = value
-                            lock.unlock()
-                        }
-
-                        func get() -> ExecOutcome? {
-                            lock.lock()
-                            let r = result
-                            lock.unlock()
-                            return r
-                        }
-                    }
-
-                    let resultBox = AsyncResultBox()
+                    // Thread-safe result storage using Mutex from Utils
+                    let resultBox: Mutex<ExecOutcome?> = .init(nil)
 
                     // TODO: consider make InvocationContext Sendable
                     let boxedCtx = UncheckedSendableBox(invocationContext)
@@ -241,7 +224,9 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     // Propagate priority from current task
                     Task.detached(priority: Task.currentPriority) { @Sendable in
                         let result = await boxedCtx.value.dispatch(index: hostCallIndex, state: vmState)
-                        resultBox.set(result)
+                        resultBox.withLock { box in
+                            box = result
+                        }
                         semaphore.signal()
                     }
 
@@ -253,7 +238,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     semaphore.wait()
 
                     // Process the async result and return appropriate status
-                    if let result = resultBox.get() {
+                    if let result = resultBox.withLock({ $0 }) {
                         switch result {
                         case .continued:
                             return 0 // Success
