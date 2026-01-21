@@ -198,9 +198,15 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             return 3; // Compilation error
         }
 
-        // Bind label for this PC if it's a jump target
-        // This ensures jump targets have labels that the dispatcher can use
+        // Bind label for this PC if:
+        // 1. It's a jump target (for branches/jumps)
+        // 2. OR we need a dispatcher table (for JumpInd to work)
+        // This ensures the dispatcher table has entries for all valid PCs
         if (labelManager.isMarkedTarget(pc) || labelManager.isJumpTarget(pc)) {
+            labelManager.bindLabel(&a, pc, "x86_64");
+        } else if (needsDispatcherTable) {
+            // For dispatcher table, we need labels for ALL instruction PCs
+            // This allows JumpInd to jump to any PC without falling back to interpreter
             labelManager.bindLabel(&a, pc, "x86_64");
         }
 
@@ -770,10 +776,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     // Build dispatcher jump table ONLY if needed (has JumpInd instructions)
     // This allows JumpInd to work without a PVM jump table
     if (needsDispatcherTable) {
-        // Note: We only have labels for jump targets, not every PC
-        // For PCs without labels, the table entry will be null, causing fallback
+        // OPTIMIZATION: Create dispatcher entries for ALL instruction PCs
+        // This eliminates interpreter fallbacks for JumpInd to any PC
+        // Previously we only created entries for jump targets, causing fallback
 
-        // Get all PCs that have labels from labelManager
+        // Get all PCs that have labels (now includes ALL instruction PCs when needsDispatcherTable is true)
         std::vector<uint32_t> labeledPCs = labelManager.getAllPCs();
 
         // Allocate table (one entry per possible PC, initialized to null)
