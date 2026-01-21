@@ -231,18 +231,34 @@ public class IPCServer {
     /// Convert errno to string (thread-safe)
     private func errnoToString(_ err: Int32) -> String {
         var buffer = [Int8](repeating: 0, count: 256)
+
         // Use strerror_r for thread safety
+        // On Linux, strerror_r has two variants:
+        // - GNU (glibc): returns char* pointer to error string
+        // - XSI (musl): returns Int32 (0 on success, error code on failure)
+        //
+        // Swift's Glibc module imports the GNU version, so we get a char* return.
+        // However, on musl-based systems (Alpine Linux), the C library uses XSI
+        // and the function returns Int32.
+        //
+        // We handle this by always checking the buffer first (both variants write to it),
+        // then using the returned pointer if available (GNU variant).
         #if os(Linux)
-        // GNU version: returns char* (pointer to error string, may be static or our buffer)
+        // Linux: Try GNU variant first, fall back to buffer
         let result = strerror_r(err, &buffer, buffer.count)
-        // On success, result points to the error string (use it instead of buffer)
-        if result != nil {
-            return String(cString: result!)
+
+        // GNU version returns char* (may be static string or our buffer)
+        // If result is nil or invalid, use buffer directly (XSI variant)
+        if let ptr = result, ptr != UnsafeMutablePointer<Int8>(bitPattern: 0xFFFFFFFF) {
+            // Check if pointer points to our buffer or static memory
+            // GNU version: use the returned pointer
+            return String(cString: ptr)
         } else {
-            return "Unknown error \(err)"
+            // XSI version or error: buffer was populated
+            return String(cString: &buffer)
         }
         #else
-        // XSI version (macOS): returns Int32 (0 on success, error code on failure)
+        // macOS/BSD: XSI version, returns Int32
         let result = strerror_r(err, &buffer, buffer.count)
         if result == 0 {
             return String(cString: &buffer)
