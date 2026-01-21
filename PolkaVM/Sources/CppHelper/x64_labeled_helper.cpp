@@ -13,11 +13,37 @@
 #include <cstring>
 #include <stdio.h>
 #include <vector>
+#include <unordered_map>
+#include <mutex>
+#include <memory>
 
 using namespace asmjit;
 using namespace asmjit::x86;
 using namespace JIT;
 using namespace PVM;
+
+// Global storage for dispatcher jump tables
+// Maps function pointer -> dispatcher table
+static std::unordered_map<void*, std::pair<void**, size_t>> s_dispatcherTables;
+static std::mutex s_dispatcherTablesMutex;
+
+// Export function to get dispatcher table for a function
+extern "C" void** getDispatcherTable(void* funcPtr, size_t* outSize) {
+    std::lock_guard<std::mutex> lock(s_dispatcherTablesMutex);
+    auto it = s_dispatcherTables.find(funcPtr);
+    if (it != s_dispatcherTables.end()) {
+        *outSize = it->second.second;
+        return it->second.first;
+    }
+    *outSize = 0;
+    return nullptr;
+}
+
+// Export function to set dispatcher table for a function (called from Swift)
+extern "C" void setDispatcherTable(void* funcPtr, void** table, size_t size) {
+    std::lock_guard<std::mutex> lock(s_dispatcherTablesMutex);
+    s_dispatcherTables[funcPtr] = {table, size};
+}
 
 // External declaration for the instruction emitter
 extern "C" bool jit_emitter_emit_basic_block_instructions(
@@ -92,16 +118,25 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     // Create label manager
     LabelManager labelManager;
 
+    // We'll build the dispatcher table after compilation, using labels that get created
+    // during the normal compilation process (via labelManager)
+
     // Create exit labels for different exit conditions
     Label exitLabel = a.newLabel();       // Normal exit (halt) - eax = 0
     Label panicLabel = a.newLabel();      // Panic exit (trap, address < 65536) - eax = -1
     Label pagefaultLabel = a.newLabel();  // Page fault exit (address >= memory_size) - eax = 3
     Label outOfGasLabel = a.newLabel();   // Out of gas exit - eax = 1
     Label unsupportedLabel = a.newLabel();// Unsupported instruction - exit to interpreter - eax = 2
+    Label dispatcherLoop = a.newLabel();  // Dispatcher loop for indirect jumps without jump table
     Label epilogueLabel = a.newLabel();   // Epilogue (restore registers and return)
+
+    // Pass the PC label map to labelManager for use during compilation
+    // We'll store it separately and use it to build the dispatcher jump table
 
     // === PRE-PASS: Identify all jump targets ===
     // This is necessary to handle backward jumps (loops)
+    // Also check if we need dispatcher table (has JumpInd without jump table support)
+    bool needsDispatcherTable = false;
     uint32_t pc = 0;
     while (pc < codeSize) {
         uint8_t opcode = codeBuffer[pc];
@@ -110,6 +145,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         if (instrSize == 0) {
             // Unknown opcode - compilation error
             return 3; // Compilation error
+        }
+
+        // Check if this code has JumpInd (which needs dispatcher)
+        if (opcode_is(opcode, Opcode::JumpInd)) {
+            needsDispatcherTable = true;
         }
 
         // Mark jump targets for control flow instructions
@@ -158,8 +198,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             return 3; // Compilation error
         }
 
-        // Check if this PC is a jump target (from pre-pass or previous branch)
-        // Bind label here if so
+        // Bind label for this PC if it's a jump target
+        // This ensures jump targets have labels that the dispatcher can use
         if (labelManager.isMarkedTarget(pc) || labelManager.isJumpTarget(pc)) {
             labelManager.bindLabel(&a, pc, "x86_64");
         }
@@ -232,7 +272,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Check if jump table is available
             a.mov(x86::rdx, x86::qword_ptr(x86::rbp, offsetof(JITHostFunctionTable, jumpTableData)));
             a.test(x86::rdx, x86::rdx);
-            a.jz(unsupportedLabel);  // No jump table, fall back to interpreter
+            a.jz(dispatcherLoop);  // No jump table, use dispatcher loop instead
 
             // Load jump table parameters
             a.mov(x86::ecx, x86::dword_ptr(x86::rbp, offsetof(JITHostFunctionTable, alignmentFactor)));
@@ -353,6 +393,10 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // internalError, hostFunctionNotFound, hostFunctionThrewError, etc.)
             a.cmp(x86::eax, 0xFFFFFFFA);
             a.jae(panicLabel);  // Jump if above or equal (error range)
+            // TODO: This loses specific error codes (e.g., hostRequestedHalt, pageFault)
+            // All errors are treated as panic(.trap) with exit code -1
+            // Should preserve specific error codes by not jumping to panicLabel
+            // or by jumping to a common error handler that preserves eax
 
             // Store result in R0
             a.mov(x86::qword_ptr(x86::rbx, 0), x86::rax);
@@ -658,11 +702,17 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     a.mov(x86::eax, 1);   // Exit code 1 = outOfGas
     a.jmp(epilogueLabel);
 
+    // Bind unsupported label
+    a.bind(unsupportedLabel);
+    a.mov(x86::eax, 2);   // Exit code 2 = fallback to interpreter
+    a.jmp(epilogueLabel);
+
     // Bind exit label
     a.bind(exitLabel);
 
     // Set return value to 0 (halt) in eax
     a.xor_(x86::eax, x86::eax);
+    // Fall through to epilogue
 
     // Bind epilogue label (for Trap - already has eax=-1 set)
     a.bind(epilogueLabel);
@@ -676,14 +726,203 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     a.pop(rbx);
     a.ret();
 
+    // === DISPATCHER LOOP FOR INDIRECT JUMPS WITHOUT JUMP TABLE ===
+    // This is used by JumpInd when no jump table is provided
+    // It implements a computed goto using a jump table built at compile time
+    // NOTE: This must come AFTER the epilogue/ret so normal execution can't reach it
+    a.bind(dispatcherLoop);
+
+    // Validate PC is within bounds
+    a.cmp(x86::r15d, static_cast<uint32_t>(codeSize));
+    a.jae(pagefaultLabel);  // PC out of bounds
+
+    // Load the jump table base address from the context
+    // The jump table is stored in JITHostFunctionTable.dispatcherJumpTable
+    a.mov(x86::rdx, x86::qword_ptr(x86::rbp, offsetof(JITHostFunctionTable, dispatcherJumpTable)));
+    a.test(x86::rdx, x86::rdx);
+    a.jz(unsupportedLabel);  // No dispatcher table - fall back to interpreter
+
+    // Jump table entry size = 8 bytes (pointer)
+    // Calculate offset: PC * 8
+    a.mov(x86::eax, x86::r15d);  // Load PC
+    a.shl(x86::rax, 3);  // Multiply by 8 (pointer size)
+    a.add(x86::rdx, x86::rax);  // Add to base
+
+    // Load target address from jump table
+    a.mov(x86::rax, x86::qword_ptr(x86::rdx));
+
+    // Jump to the target address
+    a.test(x86::rax, x86::rax);  // Check if address is null
+    a.jz(unsupportedLabel);  // Null entry - fall back to interpreter
+    a.jmp(x86::rax);
+    // NOTE: Execution never returns here - either jumps to target or falls back
+
     // Generate the function code
     Error err = runtime.add(funcOut, &code);
     if (err) {
         return int32_t(err);
     }
 
+    // Build dispatcher jump table ONLY if needed (has JumpInd instructions)
+    // This allows JumpInd to work without a PVM jump table
+    if (needsDispatcherTable) {
+        // Note: We only have labels for jump targets, not every PC
+        // For PCs without labels, the table entry will be null, causing fallback
+
+        // Get all PCs that have labels from labelManager
+        std::vector<uint32_t> labeledPCs = labelManager.getAllPCs();
+
+        // Allocate table (one entry per possible PC, initialized to null)
+        auto dispatcherTable = std::make_unique<void*[]>(codeSize);
+        std::memset(dispatcherTable.get(), 0, codeSize * sizeof(void*));
+
+        // Get the base address of the generated function
+        uint8_t* funcBase = reinterpret_cast<uint8_t*>(*funcOut);
+
+        // Resolve label addresses and populate the jump table
+        for (uint32_t pc : labeledPCs) {
+            Label label = labelManager.getLabel(pc);
+            if (!label.isValid()) {
+                continue;  // Skip invalid labels
+            }
+
+            // Get the address of this label from the CodeHolder
+            const asmjit::LabelEntry* labelEntry = code.labelEntry(label);
+            if (labelEntry) {
+                uint64_t offset = labelEntry->offset();
+                dispatcherTable[pc] = funcBase + offset;
+            }
+        }
+
+        // Store the dispatcher table in global map for later retrieval
+        {
+            std::lock_guard<std::mutex> lock(s_dispatcherTablesMutex);
+            // Transfer ownership to global storage
+            void** tablePtr = dispatcherTable.release();
+            s_dispatcherTables[*funcOut] = {tablePtr, static_cast<size_t>(codeSize)};
+        }
+    }
+
     return 0; // Success
 }
 
-// ARM64 version - implemented in a64_labeled_helper.cpp
-// Declaration is in a64_helper.hh
+// ============================================================================
+// MARK: - Export/Import API for Persistent Caching
+// ============================================================================
+
+/// Export compiled code metadata for serialization
+/// Returns information needed to serialize compiled code
+///
+/// NOTE: This is a simplified version that returns basic metadata
+/// Full code serialization would require deeper AsmJit integration
+///
+/// @param funcPtr Compiled function pointer from compilePolkaVMCode_x64_labeled
+/// @param dispatcherTableOut Output: dispatcher table pointer (if exists)
+/// @param dispatcherTableSizeOut Output: size of dispatcher table in entries
+/// @param hasDispatcherTableOut Output: 1 if function has dispatcher table, 0 otherwise
+/// @return 0 on success, error code on failure
+extern "C" int32_t getCompiledCodeInfo(
+    void* funcPtr,
+    void*** dispatcherTableOut,
+    size_t* dispatcherTableSizeOut,
+    int* hasDispatcherTableOut)
+{
+    if (!funcPtr || !dispatcherTableOut || !dispatcherTableSizeOut || !hasDispatcherTableOut) {
+        return -1;  // Invalid parameters
+    }
+
+    std::lock_guard<std::mutex> lock(s_dispatcherTablesMutex);
+    auto it = s_dispatcherTables.find(funcPtr);
+
+    if (it != s_dispatcherTables.end()) {
+        // Function has a dispatcher table
+        *dispatcherTableOut = it->second.first;
+        *dispatcherTableSizeOut = it->second.second;
+        *hasDispatcherTableOut = 1;
+    } else {
+        // Function doesn't have a dispatcher table (no JumpInd)
+        *dispatcherTableOut = nullptr;
+        *dispatcherTableSizeOut = 0;
+        *hasDispatcherTableOut = 0;
+    }
+
+    return 0;  // Success
+}
+
+/// Store compiled code metadata for a function
+/// This allows tracking which bytecode corresponds to which compiled function
+///
+/// @param bytecodeHash Hash of the bytecode (for cache key)
+/// @param funcPtr Compiled function pointer
+/// @param codeSize Size of the compiled code in bytes (if known)
+/// @return 0 on success, error code on failure
+extern "C" int32_t setCompiledCodeMetadata(
+    uint64_t bytecodeHash,
+    void* funcPtr,
+    size_t codeSize)
+{
+    if (!funcPtr) {
+        return -1;  // Invalid parameter
+    }
+
+    // For now, this is a placeholder
+    // In a full implementation, we would store this mapping in a global cache
+    // This allows looking up functions by bytecode hash later
+
+    return 0;  // Success
+}
+
+// ============================================================================
+// MARK: - Memory Management (Dispatcher Table Cleanup)
+// ============================================================================
+
+/// Free the dispatcher table associated with a JIT-compiled function (x64 version)
+/// This prevents memory leaks from accumulating dispatcher tables
+///
+/// @param funcPtr Function pointer returned by compilePolkaVMCode_x64_labeled
+/// @note Safe to call with nullptr or function pointers that don't have tables
+extern "C" void freeDispatcherTable_x64(void* funcPtr) {
+    if (!funcPtr) {
+        return;  // Nothing to free
+    }
+
+    std::lock_guard<std::mutex> lock(s_dispatcherTablesMutex);
+    auto it = s_dispatcherTables.find(funcPtr);
+
+    if (it != s_dispatcherTables.end()) {
+        // Free the dispatcher table array
+        void** table = it->second.first;
+        delete[] table;
+
+        // Remove from map
+        s_dispatcherTables.erase(it);
+
+        #ifdef DEBUG_JIT
+        fprintf(stderr, "[JIT x64] Freed dispatcher table for function %p\n", funcPtr);
+        #endif
+    } else {
+        #ifdef DEBUG_JIT
+        fprintf(stderr, "[JIT x64] Warning: No dispatcher table for function %p\n", funcPtr);
+        #endif
+    }
+}
+
+/// Free ALL dispatcher tables (x64 version)
+/// Useful for process cleanup or memory pressure situations
+///
+/// @note This frees all global dispatcher table storage
+extern "C" void freeAllDispatcherTables_x64() {
+    std::lock_guard<std::mutex> lock(s_dispatcherTablesMutex);
+
+    for (auto& entry : s_dispatcherTables) {
+        void** table = entry.second.first;
+        delete[] table;
+    }
+
+    size_t count = s_dispatcherTables.size();
+    s_dispatcherTables.clear();
+
+    #ifdef DEBUG_JIT
+    fprintf(stderr, "[JIT x64] Freed %zu dispatcher tables\n", count);
+    #endif
+}
