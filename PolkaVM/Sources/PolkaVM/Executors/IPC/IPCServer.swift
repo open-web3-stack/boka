@@ -237,24 +237,39 @@ public class IPCServer {
         // - GNU (glibc): returns char* pointer to error string
         // - XSI (musl): returns Int32 (0 on success, error code on failure)
         //
-        // Swift's Glibc module imports the GNU version, so we get a char* return.
-        // However, on musl-based systems (Alpine Linux), the C library uses XSI
-        // and the function returns Int32.
+        // Swift's Glibc module imports the GNU version signature, but the actual
+        // implementation depends on the C library (glibc vs musl).
         //
-        // We handle this by always checking the buffer first (both variants write to it),
-        // then using the returned pointer if available (GNU variant).
+        // CRITICAL: On XSI-compliant systems (musl), strerror_r returns Int32,
+        // which Swift treats as a pointer. If this Int32 is small (e.g., EINVAL=22),
+        // it becomes an invalid memory address causing crashes.
+        //
+        // Solution: Validate the "pointer" is actually a valid memory address
+        // before dereferencing. Valid addresses are either:
+        // 1. Pointing to our buffer (check address range)
+        // 2. Pointing to static memory (high address > 4096)
         #if os(Linux)
-        // Linux: Try GNU variant first, fall back to buffer
         let result = strerror_r(err, &buffer, buffer.count)
 
-        // GNU version returns char* (may be static string or our buffer)
-        // If result is nil or invalid, use buffer directly (XSI variant)
-        if let ptr = result, ptr != UnsafeMutablePointer<Int8>(bitPattern: 0xFFFFFFFF) {
-            // Check if pointer points to our buffer or static memory
-            // GNU version: use the returned pointer
-            return String(cString: ptr)
+        // Check if result is a valid pointer (GNU version) or error code (XSI version)
+        if let ptr = result {
+            // Get the numeric address value
+            let addr = Int(bitPattern: ptr)
+
+            // Valid pointers are either:
+            // - Our buffer (stack address, typically very high)
+            // - Static string (data segment, > 4096)
+            // Invalid: XSI error codes are small positive integers (1-4095)
+            if addr > 4096 {
+                // Valid pointer: use it (GNU version)
+                return String(cString: ptr)
+            } else {
+                // Invalid pointer: must be XSI error code, use buffer
+                // Buffer was populated even on error in XSI version
+                return String(cString: &buffer)
+            }
         } else {
-            // XSI version or error: buffer was populated
+            // nil result: use buffer
             return String(cString: &buffer)
         }
         #else

@@ -343,7 +343,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.bind(entrySize3);
             a.movzx(x86::eax, x86::byte_ptr(x86::r11, x86::rdx));  // Read byte 0
             a.mov(x86::r10d, x86::eax);  // Save byte 0
-            a.movzx(x86::eax, x86::word_ptr(x86::r11, x86::rdx, 1));  // Read bytes 1-2
+            // Read bytes 1-2: [r11 + rdx + 1] using base + index + displacement
+            // Format: [base + index*scale + displacement]
+            a.movzx(x86::eax, x86::word_ptr(x86::r11, x86::rdx, 0, 1));  // Read bytes 1-2
             a.shl(x86::eax, 8);  // Shift to make room for byte 0
             a.or_(x86::eax, x86::r10d);  // Combine byte 0
             a.jmp(readDone);
