@@ -210,60 +210,50 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         initialPC: 0
                     )
 
-                    // We need to convert the async operation to sync
-                    // Use DispatchQueue to avoid blocking the cooperative pool
+                    // Convert async operation to sync using semaphore + mutex
                     let semaphore = DispatchSemaphore(value: 0)
-
-                    // Thread-safe result storage using Mutex from Utils
                     let resultBox: Mutex<ExecOutcome?> = .init(nil)
 
                     // TODO: consider make InvocationContext Sendable
                     let boxedCtx = UncheckedSendableBox(invocationContext)
 
-                    // Kick off the async operation on a detached task to avoid pool starvation
-                    // Propagate priority from current task
-                    Task.detached(priority: Task.currentPriority) { @Sendable in
-                        let result = await boxedCtx.value.dispatch(index: hostCallIndex, state: vmState)
-                        resultBox.withLock { box in
-                            box = result
-                        }
+                    // Kick off the async operation on a detached task
+                    Task.detached(priority: Task.currentPriority) {
+                        let r = await boxedCtx.value.dispatch(index: hostCallIndex, state: vmState)
+                        resultBox.withLock { $0 = r }
                         semaphore.signal()
                     }
 
-                    // Wait for the async operation to complete
-                    // WARNING: Cannot use timeout because the detached task continues
-                    // accessing memory pointers even after timeout. A timeout would cause
-                    // use-after-free when JIT execution terminates and deallocates memoryBuffer.
-                    // We must wait indefinitely for the async operation to complete.
+                    // Block until async operation completes
                     semaphore.wait()
 
-                    // Process the async result and return appropriate status
-                    if let result = resultBox.withLock({ $0 }) {
-                        switch result {
-                        case .continued:
-                            return 0 // Success
-                        case let .exit(reason):
-                            switch reason {
-                            case .halt:
-                                return JITHostCallError.hostRequestedHalt.rawValue
-                            case .outOfGas:
-                                return JITHostCallError.gasExhausted.rawValue
-                            case let .hostCall(nestedIndex):
-                                self.logger.error("Nested host calls not supported: \(nestedIndex)")
-                                return JITHostCallError.hostFunctionThrewError.rawValue
-                            case let .pageFault(address):
-                                self.logger.error("Page fault at address \(address)")
-                                return JITHostCallError.pageFault.rawValue
-                            case .fallback:
-                                self.logger.error("Fallback not supported during host call")
-                                return JITHostCallError.hostFunctionThrewError.rawValue
-                            case .panic:
-                                return JITHostCallError.hostFunctionThrewError.rawValue
-                            }
-                        }
-                    } else {
+                    // Process the result
+                    guard let result = resultBox.value else {
                         self.logger.error("No result from async host function call")
                         return JITHostCallError.hostFunctionThrewError.rawValue
+                    }
+
+                    switch result {
+                    case .continued:
+                        return 0
+                    case let .exit(reason):
+                        switch reason {
+                        case .halt:
+                            return JITHostCallError.hostRequestedHalt.rawValue
+                        case .outOfGas:
+                            return JITHostCallError.gasExhausted.rawValue
+                        case let .hostCall(nestedIndex):
+                            self.logger.error("Nested host calls not supported: \(nestedIndex)")
+                            return JITHostCallError.hostFunctionThrewError.rawValue
+                        case let .pageFault(address):
+                            self.logger.error("Page fault at address \(address)")
+                            return JITHostCallError.pageFault.rawValue
+                        case .fallback:
+                            self.logger.error("Fallback not supported during host call")
+                            return JITHostCallError.hostFunctionThrewError.rawValue
+                        case .panic:
+                            return JITHostCallError.hostFunctionThrewError.rawValue
+                        }
                     }
                 }
             } else {
