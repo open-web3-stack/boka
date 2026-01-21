@@ -111,38 +111,69 @@ private final class JITCodeCache {
     }
 }
 
-/// ⚠️ CRITICAL: ExecutorBackendJIT is SINGLE-THREADED ONLY
+/// ⚠️ CRITICAL: ExecutorBackendJIT Concurrency Model
 ///
 /// This class is designed for **single-threaded execution only** and is NOT
-/// thread-safe for concurrent `execute()` calls.
+/// thread-safe for concurrent `execute()` calls on the same instance.
 ///
 /// ## Thread Safety Model
 ///
 /// ✅ **SAFE**:
 /// - Single-threaded execution of one instance
 /// - Multiple instances (each accessed from different thread)
+/// - Concurrent `execute()` calls on different instances
 ///
 /// ❌ **UNSAFE**:
 /// - Concurrent calls to `execute()` on the same instance
 /// - Shared access to `syncHostCallHandler` or `currentProgramCode`
 ///
-/// ## Concurrency Architecture Note
+/// ## Concurrency Architecture
 ///
-/// This implementation uses `semaphore.wait()` to bridge async Swift host
-/// functions to synchronous JIT code. **This blocks the Swift concurrency
-/// thread pool** and can cause deadlocks if:
-/// 1. Multiple executions run concurrently on the same instance
-/// 2. The thread pool has insufficient threads (e.g., pool size = 1)
+/// The JIT executor uses a hybrid approach to support async host functions:
 ///
-/// **Mitigation**: ExecutorFrontendInProcess serializes execution, ensuring
-/// only one JIT execution is active at a time. This is acceptable for the
-/// single-threaded use case but is **NOT safe for concurrent use**.
+/// 1. **Async entry point**: `execute()` is `async` and offloads JIT execution
+///    to `DispatchQueue.global()` to avoid blocking Swift concurrency pool threads
 ///
-/// ## Future Improvement
+/// 2. **Sync JIT execution**: The actual JIT code runs synchronously on the
+///    DispatchQueue thread, which is **outside** the Swift concurrency pool
 ///
-/// To support concurrent execution, the synchronous JIT call should be
-/// offloaded to a dedicated `Thread` or `DispatchQueue` (outside the Swift
-/// concurrency pool), allowing pool threads to remain free for async host calls.
+/// 3. **Host call bridge**: When JIT code needs to call an async Swift function,
+///    it uses `semaphore.wait()` to block the DispatchQueue thread while the
+///    async operation runs on the Swift concurrency pool
+///
+/// 4. **Multi-program execution**: The blockchain node can run multiple PVM programs
+///    concurrently by spawning multiple ExecutorBackendJIT instances (one per program)
+///
+/// ## Why DispatchQueue Offloading?
+///
+/// Without DispatchQueue offloading, the `semaphore.wait()` in the host call bridge
+/// would block Swift concurrency pool threads, potentially deadlocking when:
+/// - Multiple executions run concurrently
+/// - The thread pool has insufficient threads
+///
+/// By offloading to DispatchQueue.global(), we ensure:
+/// - Swift concurrency pool threads remain free for async operations
+/// - Only dedicated non-pool threads are blocked by semaphore.wait()
+/// - Multiple PVM programs can run concurrently at the node level
+///
+/// ## Usage Pattern for Node
+///
+/// ```swift
+/// // Node spawns one executor instance per PVM program
+/// let executor1 = ExecutorBackendJIT()  // Program 1
+/// let executor2 = ExecutorBackendJIT()  // Program 2
+///
+/// // These run concurrently without blocking each other
+/// async let result1 = executor1.execute(...)
+/// async let result2 = executor2.execute(...)
+/// ```
+///
+/// ## Internal State Safety
+///
+/// WARNING: This class has mutable instance state (`syncHostCallHandler`,
+/// `currentProgramCode`) that must not be shared across concurrent executions.
+/// TODO: Refactor to pass execution-specific state through context object
+/// instead of storing in instance properties.
 final class ExecutorBackendJIT: ExecutorBackend {
     private let logger = Logger(label: "ExecutorBackendJIT")
 
@@ -292,6 +323,65 @@ final class ExecutorBackendJIT: ExecutorBackend {
     ) async -> VMExecutionResult {
         logger.debug("JIT execution request. PC: \(pc), Gas: \(gas.value), Blob size: \(blob.count) bytes.")
 
+        // ⚠️ CRITICAL: Offload JIT execution to DispatchQueue to avoid blocking Swift concurrency pool
+        // The semaphore.wait() in host call bridge blocks the thread, which can exhaust
+        // the Swift concurrency pool and cause deadlocks when multiple executions run concurrently.
+        // By offloading to DispatchQueue.global(), we use non-pool threads for blocking operations.
+        //
+        // We use UncheckedSendableBox to safely pass non-Sendable values across concurrency boundary.
+        // This is safe because:
+        // 1. Each execute() call creates its own boxed values
+        // 2. The DispatchQueue.async closure captures these boxes exclusively
+        // 3. No shared mutable state is accessed concurrently
+        let boxedSelf = UncheckedSendableBox(self)
+        let boxedConfig = UncheckedSendableBox(config)
+        let boxedCtx = UncheckedSendableBox(ctx)
+        let boxedBlob = UncheckedSendableBox(blob)
+        let boxedArgumentData = UncheckedSendableBox(argumentData)
+
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let result = try boxedSelf.value.executeSynchronous(
+                        config: boxedConfig.value,
+                        blob: boxedBlob.value,
+                        pc: pc,
+                        gas: gas,
+                        argumentData: boxedArgumentData.value,
+                        ctx: boxedCtx.value
+                    )
+                    continuation.resume(returning: result)
+                } catch {
+                    // Handle error and convert to VMExecutionResult
+                    let mappedError: VMExecutionResult
+                    if let jitError = error as? JITError {
+                        mappedError = VMExecutionResult(
+                            exitReason: jitError.toExitReason(),
+                            gasUsed: gas,
+                            outputData: nil
+                        )
+                    } else {
+                        mappedError = VMExecutionResult(
+                            exitReason: .panic(.trap),
+                            gasUsed: gas,
+                            outputData: nil
+                        )
+                    }
+                    continuation.resume(returning: mappedError)
+                }
+            }
+        }
+    }
+
+    /// Synchronous JIT execution (runs on DispatchQueue, not Swift concurrency pool)
+    private func executeSynchronous(
+        config: PvmConfig,
+        blob: Data,
+        pc: UInt32,
+        gas: Gas,
+        argumentData: Data?,
+        ctx: (any InvocationContext)?
+    ) throws -> VMExecutionResult {
         var currentGas = gas // Mutable copy for JIT execution
 
         do {
@@ -436,20 +526,15 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     }
 
                     // Block until async operation completes
-                    // ⚠️ CRITICAL WARNING: This blocks a Swift Concurrency thread.
+                    // ✅ SAFE: This blocks the DispatchQueue thread (NOT Swift concurrency pool)
                     //
-                    // If too many JIT executions block concurrently (via semaphore.wait()),
-                    // the Swift concurrency thread pool may be exhausted, causing deadlock
-                    // where the detached task never gets to run because all threads are
-                    // blocked waiting.
+                    // The execute() method offloads JIT execution to DispatchQueue.global(),
+                    // so this semaphore.wait() blocks a dedicated non-pool thread.
+                    // The Swift concurrency pool remains free for the detached task to run.
                     //
-                    // MITIGATION: This is acceptable because:
-                    // 1. ExecutorBackendJIT is documented as SINGLE-THREADED
-                    // 2. ExecutorFrontendInProcess serializes execution
-                    // 3. Only one JIT execution should be active at a time
-                    //
-                    // DO NOT call this executor from multiple concurrent tasks without
-                    // external serialization (e.g., an actor or serial queue).
+                    // This architecture allows:
+                    // - Multiple PVM programs to run concurrently (different executor instances)
+                    // - Host functions to use async/await without deadlocking the pool
                     semaphore.wait()
 
                     // Process the result
