@@ -194,7 +194,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     )
 
                     // We need to convert the async operation to sync
-                    // Create a placeholder synchronization mechanism
+                    // Use DispatchQueue to avoid blocking the cooperative pool
                     let semaphore = DispatchSemaphore(value: 0)
                     // FIXME: `nonisolated(unsafe)` due to swift 6.2 check, figure out a better way to handle this
                     nonisolated(unsafe) var asyncResult: ExecOutcome?
@@ -202,14 +202,18 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     // TODO: consider make InvocationContext Sendable
                     let boxedCtx = UncheckedSendableBox(invocationContext)
 
-                    // Kick off the async operation but wait for it to complete
-                    Task { @Sendable in
+                    // Kick off the async operation on a detached task to avoid pool starvation
+                    Task.detached { @Sendable in
                         asyncResult = await boxedCtx.value.dispatch(index: hostCallIndex, state: vmState)
                         semaphore.signal()
                     }
 
-                    // Wait for the async operation to complete
-                    semaphore.wait()
+                    // Wait for the async operation to complete (on a DispatchQueue to avoid blocking pool)
+                    let waitResult = DispatchSemaphore.wait(timeout: .now() + 30) // 30 second timeout
+                    if waitResult == .timedOut {
+                        self.logger.error("Host call timed out")
+                        return JITHostCallError.internalErrorInvalidContext.rawValue
+                    }
 
                     // Process the async result and return appropriate status
                     if let result = asyncResult {
@@ -290,8 +294,15 @@ final class ExecutorBackendJIT: ExecutorBackend {
             currentProgramCode = nil
             jitHostFunctionTableWrapper.table.invocationContext = nil
 
-            // Calculate gas used
-            let gasUsed = gas - currentGas
+            // Calculate gas used (handle saturating Gas type correctly)
+            let gasUsed: Gas
+            if exitReason == .outOfGas {
+                // When out of gas, all remaining gas was used
+                gasUsed = gas
+            } else {
+                // Normal execution: subtract remaining from initial
+                gasUsed = gas - currentGas
+            }
 
             // Get output data from JIT memory (only on halt, following invokePVM pattern)
             let outputData: Data?
@@ -301,8 +312,8 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 let outputAddr = UInt32(truncatingIfNeeded: registers[Registers.Index(raw: 7)])
                 let outputLen = UInt32(truncatingIfNeeded: registers[Registers.Index(raw: 8)])
 
-                // Validate and read from JIT memory
-                if outputLen > 0 && outputAddr + outputLen <= totalMemorySize {
+                // Validate and read from JIT memory (prevent integer overflow)
+                if outputLen > 0 && UInt64(outputAddr) + UInt64(outputLen) <= UInt64(totalMemorySize) {
                     outputData = Data(bytes: memoryBuffer.advanced(by: Int(outputAddr)), count: Int(outputLen))
                 } else {
                     outputData = Data()
