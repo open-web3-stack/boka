@@ -5491,11 +5491,21 @@ bool jit_emit_mul_upper_su(
         a->mov(x86::rax, x86::qword_ptr(rbx, ra * 8));
         a->mov(x86::r8, x86::qword_ptr(rbx, rb * 8));
 
-        // Multiply signed-unsigned: rdx:rax = rax * r8 (signed * unsigned)
-        // Note: x86-64 doesn't have a direct signed*unsigned mul instruction
-        // We need to implement this manually
-        // For now, use unsigned mul (close enough for most cases)
+        // Save ra (signed operand) to check sign later
+        a->mov(x86::r9, x86::rax);
+
+        // Unsigned multiply: rdx:rax = rax * r8
+        // This gives us UInt128(ra) * UInt128(rb)
         a->mul(x86::r8);
+
+        // If ra was negative (signed), we need to adjust the result
+        // Int128(ra) * UInt128(rb) = UInt128(ra) * UInt128(rb) - UInt128(rb) * 2^64
+        // So we subtract rb from the high half (rdx)
+        Label skipSub = a->newLabel();
+        a->test(x86::r9, x86::r9);  // Test sign bit
+        a->jns(skipSub);            // Skip if positive
+        a->sub(x86::rdx, x86::r8);  // Subtract rb from high half
+        a->bind(skipSub);
 
         // Store high half (rdx) to rd
         a->mov(x86::qword_ptr(rbx, rd * 8), x86::rdx);
