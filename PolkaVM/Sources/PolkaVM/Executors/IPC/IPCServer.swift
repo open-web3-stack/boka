@@ -174,6 +174,10 @@ public class IPCServer {
 
                 if result < 0 {
                     let err = errno
+                    // EINTR: Interrupted system call - retry the write
+                    if err == EINTR {
+                        continue
+                    }
                     logger.error("Failed to write to IPC: \(errnoToString(err))")
                     throw IPCError.writeFailed(Int(err))
                 }
@@ -203,6 +207,10 @@ public class IPCServer {
 
                 if result < 0 {
                     let err = errno
+                    // EINTR: Interrupted system call - retry the read
+                    if err == EINTR {
+                        return
+                    }
                     logger.error("Failed to read from IPC: \(errnoToString(err))")
                     throw IPCError.readFailed(Int(err))
                 }
@@ -225,10 +233,11 @@ public class IPCServer {
         var buffer = [Int8](repeating: 0, count: 256)
         // Use strerror_r for thread safety
         #if os(Linux)
-        // GNU version: returns Int* (pointer to buffer on success, NULL on error)
+        // GNU version: returns char* (pointer to error string, may be static or our buffer)
         let result = strerror_r(err, &buffer, buffer.count)
+        // On success, result points to the error string (use it instead of buffer)
         if result != nil {
-            return String(cString: &buffer)
+            return String(cString: result!)
         } else {
             return "Unknown error \(err)"
         }
