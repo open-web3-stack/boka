@@ -359,18 +359,34 @@ final class ExecutorBackendJIT: ExecutorBackend {
             // Update the invocation context in the JIT host function table
             jitHostFunctionTablePtr.pointee.invocationContext = nil // We're using the syncHandler now
 
-            // Populate jump table data for JumpInd instruction support
-            if let programCode = currentProgramCode {
-                // Get jump table data as a pointer
-                let jumpTableData = programCode.jumpTable.withUnsafeBytes { rawBufferPointer in
-                    rawBufferPointer.baseAddress
-                }
+            // Get pointer to heap-allocated JITHostFunctionTable
+            let invocationContextPointer = UnsafeMutableRawPointer(jitHostFunctionTablePtr)
 
-                jitHostFunctionTablePtr.pointee.jumpTableData = jumpTableData?.assumingMemoryBound(to: UInt8.self)
-                jitHostFunctionTablePtr.pointee.jumpTableSize = UInt32(programCode.jumpTable.count)
-                jitHostFunctionTablePtr.pointee.jumpTableEntrySize = programCode.jumpTableEntrySize
-                jitHostFunctionTablePtr.pointee.jumpTableEntriesCount = UInt32(programCode.jumpTable.count / Int(programCode.jumpTableEntrySize))
-                jitHostFunctionTablePtr.pointee.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
+            // Execute the JIT-compiled function
+            // CRITICAL: Must wrap execute call in withUnsafeBytes to ensure jump table pointer remains valid
+            let (exitReason, memoryBuffer): (ExitReason, UnsafeMutablePointer<UInt8>)
+            if let programCode = currentProgramCode {
+                // Populate jump table data for JumpInd instruction support
+                // and execute while the pointer is still valid
+                (exitReason, memoryBuffer) = try programCode.jumpTable.withUnsafeBytes { rawBufferPointer in
+                    // Set jump table data pointer (valid only within this closure)
+                    jitHostFunctionTablePtr.pointee.jumpTableData = rawBufferPointer.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                    jitHostFunctionTablePtr.pointee.jumpTableSize = UInt32(programCode.jumpTable.count)
+                    jitHostFunctionTablePtr.pointee.jumpTableEntrySize = programCode.jumpTableEntrySize
+                    jitHostFunctionTablePtr.pointee.jumpTableEntriesCount = UInt32(programCode.jumpTable.count / Int(programCode.jumpTableEntrySize))
+                    jitHostFunctionTablePtr.pointee.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
+
+                    // Execute the JIT-compiled function while jumpTableData pointer is valid
+                    // The JIT function will use our syncHostCallHandler via the C trampoline
+                    return try jitExecutor.execute(
+                        functionPtr: compiledFuncPtr,
+                        registers: &registers,
+                        jitMemorySize: totalMemorySize,
+                        gas: &currentGas,
+                        initialPC: pc,
+                        invocationContext: invocationContextPointer
+                    )
+                }
             } else {
                 // No jump table available
                 jitHostFunctionTablePtr.pointee.jumpTableData = nil
@@ -378,21 +394,17 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 jitHostFunctionTablePtr.pointee.jumpTableEntrySize = 0
                 jitHostFunctionTablePtr.pointee.jumpTableEntriesCount = 0
                 jitHostFunctionTablePtr.pointee.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
+
+                // Execute without jump table
+                (exitReason, memoryBuffer) = try jitExecutor.execute(
+                    functionPtr: compiledFuncPtr,
+                    registers: &registers,
+                    jitMemorySize: totalMemorySize,
+                    gas: &currentGas,
+                    initialPC: pc,
+                    invocationContext: invocationContextPointer
+                )
             }
-
-            // Get pointer to heap-allocated JITHostFunctionTable
-            let invocationContextPointer = UnsafeMutableRawPointer(jitHostFunctionTablePtr)
-
-            // Execute the JIT-compiled function
-            // The JIT function will use our syncHostCallHandler via the C trampoline
-            let (exitReason, memoryBuffer) = try jitExecutor.execute(
-                functionPtr: compiledFuncPtr,
-                registers: &registers,
-                jitMemorySize: totalMemorySize,
-                gas: &currentGas,
-                initialPC: pc,
-                invocationContext: invocationContextPointer
-            )
 
             // Ensure memory is deallocated exactly once using defer
             defer {
