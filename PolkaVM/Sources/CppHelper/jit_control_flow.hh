@@ -27,7 +27,7 @@ extern "C" bool jit_emit_branch_eq_labeled(
     uint8_t src1_reg,
     uint8_t src2_reg,
     asmjit::Label target_label
-);
+) noexcept;
 
 // BranchNe: Branch if not equal (register-register) with label support
 // Emits conditional jump to target_label if registers are not equal
@@ -38,7 +38,7 @@ extern "C" bool jit_emit_branch_ne_labeled(
     uint8_t src1_reg,
     uint8_t src2_reg,
     asmjit::Label target_label
-);
+) noexcept;
 
 // Unconditional jump to label
 // Direct jump to target_label - no fallthrough
@@ -46,7 +46,7 @@ extern "C" bool jit_emit_jump_labeled(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     asmjit::Label target_label
-);
+) noexcept;
 
 // Load immediate and jump to label
 // Combines LoadImm + Jump into single operation
@@ -56,7 +56,7 @@ extern "C" bool jit_emit_load_imm_jump_labeled(
     uint8_t dest_reg,
     uint32_t immediate,
     asmjit::Label target_label
-);
+) noexcept;
 
 // Indirect jump (JumpInd) - jumps to address in register
 // Requires special handling via jump table or dispatcher
@@ -68,6 +68,6 @@ extern "C" bool jit_emit_jump_indirect_labeled(
     JIT::LabelManager* _Nullable label_manager,
     const uint8_t* _Nonnull bytecode,
     uint32_t bytecode_size
-);
+) noexcept;
 
 } // namespace JIT

@@ -19,27 +19,27 @@ namespace jit_instruction {
         const char* _Nonnull target_arch,
         uint64_t gas_cost,
         void* _Nonnull gas_ptr
-    );
+    ) noexcept;
 
     // Generate trap instruction
     bool jit_generateTrap(
         void* _Nonnull assembler,
         const char* _Nonnull target_arch
-    );
+    ) noexcept;
 
     // Generate jump instruction
     bool jit_generateJump(
         void* _Nonnull assembler,
         const char* _Nonnull target_arch,
         uint32_t target_pc
-    );
+    ) noexcept;
 
     // Generate jump indirect instruction
     bool jit_generateJumpIndirect(
         void* _Nonnull assembler,
         const char* _Nonnull target_arch,
         uint8_t reg_index
-    );
+    ) noexcept;
 
     // Generate ecalli instruction (calls into host)
     bool jit_generateEcalli(
@@ -47,7 +47,7 @@ namespace jit_instruction {
         const char* _Nonnull target_arch,
         uint32_t func_idx,
         void* _Nonnull gas_ptr
-    );
+    ) noexcept;
 
     // Generate load immediate and jump
     bool jit_generateLoadImmJump(
@@ -56,7 +56,7 @@ namespace jit_instruction {
         uint8_t dest_reg,
         uint32_t immediate,
         uint32_t target_pc
-    );
+    ) noexcept;
 
     // Generate load immediate and jump indirect
     bool jit_generateLoadImmJumpInd(
@@ -65,7 +65,7 @@ namespace jit_instruction {
         uint8_t dest_reg,
         uint32_t immediate,
         uint8_t jump_reg
-    );
+    ) noexcept;
 }
 
 // Function signature matching JITHostFunctionFnSwift in ExecutorBackendJIT.swift
@@ -107,21 +107,21 @@ uint32_t pvm_host_call_trampoline(
     uint64_t* _Nonnull guest_registers_ptr,
     uint8_t* _Nonnull guest_memory_base_ptr,
     uint32_t guest_memory_size,
-    uint64_t* _Nonnull guest_gas_ptr);
+    uint64_t* _Nonnull guest_gas_ptr) noexcept;
 
 // Get dispatcher jump table for a compiled function
 // Returns pointer to array of code addresses, or null if not found
 // outSize is set to the number of entries in the table
-extern "C" void** getDispatcherTable(
-    void* funcPtr,
-    size_t* outSize);
+extern "C" void* _Nullable * _Nullable getDispatcherTable(
+    void* _Nonnull funcPtr,
+    size_t* _Nonnull outSize) noexcept;
 
 // Set dispatcher jump table for a compiled function
 // This is called to register the dispatcher table after compilation
 extern "C" void setDispatcherTable(
-    void* funcPtr,
-    void** table,
-    size_t size);
+    void* _Nonnull funcPtr,
+    void* _Nullable * _Nullable table,
+    size_t size) noexcept;
 
 // ============================================================================
 // MARK: - Export/Import API for Persistent Caching
@@ -136,10 +136,10 @@ extern "C" void setDispatcherTable(
 /// @param hasDispatcherTableOut Output: 1 if has dispatcher table, 0 otherwise
 /// @return 0 on success, error code on failure
 extern "C" int32_t getCompiledCodeInfo(
-    void* funcPtr,
-    void*** dispatcherTableOut,
-    size_t* dispatcherTableSizeOut,
-    int* hasDispatcherTableOut);
+    void* _Nonnull funcPtr,
+    void* _Nullable * _Nullable * _Nonnull dispatcherTableOut,
+    size_t* _Nonnull dispatcherTableSizeOut,
+    int* _Nonnull hasDispatcherTableOut) noexcept;
 
 /// Store compiled code metadata
 /// Associates bytecode hash with compiled function pointer
@@ -150,8 +150,8 @@ extern "C" int32_t getCompiledCodeInfo(
 /// @return 0 on success, error code on failure
 extern "C" int32_t setCompiledCodeMetadata(
     uint64_t bytecodeHash,
-    void* funcPtr,
-    size_t codeSize);
+    void* _Nonnull funcPtr,
+    size_t codeSize) noexcept;
 
 // ============================================================================
 // MARK: - Memory Management (Dispatcher Table Cleanup)
@@ -160,12 +160,12 @@ extern "C" int32_t setCompiledCodeMetadata(
 /// Free the dispatcher table associated with a JIT-compiled function
 /// @param funcPtr Function pointer returned by compilePolkaVMCode_x64_labeled
 /// @note Safe to call with nullptr or function pointers that don't have tables
-extern "C" void freeDispatcherTable(void* funcPtr);
+extern "C" void freeDispatcherTable(void* _Nullable funcPtr) noexcept;
 
 /// Free ALL dispatcher tables
 /// Useful for process cleanup or memory pressure situations
 /// @note This frees all global dispatcher table storage
-extern "C" void freeAllDispatcherTables();
+extern "C" void freeAllDispatcherTables() noexcept;
 
 
 // Compile a range of bytecode instructions to machine code
@@ -185,11 +185,11 @@ bool compile_bytecode_range(
     size_t bytecode_size,
     uint32_t start_pc,
     uint32_t end_pc
-);
+) noexcept;
 
 // Basic block boundary detection
 // Returns true if the given opcode ends a basic block
-inline bool is_block_ending_instruction(uint8_t opcode) {
+inline bool is_block_ending_instruction(uint8_t opcode) noexcept {
     // Block-ending instructions (matching instruction_dispatcher.cpp implementation)
     using namespace PVM;
     return opcode_is(opcode, Opcode::Trap) ||
@@ -203,4 +203,4 @@ inline bool is_block_ending_instruction(uint8_t opcode) {
 
 // Get the size of an instruction in bytes
 // Returns 0 if the opcode is unknown
-uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, size_t bytecode_size);
+uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, size_t bytecode_size) noexcept;

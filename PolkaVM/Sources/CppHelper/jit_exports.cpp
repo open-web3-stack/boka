@@ -52,7 +52,7 @@ bool jit_emitGasAccounting(
     void *assembler,
     const char *target_arch,
     uint64_t gas_cost,
-    void *gas_ptr)
+    void *gas_ptr) noexcept
 {
     std::string arch(target_arch);
 
@@ -111,33 +111,35 @@ bool jit_emitGasAccounting(
 }
 
 // Generate trap instruction
-bool jit_generateTrap(void *assembler, const char *target_arch)
-{
-    std::string arch(target_arch);
+namespace jit_instruction {
+    bool jit_generateTrap(void *assembler, const char *target_arch) noexcept
+    {
+        std::string arch(target_arch);
 
-    if (arch.compare("x86_64") == 0) {
-        auto *a = getTypedAssembler<x86::Assembler>(assembler, target_arch);
-        if (!a)
-            return false;
+        if (arch.compare("x86_64") == 0) {
+            auto *a = getTypedAssembler<x86::Assembler>(assembler, target_arch);
+            if (!a)
+                return false;
 
-        // x86 trap instruction (causes SIGTRAP)
-        a->int3();
-        return true;
-    } else if (arch.compare("aarch64") == 0) {
-        auto *a = getTypedAssembler<a64::Assembler>(assembler, target_arch);
-        if (!a)
-            return false;
+            // x86 trap instruction (causes SIGTRAP)
+            a->int3();
+            return true;
+        } else if (arch.compare("aarch64") == 0) {
+            auto *a = getTypedAssembler<a64::Assembler>(assembler, target_arch);
+            if (!a)
+                return false;
 
-        // ARM breakpoint instruction (causes SIGTRAP)
-        a->brk(0);
-        return true;
+            // ARM breakpoint instruction (causes SIGTRAP)
+            a->brk(0);
+            return true;
+        }
+
+        return false;
     }
-
-    return false;
 }
 
 // Generate jump instruction (direct)
-bool jit_generateJump(void *assembler, const char *target_arch, uint32_t target_pc)
+bool jit_generateJump(void *assembler, const char *target_arch, uint32_t target_pc) noexcept
 {
     std::string arch(target_arch);
 
@@ -177,7 +179,7 @@ bool jit_generateJump(void *assembler, const char *target_arch, uint32_t target_
 }
 
 // Generate jump indirect instruction
-bool jit_generateJumpIndirect(void *assembler, const char *target_arch, uint8_t reg_index)
+bool jit_generateJumpIndirect(void *assembler, const char *target_arch, uint8_t reg_index) noexcept
 {
     std::string arch(target_arch);
 
@@ -227,7 +229,7 @@ bool jit_generateJumpIndirect(void *assembler, const char *target_arch, uint8_t 
 }
 
 // Generate ecalli instruction (calls into host)
-bool jit_generateEcalli(void *assembler, const char *target_arch, uint32_t func_idx, void *gas_ptr)
+bool jit_generateEcalli(void *assembler, const char *target_arch, uint32_t func_idx, void *gas_ptr) noexcept
 {
     std::string arch(target_arch);
 
@@ -331,7 +333,7 @@ bool jit_generateLoadImmJump(
     const char *target_arch,
     uint8_t dest_reg,
     uint32_t immediate,
-    uint32_t target_pc)
+    uint32_t target_pc) noexcept
 {
     std::string arch(target_arch);
 
@@ -392,7 +394,7 @@ bool jit_generateLoadImmJumpInd(
     const char *target_arch,
     uint8_t dest_reg,
     uint32_t immediate,
-    uint8_t jump_reg)
+    uint8_t jump_reg) noexcept
 {
     std::string arch(target_arch);
 
