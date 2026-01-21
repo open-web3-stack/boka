@@ -52,9 +52,12 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
                 executablePath: executablePath
             )
 
-            // Create IPC client
+            // Create IPC client and transfer ownership of the FD
             let ipcClient = IPCClient()
             ipcClient.setFileDescriptor(clientFD!)
+
+            // Transfer ownership - set to nil so catch block won't double-close
+            clientFD = nil
 
             // Send execute request
             let result = try await ipcClient.sendExecuteRequest(
