@@ -414,6 +414,17 @@ bool decode_ecalli(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& dec
     return true;
 }
 
+// Decode 3-register instructions (MulUpper, SetLt, Cmov, Rot)
+// Format: [opcode][ra][rb][rd]
+bool decode_3_reg(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // ra
+    decoded.src1_reg = bytecode[pc + 2];  // rb
+    decoded.src2_reg = bytecode[pc + 3];  // rd
+    decoded.size = 4; // 1 + 1 + 1 + 1 = 4 bytes
+    return true;
+}
+
 // Generic instruction dispatcher using opcode table
 bool emit_instruction_decoded(
     void* _Nonnull assembler,
@@ -807,9 +818,87 @@ bool emit_instruction_decoded(
             a->nop();
             return true;
 
-        // TODO: Implement MulUpperUU (214), MulUpperSU (215), SetLtU (216), SetLtS (217)
-        // TODO: Implement CmovIz (218), CmovNz (219), RotL64 (220), RotR64 (222)
-        // These functions need to be added to instructions.cpp or are already implemented with different names
+        case 214: // MulUpperUU
+            return jit_instruction::jit_emit_mul_upper_uu(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra
+                decoded.src1_reg,  // rb
+                decoded.src2_reg   // rd
+            );
+
+        case 215: // MulUpperSU
+            return jit_instruction::jit_emit_mul_upper_su(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra
+                decoded.src1_reg,  // rb
+                decoded.src2_reg   // rd
+            );
+
+        case 216: // SetLtU
+            return jit_instruction::jit_emit_set_lt_u(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra
+                decoded.src1_reg,  // rb
+                decoded.src2_reg   // rd
+            );
+
+        case 217: // SetLtS
+            return jit_instruction::jit_emit_set_lt_s(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra
+                decoded.src1_reg,  // rb
+                decoded.src2_reg   // rd
+            );
+
+        case 218: // CmovIz
+            return jit_instruction::jit_emit_cmov_iz(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra
+                decoded.src1_reg,  // rb
+                decoded.src2_reg   // rd
+            );
+
+        case 219: // CmovNz
+            return jit_instruction::jit_emit_cmov_nz(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra
+                decoded.src1_reg,  // rb
+                decoded.src2_reg   // rd
+            );
+
+        case 220: // RotL64
+            return jit_instruction::jit_emit_rol_64(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra
+                decoded.src1_reg,  // rb
+                decoded.src2_reg   // rd
+            );
+
+        case 221: // RotL32
+            // Use 64-bit rotate for now (PVM registers are 64-bit)
+            return jit_instruction::jit_emit_rol_64(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra
+                decoded.src1_reg,  // rb
+                decoded.src2_reg   // rd
+            );
+
+        case 222: // RotR64
+            return jit_instruction::jit_emit_ror_64(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra
+                decoded.src1_reg,  // rb
+                decoded.src2_reg   // rd
+            );
+
+        case 223: // RotR32
+            // Use 64-bit rotate for now (PVM registers are 64-bit)
+            return jit_instruction::jit_emit_ror_64(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra
+                decoded.src1_reg,  // rb
+                decoded.src2_reg   // rd
+            );
 
         case 224: // AndInv
             return jit_instruction::jit_emit_and_inv(
@@ -1031,6 +1120,27 @@ bool emit_basic_block_instructions(
 
             case static_cast<uint8_t>(Opcode::Or):
                 decoded_ok = decode_or(bytecode, current_pc, decoded);
+                break;
+
+            case 213: // MulUpperSS
+            case 214: // MulUpperUU
+            case 215: // MulUpperSU
+            case 216: // SetLtU
+            case 217: // SetLtS
+            case 218: // CmovIz
+            case 219: // CmovNz
+            case 220: // RotL64
+            case 221: // RotL32
+            case 222: // RotR64
+            case 223: // RotR32
+            case 224: // AndInv
+            case 225: // OrInv
+            case 226: // Xnor
+            case 227: // Max
+            case 228: // MaxU
+            case 229: // Min
+            case 230: // MinU
+                decoded_ok = decode_3_reg(bytecode, current_pc, decoded);
                 break;
 
             default:

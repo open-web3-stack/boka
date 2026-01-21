@@ -230,4 +230,15 @@ bool jit_emit_sll_64(void* _Nonnull assembler, const char* _Nonnull target_arch,
 bool jit_emit_srl_64(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t src_reg);
 bool jit_emit_sra_64(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t src_reg);
 
+// 3-register instructions (MulUpper, SetLt, Cmov, Rot)
+// Format: [ra][rb][rd] - all registers are passed as parameters
+bool jit_emit_mul_upper_uu(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t ra, uint8_t rb, uint8_t rd);
+bool jit_emit_mul_upper_su(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t ra, uint8_t rb, uint8_t rd);
+bool jit_emit_set_lt_u(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t ra, uint8_t rb, uint8_t rd);
+bool jit_emit_set_lt_s(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t ra, uint8_t rb, uint8_t rd);
+bool jit_emit_cmov_iz(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t ra, uint8_t rb, uint8_t rd);
+bool jit_emit_cmov_nz(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t ra, uint8_t rb, uint8_t rd);
+bool jit_emit_rol_64(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t ra, uint8_t rb, uint8_t rd);
+bool jit_emit_ror_64(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t ra, uint8_t rb, uint8_t rd);
+
 } // namespace jit_instruction

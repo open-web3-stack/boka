@@ -392,11 +392,15 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Any value >= 0xFFFF_FFFA is an error (hostRequestedHalt, pageFault, gasExhausted,
             // internalError, hostFunctionNotFound, hostFunctionThrewError, etc.)
             a.cmp(x86::eax, 0xFFFFFFFA);
-            a.jae(panicLabel);  // Jump if above or equal (error range)
-            // TODO: This loses specific error codes (e.g., hostRequestedHalt, pageFault)
-            // All errors are treated as panic(.trap) with exit code -1
-            // Should preserve specific error codes by not jumping to panicLabel
-            // or by jumping to a common error handler that preserves eax
+            // Jump directly to epilogue to preserve error code in eax
+            // This allows specific error codes to propagate:
+            // - 0xFFFFFFFA (4294967290) = hostRequestedHalt
+            // - 0xFFFFFFFB (4294967291) = pageFault
+            // - 0xFFFFFFFC (4294967292) = gasExhausted
+            // - 0xFFFFFFFD (4294967293) = internalError
+            // - 0xFFFFFFFE (4294967294) = hostFunctionNotFound
+            // - 0xFFFFFFFF (4294967295) = hostFunctionThrewError
+            a.jae(epilogueLabel);  // Jump if above or equal (error range) - preserves eax
 
             // Store result in R0
             a.mov(x86::qword_ptr(x86::rbx, 0), x86::rax);
