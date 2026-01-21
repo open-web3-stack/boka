@@ -108,6 +108,12 @@ class IPCClient {
     }
 
     /// Read message from file descriptor
+    ///
+    /// ⚠️ WARNING: Blocking I/O in async context
+    /// This function uses blocking `Glibc.read()` which can block the Swift concurrency
+    /// thread pool. If many sandboxed executions occur simultaneously, this may lead to
+    /// thread pool starvation or deadlocks. This is acceptable for single-threaded use
+    /// but should be refactored to use non-blocking I/O or DispatchIO for concurrent use.
     private func readMessage(requestId: UInt32, from fd: Int32) async throws -> IPCMessage {
         // Read length prefix (4 bytes)
         let lengthData = try readExactBytes(IPCProtocol.lengthPrefixSize, from: fd)

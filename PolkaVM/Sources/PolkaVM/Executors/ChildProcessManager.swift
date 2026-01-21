@@ -24,6 +24,15 @@ actor ChildProcessManager {
     }
 
     /// Spawn a new child process with socketpair for IPC
+    ///
+    /// - Parameter executablePath: Name or path of the executable to spawn.
+    ///   This is passed directly to `execvp()`, which searches PATH if not an
+    ///   absolute path. For development/testing, ensure the executable is in
+    ///   PATH or provide an absolute path. For production, consider resolving
+    ///   the path relative to the main executable bundle.
+    ///
+    /// - Returns: Tuple of process handle and client file descriptor for IPC
+    /// - Throws: IPCError if spawning fails
     func spawnChildProcess(executablePath: String) async throws -> (handle: ProcessHandle, clientFD: Int32) {
         // Create socket pair for IPC
         var sockets: [Int32] = [0, 0]
