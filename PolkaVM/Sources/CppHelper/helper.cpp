@@ -186,6 +186,29 @@ uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytec
             instrSize = InstructionSize::Bitwise;
             break;
 
+        // 3-register instructions: [opcode][rd][ra][rb] = 4 bytes
+        case Opcode::MulUpperSS:      // 213
+        case Opcode::MulUpperUU:      // 214
+        case Opcode::MulUpperSU:      // 215
+        case Opcode::SetLtU:          // 216
+        case Opcode::SetLtS:          // 217
+        case Opcode::CmovIz:          // 218
+        case Opcode::CmovNz:          // 219
+        case Opcode::RotL64:          // 220
+        case Opcode::RotR64:          // 222
+        case Opcode::Max:             // 227
+        case Opcode::MaxU:            // 228
+        case Opcode::Min:             // 229
+        case Opcode::MinU:            // 230
+            instrSize = 4;  // 3-register format
+            break;
+
+        // 2-register rotate instructions: [opcode][rd][ra] = 3 bytes
+        case Opcode::RotL32:          // 221
+        case Opcode::RotR32:          // 223
+            instrSize = 3;  // 2-register format
+            break;
+
         // For unimplemented opcodes, return 0 to signal error
         default:
             return 0;
