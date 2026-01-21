@@ -13,6 +13,10 @@ let package = Package(
             name: "PolkaVM",
             targets: ["PolkaVM"]
         ),
+        .executable(
+            name: "boka-sandbox",
+            targets: ["Sandbox"]
+        ),
     ],
     dependencies: [
         .package(path: "../Utils"),
@@ -31,6 +35,30 @@ let package = Package(
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
+                .unsafeFlags([
+                    "-Xcc", "-std=c++20",
+                    "-Xcc", "-I/usr/include/c++/13",
+                    "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13"
+                ]),
+            ]
+        ),
+        .executableTarget(
+            name: "Sandbox",
+            dependencies: [
+                "PolkaVM",
+                "Utils",
+                "TracingUtils",
+                .product(name: "Logging", package: "swift-log"),
+            ],
+            sources: ["main.swift"],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
+                .enableExperimentalFeature("StrictConcurrency=minimal"),
+                .unsafeFlags([
+                    "-Xcc", "-std=c++20",
+                    "-Xcc", "-I/usr/include/c++/13",
+                    "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13"
+                ]),
             ]
         ),
         .testTarget(
@@ -42,22 +70,33 @@ let package = Package(
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
+                .unsafeFlags([
+                    "-Xcc", "-std=c++20",
+                    "-Xcc", "-I/usr/include/c++/13",
+                    "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13"
+                ]),
             ]
         ),
         .target(
             name: "CppHelper",
             dependencies: [
-                "asmjit",
+                "AsmJitLib",
             ],
             sources: ["."],
-            publicHeadersPath: "."
+            publicHeadersPath: ".",
+            cxxSettings: [
+                .unsafeFlags(["-std=c++20", "-I/usr/include/c++/13", "-I/usr/include/x86_64-linux-gnu/c++/13"]),
+            ]
         ),
         .target(
-            name: "asmjit",
+            name: "AsmJitLib",
+            path: "Sources/asmjit",
+            exclude: ["src/asmjit.natvis"],
             sources: ["src/asmjit"],
-            publicHeadersPath: "src",
+            publicHeadersPath: "include",
             cxxSettings: [
-                .unsafeFlags(["-Wno-incomplete-umbrella"]),
+                .define("ASMJIT_STATIC"),
+                .unsafeFlags(["-Wno-incomplete-umbrella", "-std=c++20"]),
             ]
         ),
     ],

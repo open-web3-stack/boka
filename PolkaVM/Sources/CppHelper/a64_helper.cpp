@@ -2,8 +2,8 @@
 // AArch64-specific JIT compilation for PolkaVM
 
 #include "a64_helper.hh"
-#include <asmjit/asmjit.h>
-#include <asmjit/a64.h>
+#include "asmjit/asmjit.h"
+#include "asmjit/a64.h"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>

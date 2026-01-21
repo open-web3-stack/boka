@@ -2,12 +2,12 @@ import Foundation
 import TracingUtils
 import Utils
 
-final class ExecutorFrontendInProcess: ExecutorFrontend {
+public final class ExecutorFrontendInProcess: ExecutorFrontend {
     private let logger = Logger(label: "ExecutorFrontendInProcess")
     private let mode: ExecutionMode
     private let backend: ExecutorBackend
 
-    init(mode: ExecutionMode) {
+    public init(mode: ExecutionMode) {
         self.mode = mode
 
         backend = if mode.contains(.jit) {
@@ -17,7 +17,7 @@ final class ExecutorFrontendInProcess: ExecutorFrontend {
         }
     }
 
-    func execute(
+    public func execute(
         config: PvmConfig,
         blob: Data,
         pc: UInt32,

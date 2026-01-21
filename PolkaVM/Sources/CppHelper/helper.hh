@@ -5,7 +5,8 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <asmjit/asmjit.h>
+#include "asmjit/asmjit.h"
+#include "opcodes.hh"
 
 // JIT instruction generation interface
 // This is the C++ implementation of the JITInstructionGenerator protocol
@@ -84,6 +85,13 @@ struct JITHostFunctionTable {
     JITHostFunctionFn dispatchHostCall;
     void* _Nonnull ownerContext; // Opaque pointer to Swift ExecutorBackendJIT
     void* _Nullable invocationContext; // Opaque pointer to InvocationContext
+
+    // Jump table support for JumpInd instruction
+    const uint8_t* _Nullable jumpTableData; // Pointer to jump table data
+    uint32_t jumpTableSize; // Total size of jump table in bytes
+    uint8_t jumpTableEntrySize; // Size of each entry in bytes (1, 2, 3, or 4)
+    uint32_t jumpTableEntriesCount; // Number of entries in the jump table
+    uint32_t alignmentFactor; // Dynamic address alignment factor
 };
 
 // Trampoline for JIT code to call Swift host functions
@@ -95,3 +103,40 @@ uint32_t pvm_host_call_trampoline(
     uint8_t* _Nonnull guest_memory_base_ptr,
     uint32_t guest_memory_size,
     uint64_t* _Nonnull guest_gas_ptr);
+
+// Compile a range of bytecode instructions to machine code
+// This is the main entry point for JIT compilation from the C++ layer
+// - Parameters:
+//   - assembler: The AsmJit assembler instance
+//   - target_arch: Target architecture ("x86_64" or "aarch64")
+//   - bytecode: Pointer to the bytecode buffer
+//   - bytecode_size: Size of the bytecode buffer
+//   - start_pc: Starting program counter
+//   - end_pc: Ending program counter (exclusive)
+// - Returns: true if successful, false otherwise
+bool compile_bytecode_range(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    const uint8_t* _Nonnull bytecode,
+    size_t bytecode_size,
+    uint32_t start_pc,
+    uint32_t end_pc
+);
+
+// Basic block boundary detection
+// Returns true if the given opcode ends a basic block
+inline bool is_block_ending_instruction(uint8_t opcode) {
+    // Block-ending instructions (matching instruction_dispatcher.cpp implementation)
+    using namespace PVM;
+    return opcode_is(opcode, Opcode::Trap) ||
+           opcode_is(opcode, Opcode::Halt) ||
+           opcode_is(opcode, Opcode::Jump) ||
+           opcode_is(opcode, Opcode::JumpInd) ||
+           opcode_is(opcode, Opcode::LoadImmJump) ||
+           opcode_is(opcode, Opcode::BranchEq) ||
+           opcode_is(opcode, Opcode::BranchNe);
+}
+
+// Get the size of an instruction in bytes
+// Returns 0 if the opcode is unknown
+uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, size_t bytecode_size);

@@ -2,7 +2,8 @@
 // x86_64-specific JIT compilation for PolkaVM
 
 #include "x64_helper.hh"
-#include <asmjit/asmjit.h>
+#include "helper.hh"
+#include "asmjit/asmjit.h"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -29,7 +30,9 @@ int32_t compilePolkaVMCode_x64(
     }
 
     // Initialize asmjit runtime for code generation
-    JitRuntime runtime;
+    // IMPORTANT: JitRuntime must persist as long as generated code is used
+    // Using static to ensure runtime lifetime exceeds function pointer usage
+    static JitRuntime runtime;
     CodeHolder code;
     code.init(runtime.environment());
 
@@ -61,56 +64,16 @@ int32_t compilePolkaVMCode_x64(
     a.mov(r15d, r8d); // initial_pvm_pc -> r15d (PC)
     a.mov(rbp, r9);   // invocation_context_ptr -> rbp
 
-    // TODO: Full JIT implementation would go here
-    // This is a simplified stub implementation for now
+    // Compile bytecode using instruction dispatcher
+    // Compiles the entire bytecode range as a single unit
+    // TODO: Future enhancement: Implement block-by-block compilation with label/fixup resolution
+    // for better optimization and proper control flow handling
+    if (!compile_bytecode_range(&a, "x86_64", codeBuffer, codeSize, initialPC, static_cast<uint32_t>(codeSize))) {
+        // Compilation failed - return error code
+        return 3; // Compilation error
+    }
 
-    // For demonstration purposes, create a simple gas check and a loop dispatcher
-    Label mainLoop = a.newLabel();
-    Label outOfGas = a.newLabel();
-    Label jumpTable = a.newLabel();
-    Label exitHalt = a.newLabel();
-    Label exitNoImpl = a.newLabel();
-
-    // Main execution loop
-    a.bind(mainLoop);
-
-    // Gas check (deduct a fixed amount per instruction)
-    a.mov(rax, qword_ptr(r14));    // Load gas value
-    a.sub(rax, 1);                // Subtract gas cost
-    a.mov(qword_ptr(r14), rax);   // Store updated gas
-    a.jl(outOfGas);               // Jump if gas < 0
-
-    // Example opcode dispatch (simplified)
-    // In a real implementation, this would be a jump table based on opcodes
-    a.mov(eax, r15d);             // Load PC
-    a.cmp(eax, 0x1000);           // Check if PC is out of range
-    a.jae(exitNoImpl);            // Jump to unimplemented if too large
-
-    // Simulate a halt instruction at PC 0 (just for testing)
-    a.cmp(eax, 0);
-    a.je(exitHalt);
-
-    // If we get here, go back to the main loop
-    a.add(r15d, 4);               // Increment PC by instruction size
-    a.jmp(mainLoop);              // Continue execution
-
-    // Out of gas handler
-    a.bind(outOfGas);
-    a.mov(eax, 1);                // Exit reason: out of gas
-    a.jmp(jumpTable);
-
-    // Halt handler
-    a.bind(exitHalt);
-    a.mov(eax, 0);                // Exit reason: halt
-    a.jmp(jumpTable);
-
-    // Not implemented handler
-    a.bind(exitNoImpl);
-    a.mov(eax, -1);               // Exit reason: trap/panic
-    // Fall through to jumpTable
-
-    // Exit point - restore callee-saved registers and return
-    a.bind(jumpTable);
+    // Epilogue: restore callee-saved registers and return
     a.pop(r15);
     a.pop(r14);
     a.pop(r13);
