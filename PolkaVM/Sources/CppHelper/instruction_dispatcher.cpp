@@ -1118,6 +1118,15 @@ bool emit_basic_block_instructions(
                 decoded_ok = decode_or(bytecode, current_pc, decoded);
                 break;
 
+            // 32-bit rotate instructions use 2-register format
+            case 221: // RotL32
+                decoded_ok = decode_mul_32(bytecode, current_pc, decoded);
+                break;
+
+            case 223: // RotR32
+                decoded_ok = decode_mul_32(bytecode, current_pc, decoded);
+                break;
+
             case 213: // MulUpperSS
             case 214: // MulUpperUU
             case 215: // MulUpperSU
@@ -1126,9 +1135,7 @@ bool emit_basic_block_instructions(
             case 218: // CmovIz
             case 219: // CmovNz
             case 220: // RotL64
-            case 221: // RotL32
             case 222: // RotR64
-            case 223: // RotR32
             case 224: // AndInv
             case 225: // OrInv
             case 226: // Xnor
