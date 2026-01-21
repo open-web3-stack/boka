@@ -198,3 +198,40 @@ uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytec
 
     return instrSize;
 }
+
+// ============================================================================
+// MARK: - Memory Management (Dispatcher Table Cleanup)
+// ============================================================================
+
+/// Forward declarations from architecture-specific files
+extern "C" void freeDispatcherTable_x64(void* funcPtr);
+extern "C" void freeDispatcherTable_a64(void* funcPtr);
+extern "C" void freeAllDispatcherTables_x64();
+extern "C" void freeAllDispatcherTables_a64();
+
+/// Free the dispatcher table associated with a JIT-compiled function
+/// This is a wrapper that calls the appropriate architecture-specific implementation
+///
+/// @param funcPtr Function pointer returned by compilePolkaVMCode_x64_labeled or compilePolkaVMCode_a64_labeled
+/// @note Safe to call with nullptr or function pointers that don't have tables
+extern "C" void freeDispatcherTable(void* funcPtr) {
+    if (!funcPtr) {
+        return;
+    }
+
+    // Try x64 first (most common)
+    freeDispatcherTable_x64(funcPtr);
+
+    // ARM64 is a no-op currently (no dispatcher tables stored)
+    // freeDispatcherTable_a64(funcPtr);
+}
+
+/// Free ALL dispatcher tables
+/// This is a wrapper that calls all architecture-specific implementations
+///
+/// @note This frees all global dispatcher table storage
+extern "C" void freeAllDispatcherTables() {
+    freeAllDispatcherTables_x64();
+    // ARM64 version is a no-op
+    // freeAllDispatcherTables_a64();
+}

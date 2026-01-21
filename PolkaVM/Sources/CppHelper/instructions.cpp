@@ -2086,7 +2086,7 @@ bool jit_emit_jump_ind(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load pointer register from VM array
+    // Load target address from register
     a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
 
     // Add offset to get target address

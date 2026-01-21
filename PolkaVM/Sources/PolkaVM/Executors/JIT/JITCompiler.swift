@@ -16,6 +16,8 @@ final class JITCompiler {
         case compilationFailed(Int32)
         case unsupportedArchitecture
         case allocationFailed
+        case exportFailed(Int32)
+        case metadataStorageFailed(Int32)
 
         // Equatable conformance
         static func == (lhs: CompilationError, rhs: CompilationError) -> Bool {
@@ -25,6 +27,10 @@ final class JITCompiler {
                  (.allocationFailed, .allocationFailed):
                 return true
             case (.compilationFailed(let lhsCode), .compilationFailed(let rhsCode)):
+                return lhsCode == rhsCode
+            case (.exportFailed(let lhsCode), .exportFailed(let rhsCode)):
+                return lhsCode == rhsCode
+            case (.metadataStorageFailed(let lhsCode), .metadataStorageFailed(let rhsCode)):
                 return lhsCode == rhsCode
             default:
                 return false
@@ -143,4 +149,95 @@ final class JITCompiler {
         logger.debug("Swift compilation step for blob size: \(blob.count), PC: \(initialPC), Target: \(targetArchitecture)")
         return true
     }
+}
+
+// MARK: - Export/Import API for Persistent Caching
+
+extension JITCompiler {
+
+    /// Compiled code information for export
+    public struct CompiledCodeInfo {
+        public let functionPtr: UnsafeRawPointer
+        public let dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?
+        public let dispatcherTableSize: Int
+        public let hasDispatcherTable: Bool
+
+        public init(
+            functionPtr: UnsafeRawPointer,
+            dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?,
+            dispatcherTableSize: Int,
+            hasDispatcherTable: Bool
+        ) {
+            self.functionPtr = functionPtr
+            self.dispatcherTable = dispatcherTable
+            self.dispatcherTableSize = dispatcherTableSize
+            self.hasDispatcherTable = hasDispatcherTable
+        }
+    }
+
+    /// Get compiled code information
+    /// Retrieves metadata about compiled code needed for caching
+    ///
+    /// - Parameter functionPtr: Compiled function pointer
+    /// - Returns: CompiledCodeInfo containing metadata
+    /// - Throws: CompilationError if info cannot be retrieved
+    public static func getCompiledCodeInfo(
+        functionPtr: UnsafeRawPointer
+    ) throws -> CompiledCodeInfo {
+        var dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?
+        var dispatcherTableSize: size_t = 0
+        var hasDispatcherTable: Int32 = 0
+
+        let result = CppHelper.getCompiledCodeInfo(
+            UnsafeMutableRawPointer(mutating: functionPtr),
+            &dispatcherTable,
+            &dispatcherTableSize,
+            &hasDispatcherTable
+        )
+
+        guard result == 0 else {
+            throw CompilationError.exportFailed(result)
+        }
+
+        return CompiledCodeInfo(
+            functionPtr: functionPtr,
+            dispatcherTable: dispatcherTable,
+            dispatcherTableSize: Int(dispatcherTableSize),
+            hasDispatcherTable: hasDispatcherTable != 0
+        )
+    }
+
+    /// Store compiled code metadata
+    /// Associates bytecode hash with compiled function for cache lookup
+    ///
+    /// - Parameters:
+    ///   - bytecodeHash: Hash of the bytecode (for cache key)
+    ///   - functionPtr: Compiled function pointer
+    ///   - codeSize: Size of compiled code
+    /// - Throws: CompilationError if metadata cannot be stored
+    public static func setCompiledCodeMetadata(
+        bytecodeHash: UInt64,
+        functionPtr: UnsafeRawPointer,
+        codeSize: Int
+    ) throws {
+        let result = CppHelper.setCompiledCodeMetadata(
+            bytecodeHash,
+            UnsafeMutableRawPointer(mutating: functionPtr),
+            size_t(codeSize)
+        )
+
+        guard result == 0 else {
+            throw CompilationError.metadataStorageFailed(result)
+        }
+    }
+
+    // NOTE: Full export/import of compiled machine code requires deeper AsmJit integration
+    // This is a placeholder for future implementation
+    // For now, users can:
+    // 1. Store bytecode hash -> function pointer mapping
+    // 2. Serialize bytecode to disk
+    // 3. Load bytecode and recompile on next run
+    //
+    // This provides most of the caching benefit (avoiding recompilation)
+    // while avoiding the complexity of serializing machine code
 }

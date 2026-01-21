@@ -92,6 +92,11 @@ struct JITHostFunctionTable {
     uint8_t jumpTableEntrySize; // Size of each entry in bytes (1, 2, 3, or 4)
     uint32_t jumpTableEntriesCount; // Number of entries in the jump table
     uint32_t alignmentFactor; // Dynamic address alignment factor
+
+    // Dispatcher jump table for indirect jumps without a PVM jump table
+    // Maps PC values to compiled code addresses (computed goto)
+    void* _Nullable* _Nullable dispatcherJumpTable; // Array of code pointers, indexed by PC
+    uint32_t dispatcherJumpTableSize; // Number of entries in dispatcher table
 };
 
 // Trampoline for JIT code to call Swift host functions
@@ -103,6 +108,65 @@ uint32_t pvm_host_call_trampoline(
     uint8_t* _Nonnull guest_memory_base_ptr,
     uint32_t guest_memory_size,
     uint64_t* _Nonnull guest_gas_ptr);
+
+// Get dispatcher jump table for a compiled function
+// Returns pointer to array of code addresses, or null if not found
+// outSize is set to the number of entries in the table
+extern "C" void** getDispatcherTable(
+    void* funcPtr,
+    size_t* outSize);
+
+// Set dispatcher jump table for a compiled function
+// This is called to register the dispatcher table after compilation
+extern "C" void setDispatcherTable(
+    void* funcPtr,
+    void** table,
+    size_t size);
+
+// ============================================================================
+// MARK: - Export/Import API for Persistent Caching
+// ============================================================================
+
+/// Get compiled code information for export
+/// Returns metadata about compiled code needed for caching
+///
+/// @param funcPtr Compiled function pointer
+/// @param dispatcherTableOut Output: dispatcher table pointer
+/// @param dispatcherTableSizeOut Output: size of dispatcher table
+/// @param hasDispatcherTableOut Output: 1 if has dispatcher table, 0 otherwise
+/// @return 0 on success, error code on failure
+extern "C" int32_t getCompiledCodeInfo(
+    void* funcPtr,
+    void*** dispatcherTableOut,
+    size_t* dispatcherTableSizeOut,
+    int* hasDispatcherTableOut);
+
+/// Store compiled code metadata
+/// Associates bytecode hash with compiled function pointer
+///
+/// @param bytecodeHash Hash of the bytecode
+/// @param funcPtr Compiled function pointer
+/// @param codeSize Size of compiled code
+/// @return 0 on success, error code on failure
+extern "C" int32_t setCompiledCodeMetadata(
+    uint64_t bytecodeHash,
+    void* funcPtr,
+    size_t codeSize);
+
+// ============================================================================
+// MARK: - Memory Management (Dispatcher Table Cleanup)
+// ============================================================================
+
+/// Free the dispatcher table associated with a JIT-compiled function
+/// @param funcPtr Function pointer returned by compilePolkaVMCode_x64_labeled
+/// @note Safe to call with nullptr or function pointers that don't have tables
+extern "C" void freeDispatcherTable(void* funcPtr);
+
+/// Free ALL dispatcher tables
+/// Useful for process cleanup or memory pressure situations
+/// @note This frees all global dispatcher table storage
+extern "C" void freeAllDispatcherTables();
+
 
 // Compile a range of bytecode instructions to machine code
 // This is the main entry point for JIT compilation from the C++ layer
