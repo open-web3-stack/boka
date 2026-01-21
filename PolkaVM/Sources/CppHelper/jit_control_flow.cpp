@@ -16,7 +16,7 @@ bool jit_emit_branch_eq_labeled(
     const char* _Nonnull target_arch,
     uint8_t src1_reg,
     uint8_t src2_reg,
-    Label target_label)
+    Label target_label) noexcept
 {
     if (strcmp(target_arch, "x86_64") == 0) {
         auto* a = static_cast<x86::Assembler*>(assembler);
@@ -65,7 +65,7 @@ bool jit_emit_branch_ne_labeled(
     const char* _Nonnull target_arch,
     uint8_t src1_reg,
     uint8_t src2_reg,
-    Label target_label)
+    Label target_label) noexcept
 {
     if (strcmp(target_arch, "x86_64") == 0) {
         auto* a = static_cast<x86::Assembler*>(assembler);
@@ -112,7 +112,7 @@ bool jit_emit_branch_ne_labeled(
 bool jit_emit_jump_labeled(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
-    Label target_label)
+    Label target_label) noexcept
 {
     if (strcmp(target_arch, "x86_64") == 0) {
         auto* a = static_cast<x86::Assembler*>(assembler);
@@ -134,7 +134,7 @@ bool jit_emit_load_imm_jump_labeled(
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
     uint32_t immediate,
-    Label target_label)
+    Label target_label) noexcept
 {
     if (strcmp(target_arch, "x86_64") == 0) {
         auto* a = static_cast<x86::Assembler*>(assembler);
@@ -179,7 +179,7 @@ bool jit_emit_jump_indirect_labeled(
     uint8_t reg_index,
     JIT::LabelManager* label_manager,
     const uint8_t* _Nonnull bytecode,
-    uint32_t bytecode_size)
+    uint32_t bytecode_size) noexcept
 {
     // TODO: Implement jump table approach for indirect jumps
     // For now, this is a stub that maintains compatibility

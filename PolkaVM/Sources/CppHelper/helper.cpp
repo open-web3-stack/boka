@@ -20,12 +20,12 @@ extern "C" bool jit_emitter_emit_basic_block_instructions(
 // Trampoline for JIT code to call Swift host functions
 // Called by JIT-generated code when executing ECALL instructions
 uint32_t pvm_host_call_trampoline(
-    JITHostFunctionTable* host_table,
+    JITHostFunctionTable* _Nonnull host_table,
     uint32_t host_call_index,
-    uint64_t* guest_registers_ptr,
-    uint8_t* guest_memory_base_ptr,
+    uint64_t* _Nonnull guest_registers_ptr,
+    uint8_t* _Nonnull guest_memory_base_ptr,
     uint32_t guest_memory_size,
-    uint64_t* guest_gas_ptr) {
+    uint64_t* _Nonnull guest_gas_ptr) noexcept {
 
     if (!host_table || !host_table->dispatchHostCall) {
         // TODO: Implement proper error logging with error codes
@@ -52,7 +52,7 @@ bool compile_bytecode_range(
     const uint8_t* _Nonnull bytecode,
     size_t bytecode_size,
     uint32_t start_pc,
-    uint32_t end_pc)
+    uint32_t end_pc) noexcept
 {
     // Validate inputs
     if (!assembler || !target_arch || !bytecode) {
@@ -75,7 +75,7 @@ bool compile_bytecode_range(
 // Get the size of an instruction in bytes
 // This matches ONLY the opcodes actually implemented in instruction_dispatcher.cpp
 // For unimplemented opcodes, returns 0 to signal an error
-uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytecode_size) {
+uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, size_t bytecode_size) noexcept {
     if (pc >= bytecode_size) {
         return 0;
     }
@@ -227,17 +227,17 @@ uint32_t get_instruction_size(const uint8_t* bytecode, uint32_t pc, size_t bytec
 // ============================================================================
 
 /// Forward declarations from architecture-specific files
-extern "C" void freeDispatcherTable_x64(void* funcPtr);
-extern "C" void freeDispatcherTable_a64(void* funcPtr);
-extern "C" void freeAllDispatcherTables_x64();
-extern "C" void freeAllDispatcherTables_a64();
+extern "C" void freeDispatcherTable_x64(void* _Nullable funcPtr) noexcept;
+extern "C" void freeDispatcherTable_a64(void* _Nullable funcPtr) noexcept;
+extern "C" void freeAllDispatcherTables_x64() noexcept;
+extern "C" void freeAllDispatcherTables_a64() noexcept;
 
 /// Free the dispatcher table associated with a JIT-compiled function
 /// This is a wrapper that calls the appropriate architecture-specific implementation
 ///
 /// @param funcPtr Function pointer returned by compilePolkaVMCode_x64_labeled or compilePolkaVMCode_a64_labeled
 /// @note Safe to call with nullptr or function pointers that don't have tables
-extern "C" void freeDispatcherTable(void* funcPtr) {
+extern "C" void freeDispatcherTable(void* _Nullable funcPtr) noexcept {
     if (!funcPtr) {
         return;
     }
@@ -253,7 +253,7 @@ extern "C" void freeDispatcherTable(void* funcPtr) {
 /// This is a wrapper that calls all architecture-specific implementations
 ///
 /// @note This frees all global dispatcher table storage
-extern "C" void freeAllDispatcherTables() {
+extern "C" void freeAllDispatcherTables() noexcept {
     freeAllDispatcherTables_x64();
     // ARM64 version is a no-op
     // freeAllDispatcherTables_a64();

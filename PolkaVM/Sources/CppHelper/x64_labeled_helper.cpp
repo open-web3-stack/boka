@@ -28,7 +28,7 @@ static std::unordered_map<void*, std::pair<void**, size_t>> s_dispatcherTables;
 static std::mutex s_dispatcherTablesMutex;
 
 // Export function to get dispatcher table for a function
-extern "C" void** getDispatcherTable(void* funcPtr, size_t* outSize) {
+extern "C" void* _Nullable * _Nullable getDispatcherTable(void* _Nonnull funcPtr, size_t* _Nonnull outSize) noexcept {
     std::lock_guard<std::mutex> lock(s_dispatcherTablesMutex);
     auto it = s_dispatcherTables.find(funcPtr);
     if (it != s_dispatcherTables.end()) {
@@ -40,7 +40,7 @@ extern "C" void** getDispatcherTable(void* funcPtr, size_t* outSize) {
 }
 
 // Export function to set dispatcher table for a function (called from Swift)
-extern "C" void setDispatcherTable(void* funcPtr, void** table, size_t size) {
+extern "C" void setDispatcherTable(void* _Nonnull funcPtr, void* _Nullable * _Nullable table, size_t size) noexcept {
     std::lock_guard<std::mutex> lock(s_dispatcherTablesMutex);
     s_dispatcherTables[funcPtr] = {table, size};
 }
@@ -842,10 +842,10 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 /// @param hasDispatcherTableOut Output: 1 if function has dispatcher table, 0 otherwise
 /// @return 0 on success, error code on failure
 extern "C" int32_t getCompiledCodeInfo(
-    void* funcPtr,
-    void*** dispatcherTableOut,
-    size_t* dispatcherTableSizeOut,
-    int* hasDispatcherTableOut)
+    void* _Nonnull funcPtr,
+    void* _Nullable * _Nullable * _Nonnull dispatcherTableOut,
+    size_t* _Nonnull dispatcherTableSizeOut,
+    int* _Nonnull hasDispatcherTableOut) noexcept
 {
     if (!funcPtr || !dispatcherTableOut || !dispatcherTableSizeOut || !hasDispatcherTableOut) {
         return -1;  // Invalid parameters
@@ -878,8 +878,8 @@ extern "C" int32_t getCompiledCodeInfo(
 /// @return 0 on success, error code on failure
 extern "C" int32_t setCompiledCodeMetadata(
     uint64_t bytecodeHash,
-    void* funcPtr,
-    size_t codeSize)
+    void* _Nonnull funcPtr,
+    size_t codeSize) noexcept
 {
     if (!funcPtr) {
         return -1;  // Invalid parameter
@@ -901,7 +901,7 @@ extern "C" int32_t setCompiledCodeMetadata(
 ///
 /// @param funcPtr Function pointer returned by compilePolkaVMCode_x64_labeled
 /// @note Safe to call with nullptr or function pointers that don't have tables
-extern "C" void freeDispatcherTable_x64(void* funcPtr) {
+extern "C" void freeDispatcherTable_x64(void* _Nullable funcPtr) noexcept {
     if (!funcPtr) {
         return;  // Nothing to free
     }
@@ -931,7 +931,7 @@ extern "C" void freeDispatcherTable_x64(void* funcPtr) {
 /// Useful for process cleanup or memory pressure situations
 ///
 /// @note This frees all global dispatcher table storage
-extern "C" void freeAllDispatcherTables_x64() {
+extern "C" void freeAllDispatcherTables_x64() noexcept {
     std::lock_guard<std::mutex> lock(s_dispatcherTablesMutex);
 
     for (auto& entry : s_dispatcherTables) {

@@ -52,7 +52,7 @@ bool jit_emitGasAccounting(
     void *assembler,
     const char *target_arch,
     uint64_t gas_cost,
-    void *gas_ptr)
+    void *gas_ptr) noexcept
 {
     std::string arch(target_arch);
 
@@ -112,7 +112,7 @@ bool jit_emitGasAccounting(
 
 // Generate trap instruction
 namespace jit_instruction {
-    bool jit_generateTrap(void *assembler, const char *target_arch)
+    bool jit_generateTrap(void *assembler, const char *target_arch) noexcept
     {
         std::string arch(target_arch);
 
@@ -139,7 +139,7 @@ namespace jit_instruction {
 }
 
 // Generate jump instruction (direct)
-bool jit_generateJump(void *assembler, const char *target_arch, uint32_t target_pc)
+bool jit_generateJump(void *assembler, const char *target_arch, uint32_t target_pc) noexcept
 {
     std::string arch(target_arch);
 
@@ -179,7 +179,7 @@ bool jit_generateJump(void *assembler, const char *target_arch, uint32_t target_
 }
 
 // Generate jump indirect instruction
-bool jit_generateJumpIndirect(void *assembler, const char *target_arch, uint8_t reg_index)
+bool jit_generateJumpIndirect(void *assembler, const char *target_arch, uint8_t reg_index) noexcept
 {
     std::string arch(target_arch);
 
@@ -229,7 +229,7 @@ bool jit_generateJumpIndirect(void *assembler, const char *target_arch, uint8_t 
 }
 
 // Generate ecalli instruction (calls into host)
-bool jit_generateEcalli(void *assembler, const char *target_arch, uint32_t func_idx, void *gas_ptr)
+bool jit_generateEcalli(void *assembler, const char *target_arch, uint32_t func_idx, void *gas_ptr) noexcept
 {
     std::string arch(target_arch);
 
@@ -333,7 +333,7 @@ bool jit_generateLoadImmJump(
     const char *target_arch,
     uint8_t dest_reg,
     uint32_t immediate,
-    uint32_t target_pc)
+    uint32_t target_pc) noexcept
 {
     std::string arch(target_arch);
 
@@ -394,7 +394,7 @@ bool jit_generateLoadImmJumpInd(
     const char *target_arch,
     uint8_t dest_reg,
     uint32_t immediate,
-    uint8_t jump_reg)
+    uint8_t jump_reg) noexcept
 {
     std::string arch(target_arch);
 
