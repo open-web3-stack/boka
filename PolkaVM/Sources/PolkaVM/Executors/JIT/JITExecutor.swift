@@ -146,15 +146,9 @@ final class JITExecutor {
         case 1:
             exitReason = .outOfGas
         case 2:
-            // Fallback to interpreter with current state
-            // Extract all register values
-            // NOTE: JIT does not write PC back to registers struct, use initialPC
-            var fallbackRegisters: [UInt64] = []
-            for i: UInt8 in 0..<13 {
-                fallbackRegisters.append(registers[Registers.Index(raw: i)])
-            }
-            let gasUsed = gas.value  // Gas remaining after JIT execution
-            exitReason = .fallback(pc: initialPC, registers: fallbackRegisters, gasUsed: gasUsed)
+            // Previously fallback, now deprecated - treat as panic
+            logger.error("JIT returned exit code 2 (fallback deprecated) - treating as panic")
+            exitReason = .panic(.trap)
         case 3:
             // Page fault from bounds checking
             // For a page fault, we would need to extract the faulting address from registers

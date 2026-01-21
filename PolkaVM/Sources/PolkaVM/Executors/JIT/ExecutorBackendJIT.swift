@@ -573,9 +573,6 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         case let .pageFault(address):
                             self.logger.error("Page fault at address \(address)")
                             return JITHostCallError.pageFault.rawValue
-                        case .fallback:
-                            self.logger.error("Fallback not supported during host call")
-                            return JITHostCallError.hostFunctionThrewError.rawValue
                         case .panic:
                             return JITHostCallError.hostFunctionThrewError.rawValue
                         }
@@ -652,22 +649,6 @@ final class ExecutorBackendJIT: ExecutorBackend {
             } else {
                 // Normal execution: subtract remaining from initial
                 gasUsed = gas - currentGas
-            }
-
-            // Handle fallback case - capture memory before deallocation
-            if case let .fallback(fallbackPC, fallbackRegisters, fallbackGasUsed) = exitReason {
-                // Copy JIT memory to Data for interpreter
-                let jitMemory = Data(bytes: memoryBuffer, count: Int(totalMemorySize))
-
-                logger.debug("JIT fallback to interpreter at PC: \(fallbackPC)")
-
-                // Return result with fallback state and memory
-                return VMExecutionResult(
-                    exitReason: exitReason,
-                    gasUsed: gasUsed,
-                    outputData: jitMemory,
-                    fallbackState: (fallbackPC, fallbackRegisters, fallbackGasUsed)
-                )
             }
 
             // Get output data from JIT memory (only on halt, following invokePVM pattern)
