@@ -238,6 +238,9 @@ public class Invoke: HostCall {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCodeInner.PANIC.rawValue)
         case .halt:
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCodeInner.HALT.rawValue)
+        case .fallback:
+            // Fallback is not expected in inner PVM execution
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCodeInner.PANIC.rawValue)
         }
     }
 }
