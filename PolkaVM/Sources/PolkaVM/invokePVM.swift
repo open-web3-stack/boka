@@ -47,7 +47,12 @@ public func invokePVM(
                     while offset < jitMemory.count {
                         let end = min(offset + chunkSize, jitMemory.count)
                         let chunk = jitMemory[offset..<end]
-                        try? interpreterState.writeMemory(address: UInt32(offset), values: chunk)
+                        do {
+                            try interpreterState.writeMemory(address: UInt32(offset), values: chunk)
+                        } catch {
+                            logger.error("Failed to write JIT memory to interpreter at offset \(offset): \(error)")
+                            return (.panic(.trap), result.gasUsed, nil)
+                        }
                         offset = end
                     }
                 }

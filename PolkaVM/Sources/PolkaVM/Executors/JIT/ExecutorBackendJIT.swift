@@ -294,6 +294,11 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 invocationContext: invocationContextPointer
             )
 
+            // Ensure memory is deallocated exactly once using defer
+            defer {
+                memoryBuffer.deallocate()
+            }
+
             // Clear the invocation context reference after execution
             jitHostFunctionTableWrapper.table.invocationContext = nil
 
@@ -311,7 +316,6 @@ final class ExecutorBackendJIT: ExecutorBackend {
             if case let .fallback(fallbackPC, fallbackRegisters, fallbackGasUsed) = exitReason {
                 // Copy JIT memory to Data for interpreter
                 let jitMemory = Data(bytes: memoryBuffer, count: Int(totalMemorySize))
-                memoryBuffer.deallocate()
 
                 logger.debug("JIT fallback to interpreter at PC: \(fallbackPC)")
 
@@ -346,9 +350,6 @@ final class ExecutorBackendJIT: ExecutorBackend {
             default:
                 outputData = nil
             }
-
-            // Deallocate memory after we've read what we need
-            memoryBuffer.deallocate()
 
             logger.debug("JIT execution finished. Reason: \(exitReason). Gas used: \(gasUsed.value)")
             return VMExecutionResult(exitReason: exitReason, gasUsed: gasUsed, outputData: outputData)

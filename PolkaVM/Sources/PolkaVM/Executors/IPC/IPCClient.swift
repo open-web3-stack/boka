@@ -129,9 +129,10 @@ class IPCClient {
             throw IPCError.decodingFailed("Failed to decode IPC message")
         }
 
-        // Verify request ID
-        if message.requestId != requestId {
-            logger.warning("Received response for different request ID (expected: \(requestId), got: \(message.requestId))")
+        // Verify request ID - reject mismatched responses
+        guard message.requestId == requestId else {
+            logger.error("Received response for different request ID (expected: \(requestId), got: \(message.requestId))")
+            throw IPCError.invalidResponse("Request ID mismatch: expected \(requestId), got \(message.requestId)")
         }
 
         return message

@@ -1,7 +1,7 @@
 import Foundation
 
 /// IPC message types for communication between host and child process
-public enum IPCMessageType: UInt8, Codable {
+public enum IPCMessageType: UInt8, Codable, Sendable {
     case executeRequest = 1
     case executeResponse = 2
     case error = 3
@@ -48,11 +48,11 @@ public struct IPCExecuteResponse: Codable, Sendable {
 }
 
 /// Error message from child process
-public struct IPCErrorMessage: Codable {
+public struct IPCErrorMessage: Codable, Sendable {
     public let errorType: ErrorType
     public let message: String
 
-    public enum ErrorType: UInt8, Codable {
+    public enum ErrorType: UInt8, Codable, Sendable {
         case deserialization = 1
         case execution = 2
         case security = 3
@@ -61,11 +61,11 @@ public struct IPCErrorMessage: Codable {
 }
 
 /// Heartbeat message for health monitoring
-public struct IPCHeartbeat: Codable {
+public struct IPCHeartbeat: Codable, Sendable {
     public let timestamp: UInt64
     public let status: Status
 
-    public enum Status: UInt8, Codable {
+    public enum Status: UInt8, Codable, Sendable {
         case ready = 1
         case busy = 2
         case error = 3
@@ -73,19 +73,19 @@ public struct IPCHeartbeat: Codable {
 }
 
 /// Request for host call from child process
-public struct IPCHostCallRequest: Codable {
+public struct IPCHostCallRequest: Codable, Sendable {
     public let callIndex: UInt32
     public let registersData: Data  // Serialized register state
 }
 
 /// Response to host call from host process
-public struct IPCHostCallResponse: Codable {
+public struct IPCHostCallResponse: Codable, Sendable {
     public let outcomeCode: UInt64  // Encoded ExecOutcome
     public let registersData: Data? // Updated register state
 }
 
 /// Generic IPC message wrapper
-public struct IPCMessage: Codable {
+public struct IPCMessage: Codable, Sendable {
     public let type: IPCMessageType
     public let requestId: UInt32
     public let payload: Data?  // JSON-encoded specific message

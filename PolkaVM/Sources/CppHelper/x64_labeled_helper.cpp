@@ -245,6 +245,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // Validate target alignment
             a.mov(x86::r10d, x86::eax);  // Copy target
+            a.test(x86::ecx, x86::ecx);  // Check if alignmentFactor is 0
+            a.jz(pagefaultLabel);  // Division by zero is invalid
             a.mov(x86::edx, 0);   // Clear edx for division
             a.div(x86::ecx);  // Divide by alignmentFactor, quotient in eax, remainder in edx
             a.cmp(x86::edx, 0);  // Check if remainder is 0 (aligned)
