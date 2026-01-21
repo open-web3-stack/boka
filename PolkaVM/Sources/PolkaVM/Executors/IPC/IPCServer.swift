@@ -103,16 +103,24 @@ public class IPCServer {
         } catch {
             logger.error("Failed to handle execute request: \(error)")
 
-            // Send error response
+            // Send error response - critical to notify host of failures
             do {
                 let errorMsg = try IPCProtocol.createErrorMessage(
                     requestId: message.requestId,
                     errorType: .execution,
                     message: "\(error)"
                 )
-                try? writeData(errorMsg, to: fd)
+                do {
+                    try writeData(errorMsg, to: fd)
+                } catch {
+                    // If we can't send the error message, log and close the connection
+                    logger.error("Failed to send error message to host: \(error)")
+                    isRunning = false
+                }
             } catch {
-                logger.error("Failed to send error message: \(error)")
+                logger.error("Failed to create error message: \(error)")
+                // If we can't even create the error message, we have no choice but to close
+                isRunning = false
             }
         }
     }
