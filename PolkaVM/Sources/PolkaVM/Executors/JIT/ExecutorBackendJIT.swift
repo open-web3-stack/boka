@@ -196,17 +196,17 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         return JITHostCallError.internalErrorInvalidContext.rawValue
                     }
 
-                    // Read current PC from register r15 (PC register in JIT-compiled code)
-                    let currentPC = UInt32(truncatingIfNeeded: guestRegistersPtr[Int(15)])
-
-                    // Create a VMStateJIT adapter with the current PC from JIT execution
+                    // Create a VMStateJIT adapter
+                    // NOTE: PC is tracked internally by JIT-compiled code, not exposed to host calls.
+                    // Using 0 as initialPC. The PC value is typically not needed by host functions,
+                    // but if it is, the C++ JIT code needs to be modified to pass it.
                     let vmState = VMStateJIT(
                         jitMemoryBasePtr: guestMemoryBasePtr,
                         jitMemorySize: guestMemorySize,
                         jitRegistersPtr: guestRegistersPtr,
                         jitGasPtr: guestGasPtr,
                         programCode: programCode,
-                        initialPC: currentPC
+                        initialPC: 0
                     )
 
                     // We need to convert the async operation to sync
