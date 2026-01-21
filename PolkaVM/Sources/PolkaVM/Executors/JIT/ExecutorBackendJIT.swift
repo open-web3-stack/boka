@@ -9,6 +9,38 @@ import Utils
 
 // TODO: Build a cache system for generated code
 
+/// ⚠️ CRITICAL: ExecutorBackendJIT is SINGLE-THREADED ONLY
+///
+/// This class is designed for **single-threaded execution only** and is NOT
+/// thread-safe for concurrent `execute()` calls.
+///
+/// ## Thread Safety Model
+///
+/// ✅ **SAFE**:
+/// - Single-threaded execution of one instance
+/// - Multiple instances (each accessed from different thread)
+///
+/// ❌ **UNSAFE**:
+/// - Concurrent calls to `execute()` on the same instance
+/// - Shared access to `syncHostCallHandler` or `currentProgramCode`
+///
+/// ## Concurrency Architecture Note
+///
+/// This implementation uses `semaphore.wait()` to bridge async Swift host
+/// functions to synchronous JIT code. **This blocks the Swift concurrency
+/// thread pool** and can cause deadlocks if:
+/// 1. Multiple executions run concurrently on the same instance
+/// 2. The thread pool has insufficient threads (e.g., pool size = 1)
+///
+/// **Mitigation**: ExecutorFrontendInProcess serializes execution, ensuring
+/// only one JIT execution is active at a time. This is acceptable for the
+/// single-threaded use case but is **NOT safe for concurrent use**.
+///
+/// ## Future Improvement
+///
+/// To support concurrent execution, the synchronous JIT call should be
+/// offloaded to a dedicated `Thread` or `DispatchQueue` (outside the Swift
+/// concurrency pool), allowing pool threads to remain free for async host calls.
 final class ExecutorBackendJIT: ExecutorBackend {
     private let logger = Logger(label: "ExecutorBackendJIT")
 
