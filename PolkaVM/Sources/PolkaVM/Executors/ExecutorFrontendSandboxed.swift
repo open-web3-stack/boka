@@ -27,18 +27,14 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
         argumentData: Data?,
         ctx: (any InvocationContext)?
     ) async -> VMExecutionResult {
-        // TODO: For now, we still need to handle context properly
-        // The context serialization will be implemented in Phase 4
+        // Sandboxed mode does not support InvocationContext
+        // TODO: Implement context serialization for Phase 4
         if ctx != nil {
-            logger.warning("Sandboxed mode does not support InvocationContext yet, falling back to in-process")
-            let inProcess = ExecutorFrontendInProcess(mode: mode)
-            return await inProcess.execute(
-                config: config,
-                blob: blob,
-                pc: pc,
-                gas: gas,
-                argumentData: argumentData,
-                ctx: ctx
+            logger.error("Sandboxed mode does not support InvocationContext yet")
+            return VMExecutionResult(
+                exitReason: .panic(.trap),
+                gasUsed: Gas(0),
+                outputData: nil
             )
         }
 
@@ -102,16 +98,11 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
                 close(fd)
             }
 
-            // Fallback to in-process on error
-            logger.warning("Falling back to in-process execution")
-            let inProcess = ExecutorFrontendInProcess(mode: mode)
-            return await inProcess.execute(
-                config: config,
-                blob: blob,
-                pc: pc,
-                gas: gas,
-                argumentData: argumentData,
-                ctx: ctx
+            // Return error result instead of falling back
+            return VMExecutionResult(
+                exitReason: .panic(.trap),
+                gasUsed: Gas(0),
+                outputData: nil
             )
         }
     }
