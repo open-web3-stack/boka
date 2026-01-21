@@ -72,7 +72,12 @@ final class ExecutorBackendJIT: ExecutorBackend {
         jitHostFunctionTableStorage = JITHostFunctionTable(
             dispatchHostCall: unsafeBitCast(fnPtr, to: JITHostFunctionFn.self),
             ownerContext: Unmanaged.passUnretained(self).toOpaque(),
-            invocationContext: nil
+            invocationContext: nil,
+            jumpTableData: nil,
+            jumpTableSize: 0,
+            jumpTableEntrySize: 0,
+            jumpTableEntriesCount: 0,
+            alignmentFactor: 0
         )
 
         // Create a wrapper for the table
@@ -134,7 +139,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
         gas: Gas,
         argumentData: Data?,
         ctx: (any InvocationContext)?
-    ) async -> ExitReason {
+    ) async -> VMExecutionResult {
         logger.debug("JIT execution request. PC: \(pc), Gas: \(gas.value), Blob size: \(blob.count) bytes.")
 
         var currentGas = gas // Mutable copy for JIT execution
@@ -143,27 +148,30 @@ final class ExecutorBackendJIT: ExecutorBackend {
             let targetArchitecture = JITPlatform.getCurrentTargetArchitecture()
             logger.debug("Target architecture for JIT: \(targetArchitecture)")
 
-            // TODO: lookup from cache
-
-            let compiledFuncPtr = try jitCompiler.compile(
-                blob: blob,
-                initialPC: pc,
-                config: config,
-                targetArchitecture: targetArchitecture,
-                jitMemorySize: UInt32.max // TODO:
-            )
-
-            var registers = Registers(config: config, argumentData: argumentData)
-
-            let jitTotalMemorySize = UInt32.max
-
-            // Set up program code for host function calls
+            // Set up program code first (needed to extract bytecode for JIT compiler)
             do {
                 currentProgramCode = try ProgramCode(blob)
             } catch {
                 logger.error("Failed to create ProgramCode: \(error)")
-                return .panic(.invalidInstructionIndex)
+                return VMExecutionResult(exitReason: .panic(.invalidInstructionIndex), gasUsed: gas, outputData: nil)
             }
+
+            // TODO: lookup from cache
+
+            // CRITICAL FIX: Pass the extracted bytecode, not the raw blob!
+            // The blob contains headers (jump table count, encode size, code length, etc.)
+            // but the JIT compiler expects just the bytecode portion.
+            // Calculate total memory size from config for proper bounds checking
+            let totalMemorySize = (config.initialHeapPages + config.stackPages) * UInt32(config.pvmMemoryPageSize)
+            let compiledFuncPtr = try jitCompiler.compile(
+                blob: currentProgramCode!.code,
+                initialPC: pc,
+                config: config,
+                targetArchitecture: targetArchitecture,
+                jitMemorySize: totalMemorySize
+            )
+
+            var registers = Registers(config: config, argumentData: argumentData)
 
             // Set up the synchronous handler that will bridge to async context if invoked
             // We're capturing the invocationContext into a closure that will be called synchronously
@@ -186,7 +194,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     )
 
                     // We need to convert the async operation to sync
-                    // Create a placeholder synchronization mechanism
+                    // Use DispatchQueue to avoid blocking the cooperative pool
                     let semaphore = DispatchSemaphore(value: 0)
                     // FIXME: `nonisolated(unsafe)` due to swift 6.2 check, figure out a better way to handle this
                     nonisolated(unsafe) var asyncResult: ExecOutcome?
@@ -194,14 +202,20 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     // TODO: consider make InvocationContext Sendable
                     let boxedCtx = UncheckedSendableBox(invocationContext)
 
-                    // Kick off the async operation but wait for it to complete
-                    Task { @Sendable in
+                    // Kick off the async operation on a detached task to avoid pool starvation
+                    // Propagate priority from current task
+                    Task.detached(priority: Task.currentPriority) { @Sendable in
                         asyncResult = await boxedCtx.value.dispatch(index: hostCallIndex, state: vmState)
                         semaphore.signal()
                     }
 
                     // Wait for the async operation to complete
-                    semaphore.wait()
+                    // Host calls should complete quickly; use conservative timeout
+                    let waitResult = DispatchSemaphore.wait(timeout: .now() + 60) // 60 second timeout
+                    if waitResult == .timedOut {
+                        self.logger.error("Host call timed out after 60 seconds")
+                        return JITHostCallError.hostFunctionThrewError.rawValue
+                    }
 
                     // Process the async result and return appropriate status
                     if let result = asyncResult {
@@ -237,37 +251,96 @@ final class ExecutorBackendJIT: ExecutorBackend {
             // Update the invocation context in the JIT host function table
             jitHostFunctionTableWrapper.table.invocationContext = nil // We're using the syncHandler now
 
+            // Populate jump table data for JumpInd instruction support
+            if let programCode = currentProgramCode {
+                // Get jump table data as a pointer
+                let jumpTableData = programCode.jumpTable.withUnsafeBytes { rawBufferPointer in
+                    rawBufferPointer.baseAddress
+                }
+
+                jitHostFunctionTableWrapper.table.jumpTableData = jumpTableData?.assumingMemoryBound(to: UInt8.self)
+                jitHostFunctionTableWrapper.table.jumpTableSize = UInt32(programCode.jumpTable.count)
+                jitHostFunctionTableWrapper.table.jumpTableEntrySize = programCode.jumpTableEntrySize
+                jitHostFunctionTableWrapper.table.jumpTableEntriesCount = UInt32(programCode.jumpTable.count / Int(programCode.jumpTableEntrySize))
+                jitHostFunctionTableWrapper.table.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
+            } else {
+                // No jump table available
+                jitHostFunctionTableWrapper.table.jumpTableData = nil
+                jitHostFunctionTableWrapper.table.jumpTableSize = 0
+                jitHostFunctionTableWrapper.table.jumpTableEntrySize = 0
+                jitHostFunctionTableWrapper.table.jumpTableEntriesCount = 0
+                jitHostFunctionTableWrapper.table.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
+            }
+
             // Get a pointer to the JITHostFunctionTableWrapper
             let invocationContextPointer = Unmanaged.passUnretained(jitHostFunctionTableWrapper).toOpaque()
 
             // Execute the JIT-compiled function
             // The JIT function will use our syncHostCallHandler via the C trampoline
-            let exitReason = try jitExecutor.execute(
+            let (exitReason, memoryBuffer) = try jitExecutor.execute(
                 functionPtr: compiledFuncPtr,
                 registers: &registers,
-                jitMemorySize: jitTotalMemorySize,
+                jitMemorySize: totalMemorySize,
                 gas: &currentGas,
                 initialPC: pc,
                 invocationContext: invocationContextPointer
             )
+
+            // Deallocate memory after we've read what we need
+            defer {
+                memoryBuffer.deallocate()
+            }
 
             // Clear the references after execution
             syncHostCallHandler = nil
             currentProgramCode = nil
             jitHostFunctionTableWrapper.table.invocationContext = nil
 
-            logger.debug("JIT execution finished. Reason: \(exitReason). Remaining gas: \(currentGas.value)")
-            return exitReason
+            // Calculate gas used (handle saturating Gas type correctly)
+            let gasUsed: Gas
+            if exitReason == .outOfGas {
+                // When out of gas, all remaining gas was used
+                gasUsed = gas
+            } else {
+                // Normal execution: subtract remaining from initial
+                gasUsed = gas - currentGas
+            }
+
+            // Get output data from JIT memory (only on halt, following invokePVM pattern)
+            let outputData: Data?
+            switch exitReason {
+            case .halt:
+                // Read output address and length from registers r7 and r8
+                let outputAddr = UInt32(truncatingIfNeeded: registers[Registers.Index(raw: 7)])
+                let outputLen = UInt32(truncatingIfNeeded: registers[Registers.Index(raw: 8)])
+
+                // Validate and read from JIT memory (prevent integer overflow)
+                if outputLen == 0 {
+                    // Empty output is valid
+                    outputData = Data()
+                } else if UInt64(outputAddr) + UInt64(outputLen) <= UInt64(totalMemorySize) {
+                    outputData = Data(bytes: memoryBuffer.advanced(by: Int(outputAddr)), count: Int(outputLen))
+                } else {
+                    // Invalid memory access - return nil to indicate error
+                    logger.warning("Invalid output memory range: addr=\(outputAddr), len=\(outputLen), memorySize=\(totalMemorySize)")
+                    outputData = nil
+                }
+            default:
+                outputData = nil
+            }
+
+            logger.debug("JIT execution finished. Reason: \(exitReason). Gas used: \(gasUsed.value)")
+            return VMExecutionResult(exitReason: exitReason, gasUsed: gasUsed, outputData: outputData)
 
         } catch let error as JITCompiler.CompilationError {
             logger.error("JIT compilation failed: \(error)")
-            return .panic(.trap)
+            return VMExecutionResult(exitReason: .panic(.trap), gasUsed: gas, outputData: nil)
         } catch let error as JITError {
             logger.error("JIT execution failed with JITError: \(error)")
-            return error.toExitReason()
+            return VMExecutionResult(exitReason: error.toExitReason(), gasUsed: gas, outputData: nil)
         } catch {
             logger.error("JIT execution failed with an unexpected error: \(error)")
-            return .panic(.trap) // Generic trap for unexpected errors
+            return VMExecutionResult(exitReason: .panic(.trap), gasUsed: gas, outputData: nil)
         }
     }
 }
