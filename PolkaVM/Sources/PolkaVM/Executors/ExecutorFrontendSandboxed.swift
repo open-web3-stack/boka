@@ -1,6 +1,11 @@
 import Foundation
 import TracingUtils
 import Utils
+#if canImport(Glibc)
+import Glibc
+#elseif canImport(Darwin)
+import Darwin
+#endif
 
 final class ExecutorFrontendSandboxed: ExecutorFrontend {
     private let logger = Logger(label: "ExecutorFrontendSandboxed")

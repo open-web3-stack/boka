@@ -38,6 +38,10 @@ final class ExecutorBackendJIT: ExecutorBackend {
         UnsafeMutablePointer<UInt64>
     ) -> UInt32)?
 
+    // Track compiled function pointers for memory leak cleanup
+    private var compiledFunctionPointers: [UnsafeRawPointer] = []
+
+
     // TODO: Implement thread safety for JIT execution (similar to interpreter's async execution model)
     // TODO: Add support for debugging JIT-compiled code (instruction tracing, register dumps)
     // TODO: Implement proper memory management for JIT code (code cache eviction policies)
@@ -76,11 +80,18 @@ final class ExecutorBackendJIT: ExecutorBackend {
             jumpTableSize: 0,
             jumpTableEntrySize: 0,
             jumpTableEntriesCount: 0,
-            alignmentFactor: 0
+            alignmentFactor: 0,
+            dispatcherJumpTable: nil,
+            dispatcherJumpTableSize: 0
         ))
     }
 
     deinit {
+        // Clean up dispatcher tables for all compiled functions
+        for funcPtr in compiledFunctionPointers {
+            CppHelper.freeDispatcherTable(UnsafeMutableRawPointer(mutating: funcPtr))
+        }
+
         // Clean up heap-allocated struct
         jitHostFunctionTablePtr.deinitialize(count: 1)
         jitHostFunctionTablePtr.deallocate()
@@ -186,6 +197,23 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 jitMemorySize: totalMemorySize
             )
 
+            // Track compiled function pointer for cleanup in deinit
+            compiledFunctionPointers.append(compiledFuncPtr)
+
+            // Retrieve dispatcher jump table for this compiled function
+            // This allows JumpInd to work without a PVM jump table
+            var dispatcherTableSize: size_t = 0
+            let dispatcherTable = getDispatcherTable(compiledFuncPtr, &dispatcherTableSize)
+
+            // Update the JITHostFunctionTable with the dispatcher table
+            if let table = dispatcherTable {
+                logger.debug("Dispatcher table retrieved: \(dispatcherTableSize) entries")
+                jitHostFunctionTablePtr.pointee.dispatcherJumpTable = table
+                jitHostFunctionTablePtr.pointee.dispatcherJumpTableSize = UInt32(dispatcherTableSize)
+            } else {
+                logger.warning("No dispatcher table found for compiled function - JumpInd may fall back to interpreter")
+            }
+
             var registers = Registers(config: config, argumentData: argumentData)
 
             // Set up the synchronous handler that will bridge to async context if invoked
@@ -246,11 +274,20 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     }
 
                     // Block until async operation completes
-                    // WARNING: This blocks a Swift Concurrency thread. If too many JIT
-                    // executions block concurrently, the thread pool may be exhausted,
-                    // causing deadlock (detached task never gets to run).
-                    // Mitigation: Ensure ExecutorFrontendInProcess serializes JIT execution
-                    // or limits concurrent executions to a small number (< thread pool size).
+                    // ⚠️ CRITICAL WARNING: This blocks a Swift Concurrency thread.
+                    //
+                    // If too many JIT executions block concurrently (via semaphore.wait()),
+                    // the Swift concurrency thread pool may be exhausted, causing deadlock
+                    // where the detached task never gets to run because all threads are
+                    // blocked waiting.
+                    //
+                    // MITIGATION: This is acceptable because:
+                    // 1. ExecutorBackendJIT is documented as SINGLE-THREADED
+                    // 2. ExecutorFrontendInProcess serializes execution
+                    // 3. Only one JIT execution should be active at a time
+                    //
+                    // DO NOT call this executor from multiple concurrent tasks without
+                    // external serialization (e.g., an actor or serial queue).
                     semaphore.wait()
 
                     // Process the result
