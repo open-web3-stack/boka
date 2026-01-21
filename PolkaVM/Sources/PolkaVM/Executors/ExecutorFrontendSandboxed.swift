@@ -21,7 +21,7 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
         gas: Gas,
         argumentData: Data?,
         ctx: (any InvocationContext)?
-    ) async -> ExitReason {
+    ) async -> VMExecutionResult {
         // TODO: For now, we still need to handle context properly
         // The context serialization will be implemented in Phase 4
         if ctx != nil {
@@ -37,15 +37,19 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
             )
         }
 
+        // Declare handle outside do block so it's accessible in catch for cleanup
+        var handle: ProcessHandle?
+        var clientFD: Int32?
+
         do {
             // Spawn child process
-            let (handle, clientFD) = try await childProcessManager.spawnChildProcess(
+            (handle, clientFD) = try await childProcessManager.spawnChildProcess(
                 executablePath: executablePath
             )
 
             // Create IPC client
             let ipcClient = IPCClient()
-            ipcClient.setFileDescriptor(clientFD)
+            ipcClient.setFileDescriptor(clientFD!)
 
             // Send execute request
             let result = try await ipcClient.sendExecuteRequest(
@@ -56,19 +60,39 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
                 executionMode: mode
             )
 
-            // Clean up
+            // Clean up IPC
             ipcClient.close()
 
             // Wait for child to exit
-            let _ = try? await childProcessManager.waitForExit(
-                handle: handle,
-                timeout: 30.0
-            )
+            if let handle = handle {
+                let _ = try? await childProcessManager.waitForExit(
+                    handle: handle,
+                    timeout: 30.0
+                )
+            }
 
-            return result.exitReason
+            return VMExecutionResult(
+                exitReason: result.exitReason,
+                gasUsed: Gas(result.gasUsed),
+                outputData: result.outputData
+            )
 
         } catch {
             logger.error("Sandboxed execution failed: \(error)")
+
+            // Clean up child process if it was spawned
+            if let handle = handle {
+                // Try to kill the process and reap it to avoid zombies
+                await childProcessManager.kill(handle: handle)
+                // Try one more reap after a short delay
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                await childProcessManager.reap(handle: handle)
+            }
+
+            // Close client FD if it was opened
+            if let fd = clientFD, fd >= 0 {
+                close(fd)
+            }
 
             // Fallback to in-process on error
             logger.warning("Falling back to in-process execution")

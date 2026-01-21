@@ -1,7 +1,7 @@
 import Foundation
 
 /// IPC message types for communication between host and child process
-enum IPCMessageType: UInt8, Codable {
+public enum IPCMessageType: UInt8, Codable {
     case executeRequest = 1
     case executeResponse = 2
     case error = 3
@@ -11,33 +11,48 @@ enum IPCMessageType: UInt8, Codable {
 }
 
 /// Request to execute a PolkaVM program
-struct IPCExecuteRequest: Codable {
-    let blob: Data
-    let pc: UInt32
-    let gas: UInt64
-    let argumentData: Data?
-    let executionMode: UInt8  // Encoded ExecutionMode flags
+public struct IPCExecuteRequest: Codable {
+    public let blob: Data
+    public let pc: UInt32
+    public let gas: UInt64
+    public let argumentData: Data?
+    public let executionMode: UInt8  // Encoded ExecutionMode flags
+
+    public init(blob: Data, pc: UInt32, gas: UInt64, argumentData: Data?, executionMode: UInt8) {
+        self.blob = blob
+        self.pc = pc
+        self.gas = gas
+        self.argumentData = argumentData
+        self.executionMode = executionMode
+    }
 }
 
 /// Response from VM execution
-struct IPCExecuteResponse: Codable {
-    let exitReasonCode: UInt64  // ExitReason.toUInt64()
-    let gasUsed: UInt64
-    let outputData: Data?
-    let errorMessage: String?
+public struct IPCExecuteResponse: Codable {
+    public let exitReasonCode: UInt64  // ExitReason.toUInt64()
+    public let gasUsed: UInt64
+    public let outputData: Data?
+    public let errorMessage: String?
+
+    public init(exitReasonCode: UInt64, gasUsed: UInt64, outputData: Data?, errorMessage: String?) {
+        self.exitReasonCode = exitReasonCode
+        self.gasUsed = gasUsed
+        self.outputData = outputData
+        self.errorMessage = errorMessage
+    }
 
     /// Convert to ExitReason
-    func toExitReason() -> ExitReason {
+    public func toExitReason() -> ExitReason {
         return ExitReason.fromUInt64(exitReasonCode)
     }
 }
 
 /// Error message from child process
-struct IPCErrorMessage: Codable {
-    let errorType: ErrorType
-    let message: String
+public struct IPCErrorMessage: Codable {
+    public let errorType: ErrorType
+    public let message: String
 
-    enum ErrorType: UInt8, Codable {
+    public enum ErrorType: UInt8, Codable {
         case deserialization = 1
         case execution = 2
         case security = 3
@@ -46,11 +61,11 @@ struct IPCErrorMessage: Codable {
 }
 
 /// Heartbeat message for health monitoring
-struct IPCHeartbeat: Codable {
-    let timestamp: UInt64
-    let status: Status
+public struct IPCHeartbeat: Codable {
+    public let timestamp: UInt64
+    public let status: Status
 
-    enum Status: UInt8, Codable {
+    public enum Status: UInt8, Codable {
         case ready = 1
         case busy = 2
         case error = 3
@@ -58,24 +73,24 @@ struct IPCHeartbeat: Codable {
 }
 
 /// Request for host call from child process
-struct IPCHostCallRequest: Codable {
-    let callIndex: UInt32
-    let registersData: Data  // Serialized register state
+public struct IPCHostCallRequest: Codable {
+    public let callIndex: UInt32
+    public let registersData: Data  // Serialized register state
 }
 
 /// Response to host call from host process
-struct IPCHostCallResponse: Codable {
-    let outcomeCode: UInt64  // Encoded ExecOutcome
-    let registersData: Data? // Updated register state
+public struct IPCHostCallResponse: Codable {
+    public let outcomeCode: UInt64  // Encoded ExecOutcome
+    public let registersData: Data? // Updated register state
 }
 
 /// Generic IPC message wrapper
-struct IPCMessage: Codable {
-    let type: IPCMessageType
-    let requestId: UInt32
-    let payload: Data?  // JSON-encoded specific message
+public struct IPCMessage: Codable {
+    public let type: IPCMessageType
+    public let requestId: UInt32
+    public let payload: Data?  // JSON-encoded specific message
 
-    init(type: IPCMessageType, requestId: UInt32, payload: Data? = nil) {
+    public init(type: IPCMessageType, requestId: UInt32, payload: Data? = nil) {
         self.type = type
         self.requestId = requestId
         self.payload = payload

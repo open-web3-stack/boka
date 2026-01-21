@@ -24,7 +24,7 @@ class Executor {
         gas: Gas,
         argumentData: Data?,
         ctx: (any InvocationContext)?
-    ) async -> ExitReason {
+    ) async -> VMExecutionResult {
         await frontend.execute(
             config: config,
             blob: blob,

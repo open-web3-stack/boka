@@ -45,13 +45,6 @@ let package = Package(
                 "TracingUtils",
                 .product(name: "Logging", package: "swift-log"),
             ],
-            exclude: [
-                "IPCMessages.swift",
-                "IPCProtocol.swift",
-                "IPCClient.swift",
-                "IPCServer.swift",
-                "ChildProcessManager.swift"
-            ],
             sources: ["main.swift"]
         ),
         .testTarget(

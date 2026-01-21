@@ -9,5 +9,5 @@ protocol ExecutorBackend {
         gas: Gas,
         argumentData: Data?,
         ctx: (any InvocationContext)?
-    ) async -> ExitReason
+    ) async -> VMExecutionResult
 }

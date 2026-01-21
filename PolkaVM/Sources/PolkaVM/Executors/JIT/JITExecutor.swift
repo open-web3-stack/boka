@@ -68,7 +68,7 @@ final class JITExecutor {
     ///   - gas: Gas counter
     ///   - initialPC: Initial program counter
     ///   - invocationContext: Context for host function calls
-    /// - Returns: The exit reason
+    /// - Returns: A tuple of exit reason and memory buffer pointer (caller must deallocate)
     func execute(
         functionPtr: UnsafeMutableRawPointer,
         registers: inout Registers,
@@ -76,7 +76,7 @@ final class JITExecutor {
         gas: inout Gas,
         initialPC: UInt32,
         invocationContext: UnsafeMutableRawPointer?
-    ) throws -> ExitReason {
+    ) throws -> (ExitReason, UnsafeMutablePointer<UInt8>) {
         // Create a flat memory buffer for the JIT execution
         logger.debug("Setting up JIT execution environment")
 
@@ -84,10 +84,6 @@ final class JITExecutor {
         // TODO: Implement proper memory sandboxing by reserving 4GB address space with PROT_NONE
         //       and then enabling access only to pages that should be accessible to the guest
         let memoryBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: Int(jitMemorySize))
-        defer {
-            // Clean up memory buffer after execution
-            memoryBuffer.deallocate()
-        }
 
         // Initialize memory to zeros
         memoryBuffer.initialize(repeating: 0, count: Int(jitMemorySize))
@@ -132,22 +128,25 @@ final class JITExecutor {
 
         // Translate exit code to ExitReason
         // TODO: Define proper exit codes in the C++ side and ensure they match with Swift expectations
+        let exitReason: ExitReason
         switch exitCode {
         case 0:
-            return .halt
+            exitReason = .halt
         case 1:
-            return .outOfGas
+            exitReason = .outOfGas
         case 2:
             // For a host call, we would need to extract the host call index from registers
-            return .hostCall(UInt32(registers[Registers.Index(raw: 0)]))
+            exitReason = .hostCall(UInt32(registers[Registers.Index(raw: 0)]))
         case 3:
             // For a page fault, we would need to extract the faulting address from registers
-            return .pageFault(UInt32(registers[Registers.Index(raw: 0)]))
+            exitReason = .pageFault(UInt32(registers[Registers.Index(raw: 0)]))
         case -1:
-            return .panic(.trap)
+            exitReason = .panic(.trap)
         default:
             logger.error("Unknown JIT exit code: \(exitCode)")
-            return .panic(.trap)
+            exitReason = .panic(.trap)
         }
+
+        return (exitReason, memoryBuffer)
     }
 }

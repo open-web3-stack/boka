@@ -15,36 +15,35 @@ public func invokePVM(
     ctx: (any InvocationContext)?
 ) async -> (ExitReason, Gas, Data?) {
     do {
-        let state = try VMStateInterpreter(standardProgramBlob: blob, pc: pc, gas: gas, argumentData: argumentData)
-
-        // Use JIT Executor if requested, otherwise use Engine (interpreter)
-        let exitReason: ExitReason
+        // Use JIT/Executor if requested, otherwise use Engine (interpreter)
         if executionMode.contains(.jit) {
             let executor = Executor(mode: executionMode, config: config)
-            exitReason = await executor.execute(
+            let result = await executor.execute(
                 blob: blob,
                 pc: pc,
                 gas: gas,
                 argumentData: argumentData,
                 ctx: ctx
             )
+            return (result.exitReason, result.gasUsed, result.outputData)
         } else {
+            let state = try VMStateInterpreter(standardProgramBlob: blob, pc: pc, gas: gas, argumentData: argumentData)
             let engine = Engine(config: config, invocationContext: ctx)
-            exitReason = await engine.execute(state: state)
-        }
+            let exitReason = await engine.execute(state: state)
 
-        let postGas = state.getGas()
-        let gasUsed = postGas >= GasInt(0) ? gas - Gas(postGas) : gas
+            let postGas = state.getGas()
+            let gasUsed = postGas >= GasInt(0) ? gas - Gas(postGas) : gas
 
-        switch exitReason {
-        case .outOfGas:
-            return (.outOfGas, gasUsed, nil)
-        case .halt:
-            let (addr, len): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
-            let output = try? state.readMemory(address: addr, length: Int(len))
-            return (.halt, gasUsed, output ?? Data())
-        default:
-            return (.panic(.trap), gasUsed, nil)
+            switch exitReason {
+            case .outOfGas:
+                return (.outOfGas, gasUsed, nil)
+            case .halt:
+                let (addr, len): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
+                let output = try? state.readMemory(address: addr, length: Int(len))
+                return (.halt, gasUsed, output ?? Data())
+            default:
+                return (.panic(.trap), gasUsed, nil)
+            }
         }
     } catch let e as StandardProgram.Error {
         logger.error("standard program initialization failed: \(e)")

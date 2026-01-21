@@ -156,7 +156,8 @@ enum IPCError: Error {
     case missingPayload
     case malformedMessage
     case encodingFailed(Error)
-    case decodingFailed(Error)
+    case decodingFailed(String)
+    case childProcessError(String)
     case writeFailed(Int)  // errno
     case readFailed(Int)   // errno
     case timeout

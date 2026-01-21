@@ -1,6 +1,11 @@
 import Foundation
 import TracingUtils
 import PolkaVM
+#if canImport(Glibc)
+import Glibc
+#elseif canImport(Darwin)
+import Darwin
+#endif
 
 private let logger = Logger(label: "Boka-Sandbox")
 
@@ -32,20 +37,20 @@ struct SandboxMain {
     private static func setupSignalHandlers() {
         // Handle SIGTERM for graceful shutdown
         signal(SIGTERM) { _ in
-            logger.info("Received SIGTERM, shutting down...")
-            exit(0)
+            // Use _exit instead of exit for signal safety
+            _exit(0)
         }
 
         // Handle SIGINT (Ctrl+C)
         signal(SIGINT) { _ in
-            logger.info("Received SIGINT, shutting down...")
-            exit(0)
+            // Use _exit instead of exit for signal safety
+            _exit(0)
         }
 
         // Handle SIGXCPU (CPU limit exceeded)
         signal(SIGXCPU) { _ in
-            logger.error("CPU time limit exceeded")
-            exit(5) // Exit code for out of gas
+            // Use _exit instead of exit for signal safety
+            _exit(5) // Exit code for out of gas
         }
     }
 
@@ -63,7 +68,7 @@ struct SandboxMain {
             let config = PvmConfig(memorySize: 16 * 1024 * 1024) // 16 MB default
 
             // Execute
-            let exitReason = await executor.execute(
+            let result = await executor.execute(
                 config: config,
                 blob: request.blob,
                 pc: request.pc,
@@ -72,12 +77,12 @@ struct SandboxMain {
                 ctx: nil  // TODO: Handle context serialization in Phase 4
             )
 
-            logger.debug("Execution completed: \(exitReason)")
+            logger.debug("Execution completed: \(result.exitReason), gas used: \(result.gasUsed.value)")
 
             return IPCExecuteResponse(
-                exitReasonCode: exitReason.toUInt64(),
-                gasUsed: request.gas,  // TODO: Track actual gas used
-                outputData: nil,  // TODO: Read output from state
+                exitReasonCode: result.exitReason.toUInt64(),
+                gasUsed: result.gasUsed.value,
+                outputData: result.outputData,
                 errorMessage: nil
             )
 

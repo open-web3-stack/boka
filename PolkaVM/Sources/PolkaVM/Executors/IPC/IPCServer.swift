@@ -1,32 +1,40 @@
 import Foundation
 import TracingUtils
+#if canImport(Glibc)
 import Glibc
+#elseif canImport(Darwin)
+import Darwin
+#endif
 
 private let logger = Logger(label: "IPCServer")
 
 /// IPC server for child process to receive requests and send responses
-class IPCServer {
+public class IPCServer {
     private var fileDescriptor: Int32?
     private var isRunning = false
 
-    init() {}
+    public init() {}
 
     /// Set the file descriptor for communication
-    func setFileDescriptor(_ fd: Int32) {
+    public func setFileDescriptor(_ fd: Int32) {
         fileDescriptor = fd
     }
 
     /// Close the file descriptor
-    func close() {
+    public func close() {
         isRunning = false
         if let fd = fileDescriptor {
+#if canImport(Glibc)
             Glibc.close(fd)
+#elseif canImport(Darwin)
+            Darwin.close(fd)
+#endif
             fileDescriptor = nil
         }
     }
 
     /// Run the IPC server loop
-    func run(handler: @escaping (IPCExecuteRequest) async throws -> IPCExecuteResponse) async {
+    public func run(handler: @escaping (IPCExecuteRequest) async throws -> IPCExecuteResponse) async {
         guard let fd = fileDescriptor else {
             logger.error("No file descriptor set")
             return
@@ -128,7 +136,7 @@ class IPCServer {
         // Decode message
         let decodeResult = try? IPCProtocol.decodeMessage(lengthData + messageData)
         guard let message = decodeResult?.0 else {
-            throw IPCError.decodingFailed(NSError(domain: "IPCServer", code: -1))
+            throw IPCError.decodingFailed("Failed to decode IPC message")
         }
 
         return message
@@ -204,9 +212,17 @@ class IPCServer {
         return buffer
     }
 
-    /// Convert errno to string
+    /// Convert errno to string (thread-safe)
     private func errnoToString(_ err: Int32) -> String {
-        return String(cString: strerror(err))
+        var buffer = [Int8](repeating: 0, count: 256)
+        // Use strerror_r for thread safety (XSI-compliant version)
+        // Both Linux (glibc) and macOS support the XSI-compliant strerror_r that returns Int32
+        let result = strerror_r(err, &buffer, buffer.count)
+        if result == 0 {
+            return String(cString: &buffer)
+        } else {
+            return "Unknown error \(err)"
+        }
     }
 
     deinit {

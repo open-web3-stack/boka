@@ -139,7 +139,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
         gas: Gas,
         argumentData: Data?,
         ctx: (any InvocationContext)?
-    ) async -> ExitReason {
+    ) async -> VMExecutionResult {
         logger.debug("JIT execution request. PC: \(pc), Gas: \(gas.value), Blob size: \(blob.count) bytes.")
 
         var currentGas = gas // Mutable copy for JIT execution
@@ -153,7 +153,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 currentProgramCode = try ProgramCode(blob)
             } catch {
                 logger.error("Failed to create ProgramCode: \(error)")
-                return .panic(.invalidInstructionIndex)
+                return VMExecutionResult(exitReason: .panic(.invalidInstructionIndex), gasUsed: gas, outputData: nil)
             }
 
             // TODO: lookup from cache
@@ -271,7 +271,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
 
             // Execute the JIT-compiled function
             // The JIT function will use our syncHostCallHandler via the C trampoline
-            let exitReason = try jitExecutor.execute(
+            let (exitReason, memoryBuffer) = try jitExecutor.execute(
                 functionPtr: compiledFuncPtr,
                 registers: &registers,
                 jitMemorySize: totalMemorySize,
@@ -280,23 +280,49 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 invocationContext: invocationContextPointer
             )
 
+            // Deallocate memory after we've read what we need
+            defer {
+                memoryBuffer.deallocate()
+            }
+
             // Clear the references after execution
             syncHostCallHandler = nil
             currentProgramCode = nil
             jitHostFunctionTableWrapper.table.invocationContext = nil
 
-            logger.debug("JIT execution finished. Reason: \(exitReason). Remaining gas: \(currentGas.value)")
-            return exitReason
+            // Calculate gas used
+            let gasUsed = gas - currentGas
+
+            // Get output data from JIT memory (only on halt, following invokePVM pattern)
+            let outputData: Data?
+            switch exitReason {
+            case .halt:
+                // Read output address and length from registers r7 and r8
+                let outputAddr = UInt32(truncatingIfNeeded: registers[Registers.Index(raw: 7)])
+                let outputLen = UInt32(truncatingIfNeeded: registers[Registers.Index(raw: 8)])
+
+                // Validate and read from JIT memory
+                if outputLen > 0 && outputAddr + outputLen <= totalMemorySize {
+                    outputData = Data(bytes: memoryBuffer.advanced(by: Int(outputAddr)), count: Int(outputLen))
+                } else {
+                    outputData = Data()
+                }
+            default:
+                outputData = nil
+            }
+
+            logger.debug("JIT execution finished. Reason: \(exitReason). Gas used: \(gasUsed.value)")
+            return VMExecutionResult(exitReason: exitReason, gasUsed: gasUsed, outputData: outputData)
 
         } catch let error as JITCompiler.CompilationError {
             logger.error("JIT compilation failed: \(error)")
-            return .panic(.trap)
+            return VMExecutionResult(exitReason: .panic(.trap), gasUsed: gas, outputData: nil)
         } catch let error as JITError {
             logger.error("JIT execution failed with JITError: \(error)")
-            return error.toExitReason()
+            return VMExecutionResult(exitReason: error.toExitReason(), gasUsed: gas, outputData: nil)
         } catch {
             logger.error("JIT execution failed with an unexpected error: \(error)")
-            return .panic(.trap) // Generic trap for unexpected errors
+            return VMExecutionResult(exitReason: .panic(.trap), gasUsed: gas, outputData: nil)
         }
     }
 }

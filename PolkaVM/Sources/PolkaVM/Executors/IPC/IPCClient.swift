@@ -1,6 +1,10 @@
 import Foundation
 import TracingUtils
+#if canImport(Glibc)
 import Glibc
+#elseif canImport(Darwin)
+import Darwin
+#endif
 
 private let logger = Logger(label: "IPCClient")
 
@@ -64,9 +68,7 @@ class IPCClient {
         // Check for errors
         if let errorMessage = response.errorMessage {
             logger.error("Child process error: \(errorMessage)")
-            throw IPCError.decodingFailed(NSError(domain: "IPC", code: -1, userInfo: [
-                NSLocalizedDescriptionKey: errorMessage
-            ]))
+            throw IPCError.childProcessError(errorMessage)
         }
 
         return (
@@ -124,7 +126,7 @@ class IPCClient {
         // Decode message
         let decodeResult = try? IPCProtocol.decodeMessage(lengthData + messageData)
         guard let message = decodeResult?.0 else {
-            throw IPCError.decodingFailed(NSError(domain: "IPC", code: -1))
+            throw IPCError.decodingFailed("Failed to decode IPC message")
         }
 
         // Verify request ID
@@ -170,9 +172,17 @@ class IPCClient {
         return buffer
     }
 
-    /// Convert errno to string
+    /// Convert errno to string (thread-safe)
     private func errnoToString(_ err: Int32) -> String {
-        return String(cString: strerror(err))
+        var buffer = [Int8](repeating: 0, count: 256)
+        // Use strerror_r for thread safety (XSI-compliant version)
+        // Both Linux (glibc) and macOS support the XSI-compliant strerror_r that returns Int32
+        let result = strerror_r(err, &buffer, buffer.count)
+        if result == 0 {
+            return String(cString: &buffer)
+        } else {
+            return "Unknown error \(err)"
+        }
     }
 
     deinit {

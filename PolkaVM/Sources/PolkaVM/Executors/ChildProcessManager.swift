@@ -1,6 +1,10 @@
 import Foundation
 import TracingUtils
+#if canImport(Glibc)
 import Glibc
+#elseif canImport(Darwin)
+import Darwin
+#endif
 
 private let logger = Logger(label: "ChildProcessManager")
 
@@ -55,7 +59,7 @@ actor ChildProcessManager {
             logger.error("Failed to fork: \(err)")
             throw IPCError.writeFailed(Int(err))
         } else if pid == 0 {
-            // Child process
+            // Child process - DO NOT use logging, locks, or any async-unsafe functions
             Glibc.close(parentFD)
 
             // Redirect stdin/stdout/stderr to /dev/null
@@ -81,15 +85,15 @@ actor ChildProcessManager {
                 let exeResult = Glibc.execvp(execPath, &argv)
 
                 // execvp only returns on failure
+                // Use _exit() instead of exit() to avoid calling atexit() handlers
+                // that were registered by the parent process
                 if exeResult < 0 {
-                    let err = errno
-                    logger.error("Failed to exec child process: \(err)")
-                    exit(1)
+                    _exit(1)
                 }
             }
 
             // Should never reach here
-            exit(1)
+            _exit(1)
         } else {
             // Parent process
             Glibc.close(childFD)
@@ -160,11 +164,36 @@ actor ChildProcessManager {
         throw IPCError.timeout
     }
 
-    /// Kill a child process
+    /// Kill a child process and reap it to avoid zombies
     func kill(handle: ProcessHandle, signal: Int32 = SIGTERM) {
         logger.debug("Killing child process \(handle.pid) with signal \(signal)")
         Glibc.kill(handle.pid, signal)
+
+        // Try to reap the process immediately to avoid zombies
+        var status: Int32 = 0
+        let result = Glibc.waitpid(handle.pid, &status, WNOHANG)
+
+        if result == handle.pid {
+            logger.debug("Reaped killed process \(handle.pid)")
+        } else if result < 0 {
+            let err = errno
+            if err != ECHILD {
+                logger.warning("Failed to wait for killed process \(handle.pid): \(err)")
+            }
+        }
+
         activeProcesses.removeValue(forKey: handle.pid)
+    }
+
+    /// Force reap a specific process (if it's zombie)
+    func reap(handle: ProcessHandle) {
+        var status: Int32 = 0
+        let result = Glibc.waitpid(handle.pid, &status, WNOHANG)
+
+        if result == handle.pid {
+            logger.debug("Reaped zombie process \(handle.pid)")
+            activeProcesses.removeValue(forKey: handle.pid)
+        }
     }
 
     /// Reap zombie processes
