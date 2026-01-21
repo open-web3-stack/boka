@@ -349,8 +349,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.call(x86::rax);
 
             // Check result (eax contains error code or return value)
-            // Any value >= 0xFFFF_FFFC is an error (internalError, hostFunctionNotFound, hostFunctionThrewError, gasExhausted, etc.)
-            a.cmp(x86::eax, 0xFFFFFFFC);
+            // Any value >= 0xFFFF_FFFA is an error (hostRequestedHalt, pageFault, gasExhausted,
+            // internalError, hostFunctionNotFound, hostFunctionThrewError, etc.)
+            a.cmp(x86::eax, 0xFFFFFFFA);
             a.jae(panicLabel);  // Jump if above or equal (error range)
 
             // Store result in R0
