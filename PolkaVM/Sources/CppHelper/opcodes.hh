@@ -71,6 +71,23 @@ enum class Opcode : uint8_t {
     And = 210,          // Bitwise AND
     Xor = 211,          // Bitwise XOR
     Or = 212,           // Bitwise OR
+
+    // 3-Register Instructions (MulUpper, SetLt, Cmov, Rot, Min/Max)
+    MulUpperSS = 213,   // Multiply upper signed*signed
+    MulUpperUU = 214,   // Multiply upper unsigned*unsigned
+    MulUpperSU = 215,   // Multiply upper signed*unsigned
+    SetLtU = 216,       // Set less than unsigned
+    SetLtS = 217,       // Set less than signed
+    CmovIz = 218,       // Conditional move if zero
+    CmovNz = 219,       // Conditional move if not zero
+    RotL64 = 220,       // Rotate left 64-bit
+    RotL32 = 221,       // Rotate left 32-bit (2-register format)
+    RotR64 = 222,       // Rotate right 64-bit
+    RotR32 = 223,       // Rotate right 32-bit (2-register format)
+    Max = 227,          // Maximum signed
+    MaxU = 228,         // Maximum unsigned
+    Min = 229,          // Minimum signed
+    MinU = 230,         // Minimum unsigned
 };
 
 // Instruction size constants (in bytes)
