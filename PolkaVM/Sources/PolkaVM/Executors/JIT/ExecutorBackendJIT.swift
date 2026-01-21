@@ -210,12 +210,11 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     }
 
                     // Wait for the async operation to complete
-                    // Host calls should complete quickly; use conservative timeout
-                    let waitResult = semaphore.wait(timeout: .now() + 60) // 60 second timeout
-                    if waitResult == .timedOut {
-                        self.logger.error("Host call \(hostCallIndex) timed out after 60 seconds")
-                        return JITHostCallError.hostFunctionThrewError.rawValue
-                    }
+                    // WARNING: Cannot use timeout because the detached task continues
+                    // accessing memory pointers even after timeout. A timeout would cause
+                    // use-after-free when JIT execution terminates and deallocates memoryBuffer.
+                    // We must wait indefinitely for the async operation to complete.
+                    semaphore.wait()
 
                     // Process the async result and return appropriate status
                     if let result = asyncResult {
