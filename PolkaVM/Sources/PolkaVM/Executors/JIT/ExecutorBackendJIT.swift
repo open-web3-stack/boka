@@ -7,7 +7,109 @@ import Foundation
 import TracingUtils
 import Utils
 
-// TODO: Build a cache system for generated code
+// MARK: - In-Memory Code Cache
+
+/// Cache entry for compiled JIT code
+private struct JITCacheEntry {
+    let functionPtr: UnsafeRawPointer
+    let dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?
+    let dispatcherTableSize: UInt32
+    let bytecodeHash: Int
+    let configHash: Int
+    let initialPC: UInt32
+}
+
+/// Simple in-memory cache for JIT-compiled functions
+/// Key: (bytecodeHash, configHash, initialPC)
+private final class JITCodeCache {
+    private var cache: [String: JITCacheEntry] = [:]
+    private let logger = Logger(label: "JITCodeCache")
+    private var hitCount = 0
+    private var missCount = 0
+
+    /// Generate cache key from bytecode, config, and PC
+    private func makeKey(bytecodeHash: Int, configHash: Int, initialPC: UInt32) -> String {
+        return "\(bytecodeHash)-\(configHash)-\(initialPC)"
+    }
+
+    /// Generate hash from bytecode data
+    private func hashBytecode(_ bytecode: Data) -> Int {
+        // Simple hash using Fowler-Noll-Vo (FNV-1a) algorithm
+        var hash: UInt64 = 14695981039346656037
+        for byte in bytecode {
+            hash ^= UInt64(byte)
+            hash = hash &* 1099511628211
+        }
+        return Int(truncatingIfNeeded: hash)
+    }
+
+    /// Generate hash from PvmConfig
+    private func hashConfig(_ config: PvmConfig) -> Int {
+        // Hash relevant config fields that affect JIT compilation
+        var hasher = Hasher()
+        hasher.combine(config.initialHeapPages)
+        hasher.combine(config.stackPages)
+        hasher.combine(config.pvmMemoryPageSize)
+        hasher.combine(config.pvmDynamicAddressAlignmentFactor)
+        return hasher.finalize()
+    }
+
+    /// Lookup compiled function in cache
+    func lookup(bytecode: Data, config: PvmConfig, initialPC: UInt32) -> JITCacheEntry? {
+        let bytecodeHash = hashBytecode(bytecode)
+        let configHash = hashConfig(config)
+        let key = makeKey(bytecodeHash: bytecodeHash, configHash: configHash, initialPC: initialPC)
+
+        if let entry = cache[key] {
+            hitCount += 1
+            logger.debug("JIT cache HIT (hits: \(hitCount), misses: \(missCount), ratio: \(hitCount * 100 / (hitCount + missCount))%")
+            return entry
+        }
+
+        missCount += 1
+        logger.debug("JIT cache MISS (hits: \(hitCount), misses: \(missCount), ratio: \(hitCount * 100 / (hitCount + missCount))%")
+        return nil
+    }
+
+    /// Store compiled function in cache
+    func store(
+        bytecode: Data,
+        config: PvmConfig,
+        initialPC: UInt32,
+        functionPtr: UnsafeRawPointer,
+        dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?,
+        dispatcherTableSize: UInt32
+    ) {
+        let bytecodeHash = hashBytecode(bytecode)
+        let configHash = hashConfig(config)
+        let key = makeKey(bytecodeHash: bytecodeHash, configHash: configHash, initialPC: initialPC)
+
+        let entry = JITCacheEntry(
+            functionPtr: functionPtr,
+            dispatcherTable: dispatcherTable,
+            dispatcherTableSize: dispatcherTableSize,
+            bytecodeHash: bytecodeHash,
+            configHash: configHash,
+            initialPC: initialPC
+        )
+
+        cache[key] = entry
+        logger.debug("JIT cache STORE - Total entries: \(cache.count)")
+    }
+
+    /// Clear all cached entries
+    func clear() {
+        cache.removeAll()
+        hitCount = 0
+        missCount = 0
+        logger.debug("JIT cache CLEARED")
+    }
+
+    /// Get cache statistics
+    func stats() -> (hits: Int, misses: Int, size: Int) {
+        return (hitCount, missCount, cache.count)
+    }
+}
 
 /// ⚠️ CRITICAL: ExecutorBackendJIT is SINGLE-THREADED ONLY
 ///
@@ -72,6 +174,9 @@ final class ExecutorBackendJIT: ExecutorBackend {
 
     // Track compiled function pointers for memory leak cleanup
     private var compiledFunctionPointers: [UnsafeRawPointer] = []
+
+    // In-memory code cache for JIT-compiled functions
+    private let codeCache = JITCodeCache()
 
 
     // TODO: Implement thread safety for JIT execution (similar to interpreter's async execution model)
@@ -207,8 +312,6 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 return VMExecutionResult(exitReason: .panic(.invalidInstructionIndex), gasUsed: gas, outputData: nil)
             }
 
-            // TODO: lookup from cache
-
             // CRITICAL FIX: Pass the extracted bytecode, not the raw blob!
             // The blob contains headers (jump table count, encode size, code length, etc.)
             // but the JIT compiler expects just the bytecode portion.
@@ -221,27 +324,54 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 return VMExecutionResult(exitReason: .panic(.trap), gasUsed: gas, outputData: nil)
             }
 
-            let compiledFuncPtr = try jitCompiler.compile(
-                blob: programCode.code,
-                initialPC: pc,
-                config: config,
-                targetArchitecture: targetArchitecture,
-                jitMemorySize: totalMemorySize
-            )
+            // Check cache for previously compiled function
+            let bytecode = programCode.code
+            let compiledFuncPtr: UnsafeMutableRawPointer
+            let dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?
+            let dispatcherTableSize: UInt32
 
-            // Track compiled function pointer for cleanup in deinit
-            compiledFunctionPointers.append(compiledFuncPtr)
+            if let cachedEntry = codeCache.lookup(bytecode: bytecode, config: config, initialPC: pc) {
+                // Cache hit - use cached function pointer
+                compiledFuncPtr = UnsafeMutableRawPointer(mutating: cachedEntry.functionPtr)
+                dispatcherTable = cachedEntry.dispatcherTable
+                dispatcherTableSize = cachedEntry.dispatcherTableSize
+                logger.debug("Using cached JIT function")
+            } else {
+                // Cache miss - compile and cache the function
+                compiledFuncPtr = try jitCompiler.compile(
+                    blob: bytecode,
+                    initialPC: pc,
+                    config: config,
+                    targetArchitecture: targetArchitecture,
+                    jitMemorySize: totalMemorySize
+                )
 
-            // Retrieve dispatcher jump table for this compiled function
-            // This allows JumpInd to work without a PVM jump table
-            var dispatcherTableSize: size_t = 0
-            let dispatcherTable = getDispatcherTable(compiledFuncPtr, &dispatcherTableSize)
+                // Track compiled function pointer for cleanup in deinit
+                compiledFunctionPointers.append(compiledFuncPtr)
+
+                // Retrieve dispatcher jump table for this compiled function
+                // This allows JumpInd to work without a PVM jump table
+                var size: size_t = 0
+                let table = getDispatcherTable(compiledFuncPtr, &size)
+                dispatcherTable = table
+                dispatcherTableSize = UInt32(size)
+
+                // Store in cache for future use
+                codeCache.store(
+                    bytecode: bytecode,
+                    config: config,
+                    initialPC: pc,
+                    functionPtr: compiledFuncPtr,
+                    dispatcherTable: dispatcherTable,
+                    dispatcherTableSize: dispatcherTableSize
+                )
+            }
 
             // Update the JITHostFunctionTable with the dispatcher table
             if let table = dispatcherTable {
                 logger.debug("Dispatcher table retrieved: \(dispatcherTableSize) entries")
                 jitHostFunctionTablePtr.pointee.dispatcherJumpTable = table
-                jitHostFunctionTablePtr.pointee.dispatcherJumpTableSize = UInt32(dispatcherTableSize)
+                jitHostFunctionTablePtr.pointee.dispatcherJumpTableSize = dispatcherTableSize
             } else {
                 logger.warning("No dispatcher table found for compiled function - JumpInd may fall back to interpreter")
             }
