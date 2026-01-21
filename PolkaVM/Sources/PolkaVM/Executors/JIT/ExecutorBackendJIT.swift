@@ -145,6 +145,12 @@ final class ExecutorBackendJIT: ExecutorBackend {
         var currentGas = gas // Mutable copy for JIT execution
 
         do {
+            // Ensure cleanup happens on both success and error paths
+            defer {
+                syncHostCallHandler = nil
+                currentProgramCode = nil
+            }
+
             let targetArchitecture = JITPlatform.getCurrentTargetArchitecture()
             logger.debug("Target architecture for JIT: \(targetArchitecture)")
 
@@ -290,9 +296,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 memoryBuffer.deallocate()
             }
 
-            // Clear the references after execution
-            syncHostCallHandler = nil
-            currentProgramCode = nil
+            // Clear the invocation context reference after execution
             jitHostFunctionTableWrapper.table.invocationContext = nil
 
             // Calculate gas used (handle saturating Gas type correctly)
