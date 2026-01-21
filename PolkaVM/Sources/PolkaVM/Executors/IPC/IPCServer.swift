@@ -253,8 +253,8 @@ public class IPCServer {
 
         // Check if result is a valid pointer (GNU version) or error code (XSI version)
         if let ptr = result {
-            // Get the numeric address value
-            let addr = Int(bitPattern: ptr)
+            // Get the numeric address value via UInt for correct bitPattern conversion
+            let addr = Int(bitPattern: UInt(bitPattern: ptr))
 
             // Valid pointers are either:
             // - Our buffer (stack address, typically very high)

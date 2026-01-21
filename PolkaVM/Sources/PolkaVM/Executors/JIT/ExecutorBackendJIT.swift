@@ -14,7 +14,7 @@ private struct JITCacheEntry {
     let functionPtr: UnsafeRawPointer
     let dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?
     let dispatcherTableSize: UInt32
-    let bytecodeHash: Int
+    let bytecode: Data  // Store actual bytecode for hash collision verification
     let configHash: Int
     let initialPC: UInt32
 }
@@ -61,13 +61,20 @@ private final class JITCodeCache {
         let key = makeKey(bytecodeHash: bytecodeHash, configHash: configHash, initialPC: initialPC)
 
         if let entry = cache[key] {
-            hitCount += 1
-            logger.debug("JIT cache HIT (hits: \(hitCount), misses: \(missCount), ratio: \(hitCount * 100 / (hitCount + missCount))%")
-            return entry
+            // CRITICAL: Verify actual bytecode matches to prevent hash collision attacks
+            // Hash collisions are extremely unlikely with FNV-1a but not impossible
+            if entry.bytecode == bytecode {
+                hitCount += 1
+                logger.debug("JIT cache HIT (hits: \(hitCount), misses: \(missCount), ratio: \(hitCount * 100 / (hitCount + missCount))%)")
+                return entry
+            } else {
+                // Hash collision detected - unlikely but possible
+                logger.warning("JIT cache hash collision detected - treating as miss")
+            }
         }
 
         missCount += 1
-        logger.debug("JIT cache MISS (hits: \(hitCount), misses: \(missCount), ratio: \(hitCount * 100 / (hitCount + missCount))%")
+        logger.debug("JIT cache MISS (hits: \(hitCount), misses: \(missCount), ratio: \(hitCount * 100 / (hitCount + missCount))%)")
         return nil
     }
 
@@ -88,7 +95,7 @@ private final class JITCodeCache {
             functionPtr: functionPtr,
             dispatcherTable: dispatcherTable,
             dispatcherTableSize: dispatcherTableSize,
-            bytecodeHash: bytecodeHash,
+            bytecode: bytecode,
             configHash: configHash,
             initialPC: initialPC
         )
