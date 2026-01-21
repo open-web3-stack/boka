@@ -211,9 +211,9 @@ final class ExecutorBackendJIT: ExecutorBackend {
 
                     // Wait for the async operation to complete
                     // Host calls should complete quickly; use conservative timeout
-                    let waitResult = DispatchSemaphore.wait(timeout: .now() + 60) // 60 second timeout
+                    let waitResult = semaphore.wait(timeout: .now() + 60) // 60 second timeout
                     if waitResult == .timedOut {
-                        self.logger.error("Host call timed out after 60 seconds")
+                        self.logger.error("Host call \(hostCallIndex) timed out after 60 seconds")
                         return JITHostCallError.hostFunctionThrewError.rawValue
                     }
 
