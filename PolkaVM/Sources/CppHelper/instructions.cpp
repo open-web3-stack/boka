@@ -5518,8 +5518,17 @@ bool jit_emit_mul_upper_su(
         a->ldr(a64::x0, a64::ptr(a64::x29, ra * 8));
         a->ldr(a64::x1, a64::ptr(a64::x29, rb * 8));
 
-        // Multiply signed*unsigned high: x2 = (Int128(x0) * UInt128(x1)) >> 64
-        a->smulh(a64::x2, a64::x0, a64::x1);
+        // Multiply unsigned high: x2 = (UInt128(x0) * UInt128(x1)) >> 64
+        // We use unsigned multiply as the base, then adjust if ra is negative
+        a->umulh(a64::x2, a64::x0, a64::x1);
+
+        // If ra was negative (signed), subtract rb from the result
+        // Int128(ra) * UInt128(rb) = UInt128(ra) * UInt128(rb) - UInt128(rb) * 2^64
+        // So the high part needs adjustment when ra < 0
+        Label skipSub = a->newLabel();
+        a->tbz(a64::x0, 63, skipSub);  // Test sign bit (bit 63), skip if clear
+        a->sub(a64::x2, a64::x2, a64::x1);  // Subtract rb from result
+        a->bind(skipSub);
 
         // Store result to rd
         a->str(a64::x2, a64::ptr(a64::x29, rd * 8));
