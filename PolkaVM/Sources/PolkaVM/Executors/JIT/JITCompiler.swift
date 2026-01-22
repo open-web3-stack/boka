@@ -122,33 +122,6 @@ final class JITCompiler {
         return funcPtr
     }
 
-    /// Compile each instruction in the program - this is a placeholder that will be
-    /// replaced by the C++ implementation that handles instruction-by-instruction compilation
-    /// - Parameters:
-    ///   - blob: The program code blob
-    ///   - initialPC: The initial program counter
-    ///   - compilerPtr: The compiler pointer
-    ///   - targetArchitecture: The target architecture
-    /// - Returns: True if compilation was successful
-    private func compileInstructions(
-        blob: Data,
-        initialPC: UInt32,
-        compilerPtr _: UnsafeMutableRawPointer,
-        targetArchitecture: JITPlatform
-    ) throws -> Bool {
-        // This would typically implement instruction-by-instruction compilation
-        // but we're delegating this to the C++ layer directly.
-        // This method is kept for future refinements and direct Swift-based compilation.
-
-        // TODO: Implement a fast dispatch table for instruction compilation
-        // TODO: Add support for chunk-based decoding (16-byte chunks)
-        // TODO: Implement register allocation and mapping
-        // TODO: Add gas metering instructions
-        // TODO: Add memory access sandboxing
-
-        logger.debug("Swift compilation step for blob size: \(blob.count), PC: \(initialPC), Target: \(targetArchitecture)")
-        return true
-    }
 }
 
 // MARK: - Export/Import API for Persistent Caching

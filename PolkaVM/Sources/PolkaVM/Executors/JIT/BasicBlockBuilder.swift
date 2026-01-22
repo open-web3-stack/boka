@@ -40,8 +40,14 @@ final class BasicBlockBuilder {
         // Get basic block ending instructions - cache opcodes as constants to avoid C++ layer access
         // TODO: Import BASIC_BLOCK_INSTRUCTIONS from Instructions.swift properly
         // Block-ending opcodes matching instruction_dispatcher.cpp implementation
-        let blockEndingOpcodes: Set<UInt8> = [0, 40, 50, 6, 170, 171]
-        // 0: Trap, 40: Jump, 50: JumpInd, 6: LoadImmJump, 170: BranchEq, 171: BranchNe
+        let blockEndingOpcodes: Set<UInt8> = [
+            PVMOpcodes.trap.rawValue,
+            PVMOpcodes.jump.rawValue,
+            PVMOpcodes.jumpInd.rawValue,
+            PVMOpcodes.loadImmJump.rawValue,
+            PVMOpcodes.branchEq.rawValue,
+            PVMOpcodes.branchNe.rawValue
+        ]
 
         // First pass: identify all blocks and their instructions
         while currentPC < program.code.count {
@@ -76,7 +82,7 @@ final class BasicBlockBuilder {
                 currentBlock = nil
 
                 // If this is a branch, record the target as a jump target
-                if opcode >= 170, opcode <= 171 {
+                if opcode == PVMOpcodes.branchEq.rawValue || opcode == PVMOpcodes.branchNe.rawValue {
                     // BranchEq/Ne instructions - target is encoded in instruction
                     // For now, we'll mark all subsequent PCs as potential targets
                     // TODO: Parse branch target from instruction data
@@ -94,11 +100,11 @@ final class BasicBlockBuilder {
         // Second pass: mark jump targets
         for (_, block) in blocks {
             for (opcode, _) in block.instructions {
-                if opcode == 170 ||  // BranchEq
-                    opcode == 171 ||  // BranchNe
-                    opcode == 40 ||  // Jump
-                    opcode == 50 ||  // JumpInd
-                    opcode == 6      // LoadImmJump
+                if opcode == PVMOpcodes.branchEq.rawValue ||
+                    opcode == PVMOpcodes.branchNe.rawValue ||
+                    opcode == PVMOpcodes.jump.rawValue ||
+                    opcode == PVMOpcodes.jumpInd.rawValue ||
+                    opcode == PVMOpcodes.loadImmJump.rawValue
                 {
                     // TODO: Parse target offset and mark as jump target
                     // For now, skip this as we need to implement instruction parsing
@@ -136,41 +142,54 @@ final class BasicBlockBuilder {
         // 51: LoadImm = 6 bytes
         // 52-58: Load[U8/I8/U16/I16/U32/I32/U64] = 6 bytes each
         // 59-62: Store[U8/U16/U32/U64] = 6 bytes each
+        // 80: LoadImmJump = 10 bytes
         // 170-171: Branch[Eq/Ne] = 7 bytes each (1 opcode + 2 regs + 4 offset)
         // 190-196: 32-bit arithmetic = 3 bytes each
         // 200-202: 64-bit arithmetic = 3 bytes each
         // 210-212: And/Xor/Or = 3 bytes each
 
         switch opcode {
-        case 0, 1:  // Trap, Fallthrough
+        case PVMOpcodes.trap.rawValue, PVMOpcodes.halt.rawValue:
             return 1
-        case 20:  // LoadImm64
+        case PVMOpcodes.loadImmU64.rawValue:
             return 10
-        case 30:  // StoreImmU8
+        case PVMOpcodes.storeImmU8.rawValue:
             return 6
-        case 31:  // StoreImmU16
+        case PVMOpcodes.storeImmU16.rawValue:
             return 7
-        case 32:  // StoreImmU32
+        case PVMOpcodes.storeImmU32.rawValue:
             return 9
-        case 33:  // StoreImmU64
+        case PVMOpcodes.storeImmU64.rawValue:
             return 13
-        case 40:  // Jump (CRITICAL: 5 bytes, block-ending)
+        case PVMOpcodes.jump.rawValue:
             return 5
-        case 50:  // JumpInd
+        case PVMOpcodes.jumpInd.rawValue:
             return 2
-        case 51:  // LoadImm
+        case PVMOpcodes.loadImm.rawValue:
             return 6
-        case 52, 53, 54, 55, 56, 57, 58:  // LoadU8, LoadI8, LoadU16, LoadI16, LoadU32, LoadI32, LoadU64
+        case PVMOpcodes.loadU8.rawValue, PVMOpcodes.loadI8.rawValue,
+             PVMOpcodes.loadU16.rawValue, PVMOpcodes.loadI16.rawValue,
+             PVMOpcodes.loadU32.rawValue, PVMOpcodes.loadI32.rawValue,
+             PVMOpcodes.loadU64.rawValue:
             return 6
-        case 59, 60, 61, 62:  // StoreU8, StoreU16, StoreU32, StoreU64
+        case PVMOpcodes.storeU8.rawValue, PVMOpcodes.storeU16.rawValue,
+             PVMOpcodes.storeU32.rawValue, PVMOpcodes.storeU64.rawValue:
             return 6
-        case 170, 171:  // BranchEq, BranchNe (7 bytes: 1 opcode + 2 regs + 4 offset)
+        case PVMOpcodes.loadImmJump.rawValue:
+            return 10
+        case PVMOpcodes.branchEq.rawValue, PVMOpcodes.branchNe.rawValue:
             return 7
-        case 190, 191, 192, 193, 194, 195, 196:  // 32-bit arithmetic
+        case PVMOpcodes.add32.rawValue, PVMOpcodes.sub32.rawValue,
+             PVMOpcodes.mul32.rawValue, PVMOpcodes.divU32.rawValue,
+             PVMOpcodes.divS32.rawValue, PVMOpcodes.remU32.rawValue,
+             PVMOpcodes.remS32.rawValue:
             return 3
-        case 200, 201, 202:  // 64-bit arithmetic
+        case PVMOpcodes.add64.rawValue, PVMOpcodes.sub64.rawValue,
+             PVMOpcodes.mul64.rawValue, PVMOpcodes.divU64.rawValue,
+             PVMOpcodes.divS64.rawValue, PVMOpcodes.remU64.rawValue,
+             PVMOpcodes.remS64.rawValue:
             return 3
-        case 210, 211, 212:  // And, Xor, Or
+        case PVMOpcodes.and.rawValue, PVMOpcodes.xor.rawValue, PVMOpcodes.or.rawValue:
             return 3
         default:
             // Unknown opcode - return 0 to signal error
