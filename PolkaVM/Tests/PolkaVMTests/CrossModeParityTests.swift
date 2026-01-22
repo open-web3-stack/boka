@@ -262,15 +262,15 @@ final class ParityInstructionBuilder {
                 blob.append(codeLength > 0 ? (byte | 0x80) : byte)
             }
         }
-        
+
         // Code
         blob.append(Data(bytecode))
-        
+
         // Bitmask
         // Bitmask size: (codeLength + 7) / 8
         let bitmaskSize = (originalCodeLength + 7) / 8
         var bitmask = [UInt8](repeating: 0, count: bitmaskSize)
-        
+
         // Set bits for instruction ends
         for endIndex in instructionEndIndices {
             // The bit corresponding to the last byte of the instruction should be 1
@@ -278,12 +278,10 @@ final class ParityInstructionBuilder {
             if bitIndex >= 0 {
                 let byteIndex = bitIndex / 8
                 let bitOffset = bitIndex % 8
-                print("[buildBlob] endIndex: \(endIndex), bitIndex: \(bitIndex), byteIndex: \(byteIndex), bitOffset: \(bitOffset)")
                 bitmask[byteIndex] |= (1 << bitOffset)
             }
         }
-        print("[buildBlob] Final bitmask: \(bitmask.map { String(format: "%02x", $0) }.joined(separator: " "))")
-        
+
         blob.append(contentsOf: bitmask)
         return blob
     }
