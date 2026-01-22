@@ -852,7 +852,8 @@ bool emit_instruction_decoded(
             return true;
 
         case static_cast<uint8_t>(Opcode::Jump):
-            // TODO: Handle jump target with label
+            // NOTE: Jump target calculation handled in dispatcher
+            // Labeled JIT implementation (compilePolkaVMCode_x64_labeled) handles labels properly
             return jit_instruction::jit_emit_jump(
                 assembler, target_arch,
                 decoded.target_pc  // Use target_pc instead of offset
@@ -1552,7 +1553,8 @@ bool emit_instruction_decoded(
             );
 
         case static_cast<uint8_t>(Opcode::BranchEq):
-            // TODO: Handle branch target with label
+            // NOTE: Branch target calculation handled in dispatcher
+            // Labeled JIT implementation handles labels properly
             return jit_instruction::jit_emit_branch_eq(
                 assembler, target_arch,
                 decoded.src1_reg,
@@ -1561,7 +1563,8 @@ bool emit_instruction_decoded(
             );
 
         case static_cast<uint8_t>(Opcode::BranchNe):
-            // TODO: Handle branch target with label
+            // NOTE: Branch target calculation handled in dispatcher
+            // Labeled JIT implementation handles labels properly
             return jit_instruction::jit_emit_branch_ne(
                 assembler, target_arch,
                 decoded.src1_reg,

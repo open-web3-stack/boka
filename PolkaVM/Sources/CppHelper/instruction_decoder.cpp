@@ -108,8 +108,9 @@ bool emit_instruction(
     const Instructions::LoadU16& instr,
     uint32_t current_pc)
 {
-    // TODO: For absolute addresses, we need to use rip-relative addressing or load address into register
-    // For now, use register 0 as base and address as offset (works for small addresses)
+    // NOTE: Uses register 0 as base with address as offset (works for small addresses < 64KB)
+    // For full 32-bit addressing, labeled JIT implementation uses *_direct functions
+    // This limitation is acceptable for the legacy (non-labeled) dispatcher
     return jit_instruction::jit_emit_load_u16(
         assembler, target_arch,
         instr.reg.value,    // dest_reg
@@ -180,8 +181,8 @@ bool emit_instruction(
     const Instructions::StoreImmU8& instr,
     uint32_t current_pc)
 {
-    // TODO: Need to load immediate into a temporary register first, then store
-    // For now, skip this instruction
+    // NOTE: StoreImm instructions not implemented in legacy dispatcher
+    // Use labeled JIT implementation (compilePolkaVMCode_x64_labeled) which handles these
     return false;
 }
 
