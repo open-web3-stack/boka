@@ -46,7 +46,7 @@ namespace jit_instruction {
         void* _Nonnull assembler,
         const char* _Nonnull target_arch,
         uint32_t func_idx,
-        void* _Nonnull gas_ptr
+        void* _Nullable gas_ptr
     ) noexcept;
 
     // Generate load immediate and jump
