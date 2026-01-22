@@ -432,8 +432,170 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             continue;
         }
 
-        // === Division Instructions with Zero-Check ===
+        // === StoreImmInd Instructions ===
+        // Format: [opcode][base_reg][offset_32bit][value_Nbit]
+        if (opcode_is(opcode, Opcode::StoreImmIndU8) ||
+            opcode_is(opcode, Opcode::StoreImmIndU16) ||
+            opcode_is(opcode, Opcode::StoreImmIndU32) ||
+            opcode_is(opcode, Opcode::StoreImmIndU64)) {
+            
+            uint8_t base_reg = codeBuffer[pc + 1];
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+            
+            // Load base address from register
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, base_reg * 8));
+            
+            // Add offset
+            a.add(x86::rax, offset);
+            
+            // Bounds check: address < 65536 → panic
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+            
+            // Runtime check: address >= memory_size → page fault
+            a.mov(x86::ecx, x86::r13d); // memory_size
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+            
+            // Store value
+            x86::Mem mem(x86::r12, x86::rax, 0, 0);
+            
+            if (opcode_is(opcode, Opcode::StoreImmIndU8)) {
+                uint8_t value = codeBuffer[pc + 6];
+                a.mov(x86::dl, value);
+                a.mov(mem, x86::dl);
+            } else if (opcode_is(opcode, Opcode::StoreImmIndU16)) {
+                uint16_t value;
+                memcpy(&value, &codeBuffer[pc + 6], 2);
+                a.mov(x86::dx, value); // imm to reg
+                a.mov(mem, x86::dx);   // reg to mem
+            } else if (opcode_is(opcode, Opcode::StoreImmIndU32)) {
+                uint32_t value;
+                memcpy(&value, &codeBuffer[pc + 6], 4);
+                a.mov(x86::edx, value);
+                a.mov(mem, x86::edx);
+            } else if (opcode_is(opcode, Opcode::StoreImmIndU64)) {
+                uint64_t value;
+                memcpy(&value, &codeBuffer[pc + 6], 8);
+                a.mov(x86::rdx, value);
+                a.mov(mem, x86::rdx);
+            }
+            
+            pc += instrSize;
+            continue;
+        }
+
+        // === StoreInd Instructions ===
+        // Format: [opcode][src_reg][base_reg][offset_32bit]
+        if (opcode_is(opcode, Opcode::StoreIndU8) ||
+            opcode_is(opcode, Opcode::StoreIndU16) ||
+            opcode_is(opcode, Opcode::StoreIndU32) ||
+            opcode_is(opcode, Opcode::StoreIndU64)) {
+            
+            uint8_t src_reg = codeBuffer[pc + 1];
+            uint8_t base_reg = codeBuffer[pc + 2];
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 3], 4);
+            
+            // Load base address from register
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, base_reg * 8));
+            
+            // Add offset
+            a.add(x86::rax, offset);
+            
+            // Bounds check: address < 65536 → panic
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+            
+            // Runtime check: address >= memory_size → page fault
+            a.mov(x86::ecx, x86::r13d); // memory_size
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+            
+            // Load source value
+            a.mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
+            
+            // Store value
+            x86::Mem mem(x86::r12, x86::rax, 0, 0);
+            
+            if (opcode_is(opcode, Opcode::StoreIndU8)) {
+                a.mov(mem, x86::dl);
+            } else if (opcode_is(opcode, Opcode::StoreIndU16)) {
+                a.mov(mem, x86::dx);
+            } else if (opcode_is(opcode, Opcode::StoreIndU32)) {
+                a.mov(mem, x86::edx);
+            } else if (opcode_is(opcode, Opcode::StoreIndU64)) {
+                a.mov(mem, x86::rdx);
+            }
+            
+            pc += instrSize;
+            continue;
+        }
+
+        // === LoadInd Instructions ===
+        // Format: [opcode][dest_reg][base_reg][offset_32bit]
+        if (opcode_is(opcode, Opcode::LoadIndU8) ||
+            opcode_is(opcode, Opcode::LoadIndI8) ||
+            opcode_is(opcode, Opcode::LoadIndU16) ||
+            opcode_is(opcode, Opcode::LoadIndI16) ||
+            opcode_is(opcode, Opcode::LoadIndU32) ||
+            opcode_is(opcode, Opcode::LoadIndI32) ||
+            opcode_is(opcode, Opcode::LoadIndU64)) {
+            
+            uint8_t dest_reg = codeBuffer[pc + 1];
+            uint8_t base_reg = codeBuffer[pc + 2];
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 3], 4);
+            
+            // Load base address from register
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, base_reg * 8));
+            
+            // Add offset
+            a.add(x86::rax, offset);
+            
+            // Bounds check: address < 65536 → panic
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+            
+            // Runtime check: address >= memory_size → page fault
+            a.mov(x86::ecx, x86::r13d); // memory_size
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+            
+            // Load value
+            x86::Mem mem(x86::r12, x86::rax, 0, 0);
+            
+            if (opcode_is(opcode, Opcode::LoadIndU8)) {
+                a.movzx(x86::ecx, mem);
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+            } else if (opcode_is(opcode, Opcode::LoadIndI8)) {
+                a.movsx(x86::rcx, mem);
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+            } else if (opcode_is(opcode, Opcode::LoadIndU16)) {
+                a.movzx(x86::ecx, mem);
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+            } else if (opcode_is(opcode, Opcode::LoadIndI16)) {
+                a.movsx(x86::rcx, mem);
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+            } else if (opcode_is(opcode, Opcode::LoadIndU32)) {
+                a.mov(x86::ecx, mem); // 32-bit mov zero-extends
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+            } else if (opcode_is(opcode, Opcode::LoadIndI32)) {
+                a.movsxd(x86::rcx, mem); // Sign-extend 32 to 64
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+            } else if (opcode_is(opcode, Opcode::LoadIndU64)) {
+                a.mov(x86::rcx, mem);
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+            }
+            
+            pc += instrSize;
+            continue;
+        }
+
+        // === Division Instructions with Zero-Check and Overflow-Check ===
         // Division by zero causes hardware exception - must check explicitly
+        // Signed division overflow (INT_MIN / -1) causes hardware exception - must check explicitly
         // Format: [opcode][dest_reg][src_reg] = 3 bytes
         if (opcode_is(opcode, Opcode::DivU32) ||
             opcode_is(opcode, Opcode::DivS32) ||
@@ -447,16 +609,127 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint8_t dest_reg = codeBuffer[pc + 1];
             uint8_t src_reg = codeBuffer[pc + 2];
 
-            // Load divisor into ecx for check
+            // Load divisor into rcx
             a.mov(x86::rcx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
             // Check if divisor is zero
-            a.test(x86::rcx, x86::rcx);  // Fast way to check if rcx == 0
-            a.jz(panicLabel);  // If zero, jump to panic (division by zero)
+            a.test(x86::rcx, x86::rcx);
+            a.jz(panicLabel);  // If zero, jump to panic
 
-            // Not zero - proceed with division using dispatcher
-            if (!jit_emitter_emit_basic_block_instructions(&a, "x86_64", codeBuffer, pc, pc + instrSize)) {
-                return 3; // Compilation error
+            // Handle Signed Division Overflow
+            if (opcode_is(opcode, Opcode::DivS32) || opcode_is(opcode, Opcode::RemS32)) {
+                Label noOverflow = a.new_label();
+                Label divDone = a.new_label();
+                
+                // Check divisor == -1 (in ecx)
+                a.cmp(x86::ecx, -1);
+                a.jne(noOverflow);
+                
+                // Load dividend into eax
+                a.mov(x86::eax, x86::dword_ptr(x86::rbx, dest_reg * 8));
+                
+                // Check dividend == INT32_MIN (0x80000000)
+                a.cmp(x86::eax, 0x80000000);
+                a.jne(noOverflow);
+                
+                // Overflow case detected
+                if (opcode_is(opcode, Opcode::DivS32)) {
+                    // Result is INT32_MIN (already in eax). Sign-extend to 64-bit and store.
+                    a.movsxd(x86::rax, x86::eax);
+                    a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+                } else {
+                    // RemS32: Result is 0
+                    a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), 0);
+                }
+                a.jmp(divDone);
+                
+                a.bind(noOverflow);
+                // Normal division
+                // Load dividend into eax again (in case we skipped the load above)
+                // Optimization: we could have loaded it earlier, but let's be safe
+                a.mov(x86::eax, x86::dword_ptr(x86::rbx, dest_reg * 8));
+                a.cdq(); // Sign extend eax -> edx:eax
+                a.idiv(x86::ecx);
+                
+                // Store result
+                if (opcode_is(opcode, Opcode::DivS32)) {
+                    a.movsxd(x86::rax, x86::eax); // Sign extend result
+                    a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+                } else {
+                    a.movsxd(x86::rax, x86::edx); // Sign extend remainder
+                    a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+                }
+                
+                a.bind(divDone);
+            } else if (opcode_is(opcode, Opcode::DivS64) || opcode_is(opcode, Opcode::RemS64)) {
+                Label noOverflow = a.new_label();
+                Label divDone = a.new_label();
+                
+                // Check divisor == -1 (in rcx)
+                a.cmp(x86::rcx, -1);
+                a.jne(noOverflow);
+                
+                // Load dividend into rax
+                a.mov(x86::rax, x86::qword_ptr(x86::rbx, dest_reg * 8));
+                
+                // Check dividend == INT64_MIN (0x8000000000000000)
+                // We can't use 64-bit immediate with cmp directly if it doesn't fit in 32-bit signed
+                a.mov(x86::rdx, 0x8000000000000000);
+                a.cmp(x86::rax, x86::rdx);
+                a.jne(noOverflow);
+                
+                // Overflow case detected
+                if (opcode_is(opcode, Opcode::DivS64)) {
+                    // Result is INT64_MIN (already in rax). Store it.
+                    a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+                } else {
+                    // RemS64: Result is 0
+                    a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), 0);
+                }
+                a.jmp(divDone);
+                
+                a.bind(noOverflow);
+                // Normal division
+                a.mov(x86::rax, x86::qword_ptr(x86::rbx, dest_reg * 8));
+                a.cqo(); // Sign extend rax -> rdx:rax
+                a.idiv(x86::rcx);
+                
+                // Store result
+                if (opcode_is(opcode, Opcode::DivS64)) {
+                    a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+                } else {
+                    a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
+                }
+                
+                a.bind(divDone);
+            } else {
+                // Unsigned Division (DivU32, RemU32, DivU64, RemU64)
+                // No overflow check needed for unsigned
+                
+                if (opcode_is(opcode, Opcode::DivU32) || opcode_is(opcode, Opcode::RemU32)) {
+                    a.mov(x86::eax, x86::dword_ptr(x86::rbx, dest_reg * 8));
+                    a.xor_(x86::edx, x86::edx); // Zero extend
+                    a.div(x86::ecx);
+                    
+                    if (opcode_is(opcode, Opcode::DivU32)) {
+                        a.mov(x86::ecx, x86::eax); // Zero extend result
+                        a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+                    } else {
+                        a.mov(x86::ecx, x86::edx); // Zero extend remainder
+                        a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+                    }
+                } else {
+                    // 64-bit unsigned
+                    a.mov(x86::rax, x86::qword_ptr(x86::rbx, dest_reg * 8));
+                    a.xor_(x86::edx, x86::edx); // Zero extend
+                    a.div(x86::rcx);
+                    
+                    if (opcode_is(opcode, Opcode::DivU64)) {
+                        a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+                    } else {
+                        a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
+                    }
+                }
             }
 
             pc += instrSize;

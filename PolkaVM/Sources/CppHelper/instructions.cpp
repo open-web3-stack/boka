@@ -511,6 +511,14 @@ bool jit_emit_mul_32(
     return false;
 }
 
+// ============================================================================
+// MEMORY ACCESS INSTRUCTIONS
+// NOTE: These functions perform DIRECT memory access without bounds checking.
+// The caller MUST ensure that the address is within the valid memory range.
+// Bounds checking (panic if < 65536, page fault if >= memory_size) must be
+// performed BEFORE calling these functions.
+// ============================================================================
+
 // LoadU8: Load unsigned 8-bit from memory
 bool jit_emit_load_u8(
     void* _Nonnull assembler,
@@ -1934,6 +1942,7 @@ bool jit_emit_div_u32(
 }
 
 // DivS32: Signed division (32-bit)
+// NOTE: Caller must handle division by zero and signed overflow (INT_MIN / -1)
 bool jit_emit_div_s32(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
@@ -2041,6 +2050,7 @@ bool jit_emit_rem_u32(
 }
 
 // RemS32: Signed remainder (32-bit)
+// NOTE: Caller must handle division by zero and signed overflow (INT_MIN / -1)
 bool jit_emit_rem_s32(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
@@ -6055,6 +6065,7 @@ bool jit_emit_div_u_64(
 }
 
 // DivS64: Divide signed 64-bit
+// NOTE: Caller must handle division by zero and signed overflow (INT_MIN / -1)
 bool jit_emit_div_s_64(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
@@ -6117,6 +6128,7 @@ bool jit_emit_rem_u_64(
 }
 
 // RemS64: Remainder of signed 64-bit division
+// NOTE: Caller must handle division by zero and signed overflow (INT_MIN / -1)
 bool jit_emit_rem_s_64(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
