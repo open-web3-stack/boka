@@ -142,14 +142,14 @@ final class JITExecutor {
             case .pageFault:
                 // Page fault from bounds checking
                 // For a page fault, we would need to extract the faulting address from registers
-                exitReason = .pageFault(UInt32(registers[Registers.Index(raw: 0)]))
+                exitReason = .pageFault(UInt32(truncatingIfNeeded: registers[Registers.Index(raw: 0)]))
             case .trap:
                 exitReason = .panic(.trap)
             case .hostRequestedHalt:
                 exitReason = .halt
             case .hostPageFault:
                 // Page fault from host call - extract faulting address from R0
-                exitReason = .pageFault(UInt32(registers[Registers.Index(raw: 0)]))
+                exitReason = .pageFault(UInt32(truncatingIfNeeded: registers[Registers.Index(raw: 0)]))
             case .gasExhausted:
                 exitReason = .outOfGas
             case .hostFunctionThrewError:
