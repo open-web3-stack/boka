@@ -68,7 +68,7 @@ bool compile_bytecode_range(
     }
 
     // Call the extern C wrapper to the instruction emitter
-    // This function handles all 194 implemented instructions
+    // This function handles all implemented PVM instructions
     return jit_emitter_emit_basic_block_instructions(assembler, target_arch, bytecode, start_pc, end_pc);
 }
 
@@ -163,10 +163,10 @@ uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, siz
             break;
 
         // Additional branch instructions (same format as BranchEq)
-        case static_cast<Opcode>(172): // BranchLtU
-        case static_cast<Opcode>(173): // BranchLtS
-        case static_cast<Opcode>(174): // BranchGeU
-        case static_cast<Opcode>(175): // BranchGeS
+        case Opcode::BranchLtU:
+        case Opcode::BranchLtS:
+        case Opcode::BranchGeU:
+        case Opcode::BranchGeS:
             instrSize = InstructionSize::BranchEq;
             break;
 
@@ -178,9 +178,9 @@ uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, siz
         case Opcode::DivS32:
         case Opcode::RemU32:
         case Opcode::RemS32:
-        case static_cast<Opcode>(197): // ShloL32
-        case static_cast<Opcode>(198): // ShloR32
-        case static_cast<Opcode>(199): // SharR32
+        case Opcode::ShloL32:
+        case Opcode::ShloR32:
+        case Opcode::SharR32:
             instrSize = InstructionSize::Arithmetic32;
             break;
 
@@ -192,9 +192,9 @@ uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, siz
         case Opcode::DivS64:
         case Opcode::RemU64:
         case Opcode::RemS64:
-        case static_cast<Opcode>(207): // ShloL64
-        case static_cast<Opcode>(208): // ShloR64
-        case static_cast<Opcode>(209): // SharR64
+        case Opcode::ShloL64:
+        case Opcode::ShloR64:
+        case Opcode::SharR64:
             instrSize = InstructionSize::Arithmetic64;
             break;
 
