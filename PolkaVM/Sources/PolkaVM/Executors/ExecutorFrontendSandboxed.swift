@@ -56,6 +56,8 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
             clientFD = nil
 
             // Send execute request
+            // Note: IPCClient internally offloads blocking I/O to DispatchQueue
+            // to avoid blocking Swift concurrency pool threads
             let result = try await ipcClient.sendExecuteRequest(
                 blob: blob,
                 pc: pc,

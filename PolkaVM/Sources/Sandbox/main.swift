@@ -18,8 +18,8 @@ struct SandboxMain {
         // Set up signal handlers for clean shutdown
         setupSignalHandlers()
 
-        // TODO: Apply security restrictions
-        // applySandboxSecurity()
+        // Apply security restrictions
+        applySandboxSecurity()
 
         // Create and run IPC server
         let server = IPCServer()
@@ -55,6 +55,63 @@ struct SandboxMain {
         }
     }
 
+    /// Apply security restrictions to sandbox the process
+    /// This is a basic implementation. For production use, consider:
+    /// - Linux namespaces (mount, PID, network)
+    /// - seccomp-bpf for system call filtering
+    /// - Landlock for filesystem restrictions
+    /// - chroot for filesystem isolation
+    private static func applySandboxSecurity() {
+        #if os(Linux)
+        // 1. Set resource limits to prevent resource exhaustion
+        setResourceLimits()
+
+        // 2. Drop privileges if running as root (not applicable in most cases)
+        // dropPrivileges()
+
+        // Note: For production use, consider:
+        // - seccomp filter to restrict syscalls
+        // - unshare() for Linux namespaces
+        // - chroot() for filesystem isolation
+        // - Landlock for fine-grained filesystem access control
+
+        logger.info("Basic sandbox security applied")
+        #else
+        logger.warning("Sandbox security restrictions not implemented for this platform")
+        #endif
+    }
+
+    #if os(Linux)
+    /// Set resource limits to constrain the sandboxed process
+    private static func setResourceLimits() {
+        var limit = rlimit()
+
+        // Limit CPU time (5 seconds)
+        limit.rlim_cur = 5
+        limit.rlim_max = 10
+        if setrlimit(Int32(RLIMIT_CPU.rawValue), &limit) != 0 {
+            logger.warning("Failed to set CPU time limit: \(String(cString: strerror(errno)))")
+        }
+
+        // Limit address space to 4GB (matches PVM memory size)
+        limit.rlim_cur = UInt(4) * 1024 * 1024 * 1024
+        limit.rlim_max = UInt(4) * 1024 * 1024 * 1024
+        if setrlimit(Int32(RLIMIT_AS.rawValue), &limit) != 0 {
+            logger.warning("Failed to set address space limit: \(String(cString: strerror(errno)))")
+        }
+
+        // Limit number of file descriptors
+        limit.rlim_cur = 32
+        limit.rlim_max = 64
+        if setrlimit(Int32(RLIMIT_NOFILE.rawValue), &limit) != 0 {
+            logger.warning("Failed to set file descriptor limit: \(String(cString: strerror(errno)))")
+        }
+
+        // Note: RLIMIT_NPROC may not be available on all systems
+        // Skip for portability
+    }
+    #endif
+
     private static func handleExecuteRequest(_ request: IPCExecuteRequest) async -> IPCExecuteResponse {
         logger.debug("Received execute request: PC=\(request.pc), Gas=\(request.gas)")
 
@@ -86,11 +143,4 @@ struct SandboxMain {
             errorMessage: nil
         )
     }
-
-    // TODO: Apply security restrictions
-    // private static func applySandboxSecurity() {
-    //     // Apply resource limits
-    //     // Apply seccomp filter
-    //     // Drop capabilities
-    // }
 }

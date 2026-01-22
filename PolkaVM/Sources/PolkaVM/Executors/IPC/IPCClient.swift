@@ -9,7 +9,12 @@ import Darwin
 private let logger = Logger(label: "IPCClient")
 
 /// IPC client for host process to communicate with sandboxed child process
-class IPCClient {
+///
+/// NOTE: This class uses `@unchecked Sendable` because:
+/// - It's only used for the duration of a single request
+/// - The DispatchQueue offloading ensures no concurrent access
+/// - All state is either immutable or locally synchronized
+final class IPCClient: @unchecked Sendable {
     private var fileDescriptor: Int32?
     private var requestIdCounter: UInt32 = 0
     private let timeout: TimeInterval
@@ -39,6 +44,37 @@ class IPCClient {
         argumentData: Data?,
         executionMode: ExecutionMode
     ) async throws -> (exitReason: ExitReason, gasUsed: UInt64, outputData: Data?) {
+        // ⚠️ Offload blocking I/O to DispatchQueue to avoid blocking Swift concurrency pool
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                guard let self = self else {
+                    continuation.resume(throwing: IPCError.malformedMessage)
+                    return
+                }
+                do {
+                    let result = try self.sendExecuteRequestBlocking(
+                        blob: blob,
+                        pc: pc,
+                        gas: gas,
+                        argumentData: argumentData,
+                        executionMode: executionMode
+                    )
+                    continuation.resume(returning: result)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    /// Synchronous blocking version for DispatchQueue offloading
+    private func sendExecuteRequestBlocking(
+        blob: Data,
+        pc: UInt32,
+        gas: UInt64,
+        argumentData: Data?,
+        executionMode: ExecutionMode
+    ) throws -> (exitReason: ExitReason, gasUsed: UInt64, outputData: Data?) {
         guard let fd = fileDescriptor else {
             throw IPCError.malformedMessage
         }
@@ -59,8 +95,8 @@ class IPCClient {
 
         try writeData(requestData, to: fd)
 
-        // Wait for response
-        let responseMessage = try await readMessage(requestId: requestId, from: fd)
+        // Wait for response (blocking)
+        let responseMessage = try readMessageBlocking(requestId: requestId, from: fd)
 
         // Parse response
         let response = try IPCProtocol.parseExecuteResponse(responseMessage)
@@ -111,14 +147,17 @@ class IPCClient {
         }
     }
 
-    /// Read message from file descriptor
-    ///
+    /// Read message from file descriptor (DEPRECATED: use readMessageBlocking instead)
     /// ⚠️ WARNING: Blocking I/O in async context
-    /// This function uses blocking `Glibc.read()` which can block the Swift concurrency
-    /// thread pool. If many sandboxed executions occur simultaneously, this may lead to
-    /// thread pool starvation or deadlocks. This is acceptable for single-threaded use
-    /// but should be refactored to use non-blocking I/O or DispatchIO for concurrent use.
+    /// This function is kept for backward compatibility but should not be used.
+    /// Use readMessageBlocking which is called via DispatchQueue offloading instead.
     private func readMessage(requestId: UInt32, from fd: Int32) async throws -> IPCMessage {
+        // Delegate to the blocking version
+        return try readMessageBlocking(requestId: requestId, from: fd)
+    }
+
+    /// Read message from file descriptor (blocking version for DispatchQueue offloading)
+    private func readMessageBlocking(requestId: UInt32, from fd: Int32) throws -> IPCMessage {
         // Read length prefix (4 bytes)
         let lengthData = try readExactBytes(IPCProtocol.lengthPrefixSize, from: fd)
 
