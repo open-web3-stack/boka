@@ -147,27 +147,25 @@ bool decode_load_u64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& d
     return true;
 }
 
-// Decode Add32 instruction
+// Decode Add32 instruction (opcode 190)
 bool decode_add_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-
-    // Format: [opcode][dest_reg][src_reg]
-    decoded.dest_reg = bytecode[pc + 1];
-    decoded.src1_reg = bytecode[pc + 2];
+    // Format: [opcode][ra | (rb << 4)][rd] - 3 registers: rd = ra + rb
+    decoded.src1_reg = bytecode[pc + 1] & 0x0F;      // ra (lower 4 bits)
+    decoded.src2_reg = (bytecode[pc + 1] >> 4) & 0x0F; // rb (upper 4 bits)
+    decoded.dest_reg = bytecode[pc + 2];               // rd
     decoded.size = 3;
-
     return true;
 }
 
-// Decode Sub32 instruction
+// Decode Sub32 instruction (opcode 191)
 bool decode_sub_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-
-    // Format: [opcode][dest_reg][src_reg]
-    decoded.dest_reg = bytecode[pc + 1];
-    decoded.src1_reg = bytecode[pc + 2];
+    // Format: [opcode][ra | (rb << 4)][rd] - 3 registers: rd = ra - rb
+    decoded.src1_reg = bytecode[pc + 1] & 0x0F;      // ra (lower 4 bits)
+    decoded.src2_reg = (bytecode[pc + 1] >> 4) & 0x0F; // rb (upper 4 bits)
+    decoded.dest_reg = bytecode[pc + 2];               // rd
     decoded.size = 3;
-
     return true;
 }
 
@@ -660,9 +658,10 @@ bool decode_store_u64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& 
 // Decode Mul32 instruction (opcode 192)
 bool decode_mul_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    // Format: [opcode][dest_reg][src_reg]
-    decoded.dest_reg = bytecode[pc + 1];
-    decoded.src1_reg = bytecode[pc + 2];
+    // Format: [opcode][ra | (rb << 4)][rd] - 3 registers: rd = ra * rb
+    decoded.src1_reg = bytecode[pc + 1] & 0x0F;      // ra (lower 4 bits)
+    decoded.src2_reg = (bytecode[pc + 1] >> 4) & 0x0F; // rb (upper 4 bits)
+    decoded.dest_reg = bytecode[pc + 2];               // rd
     decoded.size = 3;
     return true;
 }
@@ -670,9 +669,10 @@ bool decode_mul_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& dec
 // Decode DivU32 instruction (opcode 193)
 bool decode_div_u32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    // Format: [opcode][dest_reg][src_reg]
-    decoded.dest_reg = bytecode[pc + 1];
-    decoded.src1_reg = bytecode[pc + 2];
+    // Format: [opcode][ra | (rb << 4)][rd] - 3 registers: rd = ra / rb
+    decoded.src1_reg = bytecode[pc + 1] & 0x0F;      // ra (lower 4 bits)
+    decoded.src2_reg = (bytecode[pc + 1] >> 4) & 0x0F; // rb (upper 4 bits)
+    decoded.dest_reg = bytecode[pc + 2];               // rd
     decoded.size = 3;
     return true;
 }
@@ -680,9 +680,10 @@ bool decode_div_u32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& de
 // Decode DivS32 instruction (opcode 194)
 bool decode_div_s32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    // Format: [opcode][dest_reg][src_reg]
-    decoded.dest_reg = bytecode[pc + 1];
-    decoded.src1_reg = bytecode[pc + 2];
+    // Format: [opcode][ra | (rb << 4)][rd] - 3 registers: rd = ra / rb (signed)
+    decoded.src1_reg = bytecode[pc + 1] & 0x0F;      // ra (lower 4 bits)
+    decoded.src2_reg = (bytecode[pc + 1] >> 4) & 0x0F; // rb (upper 4 bits)
+    decoded.dest_reg = bytecode[pc + 2];               // rd
     decoded.size = 3;
     return true;
 }
@@ -690,9 +691,10 @@ bool decode_div_s32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& de
 // Decode RemU32 instruction (opcode 195)
 bool decode_rem_u32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    // Format: [opcode][dest_reg][src_reg]
-    decoded.dest_reg = bytecode[pc + 1];
-    decoded.src1_reg = bytecode[pc + 2];
+    // Format: [opcode][ra | (rb << 4)][rd] - 3 registers: rd = ra % rb
+    decoded.src1_reg = bytecode[pc + 1] & 0x0F;      // ra (lower 4 bits)
+    decoded.src2_reg = (bytecode[pc + 1] >> 4) & 0x0F; // rb (upper 4 bits)
+    decoded.dest_reg = bytecode[pc + 2];               // rd
     decoded.size = 3;
     return true;
 }
@@ -700,9 +702,10 @@ bool decode_rem_u32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& de
 // Decode RemS32 instruction (opcode 196)
 bool decode_rem_s32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    // Format: [opcode][dest_reg][src_reg]
-    decoded.dest_reg = bytecode[pc + 1];
-    decoded.src1_reg = bytecode[pc + 2];
+    // Format: [opcode][ra | (rb << 4)][rd] - 3 registers: rd = ra % rb (signed)
+    decoded.src1_reg = bytecode[pc + 1] & 0x0F;      // ra (lower 4 bits)
+    decoded.src2_reg = (bytecode[pc + 1] >> 4) & 0x0F; // rb (upper 4 bits)
+    decoded.dest_reg = bytecode[pc + 2];               // rd
     decoded.size = 3;
     return true;
 }
@@ -710,9 +713,10 @@ bool decode_rem_s32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& de
 // Decode Add64 instruction (opcode 200)
 bool decode_add_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    // Format: [opcode][dest_reg][src_reg]
-    decoded.dest_reg = bytecode[pc + 1];
-    decoded.src1_reg = bytecode[pc + 2];
+    // Format: [opcode][ra | (rb << 4)][rd] - 3 registers: rd = ra + rb
+    decoded.src1_reg = bytecode[pc + 1] & 0x0F;      // ra (lower 4 bits)
+    decoded.src2_reg = (bytecode[pc + 1] >> 4) & 0x0F; // rb (upper 4 bits)
+    decoded.dest_reg = bytecode[pc + 2];               // rd
     decoded.size = 3;
     return true;
 }
@@ -720,9 +724,10 @@ bool decode_add_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& dec
 // Decode Sub64 instruction (opcode 201)
 bool decode_sub_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    // Format: [opcode][dest_reg][src_reg]
-    decoded.dest_reg = bytecode[pc + 1];
-    decoded.src1_reg = bytecode[pc + 2];
+    // Format: [opcode][ra | (rb << 4)][rd] - 3 registers: rd = ra - rb
+    decoded.src1_reg = bytecode[pc + 1] & 0x0F;      // ra (lower 4 bits)
+    decoded.src2_reg = (bytecode[pc + 1] >> 4) & 0x0F; // rb (upper 4 bits)
+    decoded.dest_reg = bytecode[pc + 2];               // rd
     decoded.size = 3;
     return true;
 }
@@ -730,9 +735,10 @@ bool decode_sub_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& dec
 // Decode Mul64 instruction (opcode 202)
 bool decode_mul_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    // Format: [opcode][dest_reg][src_reg]
-    decoded.dest_reg = bytecode[pc + 1];
-    decoded.src1_reg = bytecode[pc + 2];
+    // Format: [opcode][ra | (rb << 4)][rd] - 3 registers: rd = ra * rb
+    decoded.src1_reg = bytecode[pc + 1] & 0x0F;      // ra (lower 4 bits)
+    decoded.src2_reg = (bytecode[pc + 1] >> 4) & 0x0F; // rb (upper 4 bits)
+    decoded.dest_reg = bytecode[pc + 2];               // rd
     decoded.size = 3;
     return true;
 }
@@ -740,9 +746,10 @@ bool decode_mul_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& dec
 // Decode And instruction (opcode 210)
 bool decode_and(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    // Format: [opcode][dest_reg][src_reg]
-    decoded.dest_reg = bytecode[pc + 1];
-    decoded.src1_reg = bytecode[pc + 2];
+    // Format: [opcode][ra | (rb << 4)][rd] - 3 registers: rd = ra & rb
+    decoded.src1_reg = bytecode[pc + 1] & 0x0F;      // ra (lower 4 bits)
+    decoded.src2_reg = (bytecode[pc + 1] >> 4) & 0x0F; // rb (upper 4 bits)
+    decoded.dest_reg = bytecode[pc + 2];               // rd
     decoded.size = 3;
     return true;
 }
@@ -750,9 +757,10 @@ bool decode_and(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decode
 // Decode Xor instruction (opcode 211)
 bool decode_xor(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    // Format: [opcode][dest_reg][src_reg]
-    decoded.dest_reg = bytecode[pc + 1];
-    decoded.src1_reg = bytecode[pc + 2];
+    // Format: [opcode][ra | (rb << 4)][rd] - 3 registers: rd = ra ^ rb
+    decoded.src1_reg = bytecode[pc + 1] & 0x0F;      // ra (lower 4 bits)
+    decoded.src2_reg = (bytecode[pc + 1] >> 4) & 0x0F; // rb (upper 4 bits)
+    decoded.dest_reg = bytecode[pc + 2];               // rd
     decoded.size = 3;
     return true;
 }
@@ -760,9 +768,10 @@ bool decode_xor(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decode
 // Decode Or instruction (opcode 212)
 bool decode_or(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    // Format: [opcode][dest_reg][src_reg]
-    decoded.dest_reg = bytecode[pc + 1];
-    decoded.src1_reg = bytecode[pc + 2];
+    // Format: [opcode][ra | (rb << 4)][rd] - 3 registers: rd = ra | rb
+    decoded.src1_reg = bytecode[pc + 1] & 0x0F;      // ra (lower 4 bits)
+    decoded.src2_reg = (bytecode[pc + 1] >> 4) & 0x0F; // rb (upper 4 bits)
+    decoded.dest_reg = bytecode[pc + 2];               // rd
     decoded.size = 3;
     return true;
 }
@@ -1605,53 +1614,85 @@ bool emit_instruction_decoded(
             );
 
         case static_cast<uint8_t>(Opcode::Add32):
-            return jit_instruction::jit_emit_add_32(
-                assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
-            );
+            {
+                // rd = ra + rb (3-operand format)
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->mov(x86::edx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->add(x86::edx, x86::eax);  // edx = eax + edx = ra + rb
+                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::edx);  // Store to rd
+            }
+            return true;
 
         case static_cast<uint8_t>(Opcode::Sub32):
-            return jit_instruction::jit_emit_sub_32(
-                assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
-            );
+            {
+                // rd = ra - rb (3-operand format)
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->mov(x86::edx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->sub(x86::edx, x86::eax);  // edx = eax - edx = ra - rb
+                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::edx);  // Store to rd
+            }
+            return true;
 
         case static_cast<uint8_t>(Opcode::Mul32):
-            return jit_instruction::jit_emit_mul_32(
-                assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
-            );
+            {
+                // rd = ra * rb (3-operand format)
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->mov(x86::edx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->imul(x86::edx, x86::eax);  // edx = eax * edx = ra * rb
+                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::edx);  // Store to rd
+            }
+            return true;
 
         case static_cast<uint8_t>(Opcode::DivU32):
-            return jit_instruction::jit_emit_div_u32(
-                assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
-            );
+            {
+                // rd = ra / rb (3-operand format)
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->mov(x86::ecx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->xor_(x86::edx, x86::edx);  // edx = 0
+                a->div(x86::ecx);  // eax = eax / ecx, edx = eax % ecx
+                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::eax);  // Store quotient to rd
+            }
+            return true;
 
         case static_cast<uint8_t>(Opcode::DivS32):
-            return jit_instruction::jit_emit_div_s32(
-                assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
-            );
+            {
+                // rd = ra / rb (3-operand format, signed)
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->cdq();  // Sign extend eax to edx:eax
+                a->mov(x86::ecx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->idiv(x86::ecx);  // eax = eax / ecx (signed)
+                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::eax);  // Store quotient to rd
+            }
+            return true;
 
         case static_cast<uint8_t>(Opcode::RemU32):
-            return jit_instruction::jit_emit_rem_u32(
-                assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
-            );
+            {
+                // rd = ra % rb (3-operand format)
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->xor_(x86::edx, x86::edx);  // edx = 0
+                a->mov(x86::ecx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->div(x86::ecx);  // eax = eax / ecx, edx = eax % ecx
+                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::edx);  // Store remainder to rd
+            }
+            return true;
 
         case static_cast<uint8_t>(Opcode::RemS32):
-            return jit_instruction::jit_emit_rem_s32(
-                assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
-            );
+            {
+                // rd = ra % rb (3-operand format, signed)
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->cdq();  // Sign extend eax to edx:eax
+                a->mov(x86::ecx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->idiv(x86::ecx);  // eax = eax / ecx, edx = eax % ecx (signed)
+                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::edx);  // Store remainder to rd
+            }
+            return true;
 
         case static_cast<uint8_t>(Opcode::ShloL32):
             return jit_instruction::jit_emit_shlo_l_32(
@@ -1675,53 +1716,85 @@ bool emit_instruction_decoded(
             );
 
         case static_cast<uint8_t>(Opcode::Add64):
-            return jit_instruction::jit_emit_add_64(
-                assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
-            );
+            {
+                // rd = ra + rb (3-operand format, 64-bit)
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                a->mov(x86::rax, x86::qword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->mov(x86::rcx, x86::qword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->add(x86::rax, x86::rcx);  // rax = rax + rcx = ra + rb
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rax);  // Store to rd
+            }
+            return true;
 
         case static_cast<uint8_t>(Opcode::Sub64):
-            return jit_instruction::jit_emit_sub_64(
-                assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
-            );
+            {
+                // rd = ra - rb (3-operand format, 64-bit)
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                a->mov(x86::rax, x86::qword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->mov(x86::rcx, x86::qword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->sub(x86::rax, x86::rcx);  // rax = rax - rcx = ra - rb
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rax);  // Store to rd
+            }
+            return true;
 
         case static_cast<uint8_t>(Opcode::Mul64):
-            return jit_instruction::jit_emit_mul_64(
-                assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
-            );
+            {
+                // rd = ra * rb (3-operand format, 64-bit)
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                a->mov(x86::rax, x86::qword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->mov(x86::rcx, x86::qword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->imul(x86::rcx, x86::rax);  // rcx = rax * rcx = ra * rb
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rcx);  // Store to rd
+            }
+            return true;
 
         case static_cast<uint8_t>(Opcode::DivU64):
-            return jit_instruction::jit_emit_div_u_64(
-                assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
-            );
+            {
+                // rd = ra / rb (3-operand format, 64-bit unsigned)
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                a->mov(x86::rax, x86::qword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->xor_(x86::rdx, x86::rdx);  // rdx = 0
+                a->mov(x86::rcx, x86::qword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->div(x86::rcx);  // rax = rax / rcx, rdx = rax % rcx
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rax);  // Store quotient to rd
+            }
+            return true;
 
         case static_cast<uint8_t>(Opcode::DivS64):
-            return jit_instruction::jit_emit_div_s_64(
-                assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
-            );
+            {
+                // rd = ra / rb (3-operand format, 64-bit signed)
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                a->mov(x86::rax, x86::qword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->cqo();  // Sign extend rax to rdx:rax
+                a->mov(x86::rcx, x86::qword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->idiv(x86::rcx);  // rax = rax / rcx (signed)
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rax);  // Store quotient to rd
+            }
+            return true;
 
         case static_cast<uint8_t>(Opcode::RemU64):
-            return jit_instruction::jit_emit_rem_u_64(
-                assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
-            );
+            {
+                // rd = ra % rb (3-operand format, 64-bit unsigned)
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                a->mov(x86::rax, x86::qword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->xor_(x86::rdx, x86::rdx);  // rdx = 0
+                a->mov(x86::rcx, x86::qword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->div(x86::rcx);  // rax = rax / rcx, rdx = rax % rcx
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rdx);  // Store remainder to rd
+            }
+            return true;
 
         case static_cast<uint8_t>(Opcode::RemS64):
-            return jit_instruction::jit_emit_rem_s_64(
-                assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
-            );
+            {
+                // rd = ra % rb (3-operand format, 64-bit signed)
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                a->mov(x86::rax, x86::qword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->cqo();  // Sign extend rax to rdx:rax
+                a->mov(x86::rcx, x86::qword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->idiv(x86::rcx);  // rax = rax / rcx, rdx = rax % rcx (signed)
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rdx);  // Store remainder to rd
+            }
+            return true;
 
         case static_cast<uint8_t>(Opcode::ShloL64):
             return jit_instruction::jit_emit_shlo_l_64(
@@ -1745,25 +1818,37 @@ bool emit_instruction_decoded(
             );
 
         case static_cast<uint8_t>(Opcode::And):
-            return jit_instruction::jit_emit_and(
-                assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
-            );
+            {
+                // rd = ra & rb (3-operand format)
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->mov(x86::edx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->and_(x86::edx, x86::eax);  // edx = eax & edx = ra & rb
+                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::edx);  // Store to rd
+            }
+            return true;
 
         case static_cast<uint8_t>(Opcode::Xor):
-            return jit_instruction::jit_emit_xor(
-                assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
-            );
+            {
+                // rd = ra ^ rb (3-operand format)
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->mov(x86::edx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->xor_(x86::edx, x86::eax);  // edx = eax ^ edx = ra ^ rb
+                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::edx);  // Store to rd
+            }
+            return true;
 
         case static_cast<uint8_t>(Opcode::Or):
-            return jit_instruction::jit_emit_or(
-                assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
-            );
+            {
+                // rd = ra | rb (3-operand format)
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->mov(x86::edx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->or_(x86::edx, x86::eax);  // edx = eax | edx = ra | rb
+                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::edx);  // Store to rd
+            }
+            return true;
 
         case 213: // MulUpperSS
             return jit_instruction::jit_emit_mul_upper_s_s(
