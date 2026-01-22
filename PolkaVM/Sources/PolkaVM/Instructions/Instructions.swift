@@ -62,10 +62,18 @@ extension CppHelper.Instructions.LoadImm64: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let value = try data.at(relative: 1 ..< 9).decode(UInt64.self)
-        self.init(reg: register, value: value)
+        print("[LoadImm64.init] register: \(register), value: \(value)")
+        do {
+            self.init(reg: register, value: value)
+            print("[LoadImm64.init] self.init succeeded")
+        } catch {
+            print("[LoadImm64.init] self.init failed: \(error)")
+            throw error
+        }
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        print("[LoadImm64.execute] reg: \(reg), value: \(value)")
         context.state.writeRegister(reg, value)
         return .continued
     }
@@ -152,9 +160,14 @@ extension CppHelper.Instructions.JumpInd: Instruction {
 
 extension CppHelper.Instructions.LoadImm: Instruction {
     public init(data: Data) throws {
+        print("[LoadImm.init] data.count: \(data.count)")
         let register = try Registers.Index(r1: data.at(relative: 0))
+        print("[LoadImm.init] register: \(register)")
         let value: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        print("[LoadImm.init] value: \(value)")
+        print("[LoadImm.init] About to call self.init")
         self.init(reg: register, value: value)
+        print("[LoadImm.init] self.init succeeded")
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
@@ -310,13 +323,20 @@ extension CppHelper.Instructions.StoreU32: Instruction {
 
 extension CppHelper.Instructions.StoreU64: Instruction {
     public init(data: Data) throws {
+        print("[StoreU64.init] data.count: \(data.count)")
         let register = try Registers.Index(r1: data.at(relative: 0))
+        print("[StoreU64.init] register: \(register)")
         let address: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        print("[StoreU64.init] address: \(address)")
+        print("[StoreU64.init] About to call self.init")
         self.init(reg: register, address: address)
+        print("[StoreU64.init] self.init succeeded")
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
+        print("[StoreU64.execute] reg: \(reg), address: \(address)")
         let value: UInt64 = context.state.readRegister(reg)
+        print("[StoreU64.execute] value: \(value)")
         try context.state.writeMemory(address: address, values: value.encode())
         return .continued
     }
@@ -1601,25 +1621,42 @@ extension CppHelper.Instructions.SharR32: Instruction {
 extension CppHelper.Instructions.Add64: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        print("[Add64.init] ra: \(ra), rb: \(rb), rd: \(rd)")
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        print("[Add64.execute] ra: \(ra), rb: \(rb), rd: \(rd)")
+        print("[Add64.execute] ra.value: \(ra.value), rb.value: \(rb.value), rd.value: \(rd.value)")
         let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-        context.state.writeRegister(rd, raVal &+ rbVal)
+        print("[Add64.execute] raVal: \(raVal), rbVal: \(rbVal)")
+        let result = raVal &+ rbVal
+        print("[Add64.execute] result: \(result), result type: \(type(of: result))")
+        print("[Add64.execute] About to write to rd.value: \(rd.value)")
+        context.state.writeRegister(rd, result)
+        print("[Add64.execute] Write succeeded")
         return .continued
     }
 }
 
 extension CppHelper.Instructions.Sub64: Instruction {
     public init(data: Data) throws {
+        print("[Sub64.init] data.count: \(data.count)")
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        print("[Sub64.init] ra: \(ra), rb: \(rb), rd: \(rd)")
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        print("[Sub64.execute] ra: \(ra), rb: \(rb), rd: \(rd)")
+        print("[Sub64.execute] ra.value: \(ra.value) type: \(type(of: ra.value))")
         let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-        context.state.writeRegister(rd, raVal &- rbVal)
+        print("[Sub64.execute] raVal: \(raVal), rbVal: \(rbVal)")
+        let result = raVal &- rbVal
+        print("[Sub64.execute] result: \(result)")
+        print("[Sub64.execute] About to write result to register \(rd.value)")
+        context.state.writeRegister(rd, result)
+        print("[Sub64.execute] Write succeeded!")
         return .continued
     }
 }
