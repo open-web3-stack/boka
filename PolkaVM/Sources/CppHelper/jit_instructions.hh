@@ -37,6 +37,15 @@ bool jit_emit_load_i32(void* _Nonnull assembler, const char* _Nonnull target_arc
 bool jit_emit_load_u64(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t ptr_reg, int16_t offset);
 bool jit_emit_load_reserved(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t ptr_reg);
 
+// Load from memory instructions (direct addressing)
+bool jit_emit_load_u8_direct(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint32_t address);
+bool jit_emit_load_i8_direct(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint32_t address);
+bool jit_emit_load_u16_direct(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint32_t address);
+bool jit_emit_load_i16_direct(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint32_t address);
+bool jit_emit_load_u32_direct(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint32_t address);
+bool jit_emit_load_i32_direct(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint32_t address);
+bool jit_emit_load_u64_direct(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint32_t address);
+
 // Store instructions (register to memory)
 bool jit_emit_store_8(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t ptr_reg, uint8_t src_reg, int16_t offset);
 bool jit_emit_store_16(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t ptr_reg, uint8_t src_reg, int16_t offset);
@@ -47,6 +56,12 @@ bool jit_emit_store_u16(void* _Nonnull assembler, const char* _Nonnull target_ar
 bool jit_emit_store_u32(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t ptr_reg, int16_t offset, uint8_t src_reg);
 bool jit_emit_store_u64(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t ptr_reg, int16_t offset, uint8_t src_reg);
 bool jit_emit_store_conditional(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t ptr_reg, uint8_t src_reg);
+
+// Store instructions (register to memory, direct addressing)
+bool jit_emit_store_u8_direct(void* _Nonnull assembler, const char* _Nonnull target_arch, uint32_t address, uint8_t src_reg);
+bool jit_emit_store_u16_direct(void* _Nonnull assembler, const char* _Nonnull target_arch, uint32_t address, uint8_t src_reg);
+bool jit_emit_store_u32_direct(void* _Nonnull assembler, const char* _Nonnull target_arch, uint32_t address, uint8_t src_reg);
+bool jit_emit_store_u64_direct(void* _Nonnull assembler, const char* _Nonnull target_arch, uint32_t address, uint8_t src_reg);
 
 // Store immediate instructions - NOT IMPLEMENTED, use store_u* instead
 // TODO: Implement store_imm functions or update dispatcher to use store_u* with immediate loading

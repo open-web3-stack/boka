@@ -756,6 +756,321 @@ bool jit_emit_load_u64(
     return false;
 }
 
+// LoadU8Direct: Load unsigned 8-bit from memory (direct addressing)
+bool jit_emit_load_u8_direct(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t dest_reg,
+    uint32_t address)
+{
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a->mov(x86::rax, address);
+
+        // Load unsigned byte from memory at [VM_MEMORY_PTR + address]
+        a->movzx(x86::eax, x86::byte_ptr(x86::r12, x86::rax));
+
+        // Zero-extend and store to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a64::Gp addr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->mov(addr, address);
+
+        // Load unsigned byte from memory at [memBase + addr]
+        a->ldrb(dest.w(), a64::ptr(memBase, addr));
+
+        // Store to VM register array
+        a->str(dest.x(), a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
+    }
+
+    return false;
+}
+
+// LoadI8Direct: Load signed 8-bit from memory (direct addressing)
+bool jit_emit_load_i8_direct(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t dest_reg,
+    uint32_t address)
+{
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a->mov(x86::rax, address);
+
+        // Load signed byte from memory at [VM_MEMORY_PTR + address] with sign extension
+        a->movsx(x86::rax, x86::byte_ptr(x86::r12, x86::rax));
+
+        // Store to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a64::Gp addr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->mov(addr, address);
+
+        // Load signed byte from memory at [memBase + addr]
+        a->ldrsb(dest.x(), a64::ptr(memBase, addr));
+
+        // Store to VM register array
+        a->str(dest, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
+    }
+
+    return false;
+}
+
+// LoadU16Direct: Load unsigned 16-bit from memory (direct addressing)
+bool jit_emit_load_u16_direct(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t dest_reg,
+    uint32_t address)
+{
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a->mov(x86::rax, address);
+
+        // Load unsigned word from memory at [VM_MEMORY_PTR + address]
+        a->movzx(x86::eax, x86::word_ptr(x86::r12, x86::rax));
+
+        // Zero-extend and store to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a64::Gp addr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->mov(addr, address);
+
+        // Load unsigned halfword from memory at [memBase + addr]
+        a->ldrh(dest.w(), a64::ptr(memBase, addr));
+
+        // Store to VM register array
+        a->str(dest.x(), a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
+    }
+
+    return false;
+}
+
+// LoadI16Direct: Load signed 16-bit from memory (direct addressing)
+bool jit_emit_load_i16_direct(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t dest_reg,
+    uint32_t address)
+{
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a->mov(x86::rax, address);
+
+        // Load signed word from memory at [VM_MEMORY_PTR + address] with sign extension
+        a->movsx(x86::rax, x86::word_ptr(x86::r12, x86::rax));
+
+        // Store to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a64::Gp addr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->mov(addr, address);
+
+        // Load signed halfword from memory at [memBase + addr]
+        a->ldrsh(dest.x(), a64::ptr(memBase, addr));
+
+        // Store to VM register array
+        a->str(dest, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
+    }
+
+    return false;
+}
+
+// LoadU32Direct: Load unsigned 32-bit from memory (direct addressing)
+bool jit_emit_load_u32_direct(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t dest_reg,
+    uint32_t address)
+{
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a->mov(x86::rax, address);
+
+        // Load unsigned dword from memory at [VM_MEMORY_PTR + address]
+        a->mov(x86::eax, x86::dword_ptr(x86::r12, x86::rax));
+
+        // Zero-extend and store to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a64::Gp addr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->mov(addr, address);
+
+        // Load word from memory at [memBase + addr]
+        a->ldr(dest.w(), a64::ptr(memBase, addr));
+
+        // Store to VM register array
+        a->str(dest.x(), a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
+    }
+
+    return false;
+}
+
+// LoadI32Direct: Load signed 32-bit from memory (direct addressing)
+bool jit_emit_load_i32_direct(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t dest_reg,
+    uint32_t address)
+{
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a->mov(x86::rax, address);
+
+        // Load signed dword from memory at [VM_MEMORY_PTR + address] with sign extension
+        a->movsx(x86::rax, x86::dword_ptr(x86::r12, x86::rax));
+
+        // Store to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a64::Gp addr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->mov(addr, address);
+
+        // Load signed word from memory at [memBase + addr]
+        a->ldrsw(dest, a64::ptr(memBase, addr));
+
+        // Store to VM register array
+        a->str(dest, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
+    }
+
+    return false;
+}
+
+// LoadU64Direct: Load unsigned 64-bit from memory (direct addressing)
+bool jit_emit_load_u64_direct(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t dest_reg,
+    uint32_t address)
+{
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a->mov(x86::rax, address);
+
+        // Load qword from memory at [VM_MEMORY_PTR + address]
+        a->mov(x86::rax, x86::qword_ptr(x86::r12, x86::rax));
+
+        // Store to VM register array
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a64::Gp addr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp dest = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->mov(addr, address);
+
+        // Load qword from memory at [memBase + addr]
+        a->ldr(dest, a64::ptr(memBase, addr));
+
+        // Store to VM register array
+        a->str(dest, a64::ptr(regPtr, dest_reg * 8));
+
+        return true;
+    }
+
+    return false;
+}
+
 // StoreU8: Store unsigned 8-bit to memory
 bool jit_emit_store_u8(
     void* _Nonnull assembler,
@@ -937,6 +1252,178 @@ bool jit_emit_store_u64(
 
         // Store qword to memory
         a->str(src, a64::ptr(ptr, offset));
+
+        return true;
+    }
+
+    return false;
+}
+
+// StoreU8Direct: Store unsigned 8-bit to memory (direct addressing)
+bool jit_emit_store_u8_direct(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint32_t address,
+    uint8_t src_reg)
+{
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a->mov(x86::rax, address);
+
+        // Load source register from VM array
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Store byte to memory at [VM_MEMORY_PTR + address]
+        a->mov(x86::byte_ptr(x86::r12, x86::rax), x86::dl);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a64::Gp addr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp src = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->mov(addr, address);
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+
+        // Store byte to memory at [memBase + addr]
+        a->strb(src.w(), a64::ptr(memBase, addr));
+
+        return true;
+    }
+
+    return false;
+}
+
+// StoreU16Direct: Store unsigned 16-bit to memory (direct addressing)
+bool jit_emit_store_u16_direct(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint32_t address,
+    uint8_t src_reg)
+{
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a->mov(x86::rax, address);
+
+        // Load source register from VM array
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Store word to memory at [VM_MEMORY_PTR + address]
+        a->mov(x86::word_ptr(x86::r12, x86::rax), x86::dx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a64::Gp addr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp src = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->mov(addr, address);
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+
+        // Store halfword to memory at [memBase + addr]
+        a->strh(src.w(), a64::ptr(memBase, addr));
+
+        return true;
+    }
+
+    return false;
+}
+
+// StoreU32Direct: Store unsigned 32-bit to memory (direct addressing)
+bool jit_emit_store_u32_direct(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint32_t address,
+    uint8_t src_reg)
+{
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a->mov(x86::rax, address);
+
+        // Load source register from VM array
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Store dword to memory at [VM_MEMORY_PTR + address]
+        a->mov(x86::dword_ptr(x86::r12, x86::rax), x86::edx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a64::Gp addr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp src = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->mov(addr, address);
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+
+        // Store word to memory at [memBase + addr]
+        a->str(src.w(), a64::ptr(memBase, addr));
+
+        return true;
+    }
+
+    return false;
+}
+
+// StoreU64Direct: Store unsigned 64-bit to memory (direct addressing)
+bool jit_emit_store_u64_direct(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint32_t address,
+    uint8_t src_reg)
+{
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a->mov(x86::rax, address);
+
+        // Load source register from VM array
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Store qword to memory at [VM_MEMORY_PTR + address]
+        a->mov(x86::qword_ptr(x86::r12, x86::rax), x86::rdx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load address immediate into temp register
+        a64::Gp addr = a64::x0;
+        a64::Gp memBase = a64::x20; // VM_MEMORY_PTR
+        a64::Gp src = a64::x1;
+        a64::Gp regPtr = a64::x19;
+
+        a->mov(addr, address);
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+
+        // Store qword to memory at [memBase + addr]
+        a->str(src, a64::ptr(memBase, addr));
 
         return true;
     }

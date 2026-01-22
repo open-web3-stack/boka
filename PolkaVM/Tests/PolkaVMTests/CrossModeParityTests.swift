@@ -189,26 +189,24 @@ final class ParityInstructionBuilder {
         return self
     }
 
-    /// LoadU8: Load unsigned 8-bit value from memory using indirect addressing
-    /// Format: [opcode][dest_reg][ptr_reg][offset_16bit]
+    /// LoadU8: Load unsigned 8-bit value from memory using direct addressing
+    /// Format: [opcode][dest_reg][address_32bit]
     @discardableResult
-    func loadU8(destReg: UInt8, ptrReg: UInt8, offset: Int16) -> Self {
+    func loadU8(destReg: UInt8, address: UInt32) -> Self {
         bytecode.append(PVMOpcodes.loadU8.rawValue)
         bytecode.append(destReg)
-        bytecode.append(ptrReg)
-        bytecode.append(contentsOf: valueToBytes(UInt16(bitPattern: offset)))
+        bytecode.append(contentsOf: valueToBytes(address))
         didAppendInstruction()
         return self
     }
 
-    /// StoreU8: Store 8-bit value to memory using indirect addressing
-    /// Format: [opcode][src_reg][ptr_reg][offset_16bit]
+    /// StoreU8: Store 8-bit value to memory using direct addressing
+    /// Format: [opcode][src_reg][address_32bit]
     @discardableResult
-    func storeU8(srcReg: UInt8, ptrReg: UInt8, offset: Int16) -> Self {
+    func storeU8(srcReg: UInt8, address: UInt32) -> Self {
         bytecode.append(PVMOpcodes.storeU8.rawValue)
         bytecode.append(srcReg)
-        bytecode.append(ptrReg)
-        bytecode.append(contentsOf: valueToBytes(UInt16(bitPattern: offset)))
+        bytecode.append(contentsOf: valueToBytes(address))
         didAppendInstruction()
         return self
     }
@@ -491,25 +489,17 @@ struct CrossModeParityTests {
     }
 
     @Test func testMemoryOperations() async throws {
-        // Test register-indirect load/store (LoadU8/StoreU8 with ptr_reg + offset)
-        // This uses the format the JIT actually supports: [opcode][dest/src][ptr_reg][offset_16]
+        // Test 32-bit direct addressing for LoadU8/StoreU8
+        // This verifies the fix for the 32-bit address truncation bug
         //
-        // KNOWN ISSUE: Direct 32-bit addressing (LoadU8/StoreU8 with 32-bit address)
-        // does NOT work in JIT because the dispatcher truncates addresses to 16-bit:
-        //   static_cast<int16_t>(decoded.address & 0xFFFF)
-        // This is a JIT bug - the spec specifies 32-bit addresses for these instructions.
-        //
-        // For now, we test the working indirect addressing mode.
+        // R0 = 0xAB (value to store)
+        // Store low byte of R0 to address 0x20000
+        // Load from address 0x20000 into R1
 
-        // R0 = 0x100 (base address in low byte)
-        // R1 = 0xAB (value to store)
-        // Store R1 to [R0 + 0] -> address 0x100
-        // Load from [R0 + 0] into R2
         let blob = ParityInstructionBuilder()
-            .loadImm(destReg: 0, value: 0x100)  // R0 = base address
-            .loadImm(destReg: 1, value: 0xAB)   // R1 = value to store
-            .storeU8(srcReg: 1, ptrReg: 0, offset: 0)  // Store to [R0 + 0]
-            .loadU8(destReg: 2, ptrReg: 0, offset: 0)  // Load from [R0 + 0]
+            .loadImm(destReg: 0, value: 0xAB)   // R0 = value with low byte 0xAB
+            .storeU8(srcReg: 0, address: 0x20000)  // Store 0xAB to address 0x20000
+            .loadU8(destReg: 1, address: 0x20000)  // Load from address 0x20000 into R1
             .appendRegisterDump(baseAddress: 0x10000)
             .buildBlob()
 
