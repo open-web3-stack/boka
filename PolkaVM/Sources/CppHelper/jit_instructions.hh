@@ -84,10 +84,10 @@ bool jit_emit_xnor(void* _Nonnull assembler, const char* _Nonnull target_arch, u
 
 // Immediate arithmetic operations
 bool jit_emit_add_imm_32(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, int32_t immediate);
-bool jit_emit_add_imm_64(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, int64_t immediate);
+bool jit_emit_add_imm_64(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint64_t immediate);
 bool jit_emit_add_carry(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t src_reg);
 bool jit_emit_add_64_carry(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t src_reg);
-bool jit_emit_sub_imm(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, int32_t immediate);
+bool jit_emit_sub_imm(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint64_t immediate);
 bool jit_emit_sub_imm_32(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, int32_t immediate);
 bool jit_emit_sub_borrow(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t src_reg);
 bool jit_emit_sub_64_borrow(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t src_reg);
@@ -100,11 +100,11 @@ bool jit_emit_div_s32_imm(void* _Nonnull assembler, const char* _Nonnull target_
 bool jit_emit_rem_u32_imm(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint32_t immediate);
 bool jit_emit_rem_s32_imm(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, int32_t immediate);
 bool jit_emit_and_imm(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint64_t immediate);
-bool jit_emit_and_imm_32(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, int32_t immediate);
+bool jit_emit_and_imm_32(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint32_t immediate);
 bool jit_emit_or_imm(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint64_t immediate);
-bool jit_emit_or_imm_32(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, int32_t immediate);
+bool jit_emit_or_imm_32(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint32_t immediate);
 bool jit_emit_xor_imm(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint64_t immediate);
-bool jit_emit_xor_imm_32(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, int32_t immediate);
+bool jit_emit_xor_imm_32(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint32_t immediate);
 
 // Shift operations
 bool jit_emit_shlo_l_32(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t src_reg);
