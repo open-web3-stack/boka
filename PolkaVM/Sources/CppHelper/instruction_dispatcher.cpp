@@ -452,6 +452,149 @@ bool decode_branch_gt_s_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruc
     return decode_branch_eq_imm(bytecode, pc, decoded);
 }
 
+// Decode AddImm32 instruction (opcode 131)
+// Format: [opcode][ra][rb][value_32bit]
+bool decode_add_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // ra
+    decoded.src1_reg = bytecode[pc + 2];  // rb
+    decoded.immediate = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 3]);
+    decoded.size = 7; // 1 + 1 + 1 + 4 = 7 bytes
+    return true;
+}
+
+// AndImm, XorImm, OrImm have same format
+bool decode_and_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_32(bytecode, pc, decoded);
+}
+
+bool decode_xor_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_32(bytecode, pc, decoded);
+}
+
+bool decode_or_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_32(bytecode, pc, decoded);
+}
+
+bool decode_mul_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_32(bytecode, pc, decoded);
+}
+
+bool decode_set_lt_u_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_32(bytecode, pc, decoded);
+}
+
+bool decode_set_lt_s_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_32(bytecode, pc, decoded);
+}
+
+bool decode_shlo_l_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_32(bytecode, pc, decoded);
+}
+
+bool decode_shlo_r_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_32(bytecode, pc, decoded);
+}
+
+bool decode_shar_r_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_32(bytecode, pc, decoded);
+}
+
+bool decode_neg_add_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_32(bytecode, pc, decoded);
+}
+
+bool decode_set_gt_u_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_32(bytecode, pc, decoded);
+}
+
+bool decode_set_gt_s_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_32(bytecode, pc, decoded);
+}
+
+// Alt shift variants have same format
+bool decode_shlo_l_imm_alt_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_32(bytecode, pc, decoded);
+}
+
+bool decode_shlo_r_imm_alt_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_32(bytecode, pc, decoded);
+}
+
+bool decode_shar_r_imm_alt_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_32(bytecode, pc, decoded);
+}
+
+// Cmov immediate has same format
+bool decode_cmov_iz_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_32(bytecode, pc, decoded);
+}
+
+bool decode_cmov_nz_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_32(bytecode, pc, decoded);
+}
+
+// Decode AddImm64 instruction (opcode 149)
+// Format: [opcode][ra][rb][value_64bit]
+bool decode_add_imm_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // ra
+    decoded.src1_reg = bytecode[pc + 2];  // rb
+    decoded.immediate = *reinterpret_cast<const uint64_t*>(&bytecode[pc + 3]);
+    decoded.size = 11; // 1 + 1 + 1 + 8 = 11 bytes
+    return true;
+}
+
+// Other 64-bit immediate instructions have same format
+bool decode_mul_imm_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_64(bytecode, pc, decoded);
+}
+
+bool decode_shlo_l_imm_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_64(bytecode, pc, decoded);
+}
+
+bool decode_shlo_r_imm_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_64(bytecode, pc, decoded);
+}
+
+bool decode_shar_r_imm_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_64(bytecode, pc, decoded);
+}
+
+bool decode_neg_add_imm_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_64(bytecode, pc, decoded);
+}
+
+// Alt shift and rotate variants have same format
+bool decode_shlo_l_imm_alt_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_64(bytecode, pc, decoded);
+}
+
+bool decode_shlo_r_imm_alt_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_64(bytecode, pc, decoded);
+}
+
+bool decode_shar_r_imm_alt_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_64(bytecode, pc, decoded);
+}
+
+bool decode_rot_r_64_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_64(bytecode, pc, decoded);
+}
+
+bool decode_rot_r_64_imm_alt(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_64(bytecode, pc, decoded);
+}
+
+bool decode_rot_r_32_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_64(bytecode, pc, decoded);
+}
+
+bool decode_rot_r_32_imm_alt(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_add_imm_64(bytecode, pc, decoded);
+}
+
 // Decode JumpInd instruction (opcode 50)
 bool decode_jump_ind(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
@@ -825,6 +968,233 @@ bool emit_instruction_decoded(
                 decoded.dest_reg,
                 decoded.immediate,
                 decoded.target_pc
+            );
+
+        // 32-bit Immediate instructions (opcodes 131-148)
+        // Format: [opcode][ra][rb][value_32bit]
+        case static_cast<uint8_t>(Opcode::AddImm32):
+            return jit_instruction::jit_emit_add_imm_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<int32_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::AndImm):
+            return jit_instruction::jit_emit_and_imm_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint32_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::XorImm):
+            return jit_instruction::jit_emit_xor_imm_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint32_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::OrImm):
+            return jit_instruction::jit_emit_or_imm_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint32_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::MulImm32):
+            return jit_instruction::jit_emit_mul_imm_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<int32_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::SetLtUImm):
+            return jit_instruction::jit_emit_lt_imm_u(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.immediate
+            );
+
+        case static_cast<uint8_t>(Opcode::SetLtSImm):
+            return jit_instruction::jit_emit_lt_imm(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.immediate
+            );
+
+        case static_cast<uint8_t>(Opcode::ShloLImm32):
+            return jit_instruction::jit_emit_shl_imm_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint8_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::ShloRImm32):
+            return jit_instruction::jit_emit_shr_imm_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint8_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::SharRImm32):
+            return jit_instruction::jit_emit_sar_imm_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint8_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::NegAddImm32):
+            // NegAddImm32: ra = rb - value (negated addition)
+            // Implemented as: add(rb, -value) or sub(rb, value)
+            return jit_instruction::jit_emit_sub_imm_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<int32_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::SetGtUImm):
+            // SetGtUImm: ra = (rb > value) ? 1 : 0
+            // Implemented as: lt_u(value, rb) (swap operands)
+            return jit_instruction::jit_emit_gt_imm_u(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.immediate
+            );
+
+        case static_cast<uint8_t>(Opcode::SetGtSImm):
+            // SetGtSImm: ra = (rb > value) ? 1 : 0 (signed)
+            return jit_instruction::jit_emit_gt_imm(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.immediate
+            );
+
+        case static_cast<uint8_t>(Opcode::ShloLImmAlt32):
+            // Alt shift variants - same functionality
+            return jit_instruction::jit_emit_shl_imm_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint8_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::ShloRImmAlt32):
+            return jit_instruction::jit_emit_shr_imm_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint8_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::SharRImmAlt32):
+            return jit_instruction::jit_emit_sar_imm_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint8_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::CmovIzImm):
+            // CmovIzImm: conditional move if zero (immediate variant)
+            // TODO: No direct emitter - needs implementation
+            // For now, emit nop
+            a->nop();
+            return true;
+
+        case static_cast<uint8_t>(Opcode::CmovNzImm):
+            // CmovNzImm: conditional move if not zero (immediate variant)
+            // TODO: No direct emitter - needs implementation
+            a->nop();
+            return true;
+
+        // 64-bit Immediate instructions (opcodes 149-161)
+        // Format: [opcode][ra][rb][value_64bit]
+        case static_cast<uint8_t>(Opcode::AddImm64):
+            return jit_instruction::jit_emit_add_imm_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.immediate
+            );
+
+        case static_cast<uint8_t>(Opcode::MulImm64):
+            return jit_instruction::jit_emit_mul_imm_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.immediate
+            );
+
+        case static_cast<uint8_t>(Opcode::ShloLImm64):
+            return jit_instruction::jit_emit_shl_imm_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint8_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::ShloRImm64):
+            return jit_instruction::jit_emit_shr_imm_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint8_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::SharRImm64):
+            return jit_instruction::jit_emit_sar_imm_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint8_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::NegAddImm64):
+            // NegAddImm64: ra = rb - value (negated addition)
+            return jit_instruction::jit_emit_sub_imm(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint64_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::ShloLImmAlt64):
+            return jit_instruction::jit_emit_shl_imm_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint8_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::ShloRImmAlt64):
+            return jit_instruction::jit_emit_shr_imm_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint8_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::SharRImmAlt64):
+            return jit_instruction::jit_emit_sar_imm_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint8_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::RotR64Imm):
+            return jit_instruction::jit_emit_rot_r_imm_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint8_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::RotR64ImmAlt):
+            return jit_instruction::jit_emit_rot_r_imm_64(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint8_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::RotR32Imm):
+            return jit_instruction::jit_emit_rot_r_imm_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint8_t>(decoded.immediate)
+            );
+
+        case static_cast<uint8_t>(Opcode::RotR32ImmAlt):
+            return jit_instruction::jit_emit_rot_r_imm_32(
+                assembler, target_arch,
+                decoded.dest_reg,
+                static_cast<uint8_t>(decoded.immediate)
             );
 
         case static_cast<uint8_t>(Opcode::LoadU8):
@@ -1618,6 +1988,134 @@ bool emit_basic_block_instructions(
 
             case static_cast<uint8_t>(Opcode::BranchGtSImm):
                 decoded_ok = decode_branch_gt_s_imm(bytecode, current_pc, decoded);
+                break;
+
+            // 32-bit Immediate instructions (opcodes 131-148)
+            // Format: [opcode][ra][rb][value_32bit]
+            case static_cast<uint8_t>(Opcode::AddImm32):
+                decoded_ok = decode_add_imm_32(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::AndImm):
+                decoded_ok = decode_and_imm_32(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::XorImm):
+                decoded_ok = decode_xor_imm_32(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::OrImm):
+                decoded_ok = decode_or_imm_32(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::MulImm32):
+                decoded_ok = decode_mul_imm_32(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::SetLtUImm):
+                decoded_ok = decode_set_lt_u_imm(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::SetLtSImm):
+                decoded_ok = decode_set_lt_s_imm(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::ShloLImm32):
+                decoded_ok = decode_shlo_l_imm_32(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::ShloRImm32):
+                decoded_ok = decode_shlo_r_imm_32(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::SharRImm32):
+                decoded_ok = decode_shar_r_imm_32(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::NegAddImm32):
+                decoded_ok = decode_neg_add_imm_32(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::SetGtUImm):
+                decoded_ok = decode_set_gt_u_imm(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::SetGtSImm):
+                decoded_ok = decode_set_gt_s_imm(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::ShloLImmAlt32):
+                decoded_ok = decode_shlo_l_imm_alt_32(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::ShloRImmAlt32):
+                decoded_ok = decode_shlo_r_imm_alt_32(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::SharRImmAlt32):
+                decoded_ok = decode_shar_r_imm_alt_32(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::CmovIzImm):
+                decoded_ok = decode_cmov_iz_imm(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::CmovNzImm):
+                decoded_ok = decode_cmov_nz_imm(bytecode, current_pc, decoded);
+                break;
+
+            // 64-bit Immediate instructions (opcodes 149-161)
+            // Format: [opcode][ra][rb][value_64bit]
+            case static_cast<uint8_t>(Opcode::AddImm64):
+                decoded_ok = decode_add_imm_64(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::MulImm64):
+                decoded_ok = decode_mul_imm_64(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::ShloLImm64):
+                decoded_ok = decode_shlo_l_imm_64(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::ShloRImm64):
+                decoded_ok = decode_shlo_r_imm_64(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::SharRImm64):
+                decoded_ok = decode_shar_r_imm_64(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::NegAddImm64):
+                decoded_ok = decode_neg_add_imm_64(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::ShloLImmAlt64):
+                decoded_ok = decode_shlo_l_imm_alt_64(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::ShloRImmAlt64):
+                decoded_ok = decode_shlo_r_imm_alt_64(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::SharRImmAlt64):
+                decoded_ok = decode_shar_r_imm_alt_64(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::RotR64Imm):
+                decoded_ok = decode_rot_r_64_imm(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::RotR64ImmAlt):
+                decoded_ok = decode_rot_r_64_imm_alt(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::RotR32Imm):
+                decoded_ok = decode_rot_r_32_imm(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::RotR32ImmAlt):
+                decoded_ok = decode_rot_r_32_imm_alt(bytecode, current_pc, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::LoadU8):

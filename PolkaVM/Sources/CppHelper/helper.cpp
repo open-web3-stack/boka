@@ -207,6 +207,47 @@ uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, siz
             instrSize = 7; // 1 + 1 + 1 + 4 = 7 bytes
             break;
 
+        // 32-bit Immediate instructions (opcodes 131-148)
+        // Format: [opcode][ra][rb][value_32bit] = 7 bytes
+        case Opcode::AddImm32:
+        case Opcode::AndImm:
+        case Opcode::XorImm:
+        case Opcode::OrImm:
+        case Opcode::MulImm32:
+        case Opcode::SetLtUImm:
+        case Opcode::SetLtSImm:
+        case Opcode::ShloLImm32:
+        case Opcode::ShloRImm32:
+        case Opcode::SharRImm32:
+        case Opcode::NegAddImm32:
+        case Opcode::SetGtUImm:
+        case Opcode::SetGtSImm:
+        case Opcode::ShloLImmAlt32:
+        case Opcode::ShloRImmAlt32:
+        case Opcode::SharRImmAlt32:
+        case Opcode::CmovIzImm:
+        case Opcode::CmovNzImm:
+            instrSize = 7; // 1 + 1 + 1 + 4 = 7 bytes
+            break;
+
+        // 64-bit Immediate instructions (opcodes 149-161)
+        // Format: [opcode][ra][rb][value_64bit] = 11 bytes
+        case Opcode::AddImm64:
+        case Opcode::MulImm64:
+        case Opcode::ShloLImm64:
+        case Opcode::ShloRImm64:
+        case Opcode::SharRImm64:
+        case Opcode::NegAddImm64:
+        case Opcode::ShloLImmAlt64:
+        case Opcode::ShloRImmAlt64:
+        case Opcode::SharRImmAlt64:
+        case Opcode::RotR64Imm:
+        case Opcode::RotR64ImmAlt:
+        case Opcode::RotR32Imm:
+        case Opcode::RotR32ImmAlt:
+            instrSize = 11; // 1 + 1 + 1 + 8 = 11 bytes
+            break;
+
         // Branch instructions: [opcode][reg1][reg2][offset_32bit] = 7 bytes
         case Opcode::BranchEq:
         case Opcode::BranchNe:
