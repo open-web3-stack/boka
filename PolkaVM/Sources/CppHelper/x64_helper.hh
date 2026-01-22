@@ -32,10 +32,4 @@
 // - rax, r10, r11: Temporary registers for computation
 // - rdi, rsi, rdx, rcx, r8, r9: Parameter passing for function calls
 // - rax: Return value register
-int32_t compilePolkaVMCode_x64(
-    const uint8_t* _Nonnull codeBuffer,
-    size_t codeSize,
-    uint32_t initialPC,
-    uint32_t jitMemorySize,
-    void* _Nullable * _Nonnull funcOut);
 

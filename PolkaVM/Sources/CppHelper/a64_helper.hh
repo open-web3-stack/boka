@@ -32,9 +32,14 @@
 // - x9-x15: Temporary registers for computation
 // - x0-x7: Parameter passing for function calls
 // - x0: Return value register
-int32_t compilePolkaVMCode_a64(
+
+// Label-based compilation with direct jumps for maximum performance
+// Uses single-pass compilation with lazy label creation
+// Same interface as compilePolkaVMCode_a64 but uses labels for control flow
+extern "C" int32_t compilePolkaVMCode_a64_labeled(
     const uint8_t* _Nonnull codeBuffer,
     size_t codeSize,
     uint32_t initialPC,
     uint32_t jitMemorySize,
     void* _Nullable * _Nonnull funcOut);
+
