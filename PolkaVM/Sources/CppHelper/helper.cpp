@@ -156,6 +156,42 @@ uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, siz
             instrSize = InstructionSize::StoreU8;
             break;
 
+        // Store Immediate Indirect instructions (opcodes 70-73)
+        // Format: [opcode][reg_index][address_32bit][value_Nbit]
+        case Opcode::StoreImmIndU8:
+            instrSize = 7; // 1 + 1 + 4 + 1 = 7 bytes
+            break;
+        case Opcode::StoreImmIndU16:
+            instrSize = 8; // 1 + 1 + 4 + 2 = 8 bytes
+            break;
+        case Opcode::StoreImmIndU32:
+            instrSize = 10; // 1 + 1 + 4 + 4 = 10 bytes
+            break;
+        case Opcode::StoreImmIndU64:
+            instrSize = 14; // 1 + 1 + 4 + 8 = 14 bytes
+            break;
+
+        // Store Indirect instructions (opcodes 120-123)
+        // Format: [opcode][src_reg][dest_reg][offset_32bit] = 7 bytes
+        case Opcode::StoreIndU8:
+        case Opcode::StoreIndU16:
+        case Opcode::StoreIndU32:
+        case Opcode::StoreIndU64:
+            instrSize = 7; // 1 + 1 + 1 + 4 = 7 bytes
+            break;
+
+        // Load Indirect instructions (opcodes 124-130)
+        // Format: [opcode][ra][rb][offset_32bit] = 7 bytes
+        case Opcode::LoadIndU8:
+        case Opcode::LoadIndI8:
+        case Opcode::LoadIndU16:
+        case Opcode::LoadIndI16:
+        case Opcode::LoadIndU32:
+        case Opcode::LoadIndI32:
+        case Opcode::LoadIndU64:
+            instrSize = 7; // 1 + 1 + 1 + 4 = 7 bytes
+            break;
+
         // Branch instructions: [opcode][reg1][reg2][offset_32bit] = 7 bytes
         case Opcode::BranchEq:
         case Opcode::BranchNe:
