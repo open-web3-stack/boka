@@ -403,6 +403,55 @@ bool decode_load_ind_u64(const uint8_t* bytecode, uint32_t pc, DecodedInstructio
     return true;
 }
 
+// Decode BranchEqImm instruction (opcode 81)
+// Format: [opcode][reg_index][value_64bit][offset_32bit]
+bool decode_branch_eq_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // reg_index
+    decoded.immediate = *reinterpret_cast<const uint64_t*>(&bytecode[pc + 2]);
+    decoded.offset = *reinterpret_cast<const int32_t*>(&bytecode[pc + 10]);
+    decoded.target_pc = pc + 13 + static_cast<uint32_t>(decoded.offset);
+    decoded.size = 14; // 1 + 1 + 8 + 4 = 14 bytes
+    return true;
+}
+
+// The remaining BranchImm opcodes (82-90) have the same format
+bool decode_branch_ne_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_branch_eq_imm(bytecode, pc, decoded);
+}
+
+bool decode_branch_lt_u_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_branch_eq_imm(bytecode, pc, decoded);
+}
+
+bool decode_branch_le_u_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_branch_eq_imm(bytecode, pc, decoded);
+}
+
+bool decode_branch_ge_u_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_branch_eq_imm(bytecode, pc, decoded);
+}
+
+bool decode_branch_gt_u_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_branch_eq_imm(bytecode, pc, decoded);
+}
+
+bool decode_branch_lt_s_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_branch_eq_imm(bytecode, pc, decoded);
+}
+
+bool decode_branch_le_s_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_branch_eq_imm(bytecode, pc, decoded);
+}
+
+bool decode_branch_ge_s_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_branch_eq_imm(bytecode, pc, decoded);
+}
+
+bool decode_branch_gt_s_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    return decode_branch_eq_imm(bytecode, pc, decoded);
+}
+
 // Decode JumpInd instruction (opcode 50)
 bool decode_jump_ind(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
@@ -686,6 +735,96 @@ bool emit_instruction_decoded(
                 decoded.dest_reg,      // ra (register to load immediate into)
                 static_cast<uint32_t>(decoded.immediate),  // immediate value
                 decoded.offset         // PC-relative offset
+            );
+
+        // Branch Immediate instructions (opcodes 81-90)
+        // Format: [opcode][reg_index][value_64bit][offset_32bit]
+        case static_cast<uint8_t>(Opcode::BranchEqImm):
+            return jit_instruction::jit_emit_branch_eq_imm(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.immediate,
+                decoded.target_pc
+            );
+
+        case static_cast<uint8_t>(Opcode::BranchNeImm):
+            return jit_instruction::jit_emit_branch_ne_imm(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.immediate,
+                decoded.target_pc
+            );
+
+        case static_cast<uint8_t>(Opcode::BranchLtUImm):
+            return jit_instruction::jit_emit_branch_lt_u_imm(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.immediate,
+                decoded.target_pc
+            );
+
+        case static_cast<uint8_t>(Opcode::BranchLeUImm):
+            // BranchLeUImm: branch if reg <= value (unsigned)
+            // Implemented as: branch if value >= reg (swap operands)
+            return jit_instruction::jit_emit_branch_gt_u_imm(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.immediate,
+                decoded.target_pc
+            );
+
+        case static_cast<uint8_t>(Opcode::BranchGeUImm):
+            // BranchGeUImm: branch if reg >= value (unsigned)
+            // Implemented as: branch if value <= reg (swap operands)
+            return jit_instruction::jit_emit_branch_lt_u_imm(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.immediate,
+                decoded.target_pc
+            );
+
+        case static_cast<uint8_t>(Opcode::BranchGtUImm):
+            return jit_instruction::jit_emit_branch_gt_u_imm(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.immediate,
+                decoded.target_pc
+            );
+
+        case static_cast<uint8_t>(Opcode::BranchLtSImm):
+            return jit_instruction::jit_emit_branch_lt_imm(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.immediate,
+                decoded.target_pc
+            );
+
+        case static_cast<uint8_t>(Opcode::BranchLeSImm):
+            // BranchLeSImm: branch if reg <= value (signed)
+            // Implemented as: branch if value >= reg (swap operands)
+            return jit_instruction::jit_emit_branch_gt_imm(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.immediate,
+                decoded.target_pc
+            );
+
+        case static_cast<uint8_t>(Opcode::BranchGeSImm):
+            // BranchGeSImm: branch if reg >= value (signed)
+            // Implemented as: branch if value <= reg (swap operands)
+            return jit_instruction::jit_emit_branch_lt_imm(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.immediate,
+                decoded.target_pc
+            );
+
+        case static_cast<uint8_t>(Opcode::BranchGtSImm):
+            return jit_instruction::jit_emit_branch_gt_imm(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.immediate,
+                decoded.target_pc
             );
 
         case static_cast<uint8_t>(Opcode::LoadU8):
@@ -1437,6 +1576,48 @@ bool emit_basic_block_instructions(
 
             case static_cast<uint8_t>(Opcode::LoadImmJump):
                 decoded_ok = decode_load_imm_jump(bytecode, current_pc, decoded);
+                break;
+
+            // Branch Immediate instructions (opcodes 81-90)
+            // Format: [opcode][reg_index][value_64bit][offset_32bit]
+            case static_cast<uint8_t>(Opcode::BranchEqImm):
+                decoded_ok = decode_branch_eq_imm(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::BranchNeImm):
+                decoded_ok = decode_branch_ne_imm(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::BranchLtUImm):
+                decoded_ok = decode_branch_lt_u_imm(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::BranchLeUImm):
+                decoded_ok = decode_branch_le_u_imm(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::BranchGeUImm):
+                decoded_ok = decode_branch_ge_u_imm(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::BranchGtUImm):
+                decoded_ok = decode_branch_gt_u_imm(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::BranchLtSImm):
+                decoded_ok = decode_branch_lt_s_imm(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::BranchLeSImm):
+                decoded_ok = decode_branch_le_s_imm(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::BranchGeSImm):
+                decoded_ok = decode_branch_ge_s_imm(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::BranchGtSImm):
+                decoded_ok = decode_branch_gt_s_imm(bytecode, current_pc, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::LoadU8):
