@@ -49,10 +49,10 @@ template <typename T> T *getTypedAssembler(void *assembler, const char *targetAr
 
 // Gas accounting
 bool jit_emitGasAccounting(
-    void *assembler,
-    const char *target_arch,
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
     uint64_t gas_cost,
-    void *gas_ptr) noexcept
+    void* _Nonnull gas_ptr) noexcept
 {
     std::string arch(target_arch);
 
@@ -112,7 +112,7 @@ bool jit_emitGasAccounting(
 
 // Generate trap instruction
 namespace jit_instruction {
-    bool jit_generateTrap(void *assembler, const char *target_arch) noexcept
+    bool jit_generateTrap(void* _Nonnull assembler, const char* _Nonnull target_arch) noexcept
     {
         std::string arch(target_arch);
 
@@ -139,7 +139,7 @@ namespace jit_instruction {
 }
 
 // Generate jump instruction (direct)
-bool jit_generateJump(void *assembler, const char *target_arch, uint32_t target_pc) noexcept
+bool jit_generateJump(void* _Nonnull assembler, const char* _Nonnull target_arch, uint32_t target_pc) noexcept
 {
     std::string arch(target_arch);
 
@@ -179,7 +179,7 @@ bool jit_generateJump(void *assembler, const char *target_arch, uint32_t target_
 }
 
 // Generate jump indirect instruction
-bool jit_generateJumpIndirect(void *assembler, const char *target_arch, uint8_t reg_index) noexcept
+bool jit_generateJumpIndirect(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t reg_index) noexcept
 {
     std::string arch(target_arch);
 
@@ -229,7 +229,7 @@ bool jit_generateJumpIndirect(void *assembler, const char *target_arch, uint8_t 
 }
 
 // Generate ecalli instruction (calls into host)
-bool jit_generateEcalli(void *assembler, const char *target_arch, uint32_t func_idx, void *gas_ptr) noexcept
+bool jit_generateEcalli(void* _Nonnull assembler, const char* _Nonnull target_arch, uint32_t func_idx, void* _Nonnull gas_ptr) noexcept
 {
     std::string arch(target_arch);
 
@@ -329,8 +329,8 @@ bool jit_generateEcalli(void *assembler, const char *target_arch, uint32_t func_
 
 // Generate load immediate and jump
 bool jit_generateLoadImmJump(
-    void *assembler,
-    const char *target_arch,
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
     uint8_t dest_reg,
     uint32_t immediate,
     uint32_t target_pc) noexcept
@@ -390,8 +390,8 @@ bool jit_generateLoadImmJump(
 
 // Generate load immediate and jump indirect
 bool jit_generateLoadImmJumpInd(
-    void *assembler,
-    const char *target_arch,
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
     uint8_t dest_reg,
     uint32_t immediate,
     uint8_t jump_reg) noexcept

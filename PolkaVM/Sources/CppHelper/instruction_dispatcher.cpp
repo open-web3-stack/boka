@@ -231,6 +231,18 @@ bool decode_jump_ind(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& d
     return true;
 }
 
+// Decode LoadImmJumpInd instruction (opcode 180)
+bool decode_load_imm_jump_ind(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][ra][rb][value_32bit][offset_32bit]
+    decoded.dest_reg = bytecode[pc + 1];     // ra
+    decoded.src1_reg = bytecode[pc + 2];     // rb
+    decoded.immediate = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 3]);  // value
+    decoded.target_pc = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 7]);  // offset (used as jump target)
+    decoded.size = 11; // 1 + 1 + 1 + 4 + 4 = 11 bytes
+    return true;
+}
+
 // Decode StoreU8 instruction (opcode 59)
 bool decode_store_u8(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
@@ -1008,6 +1020,10 @@ bool emit_basic_block_instructions(
 
             case static_cast<uint8_t>(Opcode::JumpInd):
                 decoded_ok = decode_jump_ind(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::LoadImmJumpInd):
+                decoded_ok = decode_load_imm_jump_ind(bytecode, current_pc, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::LoadImm):

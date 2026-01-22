@@ -132,6 +132,11 @@ uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, siz
             instrSize = InstructionSize::LoadImmJump;
             break;
 
+        // LoadImmJumpInd: [opcode][ra][rb][value_32bit][offset_32bit] = 11 bytes
+        case Opcode::LoadImmJumpInd:
+            instrSize = 11; // 1 + 1 + 1 + 4 + 4 = 11 bytes
+            break;
+
         // Load instructions: [opcode][reg_index][address_32bit] = 6 bytes
         case Opcode::LoadU8:
         case Opcode::LoadI8:
