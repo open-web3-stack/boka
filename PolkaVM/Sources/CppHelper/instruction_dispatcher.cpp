@@ -1234,105 +1234,94 @@ bool emit_instruction_decoded(
         case static_cast<uint8_t>(Opcode::LoadU8):
             // LoadU8 format: [opcode][reg_index][address_32bit]
             // PVM uses direct addressing (no ptr_reg), base register is implicit
-            return jit_instruction::jit_emit_load_u8(
+            return jit_instruction::jit_emit_load_u8_direct(
                 assembler, target_arch,
                 decoded.dest_reg,
-                0,  // ptr_reg (0 = no base register, use direct addressing)
-                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+                decoded.address
             );
 
         case static_cast<uint8_t>(Opcode::LoadI8):
             // LoadI8 format: [opcode][reg_index][address_32bit]
-            return jit_instruction::jit_emit_load_i8(
+            return jit_instruction::jit_emit_load_i8_direct(
                 assembler, target_arch,
                 decoded.dest_reg,
-                0,  // ptr_reg (0 = direct addressing)
-                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+                decoded.address
             );
 
         case static_cast<uint8_t>(Opcode::LoadU16):
             // LoadU16 format: [opcode][reg_index][address_32bit]
-            return jit_instruction::jit_emit_load_u16(
+            return jit_instruction::jit_emit_load_u16_direct(
                 assembler, target_arch,
                 decoded.dest_reg,
-                0,  // ptr_reg (0 = direct addressing)
-                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+                decoded.address
             );
 
         case static_cast<uint8_t>(Opcode::LoadI16):
             // LoadI16 format: [opcode][reg_index][address_32bit]
-            return jit_instruction::jit_emit_load_i16(
+            return jit_instruction::jit_emit_load_i16_direct(
                 assembler, target_arch,
                 decoded.dest_reg,
-                0,  // ptr_reg (0 = direct addressing)
-                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+                decoded.address
             );
 
         case static_cast<uint8_t>(Opcode::LoadU32):
             // LoadU32 format: [opcode][reg_index][address_32bit]
-            return jit_instruction::jit_emit_load_u32(
+            return jit_instruction::jit_emit_load_u32_direct(
                 assembler, target_arch,
                 decoded.dest_reg,
-                0,  // ptr_reg (0 = direct addressing)
-                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+                decoded.address
             );
 
         case static_cast<uint8_t>(Opcode::LoadI32):
             // LoadI32 format: [opcode][reg_index][address_32bit]
-            return jit_instruction::jit_emit_load_i32(
+            return jit_instruction::jit_emit_load_i32_direct(
                 assembler, target_arch,
                 decoded.dest_reg,
-                0,  // ptr_reg (0 = direct addressing)
-                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+                decoded.address
             );
 
         case static_cast<uint8_t>(Opcode::LoadU64):
             // LoadU64 format: [opcode][reg_index][address_32bit]
-            return jit_instruction::jit_emit_load_u64(
+            return jit_instruction::jit_emit_load_u64_direct(
                 assembler, target_arch,
                 decoded.dest_reg,
-                0,  // ptr_reg (0 = direct addressing)
-                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+                decoded.address
             );
 
         case static_cast<uint8_t>(Opcode::StoreU8):
             // StoreU8 format: [opcode][reg_index][address_32bit]
             // PVM uses direct addressing (no ptr_reg), base register is implicit
-            return jit_instruction::jit_emit_store_8(
+            return jit_instruction::jit_emit_store_u8_direct(
                 assembler, target_arch,
-                0,  // ptr_reg (0 = no base register, use direct addressing)
-                decoded.dest_reg,
-                decoded.address
+                decoded.address,
+                decoded.dest_reg
             );
 
         case static_cast<uint8_t>(Opcode::StoreU16):
             // StoreU16 format: [opcode][reg_index][address_32bit]
             // PVM uses direct addressing (no ptr_reg), base register is implicit
-            return jit_instruction::jit_emit_store_16(
+            return jit_instruction::jit_emit_store_u16_direct(
                 assembler, target_arch,
-                0,  // ptr_reg (0 = no base register, use direct addressing)
-                decoded.dest_reg,
-                decoded.address
+                decoded.address,
+                decoded.dest_reg
             );
 
         case static_cast<uint8_t>(Opcode::StoreU32):
             // StoreU32 format: [opcode][reg_index][address_32bit]
             // PVM uses direct addressing (no ptr_reg), base register is implicit
-            return jit_instruction::jit_emit_store_32(
+            return jit_instruction::jit_emit_store_u32_direct(
                 assembler, target_arch,
-                0,  // ptr_reg (0 = no base register, use direct addressing)
-                decoded.dest_reg,
-                decoded.address
+                decoded.address,
+                decoded.dest_reg
             );
 
         case static_cast<uint8_t>(Opcode::StoreU64):
             // StoreU64 format: [opcode][reg_index][address_32bit]
             // PVM uses direct addressing (no ptr_reg), base register is implicit
-            return jit_instruction::jit_emit_store_64(
+            return jit_instruction::jit_emit_store_u64_direct(
                 assembler, target_arch,
-                0,  // ptr_reg (0 = no base register, use direct addressing)
-                decoded.dest_reg,
-                decoded.address
+                decoded.address,
+                decoded.dest_reg
             );
 
         // Store Immediate Indirect instructions (opcodes 70-73)
