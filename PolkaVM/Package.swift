@@ -39,7 +39,7 @@ let package = Package(
                     "-Xcc", "-std=c++20",
                     "-Xcc", "-I/usr/include/c++/13",
                     "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13",
-                    "-Xcc", "-I/home/ubuntu/boka/PolkaVM/Sources/asmjit"
+                    "-Xcc", "-I../asmjit"
                 ]),
             ]
         ),
@@ -59,7 +59,7 @@ let package = Package(
                     "-Xcc", "-std=c++20",
                     "-Xcc", "-I/usr/include/c++/13",
                     "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13",
-                    "-Xcc", "-I/home/ubuntu/boka/PolkaVM/Sources/asmjit"
+                    "-Xcc", "-I../asmjit"
                 ]),
             ]
         ),
@@ -76,7 +76,7 @@ let package = Package(
                     "-Xcc", "-std=c++20",
                     "-Xcc", "-I/usr/include/c++/13",
                     "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13",
-                    "-Xcc", "-I/home/ubuntu/boka/PolkaVM/Sources/asmjit"
+                    "-Xcc", "-I../../Sources/asmjit"
                 ]),
             ]
         ),
