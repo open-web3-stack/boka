@@ -137,6 +137,21 @@ uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, siz
             instrSize = 11; // 1 + 1 + 1 + 4 + 4 = 11 bytes
             break;
 
+        // Branch Immediate instructions (opcodes 81-90)
+        // Format: [opcode][reg_index][value_64bit][offset_32bit] = 14 bytes
+        case Opcode::BranchEqImm:
+        case Opcode::BranchNeImm:
+        case Opcode::BranchLtUImm:
+        case Opcode::BranchLeUImm:
+        case Opcode::BranchGeUImm:
+        case Opcode::BranchGtUImm:
+        case Opcode::BranchLtSImm:
+        case Opcode::BranchLeSImm:
+        case Opcode::BranchGeSImm:
+        case Opcode::BranchGtSImm:
+            instrSize = 14; // 1 + 1 + 8 + 4 = 14 bytes
+            break;
+
         // Load instructions: [opcode][reg_index][address_32bit] = 6 bytes
         case Opcode::LoadU8:
         case Opcode::LoadI8:
