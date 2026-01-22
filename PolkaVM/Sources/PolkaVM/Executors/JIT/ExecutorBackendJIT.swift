@@ -469,7 +469,11 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 jitHostFunctionTablePtr.pointee.dispatcherJumpTable = table
                 jitHostFunctionTablePtr.pointee.dispatcherJumpTableSize = dispatcherTableSize
             } else {
-                logger.warning("No dispatcher table found for compiled function - JumpInd may fall back to interpreter")
+                if JITPlatform.getCurrentTargetArchitecture() == .arm64 {
+                    logger.debug("No dispatcher table found for compiled function (expected on ARM64)")
+                } else {
+                    logger.warning("No dispatcher table found for compiled function - JumpInd may fall back to interpreter")
+                }
             }
 
             var registers = Registers(config: config, argumentData: argumentData)
