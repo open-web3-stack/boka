@@ -614,4 +614,64 @@ struct CrossModeParityTests {
         // Run with low gas
         try await runAndCompare(blob: blob, gas: Gas(50))
     }
+
+    @Test func testBitwiseOperations() async throws {
+        // Test AND, OR, XOR operations
+        let blob = ParityInstructionBuilder()
+            .loadImm(destReg: 0, value: 0xFF)   // R0 = 0xFF
+            .loadImm(destReg: 1, value: 0x0F)   // R1 = 0x0F
+            .and(rd: 2, ra: 0, rb: 1)           // R2 = 0xFF & 0x0F = 0x0F
+            .or(rd: 3, ra: 0, rb: 1)            // R3 = 0xFF | 0x0F = 0xFF
+            .xor(rd: 4, ra: 0, rb: 1)           // R4 = 0xFF ^ 0x0F = 0xF0
+            .appendRegisterDump(baseAddress: 0x10000)
+            .buildBlob()
+
+        try await runAndCompare(blob: blob)
+    }
+
+    @Test func testComparisonBranches() async throws {
+        // Test branch taken and not taken
+        let blob = ParityInstructionBuilder()
+            .loadImm(destReg: 0, value: 5)
+            .loadImm(destReg: 1, value: 5)
+            // Test: if R0 == R1 goto target (5 == 5, branch taken)
+            .branchEq(r1: 0, r2: 1, offset: 6)  // Will branch
+            .loadImm(destReg: 2, value: 99)   // Skipped
+            .loadImm(destReg: 3, value: 42)   // Executed
+            .appendRegisterDump(baseAddress: 0x10000)
+            .buildBlob()
+
+        try await runAndCompare(blob: blob)
+    }
+
+    @Test func test64BitOperations() async throws {
+        // Test 64-bit arithmetic
+        let blob = ParityInstructionBuilder()
+            .loadImmU64(destReg: 0, value: 0x0000000100000001)  // R0 = 2^32 + 1
+            .loadImmU64(destReg: 1, value: 0xFFFFFFFFFFFFFFFF)  // R1 = -1
+            .add64(rd: 2, ra: 0, rb: 1)           // R2 = (2^32+1) + (-1) = 2^32
+            .sub64(rd: 3, ra: 0, rb: 1)           // R3 = (2^32+1) - (-1)
+            .appendRegisterDump(baseAddress: 0x10000)
+            .buildBlob()
+
+        try await runAndCompare(blob: blob)
+    }
+
+    @Test func testMultipleOperations() async throws {
+        // Complex test with mixed operations
+        let blob = ParityInstructionBuilder()
+            .loadImm(destReg: 0, value: 10)
+            .loadImm(destReg: 1, value: 20)
+            .add32(rd: 2, ra: 0, rb: 1)          // R2 = 30
+            .loadImm(destReg: 3, value: 3)
+            .mul32(rd: 4, ra: 2, rb: 3)          // R4 = 90
+            .loadImm(destReg: 5, value: 0xFF)
+            .and(rd: 6, ra: 4, rb: 5)           // R6 = 90 & 0xFF = 90
+            .loadImm(destReg: 7, value: 0x0F)
+            .or(rd: 8, ra: 6, rb: 7)            // R8 = 90 | 0x0F = 0x9F
+            .appendRegisterDump(baseAddress: 0x10000)
+            .buildBlob()
+
+        try await runAndCompare(blob: blob)
+    }
 }
