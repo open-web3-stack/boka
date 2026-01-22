@@ -195,10 +195,10 @@ bool jit_emit_ret(void* _Nonnull assembler, const char* _Nonnull target_arch);
 // Branch instructions
 bool jit_emit_branch_eq(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t src1_reg, uint8_t src2_reg, uint32_t target_pc);
 bool jit_emit_branch_ne(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t src1_reg, uint8_t src2_reg, uint32_t target_pc);
-bool jit_emit_branch_lt(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t reg1, uint8_t reg2, int32_t offset);
-bool jit_emit_branch_lt_u(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t reg1, uint8_t reg2, int32_t offset);
-bool jit_emit_branch_gt(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t reg1, uint8_t reg2, int32_t offset);
-bool jit_emit_branch_gt_u(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t reg1, uint8_t reg2, int32_t offset);
+bool jit_emit_branch_lt(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t reg1, uint8_t reg2, uint32_t target_pc);
+bool jit_emit_branch_lt_u(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t reg1, uint8_t reg2, uint32_t target_pc);
+bool jit_emit_branch_gt(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t reg1, uint8_t reg2, uint32_t target_pc);
+bool jit_emit_branch_gt_u(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t reg1, uint8_t reg2, uint32_t target_pc);
 bool jit_emit_branch_eq_imm(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t reg, uint64_t value, int32_t offset);
 bool jit_emit_branch_ne_imm(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t reg, uint64_t value, int32_t offset);
 bool jit_emit_branch_lt_imm(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t reg, int64_t value, int32_t offset);

@@ -2060,7 +2060,9 @@ bool jit_emit_branch_ne(
 bool jit_emit_load_imm_jump(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
-    uint32_t immediate)
+    uint8_t dest_reg,
+    uint32_t value,
+    int32_t offset)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
         return false;
@@ -2068,8 +2070,15 @@ bool jit_emit_load_imm_jump(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load immediate into PC register (jump to immediate)
-    a->mov(x86::r15d, immediate);
+    // Load immediate into destination register
+    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::eax, value);
+    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+
+    // Jump to target (PC-relative)
+    // TODO: Need proper label handling for jumps
+    // For now, just load the offset into PC
+    a->add(x86::r15d, offset);
 
     return true;
 }
