@@ -2906,8 +2906,8 @@ bool jit_generateEcalli(
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
-        // TODO: Implement for ARM64
-        // ARM64 support for ecalli is not yet implemented
+        // NOTE: ARM64 ecalli not yet implemented in this legacy function
+        // ARM64 labeled JIT (compilePolkaVMCode_a64_labeled) should be used instead
         return false;
     }
     return false;

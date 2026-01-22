@@ -63,8 +63,9 @@ bool jit_emit_store_u16_direct(void* _Nonnull assembler, const char* _Nonnull ta
 bool jit_emit_store_u32_direct(void* _Nonnull assembler, const char* _Nonnull target_arch, uint32_t address, uint8_t src_reg);
 bool jit_emit_store_u64_direct(void* _Nonnull assembler, const char* _Nonnull target_arch, uint32_t address, uint8_t src_reg);
 
-// Store immediate instructions - NOT IMPLEMENTED, use store_u* instead
-// TODO: Implement store_imm functions or update dispatcher to use store_u* with immediate loading
+// Store immediate instructions - Use *_direct variants instead
+// NOTE: StoreImm* instructions handled via *_direct functions which support full 32-bit addresses
+// Legacy dispatcher doesn't implement these - use labeled JIT instead
 
 // 32-bit arithmetic instructions
 bool jit_emit_add_32(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t src_reg);
