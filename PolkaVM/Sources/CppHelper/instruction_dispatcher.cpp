@@ -236,6 +236,173 @@ bool decode_store_imm_u64(const uint8_t* bytecode, uint32_t pc, DecodedInstructi
     return true;
 }
 
+// Decode StoreImmIndU8 instruction (opcode 70)
+// Format: [opcode][reg_index][address_32bit][value_8bit]
+// Address and value share 32 bits: 16-bit address offset + 8-bit value
+bool decode_store_imm_ind_u8(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // reg_index
+    // Combined 32-bit field: [16-bit address][16-bit padding/value]
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
+    decoded.immediate = bytecode[pc + 6];  // 8-bit value
+    decoded.size = 7; // 1 + 1 + 4 + 1 = 7 bytes
+    return true;
+}
+
+// Decode StoreImmIndU16 instruction (opcode 71)
+// Format: [opcode][reg_index][address_32bit][value_16bit]
+bool decode_store_imm_ind_u16(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // reg_index
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
+    decoded.immediate = *reinterpret_cast<const uint16_t*>(&bytecode[pc + 6]);
+    decoded.size = 8; // 1 + 1 + 4 + 2 = 8 bytes
+    return true;
+}
+
+// Decode StoreImmIndU32 instruction (opcode 72)
+// Format: [opcode][reg_index][address_32bit][value_32bit]
+bool decode_store_imm_ind_u32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // reg_index
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
+    decoded.immediate = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 6]);
+    decoded.size = 10; // 1 + 1 + 4 + 4 = 10 bytes
+    return true;
+}
+
+// Decode StoreImmIndU64 instruction (opcode 73)
+// Format: [opcode][reg_index][address_32bit][value_64bit]
+bool decode_store_imm_ind_u64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // reg_index
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
+    decoded.immediate = *reinterpret_cast<const uint64_t*>(&bytecode[pc + 6]);
+    decoded.size = 14; // 1 + 1 + 4 + 8 = 14 bytes
+    return true;
+}
+
+// Decode StoreIndU8 instruction (opcode 120)
+// Format: [opcode][src_reg][dest_reg][offset_32bit]
+bool decode_store_ind_u8(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // src_reg (value to store)
+    decoded.src1_reg = bytecode[pc + 2];  // dest_reg (base address)
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 3]);
+    decoded.size = 7; // 1 + 1 + 1 + 4 = 7 bytes
+    return true;
+}
+
+// Decode StoreIndU16 instruction (opcode 121)
+// Same format as StoreIndU8
+bool decode_store_ind_u16(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // src_reg
+    decoded.src1_reg = bytecode[pc + 2];  // dest_reg
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 3]);
+    decoded.size = 7;
+    return true;
+}
+
+// Decode StoreIndU32 instruction (opcode 122)
+// Same format as StoreIndU8
+bool decode_store_ind_u32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // src_reg
+    decoded.src1_reg = bytecode[pc + 2];  // dest_reg
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 3]);
+    decoded.size = 7;
+    return true;
+}
+
+// Decode StoreIndU64 instruction (opcode 123)
+// Same format as StoreIndU8
+bool decode_store_ind_u64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // src_reg
+    decoded.src1_reg = bytecode[pc + 2];  // dest_reg
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 3]);
+    decoded.size = 7;
+    return true;
+}
+
+// Decode LoadIndU8 instruction (opcode 124)
+// Format: [opcode][ra][rb][offset_32bit]
+bool decode_load_ind_u8(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // ra (destination)
+    decoded.src1_reg = bytecode[pc + 2];  // rb (base address)
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 3]);
+    decoded.size = 7; // 1 + 1 + 1 + 4 = 7 bytes
+    return true;
+}
+
+// Decode LoadIndI8 instruction (opcode 125)
+// Same format as LoadIndU8
+bool decode_load_ind_i8(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // ra
+    decoded.src1_reg = bytecode[pc + 2];  // rb
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 3]);
+    decoded.size = 7;
+    return true;
+}
+
+// Decode LoadIndU16 instruction (opcode 126)
+// Same format as LoadIndU8
+bool decode_load_ind_u16(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // ra
+    decoded.src1_reg = bytecode[pc + 2];  // rb
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 3]);
+    decoded.size = 7;
+    return true;
+}
+
+// Decode LoadIndI16 instruction (opcode 127)
+// Same format as LoadIndU8
+bool decode_load_ind_i16(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // ra
+    decoded.src1_reg = bytecode[pc + 2];  // rb
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 3]);
+    decoded.size = 7;
+    return true;
+}
+
+// Decode LoadIndU32 instruction (opcode 128)
+// Same format as LoadIndU8
+bool decode_load_ind_u32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // ra
+    decoded.src1_reg = bytecode[pc + 2];  // rb
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 3]);
+    decoded.size = 7;
+    return true;
+}
+
+// Decode LoadIndI32 instruction (opcode 129)
+// Same format as LoadIndU8
+bool decode_load_ind_i32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // ra
+    decoded.src1_reg = bytecode[pc + 2];  // rb
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 3]);
+    decoded.size = 7;
+    return true;
+}
+
+// Decode LoadIndU64 instruction (opcode 130)
+// Same format as LoadIndU8
+bool decode_load_ind_u64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // ra
+    decoded.src1_reg = bytecode[pc + 2];  // rb
+    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 3]);
+    decoded.size = 7;
+    return true;
+}
+
 // Decode JumpInd instruction (opcode 50)
 bool decode_jump_ind(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
@@ -623,6 +790,148 @@ bool emit_instruction_decoded(
                 0,  // ptr_reg (0 = no base register, use direct addressing)
                 decoded.dest_reg,
                 decoded.address
+            );
+
+        // Store Immediate Indirect instructions (opcodes 70-73)
+        // Format: [opcode][reg_index][address_32bit][value_Nbit]
+        // Store immediate to memory at reg + address
+        case static_cast<uint8_t>(Opcode::StoreImmIndU8):
+            {
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                // Load base address from register
+                a->mov(x86::rax, x86::qword_ptr(rbx, decoded.dest_reg * 8));
+                // Store 8-bit immediate to [rax + address]
+                a->mov(x86::byte_ptr(x86::r12, x86::rax, 1, static_cast<int32_t>(decoded.address)),
+                       static_cast<uint8_t>(decoded.immediate));
+            }
+            return true;
+
+        case static_cast<uint8_t>(Opcode::StoreImmIndU16):
+            {
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                // Load base address from register
+                a->mov(x86::rax, x86::qword_ptr(rbx, decoded.dest_reg * 8));
+                // Store 16-bit immediate to [rax + address]
+                a->mov(x86::word_ptr(x86::r12, x86::rax, 1, static_cast<int32_t>(decoded.address)),
+                       static_cast<uint16_t>(decoded.immediate));
+            }
+            return true;
+
+        case static_cast<uint8_t>(Opcode::StoreImmIndU32):
+            {
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                // Load base address from register
+                a->mov(x86::rax, x86::qword_ptr(rbx, decoded.dest_reg * 8));
+                // Store 32-bit immediate to [rax + address]
+                a->mov(x86::dword_ptr(x86::r12, x86::rax, 1, static_cast<int32_t>(decoded.address)),
+                       static_cast<uint32_t>(decoded.immediate));
+            }
+            return true;
+
+        case static_cast<uint8_t>(Opcode::StoreImmIndU64):
+            {
+                auto* a = static_cast<x86::Assembler*>(assembler);
+                // Load base address from register
+                a->mov(x86::rax, x86::qword_ptr(rbx, decoded.dest_reg * 8));
+                // Store 64-bit immediate to [rax + address]
+                a->mov(x86::qword_ptr(x86::r12, x86::rax, 1, static_cast<int32_t>(decoded.address)),
+                       decoded.immediate);
+            }
+            return true;
+
+        // Store Indirect instructions (opcodes 120-123)
+        // Format: [opcode][src_reg][dest_reg][offset_32bit]
+        // Store src_reg to memory at dest_reg + offset
+        case static_cast<uint8_t>(Opcode::StoreIndU8):
+            // Use existing store_8 with ptr_reg = base register
+            return jit_instruction::jit_emit_store_8(
+                assembler, target_arch,
+                decoded.src1_reg,  // ptr_reg (base address register)
+                decoded.dest_reg,  // src_reg (value to store)
+                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+            );
+
+        case static_cast<uint8_t>(Opcode::StoreIndU16):
+            return jit_instruction::jit_emit_store_16(
+                assembler, target_arch,
+                decoded.src1_reg,  // ptr_reg
+                decoded.dest_reg,  // src_reg
+                static_cast<int16_t>(decoded.address & 0xFFFF)
+            );
+
+        case static_cast<uint8_t>(Opcode::StoreIndU32):
+            return jit_instruction::jit_emit_store_32(
+                assembler, target_arch,
+                decoded.src1_reg,  // ptr_reg
+                decoded.dest_reg,  // src_reg
+                static_cast<int16_t>(decoded.address & 0xFFFF)
+            );
+
+        case static_cast<uint8_t>(Opcode::StoreIndU64):
+            return jit_instruction::jit_emit_store_64(
+                assembler, target_arch,
+                decoded.src1_reg,  // ptr_reg
+                decoded.dest_reg,  // src_reg
+                static_cast<int16_t>(decoded.address & 0xFFFF)
+            );
+
+        // Load Indirect instructions (opcodes 124-130)
+        // Format: [opcode][ra][rb][offset_32bit]
+        // Load from memory at rb + offset into ra
+        case static_cast<uint8_t>(Opcode::LoadIndU8):
+            return jit_instruction::jit_emit_load_u8(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra (destination)
+                decoded.src1_reg,  // ptr_reg (base address = rb)
+                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+            );
+
+        case static_cast<uint8_t>(Opcode::LoadIndI8):
+            return jit_instruction::jit_emit_load_i8(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra
+                decoded.src1_reg,  // ptr_reg (rb)
+                static_cast<int16_t>(decoded.address & 0xFFFF)
+            );
+
+        case static_cast<uint8_t>(Opcode::LoadIndU16):
+            return jit_instruction::jit_emit_load_u16(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra
+                decoded.src1_reg,  // ptr_reg (rb)
+                static_cast<int16_t>(decoded.address & 0xFFFF)
+            );
+
+        case static_cast<uint8_t>(Opcode::LoadIndI16):
+            return jit_instruction::jit_emit_load_i16(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra
+                decoded.src1_reg,  // ptr_reg (rb)
+                static_cast<int16_t>(decoded.address & 0xFFFF)
+            );
+
+        case static_cast<uint8_t>(Opcode::LoadIndU32):
+            return jit_instruction::jit_emit_load_u32(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra
+                decoded.src1_reg,  // ptr_reg (rb)
+                static_cast<int16_t>(decoded.address & 0xFFFF)
+            );
+
+        case static_cast<uint8_t>(Opcode::LoadIndI32):
+            return jit_instruction::jit_emit_load_i32(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra
+                decoded.src1_reg,  // ptr_reg (rb)
+                static_cast<int16_t>(decoded.address & 0xFFFF)
+            );
+
+        case static_cast<uint8_t>(Opcode::LoadIndU64):
+            return jit_instruction::jit_emit_load_u64(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra
+                decoded.src1_reg,  // ptr_reg (rb)
+                static_cast<int16_t>(decoded.address & 0xFFFF)
             );
 
         case 100: // MoveReg
@@ -1172,6 +1481,69 @@ bool emit_basic_block_instructions(
 
             case static_cast<uint8_t>(Opcode::StoreU64):
                 decoded_ok = decode_store_u64(bytecode, current_pc, decoded);
+                break;
+
+            // Store Immediate Indirect instructions (opcodes 70-73)
+            case static_cast<uint8_t>(Opcode::StoreImmIndU8):
+                decoded_ok = decode_store_imm_ind_u8(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::StoreImmIndU16):
+                decoded_ok = decode_store_imm_ind_u16(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::StoreImmIndU32):
+                decoded_ok = decode_store_imm_ind_u32(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::StoreImmIndU64):
+                decoded_ok = decode_store_imm_ind_u64(bytecode, current_pc, decoded);
+                break;
+
+            // Store Indirect instructions (opcodes 120-123)
+            case static_cast<uint8_t>(Opcode::StoreIndU8):
+                decoded_ok = decode_store_ind_u8(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::StoreIndU16):
+                decoded_ok = decode_store_ind_u16(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::StoreIndU32):
+                decoded_ok = decode_store_ind_u32(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::StoreIndU64):
+                decoded_ok = decode_store_ind_u64(bytecode, current_pc, decoded);
+                break;
+
+            // Load Indirect instructions (opcodes 124-130)
+            case static_cast<uint8_t>(Opcode::LoadIndU8):
+                decoded_ok = decode_load_ind_u8(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::LoadIndI8):
+                decoded_ok = decode_load_ind_i8(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::LoadIndU16):
+                decoded_ok = decode_load_ind_u16(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::LoadIndI16):
+                decoded_ok = decode_load_ind_i16(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::LoadIndU32):
+                decoded_ok = decode_load_ind_u32(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::LoadIndI32):
+                decoded_ok = decode_load_ind_i32(bytecode, current_pc, decoded);
+                break;
+
+            case static_cast<uint8_t>(Opcode::LoadIndU64):
+                decoded_ok = decode_load_ind_u64(bytecode, current_pc, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::BranchEq):
