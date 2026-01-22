@@ -2,6 +2,7 @@
 // This file provides the integration layer between Swift bytecode and C++ emitters
 
 #include "jit_instructions.hh"
+#include "helper.hh"
 #include "opcodes.hh"
 #include <asmjit/asmjit.h>
 
@@ -176,7 +177,7 @@ bool decode_jump(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decod
 
     // Format: [opcode][offset_32bit]
     decoded.offset = *reinterpret_cast<const int32_t*>(&bytecode[pc + 1]);
-    decoded.target_pc = pc + 4 + static_cast<uint32_t>(decoded.offset); // PC-relative
+    decoded.target_pc = pc + 5 + static_cast<uint32_t>(decoded.offset); // PC-relative
     decoded.size = 5;
 
     return true;
@@ -410,7 +411,7 @@ bool decode_branch_eq_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstructi
     decoded.dest_reg = bytecode[pc + 1];  // reg_index
     decoded.immediate = *reinterpret_cast<const uint64_t*>(&bytecode[pc + 2]);
     decoded.offset = *reinterpret_cast<const int32_t*>(&bytecode[pc + 10]);
-    decoded.target_pc = pc + 13 + static_cast<uint32_t>(decoded.offset);
+    decoded.target_pc = pc + 14 + static_cast<uint32_t>(decoded.offset);
     decoded.size = 14; // 1 + 1 + 8 + 4 = 14 bytes
     return true;
 }
@@ -773,7 +774,7 @@ bool decode_branch_eq(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& 
     decoded.src1_reg = bytecode[pc + 1];
     decoded.src2_reg = bytecode[pc + 2];
     decoded.offset = *reinterpret_cast<const int32_t*>(&bytecode[pc + 3]);
-    decoded.target_pc = pc + 6 + static_cast<uint32_t>(decoded.offset);
+    decoded.target_pc = pc + 7 + static_cast<uint32_t>(decoded.offset);
     decoded.size = 7;
     return true;
 }
@@ -785,7 +786,7 @@ bool decode_branch_ne(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& 
     decoded.src1_reg = bytecode[pc + 1];
     decoded.src2_reg = bytecode[pc + 2];
     decoded.offset = *reinterpret_cast<const int32_t*>(&bytecode[pc + 3]);
-    decoded.target_pc = pc + 6 + static_cast<uint32_t>(decoded.offset);
+    decoded.target_pc = pc + 7 + static_cast<uint32_t>(decoded.offset);
     decoded.size = 7;
     return true;
 }
@@ -830,8 +831,9 @@ bool emit_instruction_decoded(
 
         case 10: // Ecalli - opcode 10
             // Ecalli uses decoded.immediate for call_index
-            return jit_instruction::jit_emit_ecalli(assembler, target_arch,
-                static_cast<uint32_t>(decoded.immediate));
+            // gas_ptr is passed as nullptr because the JIT implementation uses the VM_GAS_PTR register (r14/x22) directly
+            return jit_instruction::jit_generateEcalli(assembler, target_arch,
+                static_cast<uint32_t>(decoded.immediate), nullptr);
 
         case static_cast<uint8_t>(Opcode::LoadImmU64):
             return jit_instruction::jit_emit_load_imm_64(
@@ -877,7 +879,16 @@ bool emit_instruction_decoded(
                 assembler, target_arch,
                 decoded.dest_reg,      // ra (register to load immediate into)
                 static_cast<uint32_t>(decoded.immediate),  // immediate value
-                decoded.offset         // PC-relative offset
+                decoded.target_pc      // target PC
+            );
+
+        case static_cast<uint8_t>(Opcode::LoadImmJumpInd):
+            return jit_instruction::jit_emit_load_imm_jump_ind(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg,
+                static_cast<uint32_t>(decoded.immediate),
+                decoded.target_pc      // offset
             );
 
         // Branch Immediate instructions (opcodes 81-90)
@@ -907,9 +918,7 @@ bool emit_instruction_decoded(
             );
 
         case static_cast<uint8_t>(Opcode::BranchLeUImm):
-            // BranchLeUImm: branch if reg <= value (unsigned)
-            // Implemented as: branch if value >= reg (swap operands)
-            return jit_instruction::jit_emit_branch_gt_u_imm(
+            return jit_instruction::jit_emit_branch_le_u_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.immediate,
@@ -917,9 +926,7 @@ bool emit_instruction_decoded(
             );
 
         case static_cast<uint8_t>(Opcode::BranchGeUImm):
-            // BranchGeUImm: branch if reg >= value (unsigned)
-            // Implemented as: branch if value <= reg (swap operands)
-            return jit_instruction::jit_emit_branch_lt_u_imm(
+            return jit_instruction::jit_emit_branch_ge_u_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.immediate,
@@ -943,9 +950,7 @@ bool emit_instruction_decoded(
             );
 
         case static_cast<uint8_t>(Opcode::BranchLeSImm):
-            // BranchLeSImm: branch if reg <= value (signed)
-            // Implemented as: branch if value >= reg (swap operands)
-            return jit_instruction::jit_emit_branch_gt_imm(
+            return jit_instruction::jit_emit_branch_le_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.immediate,
@@ -953,9 +958,7 @@ bool emit_instruction_decoded(
             );
 
         case static_cast<uint8_t>(Opcode::BranchGeSImm):
-            // BranchGeSImm: branch if reg >= value (signed)
-            // Implemented as: branch if value <= reg (swap operands)
-            return jit_instruction::jit_emit_branch_lt_imm(
+            return jit_instruction::jit_emit_branch_ge_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.immediate,
@@ -976,6 +979,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_add_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<int32_t>(decoded.immediate)
             );
 
@@ -983,6 +987,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_and_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint32_t>(decoded.immediate)
             );
 
@@ -990,6 +995,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_xor_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint32_t>(decoded.immediate)
             );
 
@@ -997,6 +1003,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_or_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint32_t>(decoded.immediate)
             );
 
@@ -1004,6 +1011,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_mul_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<int32_t>(decoded.immediate)
             );
 
@@ -1011,6 +1019,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_lt_imm_u(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 decoded.immediate
             );
 
@@ -1018,13 +1027,15 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_lt_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
-                decoded.immediate
+                decoded.src1_reg,
+                static_cast<int32_t>(decoded.immediate)
             );
 
         case static_cast<uint8_t>(Opcode::ShloLImm32):
             return jit_instruction::jit_emit_shl_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint8_t>(decoded.immediate)
             );
 
@@ -1032,6 +1043,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_shr_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint8_t>(decoded.immediate)
             );
 
@@ -1039,15 +1051,16 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_sar_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint8_t>(decoded.immediate)
             );
 
         case static_cast<uint8_t>(Opcode::NegAddImm32):
-            // NegAddImm32: ra = rb - value (negated addition)
-            // Implemented as: add(rb, -value) or sub(rb, value)
-            return jit_instruction::jit_emit_sub_imm_32(
+            // NegAddImm32: ra = value - rb (negated addition)
+            return jit_instruction::jit_emit_neg_add_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<int32_t>(decoded.immediate)
             );
 
@@ -1057,6 +1070,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_gt_imm_u(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 decoded.immediate
             );
 
@@ -1065,7 +1079,8 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_gt_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
-                decoded.immediate
+                decoded.src1_reg,
+                static_cast<int32_t>(decoded.immediate)
             );
 
         case static_cast<uint8_t>(Opcode::ShloLImmAlt32):
@@ -1073,6 +1088,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_shl_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint8_t>(decoded.immediate)
             );
 
@@ -1080,6 +1096,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_shr_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint8_t>(decoded.immediate)
             );
 
@@ -1087,21 +1104,25 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_sar_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint8_t>(decoded.immediate)
             );
 
         case static_cast<uint8_t>(Opcode::CmovIzImm):
-            // CmovIzImm: conditional move if zero (immediate variant)
-            // TODO: No direct emitter - needs implementation
-            // For now, emit nop
-            a->nop();
-            return true;
+            return jit_instruction::jit_emit_cmov_iz_imm(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg,
+                static_cast<uint32_t>(decoded.immediate)
+            );
 
         case static_cast<uint8_t>(Opcode::CmovNzImm):
-            // CmovNzImm: conditional move if not zero (immediate variant)
-            // TODO: No direct emitter - needs implementation
-            a->nop();
-            return true;
+            return jit_instruction::jit_emit_cmov_nz_imm(
+                assembler, target_arch,
+                decoded.dest_reg,
+                decoded.src1_reg,
+                static_cast<uint32_t>(decoded.immediate)
+            );
 
         // 64-bit Immediate instructions (opcodes 149-161)
         // Format: [opcode][ra][rb][value_64bit]
@@ -1109,6 +1130,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_add_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 decoded.immediate
             );
 
@@ -1116,6 +1138,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_mul_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 decoded.immediate
             );
 
@@ -1123,6 +1146,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_shl_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint8_t>(decoded.immediate)
             );
 
@@ -1130,6 +1154,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_shr_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint8_t>(decoded.immediate)
             );
 
@@ -1137,21 +1162,24 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_sar_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint8_t>(decoded.immediate)
             );
 
         case static_cast<uint8_t>(Opcode::NegAddImm64):
-            // NegAddImm64: ra = rb - value (negated addition)
-            return jit_instruction::jit_emit_sub_imm(
+            // NegAddImm64: ra = value - rb (negated addition)
+            return jit_instruction::jit_emit_neg_add_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
-                static_cast<uint64_t>(decoded.immediate)
+                decoded.src1_reg,
+                decoded.immediate
             );
 
         case static_cast<uint8_t>(Opcode::ShloLImmAlt64):
             return jit_instruction::jit_emit_shl_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint8_t>(decoded.immediate)
             );
 
@@ -1159,6 +1187,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_shr_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint8_t>(decoded.immediate)
             );
 
@@ -1166,6 +1195,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_sar_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint8_t>(decoded.immediate)
             );
 
@@ -1173,6 +1203,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_rot_r_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint8_t>(decoded.immediate)
             );
 
@@ -1180,6 +1211,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_rot_r_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint8_t>(decoded.immediate)
             );
 
@@ -1187,6 +1219,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_rot_r_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint8_t>(decoded.immediate)
             );
 
@@ -1194,6 +1227,7 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_rot_r_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
+                decoded.src1_reg,
                 static_cast<uint8_t>(decoded.immediate)
             );
 
@@ -1740,9 +1774,12 @@ bool emit_instruction_decoded(
             );
 
         case 213: // MulUpperSS
-            // TODO: Implement jit_emit_mul_upper_s_s
-            a->nop();
-            return true;
+            return jit_instruction::jit_emit_mul_upper_s_s(
+                assembler, target_arch,
+                decoded.dest_reg,  // ra
+                decoded.src1_reg,  // rb
+                decoded.src2_reg   // rd
+            );
 
         case 214: // MulUpperUU
             return jit_instruction::jit_emit_mul_upper_uu(
@@ -1804,7 +1841,8 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_rot_l_32(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
-                decoded.src1_reg   // rb
+                decoded.src1_reg,  // rb
+                decoded.src2_reg   // rd
             );
 
         case 222: // RotR64
@@ -1819,7 +1857,8 @@ bool emit_instruction_decoded(
             return jit_instruction::jit_emit_rot_r_32(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
-                decoded.src1_reg   // rb
+                decoded.src1_reg,  // rb
+                decoded.src2_reg   // rd
             );
 
         case 224: // AndInv
@@ -2307,15 +2346,6 @@ bool emit_basic_block_instructions(
                 decoded_ok = decode_add_64(bytecode, current_pc, decoded);
                 break;
 
-            // 32-bit rotate instructions use 2-register format
-            case static_cast<uint8_t>(Opcode::RotL32):
-                decoded_ok = decode_mul_32(bytecode, current_pc, decoded);
-                break;
-
-            case static_cast<uint8_t>(Opcode::RotR32):
-                decoded_ok = decode_mul_32(bytecode, current_pc, decoded);
-                break;
-
             case 213: // MulUpperSS
             case 214: // MulUpperUU
             case 215: // MulUpperSU
@@ -2324,7 +2354,9 @@ bool emit_basic_block_instructions(
             case 218: // CmovIz
             case 219: // CmovNz
             case 220: // RotL64
+            case 221: // RotL32
             case 222: // RotR64
+            case 223: // RotR32
             case 224: // AndInv
             case 225: // OrInv
             case 226: // Xnor

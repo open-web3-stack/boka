@@ -1,4 +1,5 @@
 #include "instructions.hh"
+#include "helper.hh"
 #include <asmjit/a64.h>
 #include <asmjit/asmjit.h>
 
@@ -185,6 +186,50 @@ inline Gp get_vm_register(uint8_t vm_reg) {
         return vm_reg_map[vm_reg];
     }
     return rax; // Fallback
+}
+
+// Helper to emit exit sequence to dispatcher
+// This restores callee-saved registers and returns to the caller (dispatcher loop)
+// Sets return value (eax/w0) to 0 (Halt/Normal completion)
+void emit_exit_to_dispatcher(void* _Nonnull assembler, const char* _Nonnull target_arch) {
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+        
+        // Set return value to 0 (Halt/Normal completion)
+        a->xor_(x86::eax, x86::eax);
+        
+        // Restore callee-saved registers
+        a->pop(x86::r15);
+        a->pop(x86::r14);
+        a->pop(x86::r13);
+        a->pop(x86::r12);
+        a->pop(x86::rbx);
+        a->pop(x86::rbp);
+        
+        // Return
+        a->ret();
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+        
+        // Set return value to 0 (Halt/Normal completion)
+        a->mov(a64::w0, 0);
+        
+        // Restore callee-saved registers
+        // Note: This must match the prologue in a64_helper.cpp
+        // Prologue:
+        // a.sub(sp, sp, 48);
+        // a.stp(x19, x20, ptr(sp, 0));
+        // a.stp(x21, x22, ptr(sp, 16));
+        // a.stp(x23, x24, ptr(sp, 32));
+        
+        a->ldp(a64::x23, a64::x24, a64::ptr(a64::sp, 32));
+        a->ldp(a64::x21, a64::x22, a64::ptr(a64::sp, 16));
+        a->ldp(a64::x19, a64::x20, a64::ptr(a64::sp, 0));
+        a->add(a64::sp, a64::sp, 48);
+        
+        // Return
+        a->ret(a64::x30);
+    }
 }
 
 // Proof of concept: Implement Trap instruction
@@ -1193,19 +1238,29 @@ bool jit_emit_jump(
     const char* _Nonnull target_arch,
     uint32_t target_pc)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Update PC
+        a->mov(x86::r15d, target_pc);
+
+        // Exit to dispatcher
+        emit_exit_to_dispatcher(assembler, target_arch);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+        
+        // Update PC (x23)
+        a->mov(a64::w23, target_pc);
+        
+        // Exit to dispatcher
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        return true;
     }
-
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Update PC
-    a->mov(x86::r15d, target_pc);
-
-    // Jump to dispatch loop (will be implemented later)
-    // For now, just return to caller
-
-    return true;
+    
+    return false;
 }
 
 // BranchEqImm: Branch if equal to immediate
@@ -1216,24 +1271,62 @@ bool jit_emit_branch_eq_imm(
     uint64_t immediate,
     uint32_t target_pc)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Load immediate into temp register
+        a->mov(x86::rdx, immediate);
+
+        // Compare with immediate
+        a->cmp(x86::rax, x86::rdx);
+
+        // If equal, jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->jne(skipLabel);  // Skip PC update if not equal
+        
+        // Taken path: update PC and exit
+        a->mov(x86::r15d, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp src = a64::x0;
+        a64::Gp imm = a64::x1;
+        a64::Gp pcReg = a64::w23; // PC
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+        a->mov(imm, immediate);
+
+        // Compare registers
+        a->cmp(src, imm);
+
+        // If equal, jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->b_ne(skipLabel);  // Skip PC update if not equal
+        
+        // Taken path: update PC and exit
+        a->mov(pcReg, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
-
-    // Compare with immediate
-    a->cmp(x86::rax, immediate);
-
-    // If equal, jump to target (update PC)
-    // TODO: This needs proper label handling
-    // For now, just update PC unconditionally (stub)
-    a->mov(x86::r15d, target_pc);
-
-    return true;
+    return false;
 }
 
 // BranchNeImm: Branch if not equal to immediate
@@ -1244,24 +1337,62 @@ bool jit_emit_branch_ne_imm(
     uint64_t immediate,
     uint32_t target_pc)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Load immediate into temp register
+        a->mov(x86::rdx, immediate);
+
+        // Compare with immediate
+        a->cmp(x86::rax, x86::rdx);
+
+        // If not equal, jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->je(skipLabel);  // Skip PC update if equal
+        
+        // Taken path: update PC and exit
+        a->mov(x86::r15d, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp src = a64::x0;
+        a64::Gp imm = a64::x1;
+        a64::Gp pcReg = a64::w23; // PC
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+        a->mov(imm, immediate);
+
+        // Compare registers
+        a->cmp(src, imm);
+
+        // If not equal, jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->b_eq(skipLabel);  // Skip PC update if equal
+        
+        // Taken path: update PC and exit
+        a->mov(pcReg, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
-
-    // Compare with immediate
-    a->cmp(x86::rax, immediate);
-
-    // If not equal, jump to target (update PC)
-    // TODO: This needs proper label handling
-    // For now, just update PC unconditionally (stub)
-    a->mov(x86::r15d, target_pc);
-
-    return true;
+    return false;
 }
 
 // DivU32: Unsigned division (32-bit)
@@ -1492,13 +1623,13 @@ bool jit_emit_shlo_l_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (shift count)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
 
     // Load dest register from VM array (value to shift)
     a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
 
     // Mask shift count to 5 bits
-    a->and_(x86::eax, 0x1F);
+    a->and_(x86::ecx, 0x1F);
 
     // Shift left: dest = dest << src
     a->shl(x86::edx, x86::cl);
@@ -1523,13 +1654,13 @@ bool jit_emit_shlo_r_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (shift count)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
 
     // Load dest register from VM array (value to shift)
     a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
 
     // Mask shift count to 5 bits
-    a->and_(x86::eax, 0x1F);
+    a->and_(x86::ecx, 0x1F);
 
     // Shift right logical: dest = dest >> src
     a->shr(x86::edx, x86::cl);
@@ -1554,13 +1685,13 @@ bool jit_emit_shar_r_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (shift count)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
 
     // Load dest register from VM array (value to shift)
     a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
 
     // Mask shift count to 5 bits
-    a->and_(x86::eax, 0x1F);
+    a->and_(x86::ecx, 0x1F);
 
     // Shift right arithmetic: dest = dest >> src (sign-extending)
     a->sar(x86::edx, x86::cl);
@@ -1585,13 +1716,13 @@ bool jit_emit_shlo_l_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (shift count)
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rcx, x86::qword_ptr(rbx, src_reg * 8));
 
     // Load dest register from VM array (value to shift)
     a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
 
     // Mask shift count to 6 bits
-    a->and_(x86::rax, 0x3F);
+    a->and_(x86::rcx, 0x3F);
 
     // Shift left: dest = dest << src
     a->shl(x86::rdx, x86::cl);
@@ -1616,13 +1747,13 @@ bool jit_emit_shlo_r_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (shift count)
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rcx, x86::qword_ptr(rbx, src_reg * 8));
 
     // Load dest register from VM array (value to shift)
     a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
 
     // Mask shift count to 6 bits
-    a->and_(x86::rax, 0x3F);
+    a->and_(x86::rcx, 0x3F);
 
     // Shift right logical: dest = dest >> src
     a->shr(x86::rdx, x86::cl);
@@ -1647,13 +1778,13 @@ bool jit_emit_shar_r_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (shift count)
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rcx, x86::qword_ptr(rbx, src_reg * 8));
 
     // Load dest register from VM array (value to shift)
     a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
 
     // Mask shift count to 6 bits
-    a->and_(x86::rax, 0x3F);
+    a->and_(x86::rcx, 0x3F);
 
     // Shift right arithmetic: dest = dest >> src (sign-extending)
     a->sar(x86::rdx, x86::cl);
@@ -1665,11 +1796,13 @@ bool jit_emit_shar_r_64(
 }
 
 // RotL32: Rotate left (32-bit)
+// rd = ra rotated left by rb bits
 bool jit_emit_rot_l_32(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
-    uint8_t dest_reg,
-    uint8_t src_reg)
+    uint8_t ra,
+    uint8_t rb,
+    uint8_t rd)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
         return false;
@@ -1677,31 +1810,32 @@ bool jit_emit_rot_l_32(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load source register from VM array (shift count)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    // Load rb (shift count) from VM array
+    a->mov(x86::ecx, x86::dword_ptr(rbx, rb * 8));
 
-    // Load dest register from VM array (value to rotate)
-    a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
+    // Load ra (value to rotate) from VM array
+    a->mov(x86::edx, x86::dword_ptr(rbx, ra * 8));
 
     // Mask shift count to 5 bits (x86 requires this for rotate)
-    a->and_(x86::eax, 0x1F);
+    a->and_(x86::ecx, 0x1F);
 
-    // Rotate left through carry: dest = dest << src | dest >> (32 - src)
-    // Using rol instruction which does the full rotation
+    // Rotate left
     a->rol(x86::edx, x86::cl);
 
-    // Store result back to VM register array
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::edx);
+    // Store result to rd in VM register array
+    a->mov(x86::dword_ptr(rbx, rd * 8), x86::edx);
 
     return true;
 }
 
 // RotR32: Rotate right (32-bit)
+// rd = ra rotated right by rb bits
 bool jit_emit_rot_r_32(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
-    uint8_t dest_reg,
-    uint8_t src_reg)
+    uint8_t ra,
+    uint8_t rb,
+    uint8_t rd)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
         return false;
@@ -1709,21 +1843,20 @@ bool jit_emit_rot_r_32(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load source register from VM array (shift count)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    // Load rb (shift count) from VM array
+    a->mov(x86::ecx, x86::dword_ptr(rbx, rb * 8));
 
-    // Load dest register from VM array (value to rotate)
-    a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
+    // Load ra (value to rotate) from VM array
+    a->mov(x86::edx, x86::dword_ptr(rbx, ra * 8));
 
     // Mask shift count to 5 bits (x86 requires this for rotate)
-    a->and_(x86::eax, 0x1F);
+    a->and_(x86::ecx, 0x1F);
 
-    // Rotate right through carry: dest = dest >> src | dest << (32 - src)
-    // Using ror instruction which does the full rotation
+    // Rotate right
     a->ror(x86::edx, x86::cl);
 
-    // Store result back to VM register array
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::edx);
+    // Store result to rd in VM register array
+    a->mov(x86::dword_ptr(rbx, rd * 8), x86::edx);
 
     return true;
 }
@@ -1962,11 +2095,15 @@ bool jit_emit_branch_eq(
         // Compare registers
         a->cmp(x86::rax, x86::rdx);
 
-        // If equal, jump to target (update PC)
+        // If equal, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
         Label skipLabel = a->new_label();
         a->jne(skipLabel);  // Skip PC update if not equal
-        a->mov(x86::r15d, target_pc);  // Only update PC if equal
+        
+        // Taken path: update PC and exit
+        a->mov(x86::r15d, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
         a->bind(skipLabel);
 
         return true;
@@ -1985,11 +2122,15 @@ bool jit_emit_branch_eq(
         // Compare registers
         a->cmp(src1, src2);
 
-        // If equal, jump to target (update PC)
+        // If equal, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
         Label skipLabel = a->new_label();
         a->b_ne(skipLabel);  // Skip PC update if not equal
-        a->mov(pcReg, target_pc);  // Only update PC if equal
+        
+        // Taken path: update PC and exit
+        a->mov(pcReg, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
         a->bind(skipLabel);
 
         return true;
@@ -2020,11 +2161,15 @@ bool jit_emit_branch_ne(
         // Compare registers
         a->cmp(x86::rax, x86::rdx);
 
-        // If not equal, jump to target (update PC)
+        // If not equal, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
         Label skipLabel = a->new_label();
         a->je(skipLabel);  // Skip PC update if equal
-        a->mov(x86::r15d, target_pc);  // Only update PC if not equal
+        
+        // Taken path: update PC and exit
+        a->mov(x86::r15d, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
         a->bind(skipLabel);
 
         return true;
@@ -2043,11 +2188,15 @@ bool jit_emit_branch_ne(
         // Compare registers
         a->cmp(src1, src2);
 
-        // If not equal, jump to target (update PC)
+        // If not equal, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
         Label skipLabel = a->new_label();
         a->b_eq(skipLabel);  // Skip PC update if equal
-        a->mov(pcReg, target_pc);  // Only update PC if not equal
+        
+        // Taken path: update PC and exit
+        a->mov(pcReg, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
         a->bind(skipLabel);
 
         return true;
@@ -2062,25 +2211,93 @@ bool jit_emit_load_imm_jump(
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
     uint32_t value,
-    int32_t offset)
+    uint32_t target_pc)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load immediate into destination register (zero-extended)
+        a->mov(x86::rax, value);
+        a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+
+        // Update PC
+        a->mov(x86::r15d, target_pc);
+        
+        // Exit to dispatcher
+        emit_exit_to_dispatcher(assembler, target_arch);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+        
+        // Load immediate into destination register
+        a->mov(a64::w0, value);
+        a->str(a64::x0, a64::ptr(a64::x19, dest_reg * 8));
+        
+        // Update PC
+        a->mov(a64::w23, target_pc);
+        
+        // Exit to dispatcher
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        return true;
     }
+    
+    return false;
+}
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
+// LoadImmJumpInd: Load immediate and jump indirect
+bool jit_emit_load_imm_jump_ind(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t dest_reg,
+    uint8_t src_reg,
+    uint32_t value,
+    uint32_t offset)
+{
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load immediate into destination register
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
-    a->mov(x86::eax, value);
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+        // Load immediate into destination register (zero-extended)
+        a->mov(x86::rax, value);
+        a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
 
-    // Jump to target (PC-relative)
-    // TODO: Need proper label handling for jumps
-    // For now, just load the offset into PC
-    a->add(x86::r15d, offset);
+        // Load target address from src register
+        a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+        
+        // Add offset
+        a->add(x86::rax, offset);
+        
+        // Update PC
+        a->mov(x86::r15d, x86::eax);
+        
+        // Exit to dispatcher
+        emit_exit_to_dispatcher(assembler, target_arch);
 
-    return true;
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+        
+        // Load immediate into destination register
+        a->mov(a64::w0, value);
+        a->str(a64::x0, a64::ptr(a64::x19, dest_reg * 8));
+        
+        // Load target address from src register
+        a->ldr(a64::x0, a64::ptr(a64::x19, src_reg * 8));
+        
+        // Add offset
+        a->add(a64::x0, a64::x0, offset);
+        
+        // Update PC
+        a->mov(a64::w23, a64::w0);
+        
+        // Exit to dispatcher
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        return true;
+    }
+    
+    return false;
 }
 
 // JumpInd: Indirect jump through register
@@ -2090,22 +2307,41 @@ bool jit_emit_jump_ind(
     uint8_t ptr_reg,
     uint32_t offset)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load target address from register
+        a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
+
+        // Add offset to get target address
+        a->add(x86::rax, offset);
+
+        // Jump to target (update PC)
+        a->mov(x86::r15d, x86::eax);
+        
+        // Exit to dispatcher
+        emit_exit_to_dispatcher(assembler, target_arch);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+        
+        // Load target address from register
+        a->ldr(a64::x0, a64::ptr(a64::x19, ptr_reg * 8));
+        
+        // Add offset
+        a->add(a64::x0, a64::x0, offset);
+        
+        // Update PC
+        a->mov(a64::w23, a64::w0);
+        
+        // Exit to dispatcher
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        return true;
     }
-
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load target address from register
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
-
-    // Add offset to get target address
-    a->add(x86::rax, offset);
-
-    // Jump to target (update PC)
-    a->mov(x86::r15d, x86::eax);
-
-    return true;
+    
+    return false;
 }
 
 // Fallthrough: No-op instruction
@@ -2126,15 +2362,68 @@ bool jit_emit_fallthrough(
     return true;
 }
 
-// Ecalli: External call interface
+// Generate ecalli instruction (calls into host)
+bool jit_generateEcalli(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint32_t func_idx,
+    void* _Nullable gas_ptr
+) noexcept
+{
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<asmjit::x86::Assembler*>(assembler);
+
+        // x86_64 calling convention:
+        // rdi = context (rbp), rsi = func_idx, rdx = registers (rbx),
+        // rcx = memory (r12), r8d = memory_size (r13d), r9 = gas (r14)
+        a->mov(asmjit::x86::rdi, asmjit::x86::rbp);      // context pointer
+        a->mov(asmjit::x86::rsi, func_idx);      // function index
+        a->mov(asmjit::x86::rdx, asmjit::x86::rbx);      // registers pointer
+        a->mov(asmjit::x86::rcx, asmjit::x86::r12);      // memory pointer
+        a->mov(asmjit::x86::r8d, asmjit::x86::r13d);     // memory size
+        a->mov(asmjit::x86::r9, asmjit::x86::r14);       // gas pointer
+
+        // Call the trampoline
+        a->mov(asmjit::x86::rax, reinterpret_cast<uint64_t>(&pvm_host_call_trampoline));
+        a->call(asmjit::x86::rax);
+
+        // Check result (eax contains error code or return value)
+        // Any value >= 0xFFFF_FFFA is an error
+        asmjit::Label successLabel = a->new_label();
+        a->cmp(asmjit::x86::eax, 0xFFFFFFFA);
+        a->jb(successLabel); // Jump if below (success)
+
+        // Error case: return error code
+        // Restore callee-saved registers and return (epilogue)
+        a->pop(asmjit::x86::r15);
+        a->pop(asmjit::x86::r14);
+        a->pop(asmjit::x86::r13);
+        a->pop(asmjit::x86::r12);
+        a->pop(asmjit::x86::rbp);
+        a->pop(asmjit::x86::rbx);
+        a->ret();
+
+        a->bind(successLabel);
+        // Success case: Store result in R0
+        a->mov(asmjit::x86::qword_ptr(asmjit::x86::rbx, 0), asmjit::x86::rax);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        // TODO: Implement for ARM64
+        // ARM64 support for ecalli is not yet implemented
+        return false;
+    }
+    return false;
+}
+
+// Ecalli: External call interface (Legacy/Stub)
 bool jit_emit_ecalli(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint32_t call_index)
 {
-    // Ecalli is handled directly in the labeled helpers
-    // This is a stub for the dispatcher
-    return true;
+    // Forward to new implementation
+    return jit_generateEcalli(assembler, target_arch, call_index, nullptr);
 }
 
 // Sbrk: System break (allocate memory)
@@ -2165,24 +2454,62 @@ bool jit_emit_branch_lt_imm(
     uint64_t immediate,
     uint32_t target_pc)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Load immediate into temp register
+        a->mov(x86::rdx, immediate);
+
+        // Compare with immediate (signed)
+        a->cmp(x86::rax, x86::rdx);
+
+        // If less, jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->jge(skipLabel);  // Skip PC update if greater or equal
+        
+        // Taken path: update PC and exit
+        a->mov(x86::r15d, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp src = a64::x0;
+        a64::Gp imm = a64::x1;
+        a64::Gp pcReg = a64::w23; // PC
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+        a->mov(imm, immediate);
+
+        // Compare registers
+        a->cmp(src, imm);
+
+        // If less, jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->b_ge(skipLabel);  // Skip PC update if greater or equal
+        
+        // Taken path: update PC and exit
+        a->mov(pcReg, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
-
-    // Compare with immediate (signed)
-    a->cmp(x86::rax, immediate);
-
-    // If less, jump to target (update PC)
-    // TODO: This needs proper label handling with conditional jump
-    // For now, just update PC unconditionally (stub)
-    a->mov(x86::r15d, target_pc);
-
-    return true;
+    return false;
 }
 
 // BranchLtUImm: Branch if less-than unsigned (immediate)
@@ -2193,24 +2520,62 @@ bool jit_emit_branch_lt_u_imm(
     uint64_t immediate,
     uint32_t target_pc)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Load immediate into temp register
+        a->mov(x86::rdx, immediate);
+
+        // Compare with immediate (unsigned)
+        a->cmp(x86::rax, x86::rdx);
+
+        // If less (unsigned), jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->jae(skipLabel);  // Skip PC update if above or equal
+        
+        // Taken path: update PC and exit
+        a->mov(x86::r15d, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp src = a64::x0;
+        a64::Gp imm = a64::x1;
+        a64::Gp pcReg = a64::w23; // PC
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+        a->mov(imm, immediate);
+
+        // Compare registers
+        a->cmp(src, imm);
+
+        // If less (unsigned), jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->b_hs(skipLabel);  // Skip PC update if higher or same (unsigned >=)
+        
+        // Taken path: update PC and exit
+        a->mov(pcReg, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
-
-    // Compare with immediate (unsigned)
-    a->cmp(x86::rax, immediate);
-
-    // If less (unsigned), jump to target (update PC)
-    // TODO: This needs proper label handling with conditional jump
-    // For now, just update PC unconditionally (stub)
-    a->mov(x86::r15d, target_pc);
-
-    return true;
+    return false;
 }
 
 // BranchGtImm: Branch if greater-than signed (immediate)
@@ -2221,24 +2586,62 @@ bool jit_emit_branch_gt_imm(
     uint64_t immediate,
     uint32_t target_pc)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Load immediate into temp register
+        a->mov(x86::rdx, immediate);
+
+        // Compare with immediate (signed)
+        a->cmp(x86::rax, x86::rdx);
+
+        // If greater, jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->jle(skipLabel);  // Skip PC update if less or equal
+        
+        // Taken path: update PC and exit
+        a->mov(x86::r15d, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp src = a64::x0;
+        a64::Gp imm = a64::x1;
+        a64::Gp pcReg = a64::w23; // PC
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+        a->mov(imm, immediate);
+
+        // Compare registers
+        a->cmp(src, imm);
+
+        // If greater, jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->b_le(skipLabel);  // Skip PC update if less or equal
+        
+        // Taken path: update PC and exit
+        a->mov(pcReg, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
-
-    // Compare with immediate (signed)
-    a->cmp(x86::rax, immediate);
-
-    // If greater, jump to target (update PC)
-    // TODO: This needs proper label handling with conditional jump
-    // For now, just update PC unconditionally (stub)
-    a->mov(x86::r15d, target_pc);
-
-    return true;
+    return false;
 }
 
 // BranchGtUImm: Branch if greater-than unsigned (immediate)
@@ -2249,24 +2652,326 @@ bool jit_emit_branch_gt_u_imm(
     uint64_t immediate,
     uint32_t target_pc)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Load immediate into temp register
+        a->mov(x86::rdx, immediate);
+
+        // Compare with immediate (unsigned)
+        a->cmp(x86::rax, x86::rdx);
+
+        // If greater (unsigned), jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->jbe(skipLabel);  // Skip PC update if below or equal
+        
+        // Taken path: update PC and exit
+        a->mov(x86::r15d, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp src = a64::x0;
+        a64::Gp imm = a64::x1;
+        a64::Gp pcReg = a64::w23; // PC
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+        a->mov(imm, immediate);
+
+        // Compare registers
+        a->cmp(src, imm);
+
+        // If greater (unsigned), jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->b_ls(skipLabel);  // Skip PC update if lower or same (unsigned <=)
+        
+        // Taken path: update PC and exit
+        a->mov(pcReg, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
+    return false;
+}
 
-    // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+// BranchLeImm: Branch if less-than-or-equal signed (immediate)
+bool jit_emit_branch_le_imm(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t src_reg,
+    uint64_t immediate,
+    uint32_t target_pc)
+{
+    using namespace asmjit;
 
-    // Compare with immediate (unsigned)
-    a->cmp(x86::rax, immediate);
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // If greater (unsigned), jump to target (update PC)
-    // TODO: This needs proper label handling with conditional jump
-    // For now, just update PC unconditionally (stub)
-    a->mov(x86::r15d, target_pc);
+        // Load source register from VM array
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
-    return true;
+        // Load immediate into temp register
+        a->mov(x86::rdx, immediate);
+
+        // Compare with immediate (signed)
+        a->cmp(x86::rax, x86::rdx);
+
+        // If less or equal, jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->jg(skipLabel);  // Skip PC update if greater
+        
+        // Taken path: update PC and exit
+        a->mov(x86::r15d, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp src = a64::x0;
+        a64::Gp imm = a64::x1;
+        a64::Gp pcReg = a64::w23; // PC
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+        a->mov(imm, immediate);
+
+        // Compare registers
+        a->cmp(src, imm);
+
+        // If less or equal, jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->b_gt(skipLabel);  // Skip PC update if greater
+        
+        // Taken path: update PC and exit
+        a->mov(pcReg, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    }
+
+    return false;
+}
+
+// BranchLeUImm: Branch if less-than-or-equal unsigned (immediate)
+bool jit_emit_branch_le_u_imm(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t src_reg,
+    uint64_t immediate,
+    uint32_t target_pc)
+{
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Load immediate into temp register
+        a->mov(x86::rdx, immediate);
+
+        // Compare with immediate (unsigned)
+        a->cmp(x86::rax, x86::rdx);
+
+        // If less or equal (unsigned), jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->ja(skipLabel);  // Skip PC update if above
+        
+        // Taken path: update PC and exit
+        a->mov(x86::r15d, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp src = a64::x0;
+        a64::Gp imm = a64::x1;
+        a64::Gp pcReg = a64::w23; // PC
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+        a->mov(imm, immediate);
+
+        // Compare registers
+        a->cmp(src, imm);
+
+        // If less or equal (unsigned), jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->b_hi(skipLabel);  // Skip PC update if higher
+        
+        // Taken path: update PC and exit
+        a->mov(pcReg, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    }
+
+    return false;
+}
+
+// BranchGeImm: Branch if greater-than-or-equal signed (immediate)
+bool jit_emit_branch_ge_imm(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t src_reg,
+    uint64_t immediate,
+    uint32_t target_pc)
+{
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Load immediate into temp register
+        a->mov(x86::rdx, immediate);
+
+        // Compare with immediate (signed)
+        a->cmp(x86::rax, x86::rdx);
+
+        // If greater or equal, jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->jl(skipLabel);  // Skip PC update if less
+        
+        // Taken path: update PC and exit
+        a->mov(x86::r15d, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp src = a64::x0;
+        a64::Gp imm = a64::x1;
+        a64::Gp pcReg = a64::w23; // PC
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+        a->mov(imm, immediate);
+
+        // Compare registers
+        a->cmp(src, imm);
+
+        // If greater or equal, jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->b_lt(skipLabel);  // Skip PC update if less
+        
+        // Taken path: update PC and exit
+        a->mov(pcReg, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    }
+
+    return false;
+}
+
+// BranchGeUImm: Branch if greater-than-or-equal unsigned (immediate)
+bool jit_emit_branch_ge_u_imm(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t src_reg,
+    uint64_t immediate,
+    uint32_t target_pc)
+{
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load source register from VM array
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
+
+        // Load immediate into temp register
+        a->mov(x86::rdx, immediate);
+
+        // Compare with immediate (unsigned)
+        a->cmp(x86::rax, x86::rdx);
+
+        // If greater or equal (unsigned), jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->jb(skipLabel);  // Skip PC update if below
+        
+        // Taken path: update PC and exit
+        a->mov(x86::r15d, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load source register from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp src = a64::x0;
+        a64::Gp imm = a64::x1;
+        a64::Gp pcReg = a64::w23; // PC
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+        a->mov(imm, immediate);
+
+        // Compare registers
+        a->cmp(src, imm);
+
+        // If greater or equal (unsigned), jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->b_lo(skipLabel);  // Skip PC update if lower
+        
+        // Taken path: update PC and exit
+        a->mov(pcReg, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    }
+
+    return false;
 }
 
 // BranchLt: Branch if less-than signed (register-register)
@@ -2277,27 +2982,62 @@ bool jit_emit_branch_lt(
     uint8_t src2_reg,
     uint32_t target_pc)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load src1 from VM array
+        a->mov(x86::rax, x86::qword_ptr(rbx, src1_reg * 8));
+
+        // Load src2 from VM array
+        a->mov(x86::rdx, x86::qword_ptr(rbx, src2_reg * 8));
+
+        // Compare registers (signed)
+        a->cmp(x86::rax, x86::rdx);
+
+        // If less, jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->jge(skipLabel);  // Skip PC update if greater or equal
+        
+        // Taken path: update PC and exit
+        a->mov(x86::r15d, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load src1 from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp src1 = a64::x0;
+        a64::Gp src2 = a64::x1;
+        a64::Gp pcReg = a64::w23; // PC
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(src1, a64::ptr(regPtr, src1_reg * 8));
+        a->ldr(src2, a64::ptr(regPtr, src2_reg * 8));
+
+        // Compare registers
+        a->cmp(src1, src2);
+
+        // If less, jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->b_ge(skipLabel);  // Skip PC update if greater or equal
+        
+        // Taken path: update PC and exit
+        a->mov(pcReg, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load src1 from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src1_reg * 8));
-
-    // Load src2 from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, src2_reg * 8));
-
-    // Compare registers (signed)
-    a->cmp(x86::rax, x86::rdx);
-
-    // If less, jump to target (update PC)
-    // TODO: This needs proper label handling with conditional jump
-    // For now, just update PC unconditionally (stub)
-    a->mov(x86::r15d, target_pc);
-
-    return true;
+    return false;
 }
 
 // BranchLtU: Branch if less-than unsigned (register-register)
@@ -2308,27 +3048,62 @@ bool jit_emit_branch_lt_u(
     uint8_t src2_reg,
     uint32_t target_pc)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load src1 from VM array
+        a->mov(x86::rax, x86::qword_ptr(rbx, src1_reg * 8));
+
+        // Load src2 from VM array
+        a->mov(x86::rdx, x86::qword_ptr(rbx, src2_reg * 8));
+
+        // Compare registers (unsigned)
+        a->cmp(x86::rax, x86::rdx);
+
+        // If less (unsigned), jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->jae(skipLabel);  // Skip PC update if above or equal
+        
+        // Taken path: update PC and exit
+        a->mov(x86::r15d, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load src1 from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp src1 = a64::x0;
+        a64::Gp src2 = a64::x1;
+        a64::Gp pcReg = a64::w23; // PC
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(src1, a64::ptr(regPtr, src1_reg * 8));
+        a->ldr(src2, a64::ptr(regPtr, src2_reg * 8));
+
+        // Compare registers
+        a->cmp(src1, src2);
+
+        // If less (unsigned), jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->b_hs(skipLabel);  // Skip PC update if higher or same (unsigned >=)
+        
+        // Taken path: update PC and exit
+        a->mov(pcReg, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load src1 from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src1_reg * 8));
-
-    // Load src2 from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, src2_reg * 8));
-
-    // Compare registers (unsigned)
-    a->cmp(x86::rax, x86::rdx);
-
-    // If less (unsigned), jump to target (update PC)
-    // TODO: This needs proper label handling with conditional jump
-    // For now, just update PC unconditionally (stub)
-    a->mov(x86::r15d, target_pc);
-
-    return true;
+    return false;
 }
 
 // BranchGt: Branch if greater-than signed (register-register)
@@ -2339,27 +3114,62 @@ bool jit_emit_branch_gt(
     uint8_t src2_reg,
     uint32_t target_pc)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load src1 from VM array
+        a->mov(x86::rax, x86::qword_ptr(rbx, src1_reg * 8));
+
+        // Load src2 from VM array
+        a->mov(x86::rdx, x86::qword_ptr(rbx, src2_reg * 8));
+
+        // Compare registers (signed)
+        a->cmp(x86::rax, x86::rdx);
+
+        // If greater, jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->jle(skipLabel);  // Skip PC update if less or equal
+        
+        // Taken path: update PC and exit
+        a->mov(x86::r15d, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load src1 from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp src1 = a64::x0;
+        a64::Gp src2 = a64::x1;
+        a64::Gp pcReg = a64::w23; // PC
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(src1, a64::ptr(regPtr, src1_reg * 8));
+        a->ldr(src2, a64::ptr(regPtr, src2_reg * 8));
+
+        // Compare registers
+        a->cmp(src1, src2);
+
+        // If greater, jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->b_le(skipLabel);  // Skip PC update if less or equal
+        
+        // Taken path: update PC and exit
+        a->mov(pcReg, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load src1 from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src1_reg * 8));
-
-    // Load src2 from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, src2_reg * 8));
-
-    // Compare registers (signed)
-    a->cmp(x86::rax, x86::rdx);
-
-    // If greater, jump to target (update PC)
-    // TODO: This needs proper label handling with conditional jump
-    // For now, just update PC unconditionally (stub)
-    a->mov(x86::r15d, target_pc);
-
-    return true;
+    return false;
 }
 
 // BranchGtU: Branch if greater-than unsigned (register-register)
@@ -2370,27 +3180,62 @@ bool jit_emit_branch_gt_u(
     uint8_t src2_reg,
     uint32_t target_pc)
 {
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
+    using namespace asmjit;
+
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load src1 from VM array
+        a->mov(x86::rax, x86::qword_ptr(rbx, src1_reg * 8));
+
+        // Load src2 from VM array
+        a->mov(x86::rdx, x86::qword_ptr(rbx, src2_reg * 8));
+
+        // Compare registers (unsigned)
+        a->cmp(x86::rax, x86::rdx);
+
+        // If greater (unsigned), jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->jbe(skipLabel);  // Skip PC update if below or equal
+        
+        // Taken path: update PC and exit
+        a->mov(x86::r15d, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<a64::Assembler*>(assembler);
+
+        // Load src1 from VM array (VM_REGISTERS_PTR in x19)
+        a64::Gp src1 = a64::x0;
+        a64::Gp src2 = a64::x1;
+        a64::Gp pcReg = a64::w23; // PC
+        a64::Gp regPtr = a64::x19;
+
+        a->ldr(src1, a64::ptr(regPtr, src1_reg * 8));
+        a->ldr(src2, a64::ptr(regPtr, src2_reg * 8));
+
+        // Compare registers
+        a->cmp(src1, src2);
+
+        // If greater (unsigned), jump to target (update PC) and exit
+        // Otherwise fall through to next instruction
+        Label skipLabel = a->new_label();
+        a->b_ls(skipLabel);  // Skip PC update if lower or same (unsigned <=)
+        
+        // Taken path: update PC and exit
+        a->mov(pcReg, target_pc);
+        emit_exit_to_dispatcher(assembler, target_arch);
+        
+        a->bind(skipLabel);
+
+        return true;
     }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load src1 from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src1_reg * 8));
-
-    // Load src2 from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, src2_reg * 8));
-
-    // Compare registers (unsigned)
-    a->cmp(x86::rax, x86::rdx);
-
-    // If greater (unsigned), jump to target (update PC)
-    // TODO: This needs proper label handling with conditional jump
-    // For now, just update PC unconditionally (stub)
-    a->mov(x86::r15d, target_pc);
-
-    return true;
+    return false;
 }
 
 // Max: Maximum of two values (signed)
@@ -3086,63 +3931,16 @@ bool jit_emit_store_8(
     return true;
 }
 
-// MulU32Imm: Multiply unsigned 32-bit by immediate
-bool jit_emit_mul_u32_imm(
-    void* _Nonnull assembler,
-    const char* _Nonnull target_arch,
-    uint8_t dest_reg,
-    uint32_t immediate)
-{
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
-    }
 
-    auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
 
-    // Multiply by immediate (unsigned 32-bit)
-    a->mov(x86::edx, immediate);
-    a->mul(x86::edx);  // edx:eax = eax * edx (unsigned)
-
-    // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
-
-    return true;
-}
-
-// MulS32Imm: Multiply signed 32-bit by immediate
-bool jit_emit_mul_s32_imm(
-    void* _Nonnull assembler,
-    const char* _Nonnull target_arch,
-    uint8_t dest_reg,
-    int32_t immediate)
-{
-    if (strcmp(target_arch, "x86_64") != 0) {
-        return false;
-    }
-
-    auto* a = static_cast<x86::Assembler*>(assembler);
-
-    // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
-
-    // Multiply by immediate (signed 32-bit)
-    a->mov(x86::edx, immediate);
-    a->imul(x86::edx);  // edx:eax = eax * edx (signed)
-
-    // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
-
-    return true;
-}
 
 // AddImm64: Add 64-bit immediate
 bool jit_emit_add_imm_64(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint64_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3151,11 +3949,16 @@ bool jit_emit_add_imm_64(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array
+    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
 
     // Add immediate
-    a->add(x86::rax, immediate);
+    if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
+        a->add(x86::rax, immediate);
+    } else {
+        a->mov(x86::rdx, immediate);
+        a->add(x86::rax, x86::rdx);
+    }
 
     // Store result back to VM register array
     a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
@@ -3163,11 +3966,14 @@ bool jit_emit_add_imm_64(
     return true;
 }
 
-// SubImm: Subtract immediate (64-bit)
-bool jit_emit_sub_imm(
+
+
+// NegAddImm64: Negated addition with 64-bit immediate (dest = immediate - src)
+bool jit_emit_neg_add_imm_64(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint64_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3176,11 +3982,14 @@ bool jit_emit_sub_imm(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load immediate into rax
+    a->mov(x86::rax, immediate);
 
-    // Subtract immediate
-    a->sub(x86::rax, immediate);
+    // Load src register from VM array
+    a->mov(x86::rdx, x86::qword_ptr(rbx, src_reg * 8));
+
+    // Subtract src from immediate: rax = immediate - src
+    a->sub(x86::rax, x86::rdx);
 
     // Store result back to VM register array
     a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
@@ -3193,6 +4002,7 @@ bool jit_emit_and_imm(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint64_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3201,11 +4011,16 @@ bool jit_emit_and_imm(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array
+    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
 
     // AND with immediate
-    a->and_(x86::rax, immediate);
+    if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
+        a->and_(x86::rax, immediate);
+    } else {
+        a->mov(x86::rdx, immediate);
+        a->and_(x86::rax, x86::rdx);
+    }
 
     // Store result back to VM register array
     a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
@@ -3218,6 +4033,7 @@ bool jit_emit_or_imm(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint64_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3226,11 +4042,16 @@ bool jit_emit_or_imm(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array
+    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
 
     // OR with immediate
-    a->or_(x86::rax, immediate);
+    if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
+        a->or_(x86::rax, immediate);
+    } else {
+        a->mov(x86::rdx, immediate);
+        a->or_(x86::rax, x86::rdx);
+    }
 
     // Store result back to VM register array
     a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
@@ -3243,6 +4064,7 @@ bool jit_emit_xor_imm(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint64_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3251,11 +4073,16 @@ bool jit_emit_xor_imm(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array
+    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
 
     // XOR with immediate
-    a->xor_(x86::rax, immediate);
+    if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
+        a->xor_(x86::rax, immediate);
+    } else {
+        a->mov(x86::rdx, immediate);
+        a->xor_(x86::rax, x86::rdx);
+    }
 
     // Store result back to VM register array
     a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
@@ -3426,6 +4253,7 @@ bool jit_emit_mul_imm_32(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     int32_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3434,14 +4262,14 @@ bool jit_emit_mul_imm_32(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (32-bit)
+    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
 
     // Multiply by immediate (signed 32-bit) using imul
     a->imul(x86::eax, immediate);
 
-    // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    // Store result back to VM register array (zero-extended to 64-bit)
+    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -3451,6 +4279,7 @@ bool jit_emit_mul_imm_64(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     int64_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3459,11 +4288,16 @@ bool jit_emit_mul_imm_64(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (64-bit)
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (64-bit)
+    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
 
     // Multiply by immediate (signed 64-bit) using imul
-    a->imul(x86::rax, immediate);
+    if (immediate >= INT32_MIN && immediate <= INT32_MAX) {
+        a->imul(x86::rax, x86::rax, immediate);
+    } else {
+        a->mov(x86::rdx, immediate);
+        a->imul(x86::rax, x86::rdx);
+    }
 
     // Store result back to VM register array
     a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
@@ -3476,6 +4310,7 @@ bool jit_emit_div_u32_imm(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint32_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3486,11 +4321,11 @@ bool jit_emit_div_u32_imm(
 
     // Check for division by zero
     if (immediate == 0) {
-        return false;
+        return jit_emit_trap(assembler, target_arch);
     }
 
-    // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (32-bit)
+    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
 
     // Zero-extend to 64-bit
     a->mov(x86::edx, 0);
@@ -3499,8 +4334,8 @@ bool jit_emit_div_u32_imm(
     a->mov(x86::ecx, immediate);
     a->div(x86::ecx);  // eax = eax / ecx
 
-    // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    // Store result back to VM register array (zero-extended to 64-bit)
+    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -3510,6 +4345,7 @@ bool jit_emit_div_s32_imm(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     int32_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3520,21 +4356,53 @@ bool jit_emit_div_s32_imm(
 
     // Check for division by zero
     if (immediate == 0) {
-        return false;
+        return jit_emit_trap(assembler, target_arch);
     }
 
-    // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (32-bit)
+    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
 
-    // Sign-extend to 64-bit (cdq)
-    a->cdq();
+    // Handle overflow case: INT_MIN / -1
+    if (immediate == -1) {
+        // Check if src is INT_MIN (0x80000000)
+        Label normalDiv = a->new_label();
+        Label done = a->new_label();
+        
+        a->cmp(x86::eax, 0x80000000);
+        a->jne(normalDiv);
+        
+        // Overflow case: result is INT_MIN
+        // eax is already INT_MIN, so just store it
+        a->jmp(done);
+        
+        a->bind(normalDiv);
+        // Sign-extend to 64-bit (cdq)
+        a->cdq();
+        
+        // Divide by immediate (signed)
+        a->mov(x86::ecx, immediate);
+        a->idiv(x86::ecx);  // eax = eax / ecx
+        
+        a->bind(done);
+    } else {
+        // Sign-extend to 64-bit (cdq)
+        a->cdq();
+        
+        // Divide by immediate (signed)
+        a->mov(x86::ecx, immediate);
+        a->idiv(x86::ecx);  // eax = eax / ecx
+    }
 
-    // Divide by immediate (signed)
-    a->mov(x86::ecx, immediate);
-    a->idiv(x86::ecx);  // eax = eax / ecx
-
-    // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    // Store result back to VM register array (zero-extended to 64-bit)
+    // Note: eax contains the 32-bit result. Writing rax to qword_ptr will write 64 bits.
+    // Since we want zero-extension of the 32-bit result, we rely on the fact that
+    // 32-bit operations zero-extend to 64-bit registers.
+    // However, idiv writes to eax (and edx), but the upper 32 bits of rax are undefined or zero?
+    // On x86-64, 32-bit operations zero the upper 32 bits of the destination register.
+    // But idiv is special. It operates on edx:eax.
+    // Actually, idiv eax, ... writes to eax and edx. The upper 32 bits of rax are zeroed.
+    // So writing rax is correct for zero-extension.
+    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -3544,6 +4412,7 @@ bool jit_emit_rem_u32_imm(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint32_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3554,11 +4423,11 @@ bool jit_emit_rem_u32_imm(
 
     // Check for division by zero
     if (immediate == 0) {
-        return false;
+        return jit_emit_trap(assembler, target_arch);
     }
 
-    // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (32-bit)
+    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
 
     // Zero-extend to 64-bit
     a->mov(x86::edx, 0);
@@ -3567,8 +4436,12 @@ bool jit_emit_rem_u32_imm(
     a->mov(x86::ecx, immediate);
     a->div(x86::ecx);  // eax = quotient, edx = remainder
 
-    // Store remainder back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::edx);
+    // Store remainder back to VM register array (zero-extended to 64-bit)
+    // edx contains remainder. We need to move it to rax to zero-extend?
+    // mov edx to memory? No, we want zero extension.
+    // mov eax, edx -> zeroes upper rax.
+    a->mov(x86::eax, x86::edx);
+    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -3578,6 +4451,7 @@ bool jit_emit_rem_s32_imm(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     int32_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3588,21 +4462,51 @@ bool jit_emit_rem_s32_imm(
 
     // Check for division by zero
     if (immediate == 0) {
-        return false;
+        return jit_emit_trap(assembler, target_arch);
     }
 
-    // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (32-bit)
+    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
 
-    // Sign-extend to 64-bit (cdq)
-    a->cdq();
+    // Handle overflow case: INT_MIN / -1
+    if (immediate == -1) {
+        // Check if src is INT_MIN (0x80000000)
+        Label normalDiv = a->new_label();
+        Label done = a->new_label();
+        
+        a->cmp(x86::eax, 0x80000000);
+        a->jne(normalDiv);
+        
+        // Overflow case: remainder is 0
+        a->xor_(x86::eax, x86::eax);
+        a->jmp(done);
+        
+        a->bind(normalDiv);
+        // Sign-extend to 64-bit (cdq)
+        a->cdq();
+        
+        // Divide by immediate (signed)
+        a->mov(x86::ecx, immediate);
+        a->idiv(x86::ecx);  // eax = quotient, edx = remainder
+        
+        // Move remainder to eax for storage
+        a->mov(x86::eax, x86::edx);
+        
+        a->bind(done);
+    } else {
+        // Sign-extend to 64-bit (cdq)
+        a->cdq();
+        
+        // Divide by immediate (signed)
+        a->mov(x86::ecx, immediate);
+        a->idiv(x86::ecx);  // eax = quotient, edx = remainder
+        
+        // Move remainder to eax for storage
+        a->mov(x86::eax, x86::edx);
+    }
 
-    // Divide by immediate (signed)
-    a->mov(x86::ecx, immediate);
-    a->idiv(x86::ecx);  // eax = quotient, edx = remainder
-
-    // Store remainder back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::edx);
+    // Store remainder back to VM register array (zero-extended to 64-bit)
+    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -3692,6 +4596,7 @@ bool jit_emit_add_imm_32(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     int32_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3700,23 +4605,26 @@ bool jit_emit_add_imm_32(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (32-bit)
+    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
 
     // Add immediate
     a->add(x86::eax, immediate);
 
-    // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    // Store result back to VM register array (zero-extended to 64-bit)
+    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
 
-// SubImm32: Subtract 32-bit immediate
-bool jit_emit_sub_imm_32(
+
+
+// NegAddImm32: Negated addition with 32-bit immediate (dest = immediate - src)
+bool jit_emit_neg_add_imm_32(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     int32_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3725,14 +4633,17 @@ bool jit_emit_sub_imm_32(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+    // Load immediate into eax
+    a->mov(x86::eax, immediate);
 
-    // Subtract immediate
-    a->sub(x86::eax, immediate);
+    // Load src register from VM array (32-bit)
+    a->mov(x86::edx, x86::dword_ptr(rbx, src_reg * 8));
 
-    // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    // Subtract src from immediate: eax = immediate - src
+    a->sub(x86::eax, x86::edx);
+
+    // Store result back to VM register array (zero-extended to 64-bit)
+    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -3742,6 +4653,7 @@ bool jit_emit_and_imm_32(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint32_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3750,14 +4662,14 @@ bool jit_emit_and_imm_32(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (32-bit)
+    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
 
     // AND with immediate
     a->and_(x86::eax, immediate);
 
-    // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    // Store result back to VM register array (zero-extended to 64-bit)
+    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -3767,6 +4679,7 @@ bool jit_emit_or_imm_32(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint32_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3775,14 +4688,14 @@ bool jit_emit_or_imm_32(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (32-bit)
+    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
 
     // OR with immediate
     a->or_(x86::eax, immediate);
 
-    // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    // Store result back to VM register array (zero-extended to 64-bit)
+    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -3792,6 +4705,7 @@ bool jit_emit_xor_imm_32(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint32_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3800,14 +4714,14 @@ bool jit_emit_xor_imm_32(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (32-bit)
+    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
 
     // XOR with immediate
     a->xor_(x86::eax, immediate);
 
-    // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    // Store result back to VM register array (zero-extended to 64-bit)
+    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -3817,6 +4731,7 @@ bool jit_emit_shl_imm_32(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint8_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3825,8 +4740,8 @@ bool jit_emit_shl_imm_32(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (32-bit)
+    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
 
     // Mask immediate to 5 bits for 32-bit shift
     uint8_t shift_count = immediate & 0x1F;
@@ -3834,8 +4749,8 @@ bool jit_emit_shl_imm_32(
     // Shift left by immediate
     a->shl(x86::eax, shift_count);
 
-    // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    // Store result back to VM register array (zero-extended to 64-bit)
+    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -3845,6 +4760,7 @@ bool jit_emit_shr_imm_32(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint8_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3853,8 +4769,8 @@ bool jit_emit_shr_imm_32(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (32-bit)
+    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
 
     // Mask immediate to 5 bits for 32-bit shift
     uint8_t shift_count = immediate & 0x1F;
@@ -3862,8 +4778,8 @@ bool jit_emit_shr_imm_32(
     // Shift right logical by immediate
     a->shr(x86::eax, shift_count);
 
-    // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    // Store result back to VM register array (zero-extended to 64-bit)
+    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -3873,6 +4789,7 @@ bool jit_emit_sar_imm_32(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint8_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3881,8 +4798,8 @@ bool jit_emit_sar_imm_32(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (32-bit)
+    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
 
     // Mask immediate to 5 bits for 32-bit shift
     uint8_t shift_count = immediate & 0x1F;
@@ -3890,8 +4807,8 @@ bool jit_emit_sar_imm_32(
     // Shift right arithmetic by immediate
     a->sar(x86::eax, shift_count);
 
-    // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    // Store result back to VM register array (zero-extended to 64-bit)
+    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -3901,6 +4818,7 @@ bool jit_emit_shl_imm_64(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint8_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3909,8 +4827,8 @@ bool jit_emit_shl_imm_64(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (64-bit)
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (64-bit)
+    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
 
     // Mask immediate to 6 bits for 64-bit shift
     uint8_t shift_count = immediate & 0x3F;
@@ -3929,6 +4847,7 @@ bool jit_emit_shr_imm_64(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint8_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3937,8 +4856,8 @@ bool jit_emit_shr_imm_64(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (64-bit)
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (64-bit)
+    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
 
     // Mask immediate to 6 bits for 64-bit shift
     uint8_t shift_count = immediate & 0x3F;
@@ -3957,6 +4876,7 @@ bool jit_emit_sar_imm_64(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint8_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3965,8 +4885,8 @@ bool jit_emit_sar_imm_64(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (64-bit)
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (64-bit)
+    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
 
     // Mask immediate to 6 bits for 64-bit shift
     uint8_t shift_count = immediate & 0x3F;
@@ -3985,6 +4905,7 @@ bool jit_emit_rot_l_imm_32(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint8_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -3993,8 +4914,8 @@ bool jit_emit_rot_l_imm_32(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (32-bit)
+    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
 
     // Mask immediate to 5 bits for 32-bit rotate
     uint8_t rotate_count = immediate & 0x1F;
@@ -4002,8 +4923,8 @@ bool jit_emit_rot_l_imm_32(
     // Rotate left by immediate
     a->rol(x86::eax, rotate_count);
 
-    // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    // Store result back to VM register array (zero-extended to 64-bit)
+    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4013,6 +4934,7 @@ bool jit_emit_rot_r_imm_32(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint8_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -4021,8 +4943,8 @@ bool jit_emit_rot_r_imm_32(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (32-bit)
+    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
 
     // Mask immediate to 5 bits for 32-bit rotate
     uint8_t rotate_count = immediate & 0x1F;
@@ -4030,8 +4952,8 @@ bool jit_emit_rot_r_imm_32(
     // Rotate right by immediate
     a->ror(x86::eax, rotate_count);
 
-    // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    // Store result back to VM register array (zero-extended to 64-bit)
+    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4041,6 +4963,7 @@ bool jit_emit_rot_l_imm_64(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint8_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -4049,8 +4972,8 @@ bool jit_emit_rot_l_imm_64(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (64-bit)
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (64-bit)
+    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
 
     // Mask immediate to 6 bits for 64-bit rotate
     uint8_t rotate_count = immediate & 0x3F;
@@ -4069,6 +4992,7 @@ bool jit_emit_rot_r_imm_64(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint8_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -4077,8 +5001,8 @@ bool jit_emit_rot_r_imm_64(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array (64-bit)
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array (64-bit)
+    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
 
     // Mask immediate to 6 bits for 64-bit rotate
     uint8_t rotate_count = immediate & 0x3F;
@@ -4097,6 +5021,7 @@ bool jit_emit_eq_imm(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint64_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -4105,11 +5030,16 @@ bool jit_emit_eq_imm(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array
+    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
 
     // Compare with immediate
-    a->cmp(x86::rax, immediate);
+    if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
+        a->cmp(x86::rax, immediate);
+    } else {
+        a->mov(x86::rdx, immediate);
+        a->cmp(x86::rax, x86::rdx);
+    }
 
     // Set to 1 if equal (ZF=1), 0 otherwise
     a->sete(x86::al);
@@ -4128,6 +5058,7 @@ bool jit_emit_ne_imm(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint64_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -4136,11 +5067,16 @@ bool jit_emit_ne_imm(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array
+    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
 
     // Compare with immediate
-    a->cmp(x86::rax, immediate);
+    if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
+        a->cmp(x86::rax, immediate);
+    } else {
+        a->mov(x86::rdx, immediate);
+        a->cmp(x86::rax, x86::rdx);
+    }
 
     // Set to 1 if not-equal (ZF=0), 0 otherwise
     a->setne(x86::al);
@@ -4159,6 +5095,7 @@ bool jit_emit_lt_imm(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     int64_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -4167,11 +5104,16 @@ bool jit_emit_lt_imm(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array
+    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
 
     // Compare with immediate (signed)
-    a->cmp(x86::rax, immediate);
+    if (immediate >= INT32_MIN && immediate <= INT32_MAX) {
+        a->cmp(x86::rax, immediate);
+    } else {
+        a->mov(x86::rdx, immediate);
+        a->cmp(x86::rax, x86::rdx);
+    }
 
     // Set to 1 if less-than (signed), 0 otherwise
     a->setl(x86::al);
@@ -4190,6 +5132,7 @@ bool jit_emit_gt_imm(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     int64_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -4198,11 +5141,16 @@ bool jit_emit_gt_imm(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array
+    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
 
     // Compare with immediate (signed)
-    a->cmp(x86::rax, immediate);
+    if (immediate >= INT32_MIN && immediate <= INT32_MAX) {
+        a->cmp(x86::rax, immediate);
+    } else {
+        a->mov(x86::rdx, immediate);
+        a->cmp(x86::rax, x86::rdx);
+    }
 
     // Set to 1 if greater-than (signed), 0 otherwise
     a->setg(x86::al);
@@ -4221,6 +5169,7 @@ bool jit_emit_lt_imm_u(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint64_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -4229,11 +5178,16 @@ bool jit_emit_lt_imm_u(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array
+    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
 
     // Compare with immediate (unsigned)
-    a->cmp(x86::rax, immediate);
+    if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
+        a->cmp(x86::rax, immediate);
+    } else {
+        a->mov(x86::rdx, immediate);
+        a->cmp(x86::rax, x86::rdx);
+    }
 
     // Set to 1 if less-than (unsigned/below), 0 otherwise
     a->setb(x86::al);
@@ -4252,6 +5206,7 @@ bool jit_emit_gt_imm_u(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint64_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -4260,11 +5215,16 @@ bool jit_emit_gt_imm_u(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load src register from VM array
+    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
 
     // Compare with immediate (unsigned)
-    a->cmp(x86::rax, immediate);
+    if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
+        a->cmp(x86::rax, immediate);
+    } else {
+        a->mov(x86::rdx, immediate);
+        a->cmp(x86::rax, x86::rdx);
+    }
 
     // Set to 1 if greater-than (unsigned/above), 0 otherwise
     a->seta(x86::al);
@@ -4947,13 +5907,13 @@ bool jit_emit_rol_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load rotate count from VM array
-    a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rcx, x86::qword_ptr(rbx, src_reg * 8));
 
     // Load dest register from VM array
     a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
 
     // Mask rotate count to 6 bits for 64-bit rotate
-    a->and_(x86::ecx, 0x3F);
+    a->and_(x86::rcx, 0x3F);
 
     // Rotate left
     a->rol(x86::rdx, x86::cl);
@@ -4978,13 +5938,13 @@ bool jit_emit_ror_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load rotate count from VM array
-    a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rcx, x86::qword_ptr(rbx, src_reg * 8));
 
     // Load dest register from VM array
     a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
 
     // Mask rotate count to 6 bits for 64-bit rotate
-    a->and_(x86::ecx, 0x3F);
+    a->and_(x86::rcx, 0x3F);
 
     // Rotate right
     a->ror(x86::rdx, x86::cl);
@@ -5415,6 +6375,7 @@ bool jit_emit_test_imm(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
+    uint8_t src_reg,
     uint64_t immediate)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
@@ -5423,11 +6384,16 @@ bool jit_emit_test_imm(
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // Load dest register
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    // Load src register
+    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
 
     // Test with immediate
-    a->test(x86::rax, immediate);
+    if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
+        a->test(x86::rax, immediate);
+    } else {
+        a->mov(x86::rdx, immediate);
+        a->test(x86::rax, x86::rdx);
+    }
 
     // Set zero flag result to dest (1 if any bit set, 0 otherwise)
     a->setne(x86::dl);
@@ -5471,14 +6437,14 @@ bool jit_emit_mul_upper_uu(
         auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
 
         // Load ra and rb into temporary registers
-        a->ldr(a64::x0, a64::ptr(a64::x29, ra * 8));
-        a->ldr(a64::x1, a64::ptr(a64::x29, rb * 8));
+        a->ldr(a64::x0, a64::ptr(a64::x19, ra * 8));
+        a->ldr(a64::x1, a64::ptr(a64::x19, rb * 8));
 
         // Multiply unsigned high: x2 = (x0 * x1) >> 64
         a->umulh(a64::x2, a64::x0, a64::x1);
 
         // Store result to rd
-        a->str(a64::x2, a64::ptr(a64::x29, rd * 8));
+        a->str(a64::x2, a64::ptr(a64::x19, rd * 8));
 
         return true;
     }
@@ -5525,8 +6491,8 @@ bool jit_emit_mul_upper_su(
         auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
 
         // Load ra and rb into temporary registers
-        a->ldr(a64::x0, a64::ptr(a64::x29, ra * 8));
-        a->ldr(a64::x1, a64::ptr(a64::x29, rb * 8));
+        a->ldr(a64::x0, a64::ptr(a64::x19, ra * 8));
+        a->ldr(a64::x1, a64::ptr(a64::x19, rb * 8));
 
         // Multiply unsigned high: x2 = (UInt128(x0) * UInt128(x1)) >> 64
         // We use unsigned multiply as the base, then adjust if ra is negative
@@ -5541,7 +6507,48 @@ bool jit_emit_mul_upper_su(
         a->bind(skipSub);
 
         // Store result to rd
-        a->str(a64::x2, a64::ptr(a64::x29, rd * 8));
+        a->str(a64::x2, a64::ptr(a64::x19, rd * 8));
+
+        return true;
+    }
+
+    return false;
+}
+
+// MulUpperSS: rd = (Int128(ra) * Int128(rb)) >> 64
+bool jit_emit_mul_upper_s_s(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t ra,
+    uint8_t rb,
+    uint8_t rd)
+{
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load ra and rb
+        a->mov(x86::rax, x86::qword_ptr(rbx, ra * 8));
+        a->mov(x86::r8, x86::qword_ptr(rbx, rb * 8));
+
+        // Signed multiply: rdx:rax = rax * r8
+        a->imul(x86::r8);
+
+        // Store high half (rdx) to rd
+        a->mov(x86::qword_ptr(rbx, rd * 8), x86::rdx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
+
+        // Load ra and rb into temporary registers
+        a->ldr(a64::x0, a64::ptr(a64::x19, ra * 8));
+        a->ldr(a64::x1, a64::ptr(a64::x19, rb * 8));
+
+        // Multiply signed high: x2 = (x0 * x1) >> 64
+        a->smulh(a64::x2, a64::x0, a64::x1);
+
+        // Store result to rd
+        a->str(a64::x2, a64::ptr(a64::x19, rd * 8));
 
         return true;
     }
@@ -5579,8 +6586,8 @@ bool jit_emit_set_lt_u(
         auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
 
         // Load ra and rb into temporary registers
-        a->ldr(a64::x0, a64::ptr(a64::x29, ra * 8));
-        a->ldr(a64::x1, a64::ptr(a64::x29, rb * 8));
+        a->ldr(a64::x0, a64::ptr(a64::x19, ra * 8));
+        a->ldr(a64::x1, a64::ptr(a64::x19, rb * 8));
 
         // Compare: ra - rb (unsigned)
         a->cmp(a64::x0, a64::x1);
@@ -5589,7 +6596,7 @@ bool jit_emit_set_lt_u(
         a->cset(a64::x2, asmjit::a64::CondCode::kLO);
 
         // Store result to rd
-        a->str(a64::x2, a64::ptr(a64::x29, rd * 8));
+        a->str(a64::x2, a64::ptr(a64::x19, rd * 8));
 
         return true;
     }
@@ -5627,8 +6634,8 @@ bool jit_emit_set_lt_s(
         auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
 
         // Load ra and rb into temporary registers
-        a->ldr(a64::x0, a64::ptr(a64::x29, ra * 8));
-        a->ldr(a64::x1, a64::ptr(a64::x29, rb * 8));
+        a->ldr(a64::x0, a64::ptr(a64::x19, ra * 8));
+        a->ldr(a64::x1, a64::ptr(a64::x19, rb * 8));
 
         // Compare: ra - rb (signed)
         a->cmp(a64::x0, a64::x1);
@@ -5637,7 +6644,7 @@ bool jit_emit_set_lt_s(
         a->cset(a64::x2, asmjit::a64::CondCode::kLT);
 
         // Store result to rd
-        a->str(a64::x2, a64::ptr(a64::x29, rd * 8));
+        a->str(a64::x2, a64::ptr(a64::x19, rd * 8));
 
         return true;
     }
@@ -5676,18 +6683,18 @@ bool jit_emit_cmov_iz(
         auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
 
         // Load ra and rd into temporary registers
-        a->ldr(a64::x0, a64::ptr(a64::x29, ra * 8));
-        a->ldr(a64::x2, a64::ptr(a64::x29, rd * 8));
+        a->ldr(a64::x0, a64::ptr(a64::x19, ra * 8));
+        a->ldr(a64::x2, a64::ptr(a64::x19, rd * 8));
 
         // Load rb and compare with 0
-        a->ldr(a64::x1, a64::ptr(a64::x29, rb * 8));
+        a->ldr(a64::x1, a64::ptr(a64::x19, rb * 8));
         a->cmp(a64::x1, 0);
 
         // Conditional move: if rb == 0, move x0 to x2, else keep x2
         a->csel(a64::x2, a64::x0, a64::x2, asmjit::a64::CondCode::kEQ);
 
         // Store result to rd
-        a->str(a64::x2, a64::ptr(a64::x29, rd * 8));
+        a->str(a64::x2, a64::ptr(a64::x19, rd * 8));
 
         return true;
     }
@@ -5726,18 +6733,122 @@ bool jit_emit_cmov_nz(
         auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
 
         // Load ra and rd into temporary registers
-        a->ldr(a64::x0, a64::ptr(a64::x29, ra * 8));
-        a->ldr(a64::x2, a64::ptr(a64::x29, rd * 8));
+        a->ldr(a64::x0, a64::ptr(a64::x19, ra * 8));
+        a->ldr(a64::x2, a64::ptr(a64::x19, rd * 8));
 
         // Load rb and compare with 0
-        a->ldr(a64::x1, a64::ptr(a64::x29, rb * 8));
+        a->ldr(a64::x1, a64::ptr(a64::x19, rb * 8));
         a->cmp(a64::x1, 0);
 
         // Conditional move: if rb != 0, move x0 to x2, else keep x2
         a->csel(a64::x2, a64::x0, a64::x2, asmjit::a64::CondCode::kNE);
 
         // Store result to rd
-        a->str(a64::x2, a64::ptr(a64::x29, rd * 8));
+        a->str(a64::x2, a64::ptr(a64::x19, rd * 8));
+
+        return true;
+    }
+
+    return false;
+}
+
+// CmovIzImm: dest = (src == 0) ? immediate : dest
+bool jit_emit_cmov_iz_imm(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t dest_reg,
+    uint8_t src_reg,
+    uint32_t immediate)
+{
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load immediate into rax
+        a->mov(x86::rax, immediate);
+
+        // Load current dest value into rdx
+        a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+
+        // Test src
+        a->cmp(x86::qword_ptr(rbx, src_reg * 8), 0);
+
+        // Conditional move: if src == 0, move immediate (rax) to dest (rdx)
+        a->cmovz(x86::rdx, x86::rax);
+
+        // Store result to dest
+        a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
+
+        // Load immediate into x0
+        a->mov(a64::x0, immediate);
+
+        // Load current dest value into x2
+        a->ldr(a64::x2, a64::ptr(a64::x19, dest_reg * 8));
+
+        // Load src and compare with 0
+        a->ldr(a64::x1, a64::ptr(a64::x19, src_reg * 8));
+        a->cmp(a64::x1, 0);
+
+        // Conditional move: if src == 0, move immediate (x0) to dest (x2), else keep dest
+        a->csel(a64::x2, a64::x0, a64::x2, asmjit::a64::CondCode::kEQ);
+
+        // Store result to dest
+        a->str(a64::x2, a64::ptr(a64::x19, dest_reg * 8));
+
+        return true;
+    }
+
+    return false;
+}
+
+// CmovNzImm: dest = (src != 0) ? immediate : dest
+bool jit_emit_cmov_nz_imm(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t dest_reg,
+    uint8_t src_reg,
+    uint32_t immediate)
+{
+    if (strcmp(target_arch, "x86_64") == 0) {
+        auto* a = static_cast<x86::Assembler*>(assembler);
+
+        // Load immediate into rax
+        a->mov(x86::rax, immediate);
+
+        // Load current dest value into rdx
+        a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+
+        // Test src
+        a->cmp(x86::qword_ptr(rbx, src_reg * 8), 0);
+
+        // Conditional move: if src != 0, move immediate (rax) to dest (rdx)
+        a->cmovnz(x86::rdx, x86::rax);
+
+        // Store result to dest
+        a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+
+        return true;
+    } else if (strcmp(target_arch, "aarch64") == 0) {
+        auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
+
+        // Load immediate into x0
+        a->mov(a64::x0, immediate);
+
+        // Load current dest value into x2
+        a->ldr(a64::x2, a64::ptr(a64::x19, dest_reg * 8));
+
+        // Load src and compare with 0
+        a->ldr(a64::x1, a64::ptr(a64::x19, src_reg * 8));
+        a->cmp(a64::x1, 0);
+
+        // Conditional move: if src != 0, move immediate (x0) to dest (x2), else keep dest
+        a->csel(a64::x2, a64::x0, a64::x2, asmjit::a64::CondCode::kNE);
+
+        // Store result to dest
+        a->str(a64::x2, a64::ptr(a64::x19, dest_reg * 8));
 
         return true;
     }
@@ -5773,8 +6884,8 @@ bool jit_emit_rol_64(
         auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
 
         // Load ra and rb into temporary registers
-        a->ldr(a64::x0, a64::ptr(a64::x29, ra * 8));
-        a->ldr(a64::x1, a64::ptr(a64::x29, rb * 8));
+        a->ldr(a64::x0, a64::ptr(a64::x19, ra * 8));
+        a->ldr(a64::x1, a64::ptr(a64::x19, rb * 8));
 
         // ARM64 doesn't have register-based rotate instructions
         // Implement left rotate using shift combination:
@@ -5796,7 +6907,7 @@ bool jit_emit_rol_64(
         a->orr(a64::x2, a64::x4, a64::x5);
 
         // Store result to rd
-        a->str(a64::x2, a64::ptr(a64::x29, rd * 8));
+        a->str(a64::x2, a64::ptr(a64::x19, rd * 8));
 
         return true;
     }
@@ -5832,8 +6943,8 @@ bool jit_emit_ror_64(
         auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
 
         // Load ra and rb into temporary registers
-        a->ldr(a64::x0, a64::ptr(a64::x29, ra * 8));
-        a->ldr(a64::x1, a64::ptr(a64::x29, rb * 8));
+        a->ldr(a64::x0, a64::ptr(a64::x19, ra * 8));
+        a->ldr(a64::x1, a64::ptr(a64::x19, rb * 8));
 
         // ARM64 doesn't have register-based rotate instructions
         // Implement right rotate using shift combination:
@@ -5855,7 +6966,7 @@ bool jit_emit_ror_64(
         a->orr(a64::x2, a64::x4, a64::x5);
 
         // Store result to rd
-        a->str(a64::x2, a64::ptr(a64::x29, rd * 8));
+        a->str(a64::x2, a64::ptr(a64::x19, rd * 8));
 
         return true;
     }
