@@ -273,7 +273,7 @@ bool jit_emit_load_imm_u32(
 
     // Store to VM register array
     // [VM_REGISTERS_PTR + dest_reg * 8]
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -343,7 +343,7 @@ bool jit_emit_load_imm_u8(
     a->mov(x86::rax, immediate);
 
     // Store to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -365,7 +365,7 @@ bool jit_emit_load_imm_u16(
     a->mov(x86::rax, immediate);
 
     // Store to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -387,7 +387,7 @@ bool jit_emit_load_imm_u64(
     a->mov(x86::rax, immediate);
 
     // Store to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -410,7 +410,7 @@ bool jit_emit_load_imm_s32(
     a->movsxd(x86::rax, x86::dword_ptr(reinterpret_cast<intptr_t>(&immediate)));
 
     // Store to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -1901,10 +1901,10 @@ bool jit_emit_div_u32(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load dividend (dest_reg) into eax
-        a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+        a->mov(x86::eax, x86::dword_ptr(x86::rbx, dest_reg * 8));
 
         // Load divisor (src_reg) into ecx
-        a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
+        a->mov(x86::ecx, x86::dword_ptr(x86::rbx, src_reg * 8));
 
         // Zero-extend eax into edx:eax (dividend)
         a->xor_(x86::edx, x86::edx);
@@ -1913,7 +1913,7 @@ bool jit_emit_div_u32(
         a->div(x86::ecx);
 
         // Store quotient back to VM register array
-        a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+        a->mov(x86::dword_ptr(x86::rbx, dest_reg * 8), x86::eax);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -1953,10 +1953,10 @@ bool jit_emit_div_s32(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load dividend (dest_reg) into eax
-        a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+        a->mov(x86::eax, x86::dword_ptr(x86::rbx, dest_reg * 8));
 
         // Load divisor (src_reg) into ecx
-        a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
+        a->mov(x86::ecx, x86::dword_ptr(x86::rbx, src_reg * 8));
 
         // Sign extend dividend in eax to edx:eax
         a->cdq();
@@ -1965,7 +1965,7 @@ bool jit_emit_div_s32(
         a->idiv(x86::ecx);
 
         // Store quotient back to VM register array
-        a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+        a->mov(x86::dword_ptr(x86::rbx, dest_reg * 8), x86::eax);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -2004,10 +2004,10 @@ bool jit_emit_rem_u32(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load dividend (dest_reg) into eax
-        a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+        a->mov(x86::eax, x86::dword_ptr(x86::rbx, dest_reg * 8));
 
         // Load divisor (src_reg) into ecx
-        a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
+        a->mov(x86::ecx, x86::dword_ptr(x86::rbx, src_reg * 8));
 
         // Zero-extend eax into edx:eax (dividend)
         a->xor_(x86::edx, x86::edx);
@@ -2016,7 +2016,7 @@ bool jit_emit_rem_u32(
         a->div(x86::ecx);
 
         // Store remainder back to VM register array
-        a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::edx);
+        a->mov(x86::dword_ptr(x86::rbx, dest_reg * 8), x86::edx);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -2061,10 +2061,10 @@ bool jit_emit_rem_s32(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load dividend (dest_reg) into eax
-        a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+        a->mov(x86::eax, x86::dword_ptr(x86::rbx, dest_reg * 8));
 
         // Load divisor (src_reg) into ecx
-        a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
+        a->mov(x86::ecx, x86::dword_ptr(x86::rbx, src_reg * 8));
 
         // Sign extend dividend in eax to edx:eax
         a->cdq();
@@ -2073,7 +2073,7 @@ bool jit_emit_rem_s32(
         a->idiv(x86::ecx);
 
         // Store remainder back to VM register array
-        a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::edx);
+        a->mov(x86::dword_ptr(x86::rbx, dest_reg * 8), x86::edx);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -2120,10 +2120,10 @@ bool jit_emit_shlo_l_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (shift count)
-    a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::ecx, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array (value to shift)
-    a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::edx, x86::dword_ptr(x86::rbx, dest_reg * 8));
 
     // Mask shift count to 5 bits
     a->and_(x86::ecx, 0x1F);
@@ -2132,7 +2132,7 @@ bool jit_emit_shlo_l_32(
     a->shl(x86::edx, x86::cl);
 
     // Store result back to VM register array
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::edx);
+    a->mov(x86::dword_ptr(x86::rbx, dest_reg * 8), x86::edx);
 
     return true;
 }
@@ -2151,10 +2151,10 @@ bool jit_emit_shlo_r_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (shift count)
-    a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::ecx, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array (value to shift)
-    a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::edx, x86::dword_ptr(x86::rbx, dest_reg * 8));
 
     // Mask shift count to 5 bits
     a->and_(x86::ecx, 0x1F);
@@ -2163,7 +2163,7 @@ bool jit_emit_shlo_r_32(
     a->shr(x86::edx, x86::cl);
 
     // Store result back to VM register array
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::edx);
+    a->mov(x86::dword_ptr(x86::rbx, dest_reg * 8), x86::edx);
 
     return true;
 }
@@ -2182,10 +2182,10 @@ bool jit_emit_shar_r_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (shift count)
-    a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::ecx, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array (value to shift)
-    a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::edx, x86::dword_ptr(x86::rbx, dest_reg * 8));
 
     // Mask shift count to 5 bits
     a->and_(x86::ecx, 0x1F);
@@ -2194,7 +2194,7 @@ bool jit_emit_shar_r_32(
     a->sar(x86::edx, x86::cl);
 
     // Store result back to VM register array
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::edx);
+    a->mov(x86::dword_ptr(x86::rbx, dest_reg * 8), x86::edx);
 
     return true;
 }
@@ -2213,10 +2213,10 @@ bool jit_emit_shlo_l_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (shift count)
-    a->mov(x86::rcx, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rcx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array (value to shift)
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Mask shift count to 6 bits
     a->and_(x86::rcx, 0x3F);
@@ -2225,7 +2225,7 @@ bool jit_emit_shlo_l_64(
     a->shl(x86::rdx, x86::cl);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -2244,10 +2244,10 @@ bool jit_emit_shlo_r_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (shift count)
-    a->mov(x86::rcx, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rcx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array (value to shift)
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Mask shift count to 6 bits
     a->and_(x86::rcx, 0x3F);
@@ -2256,7 +2256,7 @@ bool jit_emit_shlo_r_64(
     a->shr(x86::rdx, x86::cl);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -2275,10 +2275,10 @@ bool jit_emit_shar_r_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (shift count)
-    a->mov(x86::rcx, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rcx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array (value to shift)
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Mask shift count to 6 bits
     a->and_(x86::rcx, 0x3F);
@@ -2287,7 +2287,7 @@ bool jit_emit_shar_r_64(
     a->sar(x86::rdx, x86::cl);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -2308,10 +2308,10 @@ bool jit_emit_rot_l_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load rb (shift count) from VM array
-    a->mov(x86::ecx, x86::dword_ptr(rbx, rb * 8));
+    a->mov(x86::ecx, x86::dword_ptr(x86::rbx, rb * 8));
 
     // Load ra (value to rotate) from VM array
-    a->mov(x86::edx, x86::dword_ptr(rbx, ra * 8));
+    a->mov(x86::edx, x86::dword_ptr(x86::rbx, ra * 8));
 
     // Mask shift count to 5 bits (x86 requires this for rotate)
     a->and_(x86::ecx, 0x1F);
@@ -2320,7 +2320,7 @@ bool jit_emit_rot_l_32(
     a->rol(x86::edx, x86::cl);
 
     // Store result to rd in VM register array
-    a->mov(x86::dword_ptr(rbx, rd * 8), x86::edx);
+    a->mov(x86::dword_ptr(x86::rbx, rd * 8), x86::edx);
 
     return true;
 }
@@ -2341,10 +2341,10 @@ bool jit_emit_rot_r_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load rb (shift count) from VM array
-    a->mov(x86::ecx, x86::dword_ptr(rbx, rb * 8));
+    a->mov(x86::ecx, x86::dword_ptr(x86::rbx, rb * 8));
 
     // Load ra (value to rotate) from VM array
-    a->mov(x86::edx, x86::dword_ptr(rbx, ra * 8));
+    a->mov(x86::edx, x86::dword_ptr(x86::rbx, ra * 8));
 
     // Mask shift count to 5 bits (x86 requires this for rotate)
     a->and_(x86::ecx, 0x1F);
@@ -2353,7 +2353,7 @@ bool jit_emit_rot_r_32(
     a->ror(x86::edx, x86::cl);
 
     // Store result to rd in VM register array
-    a->mov(x86::dword_ptr(rbx, rd * 8), x86::edx);
+    a->mov(x86::dword_ptr(x86::rbx, rd * 8), x86::edx);
 
     return true;
 }
@@ -2372,10 +2372,10 @@ bool jit_emit_eq(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Compare: dest - src
     // Set flags, result is 0 if equal, 1 if dest > src, -1 if dest < src
@@ -2390,7 +2390,7 @@ bool jit_emit_eq(
     a->movzx(x86::rax, x86::al);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -2409,10 +2409,10 @@ bool jit_emit_ne(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Compare: dest - src
     a->cmp(x86::rdx, x86::rax);
@@ -2425,7 +2425,7 @@ bool jit_emit_ne(
     a->movzx(x86::rax, x86::al);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -2444,10 +2444,10 @@ bool jit_emit_lt_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::edx, x86::dword_ptr(x86::rbx, dest_reg * 8));
 
     // Compare: dest - src (signed)
     a->cmp(x86::edx, x86::eax);
@@ -2460,7 +2460,7 @@ bool jit_emit_lt_32(
     a->movzx(x86::rax, x86::al);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -2479,10 +2479,10 @@ bool jit_emit_lt_u_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::edx, x86::dword_ptr(x86::rbx, dest_reg * 8));
 
     // Compare: dest - src (unsigned)
     a->cmp(x86::edx, x86::eax);
@@ -2495,7 +2495,7 @@ bool jit_emit_lt_u_32(
     a->movzx(x86::rax, x86::al);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -2514,10 +2514,10 @@ bool jit_emit_gt_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::edx, x86::dword_ptr(x86::rbx, dest_reg * 8));
 
     // Compare: dest - src (signed)
     a->cmp(x86::edx, x86::eax);
@@ -2530,7 +2530,7 @@ bool jit_emit_gt_32(
     a->movzx(x86::rax, x86::al);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -2549,10 +2549,10 @@ bool jit_emit_gt_u_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::edx, x86::dword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::edx, x86::dword_ptr(x86::rbx, dest_reg * 8));
 
     // Compare: dest - src (unsigned)
     a->cmp(x86::edx, x86::eax);
@@ -2565,7 +2565,7 @@ bool jit_emit_gt_u_32(
     a->movzx(x86::rax, x86::al);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -2715,7 +2715,7 @@ bool jit_emit_load_imm_jump(
 
         // Load immediate into destination register (zero-extended)
         a->mov(x86::rax, value);
-        a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
         // Update PC
         a->mov(x86::r15d, target_pc);
@@ -2757,10 +2757,10 @@ bool jit_emit_load_imm_jump_ind(
 
         // Load immediate into destination register (zero-extended)
         a->mov(x86::rax, value);
-        a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
         // Load target address from src register
-        a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
         
         // Add offset
         a->add(x86::rax, offset);
@@ -2808,7 +2808,7 @@ bool jit_emit_jump_ind(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load target address from register
-        a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
         // Add offset to get target address
         a->add(x86::rax, offset);
@@ -3485,10 +3485,10 @@ bool jit_emit_branch_lt(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load src1 from VM array
-        a->mov(x86::rax, x86::qword_ptr(rbx, src1_reg * 8));
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src1_reg * 8));
 
         // Load src2 from VM array
-        a->mov(x86::rdx, x86::qword_ptr(rbx, src2_reg * 8));
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src2_reg * 8));
 
         // Compare registers (signed)
         a->cmp(x86::rax, x86::rdx);
@@ -3551,10 +3551,10 @@ bool jit_emit_branch_lt_u(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load src1 from VM array
-        a->mov(x86::rax, x86::qword_ptr(rbx, src1_reg * 8));
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src1_reg * 8));
 
         // Load src2 from VM array
-        a->mov(x86::rdx, x86::qword_ptr(rbx, src2_reg * 8));
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src2_reg * 8));
 
         // Compare registers (unsigned)
         a->cmp(x86::rax, x86::rdx);
@@ -3617,10 +3617,10 @@ bool jit_emit_branch_gt(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load src1 from VM array
-        a->mov(x86::rax, x86::qword_ptr(rbx, src1_reg * 8));
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src1_reg * 8));
 
         // Load src2 from VM array
-        a->mov(x86::rdx, x86::qword_ptr(rbx, src2_reg * 8));
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src2_reg * 8));
 
         // Compare registers (signed)
         a->cmp(x86::rax, x86::rdx);
@@ -3683,10 +3683,10 @@ bool jit_emit_branch_gt_u(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load src1 from VM array
-        a->mov(x86::rax, x86::qword_ptr(rbx, src1_reg * 8));
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, src1_reg * 8));
 
         // Load src2 from VM array
-        a->mov(x86::rdx, x86::qword_ptr(rbx, src2_reg * 8));
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src2_reg * 8));
 
         // Compare registers (unsigned)
         a->cmp(x86::rax, x86::rdx);
@@ -3749,10 +3749,10 @@ bool jit_emit_max(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Compare: dest - src (signed)
     a->cmp(x86::rdx, x86::rax);
@@ -3762,7 +3762,7 @@ bool jit_emit_max(
     a->cmovge(x86::rdx, x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -3781,10 +3781,10 @@ bool jit_emit_max_u(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Compare: dest - src (unsigned)
     a->cmp(x86::rdx, x86::rax);
@@ -3794,7 +3794,7 @@ bool jit_emit_max_u(
     a->cmovae(x86::rdx, x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -3813,10 +3813,10 @@ bool jit_emit_min(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Compare: dest - src (signed)
     a->cmp(x86::rdx, x86::rax);
@@ -3826,7 +3826,7 @@ bool jit_emit_min(
     a->cmovle(x86::rdx, x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -3845,10 +3845,10 @@ bool jit_emit_min_u(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Compare: dest - src (unsigned)
     a->cmp(x86::rdx, x86::rax);
@@ -3858,7 +3858,7 @@ bool jit_emit_min_u(
     a->cmovbe(x86::rdx, x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -3877,10 +3877,10 @@ bool jit_emit_and_inv(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Invert source
     a->not_(x86::rax);
@@ -3889,7 +3889,7 @@ bool jit_emit_and_inv(
     a->and_(x86::rdx, x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -3908,10 +3908,10 @@ bool jit_emit_or_inv(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Invert source
     a->not_(x86::rax);
@@ -3920,7 +3920,7 @@ bool jit_emit_or_inv(
     a->or_(x86::rdx, x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -3939,10 +3939,10 @@ bool jit_emit_xnor(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // XOR: dest = dest ^ src
     a->xor_(x86::rdx, x86::rax);
@@ -3951,7 +3951,7 @@ bool jit_emit_xnor(
     a->not_(x86::rdx);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -3971,13 +3971,13 @@ bool jit_emit_lea(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load pointer register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
     // Calculate effective address: ptr + offset
     a->add(x86::rax, offset);
 
     // Store result to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -3996,7 +3996,7 @@ bool jit_emit_leading_zeros(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Save original value for zero check
     a->mov(x86::rdx, x86::rax);
@@ -4008,7 +4008,7 @@ bool jit_emit_leading_zeros(
     a->lzcnt(x86::rax, x86::rdx);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4027,7 +4027,7 @@ bool jit_emit_trailing_zeros(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Test if value is zero
     a->test(x86::rax, x86::rax);
@@ -4042,7 +4042,7 @@ bool jit_emit_trailing_zeros(
     a->cmovne(x86::rdx, x86::rax);  // If not zero, use bsf result
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -4061,14 +4061,14 @@ bool jit_emit_pop_count(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Count set bits using popcnt (SSE4.2 instruction)
     // This is widely available on modern x86_64 processors
     a->popcnt(x86::rax, x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4087,13 +4087,13 @@ bool jit_emit_zero_extend_8(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (8-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Zero-extend 8-bit to 64-bit
     a->movzx(x86::rax, x86::al);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4112,13 +4112,13 @@ bool jit_emit_zero_extend_16(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (16-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Zero-extend 16-bit to 64-bit
     a->movzx(x86::rax, x86::ax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4137,13 +4137,13 @@ bool jit_emit_zero_extend_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Zero-extend 32-bit to 64-bit (mov to rax automatically zero-extends)
     a->mov(x86::rax, x86::eax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4162,10 +4162,10 @@ bool jit_emit_sign_extend_8(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (8-bit)
-    a->movsx(x86::rax, x86::byte_ptr(rbx, src_reg * 8));
+    a->movsx(x86::rax, x86::byte_ptr(x86::rbx, src_reg * 8));
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4184,10 +4184,10 @@ bool jit_emit_sign_extend_16(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (16-bit)
-    a->movsx(x86::rax, x86::word_ptr(rbx, src_reg * 8));
+    a->movsx(x86::rax, x86::word_ptr(x86::rbx, src_reg * 8));
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4206,10 +4206,10 @@ bool jit_emit_sign_extend_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (32-bit)
-    a->movsx(x86::rax, x86::dword_ptr(rbx, src_reg * 8));
+    a->movsx(x86::rax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4229,13 +4229,13 @@ bool jit_emit_load_u32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load pointer register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
     // Load unsigned dword from memory at [ptr + offset]
     a->mov(x86::eax, x86::dword_ptr(x86::r12, x86::rax, 1, offset));
 
     // Zero-extend and store to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4255,13 +4255,13 @@ bool jit_emit_load_i32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load pointer register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
     // Load signed dword from memory at [ptr + offset] with sign extension
     a->movsx(x86::rax, x86::dword_ptr(x86::r12, x86::rax, 1, offset));
 
     // Store to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4280,10 +4280,10 @@ bool jit_emit_copy(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Store to destination register in VM array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4304,22 +4304,22 @@ bool jit_emit_select(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load condition register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, condition_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, condition_reg * 8));
 
     // Test if condition is non-zero
     a->test(x86::rax, x86::rax);
 
     // Load true value
-    a->mov(x86::rdx, x86::qword_ptr(rbx, true_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, true_reg * 8));
 
     // Load false value
-    a->mov(x86::rcx, x86::qword_ptr(rbx, false_reg * 8));
+    a->mov(x86::rcx, x86::qword_ptr(x86::rbx, false_reg * 8));
 
     // Conditional move: if condition != 0, move rdx to rax, else move rcx to rax
     a->cmovne(x86::rdx, x86::rcx);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -4339,10 +4339,10 @@ bool jit_emit_store_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load pointer register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
     // Load source value from VM array (32-bit)
-    a->mov(x86::edx, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::edx, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Store dword to memory at [ptr + offset]
     a->mov(x86::dword_ptr(x86::r12, x86::rax, 1, offset), x86::edx);
@@ -4365,10 +4365,10 @@ bool jit_emit_store_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load pointer register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
     // Load source value from VM array (64-bit)
-    a->mov(x86::rdx, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Store qword to memory at [ptr + offset]
     a->mov(x86::qword_ptr(x86::r12, x86::rax, 1, offset), x86::rdx);
@@ -4391,10 +4391,10 @@ bool jit_emit_store_16(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load pointer register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
     // Load source value from VM array (16-bit)
-    a->movzx(x86::edx, x86::word_ptr(rbx, src_reg * 8));
+    a->movzx(x86::edx, x86::word_ptr(x86::rbx, src_reg * 8));
 
     // Store word to memory at [ptr + offset]
     a->mov(x86::word_ptr(x86::r12, x86::rax, 1, offset), x86::dx);
@@ -4417,10 +4417,10 @@ bool jit_emit_store_8(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load pointer register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
     // Load source value from VM array (8-bit)
-    a->movzx(x86::edx, x86::byte_ptr(rbx, src_reg * 8));
+    a->movzx(x86::edx, x86::byte_ptr(x86::rbx, src_reg * 8));
 
     // Store byte to memory at [ptr + offset]
     a->mov(x86::byte_ptr(x86::r12, x86::rax, 1, offset), x86::dl);
@@ -4447,7 +4447,7 @@ bool jit_emit_add_imm_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Add immediate
     if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
@@ -4458,7 +4458,7 @@ bool jit_emit_add_imm_64(
     }
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4483,13 +4483,13 @@ bool jit_emit_neg_add_imm_64(
     a->mov(x86::rax, immediate);
 
     // Load src register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Subtract src from immediate: rax = immediate - src
     a->sub(x86::rax, x86::rdx);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4509,7 +4509,7 @@ bool jit_emit_and_imm(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // AND with immediate
     if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
@@ -4520,7 +4520,7 @@ bool jit_emit_and_imm(
     }
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4540,7 +4540,7 @@ bool jit_emit_or_imm(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // OR with immediate
     if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
@@ -4551,7 +4551,7 @@ bool jit_emit_or_imm(
     }
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4571,7 +4571,7 @@ bool jit_emit_xor_imm(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // XOR with immediate
     if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
@@ -4582,7 +4582,7 @@ bool jit_emit_xor_imm(
     }
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4602,13 +4602,13 @@ bool jit_emit_memset(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load pointer from VM array
-    a->mov(x86::rdi, x86::qword_ptr(rbx, ptr_reg * 8));
+    a->mov(x86::rdi, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
     // Load value from VM array (8-bit)
-    a->movzx(x86::rsi, x86::byte_ptr(rbx, value_reg * 8));
+    a->movzx(x86::rsi, x86::byte_ptr(x86::rbx, value_reg * 8));
 
     // Load count from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, count_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, count_reg * 8));
 
     // Save VM registers that will be clobbered
     a->push(x86::rbx);
@@ -4645,13 +4645,13 @@ bool jit_emit_memcpy(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load destination pointer from VM array
-    a->mov(x86::rdi, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdi, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Load source pointer from VM array
-    a->mov(x86::rsi, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rsi, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load count from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, count_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, count_reg * 8));
 
     // Save VM registers that will be clobbered
     a->push(x86::rbx);
@@ -4689,7 +4689,7 @@ bool jit_emit_load_imm_32(
     a->mov(x86::eax, immediate);
 
     // Store to VM register array (zero-extended to 64-bit)
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4711,7 +4711,7 @@ bool jit_emit_load_imm_64(
     a->mov(x86::rax, immediate);
 
     // Store to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4730,7 +4730,7 @@ bool jit_emit_load_imm_32_hi(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load current value from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Clear high 32 bits
     a->mov(x86::eax, x86::eax);  // This zero-extends eax to rax
@@ -4740,7 +4740,7 @@ bool jit_emit_load_imm_32_hi(
     a->or_(x86::rax, immediate);
 
     // Store to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4760,13 +4760,13 @@ bool jit_emit_mul_imm_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Multiply by immediate (signed 32-bit) using imul
     a->imul(x86::eax, immediate);
 
     // Store result back to VM register array (zero-extended to 64-bit)
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4786,7 +4786,7 @@ bool jit_emit_mul_imm_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array (64-bit)
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Multiply by immediate (signed 64-bit) using imul
     if (immediate >= INT32_MIN && immediate <= INT32_MAX) {
@@ -4797,7 +4797,7 @@ bool jit_emit_mul_imm_64(
     }
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4822,7 +4822,7 @@ bool jit_emit_div_u32_imm(
     }
 
     // Load src register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Zero-extend to 64-bit
     a->mov(x86::edx, 0);
@@ -4832,7 +4832,7 @@ bool jit_emit_div_u32_imm(
     a->div(x86::ecx);  // eax = eax / ecx
 
     // Store result back to VM register array (zero-extended to 64-bit)
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4857,7 +4857,7 @@ bool jit_emit_div_s32_imm(
     }
 
     // Load src register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Handle overflow case: INT_MIN / -1
     if (immediate == -1) {
@@ -4899,7 +4899,7 @@ bool jit_emit_div_s32_imm(
     // But idiv is special. It operates on edx:eax.
     // Actually, idiv eax, ... writes to eax and edx. The upper 32 bits of rax are zeroed.
     // So writing rax is correct for zero-extension.
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4924,7 +4924,7 @@ bool jit_emit_rem_u32_imm(
     }
 
     // Load src register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Zero-extend to 64-bit
     a->mov(x86::edx, 0);
@@ -4938,7 +4938,7 @@ bool jit_emit_rem_u32_imm(
     // mov edx to memory? No, we want zero extension.
     // mov eax, edx -> zeroes upper rax.
     a->mov(x86::eax, x86::edx);
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -4963,7 +4963,7 @@ bool jit_emit_rem_s32_imm(
     }
 
     // Load src register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Handle overflow case: INT_MIN / -1
     if (immediate == -1) {
@@ -5003,7 +5003,7 @@ bool jit_emit_rem_s32_imm(
     }
 
     // Store remainder back to VM register array (zero-extended to 64-bit)
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5021,13 +5021,13 @@ bool jit_emit_neg(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load dest register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Negate: rax = -rax
     a->neg(x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5045,13 +5045,13 @@ bool jit_emit_not(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load dest register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Bitwise NOT: rax = ~rax
     a->not_(x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5069,7 +5069,7 @@ bool jit_emit_abs(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load dest register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Save original value
     a->mov(x86::rdx, x86::rax);
@@ -5083,7 +5083,7 @@ bool jit_emit_abs(
     a->cmovl(x86::rax, x86::rdx);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5103,13 +5103,13 @@ bool jit_emit_add_imm_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Add immediate
     a->add(x86::eax, immediate);
 
     // Store result back to VM register array (zero-extended to 64-bit)
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5134,13 +5134,13 @@ bool jit_emit_neg_add_imm_32(
     a->mov(x86::eax, immediate);
 
     // Load src register from VM array (32-bit)
-    a->mov(x86::edx, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::edx, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Subtract src from immediate: eax = immediate - src
     a->sub(x86::eax, x86::edx);
 
     // Store result back to VM register array (zero-extended to 64-bit)
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5160,13 +5160,13 @@ bool jit_emit_and_imm_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // AND with immediate
     a->and_(x86::eax, immediate);
 
     // Store result back to VM register array (zero-extended to 64-bit)
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5186,13 +5186,13 @@ bool jit_emit_or_imm_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // OR with immediate
     a->or_(x86::eax, immediate);
 
     // Store result back to VM register array (zero-extended to 64-bit)
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5212,13 +5212,13 @@ bool jit_emit_xor_imm_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // XOR with immediate
     a->xor_(x86::eax, immediate);
 
     // Store result back to VM register array (zero-extended to 64-bit)
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5238,7 +5238,7 @@ bool jit_emit_shl_imm_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Mask immediate to 5 bits for 32-bit shift
     uint8_t shift_count = immediate & 0x1F;
@@ -5247,7 +5247,7 @@ bool jit_emit_shl_imm_32(
     a->shl(x86::eax, shift_count);
 
     // Store result back to VM register array (zero-extended to 64-bit)
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5267,7 +5267,7 @@ bool jit_emit_shr_imm_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Mask immediate to 5 bits for 32-bit shift
     uint8_t shift_count = immediate & 0x1F;
@@ -5276,7 +5276,7 @@ bool jit_emit_shr_imm_32(
     a->shr(x86::eax, shift_count);
 
     // Store result back to VM register array (zero-extended to 64-bit)
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5296,7 +5296,7 @@ bool jit_emit_sar_imm_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Mask immediate to 5 bits for 32-bit shift
     uint8_t shift_count = immediate & 0x1F;
@@ -5305,7 +5305,7 @@ bool jit_emit_sar_imm_32(
     a->sar(x86::eax, shift_count);
 
     // Store result back to VM register array (zero-extended to 64-bit)
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5325,7 +5325,7 @@ bool jit_emit_shl_imm_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array (64-bit)
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Mask immediate to 6 bits for 64-bit shift
     uint8_t shift_count = immediate & 0x3F;
@@ -5334,7 +5334,7 @@ bool jit_emit_shl_imm_64(
     a->shl(x86::rax, shift_count);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5354,7 +5354,7 @@ bool jit_emit_shr_imm_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array (64-bit)
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Mask immediate to 6 bits for 64-bit shift
     uint8_t shift_count = immediate & 0x3F;
@@ -5363,7 +5363,7 @@ bool jit_emit_shr_imm_64(
     a->shr(x86::rax, shift_count);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5383,7 +5383,7 @@ bool jit_emit_sar_imm_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array (64-bit)
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Mask immediate to 6 bits for 64-bit shift
     uint8_t shift_count = immediate & 0x3F;
@@ -5392,7 +5392,7 @@ bool jit_emit_sar_imm_64(
     a->sar(x86::rax, shift_count);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5412,7 +5412,7 @@ bool jit_emit_rot_l_imm_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Mask immediate to 5 bits for 32-bit rotate
     uint8_t rotate_count = immediate & 0x1F;
@@ -5421,7 +5421,7 @@ bool jit_emit_rot_l_imm_32(
     a->rol(x86::eax, rotate_count);
 
     // Store result back to VM register array (zero-extended to 64-bit)
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5441,7 +5441,7 @@ bool jit_emit_rot_r_imm_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Mask immediate to 5 bits for 32-bit rotate
     uint8_t rotate_count = immediate & 0x1F;
@@ -5450,7 +5450,7 @@ bool jit_emit_rot_r_imm_32(
     a->ror(x86::eax, rotate_count);
 
     // Store result back to VM register array (zero-extended to 64-bit)
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5470,7 +5470,7 @@ bool jit_emit_rot_l_imm_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array (64-bit)
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Mask immediate to 6 bits for 64-bit rotate
     uint8_t rotate_count = immediate & 0x3F;
@@ -5479,7 +5479,7 @@ bool jit_emit_rot_l_imm_64(
     a->rol(x86::rax, rotate_count);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5499,7 +5499,7 @@ bool jit_emit_rot_r_imm_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array (64-bit)
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Mask immediate to 6 bits for 64-bit rotate
     uint8_t rotate_count = immediate & 0x3F;
@@ -5508,7 +5508,7 @@ bool jit_emit_rot_r_imm_64(
     a->ror(x86::rax, rotate_count);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5528,7 +5528,7 @@ bool jit_emit_eq_imm(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Compare with immediate
     if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
@@ -5545,7 +5545,7 @@ bool jit_emit_eq_imm(
     a->movzx(x86::rax, x86::al);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5565,7 +5565,7 @@ bool jit_emit_ne_imm(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Compare with immediate
     if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
@@ -5582,7 +5582,7 @@ bool jit_emit_ne_imm(
     a->movzx(x86::rax, x86::al);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5602,7 +5602,7 @@ bool jit_emit_lt_imm(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Compare with immediate (signed)
     if (immediate >= INT32_MIN && immediate <= INT32_MAX) {
@@ -5619,7 +5619,7 @@ bool jit_emit_lt_imm(
     a->movzx(x86::rax, x86::al);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5639,7 +5639,7 @@ bool jit_emit_gt_imm(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Compare with immediate (signed)
     if (immediate >= INT32_MIN && immediate <= INT32_MAX) {
@@ -5656,7 +5656,7 @@ bool jit_emit_gt_imm(
     a->movzx(x86::rax, x86::al);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5676,7 +5676,7 @@ bool jit_emit_lt_imm_u(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Compare with immediate (unsigned)
     if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
@@ -5693,7 +5693,7 @@ bool jit_emit_lt_imm_u(
     a->movzx(x86::rax, x86::al);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5713,7 +5713,7 @@ bool jit_emit_gt_imm_u(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Compare with immediate (unsigned)
     if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
@@ -5730,7 +5730,7 @@ bool jit_emit_gt_imm_u(
     a->movzx(x86::rax, x86::al);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5749,7 +5749,7 @@ bool jit_emit_clz(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Count leading zeros using lzcnt
     a->lzcnt(x86::eax, x86::eax);
@@ -5758,7 +5758,7 @@ bool jit_emit_clz(
     a->movzx(x86::rax, x86::eax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5777,13 +5777,13 @@ bool jit_emit_clz_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Count leading zeros using lzcnt
     a->lzcnt(x86::rax, x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5802,7 +5802,7 @@ bool jit_emit_ctz(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Count trailing zeros using tzcnt
     a->tzcnt(x86::eax, x86::eax);
@@ -5811,7 +5811,7 @@ bool jit_emit_ctz(
     a->movzx(x86::rax, x86::eax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5830,13 +5830,13 @@ bool jit_emit_ctz_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Count trailing zeros using tzcnt
     a->tzcnt(x86::rax, x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5854,13 +5854,13 @@ bool jit_emit_bswap(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load dest register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Byte swap
     a->bswap(x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5878,13 +5878,13 @@ bool jit_emit_bswap_32(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load dest register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, dest_reg * 8));
 
     // Byte swap
     a->bswap(x86::eax);
 
     // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    a->mov(x86::dword_ptr(x86::rbx, dest_reg * 8), x86::eax);
 
     return true;
 }
@@ -5903,7 +5903,7 @@ bool jit_emit_ctpop(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (32-bit)
-    a->mov(x86::eax, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::eax, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Count set bits using popcnt
     a->popcnt(x86::eax, x86::eax);
@@ -5912,7 +5912,7 @@ bool jit_emit_ctpop(
     a->movzx(x86::rax, x86::eax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -5931,10 +5931,10 @@ bool jit_emit_sext_8(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (8-bit sign-extended)
-    a->movsx(x86::eax, x86::byte_ptr(rbx, src_reg * 8));
+    a->movsx(x86::eax, x86::byte_ptr(x86::rbx, src_reg * 8));
 
     // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    a->mov(x86::dword_ptr(x86::rbx, dest_reg * 8), x86::eax);
 
     return true;
 }
@@ -5953,10 +5953,10 @@ bool jit_emit_sext_16(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (16-bit sign-extended)
-    a->movsx(x86::eax, x86::word_ptr(rbx, src_reg * 8));
+    a->movsx(x86::eax, x86::word_ptr(x86::rbx, src_reg * 8));
 
     // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    a->mov(x86::dword_ptr(x86::rbx, dest_reg * 8), x86::eax);
 
     return true;
 }
@@ -5975,10 +5975,10 @@ bool jit_emit_zext_8(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (8-bit zero-extended)
-    a->movzx(x86::eax, x86::byte_ptr(rbx, src_reg * 8));
+    a->movzx(x86::eax, x86::byte_ptr(x86::rbx, src_reg * 8));
 
     // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    a->mov(x86::dword_ptr(x86::rbx, dest_reg * 8), x86::eax);
 
     return true;
 }
@@ -5997,10 +5997,10 @@ bool jit_emit_zext_16(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array (16-bit zero-extended)
-    a->movzx(x86::eax, x86::word_ptr(rbx, src_reg * 8));
+    a->movzx(x86::eax, x86::word_ptr(x86::rbx, src_reg * 8));
 
     // Store result back to VM register array (32-bit)
-    a->mov(x86::dword_ptr(rbx, dest_reg * 8), x86::eax);
+    a->mov(x86::dword_ptr(x86::rbx, dest_reg * 8), x86::eax);
 
     return true;
 }
@@ -6019,16 +6019,16 @@ bool jit_emit_mul_u_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Multiply unsigned (64-bit) - only keep low 64 bits
     a->imul(x86::rdx, x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6047,19 +6047,19 @@ bool jit_emit_div_u_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load dividend (dest_reg) into rax
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Zero-extend to rdx:rax
     a->xor_(x86::edx, x86::edx);
 
     // Load divisor (src_reg) into rcx (use qword_ptr for 64-bit)
-    a->mov(x86::rcx, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rcx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Divide unsigned: rax = rdx:rax / rcx
     a->div(x86::rcx);
 
     // Store quotient back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -6079,19 +6079,19 @@ bool jit_emit_div_s_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load dest register (dividend) from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Sign-extend to rdx:rax (cqo)
     a->cqo();
 
     // Load source register (divisor) from VM array
-    a->mov(x86::rcx, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rcx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Divide signed: rax = rdx:rax / rcx
     a->idiv(x86::rcx);
 
     // Store quotient back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -6110,19 +6110,19 @@ bool jit_emit_rem_u_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load dest register (dividend) from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Zero-extend to rdx:rax
     a->xor_(x86::edx, x86::edx);
 
     // Load source register (divisor) from VM array
-    a->mov(x86::rcx, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rcx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Divide unsigned: rax = quotient, rdx = remainder
     a->div(x86::rcx);
 
     // Store remainder back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6142,19 +6142,19 @@ bool jit_emit_rem_s_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load dest register (dividend) from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Sign-extend to rdx:rax (cqo)
     a->cqo();
 
     // Load source register (divisor) from VM array
-    a->mov(x86::rcx, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rcx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Divide signed: rax = quotient, rdx = remainder
     a->idiv(x86::rcx);
 
     // Store remainder back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6173,16 +6173,16 @@ bool jit_emit_and_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // AND: dest = dest & src
     a->and_(x86::rdx, x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6201,16 +6201,16 @@ bool jit_emit_or_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // OR: dest = dest | src
     a->or_(x86::rdx, x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6229,16 +6229,16 @@ bool jit_emit_xor_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // XOR: dest = dest ^ src
     a->xor_(x86::rdx, x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6257,16 +6257,16 @@ bool jit_emit_add_64_carry(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Add with carry
     a->add(x86::rdx, x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6285,16 +6285,16 @@ bool jit_emit_sub_64_borrow(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Subtract with borrow
     a->sub(x86::rdx, x86::rax);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6313,10 +6313,10 @@ bool jit_emit_sll_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load shift count from VM array
-    a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::ecx, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Mask shift count to 6 bits for 64-bit shift
     a->and_(x86::ecx, 0x3F);
@@ -6325,7 +6325,7 @@ bool jit_emit_sll_64(
     a->shl(x86::rdx, x86::cl);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6344,10 +6344,10 @@ bool jit_emit_srl_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load shift count from VM array
-    a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::ecx, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Mask shift count to 6 bits for 64-bit shift
     a->and_(x86::ecx, 0x3F);
@@ -6356,7 +6356,7 @@ bool jit_emit_srl_64(
     a->shr(x86::rdx, x86::cl);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6375,10 +6375,10 @@ bool jit_emit_sra_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load shift count from VM array
-    a->mov(x86::ecx, x86::dword_ptr(rbx, src_reg * 8));
+    a->mov(x86::ecx, x86::dword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Mask shift count to 6 bits for 64-bit shift
     a->and_(x86::ecx, 0x3F);
@@ -6387,7 +6387,7 @@ bool jit_emit_sra_64(
     a->sar(x86::rdx, x86::cl);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6406,10 +6406,10 @@ bool jit_emit_rol_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load rotate count from VM array
-    a->mov(x86::rcx, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rcx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Mask rotate count to 6 bits for 64-bit rotate
     a->and_(x86::rcx, 0x3F);
@@ -6418,7 +6418,7 @@ bool jit_emit_rol_64(
     a->rol(x86::rdx, x86::cl);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6437,10 +6437,10 @@ bool jit_emit_ror_64(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load rotate count from VM array
-    a->mov(x86::rcx, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rcx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Mask rotate count to 6 bits for 64-bit rotate
     a->and_(x86::rcx, 0x3F);
@@ -6449,7 +6449,7 @@ bool jit_emit_ror_64(
     a->ror(x86::rdx, x86::cl);
 
     // Store result back to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6485,13 +6485,13 @@ bool jit_emit_load_reserved(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load pointer from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
     // Load with reserved semantics (using normal load for now)
     a->mov(x86::rax, x86::qword_ptr(x86::r12, x86::rax));
 
     // Store to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -6511,10 +6511,10 @@ bool jit_emit_store_conditional(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load pointer from VM array
-    a->mov(x86::rax, x86::qword_ptr(rbx, ptr_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
     // Load source value from VM array
-    a->mov(x86::rdx, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Store with conditional semantics (using normal store for now)
     a->mov(x86::qword_ptr(x86::r12, x86::rax), x86::rdx);
@@ -6523,7 +6523,7 @@ bool jit_emit_store_conditional(
     a->mov(x86::rax, 1);
 
     // Store result to VM register array
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -6646,7 +6646,7 @@ bool jit_emit_c_zero(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load condition register
-    a->mov(x86::rax, x86::qword_ptr(rbx, condition_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, condition_reg * 8));
 
     // Test if condition is zero
     a->test(x86::rax, x86::rax);
@@ -6655,11 +6655,11 @@ bool jit_emit_c_zero(
     a->xor_(x86::rdx, x86::rdx);
 
     // If condition != 0, keep zero; otherwise, keep dest value
-    a->mov(x86::rcx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rcx, x86::qword_ptr(x86::rbx, dest_reg * 8));
     a->cmovne(x86::rdx, x86::rcx);
 
     // Store result
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6678,13 +6678,13 @@ bool jit_emit_c_not(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load condition register
-    a->mov(x86::rax, x86::qword_ptr(rbx, condition_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, condition_reg * 8));
 
     // Test if condition is zero
     a->test(x86::rax, x86::rax);
 
     // Load dest register
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Compute NOT
     a->mov(x86::rcx, x86::rdx);
@@ -6694,7 +6694,7 @@ bool jit_emit_c_not(
     a->cmovne(x86::rdx, x86::rcx);
 
     // Store result
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6715,11 +6715,11 @@ bool jit_emit_merge(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load condition
-    a->mov(x86::rax, x86::qword_ptr(rbx, condition_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, condition_reg * 8));
 
     // Load src1 and src2
-    a->mov(x86::rdx, x86::qword_ptr(rbx, src1_reg * 8));
-    a->mov(x86::rcx, x86::qword_ptr(rbx, src2_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src1_reg * 8));
+    a->mov(x86::rcx, x86::qword_ptr(x86::rbx, src2_reg * 8));
 
     // Test condition
     a->test(x86::rax, x86::rax);
@@ -6728,7 +6728,7 @@ bool jit_emit_merge(
     a->cmovne(x86::rdx, x86::rcx);
 
     // Store result
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6747,16 +6747,16 @@ bool jit_emit_add_carry(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Add with carry
     a->adc(x86::rdx, x86::rax);
 
     // Store result
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6775,16 +6775,16 @@ bool jit_emit_sub_borrow(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Subtract with borrow
     a->sbb(x86::rdx, x86::rax);
 
     // Store result
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6802,13 +6802,13 @@ bool jit_emit_inc(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load dest register
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Increment
     a->inc(x86::rax);
 
     // Store result
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -6826,13 +6826,13 @@ bool jit_emit_dec(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load dest register
-    a->mov(x86::rax, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Decrement
     a->dec(x86::rax);
 
     // Store result
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rax);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
     return true;
 }
@@ -6851,10 +6851,10 @@ bool jit_emit_test(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load source register
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Load dest register
-    a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
     // Test (AND and set flags)
     a->test(x86::rdx, x86::rax);
@@ -6864,7 +6864,7 @@ bool jit_emit_test(
     a->movzx(x86::rdx, x86::dl);
 
     // Store result
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6884,7 +6884,7 @@ bool jit_emit_test_imm(
     auto* a = static_cast<x86::Assembler*>(assembler);
 
     // Load src register
-    a->mov(x86::rax, x86::qword_ptr(rbx, src_reg * 8));
+    a->mov(x86::rax, x86::qword_ptr(x86::rbx, src_reg * 8));
 
     // Test with immediate
     if ((int64_t)immediate >= INT32_MIN && (int64_t)immediate <= INT32_MAX) {
@@ -6899,7 +6899,7 @@ bool jit_emit_test_imm(
     a->movzx(x86::rdx, x86::dl);
 
     // Store result
-    a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+    a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
     return true;
 }
@@ -6922,14 +6922,14 @@ bool jit_emit_mul_upper_uu(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load ra and rb
-        a->mov(x86::rax, x86::qword_ptr(rbx, ra * 8));
-        a->mov(x86::r8, x86::qword_ptr(rbx, rb * 8));
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
+        a->mov(x86::r8, x86::qword_ptr(x86::rbx, rb * 8));
 
         // Multiply: rdx:rax = rax * r8 (unsigned)
         a->mul(x86::r8);
 
         // Store high half (rdx) to rd
-        a->mov(x86::qword_ptr(rbx, rd * 8), x86::rdx);
+        a->mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rdx);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -6963,8 +6963,8 @@ bool jit_emit_mul_upper_su(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load ra and rb
-        a->mov(x86::rax, x86::qword_ptr(rbx, ra * 8));
-        a->mov(x86::r8, x86::qword_ptr(rbx, rb * 8));
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
+        a->mov(x86::r8, x86::qword_ptr(x86::rbx, rb * 8));
 
         // Save ra (signed operand) to check sign later
         a->mov(x86::r9, x86::rax);
@@ -6983,7 +6983,7 @@ bool jit_emit_mul_upper_su(
         a->bind(skipSub);
 
         // Store high half (rdx) to rd
-        a->mov(x86::qword_ptr(rbx, rd * 8), x86::rdx);
+        a->mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rdx);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -7026,14 +7026,14 @@ bool jit_emit_mul_upper_s_s(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load ra and rb
-        a->mov(x86::rax, x86::qword_ptr(rbx, ra * 8));
-        a->mov(x86::r8, x86::qword_ptr(rbx, rb * 8));
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
+        a->mov(x86::r8, x86::qword_ptr(x86::rbx, rb * 8));
 
         // Signed multiply: rdx:rax = rax * r8
         a->imul(x86::r8);
 
         // Store high half (rdx) to rd
-        a->mov(x86::qword_ptr(rbx, rd * 8), x86::rdx);
+        a->mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rdx);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -7067,8 +7067,8 @@ bool jit_emit_set_lt_u(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load ra and rb
-        a->mov(x86::rax, x86::qword_ptr(rbx, ra * 8));
-        a->mov(x86::r8, x86::qword_ptr(rbx, rb * 8));
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
+        a->mov(x86::r8, x86::qword_ptr(x86::rbx, rb * 8));
 
         // Compare: ra - rb (unsigned)
         a->cmp(x86::rax, x86::r8);
@@ -7078,7 +7078,7 @@ bool jit_emit_set_lt_u(
         a->movzx(x86::r8, x86::r8b);
 
         // Store result to rd
-        a->mov(x86::qword_ptr(rbx, rd * 8), x86::r8);
+        a->mov(x86::qword_ptr(x86::rbx, rd * 8), x86::r8);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -7115,8 +7115,8 @@ bool jit_emit_set_lt_s(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load ra and rb
-        a->mov(x86::rax, x86::qword_ptr(rbx, ra * 8));
-        a->mov(x86::r8, x86::qword_ptr(rbx, rb * 8));
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
+        a->mov(x86::r8, x86::qword_ptr(x86::rbx, rb * 8));
 
         // Compare: ra - rb (signed)
         a->cmp(x86::rax, x86::r8);
@@ -7126,7 +7126,7 @@ bool jit_emit_set_lt_s(
         a->movzx(x86::r8, x86::r8b);
 
         // Store result to rd
-        a->mov(x86::qword_ptr(rbx, rd * 8), x86::r8);
+        a->mov(x86::qword_ptr(x86::rbx, rd * 8), x86::r8);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -7163,19 +7163,19 @@ bool jit_emit_cmov_iz(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load ra
-        a->mov(x86::rax, x86::qword_ptr(rbx, ra * 8));
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
 
         // Load current rd value
-        a->mov(x86::rdx, x86::qword_ptr(rbx, rd * 8));
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, rd * 8));
 
         // Test rb
-        a->cmp(x86::qword_ptr(rbx, rb * 8), 0);
+        a->cmp(x86::qword_ptr(x86::rbx, rb * 8), 0);
 
         // Conditional move: if rb == 0, move ra to rd
         a->cmovz(x86::rdx, x86::rax);
 
         // Store result to rd
-        a->mov(x86::qword_ptr(rbx, rd * 8), x86::rdx);
+        a->mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rdx);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -7213,19 +7213,19 @@ bool jit_emit_cmov_nz(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load ra
-        a->mov(x86::rax, x86::qword_ptr(rbx, ra * 8));
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
 
         // Load current rd value
-        a->mov(x86::rdx, x86::qword_ptr(rbx, rd * 8));
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, rd * 8));
 
         // Test rb
-        a->cmp(x86::qword_ptr(rbx, rb * 8), 0);
+        a->cmp(x86::qword_ptr(x86::rbx, rb * 8), 0);
 
         // Conditional move: if rb != 0, move ra to rd
         a->cmovnz(x86::rdx, x86::rax);
 
         // Store result to rd
-        a->mov(x86::qword_ptr(rbx, rd * 8), x86::rdx);
+        a->mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rdx);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -7266,16 +7266,16 @@ bool jit_emit_cmov_iz_imm(
         a->mov(x86::rax, immediate);
 
         // Load current dest value into rdx
-        a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
         // Test src
-        a->cmp(x86::qword_ptr(rbx, src_reg * 8), 0);
+        a->cmp(x86::qword_ptr(x86::rbx, src_reg * 8), 0);
 
         // Conditional move: if src == 0, move immediate (rax) to dest (rdx)
         a->cmovz(x86::rdx, x86::rax);
 
         // Store result to dest
-        a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -7318,16 +7318,16 @@ bool jit_emit_cmov_nz_imm(
         a->mov(x86::rax, immediate);
 
         // Load current dest value into rdx
-        a->mov(x86::rdx, x86::qword_ptr(rbx, dest_reg * 8));
+        a->mov(x86::rdx, x86::qword_ptr(x86::rbx, dest_reg * 8));
 
         // Test src
-        a->cmp(x86::qword_ptr(rbx, src_reg * 8), 0);
+        a->cmp(x86::qword_ptr(x86::rbx, src_reg * 8), 0);
 
         // Conditional move: if src != 0, move immediate (rax) to dest (rdx)
         a->cmovnz(x86::rdx, x86::rax);
 
         // Store result to dest
-        a->mov(x86::qword_ptr(rbx, dest_reg * 8), x86::rdx);
+        a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -7367,16 +7367,16 @@ bool jit_emit_rol_64(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load ra
-        a->mov(x86::rax, x86::qword_ptr(rbx, ra * 8));
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
 
         // Load rb (shift count)
-        a->mov(x86::rcx, x86::qword_ptr(rbx, rb * 8));
+        a->mov(x86::rcx, x86::qword_ptr(x86::rbx, rb * 8));
 
         // Rotate left by rcx bits
         a->rol(x86::rax, x86::cl);
 
         // Store result to rd
-        a->mov(x86::qword_ptr(rbx, rd * 8), x86::rax);
+        a->mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -7426,16 +7426,16 @@ bool jit_emit_ror_64(
         auto* a = static_cast<x86::Assembler*>(assembler);
 
         // Load ra
-        a->mov(x86::rax, x86::qword_ptr(rbx, ra * 8));
+        a->mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
 
         // Load rb (shift count)
-        a->mov(x86::rcx, x86::qword_ptr(rbx, rb * 8));
+        a->mov(x86::rcx, x86::qword_ptr(x86::rbx, rb * 8));
 
         // Rotate right by rcx bits
         a->ror(x86::rax, x86::cl);
 
         // Store result to rd
-        a->mov(x86::qword_ptr(rbx, rd * 8), x86::rax);
+        a->mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {

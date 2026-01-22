@@ -126,10 +126,11 @@ public class ProgramCode {
 
     private func parseInstruction(startIndex: Int, skip: UInt32) throws(Error) -> Instruction {
         let endIndex = startIndex + Int(skip) + 1
-        let data = if endIndex <= code.endIndex {
-            code[startIndex ..< endIndex]
+        let data: Data
+        if endIndex <= code.endIndex {
+            data = code[startIndex ..< endIndex]
         } else {
-            code[startIndex ..< min(code.endIndex, endIndex)] + Data(repeating: 0, count: endIndex - code.endIndex)
+            data = code[startIndex ..< min(code.endIndex, endIndex)] + Data(repeating: 0, count: endIndex - code.endIndex)
         }
         guard let inst = InstructionTable.parse(data) else {
             throw Error.invalidInstruction
@@ -192,7 +193,7 @@ public class ProgramCode {
 
         let idx = min(UInt32((value >> offsetBits).trailingZeroBitCount), Constants.maxInstructionLength)
 
-        return idx
+        return idx + 1
     }
 }
 

@@ -44,6 +44,10 @@ enum PVMOpcodes: UInt8 {
     // Branch Instructions
     case branchEq = 170
     case branchNe = 171
+    case branchLtU = 172
+    case branchLtS = 173
+    case branchGeU = 174
+    case branchGeS = 175
 
     // 32-bit Arithmetic Instructions
     case add32 = 190
@@ -53,6 +57,9 @@ enum PVMOpcodes: UInt8 {
     case divS32 = 194
     case remU32 = 195
     case remS32 = 196
+    case shloL32 = 197      // Shift left logical 32-bit
+    case shloR32 = 198      // Shift right logical 32-bit
+    case sharR32 = 199      // Shift right arithmetic 32-bit
 
     // 64-bit Arithmetic Instructions
     case add64 = 200
@@ -62,9 +69,30 @@ enum PVMOpcodes: UInt8 {
     case divS64 = 204
     case remU64 = 205
     case remS64 = 206
+    case shloL64 = 207      // Shift left logical 64-bit
+    case shloR64 = 208      // Shift right logical 64-bit
+    case sharR64 = 209      // Shift right arithmetic 64-bit
 
     // Bitwise Operations
     case and = 210
     case xor = 211
     case or = 212
+    case mulUpperSS = 213
+    case mulUpperUU = 214
+    case mulUpperSU = 215
+    case setLtU = 216      // Set less than unsigned
+    case setLtS = 217      // Set less than signed
+    case cmovIz = 218      // Conditional move if zero
+    case cmovNz = 219      // Conditional move if not zero
+    case rotL64 = 220      // Rotate left 64-bit
+    case rotL32 = 221      // Rotate left 32-bit
+    case rotR64 = 222      // Rotate right 64-bit
+    case rotR32 = 223      // Rotate right 32-bit
+    case andInv = 224      // Bitwise AND with inverted operand
+    case orInv = 225       // Bitwise OR with inverted operand
+    case xnor = 226        // Bitwise XNOR
+    case max = 227         // Maximum signed
+    case maxU = 228        // Maximum unsigned
+    case min = 229         // Minimum signed
+    case minU = 230        // Minimum unsigned
 }
