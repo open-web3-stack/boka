@@ -2,6 +2,7 @@
 // JIT exports from C++ to Swift for PolkaVM
 
 #include "helper.hh"
+#include <asmjit/a64.h>
 #include <cstddef>
 #include <cstring>
 #include <stdio.h>
@@ -75,7 +76,7 @@ bool jit_emitGasAccounting(
         a->mov(x86::qword_ptr(gasReg), temp1);
 
         // If gas < 0, jump to out-of-gas handler (which will be patched later)
-        Label outOfGasLabel = a->newLabel();
+        Label outOfGasLabel = a->new_label();
         a->jl(outOfGasLabel);
         a->bind(outOfGasLabel);
 
@@ -99,7 +100,7 @@ bool jit_emitGasAccounting(
         a->str(temp1, a64::ptr(gasReg));
 
         // If gas < 0, jump to out-of-gas handler (which will be patched later)
-        Label outOfGasLabel = a->newLabel();
+        Label outOfGasLabel = a->new_label();
         a->cmp(temp1, 0);
         a->b_lt(outOfGasLabel);
         a->bind(outOfGasLabel);
@@ -153,7 +154,7 @@ bool jit_generateJump(void* _Nonnull assembler, const char* _Nonnull target_arch
         a->mov(pcReg, target_pc);
 
         // Jump to code location (this will be patched later)
-        Label dispatcherLabel = a->newLabel();
+        Label dispatcherLabel = a->new_label();
         a->jmp(dispatcherLabel);
         a->bind(dispatcherLabel);
 
@@ -168,7 +169,7 @@ bool jit_generateJump(void* _Nonnull assembler, const char* _Nonnull target_arch
         a->mov(pcReg, target_pc);
 
         // Jump to code location (this will be patched later)
-        Label dispatcherLabel = a->newLabel();
+        Label dispatcherLabel = a->new_label();
         a->b(dispatcherLabel);
         a->bind(dispatcherLabel);
 
@@ -198,7 +199,7 @@ bool jit_generateJumpIndirect(void* _Nonnull assembler, const char* _Nonnull tar
         a->mov(pcReg, x86::eax); // Move 32-bit value to PC
 
         // Jump to dispatcher (will be patched later)
-        Label dispatcherLabel = a->newLabel();
+        Label dispatcherLabel = a->new_label();
         a->jmp(dispatcherLabel);
         a->bind(dispatcherLabel);
 
@@ -218,7 +219,7 @@ bool jit_generateJumpIndirect(void* _Nonnull assembler, const char* _Nonnull tar
         a->mov(pcReg, a64::w0); // Move 32-bit value to PC
 
         // Jump to dispatcher (will be patched later)
-        Label dispatcherLabel = a->newLabel();
+        Label dispatcherLabel = a->new_label();
         a->b(dispatcherLabel);
         a->bind(dispatcherLabel);
 
@@ -269,7 +270,7 @@ bool jit_generateEcalli(void* _Nonnull assembler, const char* _Nonnull target_ar
         a->cmp(x86::eax, 0xFFFFFFFF);
 
         // If equal, jump to error handler (will be patched later)
-        Label errorLabel = a->newLabel();
+        Label errorLabel = a->new_label();
         a->je(errorLabel);
         a->bind(errorLabel);
 
@@ -314,7 +315,7 @@ bool jit_generateEcalli(void* _Nonnull assembler, const char* _Nonnull target_ar
         a->cmp(a64::w0, 0xFFFFFFFF);
 
         // If equal, jump to error handler (will be patched later)
-        Label errorLabel = a->newLabel();
+        Label errorLabel = a->new_label();
         a->b_eq(errorLabel);
         a->bind(errorLabel);
 
@@ -355,7 +356,7 @@ bool jit_generateLoadImmJump(
         a->mov(pcReg, target_pc);
 
         // Jump to dispatcher (will be patched later)
-        Label dispatcherLabel = a->newLabel();
+        Label dispatcherLabel = a->new_label();
         a->jmp(dispatcherLabel);
         a->bind(dispatcherLabel);
 
@@ -378,7 +379,7 @@ bool jit_generateLoadImmJump(
         a->mov(pcReg, target_pc);
 
         // Jump to dispatcher (will be patched later)
-        Label dispatcherLabel = a->newLabel();
+        Label dispatcherLabel = a->new_label();
         a->b(dispatcherLabel);
         a->bind(dispatcherLabel);
 
@@ -417,7 +418,7 @@ bool jit_generateLoadImmJumpInd(
         a->mov(pcReg, x86::eax); // Move lower 32 bits to PC
 
         // Jump to dispatcher (will be patched later)
-        Label dispatcherLabel = a->newLabel();
+        Label dispatcherLabel = a->new_label();
         a->jmp(dispatcherLabel);
         a->bind(dispatcherLabel);
 
@@ -442,7 +443,7 @@ bool jit_generateLoadImmJumpInd(
         a->mov(pcReg, a64::w1); // Move lower 32 bits to PC
 
         // Jump to dispatcher (will be patched later)
-        Label dispatcherLabel = a->newLabel();
+        Label dispatcherLabel = a->new_label();
         a->b(dispatcherLabel);
         a->bind(dispatcherLabel);
 

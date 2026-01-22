@@ -4,7 +4,8 @@
 
 #pragma once
 
-#include "asmjit/asmjit.h"
+#include <asmjit/a64.h>
+#include <asmjit/asmjit.h>
 #include <cstdint>
 #include <unordered_map>
 #include <unordered_set>
@@ -34,10 +35,10 @@ public:
 
         if (strcmp(arch, "x86_64") == 0) {
             auto* a = static_cast<asmjit::x86::Assembler*>(assembler);
-            label = a->newLabel();
+            label = a->new_label();
         } else if (strcmp(arch, "aarch64") == 0) {
             auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
-            label = a->newLabel();
+            label = a->new_label();
         }
 
         labels[pc] = label;
@@ -57,10 +58,10 @@ public:
             // Create and bind label immediately (no forward reference)
             if (strcmp(arch, "x86_64") == 0) {
                 auto* a = static_cast<asmjit::x86::Assembler*>(assembler);
-                label = a->newLabel();
+                label = a->new_label();
             } else if (strcmp(arch, "aarch64") == 0) {
                 auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
-                label = a->newLabel();
+                label = a->new_label();
             }
             labels[pc] = label;
         }

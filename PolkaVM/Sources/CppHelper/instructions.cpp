@@ -1,5 +1,6 @@
 #include "instructions.hh"
-#include "asmjit/asmjit.h"
+#include <asmjit/a64.h>
+#include <asmjit/asmjit.h>
 
 namespace Instructions {
     // to workaround duplicated .init issue in Swift
@@ -1963,7 +1964,7 @@ bool jit_emit_branch_eq(
 
         // If equal, jump to target (update PC)
         // Otherwise fall through to next instruction
-        Label skipLabel = a->newLabel();
+        Label skipLabel = a->new_label();
         a->jne(skipLabel);  // Skip PC update if not equal
         a->mov(x86::r15d, target_pc);  // Only update PC if equal
         a->bind(skipLabel);
@@ -1986,7 +1987,7 @@ bool jit_emit_branch_eq(
 
         // If equal, jump to target (update PC)
         // Otherwise fall through to next instruction
-        Label skipLabel = a->newLabel();
+        Label skipLabel = a->new_label();
         a->b_ne(skipLabel);  // Skip PC update if not equal
         a->mov(pcReg, target_pc);  // Only update PC if equal
         a->bind(skipLabel);
@@ -2021,7 +2022,7 @@ bool jit_emit_branch_ne(
 
         // If not equal, jump to target (update PC)
         // Otherwise fall through to next instruction
-        Label skipLabel = a->newLabel();
+        Label skipLabel = a->new_label();
         a->je(skipLabel);  // Skip PC update if equal
         a->mov(x86::r15d, target_pc);  // Only update PC if not equal
         a->bind(skipLabel);
@@ -2044,7 +2045,7 @@ bool jit_emit_branch_ne(
 
         // If not equal, jump to target (update PC)
         // Otherwise fall through to next instruction
-        Label skipLabel = a->newLabel();
+        Label skipLabel = a->new_label();
         a->b_eq(skipLabel);  // Skip PC update if equal
         a->mov(pcReg, target_pc);  // Only update PC if not equal
         a->bind(skipLabel);
@@ -5501,7 +5502,7 @@ bool jit_emit_mul_upper_su(
         // If ra was negative (signed), we need to adjust the result
         // Int128(ra) * UInt128(rb) = UInt128(ra) * UInt128(rb) - UInt128(rb) * 2^64
         // So we subtract rb from the high half (rdx)
-        Label skipSub = a->newLabel();
+        Label skipSub = a->new_label();
         a->test(x86::r9, x86::r9);  // Test sign bit
         a->jns(skipSub);            // Skip if positive
         a->sub(x86::rdx, x86::r8);  // Subtract rb from high half
@@ -5525,7 +5526,7 @@ bool jit_emit_mul_upper_su(
         // If ra was negative (signed), subtract rb from the result
         // Int128(ra) * UInt128(rb) = UInt128(ra) * UInt128(rb) - UInt128(rb) * 2^64
         // So the high part needs adjustment when ra < 0
-        Label skipSub = a->newLabel();
+        Label skipSub = a->new_label();
         a->tbz(a64::x0, 63, skipSub);  // Test sign bit (bit 63), skip if clear
         a->sub(a64::x2, a64::x2, a64::x1);  // Subtract rb from result
         a->bind(skipSub);

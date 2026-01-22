@@ -2,7 +2,7 @@
 // AArch64-specific JIT compilation for PolkaVM
 
 #include "a64_helper.hh"
-#include "asmjit/asmjit.h"
+#include <asmjit/asmjit.h>
 #include "asmjit/a64.h"
 #include <cstddef>
 #include <cstdint>
@@ -64,11 +64,11 @@ int32_t compilePolkaVMCode_a64(
     // This is a simplified stub implementation for now
 
     // For demonstration purposes, create a simple gas check and a loop dispatcher
-    Label mainLoop = a.newLabel();
-    Label outOfGas = a.newLabel();
-    Label jumpTable = a.newLabel();
-    Label exitHalt = a.newLabel();
-    Label exitNoImpl = a.newLabel();
+    Label mainLoop = a.new_label();
+    Label outOfGas = a.new_label();
+    Label jumpTable = a.new_label();
+    Label exitHalt = a.new_label();
+    Label exitNoImpl = a.new_label();
 
     // Main execution loop
     a.bind(mainLoop);
@@ -120,7 +120,7 @@ int32_t compilePolkaVMCode_a64(
 
     // Generate the function code
     Error err = runtime.add(funcOut, &code);
-    if (err) {
+    if (err != Error::kOk) {
         return int32_t(err); // Return asmjit error code
     }
 

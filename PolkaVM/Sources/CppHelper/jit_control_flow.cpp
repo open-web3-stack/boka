@@ -4,6 +4,7 @@
 
 #include "jit_control_flow.hh"
 #include "jit_label_manager.hh"
+#include <asmjit/a64.h>
 #include <cstring>
 
 using namespace asmjit;
