@@ -3,7 +3,7 @@
 
 #include "x64_helper.hh"
 #include "helper.hh"
-#include "asmjit/asmjit.h"
+#include <asmjit/asmjit.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -84,7 +84,7 @@ int32_t compilePolkaVMCode_x64(
 
     // Generate the function code
     Error err = runtime.add(funcOut, &code);
-    if (err) {
+    if (err != Error::kOk) {
         return int32_t(err); // Return asmjit error code
     }
 

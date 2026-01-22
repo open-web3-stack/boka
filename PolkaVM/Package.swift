@@ -38,7 +38,8 @@ let package = Package(
                 .unsafeFlags([
                     "-Xcc", "-std=c++20",
                     "-Xcc", "-I/usr/include/c++/13",
-                    "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13"
+                    "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13",
+                    "-Xcc", "-I/home/ubuntu/boka/PolkaVM/Sources/asmjit"
                 ]),
             ]
         ),
@@ -57,7 +58,8 @@ let package = Package(
                 .unsafeFlags([
                     "-Xcc", "-std=c++20",
                     "-Xcc", "-I/usr/include/c++/13",
-                    "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13"
+                    "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13",
+                    "-Xcc", "-I/home/ubuntu/boka/PolkaVM/Sources/asmjit"
                 ]),
             ]
         ),
@@ -73,30 +75,26 @@ let package = Package(
                 .unsafeFlags([
                     "-Xcc", "-std=c++20",
                     "-Xcc", "-I/usr/include/c++/13",
-                    "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13"
+                    "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13",
+                    "-Xcc", "-I/home/ubuntu/boka/PolkaVM/Sources/asmjit"
                 ]),
             ]
         ),
         .target(
             name: "CppHelper",
             dependencies: [
-                "AsmJitLib",
             ],
-            sources: ["."],
+            exclude: ["asmjit/asmjit.natvis", "asmjit/.git", "asmjit/.github", "asmjit/CMakeLists.txt", "asmjit/asmjit-testing"],
+            sources: [".", "../asmjit/asmjit/core", "../asmjit/asmjit/arm", "../asmjit/asmjit/x86", "../asmjit/asmjit/support", "../asmjit/asmjit/ujit"],
             publicHeadersPath: ".",
             cxxSettings: [
-                .unsafeFlags(["-std=c++20", "-I/usr/include/c++/13", "-I/usr/include/x86_64-linux-gnu/c++/13"]),
-            ]
-        ),
-        .target(
-            name: "AsmJitLib",
-            path: "Sources/asmjit",
-            exclude: ["src/asmjit.natvis"],
-            sources: ["src/asmjit"],
-            publicHeadersPath: "include",
-            cxxSettings: [
+                .unsafeFlags([
+                    "-std=c++20",
+                    "-I/usr/include/c++/13",
+                    "-I/usr/include/x86_64-linux-gnu/c++/13",
+                    "-I../asmjit"
+                ]),
                 .define("ASMJIT_STATIC"),
-                .unsafeFlags(["-Wno-incomplete-umbrella", "-std=c++20"]),
             ]
         ),
     ],

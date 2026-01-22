@@ -7,7 +7,7 @@
 #include "jit_control_flow.hh"
 #include "a64_helper.hh"
 #include "opcodes.hh"
-#include "asmjit/asmjit.h"
+#include <asmjit/asmjit.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -122,13 +122,13 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     // during the normal compilation process (via labelManager)
 
     // Create exit labels for different exit conditions
-    Label exitLabel = a.newLabel();       // Normal exit (halt) - eax = 0
-    Label panicLabel = a.newLabel();      // Panic exit (trap, address < 65536) - eax = -1
-    Label pagefaultLabel = a.newLabel();  // Page fault exit (address >= memory_size) - eax = 3
-    Label outOfGasLabel = a.newLabel();   // Out of gas exit - eax = 1
-    Label unsupportedLabel = a.newLabel();// Unsupported instruction - exit to interpreter - eax = 2
-    Label dispatcherLoop = a.newLabel();  // Dispatcher loop for indirect jumps without jump table
-    Label epilogueLabel = a.newLabel();   // Epilogue (restore registers and return)
+    Label exitLabel = a.new_label();       // Normal exit (halt) - eax = 0
+    Label panicLabel = a.new_label();      // Panic exit (trap, address < 65536) - eax = -1
+    Label pagefaultLabel = a.new_label();  // Page fault exit (address >= memory_size) - eax = 3
+    Label outOfGasLabel = a.new_label();   // Out of gas exit - eax = 1
+    Label unsupportedLabel = a.new_label();// Unsupported instruction - exit to interpreter - eax = 2
+    Label dispatcherLoop = a.new_label();  // Dispatcher loop for indirect jumps without jump table
+    Label epilogueLabel = a.new_label();   // Epilogue (restore registers and return)
 
     // Pass the PC label map to labelManager for use during compilation
     // We'll store it separately and use it to build the dispatcher jump table
@@ -312,11 +312,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // Read entry based on entrySize
             // For now, support entry sizes 1, 2, 3, 4
-            Label entrySize1 = a.newLabel();
-            Label entrySize2 = a.newLabel();
-            Label entrySize3 = a.newLabel();
-            Label entrySize4 = a.newLabel();
-            Label readDone = a.newLabel();
+            Label entrySize1 = a.new_label();
+            Label entrySize2 = a.new_label();
+            Label entrySize3 = a.new_label();
+            Label entrySize4 = a.new_label();
+            Label readDone = a.new_label();
 
             a.cmp(x86::r8d, 1);
             a.je(entrySize1);
@@ -771,7 +771,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
     // Generate the function code
     Error err = runtime.add(funcOut, &code);
-    if (err) {
+    if (err != Error::kOk) {
         return int32_t(err);
     }
 
@@ -802,16 +802,14 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             }
 
             Label label = labelManager.getLabel(pc);
-            if (!label.isValid()) {
+            if (!label.is_valid()) {
                 continue;  // Skip invalid labels
             }
 
             // Get the address of this label from the CodeHolder
-            const asmjit::LabelEntry* labelEntry = code.labelEntry(label);
-            if (labelEntry) {
-                uint64_t offset = labelEntry->offset();
-                dispatcherTable[pc] = funcBase + offset;
-            }
+            const asmjit::LabelEntry& label_entry = code.label_entry_of(label);
+            uint64_t offset = label_entry.offset();
+            dispatcherTable[pc] = funcBase + offset;
         }
 
         // Store the dispatcher table in global map for later retrieval
