@@ -728,7 +728,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc  // Use target_pc instead of offset
             );
 
-        case 172: // BranchLtU
+        case static_cast<uint8_t>(Opcode::BranchLtU):
             return jit_instruction::jit_emit_branch_lt_u(
                 assembler, target_arch,
                 decoded.src1_reg,
@@ -736,7 +736,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc
             );
 
-        case 173: // BranchLtS
+        case static_cast<uint8_t>(Opcode::BranchLtS):
             return jit_instruction::jit_emit_branch_lt(
                 assembler, target_arch,
                 decoded.src1_reg,
@@ -744,7 +744,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc
             );
 
-        case 174: // BranchGeU
+        case static_cast<uint8_t>(Opcode::BranchGeU):
             return jit_instruction::jit_emit_branch_gt_u(
                 assembler, target_arch,
                 decoded.src2_reg,  // Swap operands for Ge (a >= b => !(b > a))
@@ -752,7 +752,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc
             );
 
-        case 175: // BranchGeS
+        case static_cast<uint8_t>(Opcode::BranchGeS):
             return jit_instruction::jit_emit_branch_gt(
                 assembler, target_arch,
                 decoded.src2_reg,  // Swap operands for Ge (a >= b => !(b > a))
@@ -809,21 +809,21 @@ bool emit_instruction_decoded(
                 decoded.src1_reg
             );
 
-        case 197: // ShloL32
+        case static_cast<uint8_t>(Opcode::ShloL32):
             return jit_instruction::jit_emit_shlo_l_32(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 198: // ShloR32
+        case static_cast<uint8_t>(Opcode::ShloR32):
             return jit_instruction::jit_emit_shlo_r_32(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 199: // SharR32
+        case static_cast<uint8_t>(Opcode::SharR32):
             return jit_instruction::jit_emit_shar_r_32(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -879,21 +879,21 @@ bool emit_instruction_decoded(
                 decoded.src1_reg
             );
 
-        case 207: // ShloL64
+        case static_cast<uint8_t>(Opcode::ShloL64):
             return jit_instruction::jit_emit_shlo_l_64(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 208: // ShloR64
+        case static_cast<uint8_t>(Opcode::ShloR64):
             return jit_instruction::jit_emit_shlo_r_64(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 209: // SharR64
+        case static_cast<uint8_t>(Opcode::SharR64):
             return jit_instruction::jit_emit_shar_r_64(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1182,10 +1182,10 @@ bool emit_basic_block_instructions(
                 decoded_ok = decode_branch_ne(bytecode, current_pc, decoded);
                 break;
 
-            case 172: // BranchLtU
-            case 173: // BranchLtS
-            case 174: // BranchGeU
-            case 175: // BranchGeS
+            case static_cast<uint8_t>(Opcode::BranchLtU):
+            case static_cast<uint8_t>(Opcode::BranchLtS):
+            case static_cast<uint8_t>(Opcode::BranchGeU):
+            case static_cast<uint8_t>(Opcode::BranchGeS):
                 // Same format as BranchEq/BranchNe: [opcode][reg1][reg2][offset_32bit]
                 decoded_ok = decode_branch_eq(bytecode, current_pc, decoded);
                 break;
@@ -1218,9 +1218,9 @@ bool emit_basic_block_instructions(
                 decoded_ok = decode_rem_s32(bytecode, current_pc, decoded);
                 break;
 
-            case 197: // ShloL32
-            case 198: // ShloR32
-            case 199: // SharR32
+            case static_cast<uint8_t>(Opcode::ShloL32):
+            case static_cast<uint8_t>(Opcode::ShloR32):
+            case static_cast<uint8_t>(Opcode::SharR32):
                 // Same 2-register format as arithmetic: [opcode][dest_reg][src_reg]
                 decoded_ok = decode_add_32(bytecode, current_pc, decoded);
                 break;
@@ -1249,19 +1249,19 @@ bool emit_basic_block_instructions(
                 decoded_ok = decode_or(bytecode, current_pc, decoded);
                 break;
 
-            case 207: // ShloL64
-            case 208: // ShloR64
-            case 209: // SharR64
+            case static_cast<uint8_t>(Opcode::ShloL64):
+            case static_cast<uint8_t>(Opcode::ShloR64):
+            case static_cast<uint8_t>(Opcode::SharR64):
                 // Same 2-register format as arithmetic: [opcode][dest_reg][src_reg]
                 decoded_ok = decode_add_64(bytecode, current_pc, decoded);
                 break;
 
             // 32-bit rotate instructions use 2-register format
-            case 221: // RotL32
+            case static_cast<uint8_t>(Opcode::RotL32):
                 decoded_ok = decode_mul_32(bytecode, current_pc, decoded);
                 break;
 
-            case 223: // RotR32
+            case static_cast<uint8_t>(Opcode::RotR32):
                 decoded_ok = decode_mul_32(bytecode, current_pc, decoded);
                 break;
 
