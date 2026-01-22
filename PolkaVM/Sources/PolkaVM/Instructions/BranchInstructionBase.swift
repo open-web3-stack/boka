@@ -60,9 +60,11 @@ protocol BranchInstructionBase2<Compare>: Branch {
 
 extension BranchInstructionBase2 {
     public static func parse(data: Data) throws -> (Registers.Index, Registers.Index, UInt32) {
-        let offset: UInt32 = try Instructions.decodeImmediate(data.at(relative: 1...))
+        // Branch instruction format: [opcode][r1][r2][offset_32bit]
+        // r1 is at position 0, r2 is at position 0 (overloaded in same byte), offset starts at position 3
         let r1 = try Registers.Index(r1: data.at(relative: 0))
         let r2 = try Registers.Index(r2: data.at(relative: 0))
+        let offset: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 3 ..< data.endIndex))
         return (r1, r2, offset)
     }
 

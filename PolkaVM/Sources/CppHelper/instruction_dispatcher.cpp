@@ -783,7 +783,9 @@ bool decode_branch_eq(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& 
     decoded.src1_reg = bytecode[pc + 1];
     decoded.src2_reg = bytecode[pc + 2];
     decoded.offset = *reinterpret_cast<const int32_t*>(&bytecode[pc + 3]);
-    decoded.target_pc = pc + 7 + static_cast<uint32_t>(decoded.offset);
+    // Offset is relative to the start of the branch instruction (PC at branch)
+    // target_pc = pc + offset
+    decoded.target_pc = pc + static_cast<uint32_t>(decoded.offset);
     decoded.size = 7;
     return true;
 }
@@ -795,7 +797,8 @@ bool decode_branch_ne(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& 
     decoded.src1_reg = bytecode[pc + 1];
     decoded.src2_reg = bytecode[pc + 2];
     decoded.offset = *reinterpret_cast<const int32_t*>(&bytecode[pc + 3]);
-    decoded.target_pc = pc + 7 + static_cast<uint32_t>(decoded.offset);
+    // Offset is relative to the start of the branch instruction (PC at branch)
+    decoded.target_pc = pc + static_cast<uint32_t>(decoded.offset);
     decoded.size = 7;
     return true;
 }
