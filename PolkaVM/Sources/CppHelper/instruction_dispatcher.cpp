@@ -57,7 +57,9 @@ bool decode_load_imm_jump(const uint8_t* bytecode, uint32_t pc, DecodedInstructi
     decoded.dest_reg = bytecode[pc + 1];
     decoded.immediate = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
     decoded.offset = *reinterpret_cast<const int32_t*>(&bytecode[pc + 6]);
-    decoded.target_pc = pc + 9 + static_cast<uint32_t>(decoded.offset); // PC-relative
+    // Offset is relative to the START of the instruction (not the end)
+    // This matches the Swift implementation (Instructions.swift:422) and x64_labeled_helper.cpp
+    decoded.target_pc = pc + static_cast<uint32_t>(decoded.offset); // PC-relative
     decoded.size = 10; // 1 + 1 + 4 + 4 = 10 bytes
 
     return true;
@@ -175,7 +177,9 @@ bool decode_jump(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decod
 
     // Format: [opcode][offset_32bit]
     decoded.offset = *reinterpret_cast<const int32_t*>(&bytecode[pc + 1]);
-    decoded.target_pc = pc + 5 + static_cast<uint32_t>(decoded.offset); // PC-relative
+    // Offset is relative to the START of the instruction (not the end)
+    // This matches the Swift implementation (Instructions.swift:141) and x64_labeled_helper.cpp
+    decoded.target_pc = pc + static_cast<uint32_t>(decoded.offset); // PC-relative
     decoded.size = 5;
 
     return true;
