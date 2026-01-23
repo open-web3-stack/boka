@@ -516,7 +516,9 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 }
             }
 
-            var registers = Registers(config: config, argumentData: argumentData)
+            // Initialize registers
+            // For parity with interpreter tests, use empty Registers when no argumentData
+            var registers = argumentData == nil ? Registers() : Registers(config: config, argumentData: argumentData)
 
             // Set up the synchronous handler that will bridge to async context if invoked
             // We're capturing the invocationContext into a closure that will be called synchronously
