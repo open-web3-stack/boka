@@ -37,13 +37,14 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
     if (instrSize == 5 || instrSize == 7) {
         // Jump (5 bytes): [opcode][offset_32bit]
         // Branch (7 bytes): [opcode][reg1][reg2][offset_32bit]
+        // Offset is relative to the START of the instruction (pc), not the end
         uint32_t offset;
         if (instrSize == 5) {
             memcpy(&offset, &bytecode[pc + 1], 4);
         } else {
             memcpy(&offset, &bytecode[pc + 3], 4);
         }
-        return pc + instrSize + int32_t(offset);
+        return pc + int32_t(offset);
     }
     return pc + instrSize; // Fallthrough
 }
@@ -128,7 +129,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             uint8_t destReg = codeBuffer[pc + 1];
             uint32_t jumpOffset;
             memcpy(&jumpOffset, &codeBuffer[pc + 2], 4);   // Jump offset is at bytes 2-5
-            uint32_t targetPC = pc + instrSize + int32_t(jumpOffset);
+            uint32_t targetPC = pc + int32_t(jumpOffset);  // Offset is relative to instruction start
             labelManager.markJumpTarget(targetPC);
         }
 
@@ -210,7 +211,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             uint32_t immediate;
             memcpy(&jumpOffset, &codeBuffer[pc + 2], 4);   // Jump offset is at bytes 2-5
             memcpy(&immediate, &codeBuffer[pc + 6], 4);    // Immediate value is at bytes 6-9
-            uint32_t targetPC = pc + instrSize + int32_t(jumpOffset);
+            uint32_t targetPC = pc + int32_t(jumpOffset);  // Offset is relative to instruction start
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "aarch64");
             jit_emit_load_imm_jump_labeled(&a, "aarch64", destReg, immediate, targetLabel);
@@ -640,6 +641,116 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             // Store value to memory
             a.mov(a64::x8, value);
             a.str(a64::x8, a64::ptr(a64::x20, a64::x0));
+
+            pc += instrSize;
+            continue;
+        }
+
+        // LoadImm: Load 32-bit immediate into register
+        if (opcode_is(opcode, Opcode::LoadImm)) {
+            // LoadImm: [opcode][reg_index][value_32bit] = 6 bytes
+            uint8_t destReg = codeBuffer[pc + 1];
+            uint32_t immediate;
+            memcpy(&immediate, &codeBuffer[pc + 2], 4);
+
+            // Load immediate and sign-extend to 64-bit
+            a.mov(a64::x8, immediate);
+            a.sxtw(a64::x8, a64::x8);  // Sign-extend w8 to x8
+            a.str(a64::x8, a64::ptr(a64::x19, destReg * 8));  // Store to VM register array
+
+            pc += instrSize;
+            continue;
+        }
+
+        // LoadImmU64: Load 64-bit immediate into register
+        if (opcode_is(opcode, Opcode::LoadImmU64)) {
+            // LoadImmU64: [opcode][reg_index][value_64bit] = 10 bytes
+            uint8_t destReg = codeBuffer[pc + 1];
+            uint64_t immediate;
+            memcpy(&immediate, &codeBuffer[pc + 2], 8);
+
+            // Load 64-bit immediate using movz/movk sequence
+            uint32_t imm0 = (immediate >> 0) & 0xFFFF;
+            uint32_t imm1 = (immediate >> 16) & 0xFFFF;
+            uint32_t imm2 = (immediate >> 32) & 0xFFFF;
+            uint32_t imm3 = (immediate >> 48) & 0xFFFF;
+
+            a.movz(a64::x8, imm0, 0);
+            a.movk(a64::x8, imm1, 16);
+            a.movk(a64::x8, imm2, 32);
+            a.movk(a64::x8, imm3, 48);
+            a.str(a64::x8, a64::ptr(a64::x19, destReg * 8));
+
+            pc += instrSize;
+            continue;
+        }
+
+        // Add64: 64-bit addition
+        if (opcode_is(opcode, Opcode::Add64)) {
+            // Add64: [opcode][ra|rb<<4][rd] = 4 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
+            uint8_t rd = codeBuffer[pc + 2];
+
+            // Load ra and rb
+            a.ldr(a64::x0, a64::ptr(a64::x19, ra * 8));
+            a.ldr(a64::x1, a64::ptr(a64::x19, rb * 8));
+
+            // Add
+            a.add(a64::x0, a64::x0, a64::x1);
+
+            // Store to rd
+            a.str(a64::x0, a64::ptr(a64::x19, rd * 8));
+
+            pc += instrSize;
+            continue;
+        }
+
+        // Sub64: 64-bit subtraction
+        if (opcode_is(opcode, Opcode::Sub64)) {
+            // Sub64: [opcode][ra|rb<<4][rd] = 4 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
+            uint8_t rd = codeBuffer[pc + 2];
+
+            // Load ra and rb
+            a.ldr(a64::x0, a64::ptr(a64::x19, ra * 8));
+            a.ldr(a64::x1, a64::ptr(a64::x19, rb * 8));
+
+            // Subtract
+            a.sub(a64::x0, a64::x0, a64::x1);
+
+            // Store to rd
+            a.str(a64::x0, a64::ptr(a64::x19, rd * 8));
+
+            pc += instrSize;
+            continue;
+        }
+
+        // StoreU64: Store 64-bit value from register to memory
+        if (opcode_is(opcode, Opcode::StoreU64)) {
+            // StoreU64: [opcode][reg_index][address_32bit] = 6 bytes
+            uint8_t srcReg = codeBuffer[pc + 1];
+            uint32_t address;
+            memcpy(&address, &codeBuffer[pc + 2], 4);
+
+            // Load address into x0 for bounds checking
+            a.mov(a64::w0, address);
+
+            // Bounds check: address < 65536 → panic
+            a.cmp(a64::w0, 65536);
+            a.b_lt(panicLabel);
+
+            // Runtime check: address >= memory_size → page fault
+            a.mov(a64::w1, a64::w21);  // Load memory_size into w1
+            a.cmp(a64::w0, a64::w1);
+            a.b_ge(pagefaultLabel);
+
+            // Load source value from register
+            a.ldr(a64::x1, a64::ptr(a64::x19, srcReg * 8));
+
+            // Store to memory [VM_MEMORY_PTR + address]
+            a.str(a64::x1, a64::ptr(a64::x20, a64::x0));
 
             pc += instrSize;
             continue;
