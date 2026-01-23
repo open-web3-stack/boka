@@ -320,7 +320,7 @@ final class BasicBlockBuilder {
             return 3
 
         case PVMOpcodes.ecalli.rawValue:
-            return 6
+            return 5  // 1 byte opcode + 4 bytes callIndex
 
         default:
             // Unknown opcode - return 0 to signal error
