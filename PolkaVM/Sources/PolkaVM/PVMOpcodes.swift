@@ -41,6 +41,74 @@ enum PVMOpcodes: UInt8 {
 
     case ecalli = 10       // External call interface (host call)
 
+    // Branch Immediate Instructions (Phase 3)
+    case branchEqImm = 81
+    case branchNeImm = 82
+    case branchLtUImm = 83
+    case branchLeUImm = 84
+    case branchGeUImm = 85
+    case branchGtUImm = 86
+    case branchLtSImm = 87
+    case branchLeSImm = 88
+    case branchGeSImm = 89
+    case branchGtSImm = 90
+
+    // Store Immediate Indirect Instructions (Phase 2)
+    case storeImmIndU8 = 70
+    case storeImmIndU16 = 71
+    case storeImmIndU32 = 72
+    case storeImmIndU64 = 73
+
+    // Store Indirect Instructions (Phase 2)
+    case storeIndU8 = 120
+    case storeIndU16 = 121
+    case storeIndU32 = 122
+    case storeIndU64 = 123
+
+    // Load Indirect Instructions (Phase 2)
+    case loadIndU8 = 124
+    case loadIndI8 = 125
+    case loadIndU16 = 126
+    case loadIndI16 = 127
+    case loadIndU32 = 128
+    case loadIndI32 = 129
+    case loadIndU64 = 130
+
+    // 32-bit Immediate Instructions (Phase 4)
+    case addImm32 = 131
+    case andImm = 132
+    case xorImm = 133
+    case orImm = 134
+    case mulImm32 = 135
+    case setLtUImm = 136
+    case setLtSImm = 137
+    case shloLImm32 = 138
+    case shloRImm32 = 139
+    case sharRImm32 = 140
+    case negAddImm32 = 141
+    case setGtUImm = 142
+    case setGtSImm = 143
+    case shloLImmAlt32 = 144
+    case shloRImmAlt32 = 145
+    case sharRImmAlt32 = 146
+    case cmovIzImm = 147
+    case cmovNzImm = 148
+
+    // 64-bit Immediate Instructions (Phase 4)
+    case addImm64 = 149
+    case mulImm64 = 150
+    case shloLImm64 = 151
+    case shloRImm64 = 152
+    case sharRImm64 = 153
+    case negAddImm64 = 154
+    case shloLImmAlt64 = 155
+    case shloRImmAlt64 = 156
+    case sharRImmAlt64 = 157
+    case rotR64Imm = 158
+    case rotR64ImmAlt = 159
+    case rotR32Imm = 160
+    case rotR32ImmAlt = 161
+
     // Branch Instructions
     case branchEq = 170
     case branchNe = 171
