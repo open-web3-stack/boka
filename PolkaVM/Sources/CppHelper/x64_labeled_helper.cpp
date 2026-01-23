@@ -632,16 +632,72 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             opcode_is(opcode, Opcode::DivS64) ||
             opcode_is(opcode, Opcode::RemU64) ||
             opcode_is(opcode, Opcode::RemS64)) {
-            // Decode instruction: [opcode][dest_reg][src_reg]
-            uint8_t dest_reg = codeBuffer[pc + 1];
-            uint8_t src_reg = codeBuffer[pc + 2];
+            // Decode instruction: [opcode][ra | (rb << 4)][rd]
+            uint8_t ra = codeBuffer[pc + 1] & 0x0F;           // ra (lower 4 bits)
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;    // rb (upper 4 bits)
+            uint8_t rd = codeBuffer[pc + 2];                  // rd
 
-            // Load divisor into rcx
-            a.mov(x86::rcx, x86::qword_ptr(x86::rbx, src_reg * 8));
+            // Label to skip all division handling and continue
+            Label divisionDone = a.new_label();
 
-            // Check if divisor is zero
-            a.test(x86::rcx, x86::rcx);
-            a.jz(panicLabel);  // If zero, jump to panic
+            // Load divisor (rb) into rcx
+            a.mov(x86::rcx, x86::qword_ptr(x86::rbx, rb * 8));
+
+            // For remainder instructions, check if divisor is zero and return dividend
+            if (opcode_is(opcode, Opcode::RemU32) || opcode_is(opcode, Opcode::RemU64) ||
+                opcode_is(opcode, Opcode::RemS32) || opcode_is(opcode, Opcode::RemS64)) {
+                Label divisorNotZero = a.new_label();
+
+                a.test(x86::rcx, x86::rcx);
+                a.jnz(divisorNotZero);  // If divisor != 0, continue with division
+
+                // Division by zero case for remainder: return dividend (ra)
+                if (opcode_is(opcode, Opcode::RemU32) || opcode_is(opcode, Opcode::RemS32)) {
+                    a.mov(x86::eax, x86::dword_ptr(x86::rbx, ra * 8));
+                    a.movsxd(x86::rax, x86::eax);
+                    a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
+                } else {
+                    // RemU64/RemS64
+                    a.mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
+                    a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
+                }
+                a.jmp(divisionDone);  // Skip all division handling and continue
+
+                a.bind(divisorNotZero);
+                // Continue with normal division below
+            }
+
+            // For signed division, check if divisor is zero and return UInt64.max
+            if (opcode_is(opcode, Opcode::DivS32) || opcode_is(opcode, Opcode::DivS64)) {
+                Label divisorNotZero = a.new_label();
+
+                a.test(x86::rcx, x86::rcx);
+                a.jnz(divisorNotZero);  // If divisor != 0, continue with division
+
+                // Division by zero case: return UInt64.max
+                a.mov(x86::rax, 0xFFFFFFFFFFFFFFFFULL);
+                a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
+                a.jmp(divisionDone);  // Skip all division handling and continue
+
+                a.bind(divisorNotZero);
+                // Continue with normal division below
+            }
+
+            // For unsigned division (DivU32/DivU64), check if divisor is zero and return UInt64.max
+            if (opcode_is(opcode, Opcode::DivU32) || opcode_is(opcode, Opcode::DivU64)) {
+                Label divisorNotZero = a.new_label();
+
+                a.test(x86::rcx, x86::rcx);
+                a.jnz(divisorNotZero);  // If divisor != 0, continue with division
+
+                // Division by zero case: return UInt64.max
+                a.mov(x86::rax, 0xFFFFFFFFFFFFFFFFULL);
+                a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
+                a.jmp(divisionDone);  // Skip all division handling and continue
+
+                a.bind(divisorNotZero);
+                // Continue with normal division below
+            }
 
             // Handle Signed Division Overflow
             if (opcode_is(opcode, Opcode::DivS32) || opcode_is(opcode, Opcode::RemS32)) {
@@ -652,112 +708,113 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
                 a.cmp(x86::ecx, -1);
                 a.jne(noOverflow);
                 
-                // Load dividend into eax
-                a.mov(x86::eax, x86::dword_ptr(x86::rbx, dest_reg * 8));
-                
+                // Load dividend (ra) into eax
+                a.mov(x86::eax, x86::dword_ptr(x86::rbx, ra * 8));
+
                 // Check dividend == INT32_MIN (0x80000000)
                 a.cmp(x86::eax, 0x80000000);
                 a.jne(noOverflow);
-                
+
                 // Overflow case detected
                 if (opcode_is(opcode, Opcode::DivS32)) {
                     // Result is INT32_MIN (already in eax). Sign-extend to 64-bit and store.
                     a.movsxd(x86::rax, x86::eax);
-                    a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+                    a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
                 } else {
                     // RemS32: Result is 0
-                    a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), 0);
+                    a.mov(x86::qword_ptr(x86::rbx, rd * 8), 0);
                 }
                 a.jmp(divDone);
-                
+
                 a.bind(noOverflow);
                 // Normal division
-                // Load dividend into eax again (in case we skipped the load above)
-                // Optimization: we could have loaded it earlier, but let's be safe
-                a.mov(x86::eax, x86::dword_ptr(x86::rbx, dest_reg * 8));
+                // Load dividend (ra) into eax again (in case we skipped the load above)
+                a.mov(x86::eax, x86::dword_ptr(x86::rbx, ra * 8));
                 a.cdq(); // Sign extend eax -> edx:eax
                 a.idiv(x86::ecx);
-                
+
                 // Store result
                 if (opcode_is(opcode, Opcode::DivS32)) {
                     a.movsxd(x86::rax, x86::eax); // Sign extend result
-                    a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+                    a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
                 } else {
                     a.movsxd(x86::rax, x86::edx); // Sign extend remainder
-                    a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+                    a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
                 }
-                
+
                 a.bind(divDone);
             } else if (opcode_is(opcode, Opcode::DivS64) || opcode_is(opcode, Opcode::RemS64)) {
                 Label noOverflow = a.new_label();
                 Label divDone = a.new_label();
-                
+
                 // Check divisor == -1 (in rcx)
                 a.cmp(x86::rcx, -1);
                 a.jne(noOverflow);
-                
-                // Load dividend into rax
-                a.mov(x86::rax, x86::qword_ptr(x86::rbx, dest_reg * 8));
-                
+
+                // Load dividend (ra) into rax
+                a.mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
+
                 // Check dividend == INT64_MIN (0x8000000000000000)
                 // We can't use 64-bit immediate with cmp directly if it doesn't fit in 32-bit signed
                 a.mov(x86::rdx, 0x8000000000000000);
                 a.cmp(x86::rax, x86::rdx);
                 a.jne(noOverflow);
-                
+
                 // Overflow case detected
                 if (opcode_is(opcode, Opcode::DivS64)) {
                     // Result is INT64_MIN (already in rax). Store it.
-                    a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+                    a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
                 } else {
                     // RemS64: Result is 0
-                    a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), 0);
+                    a.mov(x86::qword_ptr(x86::rbx, rd * 8), 0);
                 }
                 a.jmp(divDone);
-                
+
                 a.bind(noOverflow);
                 // Normal division
-                a.mov(x86::rax, x86::qword_ptr(x86::rbx, dest_reg * 8));
+                a.mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
                 a.cqo(); // Sign extend rax -> rdx:rax
                 a.idiv(x86::rcx);
-                
+
                 // Store result
                 if (opcode_is(opcode, Opcode::DivS64)) {
-                    a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+                    a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
                 } else {
-                    a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
+                    a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rdx);
                 }
-                
+
                 a.bind(divDone);
             } else {
                 // Unsigned Division (DivU32, RemU32, DivU64, RemU64)
                 // No overflow check needed for unsigned
                 
                 if (opcode_is(opcode, Opcode::DivU32) || opcode_is(opcode, Opcode::RemU32)) {
-                    a.mov(x86::eax, x86::dword_ptr(x86::rbx, dest_reg * 8));
+                    a.mov(x86::eax, x86::dword_ptr(x86::rbx, ra * 8));  // Load dividend (ra)
                     a.xor_(x86::edx, x86::edx); // Zero extend
                     a.div(x86::ecx);
-                    
+
                     if (opcode_is(opcode, Opcode::DivU32)) {
                         a.mov(x86::ecx, x86::eax); // Zero extend result
-                        a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+                        a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rcx);
                     } else {
                         a.mov(x86::ecx, x86::edx); // Zero extend remainder
-                        a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+                        a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rcx);
                     }
                 } else {
                     // 64-bit unsigned
-                    a.mov(x86::rax, x86::qword_ptr(x86::rbx, dest_reg * 8));
+                    a.mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));  // Load dividend (ra)
                     a.xor_(x86::edx, x86::edx); // Zero extend
                     a.div(x86::rcx);
-                    
+
                     if (opcode_is(opcode, Opcode::DivU64)) {
-                        a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+                        a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
                     } else {
-                        a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rdx);
+                        a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rdx);
                     }
                 }
             }
+
+            a.bind(divisionDone);
 
             pc += instrSize;
             continue;
