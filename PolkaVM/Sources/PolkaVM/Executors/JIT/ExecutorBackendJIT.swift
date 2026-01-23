@@ -110,10 +110,9 @@ private final class JITCodeCache {
         // Evict least recently used entry if cache is full
         if cache.count >= maxCacheSize, let lruKey = accessOrder.first {
             if let evictedEntry = cache.removeValue(forKey: lruKey) {
-                // Free dispatcher table for evicted entry
-                if let table = evictedEntry.dispatcherTable {
-                    table.deallocate()
-                }
+                // Free dispatcher table and function code for evicted entry
+                CppHelper.freeDispatcherTable(UnsafeMutableRawPointer(mutating: evictedEntry.functionPtr))
+                CppHelper.releaseJITFunction(UnsafeMutableRawPointer(mutating: evictedEntry.functionPtr))
             }
             accessOrder.removeFirst()
             logger.debug("JIT cache EVICTED entry (cache size: \(cache.count), max: \(maxCacheSize))")
@@ -135,11 +134,10 @@ private final class JITCodeCache {
 
     /// Clear all cached entries
     func clear() {
-        // Free dispatcher tables for all entries
+        // Free dispatcher tables and function code for all entries
         for entry in cache.values {
-            if let table = entry.dispatcherTable {
-                table.deallocate()
-            }
+            CppHelper.freeDispatcherTable(UnsafeMutableRawPointer(mutating: entry.functionPtr))
+            CppHelper.releaseJITFunction(UnsafeMutableRawPointer(mutating: entry.functionPtr))
         }
         cache.removeAll()
         accessOrder.removeAll()
@@ -246,9 +244,6 @@ final class ExecutorBackendJIT: ExecutorBackend {
         UnsafeMutablePointer<UInt64>
     ) -> UInt32)?
 
-    // Track compiled function pointers for memory leak cleanup
-    private var compiledFunctionPointers: [UnsafeRawPointer] = []
-
     // In-memory code cache for JIT-compiled functions
     private let codeCache = JITCodeCache()
 
@@ -298,12 +293,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
     }
 
     deinit {
-        // Release JIT code memory for all compiled functions
-        for funcPtr in compiledFunctionPointers {
-            CppHelper.releaseJITFunction(UnsafeMutableRawPointer(mutating: funcPtr))
-        }
-
-        // Clear the code cache (frees dispatcher tables for cached entries)
+        // Clear the code cache (frees dispatcher tables and function code for all cached entries)
         codeCache.clear()
 
         // Clean up heap-allocated struct
@@ -481,9 +471,6 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     targetArchitecture: targetArchitecture,
                     jitMemorySize: totalMemorySize
                 )
-
-                // Track compiled function pointer for cleanup in deinit
-                compiledFunctionPointers.append(compiledFuncPtr)
 
                 // Retrieve dispatcher jump table for this compiled function
                 // This allows JumpInd to work without a PVM jump table
