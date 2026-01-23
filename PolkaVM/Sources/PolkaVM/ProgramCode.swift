@@ -126,11 +126,11 @@ public class ProgramCode {
                 // block end
                 blockGasCosts[currentBlockStart] = currentBlockGasCost
                 // next block
-                basicBlockIndices.insert(i + skip)
-                currentBlockStart = i + skip
+                basicBlockIndices.insert(i + skip + 1)
+                currentBlockStart = i + skip + 1
                 currentBlockGasCost = Gas(0)
             }
-            i += skip
+            i += skip + 1
         }
         blockGasCosts[currentBlockStart] = currentBlockGasCost + Gas(1)
         basicBlockIndices.insert(i)
@@ -142,7 +142,7 @@ public class ProgramCode {
     }
 
     private func parseInstruction(startIndex: Int, skip: UInt32) throws(Error) -> Instruction {
-        let endIndex = startIndex + Int(skip)
+        let endIndex = startIndex + Int(skip) + 1
         let data: Data
         if endIndex <= code.endIndex {
             data = code[startIndex ..< endIndex]
@@ -210,7 +210,7 @@ public class ProgramCode {
 
         let idx = min(UInt32((value >> offsetBits).trailingZeroBitCount), Constants.maxInstructionLength)
 
-        return idx + 1
+        return idx
     }
 }
 
