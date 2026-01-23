@@ -401,25 +401,13 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
         if (opcode_is(opcode, Opcode::LoadImmJumpInd)) {
-            // LoadImmJumpInd: [opcode][ra|rb<<4][l_X][immediate_X][immediate_Y]
-            // ra = dest register, rb = base register for indirect jump
-            uint8_t dest_reg = codeBuffer[pc + 1] & 0x0F;
-            uint8_t base_reg = codeBuffer[pc + 1] >> 4;
-            uint8_t l_X = codeBuffer[pc + 2];
-
-            // Load immediates (variable-width encoding)
-            uint32_t immediate_X = 0;
-            uint32_t immediate_Y = 0;
-
-            if (l_X == 0) {
-                immediate_X = codeBuffer[pc + 3];
-                memcpy(&immediate_Y, &codeBuffer[pc + 4], 4);
-            } else {
-                // Decode variable-width immediates
-                // For simplicity, assume 32-bit for now (full implementation would handle all cases)
-                memcpy(&immediate_X, &codeBuffer[pc + 3], 4);
-                memcpy(&immediate_Y, &codeBuffer[pc + 3 + l_X], 4);
-            }
+            // LoadImmJumpInd: [opcode][ra][rb][value_32bit][offset_32bit] = 11 bytes
+            uint8_t dest_reg = codeBuffer[pc + 1];
+            uint8_t base_reg = codeBuffer[pc + 2];
+            uint32_t immediate_X;
+            uint32_t immediate_Y;
+            memcpy(&immediate_X, &codeBuffer[pc + 3], 4);
+            memcpy(&immediate_Y, &codeBuffer[pc + 7], 4);
 
             // Load immediate into destination register (zero-extended)
             a.mov(x86::rax, immediate_X);
