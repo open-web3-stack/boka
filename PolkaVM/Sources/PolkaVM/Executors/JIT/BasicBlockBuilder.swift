@@ -40,13 +40,31 @@ final class BasicBlockBuilder {
         // Get basic block ending instructions - cache opcodes as constants to avoid C++ layer access
         // TODO: Import BASIC_BLOCK_INSTRUCTIONS from Instructions.swift properly
         // Block-ending opcodes matching instruction_dispatcher.cpp implementation
+        // NOTE: Halt/Fallthrough (opcode 1) is NOT included - it continues to next instruction for basic block purposes
         let blockEndingOpcodes: Set<UInt8> = [
             PVMOpcodes.trap.rawValue,
+            // PVMOpcodes.halt.rawValue,  // NOT included - halt/fallthrough continues to next instruction
             PVMOpcodes.jump.rawValue,
             PVMOpcodes.jumpInd.rawValue,
             PVMOpcodes.loadImmJump.rawValue,
+            // Branch instructions (all variants)
             PVMOpcodes.branchEq.rawValue,
-            PVMOpcodes.branchNe.rawValue
+            PVMOpcodes.branchNe.rawValue,
+            PVMOpcodes.branchLtU.rawValue,
+            PVMOpcodes.branchLtS.rawValue,
+            PVMOpcodes.branchGeU.rawValue,
+            PVMOpcodes.branchGeS.rawValue,
+            // Branch immediate instructions (all variants)
+            PVMOpcodes.branchEqImm.rawValue,
+            PVMOpcodes.branchNeImm.rawValue,
+            PVMOpcodes.branchLtUImm.rawValue,
+            PVMOpcodes.branchLeUImm.rawValue,
+            PVMOpcodes.branchGeUImm.rawValue,
+            PVMOpcodes.branchGtUImm.rawValue,
+            PVMOpcodes.branchLtSImm.rawValue,
+            PVMOpcodes.branchLeSImm.rawValue,
+            PVMOpcodes.branchGeSImm.rawValue,
+            PVMOpcodes.branchGtSImm.rawValue
         ]
 
         // First pass: identify all blocks and their instructions
@@ -211,27 +229,87 @@ final class BasicBlockBuilder {
              PVMOpcodes.branchGeU.rawValue, PVMOpcodes.branchGeS.rawValue:
             return 7
 
+        // 7-byte instructions (continued)
+        case PVMOpcodes.storeImmIndU8.rawValue:
+            return 7
+
+        // 8-byte instructions
+        case PVMOpcodes.storeImmIndU16.rawValue:
+            return 8
+
         // 9-byte instructions
-        case PVMOpcodes.storeImmU32.rawValue:
+        case PVMOpcodes.storeImmIndU32.rawValue,
+             PVMOpcodes.storeImmU32.rawValue:
             return 9
 
         // 10-byte instructions
         case PVMOpcodes.loadImmU64.rawValue,
-             PVMOpcodes.loadImmJump.rawValue:
+             PVMOpcodes.loadImmJump.rawValue,
+             PVMOpcodes.storeImmIndU64.rawValue:
             return 10
 
-        case PVMOpcodes.storeImmU16.rawValue:
-            return 7
+        // 11-byte instructions (64-bit immediate)
+        case PVMOpcodes.addImm64.rawValue,
+             PVMOpcodes.mulImm64.rawValue,
+             PVMOpcodes.shloLImm64.rawValue,
+             PVMOpcodes.shloRImm64.rawValue,
+             PVMOpcodes.sharRImm64.rawValue,
+             PVMOpcodes.negAddImm64.rawValue,
+             PVMOpcodes.shloLImmAlt64.rawValue,
+             PVMOpcodes.shloRImmAlt64.rawValue,
+             PVMOpcodes.sharRImmAlt64.rawValue,
+             PVMOpcodes.rotR64Imm.rawValue,
+             PVMOpcodes.rotR64ImmAlt.rawValue,
+             PVMOpcodes.rotR32Imm.rawValue,
+             PVMOpcodes.rotR32ImmAlt.rawValue:
+            return 11
 
+        // 13-byte instructions
         case PVMOpcodes.storeImmU64.rawValue:
             return 13
 
-        // 13-byte instructions (storeImmU64 is handled above)
+        // 14-byte instructions (BranchImm)
+        case PVMOpcodes.branchEqImm.rawValue,
+             PVMOpcodes.branchNeImm.rawValue,
+             PVMOpcodes.branchLtUImm.rawValue,
+             PVMOpcodes.branchLeUImm.rawValue,
+             PVMOpcodes.branchGeUImm.rawValue,
+             PVMOpcodes.branchGtUImm.rawValue,
+             PVMOpcodes.branchLtSImm.rawValue,
+             PVMOpcodes.branchLeSImm.rawValue,
+             PVMOpcodes.branchGeSImm.rawValue,
+             PVMOpcodes.branchGtSImm.rawValue:
+            return 14
 
-        // 1 + 1 + 4 + 1 = 7 bytes
-        // 1 + 1 + 4 + 2 = 8 bytes
-        // 1 + 1 + 4 + 4 = 10 bytes
-        // 1 + 1 + 4 + 8 = 14 bytes
+        // Store/Load Indirect (7 bytes)
+        case PVMOpcodes.storeIndU8.rawValue, PVMOpcodes.storeIndU16.rawValue,
+             PVMOpcodes.storeIndU32.rawValue, PVMOpcodes.storeIndU64.rawValue,
+             PVMOpcodes.loadIndU8.rawValue, PVMOpcodes.loadIndI8.rawValue,
+             PVMOpcodes.loadIndU16.rawValue, PVMOpcodes.loadIndI16.rawValue,
+             PVMOpcodes.loadIndU32.rawValue, PVMOpcodes.loadIndI32.rawValue,
+             PVMOpcodes.loadIndU64.rawValue:
+            return 7
+
+        // 32-bit immediate (7 bytes)
+        case PVMOpcodes.addImm32.rawValue,
+             PVMOpcodes.andImm.rawValue,
+             PVMOpcodes.xorImm.rawValue,
+             PVMOpcodes.orImm.rawValue,
+             PVMOpcodes.mulImm32.rawValue,
+             PVMOpcodes.setLtUImm.rawValue,
+             PVMOpcodes.setLtSImm.rawValue,
+             PVMOpcodes.shloLImm32.rawValue,
+             PVMOpcodes.shloRImm32.rawValue,
+             PVMOpcodes.sharRImm32.rawValue,
+             PVMOpcodes.negAddImm32.rawValue,
+             PVMOpcodes.setGtUImm.rawValue,
+             PVMOpcodes.setGtSImm.rawValue,
+             PVMOpcodes.shloLImmAlt32.rawValue,
+             PVMOpcodes.shloRImmAlt32.rawValue,
+             PVMOpcodes.sharRImmAlt32.rawValue,
+             PVMOpcodes.cmovIzImm.rawValue,
+             PVMOpcodes.cmovNzImm.rawValue:
+            return 7
 
         case PVMOpcodes.andInv.rawValue, PVMOpcodes.orInv.rawValue, PVMOpcodes.xnor.rawValue:
             return 3
