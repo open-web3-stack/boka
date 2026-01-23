@@ -580,14 +580,15 @@ struct CrossModeParityTests {
         // Test 32-bit direct addressing for LoadU8/StoreU8
         // This verifies the fix for the 32-bit address truncation bug
         //
+        // Valid address range: 0x10000 (65536) <= address < 0x20000 (memory_size)
         // R0 = 0xAB (value to store)
-        // Store low byte of R0 to address 0x20000
-        // Load from address 0x20000 into R1
+        // Store low byte of R0 to address 0x10000 (valid address in heap)
+        // Load from address 0x10000 into R1
 
         let blob = ParityInstructionBuilder()
             .loadImm(destReg: 0, value: 0xAB)   // R0 = value with low byte 0xAB
-            .storeU8(srcReg: 0, address: 0x20000)  // Store 0xAB to address 0x20000
-            .loadU8(destReg: 1, address: 0x20000)  // Load from address 0x20000 into R1
+            .storeU8(srcReg: 0, address: 0x10000)  // Store 0xAB to address 0x10000 (first valid address)
+            .loadU8(destReg: 1, address: 0x10000)  // Load from address 0x10000 into R1
             .appendRegisterDump(baseAddress: 0x10000)
             .buildBlob()
 
@@ -719,11 +720,19 @@ struct CrossModeParityTests {
 
     @Test func testComparisonBranches() async throws {
         // Test branch taken and not taken
+        // LoadImm is 6 bytes, BranchEq is 7 bytes
+        // PC=0: LoadImm (6 bytes)
+        // PC=6: LoadImm (6 bytes)
+        // PC=12: BranchEq (7 bytes)
+        // PC=19: LoadImm (6 bytes)
+        // PC=25: LoadImm (6 bytes)
+        // Branch target should be PC=25 (skip the LoadImm at PC=19)
+        // Offset = 25 - 12 = 13
         let blob = ParityInstructionBuilder()
             .loadImm(destReg: 0, value: 5)
             .loadImm(destReg: 1, value: 5)
             // Test: if R0 == R1 goto target (5 == 5, branch taken)
-            .branchEq(r1: 0, r2: 1, offset: 6)  // Will branch
+            .branchEq(r1: 0, r2: 1, offset: 13)  // Jump to PC=25, skipping PC=19
             .loadImm(destReg: 2, value: 99)   // Skipped
             .loadImm(destReg: 3, value: 42)   // Executed
             .appendRegisterDump(baseAddress: 0x10000)
@@ -828,10 +837,12 @@ struct CrossModeParityTests {
     @Test func testAllBranchTypes() async throws {
         // Test both BranchEq and BranchNe with taken and not-taken
         // Test BranchEq taken (10 == 10)
+        // LoadImm is 6 bytes, BranchEq is 7 bytes
+        // Offset should be 6 + 7 = 13 to jump over the next LoadImm
         let blob = ParityInstructionBuilder()
             .loadImm(destReg: 0, value: 10)
             .loadImm(destReg: 1, value: 10)
-            .branchEq(r1: 0, r2: 1, offset: 6)  // Skip next loadImm (6 bytes)
+            .branchEq(r1: 0, r2: 1, offset: 13)  // Skip next loadImm (6 bytes) + branch size (7 bytes)
             .loadImm(destReg: 3, value: 99)     // Should be skipped
             .loadImm(destReg: 3, value: 42)     // Should execute - R3 = 42
             .appendRegisterDump(baseAddress: 0x10000)
