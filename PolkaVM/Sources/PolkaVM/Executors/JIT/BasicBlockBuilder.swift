@@ -47,6 +47,7 @@ final class BasicBlockBuilder {
             PVMOpcodes.jump.rawValue,
             PVMOpcodes.jumpInd.rawValue,
             PVMOpcodes.loadImmJump.rawValue,
+            PVMOpcodes.loadImmJumpInd.rawValue,
             // Branch instructions (all variants)
             PVMOpcodes.branchEq.rawValue,
             PVMOpcodes.branchNe.rawValue,
@@ -247,6 +248,10 @@ final class BasicBlockBuilder {
              PVMOpcodes.loadImmJump.rawValue,
              PVMOpcodes.storeImmIndU64.rawValue:
             return 10
+
+        // 11-byte instructions
+        case PVMOpcodes.loadImmJumpInd.rawValue:
+            return 11
 
         // 11-byte instructions (64-bit immediate)
         case PVMOpcodes.addImm64.rawValue,

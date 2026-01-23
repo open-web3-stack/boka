@@ -15,6 +15,7 @@ enum PVMOpcodes: UInt8 {
     case jump = 40
     case jumpInd = 50
     case loadImmJump = 80
+    case loadImmJumpInd = 180  // Load immediate and jump indirect
 
     // Load Immediate Instructions
     case loadImm = 51      // LoadImm (32-bit immediate) - primary load immediate

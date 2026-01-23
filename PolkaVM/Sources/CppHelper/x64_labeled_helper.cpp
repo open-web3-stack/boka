@@ -277,10 +277,10 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
         if (opcode_is(opcode, Opcode::LoadImmJump)) {
             uint8_t destReg = codeBuffer[pc + 1];
-            uint32_t jumpOffset;
             uint32_t immediate;
-            memcpy(&jumpOffset, &codeBuffer[pc + 2], 4);   // Jump offset is at bytes 2-5
-            memcpy(&immediate, &codeBuffer[pc + 6], 4);    // Immediate value is at bytes 6-9
+            uint32_t jumpOffset;
+            memcpy(&immediate, &codeBuffer[pc + 2], 4);   // Immediate value is at bytes 2-5
+            memcpy(&jumpOffset, &codeBuffer[pc + 6], 4);   // Jump offset is at bytes 6-9
             uint32_t targetPC = pc + int32_t(jumpOffset);  // Offset is relative to instruction start
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "x86_64");
