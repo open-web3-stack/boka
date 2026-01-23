@@ -1661,48 +1661,139 @@ bool emit_instruction_decoded(
         case static_cast<uint8_t>(Opcode::DivU32):
             {
                 // rd = ra / rb (3-operand format)
+                // Per spec: when rb == 0, return UInt64.max (matches interpreter behavior)
                 auto* a = static_cast<x86::Assembler*>(assembler);
+                asmjit::Label notZero = a->new_label();
+                asmjit::Label done = a->new_label();
+
                 a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
                 a->mov(x86::ecx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->test(x86::ecx, x86::ecx);  // Check if rb == 0
+                a->jnz(notZero);  // If rb != 0, jump to division
+
+                // Division by zero case: set rax to UInt64.max
+                a->mov(x86::rax, 0xFFFFFFFFFFFFFFFFULL);
+                a->jmp(done);
+
+                // Normal division case
+                a->bind(notZero);
                 a->xor_(x86::edx, x86::edx);  // edx = 0
                 a->div(x86::ecx);  // eax = eax / ecx, edx = eax % ecx
-                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::eax);  // Store quotient to rd
+                a->movsxd(x86::rax, x86::eax);  // Sign extend eax to rax
+
+                a->bind(done);
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rax);  // Store quotient to rd
             }
             return true;
 
         case static_cast<uint8_t>(Opcode::DivS32):
             {
                 // rd = ra / rb (3-operand format, signed)
+                // Per spec: when b == 0, return UInt64.max
+                // Also handles a == Int32.min && b == -1 case (returns a, sign-extended)
                 auto* a = static_cast<x86::Assembler*>(assembler);
-                a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                asmjit::Label notZero = a->new_label();
+                asmjit::Label overflow = a->new_label();
+                asmjit::Label done = a->new_label();
+
+                a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));
+                a->mov(x86::ecx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));
+
+                // Check for overflow case: a == Int32.min && b == -1
+                a->cmp(x86::eax, 0x80000000);  // Check if a == Int32.min
+                a->jne(overflow);
+                a->cmp(x86::ecx, 0xFFFFFFFF);  // Check if b == -1
+                a->jne(overflow);
+                // Overflow case: return a (which is Int32.min, sign-extended)
+                a->movsxd(x86::rax, x86::eax);
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rax);
+                a->jmp(done);
+
+                a->bind(overflow);
+                a->test(x86::ecx, x86::ecx);
+                a->jnz(notZero);
+
+                // Division by zero case
+                a->mov(x86::rax, 0xFFFFFFFFFFFFFFFFULL);
+                a->jmp(done);
+
+                a->bind(notZero);
                 a->cdq();  // Sign extend eax to edx:eax
-                a->mov(x86::ecx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
-                a->idiv(x86::ecx);  // eax = eax / ecx (signed)
-                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::eax);  // Store quotient to rd
+                a->idiv(x86::ecx);
+                a->movsxd(x86::rax, x86::eax);
+
+                a->bind(done);
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rax);
             }
             return true;
 
         case static_cast<uint8_t>(Opcode::RemU32):
             {
-                // rd = ra % rb (3-operand format)
+                // Per spec: when rb == 0, return ra (the dividend, sign-extended to 64-bit), matches interpreter behavior
                 auto* a = static_cast<x86::Assembler*>(assembler);
+                asmjit::Label notZero = a->new_label();
+                asmjit::Label done = a->new_label();
+
                 a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
-                a->xor_(x86::edx, x86::edx);  // edx = 0
                 a->mov(x86::ecx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->test(x86::ecx, x86::ecx);  // Check if rb == 0
+                a->jnz(notZero);  // If rb != 0, jump to modulo
+
+                // Division by zero case: store the sign-extended dividend
+                a->movsxd(x86::rax, x86::eax);  // Sign extend eax to rax
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rax);  // Store to rd
+                a->jmp(done);
+
+                // Normal modulo case
+                a->bind(notZero);
+                a->xor_(x86::edx, x86::edx);  // edx = 0
                 a->div(x86::ecx);  // eax = eax / ecx, edx = eax % ecx
-                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::edx);  // Store remainder to rd
+                a->movsxd(x86::rax, x86::edx);  // Sign extend edx to rax
+
+                a->bind(done);
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rax);  // Store to rd
             }
             return true;
 
         case static_cast<uint8_t>(Opcode::RemS32):
             {
-                // rd = ra % rb (3-operand format, signed)
+                // Per spec: when b == 0, return a (the dividend, sign-extended to 64-bit), matches interpreter behavior
+                // Also handles a == Int32.min && b == -1 case (returns 0)
                 auto* a = static_cast<x86::Assembler*>(assembler);
+                asmjit::Label notZero = a->new_label();
+                asmjit::Label overflow = a->new_label();
+                asmjit::Label done = a->new_label();
+
                 a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
-                a->cdq();  // Sign extend eax to edx:eax
                 a->mov(x86::ecx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+
+                // Check for overflow case: a == Int32.min && b == -1
+                a->cmp(x86::eax, 0x80000000);  // Check if a == Int32.min
+                a->jne(overflow);
+                a->cmp(x86::ecx, 0xFFFFFFFF);  // Check if b == -1
+                a->jne(overflow);
+                // Overflow case: return 0
+                a->xor_(x86::eax, x86::eax);  // eax = 0
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rax);
+                a->jmp(done);
+
+                a->bind(overflow);
+                a->test(x86::ecx, x86::ecx);  // Check if rb == 0
+                a->jnz(notZero);  // If rb != 0, jump to modulo
+
+                // Division by zero case: store the sign-extended dividend
+                a->movsxd(x86::rax, x86::eax);  // Sign extend eax to rax
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rax);  // Store to rd
+                a->jmp(done);
+
+                // Normal modulo case
+                a->bind(notZero);
+                a->cdq();  // Sign extend eax to edx:eax
                 a->idiv(x86::ecx);  // eax = eax / ecx, edx = eax % ecx (signed)
-                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::edx);  // Store remainder to rd
+                a->movsxd(x86::rax, x86::edx);  // Sign extend edx to rax
+
+                a->bind(done);
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rax);  // Store to rd
             }
             return true;
 
