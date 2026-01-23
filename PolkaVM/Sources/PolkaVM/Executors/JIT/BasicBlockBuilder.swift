@@ -239,19 +239,22 @@ final class BasicBlockBuilder {
             return 8
 
         // 9-byte instructions
-        case PVMOpcodes.storeImmIndU32.rawValue,
-             PVMOpcodes.storeImmU32.rawValue:
+        case PVMOpcodes.storeImmU32.rawValue:
             return 9
 
         // 10-byte instructions
         case PVMOpcodes.loadImmU64.rawValue,
              PVMOpcodes.loadImmJump.rawValue,
-             PVMOpcodes.storeImmIndU64.rawValue:
+             PVMOpcodes.storeImmIndU32.rawValue:
             return 10
 
         // 11-byte instructions
         case PVMOpcodes.loadImmJumpInd.rawValue:
             return 11
+
+        // 14-byte instructions
+        case PVMOpcodes.storeImmIndU64.rawValue:
+            return 14
 
         // 11-byte instructions (64-bit immediate)
         case PVMOpcodes.addImm64.rawValue,
