@@ -314,10 +314,10 @@ uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, siz
             instrSize = 4;  // 3-register format
             break;
 
-        // 2-register rotate instructions: [opcode][rd][ra] = 3 bytes
+        // 3-register rotate instructions: [opcode][ra|rb<<4][rd] = 4 bytes
         case Opcode::RotL32:          // 221
         case Opcode::RotR32:          // 223
-            instrSize = 3;  // 2-register format
+            instrSize = 4;  // 3-register format (ra, rb, rd)
             break;
 
         // For unimplemented opcodes, return 0 to signal error
