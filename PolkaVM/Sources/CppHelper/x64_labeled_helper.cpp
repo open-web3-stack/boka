@@ -469,25 +469,26 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint8_t base_reg = codeBuffer[pc + 1];
             uint32_t offset;
             memcpy(&offset, &codeBuffer[pc + 2], 4);
-            
+
             // Load base address from register
             a.mov(x86::rax, x86::qword_ptr(x86::rbx, base_reg * 8));
-            
-            // Add offset
-            a.add(x86::rax, offset);
-            
+
+            // Add offset (zero-extend to 64-bit by loading into register first)
+            a.mov(x86::rcx, offset);
+            a.add(x86::rax, x86::rcx);
+
             // Bounds check: address < 65536 → panic
             a.cmp(x86::rax, 65536);
             a.jb(panicLabel);
-            
+
             // Runtime check: address >= memory_size → page fault
             a.mov(x86::ecx, x86::r13d); // memory_size
             a.cmp(x86::rax, x86::rcx);
             a.jae(pagefaultLabel);
-            
+
             // Store value
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
-            
+
             if (opcode_is(opcode, Opcode::StoreImmIndU8)) {
                 uint8_t value = codeBuffer[pc + 6];
                 a.mov(x86::dl, value);
@@ -524,17 +525,18 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint8_t base_reg = codeBuffer[pc + 2];
             uint32_t offset;
             memcpy(&offset, &codeBuffer[pc + 3], 4);
-            
+
             // Load base address from register
             a.mov(x86::rax, x86::qword_ptr(x86::rbx, base_reg * 8));
-            
-            // Add offset
-            a.add(x86::rax, offset);
-            
+
+            // Add offset (zero-extend to 64-bit by loading into register first)
+            a.mov(x86::r8, offset);
+            a.add(x86::rax, x86::r8);
+
             // Bounds check: address < 65536 → panic
             a.cmp(x86::rax, 65536);
             a.jb(panicLabel);
-            
+
             // Runtime check: address >= memory_size → page fault
             a.mov(x86::ecx, x86::r13d); // memory_size
             a.cmp(x86::rax, x86::rcx);
@@ -574,17 +576,18 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint8_t base_reg = codeBuffer[pc + 2];
             uint32_t offset;
             memcpy(&offset, &codeBuffer[pc + 3], 4);
-            
+
             // Load base address from register
             a.mov(x86::rax, x86::qword_ptr(x86::rbx, base_reg * 8));
-            
-            // Add offset
-            a.add(x86::rax, offset);
-            
+
+            // Add offset (zero-extend to 64-bit by loading into register first)
+            a.mov(x86::r8, offset);
+            a.add(x86::rax, x86::r8);
+
             // Bounds check: address < 65536 → panic
             a.cmp(x86::rax, 65536);
             a.jb(panicLabel);
-            
+
             // Runtime check: address >= memory_size → page fault
             a.mov(x86::ecx, x86::r13d); // memory_size
             a.cmp(x86::rax, x86::rcx);
@@ -1061,23 +1064,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint8_t destReg = codeBuffer[pc + 1];
 
             // Load 64-bit immediate value from bytecode
-            uint32_t low, high;
-            memcpy(&low, &codeBuffer[pc + 2], 4);
-            memcpy(&high, &codeBuffer[pc + 6], 4);
+            uint64_t immediate;
+            memcpy(&immediate, &codeBuffer[pc + 2], 8);
 
-            // DEBUG: Force a compilation error to verify this path is taken
-            // if (low == 0x12345678) { return 999; }
-
-            // Clear rax, then load high 32 bits (zero-extends)
-            a.xor_(x86::rax, x86::rax);
-            a.mov(x86::eax, high);  // eax = high, rax zero-extended
-            a.shl(x86::rax, 32);  // rax = high << 32
-
-            // Load low 32 bits and OR
-            a.mov(x86::ecx, low);
-            a.or_(x86::rax, x86::rcx);  // rax = (high << 32) | low
-
-            // Store to VM register
+            // Load immediate into rax and store to VM register
+            a.mov(x86::rax, immediate);
             a.mov(x86::qword_ptr(x86::rbx, destReg * 8), x86::rax);
 
             pc += instrSize;
@@ -1112,14 +1103,15 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
             uint8_t rd = codeBuffer[pc + 2];
 
-            // Load ra and rb (zero-extend to 64-bit)
+            // Load ra and rb as 32-bit values
             a.mov(x86::eax, x86::dword_ptr(x86::rbx, ra * 8));
-            a.movsx(x86::rax, x86::eax);
             a.mov(x86::ecx, x86::dword_ptr(x86::rbx, rb * 8));
-            a.movsxd(x86::rcx, x86::ecx);
 
-            // Add
-            a.add(x86::rax, x86::rcx);
+            // Add (32-bit with truncation on overflow)
+            a.add(x86::eax, x86::ecx);
+
+            // Sign-extend result to 64-bit
+            a.movsxd(x86::rax, x86::eax);
 
             // Store to rd
             a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
