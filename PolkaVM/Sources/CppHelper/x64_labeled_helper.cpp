@@ -1099,6 +1099,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint32_t address;
             memcpy(&address, &codeBuffer[pc + 2], 4);
 
+            // fprintf(stderr, "[JIT StoreU64] srcReg=%u address=%u (0x%X)\n", srcReg, address, address);
+
             // Load address into eax (zero-extends to rax automatically since eax is written)
             // NOTE: mov to eax zero-extends to rax in x86_64
             a.mov(x86::eax, address);
