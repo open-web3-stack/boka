@@ -39,7 +39,7 @@ let package = Package(
                     "-Xcc", "-std=c++20",
                     "-Xcc", "-I/usr/include/c++/13",
                     "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13",
-                    "-Xcc", "-I../asmjit"
+                    "-Xcc", "-I/home/ubuntu/boka/PolkaVM/Sources/asmjit"
                 ]),
             ]
         ),
@@ -59,7 +59,7 @@ let package = Package(
                     "-Xcc", "-std=c++20",
                     "-Xcc", "-I/usr/include/c++/13",
                     "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13",
-                    "-Xcc", "-I../asmjit"
+                    "-Xcc", "-I/home/ubuntu/boka/PolkaVM/Sources/asmjit"
                 ]),
             ]
         ),
@@ -76,7 +76,7 @@ let package = Package(
                     "-Xcc", "-std=c++20",
                     "-Xcc", "-I/usr/include/c++/13",
                     "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13",
-                    "-Xcc", "-I../../Sources/asmjit"
+                    "-Xcc", "-I/home/ubuntu/boka/PolkaVM/Sources/asmjit"
                 ]),
             ]
         ),
@@ -84,15 +84,16 @@ let package = Package(
             name: "CppHelper",
             dependencies: [
             ],
-            exclude: ["asmjit/asmjit.natvis", "asmjit/.git", "asmjit/.github", "asmjit/CMakeLists.txt", "asmjit/asmjit-testing"],
+            exclude: ["asmjit/asmjit.natvis", "asmjit/include/asmjit.natvis", "asmjit/asmjit/asmjit.natvis", "asmjit/.git", "asmjit/.github", "asmjit/CMakeLists.txt", "asmjit/asmjit-testing", "asmjit/tools", "asmjit/db", "asmjit/module.modulemap", "asmjit/LICENSE.md", "asmjit/README.md", "asmjit/CONTRIBUTING.md", "asmjit/configure.sh", "asmjit/configure_sanitizers.sh", "asmjit/configure_vs2022_x86.bat", "asmjit/configure_vs2022_x64.bat", "asmjit/CMakePresets.json", "asmjit/include"],
             sources: [".", "../asmjit/asmjit/core", "../asmjit/asmjit/arm", "../asmjit/asmjit/x86", "../asmjit/asmjit/support", "../asmjit/asmjit/ujit"],
             publicHeadersPath: ".",
             cxxSettings: [
+                .headerSearchPath("../../Sources/asmjit"),
                 .unsafeFlags([
                     "-std=c++20",
                     "-I/usr/include/c++/13",
                     "-I/usr/include/x86_64-linux-gnu/c++/13",
-                    "-I../asmjit"
+                    "-I/home/ubuntu/boka/PolkaVM/Sources/asmjit"
                 ]),
                 .define("ASMJIT_STATIC"),
             ]

@@ -1663,8 +1663,8 @@ bool emit_instruction_decoded(
                 // rd = ra / rb (3-operand format)
                 // Per spec: when rb == 0, return UInt64.max (matches interpreter behavior)
                 auto* a = static_cast<x86::Assembler*>(assembler);
-                asmjit::Label notZero = a->newLabel();
-                asmjit::Label done = a->newLabel();
+                asmjit::Label notZero = a->new_label();
+                asmjit::Label done = a->new_label();
 
                 a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
                 a->mov(x86::ecx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
@@ -1692,9 +1692,9 @@ bool emit_instruction_decoded(
                 // Per spec: when b == 0, return UInt64.max
                 // Also handles a == Int32.min && b == -1 case (returns a, sign-extended)
                 auto* a = static_cast<x86::Assembler*>(assembler);
-                asmjit::Label notZero = a->newLabel();
-                asmjit::Label overflow = a->newLabel();
-                asmjit::Label done = a->newLabel();
+                asmjit::Label notZero = a->new_label();
+                asmjit::Label overflow = a->new_label();
+                asmjit::Label done = a->new_label();
 
                 a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));
                 a->mov(x86::ecx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));
@@ -1731,8 +1731,8 @@ bool emit_instruction_decoded(
             {
                 // Per spec: when rb == 0, return ra (the dividend, sign-extended to 64-bit), matches interpreter behavior
                 auto* a = static_cast<x86::Assembler*>(assembler);
-                asmjit::Label notZero = a->newLabel();
-                asmjit::Label done = a->newLabel();
+                asmjit::Label notZero = a->new_label();
+                asmjit::Label done = a->new_label();
 
                 a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
                 a->mov(x86::ecx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
@@ -1760,9 +1760,9 @@ bool emit_instruction_decoded(
                 // Per spec: when b == 0, return a (the dividend, sign-extended to 64-bit), matches interpreter behavior
                 // Also handles a == Int32.min && b == -1 case (returns 0)
                 auto* a = static_cast<x86::Assembler*>(assembler);
-                asmjit::Label notZero = a->newLabel();
-                asmjit::Label overflow = a->newLabel();
-                asmjit::Label done = a->newLabel();
+                asmjit::Label notZero = a->new_label();
+                asmjit::Label overflow = a->new_label();
+                asmjit::Label done = a->new_label();
 
                 a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
                 a->mov(x86::ecx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb

@@ -120,12 +120,12 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     LabelManager labelManager;
 
     // Create exit labels for different exit conditions
-    Label exitLabel = a.newLabel();       // Normal exit (halt) - w0 = 0
-    Label panicLabel = a.newLabel();      // Panic exit (trap, address < 65536) - w0 = -1
-    Label pagefaultLabel = a.newLabel();  // Page fault exit (address >= memory_size) - w0 = 3
-    Label outOfGasLabel = a.newLabel();   // Out of gas exit - w0 = 1
-    Label unsupportedLabel = a.newLabel();// Unsupported instruction - exit to interpreter - w0 = 2
-    Label epilogueLabel = a.newLabel();   // Epilogue (restore registers and return)
+    Label exitLabel = a.new_label();       // Normal exit (halt) - w0 = 0
+    Label panicLabel = a.new_label();      // Panic exit (trap, address < 65536) - w0 = -1
+    Label pagefaultLabel = a.new_label();  // Page fault exit (address >= memory_size) - w0 = 3
+    Label outOfGasLabel = a.new_label();   // Out of gas exit - w0 = 1
+    Label unsupportedLabel = a.new_label();// Unsupported instruction - exit to interpreter - w0 = 2
+    Label epilogueLabel = a.new_label();   // Epilogue (restore registers and return)
 
     // === PRE-PASS: Identify all jump targets ===
     // This is necessary to handle backward jumps (loops)
@@ -280,11 +280,11 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
             // Read entry based on entrySize
             // For now, support entry sizes 1, 2, 3, 4
-            Label entrySize1 = a.newLabel();
-            Label entrySize2 = a.newLabel();
-            Label entrySize3 = a.newLabel();
-            Label entrySize4 = a.newLabel();
-            Label readDone = a.newLabel();
+            Label entrySize1 = a.new_label();
+            Label entrySize2 = a.new_label();
+            Label entrySize3 = a.new_label();
+            Label entrySize4 = a.new_label();
+            Label readDone = a.new_label();
 
             a.cmp(a64::w3, 1);
             a.b_eq(entrySize1);
