@@ -26,6 +26,13 @@ using namespace PVM;
 static std::unordered_map<void*, std::pair<void**, size_t>> s_dispatcherTables;
 static std::mutex s_dispatcherTablesMutex;
 
+// Global AsmJit runtime for JIT compilation and memory management
+// This must be static to ensure it lives for the entire process
+static JitRuntime* g_globalRuntime = nullptr;
+
+// Global mutex for runtime access
+static std::mutex g_runtimeMutex;
+
 // Export function to get dispatcher table for a function
 extern "C" void* _Nullable * _Nullable getDispatcherTable(void* _Nonnull funcPtr, size_t* _Nonnull outSize) noexcept {
     std::lock_guard<std::mutex> lock(s_dispatcherTablesMutex);
@@ -91,10 +98,16 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         return 2; // Invalid output parameter
     }
 
-    // Initialize asmjit runtime
-    static JitRuntime runtime;
+    // Initialize global runtime if needed
+    {
+        std::lock_guard<std::mutex> lock(g_runtimeMutex);
+        if (!g_globalRuntime) {
+            g_globalRuntime = new JitRuntime();
+        }
+    }
+
     CodeHolder code;
-    code.init(runtime.environment());
+    code.init(g_globalRuntime->environment());
 
     // Create x86 assembler
     x86::Assembler a(&code);
@@ -1177,7 +1190,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     // NOTE: Execution never returns here - either jumps to target or falls back
 
     // Generate the function code
-    Error err = runtime.add(funcOut, &code);
+    Error err = g_globalRuntime->add(funcOut, &code);
     if (err != Error::kOk) {
         return int32_t(err);
     }
@@ -1349,5 +1362,29 @@ extern "C" void freeAllDispatcherTables_x64() noexcept {
 
     #ifdef DEBUG_JIT
     fprintf(stderr, "[JIT x64] Freed %zu dispatcher tables\n", count);
+    #endif
+}
+
+/// Release JIT-compiled code memory (x64 version)
+/// This frees the machine code allocated by AsmJit's JitRuntime
+///
+/// @param funcPtr Function pointer to release
+/// @note Safe to call with nullptr
+/// @warning After calling this, the function pointer becomes invalid and must not be called
+extern "C" void releaseJITFunction_x64(void* _Nullable funcPtr) noexcept {
+    if (!funcPtr) {
+        return;  // Nothing to release
+    }
+
+    std::lock_guard<std::mutex> lock(g_runtimeMutex);
+    if (!g_globalRuntime) {
+        return;  // Runtime not initialized, nothing to release
+    }
+
+    // Release the function memory
+    g_globalRuntime->release((uint8_t*)funcPtr);
+
+    #ifdef DEBUG_JIT
+    fprintf(stderr, "[JIT x64] Released JIT function %p\n", funcPtr);
     #endif
 }

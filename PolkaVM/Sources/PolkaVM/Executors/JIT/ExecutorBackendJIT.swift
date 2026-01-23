@@ -18,17 +18,28 @@ private struct JITCacheEntry {
     let initialPC: UInt32
 }
 
-/// Simple in-memory cache for JIT-compiled functions
+/// Simple in-memory cache for JIT-compiled functions with LRU eviction
 /// Key: (bytecodeHash, configHash, initialPC)
 private final class JITCodeCache {
     private var cache: [String: JITCacheEntry] = [:]
+    private var accessOrder: [String] = []  // Track access order for LRU eviction
     private let logger = Logger(label: "JITCodeCache")
+    private let maxCacheSize: Int
     private var hitCount = 0
     private var missCount = 0
+
+    /// Maximum cache size - prevents unbounded memory growth
+    /// Each entry can be ~10KB+, so 100 entries = ~1MB max
+    private static let defaultMaxSize = 100
 
     /// Generate cache key from bytecode, config, and PC
     private func makeKey(bytecodeHash: Int, configHash: Int, initialPC: UInt32) -> String {
         return "\(bytecodeHash)-\(configHash)-\(initialPC)"
+    }
+
+    /// Initialize cache with optional max size
+    init(maxSize: Int = defaultMaxSize) {
+        self.maxCacheSize = maxSize
     }
 
     /// Generate hash from bytecode data
@@ -63,6 +74,12 @@ private final class JITCodeCache {
             // CRITICAL: Verify actual bytecode matches to prevent hash collision attacks
             // Hash collisions are extremely unlikely with FNV-1a but not impossible
             if entry.bytecode == bytecode {
+                // Update access order for LRU (move to end = most recently used)
+                if let index = accessOrder.firstIndex(of: key) {
+                    accessOrder.remove(at: index)
+                    accessOrder.append(key)
+                }
+
                 hitCount += 1
                 logger.debug("JIT cache HIT (hits: \(hitCount), misses: \(missCount), ratio: \(hitCount * 100 / (hitCount + missCount))%)")
                 return entry
@@ -90,6 +107,18 @@ private final class JITCodeCache {
         let configHash = hashConfig(config)
         let key = makeKey(bytecodeHash: bytecodeHash, configHash: configHash, initialPC: initialPC)
 
+        // Evict least recently used entry if cache is full
+        if cache.count >= maxCacheSize, let lruKey = accessOrder.first {
+            if let evictedEntry = cache.removeValue(forKey: lruKey) {
+                // Free dispatcher table for evicted entry
+                if let table = evictedEntry.dispatcherTable {
+                    table.deallocate()
+                }
+            }
+            accessOrder.removeFirst()
+            logger.debug("JIT cache EVICTED entry (cache size: \(cache.count), max: \(maxCacheSize))")
+        }
+
         let entry = JITCacheEntry(
             functionPtr: functionPtr,
             dispatcherTable: dispatcherTable,
@@ -100,12 +129,20 @@ private final class JITCodeCache {
         )
 
         cache[key] = entry
+        accessOrder.append(key)  // Mark as most recently used
         logger.debug("JIT cache STORE - Total entries: \(cache.count)")
     }
 
     /// Clear all cached entries
     func clear() {
+        // Free dispatcher tables for all entries
+        for entry in cache.values {
+            if let table = entry.dispatcherTable {
+                table.deallocate()
+            }
+        }
         cache.removeAll()
+        accessOrder.removeAll()
         hitCount = 0
         missCount = 0
         logger.debug("JIT cache CLEARED")
@@ -261,10 +298,13 @@ final class ExecutorBackendJIT: ExecutorBackend {
     }
 
     deinit {
-        // Clean up dispatcher tables for all compiled functions
+        // Release JIT code memory for all compiled functions
         for funcPtr in compiledFunctionPointers {
-            CppHelper.freeDispatcherTable(UnsafeMutableRawPointer(mutating: funcPtr))
+            CppHelper.releaseJITFunction(UnsafeMutableRawPointer(mutating: funcPtr))
         }
+
+        // Clear the code cache (frees dispatcher tables for cached entries)
+        codeCache.clear()
 
         // Clean up heap-allocated struct
         jitHostFunctionTablePtr.deinitialize(count: 1)
@@ -641,8 +681,14 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 memoryBuffer.deallocate()
             }
 
-            // Clear the invocation context reference after execution
+            // Clear the invocation context reference and jump table data after execution
+            // The jumpTableData pointer was only valid within the withUnsafeBytes block above
             jitHostFunctionTablePtr.pointee.invocationContext = nil
+            jitHostFunctionTablePtr.pointee.jumpTableData = nil
+            jitHostFunctionTablePtr.pointee.jumpTableSize = 0
+            jitHostFunctionTablePtr.pointee.jumpTableEntrySize = 0
+            jitHostFunctionTablePtr.pointee.jumpTableEntriesCount = 0
+            jitHostFunctionTablePtr.pointee.alignmentFactor = 0
 
             // Calculate gas used (handle saturating Gas type correctly)
             let gasUsed: Gas
