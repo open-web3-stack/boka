@@ -342,6 +342,8 @@ extern "C" void freeDispatcherTable_x64(void* _Nullable funcPtr) noexcept;
 extern "C" void freeDispatcherTable_a64(void* _Nullable funcPtr) noexcept;
 extern "C" void freeAllDispatcherTables_x64() noexcept;
 extern "C" void freeAllDispatcherTables_a64() noexcept;
+extern "C" void releaseJITFunction_x64(void* _Nullable funcPtr) noexcept;
+extern "C" void releaseJITFunction_a64(void* _Nullable funcPtr) noexcept;
 
 /// Free the dispatcher table associated with a JIT-compiled function
 /// This is a wrapper that calls the appropriate architecture-specific implementation
@@ -368,4 +370,18 @@ extern "C" void freeAllDispatcherTables() noexcept {
     freeAllDispatcherTables_x64();
     // ARM64 version is a no-op
     // freeAllDispatcherTables_a64();
+}
+
+/// Release JIT-compiled code memory
+/// This is a wrapper that calls all architecture-specific implementations
+///
+/// @param funcPtr Function pointer to release
+/// @note Safe to call with nullptr
+/// @warning After calling this, the function pointer becomes invalid and must not be called
+extern "C" void releaseJITFunction(void* _Nullable funcPtr) noexcept {
+    // Try x64 first (most common)
+    releaseJITFunction_x64(funcPtr);
+
+    // TODO: Add ARM64 support when needed
+    // releaseJITFunction_a64(funcPtr);
 }

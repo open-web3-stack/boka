@@ -167,6 +167,12 @@ extern "C" void freeDispatcherTable(void* _Nullable funcPtr) noexcept;
 /// @note This frees all global dispatcher table storage
 extern "C" void freeAllDispatcherTables() noexcept;
 
+/// Release JIT-compiled code memory (frees machine code allocated by AsmJit)
+/// @param funcPtr Function pointer to release
+/// @note Safe to call with nullptr
+/// @warning After calling this, the function pointer becomes invalid and must not be called
+extern "C" void releaseJITFunction(void* _Nullable funcPtr) noexcept;
+
 
 // Compile a range of bytecode instructions to machine code
 // This is the main entry point for JIT compilation from the C++ layer
