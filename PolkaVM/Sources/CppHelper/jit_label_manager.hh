@@ -35,10 +35,10 @@ public:
 
         if (strcmp(arch, "x86_64") == 0) {
             auto* a = static_cast<asmjit::x86::Assembler*>(assembler);
-            label = a->new_label();
+            label = a->newLabel();
         } else if (strcmp(arch, "aarch64") == 0) {
             auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
-            label = a->new_label();
+            label = a->newLabel();
         }
 
         labels[pc] = label;
@@ -58,10 +58,10 @@ public:
             // Create and bind label immediately (no forward reference)
             if (strcmp(arch, "x86_64") == 0) {
                 auto* a = static_cast<asmjit::x86::Assembler*>(assembler);
-                label = a->new_label();
+                label = a->newLabel();
             } else if (strcmp(arch, "aarch64") == 0) {
                 auto* a = static_cast<asmjit::a64::Assembler*>(assembler);
-                label = a->new_label();
+                label = a->newLabel();
             }
             labels[pc] = label;
         }
