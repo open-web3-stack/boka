@@ -164,6 +164,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     Label unsupportedLabel = a.new_label();// Unsupported instruction - exit to interpreter - eax = 2
     Label dispatcherLoop = a.new_label();  // Dispatcher loop for indirect jumps without jump table
     Label epilogueLabel = a.new_label();   // Epilogue (restore registers and return)
+    Label dispatcherLoopNoJumpTable = a.new_label();  // For JumpInd without jump table
+    Label dispatcherLoopNoJumpTable2 = a.new_label(); // For LoadImmJumpInd without jump table
 
     // Pass the PC label map to labelManager for use during compilation
     // We'll store it separately and use it to build the dispatcher jump table
@@ -304,7 +306,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Check if jump table is available
             a.mov(x86::rdx, x86::qword_ptr(x86::rbp, offsetof(JITHostFunctionTable, jumpTableData)));
             a.test(x86::rdx, x86::rdx);
-            a.jz(dispatcherLoop);  // No jump table, use dispatcher loop instead
+            a.jz(dispatcherLoopNoJumpTable);  // No jump table, update PC and use dispatcher loop instead
 
             // Load jump table parameters
             a.mov(x86::ecx, x86::dword_ptr(x86::rbp, offsetof(JITHostFunctionTable, alignmentFactor)));
@@ -396,6 +398,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.mov(x86::eax, 2);  // Exit code 2 = exit to interpreter with updated PC
             a.jmp(epilogueLabel);
 
+            // No jump table available: update PC and fall back to dispatcher
+            a.bind(dispatcherLoopNoJumpTable);
+            a.mov(x86::r15d, x86::eax);  // Update PC with target address
+            a.jmp(dispatcherLoop);
+
             pc += instrSize;
             continue;
         }
@@ -427,7 +434,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Check if jump table is available
             a.mov(x86::rdx, x86::qword_ptr(x86::rbp, offsetof(JITHostFunctionTable, jumpTableData)));
             a.test(x86::rdx, x86::rdx);
-            a.jz(dispatcherLoop);
+            a.jz(dispatcherLoopNoJumpTable2);  // No jump table, update PC and use dispatcher loop instead
 
             // Load jump table parameters
             a.mov(x86::ecx, x86::dword_ptr(x86::rbp, offsetof(JITHostFunctionTable, alignmentFactor)));
@@ -508,6 +515,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Exit to interpreter with updated PC
             a.mov(x86::eax, 2);
             a.jmp(epilogueLabel);
+
+            // No jump table available: update PC and fall back to dispatcher
+            a.bind(dispatcherLoopNoJumpTable2);
+            a.mov(x86::r15d, x86::eax);  // Update PC with target address
+            a.jmp(dispatcherLoop);
 
             pc += instrSize;
             continue;
