@@ -822,6 +822,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
         // === Load Instructions with Bounds Checking ===
         // PVM Spec: addresses < 2^16 (65536) → panic, addresses >= memory_size → page fault
+        // Format: [opcode][reg_index][address_32bit] (6 bytes)
         if (opcode_is(opcode, Opcode::LoadU8) ||
             opcode_is(opcode, Opcode::LoadI8) ||
             opcode_is(opcode, Opcode::LoadU16) ||
@@ -829,54 +830,48 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             opcode_is(opcode, Opcode::LoadU32) ||
             opcode_is(opcode, Opcode::LoadI32) ||
             opcode_is(opcode, Opcode::LoadU64)) {
-            // Decode instruction: [opcode][dest_reg][ptr_reg][offset_16bit]
+            // Decode instruction: [opcode][dest_reg][address_32bit]
             uint8_t dest_reg = codeBuffer[pc + 1];
-            uint8_t ptr_reg = codeBuffer[pc + 2];
-            int16_t offset;
-            memcpy(&offset, &codeBuffer[pc + 3], 2);
+            uint32_t address;
+            memcpy(&address, &codeBuffer[pc + 2], 4);
 
-            // Load pointer register into rax
-            a.mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
-
-            // Add offset to get final address (sign-extended 32-bit immediate)
-            a.add(x86::rax, int32_t(offset));
+            // Load address into rax (zero-extended from 32-bit)
+            // mov to 64-bit register zero-extends automatically
+            a.mov(x86::rax, uint64_t(address));
 
             // Bounds check: address < 65536 → panic
             a.cmp(x86::rax, 65536);
             a.jb(panicLabel);
 
             // Runtime check: address >= memory_size → page fault
-            a.mov(x86::ecx, x86::r13d);  // Load memory_size into ecx
-            a.cmp(x86::rax, x86::rcx);
+            a.cmp(x86::rax, x86::r13);  // Compare with full 64-bit memory_size
             a.jae(pagefaultLabel);
 
             // If we get here, address is valid - inline the load instruction
             // Load from memory into register, then store to VM register
-            // IMPORTANT: Use movzx for unsigned loads to avoid rcx corruption
-            // (rcx was used for bounds checking and still contains memory_size)
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
 
             if (opcode_is(opcode, Opcode::LoadU8)) {
-                a.movzx(x86::ecx, mem);  // Zero-extend to avoid rcx corruption
-                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+                a.movzx(x86::rax, mem);  // Zero-extend to 64-bit
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
             } else if (opcode_is(opcode, Opcode::LoadI8)) {
-                a.movsx(x86::rcx, mem);  // Sign-extend is fine for signed loads
-                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+                a.movsx(x86::rax, mem);  // Sign-extend to 64-bit
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
             } else if (opcode_is(opcode, Opcode::LoadU16)) {
-                a.movzx(x86::ecx, mem);  // Zero-extend to avoid rcx corruption
-                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+                a.movzx(x86::rax, mem);  // Zero-extend to 64-bit
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
             } else if (opcode_is(opcode, Opcode::LoadI16)) {
-                a.movsx(x86::rcx, mem);  // Sign-extend is fine for signed loads
-                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+                a.movsx(x86::rax, mem);  // Sign-extend to 64-bit
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
             } else if (opcode_is(opcode, Opcode::LoadU32)) {
-                a.mov(x86::ecx, mem);  // 32-bit mov zero-extends automatically
-                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+                a.mov(x86::eax, mem);  // 32-bit mov zero-extends automatically
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
             } else if (opcode_is(opcode, Opcode::LoadI32)) {
-                a.movsxd(x86::rcx, mem);  // Sign-extend is fine for signed loads
-                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+                a.movsxd(x86::rax, x86::dword_ptr(x86::r12, x86::rax, 0, 0));  // Sign-extend
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
             } else if (opcode_is(opcode, Opcode::LoadU64)) {
-                a.mov(x86::rcx, mem);  // 64-bit load, no corruption possible
-                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
+                a.mov(x86::rax, mem);
+                a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
             }
 
             pc += instrSize;
@@ -894,8 +889,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint32_t address;
             memcpy(&address, &codeBuffer[pc + 2], 4);
 
-            // Load address into eax for bounds checking
-            a.mov(x86::eax, address);
+            // Load address into rax (zero-extended from 32-bit)
+            // mov to 64-bit register zero-extends automatically
+            a.mov(x86::rax, uint64_t(address));
 
             // Bounds check: address < 65536 → panic
             a.cmp(x86::rax, 65536);
@@ -932,8 +928,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint32_t address;
             memcpy(&address, &codeBuffer[pc + 2], 4);
 
-            // Load address into eax for bounds checking
-            a.mov(x86::eax, address);
+            // Load address into rax (zero-extended from 32-bit)
+            // mov to 64-bit register zero-extends automatically
+            a.mov(x86::rax, uint64_t(address));
 
             // Bounds check: address < 65536 → panic
             a.cmp(x86::rax, 65536);
@@ -960,8 +957,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             memcpy(&value, &codeBuffer[pc + 1], 2);
             memcpy(&address, &codeBuffer[pc + 3], 4);
 
-            // Load address into eax for bounds checking
-            a.mov(x86::eax, address);
+            // Load address into rax (zero-extended from 32-bit)
+            // mov to 64-bit register zero-extends automatically
+            a.mov(x86::rax, uint64_t(address));
 
             // Bounds check: address < 65536 → panic
             a.cmp(x86::rax, 65536);
@@ -988,8 +986,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             memcpy(&value, &codeBuffer[pc + 1], 4);
             memcpy(&address, &codeBuffer[pc + 5], 4);
 
-            // Load address into eax for bounds checking
-            a.mov(x86::eax, address);
+            // Load address into rax (zero-extended from 32-bit)
+            // mov to 64-bit register zero-extends automatically
+            a.mov(x86::rax, uint64_t(address));
 
             // Bounds check: address < 65536 → panic
             a.cmp(x86::rax, 65536);
@@ -1016,8 +1015,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             memcpy(&value, &codeBuffer[pc + 1], 8);
             memcpy(&address, &codeBuffer[pc + 9], 4);
 
-            // Load address into eax for bounds checking
-            a.mov(x86::eax, address);
+            // Load address into rax (zero-extended from 32-bit)
+            // mov to 64-bit register zero-extends automatically
+            a.mov(x86::rax, uint64_t(address));
 
             // Bounds check: address < 65536 → panic
             a.cmp(x86::rax, 65536);
