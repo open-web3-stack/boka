@@ -1642,8 +1642,8 @@ bool emit_instruction_decoded(
                 auto* a = static_cast<x86::Assembler*>(assembler);
                 a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
                 a->mov(x86::edx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
-                a->sub(x86::edx, x86::eax);  // edx = eax - edx = ra - rb
-                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::edx);  // Store to rd
+                a->sub(x86::eax, x86::edx);  // eax = eax - edx = ra - rb
+                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::eax);  // Store to rd
             }
             return true;
 
