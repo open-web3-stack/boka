@@ -960,9 +960,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint32_t immediate;
             memcpy(&immediate, &codeBuffer[pc + 2], 4);
 
-            // Load immediate into eax, then sign-extend to 64-bit
+            // DEBUG: Print what we're loading
+            // fprintf(stderr, "[JIT LoadImm] destReg=%u immediate=%u (0x%X)\n", destReg, immediate, immediate);
+
+            // Load immediate into eax (zero-extends to rax per x86-64 ABI)
             a.mov(x86::eax, immediate);
-            a.movsx(x86::rax, x86::eax);
             a.mov(x86::qword_ptr(x86::rbx, destReg * 8), x86::rax);
 
             pc += instrSize;
@@ -1019,6 +1021,29 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             continue;
         }
 
+        // Add32: 32-bit addition
+        if (opcode_is(opcode, Opcode::Add32)) {
+            // Add32: [opcode][ra|rb<<4][rd] = 4 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
+            uint8_t rd = codeBuffer[pc + 2];
+
+            // Load ra and rb (zero-extend to 64-bit)
+            a.mov(x86::eax, x86::dword_ptr(x86::rbx, ra * 8));
+            a.movsx(x86::rax, x86::eax);
+            a.mov(x86::ecx, x86::dword_ptr(x86::rbx, rb * 8));
+            a.movsxd(x86::rcx, x86::ecx);
+
+            // Add
+            a.add(x86::rax, x86::rcx);
+
+            // Store to rd
+            a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
+
+            pc += instrSize;
+            continue;
+        }
+
         // Sub64: 64-bit subtraction
         if (opcode_is(opcode, Opcode::Sub64)) {
             // Sub64: [opcode][ra|rb<<4][rd] = 4 bytes
@@ -1047,7 +1072,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint32_t address;
             memcpy(&address, &codeBuffer[pc + 2], 4);
 
-            // Load address into eax for bounds checking
+            // Load address into eax (zero-extends to rax automatically since eax is written)
+            // NOTE: mov to eax zero-extends to rax in x86_64
             a.mov(x86::eax, address);
 
             // Bounds check: address < 65536 → panic
