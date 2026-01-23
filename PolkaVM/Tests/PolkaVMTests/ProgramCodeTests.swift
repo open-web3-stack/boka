@@ -11,17 +11,9 @@ struct ProgramTests {
     }
 
     @Test func invalidJumpTableEntriesCount() {
-        // NOTE: This test uses Codec's variableWidth encoding which is NOT ULEB128!
-        // The test encodes 0x1000000 as [e1, 00, 00, 00], but ULEB128 should be [80, 80, 80, 08]
-        // The ULEB128 decoder reads [e1, 00] and decodes it as 0x61 = 97
-        // Since 97 < 0x100000 (maxJumpTableEntriesCount), the test passes incorrectly
-        // This is a pre-existing test issue - should use proper ULEB128 encoding
         let highValue = Data(UInt64(0x1000000).encode(method: .variableWidth))
         let data = highValue + Data([0, 0])
-        // This will NOT throw invalidJumpTableEntriesCount because the value is decoded as 97
-        // Instead, it might throw invalidDataLength or succeed
-        _ = try? ProgramCode(data)
-        #expect(true)  // Placeholder - test needs fixing with proper ULEB128 encoding
+        #expect(throws: ProgramCode.Error.invalidJumpTableEntriesCount) { try ProgramCode(data) }
     }
 
     @Test func invalidJumpTableEncodeSize() {
@@ -30,13 +22,9 @@ struct ProgramTests {
     }
 
     @Test func invalidCodeLength() {
-        // NOTE: This test uses Codec's variableWidth encoding which is NOT ULEB128!
-        // The test encodes 0x1000000 as [e1, 00, 00, 00], but ULEB128 should be [80, 80, 80, 08]
-        // The ULEB128 decoder reads [e1, 00] and decodes it as 0x61 = 97
-        // This is a pre-existing test issue - should use proper ULEB128 encoding
         let highValue = Data(UInt64(0x1000000).encode(method: .variableWidth))
         let data = Data([0, 0]) + highValue
-        #expect(throws: ProgramCode.Error.invalidDataLength) { try ProgramCode(data) }
+        #expect(throws: ProgramCode.Error.invalidCodeLength) { try ProgramCode(data) }
     }
 
     @Test func tooMuchData() throws {

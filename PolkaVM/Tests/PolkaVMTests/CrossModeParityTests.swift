@@ -250,18 +250,10 @@ final class ParityInstructionBuilder {
         blob.append(0)
         // encodeSize: 8
         blob.append(8)
-        // codeLength (ULEB128)
+        // codeLength (spec-compliant variable-length encoding)
         let originalCodeLength = bytecode.count
-        var codeLength = originalCodeLength
-        if codeLength == 0 {
-            blob.append(0)
-        } else {
-            while codeLength > 0 {
-                let byte = UInt8(codeLength & 0x7F)
-                codeLength >>= 7
-                blob.append(codeLength > 0 ? (byte | 0x80) : byte)
-            }
-        }
+        let codeLengthEncoded = Data(UInt64(originalCodeLength).encode(method: .variableWidth))
+        blob.append(contentsOf: codeLengthEncoded)
 
         // Code
         blob.append(Data(bytecode))

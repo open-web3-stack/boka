@@ -217,19 +217,13 @@ struct JITComponentTests {
         let code = Data(repeating: 0, count: instructionCount)
         let blob = createBlob(code: code)
 
-        // NOTE: The test fails because createBlob() is missing the codeLength field!
-        // The blob format should be:
-        // 1. jumpTableEntriesCount (ULEB128)
-        // 2. encodeSize (1 byte)
-        // 3. codeLength (ULEB128) ← MISSING!
-        // 4. jumpTable
-        // 5. code
-        // 6. bitmask
-        // This causes ProgramCode to fail with invalidDataLength
-        // The test needs to be fixed by updating createBlob() to include codeLength
+        let program = try ProgramCode(blob)
+        let builder = BasicBlockBuilder(program: program)
+        let blocks = builder.build()
 
-        // For now, just verify that it fails with the expected error
-        #expect(throws: ProgramCode.Error.invalidDataLength) { try ProgramCode(blob) }
+        // Should successfully process all instructions
+        let totalInstructions = blocks.values.reduce(0) { $0 + $1.instructions.count }
+        #expect(totalInstructions == instructionCount)
     }
 
     // MARK: - LabelManager Tests
