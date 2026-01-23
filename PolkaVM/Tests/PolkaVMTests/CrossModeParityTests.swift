@@ -273,12 +273,15 @@ final class ParityInstructionBuilder {
 
         // Set bits for instruction ends
         for endIndex in instructionEndIndices {
-            // The bit corresponding to the last byte of the instruction should be 1
-            let bitIndex = endIndex - 1
+            // The bit corresponding to the position AFTER the last byte of the instruction should be 1
+            // This allows skip() to count the zeros to determine instruction length
+            let bitIndex = endIndex
             if bitIndex >= 0 {
                 let byteIndex = bitIndex / 8
                 let bitOffset = bitIndex % 8
-                bitmask[byteIndex] |= (1 << bitOffset)
+                if byteIndex < bitmask.count {
+                    bitmask[byteIndex] |= (1 << bitOffset)
+                }
             }
         }
 
