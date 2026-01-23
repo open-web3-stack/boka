@@ -62,13 +62,14 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
     if (instrSize == 5 || instrSize == 7) {
         // Jump (5 bytes): [opcode][offset_32bit]
         // Branch (7 bytes): [opcode][reg1][reg2][offset_32bit]
+        // Offset is relative to the START of the instruction (pc), not the end
         uint32_t offset;
         if (instrSize == 5) {
             memcpy(&offset, &bytecode[pc + 1], 4);
         } else {
             memcpy(&offset, &bytecode[pc + 3], 4);
         }
-        return pc + instrSize + int32_t(offset);
+        return pc + int32_t(offset);
     }
     return pc + instrSize; // Fallthrough
 }
@@ -109,7 +110,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     // Setup VM environment registers
     a.mov(rbx, rdi);  // registers_ptr -> rbx
     a.mov(r12, rsi);  // memory_base_ptr -> r12
-    a.mov(r13d, edx); // memory_size -> r13d
+    a.mov(x86::r13, x86::edx);  // memory_size -> r13 (zero-extends)
     a.mov(r14, rcx);  // gas_ptr -> r14
     a.mov(r15d, r8d); // initial_pvm_pc -> r15d (PC)
     a.mov(rbp, r9);   // invocation_context_ptr -> rbp
@@ -163,7 +164,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint8_t destReg = codeBuffer[pc + 1];
             uint32_t jumpOffset;
             memcpy(&jumpOffset, &codeBuffer[pc + 2], 4);   // Jump offset is at bytes 2-5
-            uint32_t targetPC = pc + instrSize + int32_t(jumpOffset);
+            uint32_t targetPC = pc + int32_t(jumpOffset);  // Offset is relative to instruction start
             labelManager.markJumpTarget(targetPC);
         }
 
@@ -253,7 +254,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint32_t immediate;
             memcpy(&jumpOffset, &codeBuffer[pc + 2], 4);   // Jump offset is at bytes 2-5
             memcpy(&immediate, &codeBuffer[pc + 6], 4);    // Immediate value is at bytes 6-9
-            uint32_t targetPC = pc + instrSize + int32_t(jumpOffset);
+            uint32_t targetPC = pc + int32_t(jumpOffset);  // Offset is relative to instruction start
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "x86_64");
             jit_emit_load_imm_jump_labeled(&a, "x86_64", destReg, immediate, targetLabel);
@@ -799,36 +800,31 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
         // === Store Instructions with Bounds Checking ===
+        // NOTE: StoreU8/16/32 use direct addressing: [opcode][reg][address_32bit]
+        // StoreU64 is handled separately below with correct direct addressing format
         if (opcode_is(opcode, Opcode::StoreU8) ||
             opcode_is(opcode, Opcode::StoreU16) ||
-            opcode_is(opcode, Opcode::StoreU32) ||
-            opcode_is(opcode, Opcode::StoreU64)) {
-            // Decode instruction: [opcode][ptr_reg][src_reg][offset_16bit]
-            uint8_t ptr_reg = codeBuffer[pc + 1];
-            uint8_t src_reg = codeBuffer[pc + 2];
-            int16_t offset;
-            memcpy(&offset, &codeBuffer[pc + 3], 2);
+            opcode_is(opcode, Opcode::StoreU32)) {
+            // Decode instruction: [opcode][reg_index][address_32bit]
+            uint8_t srcReg = codeBuffer[pc + 1];
+            uint32_t address;
+            memcpy(&address, &codeBuffer[pc + 2], 4);
 
-            // Load pointer register into rax
-            a.mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
-
-            // Add offset to get final address (sign-extended 32-bit immediate)
-            a.add(x86::rax, int32_t(offset));
+            // Load address into eax for bounds checking
+            a.mov(x86::eax, address);
 
             // Bounds check: address < 65536 → panic
             a.cmp(x86::rax, 65536);
             a.jb(panicLabel);
 
             // Runtime check: address >= memory_size → page fault
-            a.mov(x86::ecx, x86::r13d);  // Load memory_size into ecx
-            a.cmp(x86::rax, x86::rcx);
+            a.cmp(x86::rax, x86::r13);  // Compare with full 64-bit memory_size
             a.jae(pagefaultLabel);
 
-            // If we get here, address is valid - inline the store instruction
-            // Load value from VM register, then store to memory
-            a.mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));  // Load source value
+            // Load source value from VM register
+            a.mov(x86::rdx, x86::qword_ptr(x86::rbx, srcReg * 8));
 
-            // Use Mem::build() to create [r12 + rax] addressing mode
+            // Store to memory [VM_MEMORY_PTR + address]
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
 
             if (opcode_is(opcode, Opcode::StoreU8)) {
@@ -837,8 +833,6 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
                 a.mov(mem, x86::dx);
             } else if (opcode_is(opcode, Opcode::StoreU32)) {
                 a.mov(mem, x86::edx);
-            } else if (opcode_is(opcode, Opcode::StoreU64)) {
-                a.mov(mem, x86::rdx);
             }
 
             pc += instrSize;
@@ -954,6 +948,121 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.mov(x86::rcx, value);
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
             a.mov(mem, x86::rcx);
+
+            pc += instrSize;
+            continue;
+        }
+
+        // LoadImm: Load 32-bit immediate into register
+        if (opcode_is(opcode, Opcode::LoadImm)) {
+            // LoadImm: [opcode][reg_index][value_32bit] = 6 bytes
+            uint8_t destReg = codeBuffer[pc + 1];
+            uint32_t immediate;
+            memcpy(&immediate, &codeBuffer[pc + 2], 4);
+
+            // Load immediate into eax, then sign-extend to 64-bit
+            a.mov(x86::eax, immediate);
+            a.movsx(x86::rax, x86::eax);
+            a.mov(x86::qword_ptr(x86::rbx, destReg * 8), x86::rax);
+
+            pc += instrSize;
+            continue;
+        }
+
+        // LoadImmU64: Load 64-bit immediate into register
+        if (opcode_is(opcode, Opcode::LoadImmU64)) {
+            // LoadImmU64: [opcode][reg_index][value_64bit] = 10 bytes
+            uint8_t destReg = codeBuffer[pc + 1];
+
+            // Load 64-bit immediate value from bytecode
+            uint32_t low, high;
+            memcpy(&low, &codeBuffer[pc + 2], 4);
+            memcpy(&high, &codeBuffer[pc + 6], 4);
+
+            // DEBUG: Force a compilation error to verify this path is taken
+            // if (low == 0x12345678) { return 999; }
+
+            // Clear rax, then load high 32 bits (zero-extends)
+            a.xor_(x86::rax, x86::rax);
+            a.mov(x86::eax, high);  // eax = high, rax zero-extended
+            a.shl(x86::rax, 32);  // rax = high << 32
+
+            // Load low 32 bits and OR
+            a.mov(x86::ecx, low);
+            a.or_(x86::rax, x86::rcx);  // rax = (high << 32) | low
+
+            // Store to VM register
+            a.mov(x86::qword_ptr(x86::rbx, destReg * 8), x86::rax);
+
+            pc += instrSize;
+            continue;
+        }
+
+        // Add64: 64-bit addition
+        if (opcode_is(opcode, Opcode::Add64)) {
+            // Add64: [opcode][ra|rb<<4][rd] = 4 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
+            uint8_t rd = codeBuffer[pc + 2];
+
+            // Load ra and rb
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
+            a.mov(x86::rcx, x86::qword_ptr(x86::rbx, rb * 8));
+
+            // Add
+            a.add(x86::rax, x86::rcx);
+
+            // Store to rd
+            a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
+
+            pc += instrSize;
+            continue;
+        }
+
+        // Sub64: 64-bit subtraction
+        if (opcode_is(opcode, Opcode::Sub64)) {
+            // Sub64: [opcode][ra|rb<<4][rd] = 4 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
+            uint8_t rd = codeBuffer[pc + 2];
+
+            // Load ra and rb
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
+            a.mov(x86::rcx, x86::qword_ptr(x86::rbx, rb * 8));
+
+            // Subtract
+            a.sub(x86::rax, x86::rcx);
+
+            // Store to rd
+            a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
+
+            pc += instrSize;
+            continue;
+        }
+
+        // StoreU64: Store 64-bit value from register to memory
+        if (opcode_is(opcode, Opcode::StoreU64)) {
+            // StoreU64: [opcode][reg_index][address_32bit] = 6 bytes
+            uint8_t srcReg = codeBuffer[pc + 1];
+            uint32_t address;
+            memcpy(&address, &codeBuffer[pc + 2], 4);
+
+            // Load address into eax for bounds checking
+            a.mov(x86::eax, address);
+
+            // Bounds check: address < 65536 → panic
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            // Runtime check: address >= memory_size → page fault
+            a.cmp(x86::rax, x86::r13);  // Compare with full 64-bit memory_size
+            a.jae(pagefaultLabel);
+
+            // Load source value from register
+            a.mov(x86::rdx, x86::qword_ptr(x86::rbx, srcReg * 8));
+
+            // Store to memory [VM_MEMORY_PTR + address]
+            a.mov(x86::qword_ptr(x86::r12, x86::rax), x86::rdx);
 
             pc += instrSize;
             continue;

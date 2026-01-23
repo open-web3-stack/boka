@@ -14,10 +14,12 @@ extension Branch {
     public func updatePC(context: ExecutionContext, skip: UInt32) -> ExecOutcome {
         let condition = condition(state: context.state)
         if !condition {
+            // Branch not taken - fall through to next instruction
             context.state.increasePC(skip + 1)
         } else if !Instructions.isBranchValid(context: context, offset: offset) {
             return .exit(.panic(.invalidBranch))
         } else {
+            // Branch taken - jump to target
             context.state.increasePC(offset)
         }
         return .continued
@@ -60,19 +62,17 @@ protocol BranchInstructionBase2<Compare>: Branch {
 
 extension BranchInstructionBase2 {
     public static func parse(data: Data) throws -> (Registers.Index, Registers.Index, UInt32) {
-        // Branch instruction format: [opcode][r1][r2][offset_32bit]
-        // r1 is at position 0, r2 is at position 0 (overloaded in same byte), offset starts at position 3
+        // Branch instruction format: [opcode][reg1][reg2][offset_32bit]
+        // NOTE: InstructionTable.parse() strips the opcode before calling init(data:)
+        // So data starts AFTER the opcode: position 0 = reg1, position 1 = reg2, position 2+ = offset
         let r1 = try Registers.Index(r1: data.at(relative: 0))
-        let r2 = try Registers.Index(r2: data.at(relative: 0))
-        let offset: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 3 ..< data.endIndex))
+        let r2 = try Registers.Index(r2: data.at(relative: 1))
+        let offset: UInt32 = Instructions.decodeImmediate(data[2...])  // Offset starts at position 2 (after opcode, reg1, reg2)
         return (r1, r2, offset)
     }
 
     public func condition(state: VMState) -> Bool {
         let (r1Val, r2Val): (UInt64, UInt64) = (state.readRegister(r1), state.readRegister(r2))
-        #if DEBUG
-            logger.trace("🔀    \(Compare.self) a(\(r1Val)) b(\(r2Val)) => \(Compare.compare(a: r1Val, b: r2Val))")
-        #endif
         return Compare.compare(a: r1Val, b: r2Val)
     }
 }
