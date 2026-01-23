@@ -214,7 +214,6 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
     // === MAIN COMPILATION PASS ===
     pc = 0;
-    std::vector<uint32_t> compiledPCs;
 
     while (pc < codeSize) {
         uint8_t opcode = codeBuffer[pc];
