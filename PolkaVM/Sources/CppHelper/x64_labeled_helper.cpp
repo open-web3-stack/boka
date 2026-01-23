@@ -182,8 +182,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             return 3; // Compilation error
         }
 
-        // Check if this code has JumpInd (which needs dispatcher)
-        if (opcode_is(opcode, Opcode::JumpInd)) {
+        // Check if this code has JumpInd or LoadImmJumpInd (which need dispatcher)
+        if (opcode_is(opcode, Opcode::JumpInd) || opcode_is(opcode, Opcode::LoadImmJumpInd)) {
             needsDispatcherTable = true;
         }
 
@@ -394,6 +394,131 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // For now, fall back to interpreter with the updated PC
             // This is safe because the jump table lookup validated the target
             a.mov(x86::eax, 2);  // Exit code 2 = exit to interpreter with updated PC
+            a.jmp(epilogueLabel);
+
+            pc += instrSize;
+            continue;
+        }
+
+        if (opcode_is(opcode, Opcode::LoadImmJumpInd)) {
+            // LoadImmJumpInd: [opcode][ra|rb<<4][l_X][immediate_X][immediate_Y]
+            // ra = dest register, rb = base register for indirect jump
+            uint8_t dest_reg = codeBuffer[pc + 1] & 0x0F;
+            uint8_t base_reg = codeBuffer[pc + 1] >> 4;
+            uint8_t l_X = codeBuffer[pc + 2];
+
+            // Load immediates (variable-width encoding)
+            uint32_t immediate_X = 0;
+            uint32_t immediate_Y = 0;
+
+            if (l_X == 0) {
+                immediate_X = codeBuffer[pc + 3];
+                memcpy(&immediate_Y, &codeBuffer[pc + 4], 4);
+            } else {
+                // Decode variable-width immediates
+                // For simplicity, assume 32-bit for now (full implementation would handle all cases)
+                memcpy(&immediate_X, &codeBuffer[pc + 3], 4);
+                memcpy(&immediate_Y, &codeBuffer[pc + 3 + l_X], 4);
+            }
+
+            // Load immediate into destination register (zero-extended)
+            a.mov(x86::rax, immediate_X);
+            a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
+
+            // Load target address from base register
+            a.mov(x86::eax, x86::dword_ptr(x86::rbx, base_reg * 8));
+
+            // Add offset (zero-extend to 64-bit by loading into register first)
+            a.mov(x86::rcx, immediate_Y);
+            a.add(x86::rax, x86::rcx);
+
+            // Special case: check for halt address (0xFFFFFFFF)
+            a.cmp(x86::eax, 0xFFFFFFFF);
+            a.je(exitLabel);
+
+            // Check if jump table is available
+            a.mov(x86::rdx, x86::qword_ptr(x86::rbp, offsetof(JITHostFunctionTable, jumpTableData)));
+            a.test(x86::rdx, x86::rdx);
+            a.jz(dispatcherLoop);
+
+            // Load jump table parameters
+            a.mov(x86::ecx, x86::dword_ptr(x86::rbp, offsetof(JITHostFunctionTable, alignmentFactor)));
+            a.mov(x86::r8d, x86::dword_ptr(x86::rbp, offsetof(JITHostFunctionTable, jumpTableEntrySize)));
+            a.mov(x86::r9d, x86::dword_ptr(x86::rbp, offsetof(JITHostFunctionTable, jumpTableEntriesCount)));
+
+            // Validate target != 0
+            a.test(x86::eax, x86::eax);
+            a.jz(pagefaultLabel);
+
+            // Validate target alignment
+            a.mov(x86::r10d, x86::eax);
+            a.test(x86::ecx, x86::ecx);
+            a.jz(pagefaultLabel);
+            a.mov(x86::edx, 0);
+            a.div(x86::ecx);
+            a.cmp(x86::edx, 0);
+            a.jne(pagefaultLabel);
+
+            // Calculate entry index: (target / alignmentFactor) - 1
+            a.dec(x86::eax);
+            a.cmp(x86::eax, x86::r9d);
+            a.jae(pagefaultLabel);
+
+            // Calculate byte offset: entryIndex * entrySize
+            a.mov(x86::edx, x86::eax);
+            a.imul(x86::edx, x86::r8d);
+
+            // Load jump table data pointer
+            a.mov(x86::r11, x86::qword_ptr(x86::rbp, offsetof(JITHostFunctionTable, jumpTableData)));
+
+            // Read entry based on entrySize
+            Label entrySize1 = a.new_label();
+            Label entrySize2 = a.new_label();
+            Label entrySize3 = a.new_label();
+            Label entrySize4 = a.new_label();
+            Label readDone = a.new_label();
+
+            a.cmp(x86::r8d, 1);
+            a.je(entrySize1);
+            a.cmp(x86::r8d, 2);
+            a.je(entrySize2);
+            a.cmp(x86::r8d, 3);
+            a.je(entrySize3);
+            a.cmp(x86::r8d, 4);
+            a.je(entrySize4);
+            a.jmp(unsupportedLabel);
+
+            a.bind(entrySize1);
+            a.movzx(x86::eax, x86::byte_ptr(x86::r11, x86::rdx));
+            a.jmp(readDone);
+
+            a.bind(entrySize2);
+            a.movzx(x86::eax, x86::word_ptr(x86::r11, x86::rdx));
+            a.jmp(readDone);
+
+            a.bind(entrySize3);
+            a.movzx(x86::eax, x86::byte_ptr(x86::r11, x86::rdx));
+            a.mov(x86::r10d, x86::eax);
+            a.movzx(x86::eax, x86::word_ptr(x86::r11, x86::rdx, 0, 1));
+            a.shl(x86::eax, 8);
+            a.or_(x86::eax, x86::r10d);
+            a.jmp(readDone);
+
+            a.bind(entrySize4);
+            a.mov(x86::eax, x86::dword_ptr(x86::r11, x86::rdx));
+            a.jmp(readDone);
+
+            a.bind(readDone);
+
+            // Update PC with the looked-up address
+            a.mov(x86::r15d, x86::eax);
+
+            // Check if the new PC is within valid range
+            a.cmp(x86::eax, codeSize);
+            a.jae(pagefaultLabel);
+
+            // Exit to interpreter with updated PC
+            a.mov(x86::eax, 2);
             a.jmp(epilogueLabel);
 
             pc += instrSize;
