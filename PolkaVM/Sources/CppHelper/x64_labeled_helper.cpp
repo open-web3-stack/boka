@@ -157,15 +157,15 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     // during the normal compilation process (via labelManager)
 
     // Create exit labels for different exit conditions
-    Label exitLabel = a.new_label();       // Normal exit (halt) - eax = 0
-    Label panicLabel = a.new_label();      // Panic exit (trap, address < 65536) - eax = -1
-    Label pagefaultLabel = a.new_label();  // Page fault exit (address >= memory_size) - eax = 3
-    Label outOfGasLabel = a.new_label();   // Out of gas exit - eax = 1
-    Label unsupportedLabel = a.new_label();// Unsupported instruction - exit to interpreter - eax = 2
-    Label dispatcherLoop = a.new_label();  // Dispatcher loop for indirect jumps without jump table
-    Label epilogueLabel = a.new_label();   // Epilogue (restore registers and return)
-    Label dispatcherLoopNoJumpTable = a.new_label();  // For JumpInd without jump table
-    Label dispatcherLoopNoJumpTable2 = a.new_label(); // For LoadImmJumpInd without jump table
+    Label exitLabel = a.newLabel();       // Normal exit (halt) - eax = 0
+    Label panicLabel = a.newLabel();      // Panic exit (trap, address < 65536) - eax = -1
+    Label pagefaultLabel = a.newLabel();  // Page fault exit (address >= memory_size) - eax = 3
+    Label outOfGasLabel = a.newLabel();   // Out of gas exit - eax = 1
+    Label unsupportedLabel = a.newLabel();// Unsupported instruction - exit to interpreter - eax = 2
+    Label dispatcherLoop = a.newLabel();  // Dispatcher loop for indirect jumps without jump table
+    Label epilogueLabel = a.newLabel();   // Epilogue (restore registers and return)
+    Label dispatcherLoopNoJumpTable = a.newLabel();  // For JumpInd without jump table
+    Label dispatcherLoopNoJumpTable2 = a.newLabel(); // For LoadImmJumpInd without jump table
 
     // Pass the PC label map to labelManager for use during compilation
     // We'll store it separately and use it to build the dispatcher jump table
@@ -340,11 +340,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // Read entry based on entrySize
             // For now, support entry sizes 1, 2, 3, 4
-            Label entrySize1 = a.new_label();
-            Label entrySize2 = a.new_label();
-            Label entrySize3 = a.new_label();
-            Label entrySize4 = a.new_label();
-            Label readDone = a.new_label();
+            Label entrySize1 = a.newLabel();
+            Label entrySize2 = a.newLabel();
+            Label entrySize3 = a.newLabel();
+            Label entrySize4 = a.newLabel();
+            Label readDone = a.newLabel();
 
             a.cmp(x86::r8d, 1);
             a.je(entrySize1);
@@ -467,11 +467,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.mov(x86::r11, x86::qword_ptr(x86::rbp, offsetof(JITHostFunctionTable, jumpTableData)));
 
             // Read entry based on entrySize
-            Label entrySize1 = a.new_label();
-            Label entrySize2 = a.new_label();
-            Label entrySize3 = a.new_label();
-            Label entrySize4 = a.new_label();
-            Label readDone = a.new_label();
+            Label entrySize1 = a.newLabel();
+            Label entrySize2 = a.newLabel();
+            Label entrySize3 = a.newLabel();
+            Label entrySize4 = a.newLabel();
+            Label readDone = a.newLabel();
 
             a.cmp(x86::r8d, 1);
             a.je(entrySize1);
@@ -765,7 +765,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint8_t rd = codeBuffer[pc + 2];                  // rd
 
             // Label to skip all division handling and continue
-            Label divisionDone = a.new_label();
+            Label divisionDone = a.newLabel();
 
             // Load divisor (rb) into rcx
             a.mov(x86::rcx, x86::qword_ptr(x86::rbx, rb * 8));
@@ -773,7 +773,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // For remainder instructions, check if divisor is zero and return dividend
             if (opcode_is(opcode, Opcode::RemU32) || opcode_is(opcode, Opcode::RemU64) ||
                 opcode_is(opcode, Opcode::RemS32) || opcode_is(opcode, Opcode::RemS64)) {
-                Label divisorNotZero = a.new_label();
+                Label divisorNotZero = a.newLabel();
 
                 a.test(x86::rcx, x86::rcx);
                 a.jnz(divisorNotZero);  // If divisor != 0, continue with division
@@ -796,7 +796,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // For signed division, check if divisor is zero and return UInt64.max
             if (opcode_is(opcode, Opcode::DivS32) || opcode_is(opcode, Opcode::DivS64)) {
-                Label divisorNotZero = a.new_label();
+                Label divisorNotZero = a.newLabel();
 
                 a.test(x86::rcx, x86::rcx);
                 a.jnz(divisorNotZero);  // If divisor != 0, continue with division
@@ -812,7 +812,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // For unsigned division (DivU32/DivU64), check if divisor is zero and return UInt64.max
             if (opcode_is(opcode, Opcode::DivU32) || opcode_is(opcode, Opcode::DivU64)) {
-                Label divisorNotZero = a.new_label();
+                Label divisorNotZero = a.newLabel();
 
                 a.test(x86::rcx, x86::rcx);
                 a.jnz(divisorNotZero);  // If divisor != 0, continue with division
@@ -828,8 +828,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // Handle Signed Division Overflow
             if (opcode_is(opcode, Opcode::DivS32) || opcode_is(opcode, Opcode::RemS32)) {
-                Label noOverflow = a.new_label();
-                Label divDone = a.new_label();
+                Label noOverflow = a.newLabel();
+                Label divDone = a.newLabel();
                 
                 // Check divisor == -1 (in ecx)
                 a.cmp(x86::ecx, -1);
@@ -871,8 +871,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
                 a.bind(divDone);
             } else if (opcode_is(opcode, Opcode::DivS64) || opcode_is(opcode, Opcode::RemS64)) {
-                Label noOverflow = a.new_label();
-                Label divDone = a.new_label();
+                Label noOverflow = a.newLabel();
+                Label divDone = a.newLabel();
 
                 // Check divisor == -1 (in rcx)
                 a.cmp(x86::rcx, -1);
@@ -1380,7 +1380,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
     // Generate the function code
     Error err = g_globalRuntime->add(funcOut, &code);
-    if (err != Error::kOk) {
+    if (err != kErrorOk) {
         return int32_t(err);
     }
 
@@ -1411,13 +1411,12 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             }
 
             Label label = labelManager.getLabel(pc);
-            if (!label.is_valid()) {
+            if (!label.isValid()) {
                 continue;  // Skip invalid labels
             }
 
             // Get the address of this label from the CodeHolder
-            const asmjit::LabelEntry& label_entry = code.label_entry_of(label);
-            uint64_t offset = label_entry.offset();
+            uint64_t offset = code.labelOffset(label);
             dispatcherTable[pc] = funcBase + offset;
         }
 

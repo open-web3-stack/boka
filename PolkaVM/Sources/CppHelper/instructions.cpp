@@ -1782,7 +1782,7 @@ bool jit_emit_branch_eq_imm(
 
         // If equal, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->jne(skipLabel);  // Skip PC update if not equal
         
         // Taken path: update PC and exit
@@ -1809,7 +1809,7 @@ bool jit_emit_branch_eq_imm(
 
         // If equal, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->b_ne(skipLabel);  // Skip PC update if not equal
         
         // Taken path: update PC and exit
@@ -1848,7 +1848,7 @@ bool jit_emit_branch_ne_imm(
 
         // If not equal, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->je(skipLabel);  // Skip PC update if equal
         
         // Taken path: update PC and exit
@@ -1875,7 +1875,7 @@ bool jit_emit_branch_ne_imm(
 
         // If not equal, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->b_eq(skipLabel);  // Skip PC update if equal
         
         // Taken path: update PC and exit
@@ -2594,7 +2594,7 @@ bool jit_emit_branch_eq(
 
         // If equal, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->jne(skipLabel);  // Skip PC update if not equal
         
         // Taken path: update PC and exit
@@ -2621,7 +2621,7 @@ bool jit_emit_branch_eq(
 
         // If equal, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->b_ne(skipLabel);  // Skip PC update if not equal
         
         // Taken path: update PC and exit
@@ -2660,7 +2660,7 @@ bool jit_emit_branch_ne(
 
         // If not equal, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->je(skipLabel);  // Skip PC update if equal
         
         // Taken path: update PC and exit
@@ -2687,7 +2687,7 @@ bool jit_emit_branch_ne(
 
         // If not equal, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->b_eq(skipLabel);  // Skip PC update if equal
         
         // Taken path: update PC and exit
@@ -2886,7 +2886,7 @@ bool jit_generateEcalli(
 
         // Check result (eax contains error code or return value)
         // Any value >= 0xFFFF_FFFA is an error
-        asmjit::Label successLabel = a->new_label();
+        asmjit::Label successLabel = a->newLabel();
         a->cmp(asmjit::x86::eax, 0xFFFFFFFA);
         a->jb(successLabel); // Jump if below (success)
 
@@ -2967,7 +2967,7 @@ bool jit_emit_branch_lt_imm(
 
         // If less, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->jge(skipLabel);  // Skip PC update if greater or equal
         
         // Taken path: update PC and exit
@@ -2994,7 +2994,7 @@ bool jit_emit_branch_lt_imm(
 
         // If less, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->b_ge(skipLabel);  // Skip PC update if greater or equal
         
         // Taken path: update PC and exit
@@ -3033,7 +3033,7 @@ bool jit_emit_branch_lt_u_imm(
 
         // If less (unsigned), jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->jae(skipLabel);  // Skip PC update if above or equal
         
         // Taken path: update PC and exit
@@ -3060,7 +3060,7 @@ bool jit_emit_branch_lt_u_imm(
 
         // If less (unsigned), jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->b_hs(skipLabel);  // Skip PC update if higher or same (unsigned >=)
         
         // Taken path: update PC and exit
@@ -3099,7 +3099,7 @@ bool jit_emit_branch_gt_imm(
 
         // If greater, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->jle(skipLabel);  // Skip PC update if less or equal
         
         // Taken path: update PC and exit
@@ -3126,7 +3126,7 @@ bool jit_emit_branch_gt_imm(
 
         // If greater, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->b_le(skipLabel);  // Skip PC update if less or equal
         
         // Taken path: update PC and exit
@@ -3165,7 +3165,7 @@ bool jit_emit_branch_gt_u_imm(
 
         // If greater (unsigned), jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->jbe(skipLabel);  // Skip PC update if below or equal
         
         // Taken path: update PC and exit
@@ -3192,7 +3192,7 @@ bool jit_emit_branch_gt_u_imm(
 
         // If greater (unsigned), jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->b_ls(skipLabel);  // Skip PC update if lower or same (unsigned <=)
         
         // Taken path: update PC and exit
@@ -3231,7 +3231,7 @@ bool jit_emit_branch_le_imm(
 
         // If less or equal, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->jg(skipLabel);  // Skip PC update if greater
         
         // Taken path: update PC and exit
@@ -3258,7 +3258,7 @@ bool jit_emit_branch_le_imm(
 
         // If less or equal, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->b_gt(skipLabel);  // Skip PC update if greater
         
         // Taken path: update PC and exit
@@ -3297,7 +3297,7 @@ bool jit_emit_branch_le_u_imm(
 
         // If less or equal (unsigned), jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->ja(skipLabel);  // Skip PC update if above
         
         // Taken path: update PC and exit
@@ -3324,7 +3324,7 @@ bool jit_emit_branch_le_u_imm(
 
         // If less or equal (unsigned), jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->b_hi(skipLabel);  // Skip PC update if higher
         
         // Taken path: update PC and exit
@@ -3363,7 +3363,7 @@ bool jit_emit_branch_ge_imm(
 
         // If greater or equal, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->jl(skipLabel);  // Skip PC update if less
         
         // Taken path: update PC and exit
@@ -3390,7 +3390,7 @@ bool jit_emit_branch_ge_imm(
 
         // If greater or equal, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->b_lt(skipLabel);  // Skip PC update if less
         
         // Taken path: update PC and exit
@@ -3429,7 +3429,7 @@ bool jit_emit_branch_ge_u_imm(
 
         // If greater or equal (unsigned), jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->jb(skipLabel);  // Skip PC update if below
         
         // Taken path: update PC and exit
@@ -3456,7 +3456,7 @@ bool jit_emit_branch_ge_u_imm(
 
         // If greater or equal (unsigned), jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->b_lo(skipLabel);  // Skip PC update if lower
         
         // Taken path: update PC and exit
@@ -3495,7 +3495,7 @@ bool jit_emit_branch_lt(
 
         // If less, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->jge(skipLabel);  // Skip PC update if greater or equal
         
         // Taken path: update PC and exit
@@ -3522,7 +3522,7 @@ bool jit_emit_branch_lt(
 
         // If less, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->b_ge(skipLabel);  // Skip PC update if greater or equal
         
         // Taken path: update PC and exit
@@ -3561,7 +3561,7 @@ bool jit_emit_branch_lt_u(
 
         // If less (unsigned), jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->jae(skipLabel);  // Skip PC update if above or equal
         
         // Taken path: update PC and exit
@@ -3588,7 +3588,7 @@ bool jit_emit_branch_lt_u(
 
         // If less (unsigned), jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->b_hs(skipLabel);  // Skip PC update if higher or same (unsigned >=)
         
         // Taken path: update PC and exit
@@ -3627,7 +3627,7 @@ bool jit_emit_branch_gt(
 
         // If greater, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->jle(skipLabel);  // Skip PC update if less or equal
         
         // Taken path: update PC and exit
@@ -3654,7 +3654,7 @@ bool jit_emit_branch_gt(
 
         // If greater, jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->b_le(skipLabel);  // Skip PC update if less or equal
         
         // Taken path: update PC and exit
@@ -3693,7 +3693,7 @@ bool jit_emit_branch_gt_u(
 
         // If greater (unsigned), jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->jbe(skipLabel);  // Skip PC update if below or equal
         
         // Taken path: update PC and exit
@@ -3720,7 +3720,7 @@ bool jit_emit_branch_gt_u(
 
         // If greater (unsigned), jump to target (update PC) and exit
         // Otherwise fall through to next instruction
-        Label skipLabel = a->new_label();
+        Label skipLabel = a->newLabel();
         a->b_ls(skipLabel);  // Skip PC update if lower or same (unsigned <=)
         
         // Taken path: update PC and exit
@@ -4862,8 +4862,8 @@ bool jit_emit_div_s32_imm(
     // Handle overflow case: INT_MIN / -1
     if (immediate == -1) {
         // Check if src is INT_MIN (0x80000000)
-        Label normalDiv = a->new_label();
-        Label done = a->new_label();
+        Label normalDiv = a->newLabel();
+        Label done = a->newLabel();
         
         a->cmp(x86::eax, 0x80000000);
         a->jne(normalDiv);
@@ -4968,8 +4968,8 @@ bool jit_emit_rem_s32_imm(
     // Handle overflow case: INT_MIN / -1
     if (immediate == -1) {
         // Check if src is INT_MIN (0x80000000)
-        Label normalDiv = a->new_label();
-        Label done = a->new_label();
+        Label normalDiv = a->newLabel();
+        Label done = a->newLabel();
         
         a->cmp(x86::eax, 0x80000000);
         a->jne(normalDiv);
@@ -6976,7 +6976,7 @@ bool jit_emit_mul_upper_su(
         // If ra was negative (signed), we need to adjust the result
         // Int128(ra) * UInt128(rb) = UInt128(ra) * UInt128(rb) - UInt128(rb) * 2^64
         // So we subtract rb from the high half (rdx)
-        Label skipSub = a->new_label();
+        Label skipSub = a->newLabel();
         a->test(x86::r9, x86::r9);  // Test sign bit
         a->jns(skipSub);            // Skip if positive
         a->sub(x86::rdx, x86::r8);  // Subtract rb from high half
@@ -7000,7 +7000,7 @@ bool jit_emit_mul_upper_su(
         // If ra was negative (signed), subtract rb from the result
         // Int128(ra) * UInt128(rb) = UInt128(ra) * UInt128(rb) - UInt128(rb) * 2^64
         // So the high part needs adjustment when ra < 0
-        Label skipSub = a->new_label();
+        Label skipSub = a->newLabel();
         a->tbz(a64::x0, 63, skipSub);  // Test sign bit (bit 63), skip if clear
         a->sub(a64::x2, a64::x2, a64::x1);  // Subtract rb from result
         a->bind(skipSub);
