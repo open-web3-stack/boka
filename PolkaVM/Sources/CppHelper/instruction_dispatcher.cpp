@@ -413,7 +413,9 @@ bool decode_branch_eq_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstructi
     decoded.dest_reg = bytecode[pc + 1];  // reg_index
     decoded.immediate = *reinterpret_cast<const uint64_t*>(&bytecode[pc + 2]);
     decoded.offset = *reinterpret_cast<const int32_t*>(&bytecode[pc + 10]);
-    decoded.target_pc = pc + 14 + static_cast<uint32_t>(decoded.offset);
+    // Offset is relative to the START of the instruction (not the end)
+    // This matches the Swift implementation (BranchInstructionBase.swift:23)
+    decoded.target_pc = pc + static_cast<uint32_t>(decoded.offset);
     decoded.size = 14; // 1 + 1 + 8 + 4 = 14 bytes
     return true;
 }
@@ -1393,11 +1395,14 @@ bool emit_instruction_decoded(
         // Store src_reg to memory at dest_reg + offset
         case static_cast<uint8_t>(Opcode::StoreIndU8):
             // Use existing store_8 with ptr_reg = base register
+            // NOTE: jit_emit_store_* functions expect int16_t offset
+            // This is a known limitation - for now we truncate to 16-bit
+            // TODO: Update emitter functions to accept 32-bit offsets
             return jit_instruction::jit_emit_store_8(
                 assembler, target_arch,
                 decoded.src1_reg,  // ptr_reg (base address register)
                 decoded.dest_reg,  // src_reg (value to store)
-                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+                static_cast<int16_t>(decoded.address)  // offset truncated to 16-bit
             );
 
         case static_cast<uint8_t>(Opcode::StoreIndU16):
@@ -1405,7 +1410,7 @@ bool emit_instruction_decoded(
                 assembler, target_arch,
                 decoded.src1_reg,  // ptr_reg
                 decoded.dest_reg,  // src_reg
-                static_cast<int16_t>(decoded.address & 0xFFFF)
+                static_cast<int16_t>(decoded.address)  // offset truncated to 16-bit
             );
 
         case static_cast<uint8_t>(Opcode::StoreIndU32):
@@ -1413,7 +1418,7 @@ bool emit_instruction_decoded(
                 assembler, target_arch,
                 decoded.src1_reg,  // ptr_reg
                 decoded.dest_reg,  // src_reg
-                static_cast<int16_t>(decoded.address & 0xFFFF)
+                static_cast<int16_t>(decoded.address)  // offset truncated to 16-bit
             );
 
         case static_cast<uint8_t>(Opcode::StoreIndU64):
@@ -1421,7 +1426,7 @@ bool emit_instruction_decoded(
                 assembler, target_arch,
                 decoded.src1_reg,  // ptr_reg
                 decoded.dest_reg,  // src_reg
-                static_cast<int16_t>(decoded.address & 0xFFFF)
+                static_cast<int16_t>(decoded.address)  // offset truncated to 16-bit
             );
 
         // Load Indirect instructions (opcodes 124-130)

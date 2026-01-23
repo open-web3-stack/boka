@@ -65,19 +65,41 @@ static uint32_t getInstructionSize(const uint8_t* bytecode, uint32_t pc, size_t 
 }
 
 // Helper to extract jump target from instruction
+// Returns the target PC for branch instructions, or fallthrough PC for non-branches
 static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t instrSize) {
-    if (instrSize == 5 || instrSize == 7) {
-        // Jump (5 bytes): [opcode][offset_32bit]
-        // Branch (7 bytes): [opcode][reg1][reg2][offset_32bit]
-        // Offset is relative to the START of the instruction (pc), not the end
+    uint8_t opcode = bytecode[pc];
+
+    // Jump (5 bytes): [opcode][offset_32bit]
+    if (instrSize == 5 && opcode_is(opcode, Opcode::Jump)) {
         uint32_t offset;
-        if (instrSize == 5) {
-            memcpy(&offset, &bytecode[pc + 1], 4);
-        } else {
-            memcpy(&offset, &bytecode[pc + 3], 4);
-        }
+        memcpy(&offset, &bytecode[pc + 1], 4);
         return pc + int32_t(offset);
     }
+
+    // Branch register instructions (7 bytes): [opcode][reg1][reg2][offset_32bit]
+    // BranchEq, BranchNe, BranchLtU, BranchLtS, BranchGeU, BranchGeS
+    if (instrSize == 7) {
+        uint32_t offset;
+        memcpy(&offset, &bytecode[pc + 3], 4);
+        return pc + int32_t(offset);
+    }
+
+    // Branch immediate instructions (14 bytes): [opcode][reg_index][value_64bit][offset_32bit]
+    // BranchEqImm, BranchNeImm, BranchLtUImm, BranchLeUImm, BranchGeUImm, BranchGtUImm,
+    // BranchLtSImm, BranchLeSImm, BranchGeSImm, BranchGtSImm
+    if (instrSize == 14) {
+        uint32_t offset;
+        memcpy(&offset, &bytecode[pc + 10], 4);  // Offset starts at byte 10
+        return pc + int32_t(offset);
+    }
+
+    // LoadImmJump (10 bytes): [opcode][reg_index][immediate_32bit][offset_32bit]
+    if (opcode_is(opcode, Opcode::LoadImmJump)) {
+        uint32_t offset;
+        memcpy(&offset, &bytecode[pc + 6], 4);  // Offset starts at byte 6
+        return pc + int32_t(offset);
+    }
+
     return pc + instrSize; // Fallthrough
 }
 
@@ -165,19 +187,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             needsDispatcherTable = true;
         }
 
-        // Mark jump targets for control flow instructions
-        if (opcode_is(opcode, Opcode::Jump)) {
-            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
-            labelManager.markJumpTarget(targetPC);
-        } else if (opcode_is(opcode, Opcode::BranchEq) ||
-                   opcode_is(opcode, Opcode::BranchNe)) {
-            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
-            labelManager.markJumpTarget(targetPC);
-        } else if (opcode_is(opcode, Opcode::LoadImmJump)) {
-            uint8_t destReg = codeBuffer[pc + 1];
-            uint32_t jumpOffset;
-            memcpy(&jumpOffset, &codeBuffer[pc + 2], 4);   // Jump offset is at bytes 2-5
-            uint32_t targetPC = pc + int32_t(jumpOffset);  // Offset is relative to instruction start
+        // Mark jump targets for all control flow instructions
+        // This is necessary to handle backward jumps (loops) correctly
+        uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
+        if (targetPC != pc + instrSize) {
+            // This is a branch/jump instruction (not a fallthrough)
             labelManager.markJumpTarget(targetPC);
         }
 
