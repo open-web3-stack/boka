@@ -51,22 +51,9 @@ public class ProgramCode {
             throw Error.invalidJumpTableEncodeSize
         }
 
-        // Manual ULEB128 decoding for codeLength (slice.decode() has a bug with multi-byte ULEB128)
-        var codeLength: UInt64 = 0
-        var shift: UInt64 = 0
-        var index = slice.startIndex
-        while index < blob.endIndex {
-            let byte = blob[index]
-            codeLength |= UInt64(byte & 0x7F) << shift
-            index += 1
-            if (byte & 0x80) == 0 {
-                break
-            }
-            shift += 7
-        }
-        slice = Slice(base: blob, bounds: index..<slice.endIndex)
-
-        guard codeLength <= Constants.maxCodeLength else {
+        // Decode codeLength using the same spec-compliant decoder as jumpTableEntriesCount
+        // Format from serialization.tex: variable-length encoding with prefix bytes
+        guard let codeLength = slice.decode(), codeLength <= Constants.maxCodeLength else {
             throw Error.invalidCodeLength
         }
 
