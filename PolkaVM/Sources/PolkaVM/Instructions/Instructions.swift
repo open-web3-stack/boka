@@ -62,18 +62,10 @@ extension CppHelper.Instructions.LoadImm64: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
         let value = try data.at(relative: 1 ..< 9).decode(UInt64.self)
-        print("[LoadImm64.init] register: \(register), value: \(value)")
-        do {
-            self.init(reg: register, value: value)
-            print("[LoadImm64.init] self.init succeeded")
-        } catch {
-            print("[LoadImm64.init] self.init failed: \(error)")
-            throw error
-        }
+        self.init(reg: register, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        print("[LoadImm64.execute] reg: \(reg), value: \(value)")
         context.state.writeRegister(reg, value)
         return .continued
     }
@@ -160,14 +152,9 @@ extension CppHelper.Instructions.JumpInd: Instruction {
 
 extension CppHelper.Instructions.LoadImm: Instruction {
     public init(data: Data) throws {
-        print("[LoadImm.init] data.count: \(data.count)")
         let register = try Registers.Index(r1: data.at(relative: 0))
-        print("[LoadImm.init] register: \(register)")
         let value: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
-        print("[LoadImm.init] value: \(value)")
-        print("[LoadImm.init] About to call self.init")
         self.init(reg: register, value: value)
-        print("[LoadImm.init] self.init succeeded")
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
