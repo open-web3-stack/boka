@@ -45,7 +45,7 @@ extension CppHelper.Instructions.Fallthrough: Instruction {
         self.init()
     }
 
-    public func _executeImpl(context _: ExecutionContext) -> ExecOutcome { .exit(.halt) }
+    public func _executeImpl(context _: ExecutionContext) -> ExecOutcome { .continued }
 }
 
 extension CppHelper.Instructions.Ecalli: Instruction {
