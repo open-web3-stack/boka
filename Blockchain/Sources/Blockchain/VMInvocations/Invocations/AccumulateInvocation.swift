@@ -68,6 +68,8 @@ public func accumulate(
     let ctx = AccumulateContext(context: contextContent, config: config, timeslot: timeslot, inputs: arguments)
     let argumentData = try JamEncoder.encode(UInt(timeslot), UInt(serviceIndex), UInt(arguments.count))
 
+    logger.info("=== Service \(serviceIndex): about to invokePVM with executionMode: \(executionMode), codeBlob size: \(codeBlob.count), gas: \(gas) ===")
+
     let (exitReason, gas, output) = await invokePVM(
         config: config,
         executionMode: executionMode,
@@ -78,8 +80,7 @@ public func accumulate(
         ctx: ctx
     )
 
-    logger.debug("accumulate exit reason: \(exitReason)")
-    logger.debug("accumulate output: \(output?.toDebugHexString() ?? "nil")")
+    logger.info("=== Service \(serviceIndex): exit reason: \(exitReason), remaining gas: \(gas), output: \(output?.toDebugHexString() ?? "nil") ===")
 
     return try collapse(exitReason: exitReason, output: output, context: ctx.context, gas: gas)
 }

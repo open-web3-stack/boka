@@ -50,25 +50,54 @@ enum TraceTest {
 
             // compare kv as well (so accounts are compared)
             let expectedStateDict = testcase.postState.toDict()
+
+            logger.info("=== DEBUG: Starting KV comparison ===")
+            logger.info("Expected state has \(expectedStateDict.count) keys")
+
+            var mismatchCount = 0
             for (key, value) in expectedStateDict {
                 let ourVal = try await stateRef.value.read(key: key)
+                if ourVal != value {
+                    mismatchCount += 1
+                    if mismatchCount <= 5 {
+                        logger.error("KV mismatch #\(mismatchCount) - key: \(key.toHexString()), expected: \(value.toHexString()), got: \(ourVal?.toHexString() ?? "nil")")
+                    }
+                }
                 #expect(
                     ourVal == value,
                     "kv mismatch for key: \(key), expected: \(value.toHexString()), got: \(ourVal?.toHexString() ?? "nil")"
                 )
             }
 
+            logger.info("=== DEBUG: Found \(mismatchCount) mismatches (showing first 5) ===")
+
             // make sure we don't have extra keys
             let allKeys = try await stateRef.value.backend.getKeys(nil, nil, nil)
+
+            logger.info("=== DEBUG: Checking for extra keys ===")
+            logger.info("Our state has \(allKeys.count) keys, expected has \(expectedStateDict.count) keys")
+
+            var extraKeyCount = 0
             for (key, value) in allKeys {
                 let data31 = Data31(key)!
+                if expectedStateDict[data31] == nil {
+                    extraKeyCount += 1
+                    if extraKeyCount <= 5 {
+                        logger.error("Extra key #\(extraKeyCount) - key: \(data31.toHexString()), value: \(value.toDebugHexString())")
+                    }
+                }
                 #expect(
                     expectedStateDict[data31] != nil,
                     "extra key in boka post state: \(data31.toHexString()), value: \(value.toDebugHexString())"
                 )
             }
 
+            logger.info("=== DEBUG: Found \(extraKeyCount) extra keys (showing first 5) ===")
+
             let stateRoot = await stateRef.value.stateRoot
+            logger.info("=== DEBUG: State root comparison ===")
+            logger.info("Our state root: \(stateRoot.toHexString())")
+            logger.info("Expected state root: \(testcase.postState.root.toHexString())")
             #expect(stateRoot == testcase.postState.root)
         case .failure:
             if !expectFailure {
