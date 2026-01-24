@@ -62,12 +62,9 @@ protocol BranchInstructionBase2<Compare>: Branch {
 
 extension BranchInstructionBase2 {
     public static func parse(data: Data) throws -> (Registers.Index, Registers.Index, UInt32) {
-        // Branch instruction format: [opcode][reg1][reg2][offset_32bit]
-        // NOTE: InstructionTable.parse() strips the opcode before calling init(data:)
-        // So data starts AFTER the opcode: position 0 = reg1, position 1 = reg2, position 2+ = offset
         let r1 = try Registers.Index(r1: data.at(relative: 0))
-        let r2 = try Registers.Index(r2: data.at(relative: 1))
-        let offset: UInt32 = Instructions.decodeImmediate(data[2...])  // Offset starts at position 2 (after opcode, reg1, reg2)
+        let r2 = try Registers.Index(r2: data.at(relative: 0))
+        let offset: UInt32 = try Instructions.decodeImmediate(data.at(relative: 1...))
         return (r1, r2, offset)
     }
 
