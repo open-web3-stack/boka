@@ -22,8 +22,8 @@ enum TraceTest {
         // test state merklize
         let preKv = testcase.preState.toDict()
         let postKv = testcase.postState.toDict()
-        #expecttry (stateMerklize(kv: preKv) == testcase.preState.root, "pre_state root mismatch")
-        #expecttry (stateMerklize(kv: postKv) == testcase.postState.root, "post_state root mismatch")
+        #expect(try stateMerklize(kv: preKv) == testcase.preState.root, "pre_state root mismatch")
+        #expect(try stateMerklize(kv: postKv) == testcase.postState.root, "post_state root mismatch")
 
         // test STF
         let result = try await JamTestnet.runSTF(testcase, config: config)
