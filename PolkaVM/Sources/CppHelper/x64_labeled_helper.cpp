@@ -402,9 +402,6 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.bind(dispatcherLoopNoJumpTable);
             a.mov(x86::r15d, x86::eax);  // Update PC with target address
             a.jmp(dispatcherLoop);
-
-            pc += instrSize;
-            continue;
         }
 
         if (opcode_is(opcode, Opcode::LoadImmJumpInd)) {
@@ -520,9 +517,6 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.bind(dispatcherLoopNoJumpTable2);
             a.mov(x86::r15d, x86::eax);  // Update PC with target address
             a.jmp(dispatcherLoop);
-
-            pc += instrSize;
-            continue;
         }
 
         // === Ecalli (Host Call) ===
