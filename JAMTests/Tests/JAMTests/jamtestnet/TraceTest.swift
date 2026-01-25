@@ -1,6 +1,7 @@
 import Blockchain
 import Codec
 import Foundation
+import PolkaVM
 import Testing
 import TracingUtils
 import Utils
@@ -12,7 +13,8 @@ private let logger = Logger(label: "TraceTest")
 enum TraceTest {
     static func test(
         _ input: Testcase,
-        config: ProtocolConfigRef = TestVariants.tiny.config
+        config: ProtocolConfigRef = TestVariants.tiny.config,
+        executionMode: ExecutionMode = []
     ) async throws {
         // setupTestLogger()
 
@@ -26,7 +28,7 @@ enum TraceTest {
         #expect(try stateMerklize(kv: postKv) == testcase.postState.root, "post_state root mismatch")
 
         // test STF
-        let result = try await JamTestnet.runSTF(testcase, config: config)
+        let result = try await JamTestnet.runSTF(testcase, config: config, executionMode: executionMode)
         switch result {
         case let .success(stateRef):
             let expectedState = try await testcase.postState.toState(config: config)

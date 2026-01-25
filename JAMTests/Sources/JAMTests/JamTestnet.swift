@@ -1,6 +1,7 @@
 import Blockchain
 import Codec
 import Foundation
+import PolkaVM
 import Utils
 
 public struct JamTestnetTestcase: Codable, Sendable {
@@ -66,9 +67,10 @@ public enum JamTestnet {
 
     public static func runSTF(
         _ testcase: JamTestnetTestcase,
-        config: ProtocolConfigRef = TestVariants.tiny.config
+        config: ProtocolConfigRef = TestVariants.tiny.config,
+        executionMode: ExecutionMode = []
     ) async throws -> Result<StateRef, Error> {
-        let runtime = Runtime(config: config, ancestry: nil)
+        let runtime = Runtime(config: config, ancestry: nil, executionMode: executionMode)
         let blockRef = testcase.block.asRef()
         let stateRef = try await testcase.preState.toState(config: config).asRef()
 
