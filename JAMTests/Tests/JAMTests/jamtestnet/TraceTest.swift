@@ -22,8 +22,8 @@ enum TraceTest {
         // test state merklize
         let preKv = testcase.preState.toDict()
         let postKv = testcase.postState.toDict()
-        #expect(try stateMerklize(kv: preKv) == testcase.preState.root, "pre_state root mismatch")
-        #expect(try stateMerklize(kv: postKv) == testcase.postState.root, "post_state root mismatch")
+        #expecttry (stateMerklize(kv: preKv) == testcase.preState.root, "pre_state root mismatch")
+        #expecttry (stateMerklize(kv: postKv) == testcase.postState.root, "post_state root mismatch")
 
         // test STF
         let result = try await JamTestnet.runSTF(testcase, config: config)
@@ -51,16 +51,16 @@ enum TraceTest {
             // compare kv as well (so accounts are compared)
             let expectedStateDict = testcase.postState.toDict()
 
-            logger.info("=== DEBUG: Starting KV comparison ===")
-            logger.info("Expected state has \(expectedStateDict.count) keys")
-
             var mismatchCount = 0
             for (key, value) in expectedStateDict {
                 let ourVal = try await stateRef.value.read(key: key)
                 if ourVal != value {
                     mismatchCount += 1
                     if mismatchCount <= 5 {
-                        logger.error("KV mismatch #\(mismatchCount) - key: \(key.toHexString()), expected: \(value.toHexString()), got: \(ourVal?.toHexString() ?? "nil")")
+                        logger
+                            .error(
+                                "KV mismatch #\(mismatchCount) - key: \(key.toHexString()), expected: \(value.toHexString()), got: \(ourVal?.toHexString() ?? "nil")"
+                            )
                     }
                 }
                 #expect(
@@ -69,13 +69,8 @@ enum TraceTest {
                 )
             }
 
-            logger.info("=== DEBUG: Found \(mismatchCount) mismatches (showing first 5) ===")
-
             // make sure we don't have extra keys
             let allKeys = try await stateRef.value.backend.getKeys(nil, nil, nil)
-
-            logger.info("=== DEBUG: Checking for extra keys ===")
-            logger.info("Our state has \(allKeys.count) keys, expected has \(expectedStateDict.count) keys")
 
             var extraKeyCount = 0
             for (key, value) in allKeys {
@@ -92,12 +87,7 @@ enum TraceTest {
                 )
             }
 
-            logger.info("=== DEBUG: Found \(extraKeyCount) extra keys (showing first 5) ===")
-
             let stateRoot = await stateRef.value.stateRoot
-            logger.info("=== DEBUG: State root comparison ===")
-            logger.info("Our state root: \(stateRoot.toHexString())")
-            logger.info("Expected state root: \(testcase.postState.root.toHexString())")
             #expect(stateRoot == testcase.postState.root)
         case .failure:
             if !expectFailure {
