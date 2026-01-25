@@ -1171,9 +1171,6 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint32_t immediate;
             memcpy(&immediate, &codeBuffer[pc + 2], 4);
 
-            // DEBUG: Print what we're loading
-            // fprintf(stderr, "[JIT LoadImm] destReg=%u immediate=%u (0x%X)\n", destReg, immediate, immediate);
-
             // Load immediate into eax (zero-extends to rax per x86-64 ABI)
             a.mov(x86::eax, immediate);
             a.mov(x86::qword_ptr(x86::rbx, destReg * 8), x86::rax);
@@ -1271,8 +1268,6 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint8_t srcReg = codeBuffer[pc + 1];
             uint32_t address;
             memcpy(&address, &codeBuffer[pc + 2], 4);
-
-            // fprintf(stderr, "[JIT StoreU64] srcReg=%u address=%u (0x%X)\n", srcReg, address, address);
 
             // Load address into eax (zero-extends to rax automatically since eax is written)
             // NOTE: mov to eax zero-extends to rax in x86_64
