@@ -32,11 +32,9 @@ struct FuzzTests {
             }
     }
 
-    @Test(arguments: try loadTests(
+    @Testtry (arguments: loadTests(
         version: "0.7.2",
         filters: [
-            // Filter for a single test case to debug
-            ("0.7.2/1767827127_1243", "00404399.bin"),
         ],
         ignore: [
         ]
