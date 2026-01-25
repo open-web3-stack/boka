@@ -32,7 +32,7 @@ struct FuzzTests {
             }
     }
 
-    @Testtry (arguments: loadTests(
+    @Test(arguments: try loadTests(
         version: "0.7.2",
         filters: [
         ],
