@@ -1,4 +1,5 @@
 import Foundation
+import PolkaVM
 import Testing
 import Utils
 
@@ -39,7 +40,18 @@ struct FuzzTests {
         ignore: [
         ]
     ))
-    func v072(input: Testcase) async throws {
-        try await TraceTest.test(input, config: TestVariants.tiny.config)
+    func v072_interpreter(input: Testcase) async throws {
+        try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: [])
+    }
+
+    @Test(arguments: try loadTests(
+        version: "0.7.2",
+        filters: [
+        ],
+        ignore: [
+        ]
+    ))
+    func v072_sandbox(input: Testcase) async throws {
+        try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: .sandboxed)
     }
 }
