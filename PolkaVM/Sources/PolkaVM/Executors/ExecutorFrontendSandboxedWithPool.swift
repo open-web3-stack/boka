@@ -30,6 +30,8 @@ final class ExecutorFrontendSandboxedWithPool: ExecutorFrontend {
         argumentData: Data?,
         ctx: (any InvocationContext)?
     ) async -> VMExecutionResult {
+        logger.debug("[Frontend] execute() called - ctx: \(ctx != nil ? "non-nil" : "nil")")
+
         // Sandboxed mode does not support InvocationContext
         // TODO: Implement context serialization for Phase 4
         if ctx != nil {
@@ -41,9 +43,12 @@ final class ExecutorFrontendSandboxedWithPool: ExecutorFrontend {
             )
         }
 
+        logger.debug("[Frontend] Context check passed, getting pool...")
+
         do {
             // Get or create pool
             let pool = try await getPool()
+            logger.debug("[Frontend] Pool obtained, executing...")
 
             // Execute using pool
             // Note: ctx is always nil here (checked above), so passing nil is safe

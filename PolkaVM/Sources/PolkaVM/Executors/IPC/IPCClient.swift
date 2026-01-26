@@ -1,9 +1,9 @@
 import Foundation
 import TracingUtils
 #if canImport(Glibc)
-import Glibc
+    import Glibc
 #elseif canImport(Darwin)
-import Darwin
+    import Darwin
 #endif
 
 private let logger = Logger(label: "IPCClient")
@@ -25,6 +25,17 @@ final class IPCClient: @unchecked Sendable {
 
     /// Set the file descriptor for communication
     func setFileDescriptor(_ fd: Int32) {
+        logger.info("[IPC] Setting file descriptor: \(fd)")
+
+        // Validate FD is valid using fcntl
+        let flags = fcntl(fd, F_GETFL)
+        if flags == -1 {
+            let err = errno
+            logger.error("[IPC] File descriptor \(fd) is INVALID: \(errnoToString(err))")
+        } else {
+            logger.info("[IPC] File descriptor \(fd) is valid (flags: \(flags))")
+        }
+
         fileDescriptor = fd
     }
 
@@ -44,23 +55,29 @@ final class IPCClient: @unchecked Sendable {
         argumentData: Data?,
         executionMode: ExecutionMode
     ) async throws -> (exitReason: ExitReason, gasUsed: UInt64, outputData: Data?) {
+        print("[IPC-ASYNC] sendExecuteRequest called, about to offload to DispatchQueue")
         // ⚠️ Offload blocking I/O to DispatchQueue to avoid blocking Swift concurrency pool
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                guard let self = self else {
+                print("[IPC-DISPATCH] DispatchQueue block executing")
+                guard let self else {
+                    print("[IPC-DISPATCH] Self is nil, returning error")
                     continuation.resume(throwing: IPCError.malformedMessage)
                     return
                 }
                 do {
-                    let result = try self.sendExecuteRequestBlocking(
+                    print("[IPC-DISPATCH] About to call sendExecuteRequestBlocking")
+                    let result = try sendExecuteRequestBlocking(
                         blob: blob,
                         pc: pc,
                         gas: gas,
                         argumentData: argumentData,
                         executionMode: executionMode
                     )
+                    print("[IPC-DISPATCH] sendExecuteRequestBlocking succeeded, resuming")
                     continuation.resume(returning: result)
                 } catch {
+                    print("[IPC-DISPATCH] sendExecuteRequestBlocking failed: \(error)")
                     continuation.resume(throwing: error)
                 }
             }
@@ -76,12 +93,27 @@ final class IPCClient: @unchecked Sendable {
         executionMode: ExecutionMode
     ) throws -> (exitReason: ExitReason, gasUsed: UInt64, outputData: Data?) {
         guard let fd = fileDescriptor else {
+            logger.error("[IPC] No file descriptor set")
             throw IPCError.malformedMessage
+        }
+
+        let timestamp = Date().timeIntervalSince1970
+        logger.debug("[IPC][\(timestamp)] Using file descriptor: \(fd)")
+
+        // Validate FD is still valid before writing
+        let flags = fcntl(fd, F_GETFL)
+        if flags == -1 {
+            let err = errno
+            logger.error("[IPC][\(timestamp)] File descriptor \(fd) is INVALID before write: \(errnoToString(err))")
+            throw IPCError.writeFailed(Int(err))
+        } else {
+            logger.debug("[IPC][\(timestamp)] File descriptor \(fd) is valid before write (flags: \(flags))")
         }
 
         // Generate request ID
         requestIdCounter = requestIdCounter &+ 1
         let requestId = requestIdCounter
+        logger.debug("[IPC][\(timestamp)] Sending request \(requestId), blob size: \(blob.count)")
 
         // Create and send request
         let requestData = try IPCProtocol.createExecuteRequest(
@@ -93,7 +125,9 @@ final class IPCClient: @unchecked Sendable {
             executionMode: executionMode
         )
 
+        logger.info("[IPC][\(timestamp)] Writing \(requestData.count) bytes to FD \(fd)")
         try writeData(requestData, to: fd)
+        logger.info("[IPC][\(timestamp)] Write completed successfully")
 
         // Wait for response (blocking)
         let responseMessage = try readMessageBlocking(requestId: requestId, from: fd)
@@ -153,7 +187,7 @@ final class IPCClient: @unchecked Sendable {
     /// Use readMessageBlocking which is called via DispatchQueue offloading instead.
     private func readMessage(requestId: UInt32, from fd: Int32) async throws -> IPCMessage {
         // Delegate to the blocking version
-        return try readMessageBlocking(requestId: requestId, from: fd)
+        try readMessageBlocking(requestId: requestId, from: fd)
     }
 
     /// Read message from file descriptor (blocking version for DispatchQueue offloading)
@@ -165,7 +199,7 @@ final class IPCClient: @unchecked Sendable {
             $0.load(as: UInt32.self).littleEndian
         }
 
-        guard length > 0 && length < 1024 * 1024 * 100 else {
+        guard length > 0, length < 1024 * 1024 * 100 else {
             throw IPCError.malformedMessage
         }
 
@@ -218,8 +252,6 @@ final class IPCClient: @unchecked Sendable {
                 }
 
                 bytesRead += Int(result)
-
-                return
             }
         }
 
@@ -231,37 +263,37 @@ final class IPCClient: @unchecked Sendable {
         var buffer = [Int8](repeating: 0, count: 256)
         // Use strerror_r for thread safety
         #if os(Linux)
-        let result = strerror_r(err, &buffer, buffer.count)
+            let result = strerror_r(err, &buffer, buffer.count)
 
-        // Check if result is a valid pointer (GNU version) or error code (XSI version)
-        // Valid pointers are either:
-        // 1. Pointing to our buffer (stack address, typically very high)
-        // 2. Pointing to static memory (high address > 4096)
-        // Invalid: XSI error codes are small positive integers (1-4095)
-        if let ptr = result {
-            // Get the numeric address value via UInt for correct bitPattern conversion
-            let addr = Int(bitPattern: UInt(bitPattern: ptr))
+            // Check if result is a valid pointer (GNU version) or error code (XSI version)
+            // Valid pointers are either:
+            // 1. Pointing to our buffer (stack address, typically very high)
+            // 2. Pointing to static memory (high address > 4096)
+            // Invalid: XSI error codes are small positive integers (1-4095)
+            if let ptr = result {
+                // Get the numeric address value via UInt for correct bitPattern conversion
+                let addr = Int(bitPattern: UInt(bitPattern: ptr))
 
-            if addr > 4096 {
-                // Valid pointer: use it (GNU version)
-                return String(cString: ptr)
+                if addr > 4096 {
+                    // Valid pointer: use it (GNU version)
+                    return String(cString: ptr)
+                } else {
+                    // Invalid pointer: must be XSI error code, use buffer
+                    // Buffer was populated even on error in XSI version
+                    return String(cString: &buffer)
+                }
             } else {
-                // Invalid pointer: must be XSI error code, use buffer
-                // Buffer was populated even on error in XSI version
+                // nil result: use buffer
                 return String(cString: &buffer)
             }
-        } else {
-            // nil result: use buffer
-            return String(cString: &buffer)
-        }
         #else
-        // XSI version (macOS): returns Int32 (0 on success, error code on failure)
-        let result = strerror_r(err, &buffer, buffer.count)
-        if result == 0 {
-            return String(cString: &buffer)
-        } else {
-            return "Unknown error \(err)"
-        }
+            // XSI version (macOS): returns Int32 (0 on success, error code on failure)
+            let result = strerror_r(err, &buffer, buffer.count)
+            if result == 0 {
+                return String(cString: &buffer)
+            } else {
+                return "Unknown error \(err)"
+            }
         #endif
     }
 

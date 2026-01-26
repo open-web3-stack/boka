@@ -15,6 +15,7 @@ actor SandboxWorker {
 
     // Process management
     private var processHandle: ProcessHandle?
+    private var processManager = ChildProcessManager()
     private var ipcClient: IPCClient
     private var isAlive = false
     private var isBusy = false
@@ -229,8 +230,6 @@ actor SandboxWorker {
     private func spawnWorker() async throws {
         logger.debug("[SPAWN] Worker \(workerID): Starting spawn process")
 
-        let processManager = ChildProcessManager()
-
         logger.debug("[SPAWN] Worker \(workerID): Calling spawnChildProcess")
         let (handle, clientFD) = try await processManager.spawnChildProcess(
             executablePath: "boka-sandbox"
@@ -247,7 +246,7 @@ actor SandboxWorker {
     }
 
     /// Terminate the worker process
-    private func terminate() async {
+    func terminate() async {
         guard let handle = processHandle else {
             logger.debug("[TERM] Worker \(workerID): No process handle to terminate")
             return
@@ -258,7 +257,6 @@ actor SandboxWorker {
         ipcClient.close()
         logger.debug("[TERM] Worker \(workerID): IPC client closed")
 
-        let processManager = ChildProcessManager()
         await processManager.kill(handle: handle)
         logger.debug("[TERM] Worker \(workerID): Process killed")
 

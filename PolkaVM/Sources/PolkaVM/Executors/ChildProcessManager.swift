@@ -94,6 +94,13 @@ actor ChildProcessManager {
         let parentFD = sockets[0]
         let childFD = sockets[1]
 
+        logger.info("Created socketpair: parentFD=\(parentFD), childFD=\(childFD)")
+
+        // Validate both FDs are valid
+        let parentFlags = fcntl(parentFD, F_GETFL)
+        let childFlags = fcntl(childFD, F_GETFL)
+        logger.info("Socketpair validation: parentFD flags=\(parentFlags), childFD flags=\(childFlags)")
+
         // Fork child process
         let pid = Glibc.fork()
 
@@ -108,16 +115,37 @@ actor ChildProcessManager {
             // Child process - DO NOT use logging, locks, or any async-unsafe functions
             Glibc.close(parentFD)
 
-            // Redirect stdin/stdout/stderr to /dev/null
+            // TEMPORARILY keep stderr open for debugging
+            // Redirect stdin/stdout to /dev/null
             let devNull = Glibc.open("/dev/null", O_RDWR)
             if devNull >= 0 {
-                Glibc.dup2(devNull, STDOUT_FILENO)
-                Glibc.dup2(devNull, STDERR_FILENO)
+                if Glibc.dup2(devNull, STDOUT_FILENO) == -1 {
+                    let errMsg = "Child: dup2(stdout) FAILED: \(errno)\n"
+                    Glibc.write(STDERR_FILENO, errMsg, errMsg.count)
+                }
+                // Glibc.dup2(devNull, STDERR_FILENO)  // Keep stderr for debugging
                 Glibc.close(devNull)
             }
 
             // Set child FD as stdin (for IPC)
-            Glibc.dup2(childFD, STDIN_FILENO)
+            // CRITICAL: This is the IPC channel - must succeed
+            if Glibc.dup2(childFD, STDIN_FILENO) == -1 {
+                let errMsg = "Child: dup2(stdin) FAILED: \(errno)\n"
+                Glibc.write(STDERR_FILENO, errMsg, errMsg.count)
+                _exit(1)
+            }
+
+            // Verify stdin is set correctly
+            let stdinFlags = Glibc.fcntl(STDIN_FILENO, F_GETFL)
+            if stdinFlags == -1 {
+                let errMsg = "Child: stdin FD is INVALID after dup2: \(errno)\n"
+                Glibc.write(STDERR_FILENO, errMsg, errMsg.count)
+                _exit(1)
+            } else {
+                let okMsg = "Child: stdin FD \(STDIN_FILENO) is valid after dup2 (flags: \(stdinFlags))\n"
+                Glibc.write(STDERR_FILENO, okMsg, okMsg.count)
+            }
+
             Glibc.close(childFD)
 
             // Execute child process using resolved path
@@ -126,12 +154,19 @@ actor ChildProcessManager {
                     UnsafeMutablePointer(mutating: execPath),
                     nil,
                 ]
+
+                // Write debug message to stderr before exec
+                let debugMsg = "Child: About to execvp: \(String(cString: execPath))\n"
+                Glibc.write(STDERR_FILENO, debugMsg, debugMsg.count)
+
                 let exeResult = Glibc.execvp(execPath, &argv)
 
                 // execvp only returns on failure
                 // Use _exit() instead of exit() to avoid calling atexit() handlers
                 // that were registered by the parent process
                 if exeResult < 0 {
+                    let errMsg = "Child: execvp FAILED: \(errno)\n"
+                    Glibc.write(STDERR_FILENO, errMsg, errMsg.count)
                     _exit(1)
                 }
             }
@@ -140,16 +175,22 @@ actor ChildProcessManager {
             _exit(1)
         } else {
             // Parent process
+            logger.info("Parent: Closing childFD \(childFD)")
             Glibc.close(childFD)
+
+            // Validate parentFD is still valid after closing childFD
+            let parentFlagsAfterClose = fcntl(parentFD, F_GETFL)
+            logger.info("Parent: parentFD \(parentFD) validation after close: flags=\(parentFlagsAfterClose)")
 
             let handle = ProcessHandle(pid: pid, ipcFD: parentFD)
             activeProcesses[pid] = handle
 
-            logger.debug("Spawned child process: PID \(pid)")
+            logger.info("Spawned child process: PID \(pid), returning parentFD \(parentFD)")
 
             // Wait a moment for child to start
             try await Task.sleep(nanoseconds: 100_000_000) // 100ms
 
+            logger.info("Parent: Returning handle and parentFD \(parentFD) to caller")
             return (handle, parentFD)
         }
     }

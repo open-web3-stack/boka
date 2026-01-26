@@ -192,9 +192,9 @@ public actor SandboxPool {
         logger.info("Shutting down sandbox pool...")
         isShutdown = true
 
-        // Terminate all workers
-        for _ in workers.values {
-            // Workers will be terminated in their deinit
+        // Terminate all workers explicitly to close FDs and clean up processes
+        for worker in workers.values {
+            await worker.terminate()
         }
 
         workers.removeAll()
@@ -368,6 +368,10 @@ public actor SandboxPool {
         }
 
         logger.debug("Recycling worker \(id)")
+
+        // IMPORTANT: Terminate the old worker BEFORE removing from pool
+        // This ensures the FD is closed and can't be used after removal
+        await worker.terminate()
 
         workers.removeValue(forKey: id)
 

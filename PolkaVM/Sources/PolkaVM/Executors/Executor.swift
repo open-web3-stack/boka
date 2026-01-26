@@ -24,8 +24,9 @@ public final class Executor: @unchecked Sendable {
         gas: Gas,
         argumentData: Data?,
         ctx: (any InvocationContext)?
-    ) async -> ExitReason {
-        await frontend.execute(
+    ) async -> VMExecutionResult {
+        print("[DEBUG] Executor.execute() called, frontend type: \(type(of: frontend))")
+        return await frontend.execute(
             config: config,
             blob: blob,
             pc: pc,

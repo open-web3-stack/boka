@@ -1,9 +1,9 @@
 import Foundation
 import TracingUtils
 #if canImport(Glibc)
-import Glibc
+    import Glibc
 #elseif canImport(Darwin)
-import Darwin
+    import Darwin
 #endif
 
 private let logger = Logger(label: "IPCServer")
@@ -24,11 +24,11 @@ public class IPCServer {
     public func close() {
         isRunning = false
         if let fd = fileDescriptor {
-#if canImport(Glibc)
-            Glibc.close(fd)
-#elseif canImport(Darwin)
-            Darwin.close(fd)
-#endif
+            #if canImport(Glibc)
+                Glibc.close(fd)
+            #elseif canImport(Darwin)
+                Darwin.close(fd)
+            #endif
             fileDescriptor = nil
         }
     }
@@ -40,20 +40,40 @@ public class IPCServer {
             return
         }
 
+        logger.info("[IPC-SERVER] Starting server run loop with FD \(fd)")
+
+        // Validate FD before starting
+        let flags = fcntl(fd, F_GETFL)
+        if flags == -1 {
+            logger.error("[IPC-SERVER] FD \(fd) is INVALID at start: \(errnoToString(errno))")
+            return
+        } else {
+            logger.info("[IPC-SERVER] FD \(fd) is valid at start (flags: \(flags))")
+        }
+
         isRunning = true
+        var iterationCount = 0
 
         while isRunning {
+            iterationCount += 1
+            logger.debug("[IPC-SERVER] Iteration \(iterationCount): About to read message from FD \(fd)")
+
             do {
                 // Read message
+                logger.debug("[IPC-SERVER] Calling readMessage()...")
                 let message = try await readMessage(from: fd)
+                logger.info("[IPC-SERVER] Successfully read message type: \(message.type), requestId: \(message.requestId)")
 
                 // Handle based on message type
                 switch message.type {
                 case .executeRequest:
+                    logger.debug("[IPC-SERVER] Handling execute request")
                     await handleExecuteRequest(message, handler: handler)
+                    logger.debug("[IPC-SERVER] Execute request handling complete")
 
                 case .heartbeat:
                     // Respond to heartbeat
+                    logger.debug("[IPC-SERVER] Received heartbeat, sending response")
                     let response = IPCMessage(type: .heartbeat, requestId: message.requestId)
                     try? writeMessage(response, to: fd)
 
@@ -67,10 +87,19 @@ public class IPCServer {
                 }
 
             } catch {
-                logger.error("IPC server error: \(error)")
+                logger.error("[IPC-SERVER] IPC server error on iteration \(iterationCount): \(error)")
+
+                // Check if FD is still valid
+                let fdFlags = fcntl(fd, F_GETFL)
+                if fdFlags == -1 {
+                    logger.error("[IPC-SERVER] FD \(fd) became INVALID after error: \(errnoToString(errno))")
+                }
+
                 isRunning = false
             }
         }
+
+        logger.info("[IPC-SERVER] Server run loop exiting after \(iterationCount) iterations")
     }
 
     /// Handle execute request
@@ -127,26 +156,35 @@ public class IPCServer {
 
     /// Read message from file descriptor
     private func readMessage(from fd: Int32) async throws -> IPCMessage {
+        logger.debug("[IPC-SERVER] readMessage: Reading length prefix (\(IPCProtocol.lengthPrefixSize) bytes) from FD \(fd)")
+
         // Read length prefix (4 bytes)
         let lengthData = try readExactBytes(IPCProtocol.lengthPrefixSize, from: fd)
+        logger.debug("[IPC-SERVER] readMessage: Successfully read length prefix")
 
         let length = lengthData.withUnsafeBytes {
             $0.load(as: UInt32.self).littleEndian
         }
+        logger.debug("[IPC-SERVER] readMessage: Message length: \(length) bytes")
 
-        guard length > 0 && length < 1024 * 1024 * 100 else {
+        guard length > 0, length < 1024 * 1024 * 100 else {
+            logger.error("[IPC-SERVER] readMessage: Invalid length \(length)")
             throw IPCError.malformedMessage
         }
 
         // Read message payload
+        logger.debug("[IPC-SERVER] readMessage: Reading message payload (\(length) bytes)")
         let messageData = try readExactBytes(Int(length), from: fd)
+        logger.debug("[IPC-SERVER] readMessage: Successfully read message payload")
 
         // Decode message
         let decodeResult = try? IPCProtocol.decodeMessage(lengthData + messageData)
         guard let message = decodeResult?.0 else {
+            logger.error("[IPC-SERVER] readMessage: Failed to decode message")
             throw IPCError.decodingFailed("Failed to decode IPC message")
         }
 
+        logger.debug("[IPC-SERVER] readMessage: Successfully decoded message, type: \(message.type)")
         return message
     }
 
@@ -191,40 +229,51 @@ public class IPCServer {
 
     /// Read exact number of bytes from file descriptor
     private func readExactBytes(_ count: Int, from fd: Int32) throws -> Data {
+        logger.debug("[IPC-SERVER] readExactBytes: Reading \(count) bytes from FD \(fd)")
+
         var buffer = Data(count: count)
         var bytesRead = 0
 
         while bytesRead < count {
             try buffer.withUnsafeMutableBytes { rawBuffer in
                 guard let baseAddr = rawBuffer.baseAddress else {
+                    logger.error("[IPC-SERVER] readExactBytes: Failed to get buffer address")
                     throw IPCError.readFailed(Int(EINVAL))
                 }
 
                 let ptr = baseAddr.advanced(by: bytesRead)
+                let bytesToRead = count - bytesRead
+
+                logger.debug("[IPC-SERVER] readExactBytes: Calling read() for \(bytesToRead) bytes (already read: \(bytesRead)/\(count))")
+
                 let result = ptr.withMemoryRebound(to: UInt8.self, capacity: count - bytesRead) {
                     Glibc.read(fd, $0, count - bytesRead)
                 }
+
+                logger.debug("[IPC-SERVER] readExactBytes: read() returned \(result)")
 
                 if result < 0 {
                     let err = errno
                     // EINTR: Interrupted system call - retry the read
                     if err == EINTR {
+                        logger.debug("[IPC-SERVER] readExactBytes: Got EINTR, retrying")
                         return
                     }
-                    logger.error("Failed to read from IPC: \(errnoToString(err))")
+                    logger.error("[IPC-SERVER] readExactBytes: Failed to read: \(errnoToString(err))")
                     throw IPCError.readFailed(Int(err))
                 }
 
                 if result == 0 {
+                    logger.error("[IPC-SERVER] readExactBytes: Got EOF (read returned 0) - expected \(count) bytes but got \(bytesRead)")
                     throw IPCError.unexpectedEOF
                 }
 
                 bytesRead += Int(result)
-
-                return
+                logger.debug("[IPC-SERVER] readExactBytes: Read progress: \(bytesRead)/\(count) bytes")
             }
         }
 
+        logger.debug("[IPC-SERVER] readExactBytes: Successfully read all \(count) bytes")
         return buffer
     }
 
@@ -249,37 +298,37 @@ public class IPCServer {
         // 1. Pointing to our buffer (check address range)
         // 2. Pointing to static memory (high address > 4096)
         #if os(Linux)
-        let result = strerror_r(err, &buffer, buffer.count)
+            let result = strerror_r(err, &buffer, buffer.count)
 
-        // Check if result is a valid pointer (GNU version) or error code (XSI version)
-        if let ptr = result {
-            // Get the numeric address value via UInt for correct bitPattern conversion
-            let addr = Int(bitPattern: UInt(bitPattern: ptr))
+            // Check if result is a valid pointer (GNU version) or error code (XSI version)
+            if let ptr = result {
+                // Get the numeric address value via UInt for correct bitPattern conversion
+                let addr = Int(bitPattern: UInt(bitPattern: ptr))
 
-            // Valid pointers are either:
-            // - Our buffer (stack address, typically very high)
-            // - Static string (data segment, > 4096)
-            // Invalid: XSI error codes are small positive integers (1-4095)
-            if addr > 4096 {
-                // Valid pointer: use it (GNU version)
-                return String(cString: ptr)
+                // Valid pointers are either:
+                // - Our buffer (stack address, typically very high)
+                // - Static string (data segment, > 4096)
+                // Invalid: XSI error codes are small positive integers (1-4095)
+                if addr > 4096 {
+                    // Valid pointer: use it (GNU version)
+                    return String(cString: ptr)
+                } else {
+                    // Invalid pointer: must be XSI error code, use buffer
+                    // Buffer was populated even on error in XSI version
+                    return String(cString: &buffer)
+                }
             } else {
-                // Invalid pointer: must be XSI error code, use buffer
-                // Buffer was populated even on error in XSI version
+                // nil result: use buffer
                 return String(cString: &buffer)
             }
-        } else {
-            // nil result: use buffer
-            return String(cString: &buffer)
-        }
         #else
-        // macOS/BSD: XSI version, returns Int32
-        let result = strerror_r(err, &buffer, buffer.count)
-        if result == 0 {
-            return String(cString: &buffer)
-        } else {
-            return "Unknown error \(err)"
-        }
+            // macOS/BSD: XSI version, returns Int32
+            let result = strerror_r(err, &buffer, buffer.count)
+            if result == 0 {
+                return String(cString: &buffer)
+            } else {
+                return "Unknown error \(err)"
+            }
         #endif
     }
 
