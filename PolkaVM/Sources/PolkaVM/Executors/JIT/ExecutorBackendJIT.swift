@@ -287,7 +287,8 @@ final class ExecutorBackendJIT: ExecutorBackend {
             jumpTableEntriesCount: 0,
             alignmentFactor: 0,
             dispatcherJumpTable: nil,
-            dispatcherJumpTableSize: 0
+            dispatcherJumpTableSize: 0,
+            heapEnd: 0 // Initial value, will be set from StandardMemory before execution
         ))
     }
 
@@ -647,6 +648,20 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         .jumpTableEntriesCount = UInt32(programCode.jumpTable.count / Int(programCode.jumpTableEntrySize))
                     jitHostFunctionTablePtr.pointee.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
 
+                    // CRITICAL FIX: Initialize heapEnd for JIT sbrk instruction
+                    // Get initial heap end from StandardMemory to match interpreter behavior
+                    if let stdMem = initialMemory as? StandardMemory {
+                        jitHostFunctionTablePtr.pointee.heapEnd = stdMem.heapEnd
+                    } else {
+                        // Fallback: use heap zone start address from config
+                        // This should not happen in normal operation
+                        logger.error("initialMemory is not StandardMemory, using default heapEnd")
+                        let ZZ = UInt32(config.pvmProgramInitZoneSize)
+                        let Z = StandardProgram.alignToZoneSize
+                        let heapStart = 2 * ZZ + Z(UInt32(standardProgram.code.code.count), config)
+                        jitHostFunctionTablePtr.pointee.heapEnd = heapStart
+                    }
+
                     // Execute the JIT-compiled function while jumpTableData pointer is valid
                     // The JIT function will use our syncHostCallHandler via the C trampoline
                     return try jitExecutor.execute(
@@ -666,6 +681,20 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 jitHostFunctionTablePtr.pointee.jumpTableEntrySize = 0
                 jitHostFunctionTablePtr.pointee.jumpTableEntriesCount = 0
                 jitHostFunctionTablePtr.pointee.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
+
+                // CRITICAL FIX: Initialize heapEnd for JIT sbrk instruction
+                // Get initial heap end from StandardMemory to match interpreter behavior
+                if let stdMem = initialMemory as? StandardMemory {
+                    jitHostFunctionTablePtr.pointee.heapEnd = stdMem.heapEnd
+                } else {
+                    // Fallback: use heap zone start address from config
+                    // This should not happen in normal operation
+                    logger.error("initialMemory is not StandardMemory, using default heapEnd")
+                    let ZZ = UInt32(config.pvmProgramInitZoneSize)
+                    let Z = StandardProgram.alignToZoneSize
+                    let heapStart = 2 * ZZ + Z(UInt32(standardProgram.code.code.count), config)
+                    jitHostFunctionTablePtr.pointee.heapEnd = heapStart
+                }
 
                 // Execute without jump table
                 (exitReason, memoryBuffer) = try jitExecutor.execute(

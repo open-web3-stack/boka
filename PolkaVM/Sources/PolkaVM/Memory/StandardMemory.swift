@@ -5,6 +5,12 @@ public final class StandardMemory: Memory {
     public let pageMap: PageMap
     private let config: PvmConfig
 
+    /// Current end of heap (for JIT sbrk implementation)
+    /// This is needed by the JIT to track heap allocations
+    public var heapEnd: UInt32 {
+        heapZone.endAddress
+    }
+
     private class Zone {
         let startAddress: UInt32
         var endAddress: UInt32
@@ -170,7 +176,7 @@ public final class StandardMemory: Memory {
         }
     }
 
-    public func sbrk(_ size: UInt32) throws(MemoryError) -> UInt32 {
+    public func sbrk(_ size: UInt32) throws (MemoryError) -> UInt32 {
         // NOTE: sbrk will be removed from GP
         // NOTE: this impl aligns with w3f traces test vector README
 

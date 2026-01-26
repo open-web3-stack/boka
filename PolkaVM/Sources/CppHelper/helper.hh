@@ -97,6 +97,9 @@ struct JITHostFunctionTable {
     // Maps PC values to compiled code addresses (computed goto)
     void* _Nullable* _Nullable dispatcherJumpTable; // Array of code pointers, indexed by PC
     uint32_t dispatcherJumpTableSize; // Number of entries in dispatcher table
+
+    // Heap tracking for sbrk instruction
+    uint32_t heapEnd; // Current end of heap (matches StandardMemory.heapZone.endAddress)
 };
 
 // Trampoline for JIT code to call Swift host functions
