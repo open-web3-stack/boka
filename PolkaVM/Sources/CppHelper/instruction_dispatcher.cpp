@@ -1402,7 +1402,7 @@ bool emit_instruction_decoded(
                 assembler, target_arch,
                 decoded.src1_reg,  // ptr_reg (base address register)
                 decoded.dest_reg,  // src_reg (value to store)
-                static_cast<int16_t>(decoded.address)  // offset truncated to 16-bit
+                static_cast<int32_t>(decoded.address)  // offset truncated to 16-bit
             );
 
         case static_cast<uint8_t>(Opcode::StoreIndU16):
@@ -1410,7 +1410,7 @@ bool emit_instruction_decoded(
                 assembler, target_arch,
                 decoded.src1_reg,  // ptr_reg
                 decoded.dest_reg,  // src_reg
-                static_cast<int16_t>(decoded.address)  // offset truncated to 16-bit
+                static_cast<int32_t>(decoded.address)  // offset truncated to 16-bit
             );
 
         case static_cast<uint8_t>(Opcode::StoreIndU32):
@@ -1418,7 +1418,7 @@ bool emit_instruction_decoded(
                 assembler, target_arch,
                 decoded.src1_reg,  // ptr_reg
                 decoded.dest_reg,  // src_reg
-                static_cast<int16_t>(decoded.address)  // offset truncated to 16-bit
+                static_cast<int32_t>(decoded.address)  // offset truncated to 16-bit
             );
 
         case static_cast<uint8_t>(Opcode::StoreIndU64):
@@ -1426,7 +1426,7 @@ bool emit_instruction_decoded(
                 assembler, target_arch,
                 decoded.src1_reg,  // ptr_reg
                 decoded.dest_reg,  // src_reg
-                static_cast<int16_t>(decoded.address)  // offset truncated to 16-bit
+                static_cast<int32_t>(decoded.address)  // offset truncated to 16-bit
             );
 
         // Load Indirect instructions (opcodes 124-130)
@@ -1437,7 +1437,7 @@ bool emit_instruction_decoded(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra (destination)
                 decoded.src1_reg,  // ptr_reg (base address = rb)
-                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+                static_cast<int32_t>(decoded.address)  // offset
             );
 
         case static_cast<uint8_t>(Opcode::LoadIndI8):
@@ -1445,7 +1445,7 @@ bool emit_instruction_decoded(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
                 decoded.src1_reg,  // ptr_reg (rb)
-                static_cast<int16_t>(decoded.address & 0xFFFF)
+                static_cast<int32_t>(decoded.address)
             );
 
         case static_cast<uint8_t>(Opcode::LoadIndU16):
@@ -1453,7 +1453,7 @@ bool emit_instruction_decoded(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
                 decoded.src1_reg,  // ptr_reg (rb)
-                static_cast<int16_t>(decoded.address & 0xFFFF)
+                static_cast<int32_t>(decoded.address)
             );
 
         case static_cast<uint8_t>(Opcode::LoadIndI16):
@@ -1461,7 +1461,7 @@ bool emit_instruction_decoded(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
                 decoded.src1_reg,  // ptr_reg (rb)
-                static_cast<int16_t>(decoded.address & 0xFFFF)
+                static_cast<int32_t>(decoded.address)
             );
 
         case static_cast<uint8_t>(Opcode::LoadIndU32):
@@ -1469,7 +1469,7 @@ bool emit_instruction_decoded(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
                 decoded.src1_reg,  // ptr_reg (rb)
-                static_cast<int16_t>(decoded.address & 0xFFFF)
+                static_cast<int32_t>(decoded.address)
             );
 
         case static_cast<uint8_t>(Opcode::LoadIndI32):
@@ -1477,7 +1477,7 @@ bool emit_instruction_decoded(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
                 decoded.src1_reg,  // ptr_reg (rb)
-                static_cast<int16_t>(decoded.address & 0xFFFF)
+                static_cast<int32_t>(decoded.address)
             );
 
         case static_cast<uint8_t>(Opcode::LoadIndU64):
@@ -1485,7 +1485,7 @@ bool emit_instruction_decoded(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
                 decoded.src1_reg,  // ptr_reg (rb)
-                static_cast<int16_t>(decoded.address & 0xFFFF)
+                static_cast<int32_t>(decoded.address)
             );
 
         case 100: // MoveReg

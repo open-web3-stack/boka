@@ -525,7 +525,7 @@ bool jit_emit_load_u8(
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
     uint8_t ptr_reg,
-    int16_t offset)
+    int32_t offset)
 {
     using namespace asmjit;
 
@@ -574,7 +574,7 @@ bool jit_emit_load_i8(
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
     uint8_t ptr_reg,
-    int16_t offset)
+    int32_t offset)
 {
     using namespace asmjit;
 
@@ -623,7 +623,7 @@ bool jit_emit_load_u16(
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
     uint8_t ptr_reg,
-    int16_t offset)
+    int32_t offset)
 {
     using namespace asmjit;
 
@@ -672,7 +672,7 @@ bool jit_emit_load_i16(
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
     uint8_t ptr_reg,
-    int16_t offset)
+    int32_t offset)
 {
     using namespace asmjit;
 
@@ -721,7 +721,7 @@ bool jit_emit_load_u64(
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
     uint8_t ptr_reg,
-    int16_t offset)
+    int32_t offset)
 {
     using namespace asmjit;
 
@@ -4002,7 +4002,7 @@ bool jit_emit_lea(
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
     uint8_t ptr_reg,
-    int16_t offset)
+    int32_t offset)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
         return false;
@@ -4260,7 +4260,7 @@ bool jit_emit_load_u32(
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
     uint8_t ptr_reg,
-    int16_t offset)
+    int32_t offset)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
         return false;
@@ -4286,7 +4286,7 @@ bool jit_emit_load_i32(
     const char* _Nonnull target_arch,
     uint8_t dest_reg,
     uint8_t ptr_reg,
-    int16_t offset)
+    int32_t offset)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
         return false;
@@ -4370,7 +4370,7 @@ bool jit_emit_store_32(
     const char* _Nonnull target_arch,
     uint8_t ptr_reg,
     uint8_t src_reg,
-    int16_t offset)
+    int32_t offset)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
         return false;
@@ -4396,7 +4396,7 @@ bool jit_emit_store_64(
     const char* _Nonnull target_arch,
     uint8_t ptr_reg,
     uint8_t src_reg,
-    int16_t offset)
+    int32_t offset)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
         return false;
@@ -4422,7 +4422,7 @@ bool jit_emit_store_16(
     const char* _Nonnull target_arch,
     uint8_t ptr_reg,
     uint8_t src_reg,
-    int16_t offset)
+    int32_t offset)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
         return false;
@@ -4448,7 +4448,7 @@ bool jit_emit_store_8(
     const char* _Nonnull target_arch,
     uint8_t ptr_reg,
     uint8_t src_reg,
-    int16_t offset)
+    int32_t offset)
 {
     if (strcmp(target_arch, "x86_64") != 0) {
         return false;
