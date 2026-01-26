@@ -41,6 +41,27 @@ struct JITTestResult {
 
 /// Helper to build PolkaVM program blobs from raw instructions
 enum ProgramBlobBuilder {
+    /// Encode a value as varint
+    /// - Parameter value: Value to encode
+    /// - Returns: Varint-encoded data
+    private static func encodeVarint(_ value: UInt64) -> Data {
+        var data = Data()
+        var v = value
+        if v == 0 {
+            data.append(0)
+        } else {
+            while v > 0 {
+                var byte = UInt8(v & 0x7F)
+                v >>= 7
+                if v > 0 {
+                    byte |= 0x80
+                }
+                data.append(byte)
+            }
+        }
+        return data
+    }
+
     /// Create a StandardProgram blob with ProgramCode
     /// - Parameters:
     ///   - programCode: ProgramCode blob (jump table + code + bitmask)
@@ -131,16 +152,14 @@ enum ProgramBlobBuilder {
     static func createProgramCode(_ instructionBytes: [UInt8]) -> Data {
         var blob = Data()
 
-        // Jump table entry count (0 entries for single instruction)
-        let count = Data(UInt64(0).encode(method: .variableWidth))
-        blob.append(contentsOf: count)
+        // Jump table entry count (varint: 0)
+        blob.append(contentsOf: encodeVarint(0))
 
-        // Encode size (0)
+        // Encode size (1 byte: 0)
         blob.append(0)
 
-        // Code length
-        let codeLength = Data(UInt64(instructionBytes.count).encode(method: .variableWidth))
-        blob.append(contentsOf: codeLength)
+        // Code length (varint for instruction count)
+        blob.append(contentsOf: encodeVarint(UInt64(instructionBytes.count)))
 
         // No jump table entries
 
@@ -186,8 +205,7 @@ enum ProgramBlobBuilder {
         var blob = Data()
 
         // Jump table entry count
-        let count = Data(UInt64(jumpTable.count).encode(method: .variableWidth))
-        blob.append(contentsOf: count)
+        blob.append(contentsOf: encodeVarint(UInt64(jumpTable.count)))
 
         // Encode size (0)
         blob.append(0)
@@ -199,16 +217,13 @@ enum ProgramBlobBuilder {
         }
 
         // Code length
-        let codeLength = Data(UInt64(code.count).encode(method: .variableWidth))
-        blob.append(contentsOf: codeLength)
+        blob.append(contentsOf: encodeVarint(UInt64(code.count)))
 
         // Jump table entries (sorted by index)
         let sortedEntries = jumpTable.sorted { $0.key < $1.key }
         for (index, offset) in sortedEntries {
-            let indexData = Data(index.encode(method: .variableWidth))
-            let offsetData = Data(UInt64(offset).encode(method: .variableWidth))
-            blob.append(contentsOf: indexData)
-            blob.append(contentsOf: offsetData)
+            blob.append(contentsOf: encodeVarint(index))
+            blob.append(contentsOf: encodeVarint(UInt64(offset)))
         }
 
         // Code section
