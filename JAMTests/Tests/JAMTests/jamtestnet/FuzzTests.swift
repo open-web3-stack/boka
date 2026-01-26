@@ -33,7 +33,7 @@ struct FuzzTests {
             }
     }
 
-    @Test(arguments: try loadTests(
+    @Testtry (arguments: loadTests(
         version: "0.7.2",
         filters: [
         ],
@@ -44,7 +44,7 @@ struct FuzzTests {
         try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: [])
     }
 
-    @Test(arguments: try loadTests(
+    @Testtry (arguments: loadTests(
         version: "0.7.2",
         filters: [
         ],
@@ -53,5 +53,27 @@ struct FuzzTests {
     ))
     func v072_sandbox(input: Testcase) async throws {
         try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: .sandboxed)
+    }
+
+    @Testtry (arguments: loadTests(
+        version: "0.7.2",
+        filters: [
+        ],
+        ignore: [
+        ]
+    ))
+    func v072_jit(input: Testcase) async throws {
+        try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: .jit)
+    }
+
+    @Testtry (arguments: loadTests(
+        version: "0.7.2",
+        filters: [
+        ],
+        ignore: [
+        ]
+    ))
+    func v072_jit_sandbox(input: Testcase) async throws {
+        try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: [.jit, .sandboxed])
     }
 }
