@@ -11,6 +11,64 @@ public final class StandardMemory: Memory {
         heapZone.endAddress
     }
 
+    // MARK: - JIT Memory Layout Support
+
+    /// Public zone information for JIT memory rebasing
+    public struct MemoryZone {
+        public let startAddress: UInt32
+        public let endAddress: UInt32
+        public let data: Data
+
+        public func contains(_ address: UInt32) -> Bool {
+            address >= startAddress && address < endAddress
+        }
+
+        public func offset(for address: UInt32) -> Int {
+            Int(address - startAddress)
+        }
+    }
+
+    /// Read-only zone for JIT
+    public var readOnlyZoneInfo: MemoryZone {
+        MemoryZone(
+            startAddress: readOnlyZone.startAddress,
+            endAddress: readOnlyZone.endAddress,
+            data: readOnlyZone.data
+        )
+    }
+
+    /// Heap zone for JIT
+    public var heapZoneInfo: MemoryZone {
+        MemoryZone(
+            startAddress: heapZone.startAddress,
+            endAddress: heapZone.endAddress,
+            data: heapZone.data
+        )
+    }
+
+    /// Stack zone for JIT
+    public var stackZoneInfo: MemoryZone {
+        MemoryZone(
+            startAddress: stackZone.startAddress,
+            endAddress: stackZone.endAddress,
+            data: stackZone.data
+        )
+    }
+
+    /// Argument zone for JIT
+    public var argumentZoneInfo: MemoryZone {
+        MemoryZone(
+            startAddress: argumentZone.startAddress,
+            endAddress: argumentZone.endAddress,
+            data: argumentZone.data
+        )
+    }
+
+    /// Get all zones in order for JIT memory layout
+    public var allZones: [MemoryZone] {
+        [readOnlyZoneInfo, heapZoneInfo, stackZoneInfo, argumentZoneInfo]
+    }
+
     private class Zone {
         let startAddress: UInt32
         var endAddress: UInt32
