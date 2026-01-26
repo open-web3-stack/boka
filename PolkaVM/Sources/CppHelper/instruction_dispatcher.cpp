@@ -818,6 +818,16 @@ bool decode_ecalli(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& dec
     return true;
 }
 
+// Decode 2-register instructions (MoveReg, etc.)
+// Format: [opcode][dest][src]
+bool decode_2_reg(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    decoded.dest_reg = bytecode[pc + 1];  // destination register
+    decoded.src1_reg = bytecode[pc + 2];  // source register
+    decoded.size = 3; // 1 + 1 + 1 = 3 bytes
+    return true;
+}
+
 // Decode 3-register instructions (MulUpper, SetLt, Cmov, Rot)
 // Format: [opcode][ra][rb][rd]
 bool decode_3_reg(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
@@ -2156,6 +2166,10 @@ bool emit_basic_block_instructions(
                 decoded_ok = decode_jump_ind(bytecode, current_pc, decoded);
                 break;
 
+            case 2: // JumpInd (old opcode number for backwards compatibility)
+                decoded_ok = decode_jump_ind(bytecode, current_pc, decoded);
+                break;
+
             case static_cast<uint8_t>(Opcode::LoadImmJumpInd):
                 decoded_ok = decode_load_imm_jump_ind(bytecode, current_pc, decoded);
                 break;
@@ -2166,6 +2180,10 @@ bool emit_basic_block_instructions(
 
             case static_cast<uint8_t>(Opcode::LoadImmJump):
                 decoded_ok = decode_load_imm_jump(bytecode, current_pc, decoded);
+                break;
+
+            case 100: // MoveReg - 2 register format (dest, src)
+                decoded_ok = decode_2_reg(bytecode, current_pc, decoded);
                 break;
 
             // Branch Immediate instructions (opcodes 81-90)

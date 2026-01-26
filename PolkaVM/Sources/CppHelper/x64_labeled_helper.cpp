@@ -61,6 +61,14 @@ extern "C" bool jit_emitter_emit_basic_block_instructions(
 
 // Helper to get instruction size
 static uint32_t getInstructionSize(const uint8_t* bytecode, uint32_t pc, size_t bytecode_size) {
+    uint8_t opcode = bytecode[pc];
+
+    // Handle old opcode numbers for backwards compatibility
+    // Old JumpInd = opcode 2 (2 bytes: [opcode][reg_index])
+    if (opcode == 2) {
+        return 2;
+    }
+
     return get_instruction_size(bytecode, pc, bytecode_size);
 }
 
@@ -180,7 +188,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         uint32_t instrSize = getInstructionSize(codeBuffer, pc, codeSize);
 
         if (instrSize == 0) {
-            // Unknown opcode - compilation error
+            // Unknown opcode - log and fail compilation
+            fprintf(stderr, "[JIT] Unknown opcode %d (0x%02X) at PC %u\n", opcode, opcode, pc);
             return 3; // Compilation error
         }
 
@@ -222,7 +231,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         uint32_t instrSize = getInstructionSize(codeBuffer, pc, codeSize);
 
         if (instrSize == 0) {
-            // Unknown opcode - compilation error
+            // Unknown opcode - log and fail compilation
+            fprintf(stderr, "[JIT] Unknown opcode %d (0x%02X) at PC %u\n", opcode, opcode, pc);
             return 3; // Compilation error
         }
 
@@ -647,8 +657,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Load base address from register
             a.mov(x86::rax, x86::qword_ptr(x86::rbx, base_reg * 8));
 
-            // Add offset (zero-extend to 64-bit by loading into register first)
-            a.mov(x86::r8, offset);
+            // Add offset (zero-extend to 64-bit by loading into 32-bit register first)
+            a.mov(x86::r8d, offset);  // Use r8d (32-bit) to ensure zero-extension
             a.add(x86::rax, x86::r8);
 
             // Bounds check: address < 65536 → panic
@@ -698,8 +708,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Load base address from register
             a.mov(x86::rax, x86::qword_ptr(x86::rbx, base_reg * 8));
 
-            // Add offset (zero-extend to 64-bit by loading into register first)
-            a.mov(x86::r8, offset);
+            // Add offset (zero-extend to 64-bit by loading into 32-bit register first)
+            a.mov(x86::r8d, offset);  // Use r8d (32-bit) to ensure zero-extension
             a.add(x86::rax, x86::r8);
 
             // Bounds check: address < 65536 → panic

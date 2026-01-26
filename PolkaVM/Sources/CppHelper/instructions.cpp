@@ -559,6 +559,9 @@ bool jit_emit_load_u8(
         // Load unsigned byte from memory with zero-extension
         a->ldrb(dest.w(), a64::ptr(ptr, offset));
 
+        // Zero-extend to 64-bit (mov to x register automatically zero-extends)
+        a->mov(dest.x(), dest.x());
+
         // Store to VM register array
         a->str(dest.x(), a64::ptr(regPtr, dest_reg * 8));
 
@@ -656,6 +659,9 @@ bool jit_emit_load_u16(
 
         // Load unsigned halfword from memory with zero-extension
         a->ldrh(dest.w(), a64::ptr(ptr, offset));
+
+        // Zero-extend to 64-bit before storing
+        a->mov(dest.x(), dest.x());  // Zero-extend (was uxtw)
 
         // Store to VM register array
         a->str(dest.x(), a64::ptr(regPtr, dest_reg * 8));
@@ -800,6 +806,9 @@ bool jit_emit_load_u8_direct(
         // Load unsigned byte from memory at [memBase + addr]
         a->ldrb(dest.w(), a64::ptr(memBase, addr));
 
+        // Zero-extend to 64-bit before storing
+        a->mov(dest.x(), dest.x());  // Zero-extend (was uxtw)
+
         // Store to VM register array
         a->str(dest.x(), a64::ptr(regPtr, dest_reg * 8));
 
@@ -890,6 +899,9 @@ bool jit_emit_load_u16_direct(
         // Load unsigned halfword from memory at [memBase + addr]
         a->ldrh(dest.w(), a64::ptr(memBase, addr));
 
+        // Zero-extend to 64-bit before storing
+        a->mov(dest.x(), dest.x());  // Zero-extend (was uxtw)
+
         // Store to VM register array
         a->str(dest.x(), a64::ptr(regPtr, dest_reg * 8));
 
@@ -979,6 +991,9 @@ bool jit_emit_load_u32_direct(
 
         // Load word from memory at [memBase + addr]
         a->ldr(dest.w(), a64::ptr(memBase, addr));
+
+        // Zero-extend to 64-bit before storing
+        a->mov(dest.x(), dest.x());  // Zero-extend (was uxtw)
 
         // Store to VM register array
         a->str(dest.x(), a64::ptr(regPtr, dest_reg * 8));
