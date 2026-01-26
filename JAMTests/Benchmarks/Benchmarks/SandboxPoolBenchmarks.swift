@@ -206,9 +206,10 @@ func sandboxPoolBenchmarks() {
 
         // Execute 50 concurrent requests
         await withTaskGroup(of: Void.self) { group in
+            let exec = executor
             for _ in 0 ..< 50 {
                 group.addTask {
-                    let result = await executor.execute(
+                    let result = await exec.execute(
                         blob: fibonacciProgram,
                         pc: 0,
                         gas: Gas(1_000_000),
