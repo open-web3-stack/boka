@@ -74,13 +74,13 @@ enum MultiModePVMTest {
                 finalPC = state.pc
             } catch {
                 // If re-execution fails, use empty values
-                finalRegisters = Registers([])
+                finalRegisters = Registers()
                 finalPC = 0
             }
         } else {
             // Sandbox mode doesn't expose internal state the same way
             // Use empty values
-            finalRegisters = Registers([])
+            finalRegisters = Registers()
             finalPC = 0
         }
 

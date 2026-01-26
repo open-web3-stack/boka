@@ -41,10 +41,94 @@ struct JITTestResult {
 
 /// Helper to build PolkaVM program blobs from raw instructions
 enum ProgramBlobBuilder {
-    /// Create a minimal program blob with single instruction
+    /// Create a StandardProgram blob with ProgramCode
+    /// - Parameters:
+    ///   - programCode: ProgramCode blob (jump table + code + bitmask)
+    ///   - readOnlyData: Read-only data section (default: empty)
+    ///   - readWriteData: Read-write data section (default: empty)
+    ///   - heapPages: Number of heap pages (default: 0)
+    ///   - stackSize: Stack size in bytes (default: 0 = use default)
+    /// - Returns: Complete StandardProgram blob ready for execution
+    static func createStandardProgram(
+        programCode: Data,
+        readOnlyData: Data = Data(),
+        readWriteData: Data = Data(),
+        heapPages: UInt16 = 0,
+        stackSize: UInt32 = 0
+    ) -> Data {
+        var blob = Data()
+
+        // StandardProgram format:
+        // 1. readOnlyLen (3 bytes, little endian)
+        // 2. readWriteLen (3 bytes, little endian)
+        // 3. heapPages (2 bytes, little endian)
+        // 4. stackSize (3 bytes, little endian)
+        // 5. readOnlyData
+        // 6. readWriteData
+        // 7. codeLength (4 bytes, little endian)
+        // 8. programCode
+
+        // Write UInt32 as 3 bytes in little-endian order
+        func writeUInt24(_ value: UInt32) {
+            var v = value.littleEndian
+            withUnsafeBytes(of: &v) {
+                blob.append($0[0])
+                blob.append($0[1])
+                blob.append($0[2])
+            }
+        }
+
+        // Write UInt16 as 2 bytes in little-endian order
+        func writeUInt16(_ value: UInt16) {
+            var v = value.littleEndian
+            withUnsafeBytes(of: &v) {
+                blob.append($0[0])
+                blob.append($0[1])
+            }
+        }
+
+        // Write UInt32 as 4 bytes in little-endian order
+        func writeUInt32(_ value: UInt32) {
+            var v = value.littleEndian
+            withUnsafeBytes(of: &v) {
+                blob.append($0[0])
+                blob.append($0[1])
+                blob.append($0[2])
+                blob.append($0[3])
+            }
+        }
+
+        // readOnlyLen (3 bytes)
+        writeUInt24(UInt32(readOnlyData.count))
+
+        // readWriteLen (3 bytes)
+        writeUInt24(UInt32(readWriteData.count))
+
+        // heapPages (2 bytes)
+        writeUInt16(heapPages)
+
+        // stackSize (3 bytes)
+        writeUInt24(stackSize)
+
+        // readOnlyData
+        blob.append(contentsOf: readOnlyData)
+
+        // readWriteData
+        blob.append(contentsOf: readWriteData)
+
+        // codeLength (4 bytes)
+        writeUInt32(UInt32(programCode.count))
+
+        // programCode
+        blob.append(contentsOf: programCode)
+
+        return blob
+    }
+
+    /// Create a ProgramCode blob from instructions
     /// - Parameter instructionBytes: Raw instruction bytes
-    /// - Returns: Complete program blob ready for execution
-    static func createSingleInstructionProgram(_ instructionBytes: [UInt8]) -> Data {
+    /// - Returns: ProgramCode blob (jump table + code + bitmask)
+    static func createProgramCode(_ instructionBytes: [UInt8]) -> Data {
         var blob = Data()
 
         // Jump table entry count (0 entries for single instruction)
@@ -70,6 +154,14 @@ enum ProgramBlobBuilder {
         return blob
     }
 
+    /// Create a minimal program blob with single instruction
+    /// - Parameter instructionBytes: Raw instruction bytes
+    /// - Returns: Complete program blob ready for execution
+    static func createSingleInstructionProgram(_ instructionBytes: [UInt8]) -> Data {
+        let programCode = createProgramCode(instructionBytes)
+        return createStandardProgram(programCode: programCode)
+    }
+
     /// Create a program blob with multiple instructions
     /// - Parameter instructionBytes: Array of instruction bytes
     /// - Returns: Complete program blob ready for execution
@@ -78,7 +170,8 @@ enum ProgramBlobBuilder {
         for instructions in instructionBytes {
             code.append(contentsOf: instructions)
         }
-        return createSingleInstructionProgram(Array(code))
+        let programCode = createProgramCode(Array(code))
+        return createStandardProgram(programCode: programCode)
     }
 
     /// Create a program blob with a jump table
@@ -125,7 +218,9 @@ enum ProgramBlobBuilder {
         let bitmaskSize = (code.count + 7) / 8
         blob.append(contentsOf: Data(repeating: 0, count: bitmaskSize))
 
-        return blob
+        // Wrap in StandardProgram format
+        let programCode = blob
+        return createStandardProgram(programCode: programCode)
     }
 }
 
@@ -181,7 +276,7 @@ enum JITInstructionExecutor {
             finalPC = state.pc
         } catch {
             logger.error("Failed to re-execute in interpreter: \(error)")
-            finalRegisters = Registers([])
+            finalRegisters = Registers()
             finalPC = 0
         }
 
@@ -302,7 +397,7 @@ enum JITParityComparator {
             interpreterRegisters = state.getRegisters()
             interpreterPC = state.pc
         } catch {
-            interpreterRegisters = Registers([])
+            interpreterRegisters = Registers()
             interpreterPC = 0
         }
 
@@ -321,7 +416,7 @@ enum JITParityComparator {
             jitRegisters = state.getRegisters()
             jitPC = state.pc
         } catch {
-            jitRegisters = Registers([])
+            jitRegisters = Registers()
             jitPC = 0
         }
 
