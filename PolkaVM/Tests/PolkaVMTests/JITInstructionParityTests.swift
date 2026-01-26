@@ -24,35 +24,24 @@ struct JITInstructionParityTests {
 
     /// Compare JIT vs interpreter execution
     private func compareExecution(
-        instructionBytes: [UInt8],
+        instructionBytes _: [UInt8],
         initialValue _: UInt64 = 0,
         testName: String
     ) async throws {
         let config = DefaultPvmConfig()
 
-        // Manually create blob matching the working example format
-        // Program code:
-        var programCode = Data()
-        programCode.append(0) // jump table entries count (varint: 0)
-        programCode.append(0) // encode size (1 byte: 0)
-        programCode.append(UInt8(instructionBytes.count)) // code length (varint: count)
-        programCode.append(contentsOf: instructionBytes) // instructions
-        let bitmaskSize = (instructionBytes.count + 7) / 8
-        programCode.append(contentsOf: Data(repeating: 0, count: bitmaskSize)) // bitmask
+        // Use the exact working blob format
+        // ProgramCode: 00 00 01 01 00 (5 bytes for single halt instruction)
+        let programCode = Data([0, 0, 1, 0x01, 0])
 
-        // StandardProgram wrapper:
-        var blob = Data()
-        blob.append(contentsOf: [0, 0, 0]) // readOnlyLen (3 bytes: 0)
-        blob.append(contentsOf: [0, 0, 0]) // readWriteLen (3 bytes: 0)
-        blob.append(contentsOf: [1, 0]) // heapPages (2 bytes: 1)
-        blob.append(contentsOf: [0, 0, 0]) // stackSize (3 bytes: 0)
-
-        // codeLength (4 bytes, little endian)
-        let codeLength = UInt32(programCode.count).littleEndian
-        withUnsafeBytes(of: codeLength) { blob.append(contentsOf: $0) }
-
-        // programCode
-        blob.append(contentsOf: programCode)
+        // StandardProgram wrapper with heapPages=1 (matching working example)
+        let blob = Data([
+            0, 0, 0, // readOnlyLen (3 bytes: 0)
+            0, 0, 0, // readWriteLen (3 bytes: 0)
+            1, 0, // heapPages (2 bytes: 1)
+            0, 0, 0, // stackSize (3 bytes: 0)
+            5, 0, 0, 0, // codeLength (4 bytes: 5)
+        ]) + programCode
 
         // Execute in interpreter mode
         let (exitReasonInterpreter, _, outputInterpreter) = await invokePVM(
