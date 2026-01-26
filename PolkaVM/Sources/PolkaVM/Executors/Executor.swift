@@ -1,7 +1,7 @@
 import Foundation
 import Utils
 
-class Executor {
+public final class Executor: @unchecked Sendable {
     let mode: ExecutionMode
     let config: PvmConfig
 
