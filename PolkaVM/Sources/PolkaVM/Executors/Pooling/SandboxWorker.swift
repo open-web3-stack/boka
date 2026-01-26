@@ -34,11 +34,14 @@ actor SandboxWorker {
     }
 
     init(workerID: UInt32, config: SandboxPoolConfiguration) async throws {
+        logger.debug("[INIT] Worker \(workerID): Initializing with config")
         self.workerID = workerID
         self.config = config
         ipcClient = IPCClient(timeout: config.executionTimeout)
 
+        logger.debug("[INIT] Worker \(workerID): Spawning worker process")
         try await spawnWorker()
+        logger.info("[INIT] Worker \(workerID): Initialization complete")
     }
 
     // MARK: - Public API
@@ -51,20 +54,30 @@ actor SandboxWorker {
         argumentData: Data?,
         executionMode: ExecutionMode
     ) async throws -> VMExecutionResult {
+        logger.debug("[EXEC] Worker \(workerID): execute() called - isAlive=\(isAlive), isBusy=\(isBusy)")
+
         guard isAlive else {
+            logger.error("[EXEC] Worker \(workerID): Not alive, cannot execute")
             throw SandboxPoolError.workerNotAvailable
         }
 
         guard !isBusy else {
+            logger.warning("[EXEC] Worker \(workerID): Already busy, rejecting request")
             throw SandboxPoolError.workerBusy
         }
 
         isBusy = true
-        defer { isBusy = false }
+        logger.debug("[EXEC] Worker \(workerID): Marked as busy")
+        defer {
+            isBusy = false
+            logger.debug("[EXEC] Worker \(workerID): Marked as not busy")
+        }
 
         let startTime = Date()
 
         do {
+            logger.debug("[EXEC] Worker \(workerID): Sending IPC request - blob size=\(blob.count), gas=\(gas.value)")
+
             // Send execution request
             let result = try await ipcClient.sendExecuteRequest(
                 blob: blob,
@@ -75,6 +88,10 @@ actor SandboxWorker {
             )
 
             let executionTime = Date().timeIntervalSince(startTime)
+            logger
+                .debug(
+                    "[EXEC] Worker \(workerID): Got result in \(String(format: "%.2f", executionTime * 1000))ms - exitReason=\(result.exitReason)"
+                )
 
             // Update statistics
             executionCountSinceRecycle += 1
@@ -94,8 +111,17 @@ actor SandboxWorker {
             if config.enableWorkerRecycling,
                executionCountSinceRecycle >= config.workerRecycleThreshold
             {
+                logger
+                    .debug(
+                        "[EXEC] Worker \(workerID): Execution count \(executionCountSinceRecycle) >= threshold \(config.workerRecycleThreshold), recycling"
+                    )
                 await recycle()
             }
+
+            logger
+                .info(
+                    "[EXEC] Worker \(workerID): Execution successful (total: \(stats.totalExecutions), failures: \(stats.failedExecutions))"
+                )
 
             return VMExecutionResult(
                 exitReason: result.exitReason,
@@ -106,6 +132,8 @@ actor SandboxWorker {
         } catch {
             let executionTime = Date().timeIntervalSince(startTime)
             consecutiveFailures += 1
+
+            logger.error("[EXEC] Worker \(workerID): Execution failed after \(String(format: "%.2f", executionTime * 1000))ms - \(error)")
 
             // Track failure timestamp
             failureTimestamps.append(Date().timeIntervalSince1970)
@@ -124,6 +152,7 @@ actor SandboxWorker {
 
             // Check if worker should be marked unhealthy
             if consecutiveFailures >= config.maxConsecutiveFailures {
+                logger.error("[EXEC] Worker \(workerID): Marked as unhealthy after \(consecutiveFailures) consecutive failures")
                 stats = SandboxWorkerStatistics(
                     totalExecutions: stats.totalExecutions,
                     successfulExecutions: stats.successfulExecutions,
@@ -135,7 +164,6 @@ actor SandboxWorker {
                 )
             }
 
-            logger.error("Worker \(workerID) execution failed: \(error)")
             throw error
         }
     }
@@ -199,37 +227,49 @@ actor SandboxWorker {
 
     /// Spawn a new worker process
     private func spawnWorker() async throws {
+        logger.debug("[SPAWN] Worker \(workerID): Starting spawn process")
+
         let processManager = ChildProcessManager()
 
+        logger.debug("[SPAWN] Worker \(workerID): Calling spawnChildProcess")
         let (handle, clientFD) = try await processManager.spawnChildProcess(
             executablePath: "boka-sandbox"
         )
+
+        logger.debug("[SPAWN] Worker \(workerID): Got handle PID=\(handle.pid), clientFD=\(clientFD)")
 
         processHandle = handle
         ipcClient.setFileDescriptor(clientFD)
         isAlive = true
         startTime = Date()
 
-        logger.debug("Worker \(workerID) spawned with PID \(handle.pid)")
+        logger.info("[SPAWN] Worker \(workerID): Spawned successfully with PID \(handle.pid), isAlive=\(isAlive)")
     }
 
     /// Terminate the worker process
     private func terminate() async {
         guard let handle = processHandle else {
+            logger.debug("[TERM] Worker \(workerID): No process handle to terminate")
             return
         }
 
-        logger.debug("Terminating worker \(workerID)")
+        logger.debug("[TERM] Worker \(workerID): Terminating PID \(handle.pid)")
 
         ipcClient.close()
+        logger.debug("[TERM] Worker \(workerID): IPC client closed")
 
         let processManager = ChildProcessManager()
         await processManager.kill(handle: handle)
+        logger.debug("[TERM] Worker \(workerID): Process killed")
+
         await processManager.reap(handle: handle)
+        logger.debug("[TERM] Worker \(workerID): Process reaped")
 
         processHandle = nil
         isAlive = false
         isBusy = false
+
+        logger.info("[TERM] Worker \(workerID): Termination complete, isAlive=\(isAlive)")
     }
 
     /// Cleanup old failure timestamps outside tracking window
