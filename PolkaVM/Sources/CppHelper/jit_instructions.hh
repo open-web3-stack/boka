@@ -243,7 +243,7 @@ bool jit_emit_test_imm(void* _Nonnull assembler, const char* _Nonnull target_arc
 
 // System instructions
 bool jit_emit_syscall(void* _Nonnull assembler, const char* _Nonnull target_arch);
-bool jit_emit_sbrk(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t ptr_reg, int32_t offset);
+bool jit_emit_sbrk(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t src_reg);
 bool jit_emit_fence(void* _Nonnull assembler, const char* _Nonnull target_arch);
 
 // 64-bit shift operations (alternate names)

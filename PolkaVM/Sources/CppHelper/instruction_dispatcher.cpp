@@ -1496,12 +1496,13 @@ bool emit_instruction_decoded(
             );
 
         case 101: // Sbrk
-            // Sbrk format: [opcode][reg_index][offset_32bit]
-            // PVM uses direct addressing (no ptr_reg), base register is implicit
+            // Sbrk format: sbrk dest, src
+            // dest = register to store result (previous heap end)
+            // src = register containing allocation size
             return jit_instruction::jit_emit_sbrk(
                 assembler, target_arch,
-                decoded.dest_reg,  // ptr_reg (0 = no base register, use direct addressing)
-                static_cast<int16_t>(decoded.address & 0xFFFF)  // offset
+                decoded.dest_reg,  // destination register (store result)
+                decoded.src1_reg   // source register (allocation size)
             );
 
         case 102: // CountSetBits64

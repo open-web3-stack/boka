@@ -2927,18 +2927,58 @@ bool jit_emit_ecalli(
 bool jit_emit_sbrk(
     void* _Nonnull assembler,
     const char* _Nonnull target_arch,
-    uint8_t ptr_reg,
-    int32_t offset)
+    uint8_t dest_reg,
+    uint8_t src_reg)
 {
+    using namespace asmjit;
+
     if (strcmp(target_arch, "x86_64") != 0) {
         return false;
     }
 
     auto* a = static_cast<x86::Assembler*>(assembler);
 
-    // TODO: Implement memory allocation
-    // For now, just return error
-    a->mov(x86::rax, 0xFFFFFFFF);  // Error: not implemented
+    // JIT calling convention (x86-64 System V AMD64 ABI):
+    // RDI = registers pointer
+    // RSI = memory base pointer
+    // RDX = memory size
+    // RCX = gas pointer
+    // R8  = initial PC
+    // R9  = invocationContext (JITHostFunctionTable*)
+
+    // Load allocation size from src register
+    a->mov(x86::r10, x86::qword_ptr(x86::rdi, src_reg * 8));  // r10 = size
+
+    // Get host function table from R9
+    // JITHostFunctionTable* is in R9 (6th parameter)
+
+    // Check if size is 0
+    a->test(x86::r10, x86::r10);
+    Label not_zero = a->new_label();
+    a->jnz(not_zero);
+
+    // Size == 0: just return current heapEnd
+    a->mov(x86::rax, x86::qword_ptr(x86::r9, offsetof(JITHostFunctionTable, heapEnd)));
+    a->mov(x86::qword_ptr(x86::rdi, dest_reg * 8), x86::rax);  // Store in dest register
+    a->ret();
+
+    a->bind(not_zero);
+
+    // Size != 0: allocate memory
+    // Load current heapEnd
+    a->mov(x86::rax, x86::qword_ptr(x86::r9, offsetof(JITHostFunctionTable, heapEnd)));
+
+    // Save prevHeapEnd (return value)
+    a->mov(x86::r11, x86::rax);
+
+    // Calculate new heapEnd = heapEnd + size
+    a->add(x86::rax, x86::r10);
+
+    // Store new heapEnd back to host function table
+    a->mov(x86::qword_ptr(x86::r9, offsetof(JITHostFunctionTable, heapEnd)), x86::rax);
+
+    // Store prevHeapEnd in dest register
+    a->mov(x86::qword_ptr(x86::rdi, dest_reg * 8), x86::r11);
 
     return true;
 }
