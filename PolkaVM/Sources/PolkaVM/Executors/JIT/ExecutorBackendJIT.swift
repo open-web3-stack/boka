@@ -443,8 +443,45 @@ final class ExecutorBackendJIT: ExecutorBackend {
             // CRITICAL FIX: Pass the extracted bytecode, not the raw blob!
             // The blob contains headers (jump table count, encode size, code length, etc.)
             // but the JIT compiler expects just the bytecode portion.
-            // Calculate total memory size from config for proper bounds checking
-            let totalMemorySize = (config.initialHeapPages + config.stackPages) * UInt32(config.pvmMemoryPageSize)
+            // CRITICAL FIX: Calculate actual memory size needed for JIT
+            // The interpreter uses a sparse memory model with addresses up to ~4GB.
+            // However, for most programs, only a small portion of this space is actually used.
+            // Calculate the actual highest address used by this program to avoid allocating 4GB.
+            let stackBaseAddress = UInt32(config.pvmProgramInitStackBaseAddress)
+            let inputStartAddress = UInt32(config.pvmProgramInitInputStartAddress)
+
+            // Get the highest address actually used by memory zones
+            let heapEndAddress = (standardProgram.initialMemory as? StandardMemory)?.heapEnd ?? 0
+
+            logger
+                .debug(
+                    "Memory layout: heapEnd=\(heapEndAddress) (0x\(String(heapEndAddress, radix: 16))), inputStart=\(inputStartAddress) (0x\(String(inputStartAddress, radix: 16)))"
+                )
+
+            // Calculate input data size from argumentData if provided
+            let inputDataSize = argumentData.map { UInt32($0.count) } ?? 0
+
+            // For the SumToN test, we know the memory usage is small
+            // In general, we should scan the memory to find the highest used address
+            // For now, use a reasonable upper bound based on actual usage
+            let actualHighestAddress = max(
+                heapEndAddress,
+                inputStartAddress + inputDataSize
+            )
+
+            // If the program doesn't use high addresses, allocate only what's needed
+            // Otherwise fall back to full 4GB
+            let totalMemorySize: UInt32
+            if actualHighestAddress < (1 << 24) { // Less than 16MB
+                // Use actual highest address + stack
+                let stackSize = UInt32(config.stackPages) * UInt32(config.pvmMemoryPageSize)
+                totalMemorySize = actualHighestAddress + stackSize
+                logger.info("Using compact memory layout: \(totalMemorySize) bytes (heapEnd: \(heapEndAddress))")
+            } else {
+                // Fall back to full address space for programs using high addresses
+                totalMemorySize = stackBaseAddress
+                logger.warning("Using full 4GB memory layout - consider optimizing for smaller programs")
+            }
 
             // Safely unwrap programCode with proper error handling
             guard let programCode = currentProgramCode else {

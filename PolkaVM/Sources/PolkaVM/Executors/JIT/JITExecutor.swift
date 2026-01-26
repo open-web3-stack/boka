@@ -108,18 +108,22 @@ final class JITExecutor {
                 do {
                     let data = try initialMemory.read(address: address, length: currentChunkSize)
                     if !data.isEmpty {
-                        data.withUnsafeBytes { srcPtr in
-                            memcpy(memoryBuffer.advanced(by: Int(address)), srcPtr.baseAddress!, data.count)
+                        data.withUnsafeBytes { rawBuffer in
+                            if let baseAddress = rawBuffer.baseAddress {
+                                memcpy(memoryBuffer.advanced(by: Int(address)), baseAddress, data.count)
+                            }
                         }
                         totalCopied += data.count
+                        logger.debug("  Copied \(data.count) bytes at address \(address)")
                     }
                 } catch {
                     // Address not readable - already zero-initialized
+                    logger.debug("  Address \(address) not readable (gap in memory)")
                 }
 
                 address += UInt32(currentChunkSize)
             }
-            logger.info("✅ Initialized JIT memory from StandardProgram zones: \(totalCopied) bytes copied")
+            logger.info("✅ Initialized JIT memory from StandardProgram zones: \(totalCopied) bytes copied out of \(jitMemorySize) total")
         } else {
             // Initialize memory to zeros (fallback behavior)
             memoryBuffer.initialize(repeating: 0, count: Int(jitMemorySize))
