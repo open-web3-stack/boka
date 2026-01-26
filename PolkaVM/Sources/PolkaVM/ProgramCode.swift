@@ -1,3 +1,4 @@
+import Codec
 import CppHelper
 import Foundation
 import Utils
@@ -40,7 +41,7 @@ public class ProgramCode {
 
     private static let cachedTrapInst = CppHelper.Instructions.Trap()
 
-    public init(_ blob: Data) throws(Error) {
+    public init(_ blob: Data) throws (Error) {
         self.blob = blob
 
         var slice = Slice(base: blob, bounds: blob.startIndex ..< blob.endIndex)
@@ -97,7 +98,7 @@ public class ProgramCode {
         instCache = Array(repeating: nil, count: code.count)
     }
 
-    private func buildMetadata() throws(Error) {
+    private func buildMetadata() throws (Error) {
         var i = UInt32(0)
         basicBlockIndices.insert(0)
         var currentBlockStart = i
@@ -128,13 +129,12 @@ public class ProgramCode {
         Gas(1)
     }
 
-    private func parseInstruction(startIndex: Int, skip: UInt32) throws(Error) -> Instruction {
+    private func parseInstruction(startIndex: Int, skip: UInt32) throws (Error) -> Instruction {
         let endIndex = startIndex + Int(skip) + 1
-        let data: Data
-        if endIndex <= code.endIndex {
-            data = code[startIndex ..< endIndex]
+        let data: Data = if endIndex <= code.endIndex {
+            code[startIndex ..< endIndex]
         } else {
-            data = code[startIndex ..< min(code.endIndex, endIndex)] + Data(repeating: 0, count: endIndex - code.endIndex)
+            code[startIndex ..< min(code.endIndex, endIndex)] + Data(repeating: 0, count: endIndex - code.endIndex)
         }
         guard let inst = InstructionTable.parse(data) else {
             throw Error.invalidInstruction

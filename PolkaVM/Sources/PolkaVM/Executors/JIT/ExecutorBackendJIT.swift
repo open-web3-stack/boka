@@ -644,8 +644,11 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     jitHostFunctionTablePtr.pointee.jumpTableData = rawBufferPointer.baseAddress?.assumingMemoryBound(to: UInt8.self)
                     jitHostFunctionTablePtr.pointee.jumpTableSize = UInt32(programCode.jumpTable.count)
                     jitHostFunctionTablePtr.pointee.jumpTableEntrySize = programCode.jumpTableEntrySize
-                    jitHostFunctionTablePtr.pointee
-                        .jumpTableEntriesCount = UInt32(programCode.jumpTable.count / Int(programCode.jumpTableEntrySize))
+                    // Guard against division by zero when jumpTableEntrySize is 0 (empty jump table)
+                    jitHostFunctionTablePtr.pointee.jumpTableEntriesCount =
+                        programCode.jumpTableEntrySize > 0
+                            ? UInt32(programCode.jumpTable.count / Int(programCode.jumpTableEntrySize))
+                            : 0
                     jitHostFunctionTablePtr.pointee.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
 
                     // CRITICAL FIX: Initialize heapEnd for JIT sbrk instruction
