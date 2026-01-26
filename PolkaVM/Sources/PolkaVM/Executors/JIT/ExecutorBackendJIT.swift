@@ -443,44 +443,29 @@ final class ExecutorBackendJIT: ExecutorBackend {
             // CRITICAL FIX: Pass the extracted bytecode, not the raw blob!
             // The blob contains headers (jump table count, encode size, code length, etc.)
             // but the JIT compiler expects just the bytecode portion.
-            // CRITICAL FIX: Calculate actual memory size needed for JIT
-            // The interpreter uses a sparse memory model with addresses up to ~4GB.
-            // However, for most programs, only a small portion of this space is actually used.
-            // Calculate the actual highest address used by this program to avoid allocating 4GB.
-            let stackBaseAddress = UInt32(config.pvmProgramInitStackBaseAddress)
-            let inputStartAddress = UInt32(config.pvmProgramInitInputStartAddress)
-
-            // Get the highest address actually used by memory zones
-            let heapEndAddress = (standardProgram.initialMemory as? StandardMemory)?.heapEnd ?? 0
-
-            logger
-                .debug(
-                    "Memory layout: heapEnd=\(heapEndAddress) (0x\(String(heapEndAddress, radix: 16))), inputStart=\(inputStartAddress) (0x\(String(inputStartAddress, radix: 16)))"
-                )
-
-            // Calculate input data size from argumentData if provided
-            let inputDataSize = argumentData.map { UInt32($0.count) } ?? 0
-
-            // For the SumToN test, we know the memory usage is small
-            // In general, we should scan the memory to find the highest used address
-            // For now, use a reasonable upper bound based on actual usage
-            let actualHighestAddress = max(
-                heapEndAddress,
-                inputStartAddress + inputDataSize
-            )
-
-            // If the program doesn't use high addresses, allocate only what's needed
-            // Otherwise fall back to full 4GB
+            // MEMORY REBASING: Use JITMemoryLayout to calculate contiguous memory size
+            // This eliminates the 4GB allocation by rebasing zones contiguously.
             let totalMemorySize: UInt32
-            if actualHighestAddress < (1 << 24) { // Less than 16MB
-                // Use actual highest address + stack
-                let stackSize = UInt32(config.stackPages) * UInt32(config.pvmMemoryPageSize)
-                totalMemorySize = actualHighestAddress + stackSize
-                logger.info("Using compact memory layout: \(totalMemorySize) bytes (heapEnd: \(heapEndAddress))")
-            } else {
-                // Fall back to full address space for programs using high addresses
-                totalMemorySize = stackBaseAddress
-                logger.warning("Using full 4GB memory layout - consider optimizing for smaller programs")
+            let memoryLayout: JITMemoryLayout?
+
+            do {
+                // Create rebased memory layout from StandardProgram
+                let layout = try JITMemoryLayout(standardProgram: standardProgram)
+                totalMemorySize = layout.totalSize
+                memoryLayout = layout
+
+                let stackBaseAddress = UInt32(config.pvmProgramInitStackBaseAddress)
+                let savings = stackBaseAddress - totalMemorySize
+                let savingsMB = Double(savings) / (1024.0 * 1024.0)
+
+                logger.info(
+                    "✅ Using rebased memory layout: \(totalMemorySize) bytes (\(String(format: "%.2f", Double(totalMemorySize) / (1024.0 * 1024.0)))) MB - saved \(String(format: "%.2f", savingsMB)) MB vs 4GB"
+                )
+            } catch {
+                // Fallback to original calculation if rebasing fails
+                logger.error("Failed to create JITMemoryLayout, falling back to 4GB: \(error)")
+                totalMemorySize = UInt32(config.pvmProgramInitStackBaseAddress)
+                memoryLayout = nil
             }
 
             // Safely unwrap programCode with proper error handling
@@ -711,7 +696,8 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         gas: &currentGas,
                         initialPC: pc,
                         invocationContext: invocationContextPointer,
-                        initialMemory: initialMemory
+                        initialMemory: initialMemory,
+                        memoryLayout: memoryLayout
                     )
                 }
             } else {
@@ -744,7 +730,8 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     gas: &currentGas,
                     initialPC: pc,
                     invocationContext: invocationContextPointer,
-                    initialMemory: initialMemory
+                    initialMemory: initialMemory,
+                    memoryLayout: memoryLayout
                 )
             }
 
