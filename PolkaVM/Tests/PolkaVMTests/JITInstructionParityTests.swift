@@ -18,29 +18,8 @@ private let logger = Logger(label: "JITInstructionParityTests")
 struct JITInstructionParityTests {
     /// Create a minimal test program with a single instruction
     private func createSingleInstructionProgram(_ instructionBytes: [UInt8]) -> Data {
-        var blob = Data()
-
-        // Jump table entry count (0 entries)
-        let count = Data(UInt64(0).encode(method: .variableWidth))
-        blob.append(contentsOf: count)
-
-        // Encode size (0)
-        blob.append(0)
-
-        // Code length
-        let codeLength = Data(UInt64(instructionBytes.count).encode(method: .variableWidth))
-        blob.append(contentsOf: codeLength)
-
-        // No jump table
-
-        // Code
-        blob.append(contentsOf: instructionBytes)
-
-        // Bitmask (one byte per 8 code bytes, rounded up)
-        let bitmaskSize = (instructionBytes.count + 7) / 8
-        blob.append(contentsOf: Data(repeating: 0, count: bitmaskSize))
-
-        return blob
+        // Use the shared ProgramBlobBuilder which creates proper StandardProgram format
+        ProgramBlobBuilder.createSingleInstructionProgram(instructionBytes)
     }
 
     /// Compare JIT vs interpreter execution
@@ -50,7 +29,30 @@ struct JITInstructionParityTests {
         testName: String
     ) async throws {
         let config = DefaultPvmConfig()
-        let blob = createSingleInstructionProgram(instructionBytes)
+
+        // Manually create blob matching the working example format
+        // Program code:
+        var programCode = Data()
+        programCode.append(0) // jump table entries count (varint: 0)
+        programCode.append(0) // encode size (1 byte: 0)
+        programCode.append(UInt8(instructionBytes.count)) // code length (varint: count)
+        programCode.append(contentsOf: instructionBytes) // instructions
+        let bitmaskSize = (instructionBytes.count + 7) / 8
+        programCode.append(contentsOf: Data(repeating: 0, count: bitmaskSize)) // bitmask
+
+        // StandardProgram wrapper:
+        var blob = Data()
+        blob.append(contentsOf: [0, 0, 0]) // readOnlyLen (3 bytes: 0)
+        blob.append(contentsOf: [0, 0, 0]) // readWriteLen (3 bytes: 0)
+        blob.append(contentsOf: [1, 0]) // heapPages (2 bytes: 1)
+        blob.append(contentsOf: [0, 0, 0]) // stackSize (3 bytes: 0)
+
+        // codeLength (4 bytes, little endian)
+        let codeLength = UInt32(programCode.count).littleEndian
+        withUnsafeBytes(of: codeLength) { blob.append(contentsOf: $0) }
+
+        // programCode
+        blob.append(contentsOf: programCode)
 
         // Execute in interpreter mode
         let (exitReasonInterpreter, _, outputInterpreter) = await invokePVM(
