@@ -5,7 +5,7 @@ class Executor {
     let mode: ExecutionMode
     let config: PvmConfig
 
-    let frontend: ExecutorFrontend
+    var frontend: ExecutorFrontend
 
     public init(mode: ExecutionMode, config: PvmConfig) {
         self.mode = mode
