@@ -68,6 +68,7 @@ final class JITExecutor {
     ///   - gas: Gas counter
     ///   - initialPC: Initial program counter
     ///   - invocationContext: Context for host function calls
+    ///   - initialMemory: Initial memory state from StandardProgram (for proper zone initialization)
     /// - Returns: A tuple of exit reason and memory buffer pointer (caller must deallocate)
     func execute(
         functionPtr: UnsafeMutableRawPointer,
@@ -75,7 +76,8 @@ final class JITExecutor {
         jitMemorySize: UInt32,
         gas: inout Gas,
         initialPC: UInt32,
-        invocationContext: UnsafeMutableRawPointer?
+        invocationContext: UnsafeMutableRawPointer?,
+        initialMemory: (any Memory)? = nil
     ) throws -> (ExitReason, UnsafeMutablePointer<UInt8>) {
         // Create a flat memory buffer for the JIT execution
         logger.debug("Setting up JIT execution environment")
@@ -85,8 +87,44 @@ final class JITExecutor {
         //       and then enabling access only to pages that should be accessible to the guest
         let memoryBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: Int(jitMemorySize))
 
-        // Initialize memory to zeros
-        memoryBuffer.initialize(repeating: 0, count: Int(jitMemorySize))
+        // CRITICAL FIX: Initialize memory from StandardProgram's initial memory
+        // This ensures JIT execution matches interpreter behavior exactly
+        if let initialMemory {
+            // First, zero-initialize the entire buffer
+            memoryBuffer.initialize(repeating: 0, count: Int(jitMemorySize))
+
+            // Copy memory zones from initialMemory to flat JIT buffer
+            // The JIT uses a flat memory model, so we need to copy all zone data
+            // We copy in chunks for efficiency
+            let memorySize = UInt32(jitMemorySize)
+            var address: UInt32 = 0
+            let chunkSize = 4096 // Copy in 4KB chunks
+            var totalCopied = 0
+
+            while address < memorySize {
+                let remainingSize = Int(memorySize - address)
+                let currentChunkSize = min(chunkSize, remainingSize)
+
+                do {
+                    let data = try initialMemory.read(address: address, length: currentChunkSize)
+                    if !data.isEmpty {
+                        data.withUnsafeBytes { srcPtr in
+                            memcpy(memoryBuffer.advanced(by: Int(address)), srcPtr.baseAddress!, data.count)
+                        }
+                        totalCopied += data.count
+                    }
+                } catch {
+                    // Address not readable - already zero-initialized
+                }
+
+                address += UInt32(currentChunkSize)
+            }
+            logger.info("✅ Initialized JIT memory from StandardProgram zones: \(totalCopied) bytes copied")
+        } else {
+            // Initialize memory to zeros (fallback behavior)
+            memoryBuffer.initialize(repeating: 0, count: Int(jitMemorySize))
+            logger.warning("⚠️ Initialized JIT memory to zeros (no initial memory provided) - this may cause test failures!")
+        }
 
         // Execute the JIT-compiled function
         logger.debug("Executing JIT-compiled function with initial PC: \(initialPC), Gas: \(gas.value)")
@@ -128,7 +166,7 @@ final class JITExecutor {
 
         // Translate exit code to ExitReason
         let exitReason: ExitReason
-        
+
         if let jitExit = JITExitCode(rawValue: exitCode) {
             switch jitExit {
             case .halt:
