@@ -69,6 +69,7 @@ final class JITExecutor {
     ///   - initialPC: Initial program counter
     ///   - invocationContext: Context for host function calls
     ///   - initialMemory: Initial memory state from StandardProgram (for proper zone initialization)
+    ///   - memoryLayout: Optional rebased memory layout for efficient memory initialization
     /// - Returns: A tuple of exit reason and memory buffer pointer (caller must deallocate)
     func execute(
         functionPtr: UnsafeMutableRawPointer,
@@ -77,7 +78,8 @@ final class JITExecutor {
         gas: inout Gas,
         initialPC: UInt32,
         invocationContext: UnsafeMutableRawPointer?,
-        initialMemory: (any Memory)? = nil
+        initialMemory: (any Memory)? = nil,
+        memoryLayout: JITMemoryLayout? = nil
     ) throws -> (ExitReason, UnsafeMutablePointer<UInt8>) {
         // Create a flat memory buffer for the JIT execution
         logger.debug("Setting up JIT execution environment")
@@ -87,9 +89,30 @@ final class JITExecutor {
         //       and then enabling access only to pages that should be accessible to the guest
         let memoryBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: Int(jitMemorySize))
 
-        // CRITICAL FIX: Initialize memory from StandardProgram's initial memory
-        // This ensures JIT execution matches interpreter behavior exactly
-        if let initialMemory {
+        // MEMORY REBASING: Use rebased memory layout for efficient initialization
+        if let layout = memoryLayout {
+            // Zero-initialize the entire buffer
+            memoryBuffer.initialize(repeating: 0, count: Int(jitMemorySize))
+
+            // Copy zones using rebased layout (much faster than scanning 4GB)
+            var totalCopied = 0
+            for zone in layout.zones {
+                // Copy zone data to its rebased offset
+                zone.data.withUnsafeBytes { rawBuffer in
+                    if let baseAddress = rawBuffer.baseAddress {
+                        memcpy(memoryBuffer.advanced(by: Int(zone.baseOffset)), baseAddress, zone.data.count)
+                        totalCopied += zone.data.count
+                        logger
+                            .debug(
+                                "  Copied zone: \(zone.data.count) bytes at offset \(zone.baseOffset) (original address: 0x\(String(zone.originalBase, radix: 16)))"
+                            )
+                    }
+                }
+            }
+            logger.info("✅ Initialized JIT memory using rebased layout: \(totalCopied) bytes copied into \(jitMemorySize) byte buffer")
+        } else if let initialMemory {
+            // Fallback: Copy from initialMemory (old method - scans entire address space)
+            logger.warning("⚠️ Using legacy memory initialization (no rebased layout provided)")
             // First, zero-initialize the entire buffer
             memoryBuffer.initialize(repeating: 0, count: Int(jitMemorySize))
 
