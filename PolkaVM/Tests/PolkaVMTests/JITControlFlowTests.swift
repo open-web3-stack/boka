@@ -23,12 +23,8 @@ struct JITControlFlowTests {
 
     @Test("JIT: Halt instruction terminates normally")
     func jitHalt() async throws {
-        // Minimal halt program with proper jump table
-        let haltProgram = Data([
-            1, // 1 jump table entry
-            0, 0, 0, 0, 0, 0, 0, 0, // jump table entry 0: offset 0
-            0x01, // halt instruction (opcode 1)
-        ])
+        // Create a halt program using proper StandardProgram format
+        let haltProgram = ProgramBlobBuilder.createSingleInstructionProgram([0x01]) // halt instruction
 
         let result = await JITInstructionExecutor.execute(blob: haltProgram)
 
@@ -38,11 +34,7 @@ struct JITControlFlowTests {
 
     @Test("JIT vs Interpreter: Halt parity")
     func jitHaltParity() async throws {
-        let haltProgram = Data([
-            1, // 1 jump table entry
-            0, 0, 0, 0, 0, 0, 0, 0, // jump table entry 0: offset 0
-            0x01, // halt instruction (opcode 1)
-        ])
+        let haltProgram = ProgramBlobBuilder.createSingleInstructionProgram([0x01]) // halt instruction
 
         let (interpreterResult, jitResult, differences) = await JITParityComparator.compare(
             blob: haltProgram,
