@@ -37,19 +37,23 @@ public actor SandboxPool {
     private var queueWaitTimes: [TimeInterval] = []
 
     public init(config: SandboxPoolConfiguration, executionMode: ExecutionMode) async throws {
+        logger.debug("[POOL] Initializing pool with config")
         self.config = config
         self.executionMode = executionMode
 
         // Validate configuration
+        logger.debug("[POOL] Validating configuration")
         try validateConfiguration()
 
         // Spawn initial workers
+        logger.debug("[POOL] Spawning \(config.poolSize) initial workers")
         try await spawnInitialWorkers()
 
-        logger.info("Sandbox pool initialized with \(config.poolSize) workers")
+        logger.info("[POOL] Pool initialized with \(workers.count) workers (target: \(config.poolSize))")
 
         // Start health check task if enabled
         if config.healthCheckInterval > 0 {
+            logger.debug("[POOL] Starting health check task (interval: \(config.healthCheckInterval)s)")
             Task {
                 await runHealthChecks()
             }
@@ -66,11 +70,15 @@ public actor SandboxPool {
         argumentData: Data?,
         ctx _: (any InvocationContext)?
     ) async throws -> VMExecutionResult {
+        logger.debug("[POOL] execute() called - activeRequests: \(activeRequests), workers: \(workers.count)")
+
         guard !isShutdown else {
+            logger.error("[POOL] Cannot execute: pool is shutdown")
             throw SandboxPoolError.poolShutdown
         }
 
         guard isHealthy else {
+            logger.error("[POOL] Cannot execute: pool is unhealthy - \(unhealthyReason ?? "Unknown")")
             throw SandboxPoolError.poolUnhealthy(reason: unhealthyReason ?? "Unknown")
         }
 
@@ -78,7 +86,9 @@ public actor SandboxPool {
         let startTime = Date()
 
         // Try to get an available worker
+        logger.debug("[POOL] Getting available worker...")
         guard let worker = try await getAvailableWorker() else {
+            logger.warning("[POOL] No available workers, handling exhaustion")
             // Handle pool exhaustion
             return try await handleExhaustion(
                 blob: blob,
@@ -88,12 +98,17 @@ public actor SandboxPool {
             )
         }
 
+        logger.debug("[POOL] Got worker, tracking queue wait time")
         // Track queue wait time
         let queueWaitTime = Date().timeIntervalSince(startTime)
         trackQueueWaitTime(queueWaitTime)
 
+        activeRequests += 1
+        logger.debug("[POOL] Active requests: \(activeRequests)")
+
         // Execute the request
         do {
+            logger.debug("[POOL] Delegating to worker...")
             let result = try await worker.execute(
                 blob: blob,
                 pc: pc,
@@ -106,8 +121,14 @@ public actor SandboxPool {
             successfulExecutions += 1
             activeRequests -= 1
 
+            logger
+                .debug(
+                    "[POOL] Execution successful - total: \(totalExecutions), succeeded: \(successfulExecutions), failed: \(failedExecutions)"
+                )
+
             // Check if worker needs recycling
             if await worker.shouldRecycle() {
+                logger.debug("[POOL] Worker needs recycling, scheduling...")
                 Task {
                     await recycleWorker(worker)
                 }
@@ -120,8 +141,14 @@ public actor SandboxPool {
             failedExecutions += 1
             activeRequests -= 1
 
+            logger
+                .error(
+                    "[POOL] Execution failed - total: \(totalExecutions), succeeded: \(successfulExecutions), failed: \(failedExecutions) - error: \(error)"
+                )
+
             // Check if error indicates worker failure
             if isWorkerFailure(error) {
+                logger.warning("[POOL] Worker failure detected, scheduling recycling")
                 Task {
                     await recycleWorker(worker)
                 }
@@ -198,9 +225,13 @@ public actor SandboxPool {
 
     /// Spawn initial pool workers
     private func spawnInitialWorkers() async throws {
-        for _ in 0 ..< config.poolSize {
+        logger.debug("[POOL] Spawning \(config.poolSize) initial workers")
+
+        for i in 0 ..< config.poolSize {
             let workerID = nextWorkerID
             nextWorkerID += 1
+
+            logger.debug("[POOL] Spawning worker \(workerID) (\(i + 1)/\(config.poolSize))...")
 
             do {
                 let worker = try await SandboxWorker(
@@ -208,11 +239,14 @@ public actor SandboxPool {
                     config: config
                 )
                 workers[workerID] = worker
+                logger.debug("[POOL] Worker \(workerID) spawned successfully")
             } catch {
-                logger.error("Failed to spawn worker \(workerID): \(error)")
+                logger.error("[POOL] Failed to spawn worker \(workerID): \(error)")
                 throw SandboxPoolError.workerSpawnFailed(underlying: error)
             }
         }
+
+        logger.info("[POOL] All \(workers.count) workers spawned successfully")
     }
 
     /// Get an available worker from the pool
