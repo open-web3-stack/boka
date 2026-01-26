@@ -1,12 +1,42 @@
 import Foundation
 import TracingUtils
 #if canImport(Glibc)
-import Glibc
+    import Glibc
 #elseif canImport(Darwin)
-import Darwin
+    import Darwin
 #endif
 
 private let logger = Logger(label: "ChildProcessManager")
+
+/// Find the boka-sandbox executable
+/// - Returns: Path to the executable
+/// - Note: For development, looks in build directory. For production, should be installed system-wide.
+private func findBokaSandbox() -> String {
+    // Check common build locations
+    let possiblePaths = [
+        // Standard location from project root
+        "/home/ubuntu/boka/PolkaVM/.build/x86_64-unknown-linux-gnu/debug/boka-sandbox",
+        // Release build
+        "/home/ubuntu/boka/PolkaVM/.build/x86_64-unknown-linux-gnu/release/boka-sandbox",
+        // Current directory
+        "./boka-sandbox",
+        // PATH
+        "boka-sandbox",
+    ]
+
+    for path in possiblePaths {
+        if FileManager.default.fileExists(atPath: path) {
+            // Verify it's executable
+            if FileManager.default.isExecutableFile(atPath: path) {
+                logger.debug("Found boka-sandbox at: \(path)")
+                return path
+            }
+        }
+    }
+
+    logger.error("boka-sandbox not found in any known location!")
+    return "boka-sandbox"
+}
 
 /// Process handle for managing child process lifecycle
 struct ProcessHandle {
@@ -26,24 +56,31 @@ actor ChildProcessManager {
     /// Spawn a new child process with socketpair for IPC
     ///
     /// - Parameter executablePath: Name or path of the executable to spawn.
-    ///   This is passed directly to `execvp()`, which searches PATH if not an
-    ///   absolute path. For development/testing, ensure the executable is in
-    ///   PATH or provide an absolute path. For production, consider resolving
-    ///   the path relative to the main executable bundle.
+    ///   If not an absolute path, will search for boka-sandbox in build directory.
     ///
     /// - Returns: Tuple of process handle and client file descriptor for IPC
     /// - Throws: IPCError if spawning fails
     func spawnChildProcess(executablePath: String) async throws -> (handle: ProcessHandle, clientFD: Int32) {
+        // Resolve executable path
+        let resolvedPath: String = if executablePath.hasPrefix("/") {
+            // Absolute path provided
+            executablePath
+        } else {
+            // Find boka-sandbox in build directory or PATH
+            findBokaSandbox()
+        }
+
+        logger.info("Spawning child process: \(resolvedPath)")
         // Create socket pair for IPC
         var sockets: [Int32] = [0, 0]
 
         // Use the raw values directly
         #if os(Linux)
-        let domain: Int32 = 1  // AF_UNIX
-        let socketType: Int32 = 1  // SOCK_STREAM
+            let domain: Int32 = 1 // AF_UNIX
+            let socketType: Int32 = 1 // SOCK_STREAM
         #else
-        let domain: Int32 = AF_UNIX
-        let socketType: Int32 = SOCK_STREAM
+            let domain: Int32 = AF_UNIX
+            let socketType: Int32 = SOCK_STREAM
         #endif
 
         let result = Glibc.socketpair(domain, socketType, 0, &sockets)
@@ -74,7 +111,6 @@ actor ChildProcessManager {
             // Redirect stdin/stdout/stderr to /dev/null
             let devNull = Glibc.open("/dev/null", O_RDWR)
             if devNull >= 0 {
-                Glibc.dup2(devNull, STDIN_FILENO)
                 Glibc.dup2(devNull, STDOUT_FILENO)
                 Glibc.dup2(devNull, STDERR_FILENO)
                 Glibc.close(devNull)
@@ -84,12 +120,11 @@ actor ChildProcessManager {
             Glibc.dup2(childFD, STDIN_FILENO)
             Glibc.close(childFD)
 
-            // Execute child process
-            // Prepare arguments for execvp
-            executablePath.withCString { execPath in
+            // Execute child process using resolved path
+            resolvedPath.withCString { execPath in
                 var argv: [UnsafeMutablePointer<CChar>?] = [
                     UnsafeMutablePointer(mutating: execPath),
-                    nil
+                    nil,
                 ]
                 let exeResult = Glibc.execvp(execPath, &argv)
 
@@ -139,9 +174,9 @@ actor ChildProcessManager {
 
             if result == handle.pid {
                 // Child has exited
-                let exitStatus = status & 0x7f  // Extract exit status
+                let exitStatus = status & 0x7F // Extract exit status
                 if exitStatus == 0 {
-                    let exitCode = (status >> 8) & 0xff  // Extract exit code
+                    let exitCode = (status >> 8) & 0xFF // Extract exit code
                     logger.debug("Child process \(handle.pid) exited with code: \(exitCode)")
                     activeProcesses.removeValue(forKey: handle.pid)
                     return Int32(exitCode)

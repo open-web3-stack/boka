@@ -15,12 +15,12 @@ struct SandboxPoolTests {
             executionTimeout: 5.0,
             enableWorkerRecycling: false,
             workerRecycleThreshold: 1000,
-            allowOverflowWorkers: false,
-            maxOverflowWorkers: 0,
-            exhaustionPolicy: .failFast,
             healthCheckInterval: 0,
             maxConsecutiveFailures: 10,
-            failureTrackingWindow: 60.0
+            failureTrackingWindow: 60.0,
+            allowOverflowWorkers: false,
+            maxOverflowWorkers: 0,
+            exhaustionPolicy: .failFast
         )
 
         print("\n=== TEST: Single Worker Execution ===")
@@ -41,33 +41,33 @@ struct SandboxPoolTests {
             blob: emptyProgram,
             pc: 0,
             gas: Gas(1_000_000),
-            argumentData: nil,
-            ctx: nil
+            argumentData: nil as Data?,
+            ctx: nil as (any InvocationContext)?
         )
         print("Result 1: \(result1.exitReason)")
-        #expect(result1.exitReason == .halt)
+        #expect(result1.exitReason == ExitReason.halt)
 
         print("\n--- Execution 2 ---")
         let result2 = try await executor.execute(
             blob: emptyProgram,
             pc: 0,
             gas: Gas(1_000_000),
-            argumentData: nil,
-            ctx: nil
+            argumentData: nil as Data?,
+            ctx: nil as (any InvocationContext)?
         )
         print("Result 2: \(result2.exitReason)")
-        #expect(result2.exitReason == .halt)
+        #expect(result2.exitReason == ExitReason.halt)
 
         print("\n--- Execution 3 ---")
         let result3 = try await executor.execute(
             blob: emptyProgram,
             pc: 0,
             gas: Gas(1_000_000),
-            argumentData: nil,
-            ctx: nil
+            argumentData: nil as Data?,
+            ctx: nil as (any InvocationContext)?
         )
         print("Result 3: \(result3.exitReason)")
-        #expect(result3.exitReason == .halt)
+        #expect(result3.exitReason == ExitReason.halt)
 
         print("\n=== TEST PASSED ===\n")
     }
@@ -82,12 +82,12 @@ struct SandboxPoolTests {
             executionTimeout: 10.0,
             enableWorkerRecycling: false,
             workerRecycleThreshold: 1000,
-            allowOverflowWorkers: false,
-            maxOverflowWorkers: 0,
-            exhaustionPolicy: .failFast,
             healthCheckInterval: 0,
             maxConsecutiveFailures: 10,
-            failureTrackingWindow: 60.0
+            failureTrackingWindow: 60.0,
+            allowOverflowWorkers: false,
+            maxOverflowWorkers: 0,
+            exhaustionPolicy: .failFast
         )
 
         print("\n=== TEST: Multiple Executions Stability ===")
@@ -110,11 +110,11 @@ struct SandboxPoolTests {
                     blob: emptyProgram,
                     pc: 0,
                     gas: Gas(1_000_000),
-                    argumentData: nil,
-                    ctx: nil
+                    argumentData: nil as Data?,
+                    ctx: nil as (any InvocationContext)?
                 )
                 print("Result: \(result.exitReason)")
-                #expect(result.exitReason == .halt)
+                #expect(result.exitReason == ExitReason.halt)
                 successCount += 1
             } catch {
                 print("ERROR: \(error)")
@@ -136,12 +136,12 @@ struct SandboxPoolTests {
             executionTimeout: 10.0,
             enableWorkerRecycling: false,
             workerRecycleThreshold: 1000,
-            allowOverflowWorkers: false,
-            maxOverflowWorkers: 0,
-            exhaustionPolicy: .failFast,
             healthCheckInterval: 0,
             maxConsecutiveFailures: 10,
-            failureTrackingWindow: 60.0
+            failureTrackingWindow: 60.0,
+            allowOverflowWorkers: false,
+            maxOverflowWorkers: 0,
+            exhaustionPolicy: .failFast
         )
 
         print("\n=== TEST: Small Pool (2 workers) ===")
@@ -162,10 +162,10 @@ struct SandboxPoolTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([UInt8(i)]),
-                ctx: nil
+                ctx: nil as (any InvocationContext)?
             )
             print("Result: \(result.exitReason)")
-            #expect(result.exitReason == .halt)
+            #expect(result.exitReason == ExitReason.halt)
         }
 
         print("\n=== TEST PASSED ===\n")
