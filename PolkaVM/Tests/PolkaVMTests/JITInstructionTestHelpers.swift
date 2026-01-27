@@ -184,8 +184,18 @@ enum ProgramBlobBuilder {
 
         programCode.append(contentsOf: bitmask)
 
+        #if DEBUG
+            print("[DEBUG] ProgramCode blob: \(programCode.map { String(format: "%02x", $0) }.joined(separator: " "))")
+        #endif
+
         // Wrap in StandardProgram blob
-        return createStandardProgram(programCode: programCode, heapPages: 0)
+        let standardProgram = createStandardProgram(programCode: programCode, heapPages: 0)
+
+        #if DEBUG
+            print("[DEBUG] StandardProgram blob: \(standardProgram.map { String(format: "%02x", $0) }.joined(separator: " "))")
+        #endif
+
+        return standardProgram
     }
 
     /// Create a minimal program blob with single instruction

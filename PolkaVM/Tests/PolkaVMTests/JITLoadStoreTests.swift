@@ -132,7 +132,7 @@ struct JITLoadStoreTests {
         // Create program with read-only data containing 0xAB at offset 0
         let readOnlyData = Data([0xAB, 0xCD, 0xEF])
         let blob = ProgramBlobBuilder.createStandardProgram(
-            programCode: ProgramBlobBuilder.createProgramCode(Array(code)),
+            programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: readOnlyData,
             readWriteData: Data(),
             heapPages: 0
@@ -167,7 +167,7 @@ struct JITLoadStoreTests {
         // Read-only data with 0xFF (signed -1 as byte)
         let readOnlyData = Data([0xFF])
         let blob = ProgramBlobBuilder.createStandardProgram(
-            programCode: ProgramBlobBuilder.createProgramCode(Array(code)),
+            programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: readOnlyData,
             readWriteData: Data(),
             heapPages: 0
@@ -202,7 +202,7 @@ struct JITLoadStoreTests {
         // Read-only data with 0x1234 (little-endian)
         let readOnlyData = Data([0x34, 0x12])
         let blob = ProgramBlobBuilder.createStandardProgram(
-            programCode: ProgramBlobBuilder.createProgramCode(Array(code)),
+            programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: readOnlyData,
             readWriteData: Data(),
             heapPages: 0
@@ -231,7 +231,7 @@ struct JITLoadStoreTests {
 
         let readOnlyData = Data([0xAB, 0xCD])
         let blob = ProgramBlobBuilder.createStandardProgram(
-            programCode: ProgramBlobBuilder.createProgramCode(Array(code)),
+            programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: readOnlyData,
             readWriteData: Data(),
             heapPages: 0
@@ -285,7 +285,7 @@ struct JITLoadStoreTests {
         // Create program with read-write data (heap)
         let heapData = Data([0x00, 0x00, 0x00, 0x00])
         let blob = ProgramBlobBuilder.createStandardProgram(
-            programCode: ProgramBlobBuilder.createProgramCode(Array(code)),
+            programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: Data(),
             readWriteData: heapData,
             heapPages: 0
@@ -331,7 +331,7 @@ struct JITLoadStoreTests {
 
         let heapData = Data([0x00, 0x00, 0x00, 0x00])
         let blob = ProgramBlobBuilder.createStandardProgram(
-            programCode: ProgramBlobBuilder.createProgramCode(Array(code)),
+            programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: Data(),
             readWriteData: heapData,
             heapPages: 0
@@ -363,7 +363,7 @@ struct JITLoadStoreTests {
 
         let heapData = Data([0x00])
         let blob = ProgramBlobBuilder.createStandardProgram(
-            programCode: ProgramBlobBuilder.createProgramCode(Array(code)),
+            programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: Data(),
             readWriteData: heapData,
             heapPages: 0
@@ -411,7 +411,7 @@ struct JITLoadStoreTests {
 
         let heapData = Data([0x00])
         let blob = ProgramBlobBuilder.createStandardProgram(
-            programCode: ProgramBlobBuilder.createProgramCode(Array(code)),
+            programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: Data(),
             readWriteData: heapData,
             heapPages: 0
@@ -451,7 +451,7 @@ struct JITLoadStoreTests {
 
         let heapData = Data([0x00, 0x00, 0x00, 0x00])
         let blob = ProgramBlobBuilder.createStandardProgram(
-            programCode: ProgramBlobBuilder.createProgramCode(Array(code)),
+            programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: Data(),
             readWriteData: heapData,
             heapPages: 0
@@ -479,7 +479,7 @@ struct JITLoadStoreTests {
 
         let heapData = Data([0x00])
         let blob = ProgramBlobBuilder.createStandardProgram(
-            programCode: ProgramBlobBuilder.createProgramCode(Array(code)),
+            programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: Data(),
             readWriteData: heapData,
             heapPages: 0
@@ -518,7 +518,7 @@ struct JITLoadStoreTests {
         code.append(0x01) // Halt
 
         let blob = ProgramBlobBuilder.createStandardProgram(
-            programCode: ProgramBlobBuilder.createProgramCode(Array(code)),
+            programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: Data(),
             readWriteData: Data(),
             heapPages: 0
@@ -565,7 +565,7 @@ struct JITLoadStoreTests {
 
         let readOnlyData = Data([0xAA])
         let blob = ProgramBlobBuilder.createStandardProgram(
-            programCode: ProgramBlobBuilder.createProgramCode(Array(code)),
+            programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: readOnlyData,
             readWriteData: Data(),
             heapPages: 0
