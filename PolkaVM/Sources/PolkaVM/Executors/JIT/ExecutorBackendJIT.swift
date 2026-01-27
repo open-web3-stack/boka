@@ -499,6 +499,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
             let dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?
             let dispatcherTableSize: UInt32
 
+            // TODO: Re-enable JIT caching after debugging (currently disabled for troubleshooting)
             if false, let cachedEntry = codeCache.lookup(bytecode: bytecode, config: config, initialPC: pc) {
                 // Cache hit - use cached function pointer
                 compiledFuncPtr = UnsafeMutableRawPointer(mutating: cachedEntry.functionPtr)

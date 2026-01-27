@@ -3,9 +3,9 @@
 //
 // Tests for control flow instructions: Trap, Halt, Jump, JumpInd, LoadImmJump, LoadImmJumpInd
 //
-// NOTE: These tests use simple program blobs to test JIT execution. The JIT is currently
-// broken on this branch (fix-jamtests-errors) and will crash with ud2 instruction.
-// These tests are ready to run once the JIT is fixed.
+// NOTE: These tests use simple program blobs to test JIT execution. Single-instruction
+// tests (Trap, Halt, LoadImm) now pass. Multi-instruction control flow tests reveal
+// known limitations in test infrastructure (bitmask encoding complexity).
 
 import Foundation
 import PolkaVM
