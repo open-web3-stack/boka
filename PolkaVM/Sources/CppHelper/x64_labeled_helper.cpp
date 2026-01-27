@@ -136,9 +136,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         // If skip table provided, use it (from Swift's ProgramCode.skip(pc))
         if (skipTable != nullptr && pc < skipTableSize) {
             uint32_t skip = skipTable[pc];
-            if (skip > 0) {
-                return skip + 1;  // skip is additional bytes, +1 for opcode
-            }
+            return skip + 1;  // skip is additional bytes, +1 for opcode
         }
 
         // Fallback to fixed-size calculation (for safety)
