@@ -64,6 +64,11 @@ public class ProgramCode {
         let jumpTableEndIndex = slice.startIndex + jumpTableSize
 
         guard jumpTableEndIndex <= slice.endIndex else {
+            print("[ERROR] Jump table extends beyond blob:")
+            print("  jumpTableSize: \(jumpTableSize)")
+            print("  slice.startIndex: \(slice.startIndex)")
+            print("  jumpTableEndIndex: \(jumpTableEndIndex)")
+            print("  slice.endIndex: \(slice.endIndex)")
             throw Error.invalidDataLength
         }
 
@@ -71,6 +76,11 @@ public class ProgramCode {
 
         let codeEndIndex = jumpTableEndIndex + Int(codeLength)
         guard codeEndIndex <= slice.endIndex else {
+            print("[ERROR] Code extends beyond blob:")
+            print("  codeLength: \(codeLength)")
+            print("  jumpTableEndIndex: \(jumpTableEndIndex)")
+            print("  codeEndIndex: \(codeEndIndex)")
+            print("  slice.endIndex: \(slice.endIndex)")
             throw Error.invalidDataLength
         }
 
@@ -80,6 +90,15 @@ public class ProgramCode {
         let actualBitmaskSize = slice.endIndex - codeEndIndex
 
         guard expectedBitmaskSize == actualBitmaskSize else {
+            print("[ERROR] StandardProgram bitmask size mismatch:")
+            print("  codeLength: \(codeLength)")
+            print("  expectedBitmaskSize: \(expectedBitmaskSize)")
+            print("  actualBitmaskSize: \(actualBitmaskSize)")
+            print("  blob.count: \(blob.count)")
+            print("  jumpTableEndIndex: \(jumpTableEndIndex)")
+            print("  codeEndIndex: \(codeEndIndex)")
+            print("  slice.startIndex: \(slice.startIndex)")
+            print("  slice.endIndex: \(slice.endIndex)")
             throw Error.invalidDataLength
         }
 

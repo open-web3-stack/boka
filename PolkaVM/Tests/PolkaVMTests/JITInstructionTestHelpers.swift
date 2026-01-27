@@ -146,39 +146,81 @@ enum ProgramBlobBuilder {
         return blob
     }
 
-    /// Create a ProgramCode blob from instructions
+    /// Create a StandardProgram blob from instructions
     /// - Parameter instructionBytes: Raw instruction bytes
-    /// - Returns: ProgramCode blob (jump table + code + bitmask)
+    /// - Returns: Complete StandardProgram blob ready for execution
     static func createProgramCode(_ instructionBytes: [UInt8]) -> Data {
-        var blob = Data()
+        // Create ProgramCode blob
+        var programCode = Data()
 
         // Jump table entry count (varint: 0)
-        blob.append(contentsOf: encodeVarint(0))
+        programCode.append(contentsOf: encodeVarint(0))
 
         // Encode size (1 byte: 0)
-        blob.append(0)
+        programCode.append(0)
 
         // Code length (varint for instruction count)
-        blob.append(contentsOf: encodeVarint(UInt64(instructionBytes.count)))
+        programCode.append(contentsOf: encodeVarint(UInt64(instructionBytes.count)))
 
         // No jump table entries
 
         // Code section
-        blob.append(contentsOf: instructionBytes)
+        programCode.append(contentsOf: instructionBytes)
 
-        // Bitmask (one byte per 8 code bytes, rounded up)
-        let bitmaskSize = (instructionBytes.count + 7) / 8
-        blob.append(contentsOf: Data(repeating: 0, count: bitmaskSize))
+        // Bitmask - PROPERLY GENERATED per spec/pvm.tex
+        // Every instruction opcode MUST have its bitmask bit set to 1 (spec lines 220-229)
+        let bitmask = generateBitmask(instructionBytes)
 
-        return blob
+        #if DEBUG
+            let expectedBitmaskSize = (instructionBytes.count + 7) / 8
+            print("[DEBUG] createProgramCode:")
+            print("  Instruction bytes count: \(instructionBytes.count)")
+            print("  Expected bitmask size: \(expectedBitmaskSize)")
+            print("  Actual bitmask size: \(bitmask.count)")
+            print("  Bitmask hex: \(bitmask.map { String(format: "%02x", $0) }.joined(separator: " "))")
+            print("  ProgramCode size before bitmask: \(programCode.count)")
+            print("  Final ProgramCode size: \(programCode.count + bitmask.count)")
+        #endif
+
+        programCode.append(contentsOf: bitmask)
+
+        // Wrap in StandardProgram blob
+        return createStandardProgram(programCode: programCode, heapPages: 0)
     }
 
     /// Create a minimal program blob with single instruction
     /// - Parameter instructionBytes: Raw instruction bytes
     /// - Returns: Complete program blob ready for execution
     static func createSingleInstructionProgram(_ instructionBytes: [UInt8]) -> Data {
-        let programCode = createProgramCode(instructionBytes)
-        return createStandardProgram(programCode: programCode, heapPages: 0)
+        createProgramCode(instructionBytes)
+    }
+
+    /// Create ProgramCode blob (jump table + code + bitmask) from instructions
+    /// - Parameter instructionBytes: Raw instruction bytes
+    /// - Returns: ProgramCode blob (NOT a full StandardProgram)
+    /// NOTE: This is an internal helper. Use createProgramCode() for a complete StandardProgram.
+    static func createProgramCodeBlob(_ instructionBytes: [UInt8]) -> Data {
+        var programCode = Data()
+
+        // Jump table entry count (varint: 0)
+        programCode.append(contentsOf: encodeVarint(0))
+
+        // Encode size (1 byte: 0)
+        programCode.append(0)
+
+        // Code length (varint for instruction count)
+        programCode.append(contentsOf: encodeVarint(UInt64(instructionBytes.count)))
+
+        // No jump table entries
+
+        // Code section
+        programCode.append(contentsOf: instructionBytes)
+
+        // Bitmask - PROPERLY GENERATED per spec/pvm.tex
+        let bitmask = generateBitmask(instructionBytes)
+        programCode.append(contentsOf: bitmask)
+
+        return programCode
     }
 
     /// Create a program blob with multiple instructions
@@ -189,7 +231,7 @@ enum ProgramBlobBuilder {
         for instructions in instructionBytes {
             code.append(contentsOf: instructions)
         }
-        let programCode = createProgramCode(Array(code))
+        let programCode = createProgramCodeBlob(Array(code))
         return createStandardProgram(programCode: programCode)
     }
 
@@ -236,6 +278,157 @@ enum ProgramBlobBuilder {
         // Wrap in StandardProgram format
         let programCode = blob
         return createStandardProgram(programCode: programCode)
+    }
+
+    /// Generate proper bitmask from instruction bytes
+    /// Per spec/pvm.tex lines 220-229: Instructions with k[n] = 0 behave as TRAP
+    /// Therefore EVERY instruction opcode byte MUST have its bitmask bit set to 1
+    ///
+    /// - Parameter instructionBytes: Raw instruction bytes
+    /// - Returns: Bitmask data (bit 1 = opcode byte, bit 0 = immediate/operand byte)
+    static func generateBitmask(_ instructionBytes: [UInt8]) -> Data {
+        var bitmask = Data(repeating: 0, count: (instructionBytes.count + 7) / 8)
+        var pc = 0
+
+        while pc < instructionBytes.count {
+            let opcode = instructionBytes[pc]
+
+            // Mark current byte as opcode (bit = 1) per spec requirement
+            setBit(bitmask: &bitmask, at: pc, value: 1)
+
+            // Calculate instruction size based on opcode
+            let size = calculateInstructionSize(opcode, instructionBytes: instructionBytes, pc: pc)
+
+            // Advance to next instruction
+            pc += size
+        }
+
+        return bitmask
+    }
+
+    /// Set a bit in the bitmask
+    /// - Parameters:
+    ///   - bitmask: Bitmask data to modify
+    ///   - at: Bit position (byte index)
+    ///   - value: Bit value (0 or 1)
+    private static func setBit(bitmask: inout Data, at: Int, value: UInt8) {
+        let byteIndex = at / 8
+        let bitIndex = at % 8
+
+        if byteIndex < bitmask.count {
+            if value == 1 {
+                bitmask[byteIndex] |= (1 << bitIndex)
+            } else {
+                bitmask[byteIndex] &= ~(1 << bitIndex)
+            }
+        }
+    }
+
+    /// Calculate instruction size based on opcode
+    /// - Parameters:
+    ///   - opcode: Instruction opcode byte
+    ///   - instructionBytes: Full instruction bytes array
+    ///   - pc: Current program counter
+    /// - Returns: Instruction size in bytes
+    private static func calculateInstructionSize(
+        _ opcode: UInt8,
+        instructionBytes: [UInt8],
+        pc: Int
+    ) -> Int {
+        // Fixed-size instructions (1 byte) - per spec/pvm.tex
+        if [0x00, 0x01].contains(opcode) { // Trap, Halt
+            return 1
+        }
+
+        // Instructions with register + 32-bit immediate (6 bytes total)
+        // Format: opcode (1) + register (1) + immediate32 (4)
+        if opcode == 0x32 { // LoadImm32
+            return 2 + 4
+        }
+
+        // Instructions with register + 64-bit immediate (10 bytes total)
+        // Format: opcode (1) + register (1) + immediate64 (8)
+        if opcode == 0x33 { // LoadImm64
+            return 2 + 8
+        }
+
+        // Jump instruction (5 bytes: opcode + 32-bit offset)
+        // Format: opcode (1) + offset32 (4)
+        if opcode == 0x28 { // Jump
+            return 1 + 4
+        }
+
+        // JumpInd instruction (2 bytes: opcode + register)
+        // Format: opcode (1) + register (1)
+        if opcode == 0x32, pc + 1 < instructionBytes.count {
+            // Check if this is JumpInd (opcode 0x32 in a different context)
+            // We need to distinguish from LoadImm32
+            // For now, assume 2-byte format for JumpInd
+            return 1 + 1
+        }
+
+        // Arithmetic instructions (4 bytes: opcode + 3 registers)
+        // Format: opcode (1) + dest_reg (1) + src1_reg (1) + src2_reg (1)
+        // Opcodes 0xC8-0xD0: Add64, Sub64, Mul64, DivU64, DivS64, RemU64, RemS64, ShloL64, ShroR64, SharR64
+        if opcode >= 0xC8, opcode <= 0xD0 {
+            return 1 + 3
+        }
+
+        // 32-bit arithmetic (opcodes 0xC0-0xC8)
+        if opcode >= 0xC0, opcode < 0xC8 {
+            return 1 + 3
+        }
+
+        // LoadU8/I8/U16/I16/U32/I32/U64 (7 bytes: opcode + 2 registers + 32-bit offset)
+        // Format: opcode (1) + dest_reg (1) + base_reg (1) + offset32 (4)
+        // Opcodes 0x34-0x3A
+        if opcode >= 0x34, opcode <= 0x3A {
+            return 1 + 2 + 4
+        }
+
+        // StoreU8/U16/U32/U64 (7 bytes: opcode + base_reg + offset32 + value_reg)
+        // Format: opcode (1) + base_reg (1) + offset32 (4) + value_reg (1)
+        // Opcodes 0x3B-0x3E
+        if opcode >= 0x3B, opcode <= 0x3E {
+            return 1 + 1 + 4 + 1
+        }
+
+        // StoreImmU8/U16/U32/U64 (opcode + register + offset32 + immediate)
+        // These have variable-sized immediates (1, 2, or 4 bytes)
+        // Opcodes 0x1E, 0x1F, 0x20, 0x21 (StoreImmU8, StoreImmU16, StoreImmU32, StoreImmU64)
+        if opcode == 0x1E { // StoreImmU8: opcode + reg + offset8 + imm8
+            return 1 + 1 + 4 + 1 // offset32 is 4 bytes (aligned), imm8 is 1 byte
+        }
+        if opcode == 0x20 { // StoreImmU32: opcode + reg + offset32 + imm32
+            return 1 + 1 + 4 + 4 // offset32 (4), imm32 (4)
+        }
+
+        // Bitwise operations (4 bytes: opcode + 3 registers)
+        // Opcodes 0xD2-0xD4: And, Xor, Or
+        if opcode >= 0xD2, opcode <= 0xD4 {
+            return 1 + 3
+        }
+
+        // Varint-encoded instructions
+        // LoadImmJump (0x50), LoadImmJumpInd (0xB4), AddImm64 (0x97), SubImm64 (0x9A)
+        // Format: opcode (1) + register (1) + varint_immediate (variable)
+        if [0x50, 0xB4, 0x97, 0x9A].contains(opcode) {
+            var size = 2 // opcode + register
+            var offset = pc + 2
+
+            // Decode varint to find its size
+            while offset < instructionBytes.count {
+                let byte = instructionBytes[offset]
+                size += 1
+                offset += 1
+                if byte & 0x80 == 0 { break } // Last varint byte
+            }
+
+            return size
+        }
+
+        // Default: assume minimum valid instruction
+        return 1
     }
 }
 
