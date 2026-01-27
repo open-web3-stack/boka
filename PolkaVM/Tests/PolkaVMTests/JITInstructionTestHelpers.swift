@@ -44,7 +44,7 @@ enum ProgramBlobBuilder {
     /// Encode a value as varint
     /// - Parameter value: Value to encode
     /// - Returns: Varint-encoded data
-    private static func encodeVarint(_ value: UInt64) -> Data {
+    static func encodeVarint(_ value: UInt64) -> Data {
         var data = Data()
         var v = value
         if v == 0 {
@@ -273,8 +273,12 @@ enum JITInstructionExecutor {
             ctx: context
         )
 
-        // For JIT mode, we need to re-run in interpreter to capture final state
-        // This is a limitation of the current invokePVM API
+        // LIMITATION: invokePVM doesn't expose final register state for JIT execution
+        // Workaround: Re-run in interpreter to capture finalRegisters and finalPC
+        // This means we verify parity between JIT and interpreter, but don't verify
+        // JIT register values directly. To detect JIT bugs that don't crash but
+        // produce wrong register values, we would need to extend invokePVM API
+        // or add JIT-specific register inspection capabilities.
         let finalRegisters: Registers
         let finalPC: UInt32
 
