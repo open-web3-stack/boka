@@ -33,3 +33,19 @@
 // - rdi, rsi, rdx, rcx, r8, r9: Parameter passing for function calls
 // - rax: Return value register
 
+// Label-based compilation with direct jumps for maximum performance
+// Uses single-pass compilation with lazy label creation
+// Same interface as compilePolkaVMCode_x64 but uses labels for control flow
+//
+// NEW: skipTable provides instruction sizes from Swift's ProgramCode.skip(pc)
+// This is required for variable-length encoded instructions (LoadImmJump, BranchImm, etc.)
+// skipTable[pc] = number of additional bytes after opcode (instruction size = skip + 1)
+extern "C" int32_t compilePolkaVMCode_x64_labeled(
+    const uint8_t* _Nonnull codeBuffer,
+    size_t codeSize,
+    uint32_t initialPC,
+    uint32_t jitMemorySize,
+    const uint32_t* _Nullable skipTable,   // NEW: instruction skip values
+    size_t skipTableSize,                   // NEW: skip table size
+    void* _Nullable * _Nonnull funcOut);
+

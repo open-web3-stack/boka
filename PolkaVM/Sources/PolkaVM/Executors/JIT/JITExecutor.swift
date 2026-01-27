@@ -105,11 +105,42 @@ final class JITExecutor {
         // Use compact layout: allocate only what's needed, but use original addresses
         // This means buffer[0xFF000000] actually needs to exist!
         let memoryBuffer: UnsafeMutablePointer<UInt8>
-        let usesMmap = false // Don't use mmap for now
+        let usesMmap: Bool
 
-        // Allocate compact buffer
-        logger.info("Allocating compact buffer: \(jitMemorySize) bytes")
-        memoryBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: Int(jitMemorySize))
+        // Use mmap for large allocations (>= 1GB) to avoid physical memory allocation
+        let largeAllocationThreshold = UInt32(1 * 1024 * 1024 * 1024) // 1GB
+        if jitMemorySize >= largeAllocationThreshold {
+            // Use mmap with MAP_NORESERVE to reserve virtual address space
+            // without allocating physical memory upfront
+            logger.info("Using mmap for large allocation: \(jitMemorySize) bytes (\(Double(jitMemorySize) / 1024 / 1024 / 1024) GB)")
+
+            let flags = Int32(MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE)
+            let prot = Int32(PROT_READ | PROT_WRITE)
+
+            let ptr = mmap(
+                nil, // Let kernel choose address
+                Int(jitMemorySize),
+                prot,
+                flags,
+                -1, // No file descriptor
+                0 // No offset
+            )
+
+            if ptr == MAP_FAILED {
+                logger.error("mmap failed: \(errno)")
+                throw JITError.memoryAllocationFailed
+            }
+
+            // mmap returns UnsafeMutableRawPointer? (optional), but MAP_FAILED check ensures it's valid
+            memoryBuffer = UnsafeMutableRawPointer(ptr!).assumingMemoryBound(to: UInt8.self)
+            usesMmap = true
+            logger.info("✅ mmap reserved \(jitMemorySize) bytes of virtual address space")
+        } else {
+            // Use normal allocation for smaller buffers
+            logger.info("Allocating compact buffer: \(jitMemorySize) bytes")
+            memoryBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: Int(jitMemorySize))
+            usesMmap = false
+        }
 
         // MEMORY INITIALIZATION: Copy data to appropriate addresses
         // We use original addresses (e.g., 0xFF000000 for stack), NOT rebased offsets
@@ -117,23 +148,45 @@ final class JITExecutor {
             // Copy zone data to original addresses in the buffer
             logger.info("Copying zones to original addresses")
 
-            // First, zero-initialize the entire buffer
-            memoryBuffer.initialize(repeating: 0, count: Int(jitMemorySize))
+            if usesMmap {
+                // For mmap: only zero-initialize and copy zones that actually have data
+                // This is much faster than zeroing 4GB
+                logger.info("Using mmap - only initializing pages with data")
+            } else {
+                // For normal allocation: zero-initialize the entire buffer
+                memoryBuffer.initialize(repeating: 0, count: Int(jitMemorySize))
+            }
 
             // Copy zones using layout for efficient initialization
             var totalCopied = 0
             for zone in layout.zones {
                 logger.info("  Zone: base=0x\(String(zone.originalBase, radix: 16)), size=\(zone.size), dataCount=\(zone.data.count)")
 
+                let zoneBase = memoryBuffer.advanced(by: Int(zone.originalBase))
+
+                // For mmap, we need to ensure all pages in the zone range are accessible
+                // Even zones with no data need to be touched to ensure the pages are mapped
+                if usesMmap, zone.size > 0 {
+                    logger.info("  Zone has size=\(zone.size), touching pages")
+                    let pageSize = 4096
+                    var pagesTouched = 0
+                    for offset in stride(from: 0, to: Int(zone.size), by: pageSize) {
+                        zoneBase.advanced(by: offset).pointee = 0 // Touch the page
+                        pagesTouched += 1
+                    }
+                    logger.info("  ✅ Touched \(pagesTouched) pages across zone")
+                }
+
                 // Copy zone data to its original address
-                zone.data.withUnsafeBytes { rawBuffer in
-                    if let baseAddress = rawBuffer.baseAddress {
-                        let destPtr = memoryBuffer.advanced(by: Int(zone.originalBase))
-                        memcpy(destPtr, baseAddress, zone.data.count)
-                        totalCopied += zone.data.count
-                        logger.debug(
-                            "  Copied zone: \(zone.data.count) bytes to original address 0x\(String(zone.originalBase, radix: 16))"
-                        )
+                if !zone.data.isEmpty {
+                    zone.data.withUnsafeBytes { rawBuffer in
+                        if let baseAddress = rawBuffer.baseAddress {
+                            memcpy(zoneBase, baseAddress, zone.data.count)
+                            totalCopied += zone.data.count
+                            logger.debug(
+                                "  Copied zone: \(zone.data.count) bytes to original address 0x\(String(zone.originalBase, radix: 16))"
+                            )
+                        }
                     }
                 }
             }
@@ -241,7 +294,9 @@ final class JITExecutor {
             case .pageFault:
                 // Page fault from bounds checking
                 // For a page fault, we would need to extract the faulting address from registers
-                exitReason = .pageFault(UInt32(truncatingIfNeeded: registers[Registers.Index(raw: 0)]))
+                let r0Value = UInt32(truncatingIfNeeded: registers[Registers.Index(raw: 0)])
+                logger.error("JIT page fault: R0 = 0x\(String(r0Value, radix: 16)), gas = \(gas.value)")
+                exitReason = .pageFault(r0Value)
             case .trap:
                 exitReason = .panic(.trap)
             case .hostRequestedHalt:

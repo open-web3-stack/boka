@@ -77,6 +77,8 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     size_t codeSize,
     uint32_t initialPC,
     uint32_t jitMemorySize,
+    const uint32_t* _Nullable skipTable,   // NEW: instruction skip values
+    size_t skipTableSize,                   // NEW: skip table size
     void* _Nullable * _Nonnull funcOut)
 {
     // Validate inputs
@@ -87,6 +89,21 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     if (!funcOut) {
         return 2; // Invalid output parameter
     }
+
+    // Create lambda to get instruction size using skip table
+    // This is the authoritative source for variable-length encoded instructions
+    auto getInstrSize = [&](uint32_t pc) -> uint32_t {
+        // If skip table provided, use it (from Swift's ProgramCode.skip(pc))
+        if (skipTable != nullptr && pc < skipTableSize) {
+            uint32_t skip = skipTable[pc];
+            if (skip > 0) {
+                return skip + 1;  // skip is additional bytes, +1 for opcode
+            }
+        }
+
+        // Fallback to fixed-size calculation (for safety)
+        return getInstructionSize(codeBuffer, pc, codeSize);
+    };
 
     // Initialize asmjit runtime
     static JitRuntime runtime;
@@ -132,7 +149,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     uint32_t pc = 0;
     while (pc < codeSize) {
         uint8_t opcode = codeBuffer[pc];
-        uint32_t instrSize = getInstructionSize(codeBuffer, pc, codeSize);
+        uint32_t instrSize = getInstrSize(pc);  // USE skip table
 
         if (instrSize == 0) {
             // Unknown opcode - compilation error
@@ -168,7 +185,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
     while (pc < codeSize) {
         uint8_t opcode = codeBuffer[pc];
-        uint32_t instrSize = getInstructionSize(codeBuffer, pc, codeSize);
+        uint32_t instrSize = getInstrSize(pc);  // USE skip table
 
         if (instrSize == 0) {
             // Unknown opcode - compilation error
@@ -764,6 +781,360 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             a.ldr(a64::x1, a64::ptr(a64::x19, srcReg * 8));
 
             // Store to memory [VM_MEMORY_PTR + address]
+            a.str(a64::x1, a64::ptr(a64::x20, a64::x0));
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === LoadIndU32: Load 32-bit unsigned value from indirect address ===
+        // Format: [opcode][ra_rb][offset_32bit] where ra_rb = (ra | rb << 4)
+        if (opcode_is(opcode, Opcode::LoadIndU32)) {
+            uint8_t ra_rb = codeBuffer[pc + 1];
+            uint8_t ra = (ra_rb >> 0) & 0x0F;
+            uint8_t rb = (ra_rb >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, rb * 8));
+
+            if (offset >= -4095 && offset <= 4095) {
+                a.add(a64::x0, a64::x0, offset);
+            } else {
+                a.mov(a64::x5, offset);
+                a.add(a64::x0, a64::x0, a64::x5);
+            }
+
+            a.cmp(a64::x0, 65536);
+            a.b_lo(panicLabel);
+
+            a.mov(a64::w1, a64::w21);
+            a.cmp(a64::x0, a64::x1);
+            a.b_hs(pagefaultLabel);
+
+            a.ldr(a64::w1, a64::ptr(a64::x20, a64::x0));
+
+            a.str(a64::x1, a64::ptr(a64::x19, ra * 8));
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === LoadIndI32: Load 32-bit signed value from indirect address ===
+        if (opcode_is(opcode, Opcode::LoadIndI32)) {
+            uint8_t ra_rb = codeBuffer[pc + 1];
+            uint8_t ra = (ra_rb >> 0) & 0x0F;
+            uint8_t rb = (ra_rb >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, rb * 8));
+
+            if (offset >= -4095 && offset <= 4095) {
+                a.add(a64::x0, a64::x0, offset);
+            } else {
+                a.mov(a64::x5, offset);
+                a.add(a64::x0, a64::x0, a64::x5);
+            }
+
+            a.cmp(a64::x0, 65536);
+            a.b_lo(panicLabel);
+
+            a.mov(a64::w1, a64::w21);
+            a.cmp(a64::x0, a64::x1);
+            a.b_hs(pagefaultLabel);
+
+            a.ldrsw(a64::x1, a64::ptr(a64::x20, a64::x0));
+
+            a.str(a64::x1, a64::ptr(a64::x19, ra * 8));
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === LoadIndU16: Load 16-bit unsigned value from indirect address ===
+        if (opcode_is(opcode, Opcode::LoadIndU16)) {
+            uint8_t ra_rb = codeBuffer[pc + 1];
+            uint8_t ra = (ra_rb >> 0) & 0x0F;
+            uint8_t rb = (ra_rb >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, rb * 8));
+
+            if (offset >= -4095 && offset <= 4095) {
+                a.add(a64::x0, a64::x0, offset);
+            } else {
+                a.mov(a64::x5, offset);
+                a.add(a64::x0, a64::x0, a64::x5);
+            }
+
+            a.cmp(a64::x0, 65536);
+            a.b_lo(panicLabel);
+
+            a.mov(a64::w1, a64::w21);
+            a.cmp(a64::x0, a64::x1);
+            a.b_hs(pagefaultLabel);
+
+            a.ldrh(a64::w1, a64::ptr(a64::x20, a64::x0));
+
+            a.str(a64::x1, a64::ptr(a64::x19, ra * 8));
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === LoadIndI16: Load 16-bit signed value from indirect address ===
+        if (opcode_is(opcode, Opcode::LoadIndI16)) {
+            uint8_t ra_rb = codeBuffer[pc + 1];
+            uint8_t ra = (ra_rb >> 0) & 0x0F;
+            uint8_t rb = (ra_rb >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, rb * 8));
+
+            if (offset >= -4095 && offset <= 4095) {
+                a.add(a64::x0, a64::x0, offset);
+            } else {
+                a.mov(a64::x5, offset);
+                a.add(a64::x0, a64::x0, a64::x5);
+            }
+
+            a.cmp(a64::x0, 65536);
+            a.b_lo(panicLabel);
+
+            a.mov(a64::w1, a64::w21);
+            a.cmp(a64::x0, a64::x1);
+            a.b_hs(pagefaultLabel);
+
+            a.ldrsh(a64::x1, a64::ptr(a64::x20, a64::x0));
+
+            a.str(a64::x1, a64::ptr(a64::x19, ra * 8));
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === LoadIndU8: Load 8-bit unsigned value from indirect address ===
+        if (opcode_is(opcode, Opcode::LoadIndU8)) {
+            uint8_t ra_rb = codeBuffer[pc + 1];
+            uint8_t ra = (ra_rb >> 0) & 0x0F;
+            uint8_t rb = (ra_rb >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, rb * 8));
+
+            if (offset >= -4095 && offset <= 4095) {
+                a.add(a64::x0, a64::x0, offset);
+            } else {
+                a.mov(a64::x5, offset);
+                a.add(a64::x0, a64::x0, a64::x5);
+            }
+
+            a.cmp(a64::x0, 65536);
+            a.b_lo(panicLabel);
+
+            a.mov(a64::w1, a64::w21);
+            a.cmp(a64::x0, a64::x1);
+            a.b_hs(pagefaultLabel);
+
+            a.ldrb(a64::w1, a64::ptr(a64::x20, a64::x0));
+
+            a.str(a64::x1, a64::ptr(a64::x19, ra * 8));
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === LoadIndI8: Load 8-bit signed value from indirect address ===
+        if (opcode_is(opcode, Opcode::LoadIndI8)) {
+            uint8_t ra_rb = codeBuffer[pc + 1];
+            uint8_t ra = (ra_rb >> 0) & 0x0F;
+            uint8_t rb = (ra_rb >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, rb * 8));
+
+            if (offset >= -4095 && offset <= 4095) {
+                a.add(a64::x0, a64::x0, offset);
+            } else {
+                a.mov(a64::x5, offset);
+                a.add(a64::x0, a64::x0, a64::x5);
+            }
+
+            a.cmp(a64::x0, 65536);
+            a.b_lo(panicLabel);
+
+            a.mov(a64::w1, a64::w21);
+            a.cmp(a64::x0, a64::x1);
+            a.b_hs(pagefaultLabel);
+
+            a.ldrsb(a64::x1, a64::ptr(a64::x20, a64::x0));
+
+            a.str(a64::x1, a64::ptr(a64::x19, ra * 8));
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === LoadIndU64: Load 64-bit unsigned value from indirect address ===
+        if (opcode_is(opcode, Opcode::LoadIndU64)) {
+            uint8_t ra_rb = codeBuffer[pc + 1];
+            uint8_t ra = (ra_rb >> 0) & 0x0F;
+            uint8_t rb = (ra_rb >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, rb * 8));
+
+            if (offset >= -4095 && offset <= 4095) {
+                a.add(a64::x0, a64::x0, offset);
+            } else {
+                a.mov(a64::x5, offset);
+                a.add(a64::x0, a64::x0, a64::x5);
+            }
+
+            a.cmp(a64::x0, 65536);
+            a.b_lo(panicLabel);
+
+            a.mov(a64::w1, a64::w21);
+            a.cmp(a64::x0, a64::x1);
+            a.b_hs(pagefaultLabel);
+
+            a.ldr(a64::x1, a64::ptr(a64::x20, a64::x0));
+
+            a.str(a64::x1, a64::ptr(a64::x19, ra * 8));
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === StoreIndU8: Store 8-bit value to indirect address ===
+        // Format: [opcode][src_dest][offset_32bit] where src_dest = (src | dest << 4)
+        if (opcode_is(opcode, Opcode::StoreIndU8)) {
+            uint8_t src_dest = codeBuffer[pc + 1];
+            uint8_t src = (src_dest >> 0) & 0x0F;
+            uint8_t dest = (src_dest >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, dest * 8));
+
+            if (offset >= -4095 && offset <= 4095) {
+                a.add(a64::x0, a64::x0, offset);
+            } else {
+                a.mov(a64::x5, offset);
+                a.add(a64::x0, a64::x0, a64::x5);
+            }
+
+            a.cmp(a64::x0, 65536);
+            a.b_lo(panicLabel);
+
+            a.mov(a64::w1, a64::w21);
+            a.cmp(a64::x0, a64::x1);
+            a.b_hs(pagefaultLabel);
+
+            a.ldr(a64::x1, a64::ptr(a64::x19, src * 8));
+
+            a.strb(a64::w1, a64::ptr(a64::x20, a64::x0));
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === StoreIndU16: Store 16-bit value to indirect address ===
+        if (opcode_is(opcode, Opcode::StoreIndU16)) {
+            uint8_t src_dest = codeBuffer[pc + 1];
+            uint8_t src = (src_dest >> 0) & 0x0F;
+            uint8_t dest = (src_dest >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, dest * 8));
+
+            if (offset >= -4095 && offset <= 4095) {
+                a.add(a64::x0, a64::x0, offset);
+            } else {
+                a.mov(a64::x5, offset);
+                a.add(a64::x0, a64::x0, a64::x5);
+            }
+
+            a.cmp(a64::x0, 65536);
+            a.b_lo(panicLabel);
+
+            a.mov(a64::w1, a64::w21);
+            a.cmp(a64::x0, a64::x1);
+            a.b_hs(pagefaultLabel);
+
+            a.ldr(a64::x1, a64::ptr(a64::x19, src * 8));
+
+            a.strh(a64::w1, a64::ptr(a64::x20, a64::x0));
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === StoreIndU32: Store 32-bit value to indirect address ===
+        if (opcode_is(opcode, Opcode::StoreIndU32)) {
+            uint8_t src_dest = codeBuffer[pc + 1];
+            uint8_t src = (src_dest >> 0) & 0x0F;
+            uint8_t dest = (src_dest >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, dest * 8));
+
+            if (offset >= -4095 && offset <= 4095) {
+                a.add(a64::x0, a64::x0, offset);
+            } else {
+                a.mov(a64::x5, offset);
+                a.add(a64::x0, a64::x0, a64::x5);
+            }
+
+            a.cmp(a64::x0, 65536);
+            a.b_lo(panicLabel);
+
+            a.mov(a64::w1, a64::w21);
+            a.cmp(a64::x0, a64::x1);
+            a.b_hs(pagefaultLabel);
+
+            a.ldr(a64::x1, a64::ptr(a64::x19, src * 8));
+
+            a.str(a64::w1, a64::ptr(a64::x20, a64::x0));
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === StoreIndU64: Store 64-bit value to indirect address ===
+        if (opcode_is(opcode, Opcode::StoreIndU64)) {
+            uint8_t src_dest = codeBuffer[pc + 1];
+            uint8_t src = (src_dest >> 0) & 0x0F;
+            uint8_t dest = (src_dest >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, dest * 8));
+
+            if (offset >= -4095 && offset <= 4095) {
+                a.add(a64::x0, a64::x0, offset);
+            } else {
+                a.mov(a64::x5, offset);
+                a.add(a64::x0, a64::x0, a64::x5);
+            }
+
+            a.cmp(a64::x0, 65536);
+            a.b_lo(panicLabel);
+
+            a.mov(a64::w1, a64::w21);
+            a.cmp(a64::x0, a64::x1);
+            a.b_hs(pagefaultLabel);
+
+            a.ldr(a64::x1, a64::ptr(a64::x19, src * 8));
+
             a.str(a64::x1, a64::ptr(a64::x20, a64::x0));
 
             pc += instrSize;
