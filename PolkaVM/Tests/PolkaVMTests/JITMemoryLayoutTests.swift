@@ -15,7 +15,7 @@ struct JITMemoryLayoutTests {
     @Test("Extract zones from simple program")
     func extractZonesFromSimpleProgram() throws {
         // Create a simple program with minimal memory
-        let code = ProgramBlobBuilder.createProgramCode([]) // Empty code
+        let code = ProgramBlobBuilder.createProgramCodeBlob([]) // Empty code
         let program = ProgramBlobBuilder.createStandardProgram(
             programCode: code,
             readOnlyData: Data([0x01, 0x02, 0x03]),
@@ -40,7 +40,7 @@ struct JITMemoryLayoutTests {
 
     @Test("First zone starts at offset 0")
     func firstZoneStartsAtOffsetZero() throws {
-        let code = ProgramBlobBuilder.createProgramCode([])
+        let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
             programCode: code,
             readOnlyData: Data([0x01]),
@@ -59,7 +59,7 @@ struct JITMemoryLayoutTests {
 
     @Test("Translate read-only zone address")
     func translateReadOnlyZoneAddress() throws {
-        let code = ProgramBlobBuilder.createProgramCode([])
+        let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
             programCode: code,
             readOnlyData: Data([0xAA, 0xBB, 0xCC]),
@@ -87,7 +87,7 @@ struct JITMemoryLayoutTests {
         let readOnlyData = Data([0x01, 0x02, 0x03])
         let heapData = Data([0xAA, 0xBB, 0xCC])
 
-        let code = ProgramBlobBuilder.createProgramCode([])
+        let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
             programCode: code,
             readOnlyData: readOnlyData,
@@ -114,7 +114,7 @@ struct JITMemoryLayoutTests {
 
     @Test("Translate stack zone address")
     func translateStackZoneAddress() throws {
-        let code = ProgramBlobBuilder.createProgramCode([])
+        let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
             programCode: code,
             readOnlyData: Data([0x01]),
@@ -140,7 +140,7 @@ struct JITMemoryLayoutTests {
 
     @Test("Return nil for invalid address")
     func returnNilForInvalidAddress() throws {
-        let code = ProgramBlobBuilder.createProgramCode([])
+        let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
             programCode: code,
             readOnlyData: Data([0x01]),
@@ -163,7 +163,7 @@ struct JITMemoryLayoutTests {
 
     @Test("Total size is much less than 4GB")
     func totalSizeIsMuchLessThan4GB() throws {
-        let code = ProgramBlobBuilder.createProgramCode([])
+        let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
             programCode: code,
             readOnlyData: Data([0x01, 0x02, 0x03]),
@@ -185,7 +185,7 @@ struct JITMemoryLayoutTests {
 
     @Test("Total size accounts for all zones")
     func totalSizeAccountsForAllZones() throws {
-        let code = ProgramBlobBuilder.createProgramCode([])
+        let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
             programCode: code,
             readOnlyData: Data([0x01]),
@@ -207,7 +207,7 @@ struct JITMemoryLayoutTests {
 
     @Test("Find zone for valid address")
     func findZoneForValidAddress() throws {
-        let code = ProgramBlobBuilder.createProgramCode([])
+        let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
             programCode: code,
             readOnlyData: Data([0x01, 0x02, 0x03]),
@@ -231,7 +231,7 @@ struct JITMemoryLayoutTests {
 
     @Test("Return nil for address not in any zone")
     func returnNilForAddressNotInAnyZone() throws {
-        let code = ProgramBlobBuilder.createProgramCode([])
+        let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
             programCode: code,
             readOnlyData: Data([0x01]),
@@ -256,7 +256,7 @@ struct JITMemoryLayoutTests {
         let readOnlyData = Data([0xAA, 0xBB, 0xCC, 0xDD])
         let heapData = Data([0x11, 0x22, 0x33])
 
-        let code = ProgramBlobBuilder.createProgramCode([])
+        let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
             programCode: code,
             readOnlyData: readOnlyData,
