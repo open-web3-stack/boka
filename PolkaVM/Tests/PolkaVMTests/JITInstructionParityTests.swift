@@ -117,15 +117,6 @@ struct JITInstructionParityTests {
         )
     }
 
-    // MARK: - Arithmetic Instructions
-
-    @Test("JIT vs Interpreter: Add64")
-    func testAdd64() async throws {
-        // Need to setup initial registers first, then add
-        // This is more complex and requires a multi-instruction program
-        // For now, we'll skip this and test with real programs
-    }
-
     // MARK: - Real Program Tests
 
     // NOTE: SumToN test removed - the hardcoded blob has malformed bitmask
