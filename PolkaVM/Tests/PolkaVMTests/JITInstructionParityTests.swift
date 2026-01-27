@@ -134,6 +134,9 @@ struct JITInstructionParityTests {
     func testSumToN() async throws {
         let config = DefaultPvmConfig()
 
+        // Use the EXACT same sumToN blob from InvokePVMTest.swift
+        // This blob has stackSize=0, which the interpreter handles fine
+        // If JIT fails, it's a JIT issue, not a test issue
         let sumToN = Data([
             0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 46, 0, 0, 0, 0, 0, 38, 128, 119, 0,
             51, 8, 0, 100, 121, 40, 3, 0, 200, 137, 8, 149, 153, 255, 86, 9, 250,
