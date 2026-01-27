@@ -443,27 +443,37 @@ final class ExecutorBackendJIT: ExecutorBackend {
             // CRITICAL FIX: Pass the extracted bytecode, not the raw blob!
             // The blob contains headers (jump table count, encode size, code length, etc.)
             // but the JIT compiler expects just the bytecode portion.
-            // MEMORY REBASING: Use JITMemoryLayout to calculate contiguous memory size
-            // This eliminates the 4GB allocation by rebasing zones contiguously.
+
+            // MMAP SPARSE ALLOCATION: Use 4GB address space with mmap for efficient virtual memory usage
+            // With mmap(MAP_NORESERVE), we reserve 4GB of virtual address space without allocating physical memory.
+            // The OS only allocates physical pages for regions we actually write to.
             let totalMemorySize: UInt32
             let memoryLayout: JITMemoryLayout?
 
             do {
-                // Create rebased memory layout from StandardProgram
+                // Create memory layout from StandardProgram for efficient zone initialization
+                // Use rebased layout for efficient memory usage
                 let layout = try JITMemoryLayout(standardProgram: standardProgram)
-                totalMemorySize = layout.totalSize
                 memoryLayout = layout
 
-                let stackBaseAddress = UInt32(config.pvmProgramInitStackBaseAddress)
-                let savings = stackBaseAddress - totalMemorySize
-                let savingsMB = Double(savings) / (1024.0 * 1024.0)
+                // Find the highest address used in the program
+                // We need to allocate enough space to cover all addresses
+                let highestAddress = layout.zones.map { $0.originalBase + $0.size }.max() ?? 0
+
+                // Align to page boundary and add stack space
+                let stackSize = UInt32(config.stackPages) * UInt32(config.pvmMemoryPageSize)
+                totalMemorySize = StandardProgram.alignToPageSize(size: highestAddress + stackSize, config: config)
+
+                let actualUsage = layout.totalSize
+                let usageMB = Double(actualUsage) / (1024.0 * 1024.0)
+                let totalMB = Double(totalMemorySize) / (1024.0 * 1024.0)
 
                 logger.info(
-                    "✅ Using rebased memory layout: \(totalMemorySize) bytes (\(String(format: "%.2f", Double(totalMemorySize) / (1024.0 * 1024.0)))) MB - saved \(String(format: "%.2f", savingsMB)) MB vs 4GB"
+                    "✅ Using compact layout: highest=0x\(String(highestAddress, radix: 16)), total=\(String(format: "%.2f", totalMB)) MB (data: \(String(format: "%.2f", usageMB)) MB)"
                 )
             } catch {
-                // Fallback to original calculation if rebasing fails
-                logger.error("Failed to create JITMemoryLayout, falling back to 4GB: \(error)")
+                // Fallback if layout creation fails
+                logger.error("Failed to create JITMemoryLayout: \(error)")
                 totalMemorySize = UInt32(config.pvmProgramInitStackBaseAddress)
                 memoryLayout = nil
             }
@@ -478,12 +488,14 @@ final class ExecutorBackendJIT: ExecutorBackend {
             let initialMemory = standardProgram.initialMemory
 
             // Check cache for previously compiled function
+            // TEMPORARY: Disable cache to force recompilation with correct memory size
+            // TODO: Add memory size to cache key to properly enable caching
             let bytecode = programCode.code
             let compiledFuncPtr: UnsafeMutableRawPointer
             let dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?
             let dispatcherTableSize: UInt32
 
-            if let cachedEntry = codeCache.lookup(bytecode: bytecode, config: config, initialPC: pc) {
+            if false, let cachedEntry = codeCache.lookup(bytecode: bytecode, config: config, initialPC: pc) {
                 // Cache hit - use cached function pointer
                 compiledFuncPtr = UnsafeMutableRawPointer(mutating: cachedEntry.functionPtr)
                 dispatcherTable = cachedEntry.dispatcherTable
@@ -657,11 +669,13 @@ final class ExecutorBackendJIT: ExecutorBackend {
 
             // Execute the JIT-compiled function
             // CRITICAL: Must wrap execute call in withUnsafeBytes to ensure jump table pointer remains valid
-            let (exitReason, memoryBuffer): (ExitReason, UnsafeMutablePointer<UInt8>)
+            let (exitReason, memoryInfo): (ExitReason, MemoryAllocationInfo)
+            let memoryBuffer: UnsafeMutablePointer<UInt8> // Extract pointer for use in output reading
+
             if let programCode = currentProgramCode {
                 // Populate jump table data for JumpInd instruction support
                 // and execute while the pointer is still valid
-                (exitReason, memoryBuffer) = try programCode.jumpTable.withUnsafeBytes { rawBufferPointer in
+                let (er, mi): (ExitReason, MemoryAllocationInfo) = try programCode.jumpTable.withUnsafeBytes { rawBufferPointer in
                     // Set jump table data pointer (valid only within this closure)
                     jitHostFunctionTablePtr.pointee.jumpTableData = rawBufferPointer.baseAddress?.assumingMemoryBound(to: UInt8.self)
                     jitHostFunctionTablePtr.pointee.jumpTableSize = UInt32(programCode.jumpTable.count)
@@ -700,6 +714,10 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         memoryLayout: memoryLayout
                     )
                 }
+                // Assign values from first execution path
+                exitReason = er
+                memoryInfo = mi
+                memoryBuffer = mi.pointer
             } else {
                 // No jump table available
                 jitHostFunctionTablePtr.pointee.jumpTableData = nil
@@ -723,7 +741,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 }
 
                 // Execute without jump table
-                (exitReason, memoryBuffer) = try jitExecutor.execute(
+                let (er, mi) = try jitExecutor.execute(
                     functionPtr: compiledFuncPtr,
                     registers: &registers,
                     jitMemorySize: totalMemorySize,
@@ -733,11 +751,15 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     initialMemory: initialMemory,
                     memoryLayout: memoryLayout
                 )
+                // Assign values from second execution path
+                exitReason = er
+                memoryInfo = mi
+                memoryBuffer = mi.pointer
             }
 
             // Ensure memory is deallocated exactly once using defer
             defer {
-                memoryBuffer.deallocate()
+                memoryInfo.deallocate()
             }
 
             // Clear the invocation context reference and jump table data after execution

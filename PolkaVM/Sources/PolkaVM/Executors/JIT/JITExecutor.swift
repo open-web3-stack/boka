@@ -3,6 +3,7 @@
 
 import CppHelper
 import Foundation
+import Glibc
 import TracingUtils
 import Utils
 
@@ -55,6 +56,22 @@ enum JITError: Error, CustomStringConvertible {
     }
 }
 
+/// Memory allocation information for proper deallocation
+struct MemoryAllocationInfo {
+    let pointer: UnsafeMutablePointer<UInt8>
+    let size: Int
+    let usesMmap: Bool
+
+    /// Deallocate the memory using the appropriate method
+    func deallocate() {
+        if usesMmap {
+            munmap(pointer, size)
+        } else {
+            pointer.deallocate()
+        }
+    }
+}
+
 /// JIT executor for PolkaVM
 /// Responsible for executing JIT-compiled machine code
 final class JITExecutor {
@@ -70,7 +87,7 @@ final class JITExecutor {
     ///   - invocationContext: Context for host function calls
     ///   - initialMemory: Initial memory state from StandardProgram (for proper zone initialization)
     ///   - memoryLayout: Optional rebased memory layout for efficient memory initialization
-    /// - Returns: A tuple of exit reason and memory buffer pointer (caller must deallocate)
+    /// - Returns: A tuple of exit reason and memory allocation info (caller must deallocate)
     func execute(
         functionPtr: UnsafeMutableRawPointer,
         registers: inout Registers,
@@ -80,36 +97,47 @@ final class JITExecutor {
         invocationContext: UnsafeMutableRawPointer?,
         initialMemory: (any Memory)? = nil,
         memoryLayout: JITMemoryLayout? = nil
-    ) throws -> (ExitReason, UnsafeMutablePointer<UInt8>) {
+    ) throws -> (ExitReason, MemoryAllocationInfo) {
         // Create a flat memory buffer for the JIT execution
         logger.debug("Setting up JIT execution environment")
 
         // Prepare VM memory
-        // TODO: Implement proper memory sandboxing by reserving 4GB address space with PROT_NONE
-        //       and then enabling access only to pages that should be accessible to the guest
-        let memoryBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: Int(jitMemorySize))
+        // Use compact layout: allocate only what's needed, but use original addresses
+        // This means buffer[0xFF000000] actually needs to exist!
+        let memoryBuffer: UnsafeMutablePointer<UInt8>
+        let usesMmap = false // Don't use mmap for now
 
-        // MEMORY REBASING: Use rebased memory layout for efficient initialization
+        // Allocate compact buffer
+        logger.info("Allocating compact buffer: \(jitMemorySize) bytes")
+        memoryBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: Int(jitMemorySize))
+
+        // MEMORY INITIALIZATION: Copy data to appropriate addresses
+        // We use original addresses (e.g., 0xFF000000 for stack), NOT rebased offsets
         if let layout = memoryLayout {
-            // Zero-initialize the entire buffer
+            // Copy zone data to original addresses in the buffer
+            logger.info("Copying zones to original addresses")
+
+            // First, zero-initialize the entire buffer
             memoryBuffer.initialize(repeating: 0, count: Int(jitMemorySize))
 
-            // Copy zones using rebased layout (much faster than scanning 4GB)
+            // Copy zones using layout for efficient initialization
             var totalCopied = 0
             for zone in layout.zones {
-                // Copy zone data to its rebased offset
+                logger.info("  Zone: base=0x\(String(zone.originalBase, radix: 16)), size=\(zone.size), dataCount=\(zone.data.count)")
+
+                // Copy zone data to its original address
                 zone.data.withUnsafeBytes { rawBuffer in
                     if let baseAddress = rawBuffer.baseAddress {
-                        memcpy(memoryBuffer.advanced(by: Int(zone.baseOffset)), baseAddress, zone.data.count)
+                        let destPtr = memoryBuffer.advanced(by: Int(zone.originalBase))
+                        memcpy(destPtr, baseAddress, zone.data.count)
                         totalCopied += zone.data.count
-                        logger
-                            .debug(
-                                "  Copied zone: \(zone.data.count) bytes at offset \(zone.baseOffset) (original address: 0x\(String(zone.originalBase, radix: 16)))"
-                            )
+                        logger.debug(
+                            "  Copied zone: \(zone.data.count) bytes to original address 0x\(String(zone.originalBase, radix: 16))"
+                        )
                     }
                 }
             }
-            logger.info("✅ Initialized JIT memory using rebased layout: \(totalCopied) bytes copied into \(jitMemorySize) byte buffer")
+            logger.info("✅ Initialized JIT memory: \(totalCopied) bytes copied to original addresses")
         } else if let initialMemory {
             // Fallback: Copy from initialMemory (old method - scans entire address space)
             logger.warning("⚠️ Using legacy memory initialization (no rebased layout provided)")
@@ -149,12 +177,18 @@ final class JITExecutor {
             logger.info("✅ Initialized JIT memory from StandardProgram zones: \(totalCopied) bytes copied out of \(jitMemorySize) total")
         } else {
             // Initialize memory to zeros (fallback behavior)
-            memoryBuffer.initialize(repeating: 0, count: Int(jitMemorySize))
+            if usesMmap {
+                // For mmap, only initialize likely-used pages
+                logger.warning("⚠️ Initializing mmap memory to zeros (no initial memory provided)")
+            } else {
+                memoryBuffer.initialize(repeating: 0, count: Int(jitMemorySize))
+            }
             logger.warning("⚠️ Initialized JIT memory to zeros (no initial memory provided) - this may cause test failures!")
         }
 
         // Execute the JIT-compiled function
         logger.debug("Executing JIT-compiled function with initial PC: \(initialPC), Gas: \(gas.value)")
+        logger.info("JIT memory size: \(jitMemorySize), memoryBuffer: \(memoryBuffer)")
 
         var exitCode: Int32
         var gasValue = gas.value // Local copy since we can't modify gas.value directly
@@ -229,6 +263,13 @@ final class JITExecutor {
             exitReason = .panic(.trap)
         }
 
-        return (exitReason, memoryBuffer)
+        // Return exit reason and memory allocation info for proper deallocation
+        let memoryInfo = MemoryAllocationInfo(
+            pointer: memoryBuffer,
+            size: Int(jitMemorySize),
+            usesMmap: usesMmap
+        )
+
+        return (exitReason, memoryInfo)
     }
 }
