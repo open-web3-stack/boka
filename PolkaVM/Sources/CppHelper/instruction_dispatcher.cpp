@@ -25,6 +25,32 @@ struct DecodedInstruction {
     uint8_t size;
 };
 
+// Decode varint (variable-length integer)
+// Returns the decoded value and updates size to include varint bytes
+uint64_t decode_varint(const uint8_t* bytecode, uint32_t offset, uint32_t& out_size) {
+    uint64_t result = 0;
+    uint32_t shift = 0;
+    uint32_t i = 0;
+
+    while (true) {
+        uint8_t byte = bytecode[offset + i];
+        result |= (uint64_t(byte & 0x7F)) << shift;
+        i++;
+        if ((byte & 0x80) == 0) {
+            break;
+        }
+        shift += 7;
+        if (shift >= 64) {
+            // Varint too large, return 0
+            out_size = 1;
+            return 0;
+        }
+    }
+
+    out_size = i;
+    return result;
+}
+
 // Decode LoadImm64 instruction
 bool decode_load_imm_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
@@ -38,29 +64,40 @@ bool decode_load_imm_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction
 }
 
 // Decode LoadImm instruction
+// Format: [opcode][reg_index][varint_32bit_value]
 bool decode_load_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-
-    // Format: [opcode][reg_index][value_32bit]
     decoded.dest_reg = bytecode[pc + 1];
-    decoded.immediate = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
-    decoded.size = 6; // 1 + 1 + 4 = 6 bytes
+
+    // Decode varint immediate starting at pc + 2 (after register)
+    uint32_t varint_size = 0;
+    decoded.immediate = decode_varint(bytecode, pc + 2, varint_size);
+
+    // Size: opcode (1) + reg (1) + varint (variable)
+    decoded.size = 2 + varint_size;
 
     return true;
 }
 
 // Decode LoadImmJump instruction (opcode 80)
+// Format: [opcode][reg_index][varint_value][varint_offset]
+// Both value and offset are varint-encoded
 bool decode_load_imm_jump(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-
-    // Format: [opcode][reg_index][immediate_32bit][offset_32bit]
     decoded.dest_reg = bytecode[pc + 1];
-    decoded.immediate = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
-    decoded.offset = *reinterpret_cast<const int32_t*>(&bytecode[pc + 6]);
-    // Offset is relative to the START of the instruction (not the end)
-    // This matches the Swift implementation (Instructions.swift:422) and x64_labeled_helper.cpp
-    decoded.target_pc = pc + static_cast<uint32_t>(decoded.offset); // PC-relative
-    decoded.size = 10; // 1 + 1 + 4 + 4 = 10 bytes
+
+    // Decode first varint (value)
+    uint32_t varint1_size = 0;
+    decoded.immediate = decode_varint(bytecode, pc + 2, varint1_size);
+
+    // Decode second varint (offset)
+    uint32_t varint2_size = 0;
+    uint64_t offset_value = decode_varint(bytecode, pc + 2 + varint1_size, varint2_size);
+    decoded.offset = static_cast<int32_t>(offset_value);
+    decoded.target_pc = pc + static_cast<uint32_t>(decoded.offset);
+
+    // Size: opcode (1) + reg (1) + varint1 + varint2
+    decoded.size = 2 + varint1_size + varint2_size;
 
     return true;
 }
@@ -200,88 +237,166 @@ bool decode_fallthrough(const uint8_t* bytecode, uint32_t pc, DecodedInstruction
 }
 
 // Decode StoreImmU8 instruction (opcode 30)
+// Format: [opcode][varint_address][varint_value_8bit]
 bool decode_store_imm_u8(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    // Format: [opcode][value_8bit][address_32bit]
-    decoded.immediate = bytecode[pc + 1];
-    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
-    decoded.size = 6; // 1 + 1 + 4 = 6 bytes
+
+    // Decode first varint (address)
+    uint32_t varint1_size = 0;
+    uint64_t address = decode_varint(bytecode, pc + 1, varint1_size);
+    decoded.address = static_cast<uint32_t>(address);
+
+    // Decode second varint (value)
+    uint32_t varint2_size = 0;
+    decoded.immediate = decode_varint(bytecode, pc + 1 + varint1_size, varint2_size);
+
+    // Size: opcode (1) + varint1 + varint2
+    decoded.size = 1 + varint1_size + varint2_size;
+
     return true;
 }
 
 // Decode StoreImmU16 instruction (opcode 31)
+// Format: [opcode][varint_address][varint_value_16bit]
 bool decode_store_imm_u16(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    // Format: [opcode][value_16bit][address_32bit]
-    decoded.immediate = *reinterpret_cast<const uint16_t*>(&bytecode[pc + 1]);
-    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 3]);
-    decoded.size = 7; // 1 + 2 + 4 = 7 bytes
+
+    // Decode first varint (address)
+    uint32_t varint1_size = 0;
+    uint64_t address = decode_varint(bytecode, pc + 1, varint1_size);
+    decoded.address = static_cast<uint32_t>(address);
+
+    // Decode second varint (value)
+    uint32_t varint2_size = 0;
+    decoded.immediate = decode_varint(bytecode, pc + 1 + varint1_size, varint2_size);
+
+    // Size: opcode (1) + varint1 + varint2
+    decoded.size = 1 + varint1_size + varint2_size;
+
     return true;
 }
 
 // Decode StoreImmU32 instruction (opcode 32)
+// Format: [opcode][varint_address][varint_value_32bit]
 bool decode_store_imm_u32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    // Format: [opcode][value_32bit][address_32bit]
-    decoded.immediate = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 1]);
-    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 5]);
-    decoded.size = 9; // 1 + 4 + 4 = 9 bytes
+
+    // Decode first varint (address)
+    uint32_t varint1_size = 0;
+    uint64_t address = decode_varint(bytecode, pc + 1, varint1_size);
+    decoded.address = static_cast<uint32_t>(address);
+
+    // Decode second varint (value)
+    uint32_t varint2_size = 0;
+    decoded.immediate = decode_varint(bytecode, pc + 1 + varint1_size, varint2_size);
+
+    // Size: opcode (1) + varint1 + varint2
+    decoded.size = 1 + varint1_size + varint2_size;
+
     return true;
 }
 
 // Decode StoreImmU64 instruction (opcode 33)
+// Format: [opcode][varint_address][varint_value_64bit]
 bool decode_store_imm_u64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    // Format: [opcode][value_64bit][address_32bit]
-    decoded.immediate = *reinterpret_cast<const uint64_t*>(&bytecode[pc + 1]);
-    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 9]);
-    decoded.size = 13; // 1 + 8 + 4 = 13 bytes
+
+    // Decode first varint (address)
+    uint32_t varint1_size = 0;
+    uint64_t address = decode_varint(bytecode, pc + 1, varint1_size);
+    decoded.address = static_cast<uint32_t>(address);
+
+    // Decode second varint (value)
+    uint32_t varint2_size = 0;
+    decoded.immediate = decode_varint(bytecode, pc + 1 + varint1_size, varint2_size);
+
+    // Size: opcode (1) + varint1 + varint2
+    decoded.size = 1 + varint1_size + varint2_size;
+
     return true;
 }
 
 // Decode StoreImmIndU8 instruction (opcode 70)
-// Format: [opcode][reg_index][address_32bit][value_8bit]
-// Address and value share 32 bits: 16-bit address offset + 8-bit value
+// Format: [opcode][reg_index][varint_address][varint_value_8bit]
 bool decode_store_imm_ind_u8(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
     decoded.dest_reg = bytecode[pc + 1];  // reg_index
-    // Combined 32-bit field: [16-bit address][16-bit padding/value]
-    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
-    decoded.immediate = bytecode[pc + 6];  // 8-bit value
-    decoded.size = 7; // 1 + 1 + 4 + 1 = 7 bytes
+
+    // Decode first varint (address)
+    uint32_t varint1_size = 0;
+    uint64_t address = decode_varint(bytecode, pc + 2, varint1_size);
+    decoded.address = static_cast<uint32_t>(address);
+
+    // Decode second varint (value)
+    uint32_t varint2_size = 0;
+    decoded.immediate = decode_varint(bytecode, pc + 2 + varint1_size, varint2_size);
+
+    // Size: opcode (1) + reg (1) + varint1 + varint2
+    decoded.size = 2 + varint1_size + varint2_size;
+
     return true;
 }
 
 // Decode StoreImmIndU16 instruction (opcode 71)
-// Format: [opcode][reg_index][address_32bit][value_16bit]
+// Format: [opcode][reg_index][varint_address][varint_value_16bit]
 bool decode_store_imm_ind_u16(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
     decoded.dest_reg = bytecode[pc + 1];  // reg_index
-    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
-    decoded.immediate = *reinterpret_cast<const uint16_t*>(&bytecode[pc + 6]);
-    decoded.size = 8; // 1 + 1 + 4 + 2 = 8 bytes
+
+    // Decode first varint (address)
+    uint32_t varint1_size = 0;
+    uint64_t address = decode_varint(bytecode, pc + 2, varint1_size);
+    decoded.address = static_cast<uint32_t>(address);
+
+    // Decode second varint (value)
+    uint32_t varint2_size = 0;
+    decoded.immediate = decode_varint(bytecode, pc + 2 + varint1_size, varint2_size);
+
+    // Size: opcode (1) + reg (1) + varint1 + varint2
+    decoded.size = 2 + varint1_size + varint2_size;
+
     return true;
 }
 
 // Decode StoreImmIndU32 instruction (opcode 72)
-// Format: [opcode][reg_index][address_32bit][value_32bit]
+// Format: [opcode][reg_index][varint_address][varint_value_32bit]
 bool decode_store_imm_ind_u32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
     decoded.dest_reg = bytecode[pc + 1];  // reg_index
-    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
-    decoded.immediate = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 6]);
-    decoded.size = 10; // 1 + 1 + 4 + 4 = 10 bytes
+
+    // Decode first varint (address)
+    uint32_t varint1_size = 0;
+    uint64_t address = decode_varint(bytecode, pc + 2, varint1_size);
+    decoded.address = static_cast<uint32_t>(address);
+
+    // Decode second varint (value)
+    uint32_t varint2_size = 0;
+    decoded.immediate = decode_varint(bytecode, pc + 2 + varint1_size, varint2_size);
+
+    // Size: opcode (1) + reg (1) + varint1 + varint2
+    decoded.size = 2 + varint1_size + varint2_size;
+
     return true;
 }
 
 // Decode StoreImmIndU64 instruction (opcode 73)
-// Format: [opcode][reg_index][address_32bit][value_64bit]
+// Format: [opcode][reg_index][varint_address][varint_value_64bit]
 bool decode_store_imm_ind_u64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
     decoded.dest_reg = bytecode[pc + 1];  // reg_index
-    decoded.address = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 2]);
-    decoded.immediate = *reinterpret_cast<const uint64_t*>(&bytecode[pc + 6]);
-    decoded.size = 14; // 1 + 1 + 4 + 8 = 14 bytes
+
+    // Decode first varint (address)
+    uint32_t varint1_size = 0;
+    uint64_t address = decode_varint(bytecode, pc + 2, varint1_size);
+    decoded.address = static_cast<uint32_t>(address);
+
+    // Decode second varint (value)
+    uint32_t varint2_size = 0;
+    decoded.immediate = decode_varint(bytecode, pc + 2 + varint1_size, varint2_size);
+
+    // Size: opcode (1) + reg (1) + varint1 + varint2
+    decoded.size = 2 + varint1_size + varint2_size;
+
     return true;
 }
 
@@ -407,16 +522,26 @@ bool decode_load_ind_u64(const uint8_t* bytecode, uint32_t pc, DecodedInstructio
 }
 
 // Decode BranchEqImm instruction (opcode 81)
-// Format: [opcode][reg_index][value_64bit][offset_32bit]
+// Decode BranchEqImm instruction
+// Format: [opcode][reg_index][varint_value][varint_offset]
+// Both value and offset are varint-encoded
 bool decode_branch_eq_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
     decoded.dest_reg = bytecode[pc + 1];  // reg_index
-    decoded.immediate = *reinterpret_cast<const uint64_t*>(&bytecode[pc + 2]);
-    decoded.offset = *reinterpret_cast<const int32_t*>(&bytecode[pc + 10]);
-    // Offset is relative to the START of the instruction (not the end)
-    // This matches the Swift implementation (BranchInstructionBase.swift:23)
+
+    // Decode first varint (value)
+    uint32_t varint1_size = 0;
+    decoded.immediate = decode_varint(bytecode, pc + 2, varint1_size);
+
+    // Decode second varint (offset)
+    uint32_t varint2_size = 0;
+    uint64_t offset_value = decode_varint(bytecode, pc + 2 + varint1_size, varint2_size);
+    decoded.offset = static_cast<int32_t>(offset_value);
     decoded.target_pc = pc + static_cast<uint32_t>(decoded.offset);
-    decoded.size = 14; // 1 + 1 + 8 + 4 = 14 bytes
+
+    // Size: opcode (1) + reg (1) + varint1 + varint2
+    decoded.size = 2 + varint1_size + varint2_size;
+
     return true;
 }
 
@@ -458,13 +583,21 @@ bool decode_branch_gt_s_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruc
 }
 
 // Decode AddImm32 instruction (opcode 131)
-// Format: [opcode][ra][rb][value_32bit]
+// Format: [opcode][packed_ra_rb][varint_32bit_value]
+// where packed_ra_rb = (rb << 4) | ra (both in same byte)
 bool decode_add_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    decoded.dest_reg = bytecode[pc + 1];  // ra
-    decoded.src1_reg = bytecode[pc + 2];  // rb
-    decoded.immediate = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 3]);
-    decoded.size = 7; // 1 + 1 + 1 + 4 = 7 bytes
+    uint8_t packed = bytecode[pc + 1];
+    decoded.dest_reg = packed & 0x0F;  // ra (lower nibble)
+    decoded.src1_reg = (packed >> 4) & 0x0F;  // rb (upper nibble)
+
+    // Decode varint immediate starting at pc + 2 (after packed registers)
+    uint32_t varint_size = 0;
+    decoded.immediate = decode_varint(bytecode, pc + 2, varint_size);
+
+    // Size: opcode (1) + packed (1) + varint (variable)
+    decoded.size = 2 + varint_size;
+
     return true;
 }
 
@@ -540,13 +673,21 @@ bool decode_cmov_nz_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction
 }
 
 // Decode AddImm64 instruction (opcode 149)
-// Format: [opcode][ra][rb][value_64bit]
+// Format: [opcode][packed_ra_rb][value_varint]
+// where packed_ra_rb = (rb << 4) | ra (both in same byte)
 bool decode_add_imm_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    decoded.dest_reg = bytecode[pc + 1];  // ra
-    decoded.src1_reg = bytecode[pc + 2];  // rb
-    decoded.immediate = *reinterpret_cast<const uint64_t*>(&bytecode[pc + 3]);
-    decoded.size = 11; // 1 + 1 + 1 + 8 = 11 bytes
+    uint8_t packed = bytecode[pc + 1];
+    decoded.dest_reg = packed & 0x0F;  // ra (lower nibble)
+    decoded.src1_reg = (packed >> 4) & 0x0F;  // rb (upper nibble)
+
+    // Decode varint immediate starting at pc + 2 (after packed registers)
+    uint32_t varint_size = 0;
+    decoded.immediate = decode_varint(bytecode, pc + 2, varint_size);
+
+    // Size: opcode (1) + packed (1) + varint (variable)
+    decoded.size = 2 + varint_size;
+
     return true;
 }
 
@@ -610,14 +751,28 @@ bool decode_jump_ind(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& d
 }
 
 // Decode LoadImmJumpInd instruction (opcode 180)
+// Format: [opcode][packed_ra_rb][varint_value][varint_offset]
+// where packed_ra_rb = (rb << 4) | ra
+// Both value and offset are varint-encoded
 bool decode_load_imm_jump_ind(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    // Format: [opcode][ra][rb][value_32bit][offset_32bit]
-    decoded.dest_reg = bytecode[pc + 1];     // ra
-    decoded.src1_reg = bytecode[pc + 2];     // rb
-    decoded.immediate = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 3]);  // value
-    decoded.target_pc = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 7]);  // offset (used as jump target)
-    decoded.size = 11; // 1 + 1 + 1 + 4 + 4 = 11 bytes
+    uint8_t packed = bytecode[pc + 1];
+    decoded.dest_reg = packed & 0x0F;  // ra
+    decoded.src1_reg = (packed >> 4) & 0x0F;  // rb
+
+    // Decode first varint (value) starting at pc + 2
+    uint32_t varint1_size = 0;
+    decoded.immediate = decode_varint(bytecode, pc + 2, varint1_size);
+
+    // Decode second varint (offset)
+    uint32_t varint2_size = 0;
+    uint64_t offset_value = decode_varint(bytecode, pc + 2 + varint1_size, varint2_size);
+    decoded.offset = static_cast<int32_t>(offset_value);
+    decoded.target_pc = pc + static_cast<uint32_t>(decoded.offset);
+
+    // Size: opcode (1) + packed (1) + varint1 + varint2
+    decoded.size = 2 + varint1_size + varint2_size;
+
     return true;
 }
 
@@ -810,11 +965,17 @@ bool decode_branch_ne(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& 
 }
 
 // Decode Ecalli instruction (opcode 10)
+// Format: [opcode][varint_call_index]
 bool decode_ecalli(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    // Format: [opcode][call_index_32bit]
-    decoded.immediate = *reinterpret_cast<const uint32_t*>(&bytecode[pc + 1]);
-    decoded.size = 5; // 1 + 4 = 5 bytes
+
+    // Decode varint call index
+    uint32_t varint_size = 0;
+    decoded.immediate = decode_varint(bytecode, pc + 1, varint_size);
+
+    // Size: opcode (1) + varint (variable)
+    decoded.size = 1 + varint_size;
+
     return true;
 }
 
