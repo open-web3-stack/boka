@@ -174,7 +174,11 @@ final class JITExecutor {
                 let zoneBase = memoryBuffer.advanced(by: Int(zone.originalBase))
 
                 // For mmap, we need to ensure all pages in the zone range are accessible
-                // Even zones with no data need to be touched to ensure the pages are mapped
+                // Even zones with no data need to be touched to ensure the pages are mapped.
+                // This pre-touching is necessary because JIT-compiled code may access any
+                // address in the zone, and we want to avoid page faults during execution.
+                // The cost is acceptable because it's done once during initialization,
+                // and MAP_NORESERVE still saves us from allocating physical memory upfront.
                 if usesMmap, zone.size > 0 {
                     logger.info("  Zone has size=\(zone.size), touching pages")
                     let pageSize = 4096

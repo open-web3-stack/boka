@@ -458,7 +458,10 @@ final class ExecutorBackendJIT: ExecutorBackend {
 
                 // CRITICAL: JIT must use pvmProgramInitStackBaseAddress to match interpreter memory layout
                 // The interpreter allows accesses up to this address (uses sparse memory model)
-                // Even if program zones don't reach this high, JIT needs same memory size for compatibility
+                // Even if program zones don't reach this high, JIT needs same memory size for compatibility.
+                // NOTE: This hybrid approach uses compact layout for zone offsets but traditional
+                // layout for total memory size. A full transition to compact layout would require
+                // changing the interpreter's memory model, which is beyond the current scope.
                 totalMemorySize = UInt32(config.pvmProgramInitStackBaseAddress)
 
                 logger.info("🔍 Using pvmProgramInitStackBaseAddress for memory size: 0x\(String(totalMemorySize, radix: 16))")
