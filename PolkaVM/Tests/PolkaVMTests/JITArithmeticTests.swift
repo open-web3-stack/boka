@@ -190,7 +190,7 @@ struct JITArithmeticTests {
 
         // AddImm64 r1, r1, 42
         code.append(0x97) // AddImm64 opcode
-        code.append(0x01) // r1
+        code.append(0x11) // packed: ra=r1, rb=r1
         // Immediate 42 (varint encoded)
         var imm = UInt64(42)
         while imm > 0 {
@@ -225,7 +225,7 @@ struct JITArithmeticTests {
 
         // SubImm64 r1, r1, 42
         code.append(0x9A) // SubImm64 opcode
-        code.append(0x01) // r1
+        code.append(0x11) // packed: ra=r1, rb=r1
         // Immediate 42 (varint encoded)
         var imm = UInt64(42)
         while imm > 0 {
@@ -256,7 +256,7 @@ struct JITArithmeticTests {
 
         // AddImm64 r1, r1, 500
         code.append(0x97) // AddImm64
-        code.append(0x01)
+        code.append(0x11) // packed: ra=r1, rb=r1
         var imm = UInt64(500)
         while imm > 0 {
             var byte = UInt8(imm & 0x7F)
