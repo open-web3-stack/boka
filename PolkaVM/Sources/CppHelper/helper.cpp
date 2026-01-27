@@ -93,23 +93,53 @@ uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, siz
             instrSize = InstructionSize::Trap;
             break;
 
+        // Ecalli: [opcode][varint_call_index] = variable size
+        case Opcode::Ecalli:
+            {
+                instrSize = 1; // opcode
+                uint32_t offset = pc + 1;
+                while (offset < bytecode_size) {
+                    uint8_t byte = bytecode[offset];
+                    instrSize++;
+                    offset++;
+                    if ((byte & 0x80) == 0) break;  // Last varint byte
+                    if (instrSize > 20) return 0;  // Sanity check
+                }
+            }
+            break;
+
         // LoadImm64: [opcode][reg_index][value_64bit] = 10 bytes
         case Opcode::LoadImmU64:
             instrSize = InstructionSize::LoadImm64;
             break;
 
-        // StoreImmU8/U16/U32/U64
+        // StoreImmU8/U16/U32/U64: two varints (address + value)
         case Opcode::StoreImmU8:
-            instrSize = InstructionSize::StoreImmU8;
-            break;
         case Opcode::StoreImmU16:
-            instrSize = InstructionSize::StoreImmU16;
-            break;
         case Opcode::StoreImmU32:
-            instrSize = InstructionSize::StoreImmU32;
-            break;
         case Opcode::StoreImmU64:
-            instrSize = InstructionSize::StoreImmU64;
+            {
+                instrSize = 1; // opcode
+                uint32_t offset = pc + 1;
+
+                // Decode first varint (address)
+                while (offset < bytecode_size) {
+                    uint8_t byte = bytecode[offset];
+                    instrSize++;
+                    offset++;
+                    if ((byte & 0x80) == 0) break;
+                    if (instrSize > 20) return 0;
+                }
+
+                // Decode second varint (value)
+                while (offset < bytecode_size) {
+                    uint8_t byte = bytecode[offset];
+                    instrSize++;
+                    offset++;
+                    if ((byte & 0x80) == 0) break;
+                    if (instrSize > 20) return 0;
+                }
+            }
             break;
 
         // Jump: [opcode][offset_32bit] = 5 bytes
@@ -122,23 +152,75 @@ uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, siz
             instrSize = InstructionSize::JumpInd;
             break;
 
-        // LoadImm: [opcode][reg_index][value_32bit] = 6 bytes
+        // LoadImm: [opcode][reg_index][varint_value] = variable size
         case Opcode::LoadImm:
-            instrSize = InstructionSize::LoadImm;
+            {
+                instrSize = 2; // opcode + reg
+                uint32_t offset = pc + 2;
+                while (offset < bytecode_size) {
+                    uint8_t byte = bytecode[offset];
+                    instrSize++;
+                    offset++;
+                    if ((byte & 0x80) == 0) break;  // Last varint byte
+                    if (instrSize > 20) return 0;  // Sanity check
+                }
+            }
             break;
 
-        // LoadImmJump: [opcode][reg_index][offset_32bit][value_32bit] = 10 bytes
+        // LoadImmJump: [opcode][reg_index][varint_value][varint_offset] = variable size
         case Opcode::LoadImmJump:
-            instrSize = InstructionSize::LoadImmJump;
+            {
+                instrSize = 2; // opcode + reg
+                uint32_t offset = pc + 2;
+
+                // Decode first varint (value)
+                while (offset < bytecode_size) {
+                    uint8_t byte = bytecode[offset];
+                    instrSize++;
+                    offset++;
+                    if ((byte & 0x80) == 0) break;
+                    if (instrSize > 20) return 0;
+                }
+
+                // Decode second varint (offset)
+                while (offset < bytecode_size) {
+                    uint8_t byte = bytecode[offset];
+                    instrSize++;
+                    offset++;
+                    if ((byte & 0x80) == 0) break;
+                    if (instrSize > 20) return 0;
+                }
+            }
             break;
 
-        // LoadImmJumpInd: [opcode][ra][rb][value_32bit][offset_32bit] = 11 bytes
+        // LoadImmJumpInd: [opcode][packed_ra_rb][varint_value][varint_offset] = variable size
         case Opcode::LoadImmJumpInd:
-            instrSize = 11; // 1 + 1 + 1 + 4 + 4 = 11 bytes
+            {
+                instrSize = 2; // opcode + packed registers
+                uint32_t offset = pc + 2;
+
+                // Decode first varint (value)
+                while (offset < bytecode_size) {
+                    uint8_t byte = bytecode[offset];
+                    instrSize++;
+                    offset++;
+                    if ((byte & 0x80) == 0) break;
+                    if (instrSize > 20) return 0;
+                }
+
+                // Decode second varint (offset)
+                while (offset < bytecode_size) {
+                    uint8_t byte = bytecode[offset];
+                    instrSize++;
+                    offset++;
+                    if ((byte & 0x80) == 0) break;
+                    if (instrSize > 20) return 0;
+                }
+            }
             break;
 
         // Branch Immediate instructions (opcodes 81-90)
-        // Format: [opcode][reg_index][value_64bit][offset_32bit] = 14 bytes
+        // Format: [opcode][reg_index][varint_value][varint_offset] = variable size
         case Opcode::BranchEqImm:
         case Opcode::BranchNeImm:
         case Opcode::BranchLtUImm:
@@ -149,7 +231,28 @@ uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, siz
         case Opcode::BranchLeSImm:
         case Opcode::BranchGeSImm:
         case Opcode::BranchGtSImm:
-            instrSize = 14; // 1 + 1 + 8 + 4 = 14 bytes
+            {
+                instrSize = 2; // opcode + reg
+                uint32_t offset = pc + 2;
+
+                // Decode first varint (value)
+                while (offset < bytecode_size) {
+                    uint8_t byte = bytecode[offset];
+                    instrSize++;
+                    offset++;
+                    if ((byte & 0x80) == 0) break;
+                    if (instrSize > 20) return 0;
+                }
+
+                // Decode second varint (offset)
+                while (offset < bytecode_size) {
+                    uint8_t byte = bytecode[offset];
+                    instrSize++;
+                    offset++;
+                    if ((byte & 0x80) == 0) break;
+                    if (instrSize > 20) return 0;
+                }
+            }
             break;
 
         // Load instructions: [opcode][reg_index][address_32bit] = 6 bytes
@@ -171,19 +274,33 @@ uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, siz
             instrSize = InstructionSize::StoreU8;
             break;
 
-        // Store Immediate Indirect instructions (opcodes 70-73)
-        // Format: [opcode][reg_index][address_32bit][value_Nbit]
+        // StoreImmIndU8/U16/U32/U64: reg + two varints (address + value)
         case Opcode::StoreImmIndU8:
-            instrSize = 7; // 1 + 1 + 4 + 1 = 7 bytes
-            break;
         case Opcode::StoreImmIndU16:
-            instrSize = 8; // 1 + 1 + 4 + 2 = 8 bytes
-            break;
         case Opcode::StoreImmIndU32:
-            instrSize = 10; // 1 + 1 + 4 + 4 = 10 bytes
-            break;
         case Opcode::StoreImmIndU64:
-            instrSize = 14; // 1 + 1 + 4 + 8 = 14 bytes
+            {
+                instrSize = 2; // opcode + reg
+                uint32_t offset = pc + 2;
+
+                // Decode first varint (address)
+                while (offset < bytecode_size) {
+                    uint8_t byte = bytecode[offset];
+                    instrSize++;
+                    offset++;
+                    if ((byte & 0x80) == 0) break;
+                    if (instrSize > 20) return 0;
+                }
+
+                // Decode second varint (value)
+                while (offset < bytecode_size) {
+                    uint8_t byte = bytecode[offset];
+                    instrSize++;
+                    offset++;
+                    if ((byte & 0x80) == 0) break;
+                    if (instrSize > 20) return 0;
+                }
+            }
             break;
 
         // Store Indirect instructions (opcodes 120-123)
@@ -207,8 +324,9 @@ uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, siz
             instrSize = 7; // 1 + 1 + 1 + 4 = 7 bytes
             break;
 
-        // 32-bit Immediate instructions (opcodes 131-148)
-        // Format: [opcode][ra][rb][value_32bit] = 7 bytes
+        // 32-bit Immediate instructions (opcodes 131-148, 230-231)
+        // Format: [opcode][packed_ra_rb][varint_32bit_value]
+        // where packed_ra_rb = (rb << 4) | ra (both in same byte)
         case Opcode::AddImm32:
         case Opcode::AndImm:
         case Opcode::XorImm:
@@ -227,11 +345,23 @@ uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, siz
         case Opcode::SharRImmAlt32:
         case Opcode::CmovIzImm:
         case Opcode::CmovNzImm:
-            instrSize = 7; // 1 + 1 + 1 + 4 = 7 bytes
+            {
+                // Varint-encoded immediate: need to decode to find size
+                instrSize = 2; // opcode + packed registers
+                uint32_t offset = pc + 2;
+                while (offset < bytecode_size) {
+                    uint8_t byte = bytecode[offset];
+                    instrSize++;
+                    offset++;
+                    if ((byte & 0x80) == 0) break;  // Last varint byte
+                    if (instrSize > 20) return 0;  // Sanity check
+                }
+            }
             break;
 
         // 64-bit Immediate instructions (opcodes 149-161)
-        // Format: [opcode][ra][rb][value_64bit] = 11 bytes
+        // Format: [opcode][packed_ra_rb][value_varint] = variable size
+        // where packed_ra_rb contains both registers in one byte
         case Opcode::AddImm64:
         case Opcode::MulImm64:
         case Opcode::ShloLImm64:
@@ -245,7 +375,20 @@ uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, siz
         case Opcode::RotR64ImmAlt:
         case Opcode::RotR32Imm:
         case Opcode::RotR32ImmAlt:
-            instrSize = 11; // 1 + 1 + 1 + 8 = 11 bytes
+            {
+                // Varint-encoded immediate: need to decode to find size
+                // Format: [opcode][packed_ra_rb][varint...]
+                instrSize = 2; // opcode + packed registers
+                // Decode varint to find its size
+                uint32_t offset = pc + 2;  // Skip opcode and packed registers
+                while (offset < bytecode_size) {
+                    uint8_t byte = bytecode[offset];
+                    instrSize++;
+                    offset++;
+                    if ((byte & 0x80) == 0) break;  // Last varint byte
+                    if (instrSize > 20) return 0;  // Sanity check
+                }
+            }
             break;
 
         // Branch instructions: [opcode][reg1][reg2][offset_32bit] = 7 bytes
