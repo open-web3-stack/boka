@@ -149,14 +149,7 @@ struct JITControlFlowTests {
             testName: "Jump forward"
         )
 
-        // Log results for debugging
-        print("DEBUG: Jump test")
-        print("  Interpreter exitReason: \(interpreterResult.exitReason)")
-        print("  JIT exitReason: \(jitResult.exitReason)")
-        if let diff = differences {
-            print("  Differences: \(diff)")
-        }
-
+        // Both should have the same behavior (currently both trap due to bitmask encoding issue)
         #expect(
             differences == nil,
             "Jump parity mismatch: \(differences ?? "none")"
