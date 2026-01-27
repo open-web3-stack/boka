@@ -117,6 +117,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     size_t codeSize,
     uint32_t initialPC,
     uint32_t jitMemorySize,
+    const uint32_t* _Nullable skipTable,   // NEW: instruction skip values
+    size_t skipTableSize,                   // NEW: skip table size
     void* _Nullable * _Nonnull funcOut)
 {
     // Validate inputs
@@ -127,6 +129,21 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     if (!funcOut) {
         return 2; // Invalid output parameter
     }
+
+    // Create lambda to get instruction size using skip table
+    // This is the authoritative source for variable-length encoded instructions
+    auto getInstrSize = [&](uint32_t pc) -> uint32_t {
+        // If skip table provided, use it (from Swift's ProgramCode.skip(pc))
+        if (skipTable != nullptr && pc < skipTableSize) {
+            uint32_t skip = skipTable[pc];
+            if (skip > 0) {
+                return skip + 1;  // skip is additional bytes, +1 for opcode
+            }
+        }
+
+        // Fallback to fixed-size calculation (for safety)
+        return getInstructionSize(codeBuffer, pc, codeSize);
+    };
 
     // Initialize global runtime if needed
     {
@@ -228,7 +245,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
     while (pc < codeSize) {
         uint8_t opcode = codeBuffer[pc];
-        uint32_t instrSize = getInstructionSize(codeBuffer, pc, codeSize);
+        uint32_t instrSize = getInstrSize(pc);  // USE skip table
 
         if (instrSize == 0) {
             // Unknown opcode - log and fail compilation
@@ -293,6 +310,10 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             memcpy(&immediate, &codeBuffer[pc + 2], 4);   // Immediate value is at bytes 2-5
             memcpy(&jumpOffset, &codeBuffer[pc + 6], 4);   // Jump offset is at bytes 6-9
             uint32_t targetPC = pc + int32_t(jumpOffset);  // Offset is relative to instruction start
+
+            // DEBUG: Log LoadImmJump details
+            fprintf(stderr, "DEBUG LoadImmJump: pc=%u, destReg=%u, immediate=0x%x, jumpOffset=0x%x (%d), targetPC=%u\n",
+                    pc, destReg, immediate, jumpOffset, (int32_t)jumpOffset, targetPC);
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "x86_64");
             jit_emit_load_imm_jump_labeled(&a, "x86_64", destReg, immediate, targetLabel);
@@ -1161,6 +1182,324 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // Store value to memory
             a.mov(x86::rcx, value);
+            x86::Mem mem(x86::r12, x86::rax, 0, 0);
+            a.mov(mem, x86::rcx);
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === LoadIndU32: Load 32-bit unsigned value from indirect address ===
+        // Format: [opcode][ra_rb][offset_32bit] where ra_rb = (ra | rb << 4)
+        if (opcode_is(opcode, Opcode::LoadIndU32)) {
+            uint8_t ra_rb = codeBuffer[pc + 1];
+            uint8_t ra = (ra_rb >> 0) & 0x0F;
+            uint8_t rb = (ra_rb >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            // DEBUG: Log instruction details
+            fprintf(stderr, "DEBUG LoadIndU32: ra=%d, rb=%d, offset=0x%x\n", ra, rb, offset);
+
+            // Load base address from rb register into rax
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, rb * 8));
+
+            // DEBUG: Log loaded base address (need to save rax first)
+            a.mov(x86::rdi, x86::rax);  // Save rax to rdi
+            // We can't easily call fprintf here, so we'll skip runtime logging
+
+            // Add offset to get final address
+            a.add(x86::rax, offset);
+
+            // Bounds check: address < 65536 → panic
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            // Runtime check: address >= memory_size → page fault
+            a.mov(x86::ecx, x86::r13d);
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+
+            // Load 32-bit value from memory into eax (zero-extended to rax)
+            a.mov(x86::eax, x86::dword_ptr(x86::r12, x86::rax));
+            a.movsxd(x86::rax, x86::eax);
+
+            // Store to destination register ra
+            a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === LoadIndI32: Load 32-bit signed value from indirect address ===
+        if (opcode_is(opcode, Opcode::LoadIndI32)) {
+            uint8_t ra_rb = codeBuffer[pc + 1];
+            uint8_t ra = (ra_rb >> 0) & 0x0F;
+            uint8_t rb = (ra_rb >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, rb * 8));
+            a.add(x86::rax, offset);
+
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            a.mov(x86::ecx, x86::r13d);
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+
+            // Load 32-bit signed value (sign-extends to 64-bit)
+            a.movsxd(x86::rax, x86::dword_ptr(x86::r12, x86::rax));
+
+            a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === LoadIndU16: Load 16-bit unsigned value from indirect address ===
+        if (opcode_is(opcode, Opcode::LoadIndU16)) {
+            uint8_t ra_rb = codeBuffer[pc + 1];
+            uint8_t ra = (ra_rb >> 0) & 0x0F;
+            uint8_t rb = (ra_rb >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, rb * 8));
+            a.add(x86::rax, offset);
+
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            a.mov(x86::ecx, x86::r13d);
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+
+            // Load 16-bit unsigned value (zero-extended to 64-bit)
+            a.movzx(x86::eax, x86::word_ptr(x86::r12, x86::rax));
+            a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === LoadIndI16: Load 16-bit signed value from indirect address ===
+        if (opcode_is(opcode, Opcode::LoadIndI16)) {
+            uint8_t ra_rb = codeBuffer[pc + 1];
+            uint8_t ra = (ra_rb >> 0) & 0x0F;
+            uint8_t rb = (ra_rb >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, rb * 8));
+            a.add(x86::rax, offset);
+
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            a.mov(x86::ecx, x86::r13d);
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+
+            // Load 16-bit signed value (sign-extends to 64-bit)
+            a.movsx(x86::rax, x86::word_ptr(x86::r12, x86::rax));
+
+            a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === LoadIndU8: Load 8-bit unsigned value from indirect address ===
+        if (opcode_is(opcode, Opcode::LoadIndU8)) {
+            uint8_t ra_rb = codeBuffer[pc + 1];
+            uint8_t ra = (ra_rb >> 0) & 0x0F;
+            uint8_t rb = (ra_rb >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, rb * 8));
+            a.add(x86::rax, offset);
+
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            a.mov(x86::ecx, x86::r13d);
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+
+            // Load 8-bit unsigned value (zero-extended to 64-bit)
+            a.movzx(x86::eax, x86::byte_ptr(x86::r12, x86::rax));
+            a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === LoadIndI8: Load 8-bit signed value from indirect address ===
+        if (opcode_is(opcode, Opcode::LoadIndI8)) {
+            uint8_t ra_rb = codeBuffer[pc + 1];
+            uint8_t ra = (ra_rb >> 0) & 0x0F;
+            uint8_t rb = (ra_rb >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, rb * 8));
+            a.add(x86::rax, offset);
+
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            a.mov(x86::ecx, x86::r13d);
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+
+            // Load 8-bit signed value (sign-extends to 64-bit)
+            a.movsx(x86::rax, x86::byte_ptr(x86::r12, x86::rax));
+
+            a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === LoadIndU64: Load 64-bit unsigned value from indirect address ===
+        if (opcode_is(opcode, Opcode::LoadIndU64)) {
+            uint8_t ra_rb = codeBuffer[pc + 1];
+            uint8_t ra = (ra_rb >> 0) & 0x0F;
+            uint8_t rb = (ra_rb >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, rb * 8));
+            a.add(x86::rax, offset);
+
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            a.mov(x86::ecx, x86::r13d);
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+
+            // Load 64-bit value
+            a.mov(x86::rax, x86::qword_ptr(x86::r12, x86::rax));
+
+            a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === StoreIndU8: Store 8-bit value to indirect address ===
+        // Format: [opcode][src_dest][offset_32bit] where src_dest = (src | dest << 4)
+        if (opcode_is(opcode, Opcode::StoreIndU8)) {
+            uint8_t src_dest = codeBuffer[pc + 1];
+            uint8_t src = (src_dest >> 0) & 0x0F;
+            uint8_t dest = (src_dest >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            // Load base address from dest register into rax
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, dest * 8));
+
+            // Add offset
+            a.add(x86::rax, offset);
+
+            // Bounds check: address < 65536 → panic
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            // Runtime check: address >= memory_size → page fault
+            a.mov(x86::ecx, x86::r13d);
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+
+            // Load value from src register into cl (lower 8 bits)
+            a.mov(x86::rcx, x86::qword_ptr(x86::rbx, src * 8));
+
+            // Store 8-bit value to memory
+            x86::Mem mem(x86::r12, x86::rax, 0, 0);
+            a.mov(mem, x86::cl);
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === StoreIndU16: Store 16-bit value to indirect address ===
+        if (opcode_is(opcode, Opcode::StoreIndU16)) {
+            uint8_t src_dest = codeBuffer[pc + 1];
+            uint8_t src = (src_dest >> 0) & 0x0F;
+            uint8_t dest = (src_dest >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, dest * 8));
+            a.add(x86::rax, offset);
+
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            a.mov(x86::ecx, x86::r13d);
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+
+            a.mov(x86::rcx, x86::qword_ptr(x86::rbx, src * 8));
+
+            x86::Mem mem(x86::r12, x86::rax, 0, 0);
+            a.mov(mem, x86::cx);
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === StoreIndU32: Store 32-bit value to indirect address ===
+        if (opcode_is(opcode, Opcode::StoreIndU32)) {
+            uint8_t src_dest = codeBuffer[pc + 1];
+            uint8_t src = (src_dest >> 0) & 0x0F;
+            uint8_t dest = (src_dest >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, dest * 8));
+            a.add(x86::rax, offset);
+
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            a.mov(x86::ecx, x86::r13d);
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+
+            a.mov(x86::ecx, x86::qword_ptr(x86::rbx, src * 8));
+
+            x86::Mem mem(x86::r12, x86::rax, 0, 0);
+            a.mov(mem, x86::ecx);
+
+            pc += instrSize;
+            continue;
+        }
+
+        // === StoreIndU64: Store 64-bit value to indirect address ===
+        if (opcode_is(opcode, Opcode::StoreIndU64)) {
+            uint8_t src_dest = codeBuffer[pc + 1];
+            uint8_t src = (src_dest >> 0) & 0x0F;
+            uint8_t dest = (src_dest >> 4) & 0x0F;
+            uint32_t offset;
+            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, dest * 8));
+            a.add(x86::rax, offset);
+
+            a.cmp(x86::rax, 65536);
+            a.jb(panicLabel);
+
+            a.mov(x86::ecx, x86::r13d);
+            a.cmp(x86::rax, x86::rcx);
+            a.jae(pagefaultLabel);
+
+            a.mov(x86::rcx, x86::qword_ptr(x86::rbx, src * 8));
+
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
             a.mov(mem, x86::rcx);
 

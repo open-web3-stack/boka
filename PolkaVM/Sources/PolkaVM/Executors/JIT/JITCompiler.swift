@@ -25,15 +25,15 @@ final class JITCompiler {
             case (.invalidBlob, .invalidBlob),
                  (.unsupportedArchitecture, .unsupportedArchitecture),
                  (.allocationFailed, .allocationFailed):
-                return true
-            case (.compilationFailed(let lhsCode), .compilationFailed(let rhsCode)):
-                return lhsCode == rhsCode
-            case (.exportFailed(let lhsCode), .exportFailed(let rhsCode)):
-                return lhsCode == rhsCode
-            case (.metadataStorageFailed(let lhsCode), .metadataStorageFailed(let rhsCode)):
-                return lhsCode == rhsCode
+                true
+            case let (.compilationFailed(lhsCode), .compilationFailed(rhsCode)):
+                lhsCode == rhsCode
+            case let (.exportFailed(lhsCode), .exportFailed(rhsCode)):
+                lhsCode == rhsCode
+            case let (.metadataStorageFailed(lhsCode), .metadataStorageFailed(rhsCode)):
+                lhsCode == rhsCode
             default:
-                return false
+                false
             }
         }
     }
@@ -45,13 +45,15 @@ final class JITCompiler {
     ///   - config: The VM configuration
     ///   - targetArchitecture: The target architecture
     ///   - jitMemorySize: The total memory size for JIT operations
+    ///   - skipTable: Instruction skip values from ProgramCode.skip(pc) for variable-length encoding
     /// - Returns: Pointer to the compiled function
     func compile(
         blob: Data,
         initialPC: UInt32,
         config _: PvmConfig,
         targetArchitecture: JITPlatform,
-        jitMemorySize: UInt32
+        jitMemorySize: UInt32,
+        skipTable: [UInt32] // NEW: skip table for variable-length instructions
     ) throws -> UnsafeMutableRawPointer {
         logger.debug("Starting JIT compilation. Blob size: \(blob.count), Initial PC: \(initialPC), Target: \(targetArchitecture)")
 
@@ -88,6 +90,8 @@ final class JITCompiler {
                 blob.count,
                 initialPC,
                 jitMemorySize,
+                skipTable, // NEW: pass skip table
+                skipTable.count,
                 &compiledFuncPtr
             )
 
@@ -98,6 +102,8 @@ final class JITCompiler {
                 blob.count,
                 initialPC,
                 jitMemorySize,
+                skipTable, // NEW: pass skip table
+                skipTable.count,
                 &compiledFuncPtr
             )
         }
@@ -121,13 +127,11 @@ final class JITCompiler {
 
         return funcPtr
     }
-
 }
 
 // MARK: - Export/Import API for Persistent Caching
 
 extension JITCompiler {
-
     /// Compiled code information for export
     public struct CompiledCodeInfo {
         public let functionPtr: UnsafeRawPointer

@@ -456,20 +456,19 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 let layout = try JITMemoryLayout(standardProgram: standardProgram)
                 memoryLayout = layout
 
-                // Find the highest address used in the program
-                // We need to allocate enough space to cover all addresses
-                let highestAddress = layout.zones.map { $0.originalBase + $0.size }.max() ?? 0
+                // CRITICAL: JIT must use pvmProgramInitStackBaseAddress to match interpreter memory layout
+                // The interpreter allows accesses up to this address (uses sparse memory model)
+                // Even if program zones don't reach this high, JIT needs same memory size for compatibility
+                totalMemorySize = UInt32(config.pvmProgramInitStackBaseAddress)
 
-                // Align to page boundary and add stack space
-                let stackSize = UInt32(config.stackPages) * UInt32(config.pvmMemoryPageSize)
-                totalMemorySize = StandardProgram.alignToPageSize(size: highestAddress + stackSize, config: config)
+                logger.info("🔍 Using pvmProgramInitStackBaseAddress for memory size: 0x\(String(totalMemorySize, radix: 16))")
 
                 let actualUsage = layout.totalSize
                 let usageMB = Double(actualUsage) / (1024.0 * 1024.0)
                 let totalMB = Double(totalMemorySize) / (1024.0 * 1024.0)
 
                 logger.info(
-                    "✅ Using compact layout: highest=0x\(String(highestAddress, radix: 16)), total=\(String(format: "%.2f", totalMB)) MB (data: \(String(format: "%.2f", usageMB)) MB)"
+                    "✅ Using interpreter-compatible layout: total=\(String(format: "%.2f", totalMB)) MB (data: \(String(format: "%.2f", usageMB)) MB)"
                 )
             } catch {
                 // Fallback if layout creation fails
@@ -491,6 +490,11 @@ final class ExecutorBackendJIT: ExecutorBackend {
             // TEMPORARY: Disable cache to force recompilation with correct memory size
             // TODO: Add memory size to cache key to properly enable caching
             let bytecode = programCode.code
+            logger
+                .info(
+                    "🔍 JIT bytecode: \(bytecode.prefix(20).map { String(format: "%02x", $0) }.joined(separator: " "))... (total: \(bytecode.count) bytes)"
+                )
+            logger.info("🔍 JIT initial PC: \(pc)")
             let compiledFuncPtr: UnsafeMutableRawPointer
             let dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?
             let dispatcherTableSize: UInt32
@@ -503,12 +507,18 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 logger.debug("Using cached JIT function")
             } else {
                 // Cache miss - compile and cache the function
+
+                // Extract skip table from programCode for variable-length instruction encoding
+                // This is CRITICAL for instructions like LoadImmJump, BranchImm, etc.
+                let skipTable = programCode.skipValues // NEW: get skip values
+
                 compiledFuncPtr = try jitCompiler.compile(
                     blob: bytecode,
                     initialPC: pc,
                     config: config,
                     targetArchitecture: targetArchitecture,
-                    jitMemorySize: totalMemorySize
+                    jitMemorySize: totalMemorySize,
+                    skipTable: skipTable // NEW: pass skip table
                 )
 
                 // Retrieve dispatcher jump table for this compiled function
@@ -551,6 +561,12 @@ final class ExecutorBackendJIT: ExecutorBackend {
             } else {
                 standardProgram.initialRegisters
             }
+
+            // Log initial register values for debugging
+            logger
+                .info(
+                    "Initial registers: R0=\(registers[Registers.Index(raw: 0)]), R1=\(registers[Registers.Index(raw: 1)]), R7=\(registers[Registers.Index(raw: 7)]), R8=\(registers[Registers.Index(raw: 8)])"
+                )
 
             // Set up the synchronous handler that will bridge to async context if invoked
             // We're capturing the invocationContext into a closure that will be called synchronously

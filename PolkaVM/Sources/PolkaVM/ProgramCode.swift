@@ -175,6 +175,18 @@ public class ProgramCode {
         ProgramCode.skip(start: pc, bitmask: bitmask)
     }
 
+    /// Extract all skip values as an array for JIT compilation
+    /// This provides the instruction sizes for variable-length encoded instructions
+    public var skipValues: [UInt32] {
+        var skips: [UInt32] = []
+        skips.reserveCapacity(code.count)
+        for pc in 0 ..< UInt32(code.count) {
+            let skip = skip(pc)
+            skips.append(skip)
+        }
+        return skips
+    }
+
     public static func skip(start: UInt32, bitmask: Data) -> UInt32 {
         let start = start + 1
         let beginIndex = Int(start / 8) + bitmask.startIndex
