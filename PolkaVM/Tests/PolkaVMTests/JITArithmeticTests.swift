@@ -27,11 +27,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 100
+        code.append(0x14) // LoadImm64 r1, 100
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(100).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 42
+        code.append(0x14) // LoadImm64 r2, 42
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(42).littleEndian) { Array($0) })
 
@@ -58,11 +58,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, UInt64.max
+        code.append(0x14) // LoadImm64 r1, UInt64.max
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64.max.littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 1
+        code.append(0x14) // LoadImm64 r2, 1
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(1).littleEndian) { Array($0) })
 
@@ -89,11 +89,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 100
+        code.append(0x14) // LoadImm64 r1, 100
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(100).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 42
+        code.append(0x14) // LoadImm64 r2, 42
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(42).littleEndian) { Array($0) })
 
@@ -120,11 +120,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 42
+        code.append(0x14) // LoadImm64 r1, 42
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(42).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 100
+        code.append(0x14) // LoadImm64 r2, 100
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(100).littleEndian) { Array($0) })
 
@@ -147,11 +147,11 @@ struct JITArithmeticTests {
     func jitAdd64Parity() async throws {
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 1000
+        code.append(0x14) // LoadImm64 r1, 1000
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(1000).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 234
+        code.append(0x14) // LoadImm64 r2, 234
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(234).littleEndian) { Array($0) })
 
@@ -184,7 +184,7 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 100
+        code.append(0x14) // LoadImm64 r1, 100
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(100).littleEndian) { Array($0) })
 
@@ -219,7 +219,7 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 100
+        code.append(0x14) // LoadImm64 r1, 100
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(100).littleEndian) { Array($0) })
 
@@ -250,7 +250,7 @@ struct JITArithmeticTests {
     func jitAddImm64Parity() async throws {
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 1000
+        code.append(0x14) // LoadImm64 r1, 1000
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(1000).littleEndian) { Array($0) })
 
@@ -292,11 +292,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 100
+        code.append(0x14) // LoadImm64 r1, 100
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(100).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 42
+        code.append(0x14) // LoadImm64 r2, 42
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(42).littleEndian) { Array($0) })
 
@@ -323,11 +323,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 2^40
+        code.append(0x14) // LoadImm64 r1, 2^40
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(1 << 40).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 2^30
+        code.append(0x14) // LoadImm64 r2, 2^30
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(1 << 30).littleEndian) { Array($0) })
 
@@ -350,11 +350,11 @@ struct JITArithmeticTests {
     func jitMul64Parity() async throws {
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 12345
+        code.append(0x14) // LoadImm64 r1, 12345
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(12345).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 6789
+        code.append(0x14) // LoadImm64 r2, 6789
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(6789).littleEndian) { Array($0) })
 
@@ -388,11 +388,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 1
+        code.append(0x14) // LoadImm64 r1, 1
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(1).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 4
+        code.append(0x14) // LoadImm64 r2, 4
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(4).littleEndian) { Array($0) })
 
@@ -419,11 +419,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 1
+        code.append(0x14) // LoadImm64 r1, 1
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(1).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 68
+        code.append(0x14) // LoadImm64 r2, 68
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(68).littleEndian) { Array($0) })
 
@@ -450,11 +450,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 128
+        code.append(0x14) // LoadImm64 r1, 128
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(128).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 2
+        code.append(0x14) // LoadImm64 r2, 2
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(2).littleEndian) { Array($0) })
 
@@ -481,11 +481,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, UInt64.max - 127 (signed -128)
+        code.append(0x14) // LoadImm64 r1, UInt64.max - 127 (signed -128)
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(bitPattern: Int64(-128)).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 2
+        code.append(0x14) // LoadImm64 r2, 2
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(2).littleEndian) { Array($0) })
 
@@ -509,11 +509,11 @@ struct JITArithmeticTests {
     func jitShloL64Parity() async throws {
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 256
+        code.append(0x14) // LoadImm64 r1, 256
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(256).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 3
+        code.append(0x14) // LoadImm64 r2, 3
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(3).littleEndian) { Array($0) })
 
@@ -547,11 +547,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 0xFF00FF00
+        code.append(0x14) // LoadImm64 r1, 0xFF00FF00
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xFF00_FF00).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 0xFFFF0000
+        code.append(0x14) // LoadImm64 r2, 0xFFFF0000
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xFFFF_0000).littleEndian) { Array($0) })
 
@@ -578,11 +578,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 0xF0
+        code.append(0x14) // LoadImm64 r1, 0xF0
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xF0).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 0x0F
+        code.append(0x14) // LoadImm64 r2, 0x0F
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0F).littleEndian) { Array($0) })
 
@@ -609,11 +609,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 0xFF
+        code.append(0x14) // LoadImm64 r1, 0xFF
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xFF).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 0xFF
+        code.append(0x14) // LoadImm64 r2, 0xFF
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xFF).littleEndian) { Array($0) })
 
@@ -635,11 +635,11 @@ struct JITArithmeticTests {
     func jitAndParity() async throws {
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 0x123456789ABCDEF0
+        code.append(0x14) // LoadImm64 r1, 0x123456789ABCDEF0
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x1234_5678_9ABC_DEF0).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 0xFF00FF00FF00FF00
+        code.append(0x14) // LoadImm64 r2, 0xFF00FF00FF00FF00
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xFF00_FF00_FF00_FF00).littleEndian) { Array($0) })
 
@@ -672,7 +672,7 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 100
+        code.append(0x14) // LoadImm64 r1, 100
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(100).littleEndian) { Array($0) })
 
@@ -699,11 +699,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 12345
+        code.append(0x14) // LoadImm64 r1, 12345
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(12345).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 0
+        code.append(0x14) // LoadImm64 r2, 0
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0).littleEndian) { Array($0) })
 
