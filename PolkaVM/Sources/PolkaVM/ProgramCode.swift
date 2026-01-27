@@ -176,7 +176,16 @@ public class ProgramCode {
     }
 
     /// Extract all skip values as an array for JIT compilation
-    /// This provides the instruction sizes for variable-length encoded instructions
+    /// This provides the instruction sizes for variable-length encoded instructions.
+    ///
+    /// Memory Trade-off: This array uses 4 bytes per instruction byte (4x code size).
+    /// For a 100KB program, this adds ~400KB of memory. This is acceptable because:
+    /// 1. It's only computed once during program loading
+    /// 2. It's freed after JIT compilation completes
+    /// 3. It's significantly faster than on-demand calculation from C++
+    ///
+    /// Alternative: Could calculate on-demand in C++ to save memory, but would add
+    /// complexity to the Swift/C++ boundary and slow down compilation.
     public var skipValues: [UInt32] {
         var skips: [UInt32] = []
         skips.reserveCapacity(code.count)
