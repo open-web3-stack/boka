@@ -3,7 +3,11 @@
 
 import CppHelper
 import Foundation
-import Glibc
+#if canImport(Glibc)
+    import Glibc
+#elseif canImport(Darwin)
+    import Darwin
+#endif
 import TracingUtils
 import Utils
 
@@ -114,7 +118,12 @@ final class JITExecutor {
             // without allocating physical memory upfront
             logger.info("Using mmap for large allocation: \(jitMemorySize) bytes (\(Double(jitMemorySize) / 1024 / 1024 / 1024) GB)")
 
-            let flags = Int32(MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE)
+            // Platform-specific mmap flags: macOS uses MAP_ANON, Linux uses MAP_ANONYMOUS
+            #if os(Linux)
+                let flags = Int32(MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE)
+            #else
+                let flags = Int32(MAP_PRIVATE | MAP_ANON | MAP_NORESERVE)
+            #endif
             let prot = Int32(PROT_READ | PROT_WRITE)
 
             let ptr = mmap(
