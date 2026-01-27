@@ -24,27 +24,17 @@ struct JITInstructionParityTests {
 
     /// Compare JIT vs interpreter execution
     private func compareExecution(
-        instructionBytes _: [UInt8],
+        instructionBytes: [UInt8],
         initialValue _: UInt64 = 0,
         testName: String
     ) async throws {
         let config = DefaultPvmConfig()
 
-        // Use the exact working blob format
-        // ProgramCode: 00 00 01 01 00 (5 bytes for single halt instruction)
-        let programCode = Data([0, 0, 1, 0x01, 0])
-
-        // StandardProgram wrapper with heapPages=1 (matching working example)
-        let blob = Data([
-            0, 0, 0, // readOnlyLen (3 bytes: 0)
-            0, 0, 0, // readWriteLen (3 bytes: 0)
-            1, 0, // heapPages (2 bytes: 1)
-            0, 0, 0, // stackSize (3 bytes: 0)
-            5, 0, 0, 0, // codeLength (4 bytes: 5)
-        ]) + programCode
+        // Create proper program blob using ProgramBlobBuilder
+        let blob = createSingleInstructionProgram(instructionBytes)
 
         // Execute in interpreter mode
-        let (exitReasonInterpreter, _, outputInterpreter) = await invokePVM(
+        let (exitReasonInterpreter, gasInterpreter, outputInterpreter) = await invokePVM(
             config: config,
             executionMode: [],
             blob: blob,
@@ -55,7 +45,7 @@ struct JITInstructionParityTests {
         )
 
         // Execute in JIT mode
-        let (exitReasonJIT, _, outputJIT) = await invokePVM(
+        let (exitReasonJIT, gasJIT, outputJIT) = await invokePVM(
             config: config,
             executionMode: .jit,
             blob: blob,
@@ -76,6 +66,14 @@ struct JITInstructionParityTests {
             outputInterpreter == outputJIT,
             "\(testName): Output mismatch - interpreter: \(outputInterpreter?.toHexString() ?? "nil"), JIT: \(outputJIT?.toHexString() ?? "nil")"
         )
+
+        // Compare gas usage if both executions completed successfully
+        if case .halt = exitReasonInterpreter, case .halt = exitReasonJIT {
+            #expect(
+                gasInterpreter == gasJIT,
+                "\(testName): Gas mismatch - interpreter: \(gasInterpreter.value), JIT: \(gasJIT.value)"
+            )
+        }
     }
 
     // MARK: - Load Immediate Instructions
@@ -199,12 +197,8 @@ struct JITInstructionParityTests {
     func testHalt() async throws {
         let config = DefaultPvmConfig()
 
-        // Minimal halt program
-        let haltProgram = Data([
-            1, // 1 jump table entry
-            0, 0, 0, 0, 0, 0, 0, 0, // jump table entry 0: offset 0
-            0x01, // halt instruction (opcode 1)
-        ])
+        // Create proper halt program using ProgramBlobBuilder
+        let haltProgram = createSingleInstructionProgram([0x01]) // halt instruction
 
         // Execute in interpreter mode
         let (exitReasonInterpreter, _, outputInterpreter) = await invokePVM(

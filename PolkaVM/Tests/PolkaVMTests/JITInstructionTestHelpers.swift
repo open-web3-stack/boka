@@ -178,7 +178,7 @@ enum ProgramBlobBuilder {
     /// - Returns: Complete program blob ready for execution
     static func createSingleInstructionProgram(_ instructionBytes: [UInt8]) -> Data {
         let programCode = createProgramCode(instructionBytes)
-        return createStandardProgram(programCode: programCode)
+        return createStandardProgram(programCode: programCode, heapPages: 1)
     }
 
     /// Create a program blob with multiple instructions
