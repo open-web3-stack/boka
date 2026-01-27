@@ -45,7 +45,20 @@ extension CppHelper.Instructions.Fallthrough: Instruction {
         self.init()
     }
 
-    public func _executeImpl(context _: ExecutionContext) -> ExecOutcome { .continued }
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        // Fallthrough (opcode 0x01, also called Halt):
+        // - If at end of program, return .halt (normal termination)
+        // - Otherwise, continue to next instruction
+        let pc = context.state.pc
+        let programLength = UInt32(context.state.program.code.count)
+
+        // Check if we're at or past the end of the program
+        if pc + 1 >= programLength {
+            return .exit(.halt)
+        }
+
+        return .continued
+    }
 }
 
 extension CppHelper.Instructions.Ecalli: Instruction {
