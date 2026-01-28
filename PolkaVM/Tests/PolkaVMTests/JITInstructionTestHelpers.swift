@@ -358,8 +358,8 @@ enum ProgramBlobBuilder {
 
         // Instructions with register + 64-bit immediate (10 bytes total)
         // Format: opcode (1) + register (1) + immediate64 (8)
-        if opcode == 0x33 { // LoadImm64
-            return 2 + 8
+        if opcode == 0x14 { // LoadImm64 (opcode 0x14 = 20)
+            return 1 + 1 + 8 // opcode (1) + register (1) + immediate64 (8) = 10 bytes
         }
 
         // Jump instruction (5 bytes: opcode + 32-bit offset)
