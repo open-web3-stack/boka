@@ -35,10 +35,10 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(42).littleEndian) { Array($0) })
 
-        code.append(0xC8) // Add64 r3, r1, r2
-        code.append(0x03) // r3
-        code.append(0x01) // r1
-        code.append(0x02) // r2
+        // Add64: [opcode][ra|rb<<4][rd] where rd = ra + rb
+        code.append(0xC8) // Add64 opcode
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
@@ -66,10 +66,10 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(1).littleEndian) { Array($0) })
 
-        code.append(0xC8) // Add64 r3, r1, r2
-        code.append(0x03)
-        code.append(0x01)
-        code.append(0x02)
+        // Add64: [opcode][ra|rb<<4][rd] where rd = ra + rb
+        code.append(0xC8) // Add64 opcode
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
@@ -97,10 +97,10 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(42).littleEndian) { Array($0) })
 
-        code.append(0xC9) // Sub64 r3, r1, r2
-        code.append(0x03)
-        code.append(0x01)
-        code.append(0x02)
+        // Sub64: [opcode][ra|rb<<4][rd] where rd = ra - rb
+        code.append(0xC9) // Sub64 opcode
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
@@ -128,10 +128,10 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(100).littleEndian) { Array($0) })
 
-        code.append(0xC9) // Sub64 r3, r1, r2
-        code.append(0x03)
-        code.append(0x01)
-        code.append(0x02)
+        // Sub64: [opcode][ra|rb<<4][rd] where rd = ra - rb
+        code.append(0xC9) // Sub64 opcode
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
@@ -155,10 +155,10 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(234).littleEndian) { Array($0) })
 
-        code.append(0xC8) // Add64 r3, r1, r2
-        code.append(0x03)
-        code.append(0x01)
-        code.append(0x02)
+        // Add64: [opcode][ra|rb<<4][rd] where rd = ra + rb
+        code.append(0xC8) // Add64 opcode
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
