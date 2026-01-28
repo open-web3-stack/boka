@@ -1,6 +1,7 @@
 import Codec
 import CppHelper
 import Foundation
+import TracingUtils
 import Utils
 
 public class ProgramCode {
@@ -40,6 +41,7 @@ public class ProgramCode {
     private var blockGasCosts: [UInt32: Gas] = [:]
 
     private static let cachedTrapInst = CppHelper.Instructions.Trap()
+    private static let logger = Logger(label: "ProgramCode")
 
     public init(_ blob: Data) throws (Error) {
         self.blob = blob
@@ -64,11 +66,10 @@ public class ProgramCode {
         let jumpTableEndIndex = slice.startIndex + jumpTableSize
 
         guard jumpTableEndIndex <= slice.endIndex else {
-            print("[ERROR] Jump table extends beyond blob:")
-            print("  jumpTableSize: \(jumpTableSize)")
-            print("  slice.startIndex: \(slice.startIndex)")
-            print("  jumpTableEndIndex: \(jumpTableEndIndex)")
-            print("  slice.endIndex: \(slice.endIndex)")
+            Self.logger
+                .error(
+                    "Jump table extends beyond blob: jumpTableSize=\(jumpTableSize), startIndex=\(slice.startIndex), endIndex=\(jumpTableEndIndex), slice.endIndex=\(slice.endIndex)"
+                )
             throw Error.invalidDataLength
         }
 
@@ -76,11 +77,10 @@ public class ProgramCode {
 
         let codeEndIndex = jumpTableEndIndex + Int(codeLength)
         guard codeEndIndex <= slice.endIndex else {
-            print("[ERROR] Code extends beyond blob:")
-            print("  codeLength: \(codeLength)")
-            print("  jumpTableEndIndex: \(jumpTableEndIndex)")
-            print("  codeEndIndex: \(codeEndIndex)")
-            print("  slice.endIndex: \(slice.endIndex)")
+            Self.logger
+                .error(
+                    "Code extends beyond blob: codeLength=\(codeLength), jumpTableEndIndex=\(jumpTableEndIndex), codeEndIndex=\(codeEndIndex), slice.endIndex=\(slice.endIndex)"
+                )
             throw Error.invalidDataLength
         }
 
@@ -90,15 +90,10 @@ public class ProgramCode {
         let actualBitmaskSize = slice.endIndex - codeEndIndex
 
         guard expectedBitmaskSize == actualBitmaskSize else {
-            print("[ERROR] StandardProgram bitmask size mismatch:")
-            print("  codeLength: \(codeLength)")
-            print("  expectedBitmaskSize: \(expectedBitmaskSize)")
-            print("  actualBitmaskSize: \(actualBitmaskSize)")
-            print("  blob.count: \(blob.count)")
-            print("  jumpTableEndIndex: \(jumpTableEndIndex)")
-            print("  codeEndIndex: \(codeEndIndex)")
-            print("  slice.startIndex: \(slice.startIndex)")
-            print("  slice.endIndex: \(slice.endIndex)")
+            Self.logger
+                .error(
+                    "Bitmask size mismatch: codeLength=\(codeLength), expected=\(expectedBitmaskSize), actual=\(actualBitmaskSize), blob.count=\(blob.count), jumpTableEndIndex=\(jumpTableEndIndex), codeEndIndex=\(codeEndIndex), slice.startIndex=\(slice.startIndex), slice.endIndex=\(slice.endIndex)"
+                )
             throw Error.invalidDataLength
         }
 
