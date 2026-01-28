@@ -294,33 +294,26 @@ struct JITLoadStoreTests {
 
     @Test("JIT: StoreU16 stores halfword to memory")
     func jitStoreU16() async throws {
-        // LoadImm64 r1, writeable address
-        // LoadImm64 r2, value (0x1234)
-        // StoreU16 [r1], r2
-        // LoadU16 r3, [r1] - read back
+        // LoadImm64 r1, value (0x1234)
+        // StoreU16 [0x20000], r1
+        // LoadU16 r2, [0x20000] - read back
         // Halt
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 0x20000
+        code.append(0x14) // LoadImm64 r1, 0x1234
         code.append(0x01)
-        code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
-
-        code.append(0x14) // LoadImm64 r2, 0x1234
-        code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0000_0000_0000_1234).littleEndian) { Array($0) })
 
-        // StoreU16 [r1 + 0], r2
-        code.append(0x3C) // StoreU16 opcode
-        code.append(0x01)
-        code.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian) { Array($0) })
-        code.append(0x02)
+        // StoreU16 [0x20000], r1
+        code.append(0x3C) // StoreU16 opcode (60)
+        code.append(0x01) // r1 (source register)
+        code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0002_0000).littleEndian) { Array($0) }) // address
 
-        // LoadU16 r3, [r1 + 0]
-        code.append(0x36) // LoadU16
-        code.append(0x03)
-        code.append(0x01)
-        code.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian) { Array($0) })
+        // LoadU16 r2, [0x20000] to verify
+        code.append(0x36) // LoadU16 opcode
+        code.append(0x02) // r2
+        code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0002_0000).littleEndian) { Array($0) })
 
         code.append(0x01) // Halt
 
@@ -334,7 +327,7 @@ struct JITLoadStoreTests {
 
         let result = await JITInstructionExecutor.execute(blob: blob)
 
-        JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: 0x0000_0000_0000_1234)
+        JITTestAssertions.assertRegister(result, Registers.Index(raw: 2), equals: 0x0000_0000_0000_1234)
     }
 
     @Test("JIT vs Interpreter: StoreU8 parity")
@@ -391,11 +384,10 @@ struct JITLoadStoreTests {
         code.append(contentsOf: encodeVarint(0)) // offset (varint)
         code.append(contentsOf: encodeVarint(0xAB)) // value (varint)
 
-        // LoadU8 r2, [r1 + 0]
-        code.append(0x34)
-        code.append(0x02)
-        code.append(0x01)
-        code.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian) { Array($0) })
+        // LoadU8 r2, [0x20000] to verify (direct addressing)
+        code.append(0x34) // LoadU8 opcode
+        code.append(0x02) // r2
+        code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0002_0000).littleEndian) { Array($0) })
 
         code.append(0x01) // Halt
 
@@ -431,11 +423,10 @@ struct JITLoadStoreTests {
         code.append(contentsOf: encodeVarint(0)) // offset (varint)
         code.append(contentsOf: encodeVarint(0x1234_5678)) // value (varint)
 
-        // LoadU32 r2, [r1 + 0]
+        // LoadU32 r2, [0x20000] to verify (direct addressing)
         code.append(0x38) // LoadU32 opcode
         code.append(0x02) // r2
-        code.append(0x01) // r1
-        code.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian) { Array($0) }) // offset
+        code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0002_0000).littleEndian) { Array($0) })
 
         code.append(0x01) // Halt
 
@@ -491,7 +482,7 @@ struct JITLoadStoreTests {
     @Test("JIT: Load from invalid address causes page fault")
     func jitLoadInvalidAddress() async throws {
         // LoadImm64 r1, invalid address (beyond all zones)
-        // LoadU8 r2, [r1] - should page fault
+        // LoadIndU8 r2, [r1] - should page fault
         // Halt (shouldn't reach)
 
         var code = Data()
@@ -500,10 +491,11 @@ struct JITLoadStoreTests {
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x6300_0000).littleEndian) { Array($0) })
 
-        code.append(0x34) // LoadU8 r2, [r1 + 0]
-        code.append(0x02)
-        code.append(0x01)
-        code.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian) { Array($0) })
+        // LoadIndU8 r2, [r1 + 0] - register-relative addressing
+        code.append(0x7C) // LoadIndU8 opcode (124)
+        code.append(0x02) // r2 (destination)
+        code.append(0x01) // r1 (base register)
+        code.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian) { Array($0) }) // offset
 
         code.append(0x01) // Halt
 
@@ -533,7 +525,7 @@ struct JITLoadStoreTests {
     func jitStoreToReadOnly() async throws {
         // LoadImm64 r1, read-only address
         // LoadImm64 r2, value
-        // StoreU8 [r1], r2 - should panic (read-only violation)
+        // StoreIndU8 [r1+0], r2 - should panic (read-only violation)
         // Halt
 
         var code = Data()
@@ -546,10 +538,11 @@ struct JITLoadStoreTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0000_0000_0000_00AB).littleEndian) { Array($0) })
 
-        code.append(0x3B) // StoreU8 [r1+0], r2
-        code.append(0x01)
-        code.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian) { Array($0) })
-        code.append(0x02)
+        // StoreIndU8 [r1 + 0], r2 - register-relative addressing
+        code.append(0x78) // StoreIndU8 opcode (120)
+        code.append(0x02) // r2 (source register)
+        code.append(0x01) // r1 (base register)
+        code.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian) { Array($0) }) // offset
 
         code.append(0x01) // Halt
 
