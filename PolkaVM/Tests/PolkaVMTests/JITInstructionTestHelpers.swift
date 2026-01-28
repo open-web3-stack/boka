@@ -377,11 +377,11 @@ enum ProgramBlobBuilder {
             return 1 + 1
         }
 
-        // Arithmetic instructions (4 bytes: opcode + 3 registers)
-        // Format: opcode (1) + dest_reg (1) + src1_reg (1) + src2_reg (1)
+        // Arithmetic instructions (3 bytes: opcode + packed registers + rd)
+        // Format: opcode (1) + [ra|rb<<4] (1) + rd (1) = 3 bytes total
         // Opcodes 0xC8-0xD0: Add64, Sub64, Mul64, DivU64, DivS64, RemU64, RemS64, ShloL64, ShroR64, SharR64
         if opcode >= 0xC8, opcode <= 0xD0 {
-            return 1 + 3
+            return 3 // 3 bytes: [opcode][ra|rb<<4][rd]
         }
 
         // 32-bit arithmetic (opcodes 0xC0-0xC8)
@@ -413,10 +413,11 @@ enum ProgramBlobBuilder {
             return 1 + 1 + 4 + 4 // offset32 (4), imm32 (4)
         }
 
-        // Bitwise operations (4 bytes: opcode + 3 registers)
+        // Bitwise operations (3 bytes: opcode + packed registers + rd)
+        // Format: opcode (1) + [ra|rb<<4] (1) + rd (1) = 3 bytes total
         // Opcodes 0xD2-0xD4: And, Xor, Or
         if opcode >= 0xD2, opcode <= 0xD4 {
-            return 1 + 3
+            return 3 // 3 bytes: [opcode][ra|rb<<4][rd]
         }
 
         // Varint-encoded instructions
