@@ -442,11 +442,18 @@ enum ProgramBlobBuilder {
             return 1 + 2 + 4
         }
 
-        // StoreU8/U16/U32/U64 (7 bytes: opcode + base_reg + offset32 + value_reg)
-        // Format: opcode (1) + base_reg (1) + offset32 (4) + value_reg (1)
-        // Opcodes 0x3B-0x3E
+        // StoreU8/U16/U32/U64 (6 bytes: direct addressing)
+        // Format: [opcode][reg_index][address_32bit]
+        // Opcodes 0x3B-0x3E (59-62)
         if opcode >= 0x3B, opcode <= 0x3E {
-            return 1 + 1 + 4 + 1
+            return 6
+        }
+
+        // StoreIndU8/16/32/64 (7 bytes: register-relative addressing)
+        // Format: [opcode][dest/base][base_reg][offset_32bit]
+        // Opcodes 0x78-0x7B (120-123)
+        if opcode >= 0x78, opcode <= 0x7B {
+            return 7
         }
 
         // StoreImmU8/U16/U32/U64 (direct store: opcode + address_varint + value_varint)
