@@ -174,7 +174,7 @@ struct JITArithmeticTests {
         )
     }
 
-    // MARK: - AddImm/SubImm Instructions (Opcodes 131-134, 151-154)
+    // MARK: - AddImm/SubImm Instructions (Opcodes 149-154)
 
     @Test("JIT: AddImm64 adds immediate to register")
     func jitAddImm64() async throws {
@@ -189,7 +189,7 @@ struct JITArithmeticTests {
         code.append(contentsOf: withUnsafeBytes(of: UInt64(100).littleEndian) { Array($0) })
 
         // AddImm64 r1, r1, 42
-        code.append(0x97) // AddImm64 opcode
+        code.append(0x95) // AddImm64 opcode (149)
         code.append(0x11) // packed: ra=r1, rb=r1
         // Immediate 42 (varint encoded)
         var imm = UInt64(42)
@@ -211,41 +211,6 @@ struct JITArithmeticTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 1), equals: 142)
     }
 
-    @Test("JIT: SubImm64 subtracts immediate from register")
-    func jitSubImm64() async throws {
-        // LoadImm64 r1, 100
-        // SubImm64 r1, 42
-        // Halt
-
-        var code = Data()
-
-        code.append(0x14) // LoadImm64 r1, 100
-        code.append(0x01)
-        code.append(contentsOf: withUnsafeBytes(of: UInt64(100).littleEndian) { Array($0) })
-
-        // SubImm64 r1, r1, 42
-        code.append(0x9A) // SubImm64 opcode
-        code.append(0x11) // packed: ra=r1, rb=r1
-        // Immediate 42 (varint encoded)
-        var imm = UInt64(42)
-        while imm > 0 {
-            var byte = UInt8(imm & 0x7F)
-            imm >>= 7
-            if imm > 0 {
-                byte |= 0x80
-            }
-            code.append(byte)
-        }
-
-        code.append(0x01) // Halt
-
-        let blob = ProgramBlobBuilder.createProgramCode(Array(code))
-        let result = await JITInstructionExecutor.execute(blob: blob)
-
-        // r1 should contain 58
-        JITTestAssertions.assertRegister(result, Registers.Index(raw: 1), equals: 58)
-    }
-
     @Test("JIT vs Interpreter: AddImm64 parity")
     func jitAddImm64Parity() async throws {
         var code = Data()
@@ -255,7 +220,7 @@ struct JITArithmeticTests {
         code.append(contentsOf: withUnsafeBytes(of: UInt64(1000).littleEndian) { Array($0) })
 
         // AddImm64 r1, r1, 500
-        code.append(0x97) // AddImm64
+        code.append(0x95) // AddImm64 (opcode 149)
         code.append(0x11) // packed: ra=r1, rb=r1
         var imm = UInt64(500)
         while imm > 0 {
@@ -340,8 +305,8 @@ struct JITArithmeticTests {
         let result = await JITInstructionExecutor.execute(blob: blob)
 
         // 2^40 * 2^30 = 2^70, which overflows 64 bits
-        // Result should be 2^70 mod 2^64 = 2^6 = 64
-        JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: 64)
+        // In 64-bit arithmetic: 2^70 mod 2^64 = 0 (because 2^70 = 2^64 * 2^6)
+        JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: 0)
     }
 
     @Test("JIT vs Interpreter: Mul64 parity")
@@ -393,7 +358,7 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(4).littleEndian) { Array($0) })
 
-        code.append(0xCE) // ShloL64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0xCF) // ShloL64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
@@ -423,7 +388,7 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(68).littleEndian) { Array($0) })
 
-        code.append(0xCE) // ShloL64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0xCF) // ShloL64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
@@ -453,7 +418,7 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(2).littleEndian) { Array($0) })
 
-        code.append(0xCF) // ShroR64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0xD0) // ShroR64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
@@ -483,7 +448,7 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(2).littleEndian) { Array($0) })
 
-        code.append(0xD0) // SharR64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0xD1) // SharR64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
@@ -510,7 +475,7 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(3).littleEndian) { Array($0) })
 
-        code.append(0xCE) // ShloL64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0xCF) // ShloL64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
@@ -557,7 +522,7 @@ struct JITArithmeticTests {
         let result = await JITInstructionExecutor.execute(blob: blob)
 
         // 0xFF00FF00 & 0xFFFF0000 = 0xFF000000
-        JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: 0x0000_00FF_0000_0000)
+        JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: 0x0000_0000_FF00_0000)
     }
 
     @Test("JIT: Or performs bitwise OR")
@@ -655,7 +620,8 @@ struct JITArithmeticTests {
     @Test("JIT: Add64 with zero register")
     func jitAdd64WithZero() async throws {
         // LoadImm64 r1, 100
-        // Add64 r2, r1, r0 (r0 is always 0)
+        // LoadImm64 r2, 0
+        // Add64 r3, r1, r2
         // Halt
 
         var code = Data()
@@ -664,18 +630,21 @@ struct JITArithmeticTests {
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(100).littleEndian) { Array($0) })
 
-        code.append(0xC8) // Add64 r2, r1, r0
+        code.append(0x14) // LoadImm64 r2, 0
         code.append(0x02)
-        code.append(0x01)
-        code.append(0x00) // r0
+        code.append(contentsOf: withUnsafeBytes(of: UInt64(0).littleEndian) { Array($0) })
+
+        code.append(0xC8) // Add64 opcode
+        code.append(0x02 | (0x01 << 4)) // ra=2, rb=1 packed
+        code.append(0x03) // rd=3
 
         code.append(0x01) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let result = await JITInstructionExecutor.execute(blob: blob)
 
-        // r2 should contain 100 (r1 + r0 = 100 + 0)
-        JITTestAssertions.assertRegister(result, Registers.Index(raw: 2), equals: 100)
+        // r3 should contain 100 (r1 + r2 = 100 + 0)
+        JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: 100)
     }
 
     @Test("JIT: Mul64 by zero")

@@ -937,6 +937,39 @@ bool decode_or(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded
     return true;
 }
 
+// Decode ShloL64 instruction (opcode 206) - 3-register format
+bool decode_shlo_l_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][ra | (rb << 4)][rd] - 3 registers: rd = ra << rb
+    decoded.src1_reg = bytecode[pc + 1] & 0x0F;      // ra (lower 4 bits)
+    decoded.src2_reg = (bytecode[pc + 1] >> 4) & 0x0F; // rb (upper 4 bits)
+    decoded.dest_reg = bytecode[pc + 2];               // rd
+    decoded.size = 3;
+    return true;
+}
+
+// Decode ShloR64 instruction (opcode 207) - 3-register format
+bool decode_shlo_r_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][ra | (rb << 4)][rd] - 3 registers: rd = ra >> rb (logical)
+    decoded.src1_reg = bytecode[pc + 1] & 0x0F;      // ra (lower 4 bits)
+    decoded.src2_reg = (bytecode[pc + 1] >> 4) & 0x0F; // rb (upper 4 bits)
+    decoded.dest_reg = bytecode[pc + 2];               // rd
+    decoded.size = 3;
+    return true;
+}
+
+// Decode SharR64 instruction (opcode 208) - 3-register format
+bool decode_shar_r_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+    decoded.opcode = bytecode[pc];
+    // Format: [opcode][ra | (rb << 4)][rd] - 3 registers: rd = ra >> rb (arithmetic)
+    decoded.src1_reg = bytecode[pc + 1] & 0x0F;      // ra (lower 4 bits)
+    decoded.src2_reg = (bytecode[pc + 1] >> 4) & 0x0F; // rb (upper 4 bits)
+    decoded.dest_reg = bytecode[pc + 2];               // rd
+    decoded.size = 3;
+    return true;
+}
+
 // Decode BranchEq instruction (opcode 170)
 bool decode_branch_eq(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
@@ -2072,56 +2105,59 @@ bool emit_instruction_decoded(
             return true;
 
         case static_cast<uint8_t>(Opcode::ShloL64):
-            return jit_instruction::jit_emit_shlo_l_64(
+            return jit_instruction::jit_emit_shlo_l_64_3reg(
                 assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
+                decoded.src1_reg,  // ra
+                decoded.src2_reg,  // rb
+                decoded.dest_reg   // rd
             );
 
         case static_cast<uint8_t>(Opcode::ShloR64):
-            return jit_instruction::jit_emit_shlo_r_64(
+            return jit_instruction::jit_emit_shlo_r_64_3reg(
                 assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
+                decoded.src1_reg,  // ra
+                decoded.src2_reg,  // rb
+                decoded.dest_reg   // rd
             );
 
         case static_cast<uint8_t>(Opcode::SharR64):
-            return jit_instruction::jit_emit_shar_r_64(
+            return jit_instruction::jit_emit_shar_r_64_3reg(
                 assembler, target_arch,
-                decoded.dest_reg,
-                decoded.src1_reg
+                decoded.src1_reg,  // ra
+                decoded.src2_reg,  // rb
+                decoded.dest_reg   // rd
             );
 
         case static_cast<uint8_t>(Opcode::And):
             {
-                // rd = ra & rb (3-operand format)
+                // rd = ra & rb (3-operand format, 64-bit)
                 auto* a = static_cast<x86::Assembler*>(assembler);
-                a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
-                a->mov(x86::edx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
-                a->and_(x86::edx, x86::eax);  // edx = eax & edx = ra & rb
-                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::edx);  // Store to rd
+                a->mov(x86::rax, x86::qword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->mov(x86::rdx, x86::qword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->and_(x86::rdx, x86::rax);  // rdx = rax & rdx = ra & rb
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rdx);  // Store to rd
             }
             return true;
 
         case static_cast<uint8_t>(Opcode::Xor):
             {
-                // rd = ra ^ rb (3-operand format)
+                // rd = ra ^ rb (3-operand format, 64-bit)
                 auto* a = static_cast<x86::Assembler*>(assembler);
-                a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
-                a->mov(x86::edx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
-                a->xor_(x86::edx, x86::eax);  // edx = eax ^ edx = ra ^ rb
-                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::edx);  // Store to rd
+                a->mov(x86::rax, x86::qword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->mov(x86::rdx, x86::qword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->xor_(x86::rdx, x86::rax);  // rdx = rax ^ rdx = ra ^ rb
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rdx);  // Store to rd
             }
             return true;
 
         case static_cast<uint8_t>(Opcode::Or):
             {
-                // rd = ra | rb (3-operand format)
+                // rd = ra | rb (3-operand format, 64-bit)
                 auto* a = static_cast<x86::Assembler*>(assembler);
-                a->mov(x86::eax, x86::dword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
-                a->mov(x86::edx, x86::dword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
-                a->or_(x86::edx, x86::eax);  // edx = eax | edx = ra | rb
-                a->mov(x86::dword_ptr(x86::rbx, decoded.dest_reg * 8), x86::edx);  // Store to rd
+                a->mov(x86::rax, x86::qword_ptr(x86::rbx, decoded.src1_reg * 8));  // Load ra
+                a->mov(x86::rdx, x86::qword_ptr(x86::rbx, decoded.src2_reg * 8));  // Load rb
+                a->or_(x86::rdx, x86::rax);  // rdx = rax | rdx = ra | rb
+                a->mov(x86::qword_ptr(x86::rbx, decoded.dest_reg * 8), x86::rdx);  // Store to rd
             }
             return true;
 
@@ -2700,10 +2736,15 @@ bool emit_basic_block_instructions(
                 break;
 
             case static_cast<uint8_t>(Opcode::ShloL64):
+                decoded_ok = decode_shlo_l_64(bytecode, current_pc, decoded);
+                break;
+
             case static_cast<uint8_t>(Opcode::ShloR64):
+                decoded_ok = decode_shlo_r_64(bytecode, current_pc, decoded);
+                break;
+
             case static_cast<uint8_t>(Opcode::SharR64):
-                // Same 2-register format as arithmetic: [opcode][dest_reg][src_reg]
-                decoded_ok = decode_add_64(bytecode, current_pc, decoded);
+                decoded_ok = decode_shar_r_64(bytecode, current_pc, decoded);
                 break;
 
             case 213: // MulUpperSS

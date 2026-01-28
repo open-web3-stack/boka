@@ -130,6 +130,9 @@ bool jit_emit_shar_r_32(void* _Nonnull assembler, const char* _Nonnull target_ar
 bool jit_emit_shlo_l_64(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t src_reg);
 bool jit_emit_shlo_r_64(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t src_reg);
 bool jit_emit_shar_r_64(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t src_reg);
+bool jit_emit_shlo_l_64_3reg(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t ra, uint8_t rb, uint8_t rd);
+bool jit_emit_shlo_r_64_3reg(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t ra, uint8_t rb, uint8_t rd);
+bool jit_emit_shar_r_64_3reg(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t ra, uint8_t rb, uint8_t rd);
 bool jit_emit_shl_imm_32(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t src_reg, uint8_t immediate);
 bool jit_emit_shl_imm_64(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t src_reg, uint8_t immediate);
 bool jit_emit_shr_imm_32(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t dest_reg, uint8_t src_reg, uint8_t immediate);

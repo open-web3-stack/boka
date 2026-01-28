@@ -2307,6 +2307,105 @@ bool jit_emit_shar_r_64(
     return true;
 }
 
+// ShloL64: Shift left logical (64-bit) - 3-operand version
+// rd = ra << rb
+bool jit_emit_shlo_l_64_3reg(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t ra,
+    uint8_t rb,
+    uint8_t rd)
+{
+    if (strcmp(target_arch, "x86_64") != 0) {
+        return false;
+    }
+
+    auto* a = static_cast<x86::Assembler*>(assembler);
+
+    // Load rb (shift count) from VM array
+    a->mov(x86::rcx, x86::qword_ptr(x86::rbx, rb * 8));
+
+    // Load ra (value to shift) from VM array
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, ra * 8));
+
+    // Mask shift count to 6 bits
+    a->and_(x86::rcx, 0x3F);
+
+    // Shift left: rdx = rdx << cl
+    a->shl(x86::rdx, x86::cl);
+
+    // Store result to rd in VM register array
+    a->mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rdx);
+
+    return true;
+}
+
+// ShloR64: Shift right logical (64-bit) - 3-operand version
+// rd = ra >> rb (logical)
+bool jit_emit_shlo_r_64_3reg(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t ra,
+    uint8_t rb,
+    uint8_t rd)
+{
+    if (strcmp(target_arch, "x86_64") != 0) {
+        return false;
+    }
+
+    auto* a = static_cast<x86::Assembler*>(assembler);
+
+    // Load rb (shift count) from VM array
+    a->mov(x86::rcx, x86::qword_ptr(x86::rbx, rb * 8));
+
+    // Load ra (value to shift) from VM array
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, ra * 8));
+
+    // Mask shift count to 6 bits
+    a->and_(x86::rcx, 0x3F);
+
+    // Shift right logical: rdx = rdx >> cl
+    a->shr(x86::rdx, x86::cl);
+
+    // Store result to rd in VM register array
+    a->mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rdx);
+
+    return true;
+}
+
+// SharR64: Shift right arithmetic (64-bit) - 3-operand version
+// rd = ra >> rb (arithmetic, sign-extending)
+bool jit_emit_shar_r_64_3reg(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    uint8_t ra,
+    uint8_t rb,
+    uint8_t rd)
+{
+    if (strcmp(target_arch, "x86_64") != 0) {
+        return false;
+    }
+
+    auto* a = static_cast<x86::Assembler*>(assembler);
+
+    // Load rb (shift count) from VM array
+    a->mov(x86::rcx, x86::qword_ptr(x86::rbx, rb * 8));
+
+    // Load ra (value to shift) from VM array
+    a->mov(x86::rdx, x86::qword_ptr(x86::rbx, ra * 8));
+
+    // Mask shift count to 6 bits
+    a->and_(x86::rcx, 0x3F);
+
+    // Shift right arithmetic: rdx = rdx >> cl (sign-extending)
+    a->sar(x86::rdx, x86::cl);
+
+    // Store result to rd in VM register array
+    a->mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rdx);
+
+    return true;
+}
+
 // RotL32: Rotate left (32-bit)
 // rd = ra rotated left by rb bits
 bool jit_emit_rot_l_32(
