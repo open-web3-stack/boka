@@ -300,10 +300,9 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(42).littleEndian) { Array($0) })
 
-        code.append(0xCA) // Mul64 r3, r1, r2
-        code.append(0x03)
-        code.append(0x01)
-        code.append(0x02)
+        code.append(0xCA) // Mul64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
@@ -331,10 +330,9 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(1 << 30).littleEndian) { Array($0) })
 
-        code.append(0xCA) // Mul64 r3, r1, r2
-        code.append(0x03)
-        code.append(0x01)
-        code.append(0x02)
+        code.append(0xCA) // Mul64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
@@ -358,10 +356,9 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(6789).littleEndian) { Array($0) })
 
-        code.append(0xCA) // Mul64 r3, r1, r2
-        code.append(0x03)
-        code.append(0x01)
-        code.append(0x02)
+        code.append(0xCA) // Mul64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
@@ -396,10 +393,9 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(4).littleEndian) { Array($0) })
 
-        code.append(0xCE) // ShloL64 r3, r1, r2
-        code.append(0x03)
-        code.append(0x01)
-        code.append(0x02)
+        code.append(0xCE) // ShloL64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
@@ -427,10 +423,9 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(68).littleEndian) { Array($0) })
 
-        code.append(0xCE) // ShloL64 r3, r1, r2
-        code.append(0x03)
-        code.append(0x01)
-        code.append(0x02)
+        code.append(0xCE) // ShloL64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
@@ -458,10 +453,9 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(2).littleEndian) { Array($0) })
 
-        code.append(0xCF) // ShroR64 r3, r1, r2
-        code.append(0x03)
-        code.append(0x01)
-        code.append(0x02)
+        code.append(0xCF) // ShroR64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
@@ -489,10 +483,9 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(2).littleEndian) { Array($0) })
 
-        code.append(0xD0) // SharR64 r3, r1, r2
-        code.append(0x03)
-        code.append(0x01)
-        code.append(0x02)
+        code.append(0xD0) // SharR64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
@@ -517,10 +510,9 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(3).littleEndian) { Array($0) })
 
-        code.append(0xCE) // ShloL64 r3, r1, r2
-        code.append(0x03)
-        code.append(0x01)
-        code.append(0x02)
+        code.append(0xCE) // ShloL64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
@@ -555,10 +547,9 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xFFFF_0000).littleEndian) { Array($0) })
 
-        code.append(0xD2) // And r3, r1, r2
-        code.append(0x03)
-        code.append(0x01)
-        code.append(0x02)
+        code.append(0xD2) // And r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
@@ -586,10 +577,9 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0F).littleEndian) { Array($0) })
 
-        code.append(0xD4) // Or r3, r1, r2
-        code.append(0x03)
-        code.append(0x01)
-        code.append(0x02)
+        code.append(0xD4) // Or r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
@@ -617,10 +607,9 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xFF).littleEndian) { Array($0) })
 
-        code.append(0xD3) // Xor r3, r1, r2
-        code.append(0x03)
-        code.append(0x01)
-        code.append(0x02)
+        code.append(0xD3) // Xor r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
@@ -643,10 +632,9 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xFF00_FF00_FF00_FF00).littleEndian) { Array($0) })
 
-        code.append(0xD2) // And r3, r1, r2
-        code.append(0x03)
-        code.append(0x01)
-        code.append(0x02)
+        code.append(0xD2) // And r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
@@ -707,10 +695,9 @@ struct JITArithmeticTests {
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0).littleEndian) { Array($0) })
 
-        code.append(0xCA) // Mul64 r3, r1, r2
-        code.append(0x03)
-        code.append(0x01)
-        code.append(0x02)
+        code.append(0xCA) // Mul64 r3, r1, r2 (packed: ra=0x01, rb=0x02)
+        code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
+        code.append(0x03) // rd=0x03
 
         code.append(0x01) // Halt
 
