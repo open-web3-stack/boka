@@ -146,13 +146,13 @@ extension Instructions {
         return .continued
     }
 
-    static func deocdeRegisters(_ data: Data) throws -> (Registers.Index, Registers.Index) {
+    static func decodeRegisters(_ data: Data) throws -> (Registers.Index, Registers.Index) {
         let ra = try Registers.Index(r1: data.at(relative: 0))
         let rb = try Registers.Index(r2: data.at(relative: 0))
         return (ra, rb)
     }
 
-    static func deocdeRegisters(_ data: Data) throws -> (Registers.Index, Registers.Index, Registers.Index) {
+    static func decodeRegisters(_ data: Data) throws -> (Registers.Index, Registers.Index, Registers.Index) {
         let ra = try Registers.Index(r1: data.at(relative: 0))
         let rb = try Registers.Index(r2: data.at(relative: 0))
         let rd = try Registers.Index(r3: data.at(relative: 1))
