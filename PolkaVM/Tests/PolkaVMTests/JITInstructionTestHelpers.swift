@@ -335,6 +335,12 @@ enum ProgramBlobBuilder {
     }
 
     /// Calculate instruction size based on opcode
+    ///
+    /// **IMPORTANT**: This function duplicates the instruction size calculation logic
+    /// from `PolkaVM/Sources/CppHelper/helper.cpp` (get_instruction_size function).
+    /// Any changes to instruction formats in the C++ implementation MUST be mirrored here
+    /// to ensure correct bitmask generation for JIT tests.
+    ///
     /// - Parameters:
     ///   - opcode: Instruction opcode byte
     ///   - instructionBytes: Full instruction bytes array
