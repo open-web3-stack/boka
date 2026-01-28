@@ -424,8 +424,9 @@ enum ProgramBlobBuilder {
         }
 
         // 32-bit arithmetic (opcodes 0xC0-0xC7)
+        // Same 3-register format as 64-bit: [opcode][ra|rb<<4][rd] = 3 bytes
         if opcode >= 0xC0, opcode < 0xC8 {
-            return 1 + 3
+            return 3
         }
 
         // LoadU8/I8/U16/I16/U32/I32/U64 (7 bytes: opcode + 2 registers + 32-bit offset)
@@ -488,13 +489,6 @@ enum ProgramBlobBuilder {
             }
 
             return size
-        }
-
-        // Bitwise operations (3 bytes: opcode + packed registers + rd)
-        // Format: opcode (1) + [ra|rb<<4] (1) + rd (1) = 3 bytes total
-        // Opcodes 0xD2-0xD4: And, Xor, Or
-        if opcode >= 0xD2, opcode <= 0xD4 {
-            return 3 // 3 bytes: [opcode][ra|rb<<4][rd]
         }
 
         // Varint-encoded instructions
