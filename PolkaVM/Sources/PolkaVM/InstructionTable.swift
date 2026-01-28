@@ -4,7 +4,7 @@ import Utils
 
 private let logger = Logger(label: "InstructionTable")
 
-public class InstructionTable {
+public enum InstructionTable {
     public nonisolated(unsafe) static let table: [Instruction.Type?] = {
         let insts: [Instruction.Type] = [
             Instructions.Trap.self,
@@ -155,18 +155,15 @@ public class InstructionTable {
     }()
 
     public static func parse(_ data: Data) -> (any Instruction)? {
-        // logger.trace("parsing \(data)")
         guard data.count >= 1 else {
             return nil
         }
 
         let opcode = data[data.startIndex]
-        // logger.trace("parsed opcode: \(opcode)")
 
         guard let instType = table[Int(opcode)] else {
             return nil
         }
-        // logger.trace("initializing \(instType)")
 
         let instructionData = data.subdata(in: (data.startIndex + 1) ..< data.endIndex)
         return try? instType.init(data: instructionData)

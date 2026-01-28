@@ -1621,20 +1621,13 @@ extension CppHelper.Instructions.SharR32: Instruction {
 extension CppHelper.Instructions.Add64: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        print("[Add64.init] ra: \(ra), rb: \(rb), rd: \(rd)")
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        print("[Add64.execute] ra: \(ra), rb: \(rb), rd: \(rd)")
-        print("[Add64.execute] ra.value: \(ra.value), rb.value: \(rb.value), rd.value: \(rd.value)")
         let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-        print("[Add64.execute] raVal: \(raVal), rbVal: \(rbVal)")
         let result = raVal &+ rbVal
-        print("[Add64.execute] result: \(result), result type: \(type(of: result))")
-        print("[Add64.execute] About to write to rd.value: \(rd.value)")
         context.state.writeRegister(rd, result)
-        print("[Add64.execute] Write succeeded")
         return .continued
     }
 }
