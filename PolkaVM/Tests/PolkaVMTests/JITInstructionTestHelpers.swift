@@ -442,19 +442,52 @@ enum ProgramBlobBuilder {
             return 1 + 1 + 4 + 1
         }
 
-        // StoreImmU8/U16/U32/U64 (opcode + register + offset32 + immediate)
-        // These have variable-sized immediates (1, 2, 4, or 8 bytes)
-        if opcode == 0x1E { // StoreImmU8: opcode + reg + offset32 + imm8
-            return 1 + 1 + 4 + 1 // offset32 is 4 bytes (aligned), imm8 is 1 byte
+        // StoreImmU8/U16/U32/U64 (direct store: opcode + address_varint + value_varint)
+        if opcode == 0x1E || opcode == 0x1F || opcode == 0x20 || opcode == 0x21 {
+            var size = 1 // opcode
+            var offset = pc + 1
+
+            // Decode address varint
+            while offset < instructionBytes.count {
+                let byte = instructionBytes[offset]
+                size += 1
+                offset += 1
+                if byte & 0x80 == 0 { break }
+            }
+
+            // Decode value varint
+            while offset < instructionBytes.count {
+                let byte = instructionBytes[offset]
+                size += 1
+                offset += 1
+                if byte & 0x80 == 0 { break }
+            }
+
+            return size
         }
-        if opcode == 0x1F { // StoreImmU16: opcode + reg + offset32 + imm16
-            return 1 + 1 + 4 + 2 // offset32 (4), imm16 (2)
-        }
-        if opcode == 0x20 { // StoreImmU32: opcode + reg + offset32 + imm32
-            return 1 + 1 + 4 + 4 // offset32 (4), imm32 (4)
-        }
-        if opcode == 0x21 { // StoreImmU64: opcode + reg + offset32 + imm64
-            return 1 + 1 + 4 + 8 // offset32 (4), imm64 (8)
+
+        // StoreImmIndU8/U16/U32/U64 (register-relative: opcode + reg + offset_varint + value_varint)
+        if opcode >= 0x46, opcode <= 0x49 {
+            var size = 2 // opcode + reg
+            var offset = pc + 2
+
+            // Decode offset varint
+            while offset < instructionBytes.count {
+                let byte = instructionBytes[offset]
+                size += 1
+                offset += 1
+                if byte & 0x80 == 0 { break }
+            }
+
+            // Decode value varint
+            while offset < instructionBytes.count {
+                let byte = instructionBytes[offset]
+                size += 1
+                offset += 1
+                if byte & 0x80 == 0 { break }
+            }
+
+            return size
         }
 
         // Bitwise operations (3 bytes: opcode + packed registers + rd)

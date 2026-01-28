@@ -14,6 +14,29 @@ import Utils
 
 private let logger = Logger(label: "JITLoadStoreTests")
 
+/// Helper function to encode unsigned integers as varint (LEB128)
+/// Uses high bit (0x80) to indicate continuation
+private func encodeVarint(_ value: UInt64) -> [UInt8] {
+    guard value > 0 else { return [0] }
+
+    var bytes: [UInt8] = []
+    var remaining = value
+
+    while remaining > 0 {
+        var byte = UInt8(remaining & 0x7F)
+        remaining >>= 7
+
+        // Set continuation bit if more bytes follow
+        if remaining > 0 {
+            byte |= 0x80
+        }
+
+        bytes.append(byte)
+    }
+
+    return bytes
+}
+
 /// JIT Load/Store Instruction Tests
 struct JITLoadStoreTests {
     // MARK: - LoadImm Instructions (Opcodes 51, 20)
@@ -61,10 +84,12 @@ struct JITLoadStoreTests {
     @Test("JIT: LoadImm loads 32-bit immediate with sign extension")
     func jitLoadImm32() async throws {
         // LoadImm r1, 0x12345678 (sign-extended to 64-bit)
+        // LoadImm uses varint encoding for the immediate value
+        let value = UInt64(bitPattern: Int64(Int32(bitPattern: 0x1234_5678)))
         let instruction: [UInt8] = [
             0x33, // LoadImm opcode (32-bit immediate, sign-extended)
             0x01, // r1
-        ] + withUnsafeBytes(of: UInt32(0x1234_5678).littleEndian) { Array($0) }
+        ] + encodeVarint(value)
 
         let result = await JITInstructionExecutor.executeSingleInstruction(instruction)
 
@@ -395,11 +420,11 @@ struct JITLoadStoreTests {
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
 
-        // StoreImmU8 [r1 + 0], 0xAB
-        code.append(0x1E) // StoreImmU8 opcode
+        // StoreImmIndU8 [r1 + 0], 0xAB
+        code.append(0x46) // StoreImmIndU8 opcode (70)
         code.append(0x01) // r1
-        code.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian) { Array($0) }) // offset
-        code.append(0xAB) // immediate value
+        code.append(contentsOf: encodeVarint(0)) // offset (varint)
+        code.append(contentsOf: encodeVarint(0xAB)) // value (varint)
 
         // LoadU8 r2, [r1 + 0]
         code.append(0x34)
@@ -435,11 +460,11 @@ struct JITLoadStoreTests {
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
 
-        // StoreImmU32 [r1 + 0], 0x12345678
-        code.append(0x20) // StoreImmU32 opcode (32)
+        // StoreImmIndU32 [r1 + 0], 0x12345678
+        code.append(0x48) // StoreImmIndU32 opcode (72)
         code.append(0x01) // r1
-        code.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian) { Array($0) }) // offset
-        code.append(contentsOf: withUnsafeBytes(of: UInt32(0x1234_5678).littleEndian) { Array($0) }) // immediate
+        code.append(contentsOf: encodeVarint(0)) // offset (varint)
+        code.append(contentsOf: encodeVarint(0x1234_5678)) // value (varint)
 
         // LoadU32 r2, [r1 + 0]
         code.append(0x38) // LoadU32 opcode
@@ -470,10 +495,10 @@ struct JITLoadStoreTests {
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
 
-        code.append(0x1E) // StoreImmU8 [r1+0], 0xCD
-        code.append(0x01)
-        code.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian) { Array($0) })
-        code.append(0xCD)
+        code.append(0x46) // StoreImmIndU8 [r1+0], 0xCD
+        code.append(0x01) // r1
+        code.append(contentsOf: encodeVarint(0)) // offset (varint)
+        code.append(contentsOf: encodeVarint(0xCD)) // value (varint)
 
         code.append(0x01) // Halt
 
