@@ -423,7 +423,7 @@ enum ProgramBlobBuilder {
             return 3 // 3 bytes: [opcode][ra|rb<<4][rd]
         }
 
-        // 32-bit arithmetic (opcodes 0xC0-0xC8)
+        // 32-bit arithmetic (opcodes 0xC0-0xC7)
         if opcode >= 0xC0, opcode < 0xC8 {
             return 1 + 3
         }
