@@ -560,7 +560,7 @@ extension CppHelper.Instructions.BranchGtSImm: BranchInstructionBase {
 
 extension CppHelper.Instructions.MoveReg: Instruction {
     public init(data: Data) throws {
-        let (dest, src) = try Instructions.deocdeRegisters(data)
+        let (dest, src) = try Instructions.decodeRegisters(data)
         self.init(src: src, dest: dest)
     }
 
@@ -572,7 +572,7 @@ extension CppHelper.Instructions.MoveReg: Instruction {
 
 extension CppHelper.Instructions.Sbrk: Instruction {
     public init(data: Data) throws {
-        let (dest, src) = try Instructions.deocdeRegisters(data)
+        let (dest, src) = try Instructions.decodeRegisters(data)
         self.init(src: src, dest: dest)
     }
 
@@ -586,7 +586,7 @@ extension CppHelper.Instructions.Sbrk: Instruction {
 
 extension CppHelper.Instructions.CountSetBits64: Instruction {
     public init(data: Data) throws {
-        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        let (dest, ra) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, dest: dest)
     }
 
@@ -599,7 +599,7 @@ extension CppHelper.Instructions.CountSetBits64: Instruction {
 
 extension CppHelper.Instructions.CountSetBits32: Instruction {
     public init(data: Data) throws {
-        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        let (dest, ra) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, dest: dest)
     }
 
@@ -612,7 +612,7 @@ extension CppHelper.Instructions.CountSetBits32: Instruction {
 
 extension CppHelper.Instructions.LeadingZeroBits64: Instruction {
     public init(data: Data) throws {
-        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        let (dest, ra) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, dest: dest)
     }
 
@@ -625,7 +625,7 @@ extension CppHelper.Instructions.LeadingZeroBits64: Instruction {
 
 extension CppHelper.Instructions.LeadingZeroBits32: Instruction {
     public init(data: Data) throws {
-        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        let (dest, ra) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, dest: dest)
     }
 
@@ -638,7 +638,7 @@ extension CppHelper.Instructions.LeadingZeroBits32: Instruction {
 
 extension CppHelper.Instructions.TrailingZeroBits64: Instruction {
     public init(data: Data) throws {
-        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        let (dest, ra) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, dest: dest)
     }
 
@@ -651,7 +651,7 @@ extension CppHelper.Instructions.TrailingZeroBits64: Instruction {
 
 extension CppHelper.Instructions.TrailingZeroBits32: Instruction {
     public init(data: Data) throws {
-        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        let (dest, ra) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, dest: dest)
     }
 
@@ -664,7 +664,7 @@ extension CppHelper.Instructions.TrailingZeroBits32: Instruction {
 
 extension CppHelper.Instructions.SignExtend8: Instruction {
     public init(data: Data) throws {
-        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        let (dest, ra) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, dest: dest)
     }
 
@@ -677,7 +677,7 @@ extension CppHelper.Instructions.SignExtend8: Instruction {
 
 extension CppHelper.Instructions.SignExtend16: Instruction {
     public init(data: Data) throws {
-        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        let (dest, ra) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, dest: dest)
     }
 
@@ -690,7 +690,7 @@ extension CppHelper.Instructions.SignExtend16: Instruction {
 
 extension CppHelper.Instructions.ZeroExtend16: Instruction {
     public init(data: Data) throws {
-        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        let (dest, ra) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, dest: dest)
     }
 
@@ -703,7 +703,7 @@ extension CppHelper.Instructions.ZeroExtend16: Instruction {
 
 extension CppHelper.Instructions.ReverseBytes: Instruction {
     public init(data: Data) throws {
-        let (dest, ra) = try Instructions.deocdeRegisters(data)
+        let (dest, ra) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, dest: dest)
     }
 
@@ -716,7 +716,7 @@ extension CppHelper.Instructions.ReverseBytes: Instruction {
 
 extension CppHelper.Instructions.StoreIndU8: Instruction {
     public init(data: Data) throws {
-        let (src, dest) = try Instructions.deocdeRegisters(data)
+        let (src, dest) = try Instructions.decodeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(src: src, dest: dest, offset: offset)
     }
@@ -730,7 +730,7 @@ extension CppHelper.Instructions.StoreIndU8: Instruction {
 
 extension CppHelper.Instructions.StoreIndU16: Instruction {
     public init(data: Data) throws {
-        let (src, dest) = try Instructions.deocdeRegisters(data)
+        let (src, dest) = try Instructions.decodeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(src: src, dest: dest, offset: offset)
     }
@@ -747,7 +747,7 @@ extension CppHelper.Instructions.StoreIndU16: Instruction {
 
 extension CppHelper.Instructions.StoreIndU32: Instruction {
     public init(data: Data) throws {
-        let (src, dest) = try Instructions.deocdeRegisters(data)
+        let (src, dest) = try Instructions.decodeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(src: src, dest: dest, offset: offset)
     }
@@ -764,7 +764,7 @@ extension CppHelper.Instructions.StoreIndU32: Instruction {
 
 extension CppHelper.Instructions.StoreIndU64: Instruction {
     public init(data: Data) throws {
-        let (src, dest) = try Instructions.deocdeRegisters(data)
+        let (src, dest) = try Instructions.decodeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(src: src, dest: dest, offset: offset)
     }
@@ -781,7 +781,7 @@ extension CppHelper.Instructions.StoreIndU64: Instruction {
 
 extension CppHelper.Instructions.LoadIndU8: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, offset: offset)
     }
@@ -795,7 +795,7 @@ extension CppHelper.Instructions.LoadIndU8: Instruction {
 
 extension CppHelper.Instructions.LoadIndI8: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, offset: offset)
     }
@@ -809,7 +809,7 @@ extension CppHelper.Instructions.LoadIndI8: Instruction {
 
 extension CppHelper.Instructions.LoadIndU16: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, offset: offset)
     }
@@ -824,7 +824,7 @@ extension CppHelper.Instructions.LoadIndU16: Instruction {
 
 extension CppHelper.Instructions.LoadIndI16: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, offset: offset)
     }
@@ -839,7 +839,7 @@ extension CppHelper.Instructions.LoadIndI16: Instruction {
 
 extension CppHelper.Instructions.LoadIndU32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, offset: offset)
     }
@@ -854,7 +854,7 @@ extension CppHelper.Instructions.LoadIndU32: Instruction {
 
 extension CppHelper.Instructions.LoadIndI32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, offset: offset)
     }
@@ -869,7 +869,7 @@ extension CppHelper.Instructions.LoadIndI32: Instruction {
 
 extension CppHelper.Instructions.LoadIndU64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let offset: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, offset: offset)
     }
@@ -884,7 +884,7 @@ extension CppHelper.Instructions.LoadIndU64: Instruction {
 
 extension CppHelper.Instructions.AddImm32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -898,7 +898,7 @@ extension CppHelper.Instructions.AddImm32: Instruction {
 
 extension CppHelper.Instructions.AndImm: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -912,7 +912,7 @@ extension CppHelper.Instructions.AndImm: Instruction {
 
 extension CppHelper.Instructions.XorImm: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -926,7 +926,7 @@ extension CppHelper.Instructions.XorImm: Instruction {
 
 extension CppHelper.Instructions.OrImm: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -940,7 +940,7 @@ extension CppHelper.Instructions.OrImm: Instruction {
 
 extension CppHelper.Instructions.MulImm32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -954,7 +954,7 @@ extension CppHelper.Instructions.MulImm32: Instruction {
 
 extension CppHelper.Instructions.SetLtUImm: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -968,7 +968,7 @@ extension CppHelper.Instructions.SetLtUImm: Instruction {
 
 extension CppHelper.Instructions.SetLtSImm: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -982,7 +982,7 @@ extension CppHelper.Instructions.SetLtSImm: Instruction {
 
 extension CppHelper.Instructions.ShloLImm32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -997,7 +997,7 @@ extension CppHelper.Instructions.ShloLImm32: Instruction {
 
 extension CppHelper.Instructions.ShloRImm32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1012,7 +1012,7 @@ extension CppHelper.Instructions.ShloRImm32: Instruction {
 
 extension CppHelper.Instructions.SharRImm32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1027,7 +1027,7 @@ extension CppHelper.Instructions.SharRImm32: Instruction {
 
 extension CppHelper.Instructions.NegAddImm32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1041,7 +1041,7 @@ extension CppHelper.Instructions.NegAddImm32: Instruction {
 
 extension CppHelper.Instructions.SetGtUImm: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1055,7 +1055,7 @@ extension CppHelper.Instructions.SetGtUImm: Instruction {
 
 extension CppHelper.Instructions.SetGtSImm: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1069,7 +1069,7 @@ extension CppHelper.Instructions.SetGtSImm: Instruction {
 
 extension CppHelper.Instructions.ShloLImmAlt32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1084,7 +1084,7 @@ extension CppHelper.Instructions.ShloLImmAlt32: Instruction {
 
 extension CppHelper.Instructions.ShloRImmAlt32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1099,7 +1099,7 @@ extension CppHelper.Instructions.ShloRImmAlt32: Instruction {
 
 extension CppHelper.Instructions.SharRImmAlt32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1114,7 +1114,7 @@ extension CppHelper.Instructions.SharRImmAlt32: Instruction {
 
 extension CppHelper.Instructions.CmovIzImm: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1130,7 +1130,7 @@ extension CppHelper.Instructions.CmovIzImm: Instruction {
 
 extension CppHelper.Instructions.CmovNzImm: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1146,7 +1146,7 @@ extension CppHelper.Instructions.CmovNzImm: Instruction {
 
 extension CppHelper.Instructions.AddImm64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1160,7 +1160,7 @@ extension CppHelper.Instructions.AddImm64: Instruction {
 
 extension CppHelper.Instructions.MulImm64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1174,7 +1174,7 @@ extension CppHelper.Instructions.MulImm64: Instruction {
 
 extension CppHelper.Instructions.ShloLImm64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1189,7 +1189,7 @@ extension CppHelper.Instructions.ShloLImm64: Instruction {
 
 extension CppHelper.Instructions.ShloRImm64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1204,7 +1204,7 @@ extension CppHelper.Instructions.ShloRImm64: Instruction {
 
 extension CppHelper.Instructions.SharRImm64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1219,7 +1219,7 @@ extension CppHelper.Instructions.SharRImm64: Instruction {
 
 extension CppHelper.Instructions.NegAddImm64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1233,7 +1233,7 @@ extension CppHelper.Instructions.NegAddImm64: Instruction {
 
 extension CppHelper.Instructions.ShloLImmAlt64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1248,7 +1248,7 @@ extension CppHelper.Instructions.ShloLImmAlt64: Instruction {
 
 extension CppHelper.Instructions.ShloRImmAlt64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1263,7 +1263,7 @@ extension CppHelper.Instructions.ShloRImmAlt64: Instruction {
 
 extension CppHelper.Instructions.SharRImmAlt64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1278,7 +1278,7 @@ extension CppHelper.Instructions.SharRImmAlt64: Instruction {
 
 extension CppHelper.Instructions.RotR64Imm: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1292,7 +1292,7 @@ extension CppHelper.Instructions.RotR64Imm: Instruction {
 
 extension CppHelper.Instructions.RotR64ImmAlt: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1306,7 +1306,7 @@ extension CppHelper.Instructions.RotR64ImmAlt: Instruction {
 
 extension CppHelper.Instructions.RotR32Imm: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1320,7 +1320,7 @@ extension CppHelper.Instructions.RotR32Imm: Instruction {
 
 extension CppHelper.Instructions.RotR32ImmAlt: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
         self.init(ra: ra, rb: rb, value: value)
     }
@@ -1442,7 +1442,7 @@ extension CppHelper.Instructions.BranchGeS: BranchInstructionBase2 {
 
 extension CppHelper.Instructions.LoadImmJumpInd: Instruction {
     public init(data: Data) throws {
-        let (ra, rb) = try Instructions.deocdeRegisters(data)
+        let (ra, rb) = try Instructions.decodeRegisters(data)
         let (value, offset): (UInt32, UInt32) = try Instructions.decodeImmediate2(data, minus: 2, startIdx: 1)
         self.init(ra: ra, rb: rb, value: value, offset: offset)
     }
@@ -1463,7 +1463,7 @@ extension CppHelper.Instructions.LoadImmJumpInd: Instruction {
 
 extension CppHelper.Instructions.Add32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1476,7 +1476,7 @@ extension CppHelper.Instructions.Add32: Instruction {
 
 extension CppHelper.Instructions.Sub32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1489,7 +1489,7 @@ extension CppHelper.Instructions.Sub32: Instruction {
 
 extension CppHelper.Instructions.Mul32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1502,7 +1502,7 @@ extension CppHelper.Instructions.Mul32: Instruction {
 
 extension CppHelper.Instructions.DivU32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1519,7 +1519,7 @@ extension CppHelper.Instructions.DivU32: Instruction {
 
 extension CppHelper.Instructions.DivS32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1540,7 +1540,7 @@ extension CppHelper.Instructions.DivS32: Instruction {
 
 extension CppHelper.Instructions.RemU32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1557,7 +1557,7 @@ extension CppHelper.Instructions.RemU32: Instruction {
 
 extension CppHelper.Instructions.RemS32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1578,7 +1578,7 @@ extension CppHelper.Instructions.RemS32: Instruction {
 
 extension CppHelper.Instructions.ShloL32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1592,7 +1592,7 @@ extension CppHelper.Instructions.ShloL32: Instruction {
 
 extension CppHelper.Instructions.ShloR32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1606,7 +1606,7 @@ extension CppHelper.Instructions.ShloR32: Instruction {
 
 extension CppHelper.Instructions.SharR32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1620,7 +1620,7 @@ extension CppHelper.Instructions.SharR32: Instruction {
 
 extension CppHelper.Instructions.Add64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1635,7 +1635,7 @@ extension CppHelper.Instructions.Add64: Instruction {
 extension CppHelper.Instructions.Sub64: Instruction {
     public init(data: Data) throws {
         print("[Sub64.init] data.count: \(data.count)")
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         print("[Sub64.init] ra: \(ra), rb: \(rb), rd: \(rd)")
         self.init(ra: ra, rb: rb, rd: rd)
     }
@@ -1656,7 +1656,7 @@ extension CppHelper.Instructions.Sub64: Instruction {
 
 extension CppHelper.Instructions.Mul64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1669,7 +1669,7 @@ extension CppHelper.Instructions.Mul64: Instruction {
 
 extension CppHelper.Instructions.DivU64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1686,7 +1686,7 @@ extension CppHelper.Instructions.DivU64: Instruction {
 
 extension CppHelper.Instructions.DivS64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1707,7 +1707,7 @@ extension CppHelper.Instructions.DivS64: Instruction {
 
 extension CppHelper.Instructions.RemU64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1724,7 +1724,7 @@ extension CppHelper.Instructions.RemU64: Instruction {
 
 extension CppHelper.Instructions.RemS64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1745,7 +1745,7 @@ extension CppHelper.Instructions.RemS64: Instruction {
 
 extension CppHelper.Instructions.ShloL64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1760,7 +1760,7 @@ extension CppHelper.Instructions.ShloL64: Instruction {
 
 extension CppHelper.Instructions.ShloR64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1774,7 +1774,7 @@ extension CppHelper.Instructions.ShloR64: Instruction {
 
 extension CppHelper.Instructions.SharR64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1788,7 +1788,7 @@ extension CppHelper.Instructions.SharR64: Instruction {
 
 extension CppHelper.Instructions.And: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1801,7 +1801,7 @@ extension CppHelper.Instructions.And: Instruction {
 
 extension CppHelper.Instructions.Xor: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1814,7 +1814,7 @@ extension CppHelper.Instructions.Xor: Instruction {
 
 extension CppHelper.Instructions.Or: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1827,7 +1827,7 @@ extension CppHelper.Instructions.Or: Instruction {
 
 extension CppHelper.Instructions.MulUpperSS: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1842,7 +1842,7 @@ extension CppHelper.Instructions.MulUpperSS: Instruction {
 
 extension CppHelper.Instructions.MulUpperUU: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1855,7 +1855,7 @@ extension CppHelper.Instructions.MulUpperUU: Instruction {
 
 extension CppHelper.Instructions.MulUpperSU: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1870,7 +1870,7 @@ extension CppHelper.Instructions.MulUpperSU: Instruction {
 
 extension CppHelper.Instructions.SetLtU: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1883,7 +1883,7 @@ extension CppHelper.Instructions.SetLtU: Instruction {
 
 extension CppHelper.Instructions.SetLtS: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1896,7 +1896,7 @@ extension CppHelper.Instructions.SetLtS: Instruction {
 
 extension CppHelper.Instructions.CmovIz: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1911,7 +1911,7 @@ extension CppHelper.Instructions.CmovIz: Instruction {
 
 extension CppHelper.Instructions.CmovNz: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1926,7 +1926,7 @@ extension CppHelper.Instructions.CmovNz: Instruction {
 
 extension CppHelper.Instructions.RotL64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1939,7 +1939,7 @@ extension CppHelper.Instructions.RotL64: Instruction {
 
 extension CppHelper.Instructions.RotL32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1952,7 +1952,7 @@ extension CppHelper.Instructions.RotL32: Instruction {
 
 extension CppHelper.Instructions.RotR64: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1965,7 +1965,7 @@ extension CppHelper.Instructions.RotR64: Instruction {
 
 extension CppHelper.Instructions.RotR32: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1978,7 +1978,7 @@ extension CppHelper.Instructions.RotR32: Instruction {
 
 extension CppHelper.Instructions.AndInv: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -1991,7 +1991,7 @@ extension CppHelper.Instructions.AndInv: Instruction {
 
 extension CppHelper.Instructions.OrInv: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -2004,7 +2004,7 @@ extension CppHelper.Instructions.OrInv: Instruction {
 
 extension CppHelper.Instructions.Xnor: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -2017,7 +2017,7 @@ extension CppHelper.Instructions.Xnor: Instruction {
 
 extension CppHelper.Instructions.Max: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -2030,7 +2030,7 @@ extension CppHelper.Instructions.Max: Instruction {
 
 extension CppHelper.Instructions.MaxU: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -2043,7 +2043,7 @@ extension CppHelper.Instructions.MaxU: Instruction {
 
 extension CppHelper.Instructions.Min: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
@@ -2056,7 +2056,7 @@ extension CppHelper.Instructions.Min: Instruction {
 
 extension CppHelper.Instructions.MinU: Instruction {
     public init(data: Data) throws {
-        let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
+        let (ra, rb, rd) = try Instructions.decodeRegisters(data)
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
