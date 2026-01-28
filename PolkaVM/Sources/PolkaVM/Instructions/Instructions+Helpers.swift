@@ -25,6 +25,32 @@ extension Instructions {
         return T(truncatingIfNeeded: signExtendedValue)
     }
 
+    /// Decode variable-length integer (varint) from data
+    /// Varint format: 7 bits per byte, continuation bit (0x80) indicates more bytes
+    static func decodeVarint(_ data: Data) -> UInt64 {
+        var result: UInt64 = 0
+        var shift = 0
+        var index = 0
+
+        while index < data.count {
+            let byte = data[index]
+            result |= UInt64(byte & 0x7F) << shift
+            index += 1
+
+            if (byte & 0x80) == 0 {
+                break
+            }
+
+            shift += 7
+            if shift >= 64 {
+                logger.error("Varint overflow - value too large")
+                return 0
+            }
+        }
+
+        return result
+    }
+
     static func decodeImmediate2<T: FixedWidthInteger, U: FixedWidthInteger>(
         _ data: Data,
         divideBy: UInt8 = 1,
