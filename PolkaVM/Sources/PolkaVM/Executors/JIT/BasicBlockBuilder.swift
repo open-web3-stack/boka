@@ -80,11 +80,16 @@ final class BasicBlockBuilder {
             }
 
             // Get instruction length using C++ implementation
-            let instructionLength = get_instruction_size(
-                program.code.withUnsafeBytes { $0.baseAddress!.assumingMemoryBound(to: UInt8.self) },
-                UInt32(currentPC),
-                program.code.count
-            )
+            let instructionLength = program.code.withUnsafeBytes { bytes -> UInt32 in
+                guard let baseAddress = bytes.baseAddress else {
+                    return 0 // Empty code - signal error
+                }
+                return get_instruction_size(
+                    baseAddress.assumingMemoryBound(to: UInt8.self),
+                    UInt32(currentPC),
+                    program.code.count
+                )
+            }
 
             // Handle unknown opcodes - return 0 signals error
             if instructionLength == 0 {
