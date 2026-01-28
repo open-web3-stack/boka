@@ -164,7 +164,7 @@ struct JITControlFlowTests {
         var code = Data()
 
         // LoadImm64 r1, 8 (jump target offset)
-        code.append(0x33) // LoadImm64 opcode
+        code.append(0x14) // LoadImm64 opcode
         code.append(0x01) // r1
         code.append(contentsOf: [0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]) // immediate = 8
 
@@ -234,12 +234,12 @@ struct JITControlFlowTests {
         code.append(0x01) // jump offset
 
         // LoadImm32 r2, 0xFF (should be skipped)
-        code.append(0x32) // LoadImm32 opcode
+        code.append(0x33) // LoadImm opcode (32-bit immediate, sign-extended)
         code.append(0x02) // r2
         code.append(contentsOf: [0xFF, 0x00, 0x00, 0x00]) // immediate
 
         // LoadImm32 r3, 0xAA (should execute)
-        code.append(0x32) // LoadImm32 opcode
+        code.append(0x33) // LoadImm opcode (32-bit immediate, sign-extended)
         code.append(0x03) // r3
         code.append(contentsOf: [0xAA, 0x00, 0x00, 0x00]) // immediate
 
@@ -339,7 +339,7 @@ struct JITControlFlowTests {
         }
 
         // Target instruction at offset 8: LoadImm32 r2, 0xBB
-        code.append(0x32) // LoadImm32 opcode
+        code.append(0x33) // LoadImm opcode (32-bit immediate, sign-extended)
         code.append(0x02) // r2
         code.append(contentsOf: [0xBB, 0x00, 0x00, 0x00]) // immediate
 
@@ -426,7 +426,7 @@ struct JITControlFlowTests {
         code.append(0x03) // offset 3
 
         // LoadImm32 instruction (6 bytes) - offset 3 is in the middle
-        code.append(0x32) // LoadImm32 opcode
+        code.append(0x33) // LoadImm opcode (32-bit immediate, sign-extended)
         code.append(0x01) // r1
         code.append(contentsOf: [0x78, 0x56, 0x34, 0x12]) // immediate
 

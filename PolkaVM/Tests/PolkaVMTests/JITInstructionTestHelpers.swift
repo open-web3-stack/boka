@@ -370,11 +370,22 @@ enum ProgramBlobBuilder {
 
         // JumpInd instruction (2 bytes: opcode + register)
         // Format: opcode (1) + register (1)
-        if opcode == 0x32, pc + 1 < instructionBytes.count {
-            // Check if this is JumpInd (opcode 0x32 in a different context)
-            // We need to distinguish from LoadImm32
-            // For now, assume 2-byte format for JumpInd
-            return 1 + 1
+        if opcode == 0x32 { // JumpInd (opcode 50)
+            return 1 + 1 // opcode (1) + register (1) = 2 bytes
+        }
+
+        // LoadImmJump (10 bytes: opcode + register + 32-bit offset + 32-bit value)
+        // Format: opcode (1) + register (1) + offset32 (4) + value32 (4)
+        if opcode == 0x50 { // LoadImmJump (opcode 80)
+            return 1 + 1 + 4 + 4 // 10 bytes total
+        }
+
+        // LoadImmJumpInd - variable size due to varint encoding
+        // Format: opcode (1) + register (1) + varint_offset (variable) + varint_value (variable)
+        if opcode == 0xB4 { // LoadImmJumpInd (opcode 180)
+            // This is complex - for now, return a reasonable size
+            // The actual size depends on varint encoding
+            return 20 // Conservative estimate
         }
 
         // Arithmetic instructions (3 bytes: opcode + packed registers + rd)
