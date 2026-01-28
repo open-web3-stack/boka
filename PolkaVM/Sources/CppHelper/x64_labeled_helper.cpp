@@ -59,6 +59,32 @@ extern "C" bool jit_emitter_emit_basic_block_instructions(
     uint32_t start_pc,
     uint32_t end_pc);
 
+// Varint decoder for variable-length integer encoding
+// Returns the decoded value and updates out_size to include varint bytes
+static uint64_t decode_varint(const uint8_t* bytecode, uint32_t offset, uint32_t& out_size) {
+    uint64_t result = 0;
+    uint32_t shift = 0;
+    uint32_t i = 0;
+
+    while (true) {
+        uint8_t byte = bytecode[offset + i];
+        result |= (uint64_t(byte & 0x7F)) << shift;
+        i++;
+        if ((byte & 0x80) == 0) {
+            break;
+        }
+        shift += 7;
+        if (shift >= 64) {
+            // Varint too large, return 0
+            out_size = 1;
+            return 0;
+        }
+    }
+
+    out_size = i;
+    return result;
+}
+
 // Helper to get instruction size
 static uint32_t getInstructionSize(const uint8_t* bytecode, uint32_t pc, size_t bytecode_size) {
     uint8_t opcode = bytecode[pc];
@@ -607,15 +633,21 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
         // === StoreImmInd Instructions ===
-        // Format: [opcode][base_reg][offset_32bit][value_Nbit]
+        // Format: [opcode][base_reg][offset_varint][value_varint]
         if (opcode_is(opcode, Opcode::StoreImmIndU8) ||
             opcode_is(opcode, Opcode::StoreImmIndU16) ||
             opcode_is(opcode, Opcode::StoreImmIndU32) ||
             opcode_is(opcode, Opcode::StoreImmIndU64)) {
-            
+
             uint8_t base_reg = codeBuffer[pc + 1];
-            uint32_t offset;
-            memcpy(&offset, &codeBuffer[pc + 2], 4);
+
+            // Decode offset varint starting at pc + 2
+            uint32_t offset_varint_size = 0;
+            uint64_t offset = decode_varint(codeBuffer, pc + 2, offset_varint_size);
+
+            // Decode value varint starting after offset varint
+            uint32_t value_varint_size = 0;
+            uint64_t value = decode_varint(codeBuffer, pc + 2 + offset_varint_size, value_varint_size);
 
             // Load base address from register
             a.mov(x86::rax, x86::qword_ptr(x86::rbx, base_reg * 8));
@@ -624,8 +656,10 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.mov(x86::rcx, offset);
             a.add(x86::rax, x86::rcx);
 
-            // Bounds check: address < 65536 → panic
-            a.cmp(x86::rax, 65536);
+            // Read-only protection: address < 0x20000 (131072) → panic
+            // Read-only data zone: 0x10000 - 0x1FFFF
+            // Read-write zone: 0x20000 and above
+            a.cmp(x86::rax, 0x20000);
             a.jb(panicLabel);
 
             // Runtime check: address >= memory_size → page fault
@@ -637,26 +671,19 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
 
             if (opcode_is(opcode, Opcode::StoreImmIndU8)) {
-                uint8_t value = codeBuffer[pc + 6];
-                a.mov(x86::dl, value);
+                a.mov(x86::dl, static_cast<uint8_t>(value));
                 a.mov(mem, x86::dl);
             } else if (opcode_is(opcode, Opcode::StoreImmIndU16)) {
-                uint16_t value;
-                memcpy(&value, &codeBuffer[pc + 6], 2);
-                a.mov(x86::dx, value); // imm to reg
-                a.mov(mem, x86::dx);   // reg to mem
+                a.mov(x86::dx, static_cast<uint16_t>(value));
+                a.mov(mem, x86::dx);
             } else if (opcode_is(opcode, Opcode::StoreImmIndU32)) {
-                uint32_t value;
-                memcpy(&value, &codeBuffer[pc + 6], 4);
-                a.mov(x86::edx, value);
+                a.mov(x86::edx, static_cast<uint32_t>(value));
                 a.mov(mem, x86::edx);
             } else if (opcode_is(opcode, Opcode::StoreImmIndU64)) {
-                uint64_t value;
-                memcpy(&value, &codeBuffer[pc + 6], 8);
                 a.mov(x86::rdx, value);
                 a.mov(mem, x86::rdx);
             }
-            
+
             pc += instrSize;
             continue;
         }
@@ -680,8 +707,10 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.mov(x86::r8d, offset);  // Use r8d (32-bit) to ensure zero-extension
             a.add(x86::rax, x86::r8);
 
-            // Bounds check: address < 65536 → panic
-            a.cmp(x86::rax, 65536);
+            // Read-only protection: address < 0x20000 (131072) → panic
+            // Read-only data zone: 0x10000 - 0x1FFFF
+            // Read-write zone: 0x20000 and above
+            a.cmp(x86::rax, 0x20000);
             a.jb(panicLabel);
 
             // Runtime check: address >= memory_size → page fault
@@ -718,7 +747,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             opcode_is(opcode, Opcode::LoadIndU32) ||
             opcode_is(opcode, Opcode::LoadIndI32) ||
             opcode_is(opcode, Opcode::LoadIndU64)) {
-            
+
             uint8_t dest_reg = codeBuffer[pc + 1];
             uint8_t base_reg = codeBuffer[pc + 2];
             uint32_t offset;
@@ -741,28 +770,26 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.jae(pagefaultLabel);
             
             // Load value
-            x86::Mem mem(x86::r12, x86::rax, 0, 0);
-            
             if (opcode_is(opcode, Opcode::LoadIndU8)) {
-                a.movzx(x86::ecx, mem);
+                a.movzx(x86::ecx, x86::byte_ptr(x86::r12, x86::rax));
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
             } else if (opcode_is(opcode, Opcode::LoadIndI8)) {
-                a.movsx(x86::rcx, mem);
+                a.movsx(x86::rcx, x86::byte_ptr(x86::r12, x86::rax));
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
             } else if (opcode_is(opcode, Opcode::LoadIndU16)) {
-                a.movzx(x86::ecx, mem);
+                a.movzx(x86::ecx, x86::word_ptr(x86::r12, x86::rax));
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
             } else if (opcode_is(opcode, Opcode::LoadIndI16)) {
-                a.movsx(x86::rcx, mem);
+                a.movsx(x86::rcx, x86::word_ptr(x86::r12, x86::rax));
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
             } else if (opcode_is(opcode, Opcode::LoadIndU32)) {
-                a.mov(x86::ecx, mem); // 32-bit mov zero-extends
+                a.mov(x86::ecx, x86::dword_ptr(x86::r12, x86::rax, 0, 0)); // 32-bit mov zero-extends
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
             } else if (opcode_is(opcode, Opcode::LoadIndI32)) {
-                a.movsxd(x86::rcx, mem); // Sign-extend 32 to 64
+                a.movsxd(x86::rcx, x86::dword_ptr(x86::r12, x86::rax, 0, 0)); // Sign-extend 32 to 64
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
             } else if (opcode_is(opcode, Opcode::LoadIndU64)) {
-                a.mov(x86::rcx, mem);
+                a.mov(x86::rcx, x86::qword_ptr(x86::r12, x86::rax, 0, 0));
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
             }
             
@@ -971,7 +998,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
         // === Load Instructions with Bounds Checking ===
-        // PVM Spec: addresses < 2^16 (65536) → panic, addresses >= memory_size → page fault
+        // PVM Spec: addresses < 0x10000 (65536) → panic, addresses >= memory_size → page fault
         // Format: [opcode][reg_index][address_32bit] (6 bytes)
         if (opcode_is(opcode, Opcode::LoadU8) ||
             opcode_is(opcode, Opcode::LoadI8) ||
@@ -989,8 +1016,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // mov to 64-bit register zero-extends automatically
             a.mov(x86::rax, uint64_t(address));
 
-            // Bounds check: address < 65536 → panic
-            a.cmp(x86::rax, 65536);
+            // Bounds check: address < 0x10000 → panic (reserved region)
+            a.cmp(x86::rax, 0x10000);
             a.jb(panicLabel);
 
             // Runtime check: address >= memory_size → page fault
@@ -1002,25 +1029,25 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
 
             if (opcode_is(opcode, Opcode::LoadU8)) {
-                a.movzx(x86::rax, mem);  // Zero-extend to 64-bit
+                a.movzx(x86::eax, x86::byte_ptr(x86::r12, x86::rax));  // Zero-extend byte to 32-bit
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
             } else if (opcode_is(opcode, Opcode::LoadI8)) {
-                a.movsx(x86::rax, mem);  // Sign-extend to 64-bit
+                a.movsx(x86::rax, x86::byte_ptr(x86::r12, x86::rax));  // Sign-extend byte to 64-bit
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
             } else if (opcode_is(opcode, Opcode::LoadU16)) {
-                a.movzx(x86::rax, mem);  // Zero-extend to 64-bit
+                a.movzx(x86::eax, x86::word_ptr(x86::r12, x86::rax));  // Zero-extend word to 32-bit
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
             } else if (opcode_is(opcode, Opcode::LoadI16)) {
-                a.movsx(x86::rax, mem);  // Sign-extend to 64-bit
+                a.movsx(x86::rax, x86::word_ptr(x86::r12, x86::rax));  // Sign-extend word to 64-bit
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
             } else if (opcode_is(opcode, Opcode::LoadU32)) {
-                a.mov(x86::eax, mem);  // 32-bit mov zero-extends automatically
+                a.mov(x86::eax, x86::dword_ptr(x86::r12, x86::rax, 0, 0));  // 32-bit mov zero-extends automatically
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
             } else if (opcode_is(opcode, Opcode::LoadI32)) {
                 a.movsxd(x86::rax, x86::dword_ptr(x86::r12, x86::rax, 0, 0));  // Sign-extend
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
             } else if (opcode_is(opcode, Opcode::LoadU64)) {
-                a.mov(x86::rax, mem);
+                a.mov(x86::rax, x86::qword_ptr(x86::r12, x86::rax, 0, 0));
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
             }
 
@@ -1043,8 +1070,10 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // mov to 64-bit register zero-extends automatically
             a.mov(x86::rax, uint64_t(address));
 
-            // Bounds check: address < 65536 → panic
-            a.cmp(x86::rax, 65536);
+            // Read-only protection: address < 0x20000 (131072) → panic
+            // Read-only data zone: 0x10000 - 0x1FFFF
+            // Read-write zone: 0x20000 and above
+            a.cmp(x86::rax, 0x20000);
             a.jb(panicLabel);
 
             // Runtime check: address >= memory_size → page fault
@@ -1505,15 +1534,18 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             continue;
         }
 
-        // LoadImm: Load 32-bit immediate into register
+        // LoadImm: Load 32-bit immediate into register using varint encoding
         if (opcode_is(opcode, Opcode::LoadImm)) {
-            // LoadImm: [opcode][reg_index][value_32bit] = 6 bytes
+            // LoadImm: [opcode][reg_index][varint_value] - variable length
             uint8_t destReg = codeBuffer[pc + 1];
-            uint32_t immediate;
-            memcpy(&immediate, &codeBuffer[pc + 2], 4);
+
+            // Decode varint immediate starting at pc + 2 (after register)
+            uint32_t varint_size = 0;
+            uint64_t immediate = decode_varint(codeBuffer, pc + 2, varint_size);
 
             // Load immediate into eax (zero-extends to rax per x86-64 ABI)
-            a.mov(x86::eax, immediate);
+            // Truncate to 32-bit as LoadImm loads signed 32-bit values
+            a.mov(x86::eax, static_cast<uint32_t>(immediate));
             a.mov(x86::qword_ptr(x86::rbx, destReg * 8), x86::rax);
 
             pc += instrSize;
