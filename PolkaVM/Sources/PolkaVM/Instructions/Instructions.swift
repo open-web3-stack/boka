@@ -1746,18 +1746,13 @@ extension CppHelper.Instructions.RemS64: Instruction {
 extension CppHelper.Instructions.ShloL64: Instruction {
     public init(data: Data) throws {
         let (ra, rb, rd) = try Instructions.deocdeRegisters(data)
-        print("[ShloL64.init] ra: \(ra), rb: \(rb), rd: \(rd)")
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
         let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-        print("[ShloL64.execute] ra: \(ra), rb: \(rb), rd: \(rd)")
-        print("[ShloL64.execute] raVal: \(raVal), rbVal: \(rbVal)")
         let shift = rbVal & 0x3F
-        print("[ShloL64.execute] shift: \(shift)")
         let result = UInt64(truncatingIfNeeded: raVal << shift)
-        print("[ShloL64.execute] result: \(result)")
         context.state.writeRegister(rd, result)
         return .continued
     }

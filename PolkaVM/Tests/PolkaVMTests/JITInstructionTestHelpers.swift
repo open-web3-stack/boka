@@ -350,10 +350,21 @@ enum ProgramBlobBuilder {
             return 1
         }
 
-        // Instructions with register + 32-bit immediate (6 bytes total)
-        // Format: opcode (1) + register (1) + immediate32 (4)
-        if opcode == 0x33 { // LoadImm (32-bit immediate, sign-extended)
-            return 1 + 1 + 4 // opcode (1) + register (1) + immediate32 (4) = 6 bytes
+        // LoadImm (varint-encoded value)
+        // Format: opcode (1) + register (1) + varint_value (variable)
+        if opcode == 0x33 { // LoadImm (opcode 51)
+            var size = 2 // opcode + register
+            var offset = pc + 2
+
+            // Decode varint to find its size
+            while offset < instructionBytes.count {
+                let byte = instructionBytes[offset]
+                size += 1
+                offset += 1
+                if byte & 0x80 == 0 { break } // Last varint byte
+            }
+
+            return size
         }
 
         // Instructions with register + 64-bit immediate (10 bytes total)
@@ -383,9 +394,26 @@ enum ProgramBlobBuilder {
         // LoadImmJumpInd - variable size due to varint encoding
         // Format: opcode (1) + register (1) + varint_offset (variable) + varint_value (variable)
         if opcode == 0xB4 { // LoadImmJumpInd (opcode 180)
-            // This is complex - for now, return a reasonable size
-            // The actual size depends on varint encoding
-            return 20 // Conservative estimate
+            var size = 2 // opcode + register
+            var offset = pc + 2
+
+            // Decode varint offset
+            while offset < instructionBytes.count {
+                let byte = instructionBytes[offset]
+                size += 1
+                offset += 1
+                if byte & 0x80 == 0 { break }
+            }
+
+            // Decode varint value
+            while offset < instructionBytes.count {
+                let byte = instructionBytes[offset]
+                size += 1
+                offset += 1
+                if byte & 0x80 == 0 { break }
+            }
+
+            return size
         }
 
         // Arithmetic instructions (3 bytes: opcode + packed registers + rd)
