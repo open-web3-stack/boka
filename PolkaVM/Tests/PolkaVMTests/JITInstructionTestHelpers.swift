@@ -379,8 +379,8 @@ enum ProgramBlobBuilder {
 
         // Arithmetic instructions (3 bytes: opcode + packed registers + rd)
         // Format: opcode (1) + [ra|rb<<4] (1) + rd (1) = 3 bytes total
-        // Opcodes 0xC8-0xD0: Add64, Sub64, Mul64, DivU64, DivS64, RemU64, RemS64, ShloL64, ShroR64, SharR64
-        if opcode >= 0xC8, opcode <= 0xD0 {
+        // Opcodes 0xC8-0xD4: Add64, Sub64, Mul64, DivU64, DivS64, RemU64, RemS64, ShloL64, ShloR64, SharR64, And, Xor, Or
+        if opcode >= 0xC8, opcode <= 0xD4 {
             return 3 // 3 bytes: [opcode][ra|rb<<4][rd]
         }
 
@@ -421,10 +421,11 @@ enum ProgramBlobBuilder {
         }
 
         // Varint-encoded instructions
-        // LoadImmJump (0x50), LoadImmJumpInd (0xB4), AddImm64 (0x97), SubImm64 (0x9A)
-        // Format: opcode (1) + register (1) + varint_immediate (variable)
-        if [0x50, 0xB4, 0x97, 0x9A].contains(opcode) {
-            var size = 2 // opcode + register
+        // LoadImmJump (0x50), LoadImmJumpInd (0xB4), AddImm64 (0x95), MulImm64 (0x96),
+        // ShloLImm64 (0x97), ShloRImm64 (0x98), SharRImm64 (0x99), NegAddImm64 (0x9A)
+        // Format: opcode (1) + packed_ra_rb (1) + varint_immediate (variable)
+        if opcode >= 0x95, opcode <= 0x9A {
+            var size = 2 // opcode + packed registers
             var offset = pc + 2
 
             // Decode varint to find its size
@@ -644,6 +645,13 @@ enum JITParityComparator {
         if outputInterpreter != outputJIT {
             differences.append(
                 "Output: interpreter=\(outputInterpreter?.toHexString() ?? "nil"), jit=\(outputJIT?.toHexString() ?? "nil")"
+            )
+        }
+
+        // Compare registers
+        if interpreterRegisters != jitRegisters {
+            differences.append(
+                "Registers mismatch: interpreter=\(interpreterRegisters), jit=\(jitRegisters)"
             )
         }
 

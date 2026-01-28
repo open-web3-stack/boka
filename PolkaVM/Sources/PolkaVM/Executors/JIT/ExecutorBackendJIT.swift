@@ -569,14 +569,9 @@ final class ExecutorBackendJIT: ExecutorBackend {
             }
 
             // Initialize registers from StandardProgram
-            // CRITICAL: When argumentData is nil, use empty Registers() to match interpreter behavior
-            // StandardProgram.initialRegisters always sets R7/R8 even when argumentData is nil,
-            // but the test harness uses empty Registers() for interpreter mode when argumentData is nil
-            var registers: Registers = if argumentData == nil {
-                Registers()
-            } else {
-                standardProgram.initialRegisters
-            }
+            // Always use initialRegisters to match VMStateInterpreter behavior
+            // VMStateInterpreter uses program.initialRegisters even when argumentData is nil
+            var registers: Registers = standardProgram.initialRegisters
 
             // Log initial register values for debugging
             logger
