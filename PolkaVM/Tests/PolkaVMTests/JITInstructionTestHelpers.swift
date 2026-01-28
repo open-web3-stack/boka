@@ -352,13 +352,13 @@ enum ProgramBlobBuilder {
 
         // Instructions with register + 32-bit immediate (6 bytes total)
         // Format: opcode (1) + register (1) + immediate32 (4)
-        if opcode == 0x32 { // LoadImm32
-            return 2 + 4
+        if opcode == 0x33 { // LoadImm (32-bit immediate, sign-extended)
+            return 1 + 1 + 4 // opcode (1) + register (1) + immediate32 (4) = 6 bytes
         }
 
         // Instructions with register + 64-bit immediate (10 bytes total)
         // Format: opcode (1) + register (1) + immediate64 (8)
-        if opcode == 0x14 { // LoadImm64 (opcode 0x14 = 20)
+        if opcode == 0x14 { // LoadImm64 (opcode 0x14 = 20 = LoadImmU64)
             return 1 + 1 + 8 // opcode (1) + register (1) + immediate64 (8) = 10 bytes
         }
 
@@ -404,13 +404,18 @@ enum ProgramBlobBuilder {
         }
 
         // StoreImmU8/U16/U32/U64 (opcode + register + offset32 + immediate)
-        // These have variable-sized immediates (1, 2, or 4 bytes)
-        // Opcodes 0x1E, 0x1F, 0x20, 0x21 (StoreImmU8, StoreImmU16, StoreImmU32, StoreImmU64)
-        if opcode == 0x1E { // StoreImmU8: opcode + reg + offset8 + imm8
+        // These have variable-sized immediates (1, 2, 4, or 8 bytes)
+        if opcode == 0x1E { // StoreImmU8: opcode + reg + offset32 + imm8
             return 1 + 1 + 4 + 1 // offset32 is 4 bytes (aligned), imm8 is 1 byte
+        }
+        if opcode == 0x1F { // StoreImmU16: opcode + reg + offset32 + imm16
+            return 1 + 1 + 4 + 2 // offset32 (4), imm16 (2)
         }
         if opcode == 0x20 { // StoreImmU32: opcode + reg + offset32 + imm32
             return 1 + 1 + 4 + 4 // offset32 (4), imm32 (4)
+        }
+        if opcode == 0x21 { // StoreImmU64: opcode + reg + offset32 + imm64
+            return 1 + 1 + 4 + 8 // offset32 (4), imm64 (8)
         }
 
         // Bitwise operations (3 bytes: opcode + packed registers + rd)

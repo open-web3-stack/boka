@@ -22,7 +22,7 @@ struct JITLoadStoreTests {
     func jitLoadImm64() async throws {
         // LoadImm64 r1, 0x123456789ABCDEF0
         let instruction: [UInt8] = [
-            0x33, // LoadImm64 opcode
+            0x14, // LoadImm64 opcode (20)
             0x01, // r1
         ] + withUnsafeBytes(of: UInt64(0x1234_5678_9ABC_DEF0).littleEndian) { Array($0) }
 
@@ -36,7 +36,7 @@ struct JITLoadStoreTests {
     func jitLoadImm64Zero() async throws {
         // LoadImm64 r2, 0
         let instruction: [UInt8] = [
-            0x33, // LoadImm64 opcode
+            0x14, // LoadImm64 opcode (20)
             0x02, // r2
         ] + withUnsafeBytes(of: UInt64(0).littleEndian) { Array($0) }
 
@@ -49,7 +49,7 @@ struct JITLoadStoreTests {
     func jitLoadImm64Max() async throws {
         // LoadImm64 r3, UInt64.max
         let instruction: [UInt8] = [
-            0x33, // LoadImm64 opcode
+            0x14, // LoadImm64 opcode (20)
             0x03, // r3
         ] + withUnsafeBytes(of: UInt64.max.littleEndian) { Array($0) }
 
@@ -58,11 +58,11 @@ struct JITLoadStoreTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: UInt64.max)
     }
 
-    @Test("JIT: LoadImm32 loads 32-bit immediate with sign extension")
+    @Test("JIT: LoadImm loads 32-bit immediate with sign extension")
     func jitLoadImm32() async throws {
-        // LoadImm32 r1, 0x12345678
+        // LoadImm r1, 0x12345678 (sign-extended to 64-bit)
         let instruction: [UInt8] = [
-            0x32, // LoadImm32 opcode
+            0x33, // LoadImm opcode (32-bit immediate, sign-extended)
             0x01, // r1
         ] + withUnsafeBytes(of: UInt32(0x1234_5678).littleEndian) { Array($0) }
 
@@ -73,13 +73,13 @@ struct JITLoadStoreTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 1), equals: expected)
     }
 
-    @Test("JIT: LoadImmU32 loads unsigned 32-bit immediate")
+    @Test("JIT: LoadImm64 loads unsigned 32-bit value zero-extended")
     func jitLoadImmU32() async throws {
-        // LoadImmU32 r1, 0xFFFFFFFF (should be zero-extended)
+        // LoadImm64 r1, 0xFFFFFFFF (zero-extended 32-bit value)
         let instruction: [UInt8] = [
-            0x31, // LoadImmU32 opcode
+            0x14, // LoadImm64 opcode
             0x01, // r1
-        ] + withUnsafeBytes(of: UInt32(0xFFFF_FFFF).littleEndian) { Array($0) }
+        ] + withUnsafeBytes(of: UInt64(0xFFFF_FFFF).littleEndian) { Array($0) }
 
         let result = await JITInstructionExecutor.executeSingleInstruction(instruction)
 
@@ -90,7 +90,7 @@ struct JITLoadStoreTests {
     @Test("JIT vs Interpreter: LoadImm64 parity")
     func jitLoadImm64Parity() async throws {
         let instruction: [UInt8] = [
-            0x33, // LoadImm64 opcode
+            0x14, // LoadImm64 opcode
             0x01, // r1
         ] + withUnsafeBytes(of: UInt64(0xDEAD_BEEF_CAFE_BABE).littleEndian) { Array($0) }
 
@@ -116,7 +116,7 @@ struct JITLoadStoreTests {
         var code = Data()
 
         // LoadImm64 r1, 0x10000 (address in read-only zone)
-        code.append(0x33) // LoadImm64
+        code.append(0x14) // LoadImm64
         code.append(0x01) // r1
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0001_0000).littleEndian) { Array($0) })
 
@@ -152,7 +152,7 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64
+        code.append(0x14) // LoadImm64
         code.append(0x01) // r1
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0001_0000).littleEndian) { Array($0) })
 
@@ -187,7 +187,7 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64
+        code.append(0x14) // LoadImm64
         code.append(0x01) // r1
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0001_0000).littleEndian) { Array($0) })
 
@@ -218,7 +218,7 @@ struct JITLoadStoreTests {
     func jitLoadU8Parity() async throws {
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 0x10000
+        code.append(0x14) // LoadImm64 r1, 0x10000
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0001_0000).littleEndian) { Array($0) })
 
@@ -260,11 +260,11 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 0x20000 (heap start)
+        code.append(0x14) // LoadImm64 r1, 0x20000 (heap start)
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 0xAB
+        code.append(0x14) // LoadImm64 r2, 0xAB
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0000_0000_0000_00AB).littleEndian) { Array($0) })
 
@@ -307,11 +307,11 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 0x20000
+        code.append(0x14) // LoadImm64 r1, 0x20000
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 0x1234
+        code.append(0x14) // LoadImm64 r2, 0x1234
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0000_0000_0000_1234).littleEndian) { Array($0) })
 
@@ -346,11 +346,11 @@ struct JITLoadStoreTests {
     func jitStoreU8Parity() async throws {
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 0x20000
+        code.append(0x14) // LoadImm64 r1, 0x20000
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 0xFF
+        code.append(0x14) // LoadImm64 r2, 0xFF
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0000_0000_0000_00FF).littleEndian) { Array($0) })
 
@@ -391,7 +391,7 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 0x20000
+        code.append(0x14) // LoadImm64 r1, 0x20000
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
 
@@ -431,12 +431,12 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 0x20000
+        code.append(0x14) // LoadImm64 r1, 0x20000
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
 
         // StoreImmU32 [r1 + 0], 0x12345678
-        code.append(0x21) // StoreImmU32 opcode
+        code.append(0x20) // StoreImmU32 opcode (32)
         code.append(0x01) // r1
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian) { Array($0) }) // offset
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x1234_5678).littleEndian) { Array($0) }) // immediate
@@ -466,7 +466,7 @@ struct JITLoadStoreTests {
     func jitStoreImmU8Parity() async throws {
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 0x20000
+        code.append(0x14) // LoadImm64 r1, 0x20000
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
 
@@ -506,7 +506,7 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 0x63000000 (invalid)
+        code.append(0x14) // LoadImm64 r1, 0x63000000 (invalid)
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x6300_0000).littleEndian) { Array($0) })
 
@@ -548,11 +548,11 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(0x33) // LoadImm64 r1, 0x10000 (read-only)
+        code.append(0x14) // LoadImm64 r1, 0x10000 (read-only)
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0001_0000).littleEndian) { Array($0) })
 
-        code.append(0x33) // LoadImm64 r2, 0xAB
+        code.append(0x14) // LoadImm64 r2, 0xAB
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0000_0000_0000_00AB).littleEndian) { Array($0) })
 
