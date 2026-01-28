@@ -437,7 +437,13 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 currentProgramCode = standardProgram.code
             } catch {
                 logger.error("Failed to create StandardProgram: \(error)")
-                return VMExecutionResult(exitReason: .panic(.invalidInstructionIndex), gasUsed: gas, outputData: nil)
+                return VMExecutionResult(
+                    exitReason: .panic(.invalidInstructionIndex),
+                    gasUsed: gas,
+                    outputData: nil,
+                    finalRegisters: Registers(),
+                    finalPC: 0
+                )
             }
 
             // CRITICAL FIX: Pass the extracted bytecode, not the raw blob!
@@ -483,7 +489,13 @@ final class ExecutorBackendJIT: ExecutorBackend {
             // Safely unwrap programCode with proper error handling
             guard let programCode = currentProgramCode else {
                 logger.error("ProgramCode not available for JIT compilation")
-                return VMExecutionResult(exitReason: .panic(.trap), gasUsed: gas, outputData: nil)
+                return VMExecutionResult(
+                    exitReason: .panic(.trap),
+                    gasUsed: gas,
+                    outputData: nil,
+                    finalRegisters: Registers(),
+                    finalPC: 0
+                )
             }
 
             // Get initial memory from StandardProgram for proper initialization
@@ -820,7 +832,9 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     return VMExecutionResult(
                         exitReason: .panic(.jitMemoryError),
                         gasUsed: gasUsed,
-                        outputData: nil
+                        outputData: nil,
+                        finalRegisters: Registers(),
+                        finalPC: 0
                     )
                 }
             default:
@@ -828,17 +842,42 @@ final class ExecutorBackendJIT: ExecutorBackend {
             }
 
             logger.debug("JIT execution finished. Reason: \(exitReason). Gas used: \(gasUsed.value)")
-            return VMExecutionResult(exitReason: exitReason, gasUsed: gasUsed, outputData: outputData)
+            // Note: PC is not tracked by JIT execution (only exit reason matters)
+            return VMExecutionResult(
+                exitReason: exitReason,
+                gasUsed: gasUsed,
+                outputData: outputData,
+                finalRegisters: registers,
+                finalPC: 0 // JIT doesn't track final PC - only exit reason
+            )
 
         } catch let error as JITCompiler.CompilationError {
             logger.error("JIT compilation failed: \(error)")
-            return VMExecutionResult(exitReason: .panic(.trap), gasUsed: gas, outputData: nil)
+            return VMExecutionResult(
+                exitReason: .panic(.trap),
+                gasUsed: gas,
+                outputData: nil,
+                finalRegisters: Registers(),
+                finalPC: 0
+            )
         } catch let error as JITError {
             logger.error("JIT execution failed with JITError: \(error)")
-            return VMExecutionResult(exitReason: error.toExitReason(), gasUsed: gas, outputData: nil)
+            return VMExecutionResult(
+                exitReason: error.toExitReason(),
+                gasUsed: gas,
+                outputData: nil,
+                finalRegisters: Registers(),
+                finalPC: 0
+            )
         } catch {
             logger.error("JIT execution failed with an unexpected error: \(error)")
-            return VMExecutionResult(exitReason: .panic(.trap), gasUsed: gas, outputData: nil)
+            return VMExecutionResult(
+                exitReason: .panic(.trap),
+                gasUsed: gas,
+                outputData: nil,
+                finalRegisters: Registers(),
+                finalPC: 0
+            )
         }
     }
 }

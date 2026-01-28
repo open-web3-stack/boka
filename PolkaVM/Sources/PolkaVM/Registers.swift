@@ -1,7 +1,7 @@
 import CppHelper
 import Foundation
 
-public struct Registers: Equatable {
+public struct Registers: Equatable, Sendable {
     public typealias Index = CppHelper.RegisterIndex
 
     private var regs: (UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64) = (
