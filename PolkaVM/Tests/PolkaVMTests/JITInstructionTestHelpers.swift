@@ -464,11 +464,12 @@ enum JITInstructionExecutor {
         config: PvmConfig = DefaultPvmConfig(),
         context: (any InvocationContext)? = nil
     ) async -> JITTestResult {
-        // Execute in JIT mode
+        // Execute in JIT mode using Executor directly to get register state
+        // CRITICAL: We don't use invokePVM here because it doesn't return register state
+        // Instead we call Executor.execute() directly which returns VMExecutionResult with registers
         let executionMode: ExecutionMode = .jit
-        let (exitReason, gasUsed, outputData) = await invokePVM(
-            config: config,
-            executionMode: executionMode,
+        let executor = Executor(mode: executionMode, config: config)
+        let result = await executor.execute(
             blob: blob,
             pc: pc,
             gas: gas,
@@ -476,40 +477,14 @@ enum JITInstructionExecutor {
             ctx: context
         )
 
-        // LIMITATION: invokePVM doesn't expose final register state for JIT execution
-        // Workaround: Re-run in interpreter to capture finalRegisters and finalPC
-        // This means we verify parity between JIT and interpreter, but don't verify
-        // JIT register values directly. To detect JIT bugs that don't crash but
-        // produce wrong register values, we would need to extend invokePVM API
-        // or add JIT-specific register inspection capabilities.
-        let finalRegisters: Registers
-        let finalPC: UInt32
-
-        do {
-            let state = try VMStateInterpreter(
-                standardProgramBlob: blob,
-                pc: pc,
-                gas: gas,
-                argumentData: argumentData
-            )
-            let engine = Engine(config: config, invocationContext: context)
-            let _ = await engine.execute(state: state)
-            finalRegisters = state.getRegisters()
-            finalPC = state.pc
-        } catch {
-            logger.error("Failed to re-execute in interpreter: \(error)")
-            finalRegisters = Registers()
-            finalPC = 0
-        }
-
-        let finalGas = gas - gasUsed
+        let finalGas = gas - result.gasUsed
 
         return JITTestResult(
-            exitReason: exitReason,
+            exitReason: result.exitReason,
             finalGas: finalGas,
-            outputData: outputData,
-            finalRegisters: finalRegisters,
-            finalPC: finalPC,
+            outputData: result.outputData,
+            finalRegisters: result.finalRegisters,
+            finalPC: result.finalPC,
             executionMode: executionMode
         )
     }
@@ -593,18 +568,24 @@ enum JITParityComparator {
             ctx: nil
         )
 
-        // Execute in JIT mode
-        let (exitReasonJIT, gasUsedJIT, outputJIT) = await invokePVM(
-            config: config,
-            executionMode: .jit,
+        // Execute in JIT mode using Executor directly to get register state
+        // CRITICAL: We don't use invokePVM here because it doesn't return register state
+        // Instead we call Executor.execute() directly which returns VMExecutionResult with registers
+        let executor = Executor(mode: .jit, config: config)
+        let jitVMResult = await executor.execute(
             blob: blob,
             pc: 0,
             gas: gas,
             argumentData: argumentData,
             ctx: nil
         )
+        let exitReasonJIT = jitVMResult.exitReason
+        let gasUsedJIT = jitVMResult.gasUsed
+        let outputJIT = jitVMResult.outputData
+        let jitRegisters = jitVMResult.finalRegisters
+        let jitPC = jitVMResult.finalPC
 
-        // Get interpreter state
+        // Get interpreter state by re-running (invokePVM doesn't return registers)
         let interpreterRegisters: Registers
         let interpreterPC: UInt32
         do {
@@ -621,25 +602,6 @@ enum JITParityComparator {
         } catch {
             interpreterRegisters = Registers()
             interpreterPC = 0
-        }
-
-        // Get JIT state
-        let jitRegisters: Registers
-        let jitPC: UInt32
-        do {
-            let state = try VMStateInterpreter(
-                standardProgramBlob: blob,
-                pc: 0,
-                gas: gas,
-                argumentData: argumentData
-            )
-            let engine = Engine(config: config)
-            _ = await engine.execute(state: state)
-            jitRegisters = state.getRegisters()
-            jitPC = state.pc
-        } catch {
-            jitRegisters = Registers()
-            jitPC = 0
         }
 
         let interpreterResult = JITTestResult(
