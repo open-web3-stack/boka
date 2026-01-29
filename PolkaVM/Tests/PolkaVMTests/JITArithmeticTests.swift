@@ -27,20 +27,20 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 100
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 100
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(100).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 42
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 42
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(42).littleEndian) { Array($0) })
 
         // Add64: [opcode][ra|rb<<4][rd] where rd = ra + rb
-        code.append(0xC8) // Add64 opcode
+        code.append(PVMOpcodes.add64.rawValue) // Add64 opcode
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -58,20 +58,20 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, UInt64.max
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, UInt64.max
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64.max.littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 1
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 1
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(1).littleEndian) { Array($0) })
 
         // Add64: [opcode][ra|rb<<4][rd] where rd = ra + rb
-        code.append(0xC8) // Add64 opcode
+        code.append(PVMOpcodes.add64.rawValue) // Add64 opcode
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -89,20 +89,20 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 100
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 100
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(100).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 42
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 42
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(42).littleEndian) { Array($0) })
 
         // Sub64: [opcode][ra|rb<<4][rd] where rd = ra - rb
-        code.append(0xC9) // Sub64 opcode
+        code.append(PVMOpcodes.sub64.rawValue) // Sub64 opcode
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -120,20 +120,20 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 42
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 42
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(42).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 100
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 100
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(100).littleEndian) { Array($0) })
 
         // Sub64: [opcode][ra|rb<<4][rd] where rd = ra - rb
-        code.append(0xC9) // Sub64 opcode
+        code.append(PVMOpcodes.sub64.rawValue) // Sub64 opcode
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -147,20 +147,20 @@ struct JITArithmeticTests {
     func jitAdd64Parity() async throws {
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 1000
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 1000
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(1000).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 234
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 234
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(234).littleEndian) { Array($0) })
 
         // Add64: [opcode][ra|rb<<4][rd] where rd = ra + rb
-        code.append(0xC8) // Add64 opcode
+        code.append(PVMOpcodes.add64.rawValue) // Add64 opcode
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let (_, _, differences) = await JITParityComparator.compare(
@@ -184,12 +184,12 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 100
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 100
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(100).littleEndian) { Array($0) })
 
         // AddImm64 r1, r1, 42
-        code.append(0x95) // AddImm64 opcode (149)
+        code.append(PVMOpcodes.addImm64.rawValue) // AddImm64 opcode (149)
         code.append(0x11) // packed: ra=r1, rb=r1
         // Immediate 42 (varint encoded)
         var imm = UInt64(42)
@@ -202,7 +202,7 @@ struct JITArithmeticTests {
             code.append(byte)
         }
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -215,7 +215,7 @@ struct JITArithmeticTests {
     func jitAddImm64Parity() async throws {
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 1000
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 1000
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(1000).littleEndian) { Array($0) })
 
@@ -232,7 +232,7 @@ struct JITArithmeticTests {
             code.append(byte)
         }
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let (_, _, differences) = await JITParityComparator.compare(
@@ -257,11 +257,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 100
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 100
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(100).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 42
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 42
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(42).littleEndian) { Array($0) })
 
@@ -269,7 +269,7 @@ struct JITArithmeticTests {
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -287,11 +287,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 2^40
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 2^40
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(1 << 40).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 2^30
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 2^30
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(1 << 30).littleEndian) { Array($0) })
 
@@ -299,7 +299,7 @@ struct JITArithmeticTests {
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -313,11 +313,11 @@ struct JITArithmeticTests {
     func jitMul64Parity() async throws {
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 12345
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 12345
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(12345).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 6789
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 6789
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(6789).littleEndian) { Array($0) })
 
@@ -325,7 +325,7 @@ struct JITArithmeticTests {
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let (_, _, differences) = await JITParityComparator.compare(
@@ -350,11 +350,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 1
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 1
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(1).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 4
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 4
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(4).littleEndian) { Array($0) })
 
@@ -362,7 +362,7 @@ struct JITArithmeticTests {
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -380,11 +380,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 1
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 1
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(1).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 68
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 68
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(68).littleEndian) { Array($0) })
 
@@ -392,7 +392,7 @@ struct JITArithmeticTests {
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -410,11 +410,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 128
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 128
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(128).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 2
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 2
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(2).littleEndian) { Array($0) })
 
@@ -422,7 +422,7 @@ struct JITArithmeticTests {
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -440,11 +440,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, UInt64.max - 127 (signed -128)
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, UInt64.max - 127 (signed -128)
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(bitPattern: Int64(-128)).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 2
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 2
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(2).littleEndian) { Array($0) })
 
@@ -452,7 +452,7 @@ struct JITArithmeticTests {
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -467,11 +467,11 @@ struct JITArithmeticTests {
     func jitShloL64Parity() async throws {
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 256
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 256
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(256).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 3
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 3
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(3).littleEndian) { Array($0) })
 
@@ -479,7 +479,7 @@ struct JITArithmeticTests {
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let (_, _, differences) = await JITParityComparator.compare(
@@ -504,11 +504,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 0xFF00FF00
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0xFF00FF00
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xFF00_FF00).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 0xFFFF0000
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 0xFFFF0000
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xFFFF_0000).littleEndian) { Array($0) })
 
@@ -516,7 +516,7 @@ struct JITArithmeticTests {
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -534,11 +534,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 0xF0
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0xF0
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xF0).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 0x0F
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 0x0F
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0F).littleEndian) { Array($0) })
 
@@ -546,7 +546,7 @@ struct JITArithmeticTests {
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -564,11 +564,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 0xFF
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0xFF
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xFF).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 0xFF
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 0xFF
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xFF).littleEndian) { Array($0) })
 
@@ -576,7 +576,7 @@ struct JITArithmeticTests {
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -589,11 +589,11 @@ struct JITArithmeticTests {
     func jitAndParity() async throws {
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 0x123456789ABCDEF0
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0x123456789ABCDEF0
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x1234_5678_9ABC_DEF0).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 0xFF00FF00FF00FF00
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 0xFF00FF00FF00FF00
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xFF00_FF00_FF00_FF00).littleEndian) { Array($0) })
 
@@ -601,7 +601,7 @@ struct JITArithmeticTests {
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let (_, _, differences) = await JITParityComparator.compare(
@@ -626,19 +626,19 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 100
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 100
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(100).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 0
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 0
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0).littleEndian) { Array($0) })
 
-        code.append(0xC8) // Add64 opcode
+        code.append(PVMOpcodes.add64.rawValue) // Add64 opcode
         code.append(0x02 | (0x01 << 4)) // ra=2, rb=1 packed
         code.append(0x03) // rd=3
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -656,11 +656,11 @@ struct JITArithmeticTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 12345
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 12345
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(12345).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 0
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 0
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0).littleEndian) { Array($0) })
 
@@ -668,7 +668,7 @@ struct JITArithmeticTests {
         code.append(0x01 | (0x02 << 4)) // ra=0x01, rb=0x02 packed
         code.append(0x03) // rd=0x03
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let result = await JITInstructionExecutor.execute(blob: blob)
