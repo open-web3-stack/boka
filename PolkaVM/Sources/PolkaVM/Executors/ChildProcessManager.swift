@@ -29,6 +29,9 @@ private func findBokaSandbox() -> String {
         // Try architecture-specific paths (Linux)
         executableDir.appendingPathComponent("../PolkaVM/.build/x86_64-unknown-linux-gnu/debug/boka-sandbox").path,
         executableDir.appendingPathComponent("../PolkaVM/.build/x86_64-unknown-linux-gnu/release/boka-sandbox").path,
+        // Direct .build paths (when running from .build/debug)
+        executableDir.appendingPathComponent("../../../PolkaVM/.build/debug/boka-sandbox").path,
+        executableDir.appendingPathComponent("../../../PolkaVM/.build/release/boka-sandbox").path,
         // Current working directory
         "./boka-sandbox",
         // System PATH
