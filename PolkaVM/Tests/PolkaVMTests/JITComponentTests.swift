@@ -156,8 +156,8 @@ struct JITComponentTests {
 
     @Test func basicBlockBuilderBranchInstructions() throws {
         // Test block detection with different block-ending instructions
-        // Using only argless instructions for now (Trap, Fallthrough)
-        // TODO: Update when instruction length calculation is fixed for branches
+        // Both Trap (0) and Fallthrough (1) are in BASIC_BLOCK_INSTRUCTIONS
+        // so each instruction ends its own block
         let code = Data([0, 1, 0, 1, 0])  // Trap, Fallthrough, Trap, Fallthrough, Trap
         let blob = createBlob(code: code)
 
@@ -165,14 +165,23 @@ struct JITComponentTests {
         let builder = BasicBlockBuilder(program: program)
         let blocks = builder.build()
 
-        // Trap (0) ends blocks, Fallthrough (1) does not
-        // Block 0: [Trap] - ends at Trap
-        // Block 1: [Fallthrough, Trap] - Fallthrough continues, Trap ends
-        // Block 3: [Fallthrough, Trap] - Fallthrough continues, Trap ends
-        #expect(blocks.count == 3)
+        // Each instruction creates its own block since both Trap and Fallthrough end blocks
+        // Block 0: [Trap]
+        // Block 1: [Fallthrough]
+        // Block 2: [Trap]
+        // Block 3: [Fallthrough]
+        // Block 4: [Trap]
+        #expect(blocks.count == 5)
         #expect(blocks[0]?.instructions.first?.opcode == 0)
-        #expect(blocks[1]?.instructions.count == 2)
-        #expect(blocks[3]?.instructions.count == 2)
+        #expect(blocks[1]?.instructions.first?.opcode == 1)
+        #expect(blocks[2]?.instructions.first?.opcode == 0)
+        #expect(blocks[3]?.instructions.first?.opcode == 1)
+        #expect(blocks[4]?.instructions.first?.opcode == 0)
+
+        // Verify all blocks have exactly 1 instruction
+        for (_, block) in blocks {
+            #expect(block.instructions.count == 1)
+        }
     }
 
     @Test func basicBlockBuilderMixedInstructions() throws {
