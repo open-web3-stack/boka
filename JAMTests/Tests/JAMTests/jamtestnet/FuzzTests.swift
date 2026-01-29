@@ -1,15 +1,14 @@
 import Foundation
+@testable import JAMTests
 import PolkaVM
 import Testing
 import Utils
-
-@testable import JAMTests
 
 struct FuzzTests {
     static func loadTests(
         version: String,
         filters: [(String, String)],
-        ignore: [(String, String)]
+        ignore: [(String, String)],
     ) throws -> [Testcase] {
         let basePath = Bundle.module.resourcePath! + "/fuzz/" + version
 
@@ -33,45 +32,45 @@ struct FuzzTests {
             }
     }
 
-    @Testtry (arguments: loadTests(
+    @Test(arguments: try loadTests(
         version: "0.7.2",
         filters: [
         ],
         ignore: [
-        ]
+        ],
     ))
     func v072_interpreter(input: Testcase) async throws {
         try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: [])
     }
 
-    @Testtry (arguments: loadTests(
+    @Test(arguments: try loadTests(
         version: "0.7.2",
         filters: [
         ],
         ignore: [
-        ]
+        ],
     ))
     func v072_sandbox(input: Testcase) async throws {
         try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: .sandboxed)
     }
 
-    @Testtry (arguments: loadTests(
+    @Test(arguments: try loadTests(
         version: "0.7.2",
         filters: [
         ],
         ignore: [
-        ]
+        ],
     ))
     func v072_jit(input: Testcase) async throws {
         try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: .jit)
     }
 
-    @Testtry (arguments: loadTests(
+    @Test(arguments: try loadTests(
         version: "0.7.2",
         filters: [
         ],
         ignore: [
-        ]
+        ],
     ))
     func v072_jit_sandbox(input: Testcase) async throws {
         try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: [.jit, .sandboxed])
