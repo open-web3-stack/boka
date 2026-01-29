@@ -69,8 +69,20 @@ struct PVMComprehensiveParityTests {
             )
 
             // Verify expected output
-            let valueInterpreter = outputInterpreter?.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } ?? 0
-            let valueSandbox = outputSandbox?.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } ?? 0
+            // Only load UInt32 if output has at least 4 bytes
+            let valueInterpreter: UInt32
+            if let output = outputInterpreter, output.count >= 4 {
+                valueInterpreter = output.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            } else {
+                valueInterpreter = 0
+            }
+
+            let valueSandbox: UInt32
+            if let output = outputSandbox, output.count >= 4 {
+                valueSandbox = output.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            } else {
+                valueSandbox = 0
+            }
 
             #expect(
                 valueInterpreter == expectedOutput,
@@ -136,8 +148,20 @@ struct PVMComprehensiveParityTests {
             #expect(exitReasonInterpreter == exitReasonSandbox)
             #expect(outputInterpreter == outputSandbox)
 
-            let valueInterpreter = outputInterpreter?.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } ?? 0
-            let valueSandbox = outputSandbox?.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } ?? 0
+            // Only load UInt32 if output has at least 4 bytes
+            let valueInterpreter: UInt32
+            if let output = outputInterpreter, output.count >= 4 {
+                valueInterpreter = output.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            } else {
+                valueInterpreter = 0
+            }
+
+            let valueSandbox: UInt32
+            if let output = outputSandbox, output.count >= 4 {
+                valueSandbox = output.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            } else {
+                valueSandbox = 0
+            }
 
             #expect(valueInterpreter == expectedOutput)
             #expect(valueSandbox == expectedOutput)
