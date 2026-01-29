@@ -27,7 +27,7 @@ deps: .lib/libbls.a .lib/libbandersnatch_vrfs.a .lib/libec.a .lib/libed25519_zeb
 
 .PHONY: test
 test: githooks deps
-	./scripts/runTests.sh test
+	ulimit -s 65536 && ./scripts/runTests.sh test
 
 .PHONY: test-cargo
 test-cargo:
