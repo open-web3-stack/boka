@@ -382,6 +382,11 @@ public actor StateTrie {
     /// - Parallel processing: Use TaskGroup for independent updates (future)
     /// - Cache optimization: Keep recently accessed nodes in memory
     public func update(_ updates: [(key: Data31, value: Data?)]) async throws {
+        // Log large update batches that might cause stack overflow
+        if updates.count > 100 {
+            logger.warning("StateTrie.update: large batch of \(updates.count) updates")
+        }
+
         // If write buffering is enabled, use buffered updates
         if enableWriteBuffer, let buffer = writeBuffer {
             try await updateBuffered(updates, buffer: buffer)
@@ -547,6 +552,11 @@ public actor StateTrie {
     private func insert(
         hash: Data32, key: Data31, value: Data, depth: UInt8
     ) async throws -> Data32 {
+        // Log deep recursion to identify stack overflow risk
+        if depth > 200 {
+            logger.warning("StateTrie.insert: deep recursion depth=\(depth), key=\(key.toHexString().prefix(16))...")
+        }
+
         guard let parent = try await get(hash: hash) else {
             let node = TrieNode.leaf(key: key, value: value)
             saveNode(node: node)
@@ -574,6 +584,11 @@ public actor StateTrie {
     }
 
     private func insertLeafNode(existing: TrieNode, newKey: Data31, newValue: Data, depth: UInt8) async throws -> Data32 {
+        // Log deep recursion in insertLeafNode
+        if depth > 200 {
+            logger.warning("StateTrie.insertLeafNode: deep recursion depth=\(depth), key=\(newKey.toHexString().prefix(16))...")
+        }
+
         if existing.isLeaf(key: newKey) {
             // update existing leaf
             removeNode(node: existing)
@@ -611,6 +626,11 @@ public actor StateTrie {
     }
 
     private func delete(hash: Data32, key: Data31, depth: UInt8) async throws -> Data32 {
+        // Log deep recursion to identify stack overflow risk
+        if depth > 200 {
+            logger.warning("StateTrie.delete: deep recursion depth=\(depth), key=\(key.toHexString().prefix(16))...")
+        }
+
         let node = try await get(hash: hash)
         guard let node else {
             return Data32()
