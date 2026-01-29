@@ -1771,14 +1771,6 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         // Get all PCs that have labels (now includes ALL instruction PCs when needsDispatcherTable is true)
         std::vector<uint32_t> labeledPCs = labelManager.getAllPCs();
 
-        // DEBUG: Log dispatcher table creation
-                // DEBUG: Dispatcher table creation
-        for (size_t i = 0; i < std::min(size_t(10), labeledPCs.size()); i++) {
-                    }
-        if (labeledPCs.size() > 10) {
-            fprintf(stderr, "  ... and %zu more\n", labeledPCs.size() - 10);
-        }
-
         // Allocate table (one entry per possible PC, initialized to null)
         auto dispatcherTable = std::make_unique<void*[]>(codeSize);
         std::memset(dispatcherTable.get(), 0, codeSize * sizeof(void*));
@@ -1793,19 +1785,19 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // labeledPCs may contain out-of-bounds values from markJumpTarget
             if (pc >= codeSize) {
                 // Skip out-of-bounds PC values silently
-                                continue;
+                continue;
             }
 
             Label label = labelManager.getLabel(pc);
             if (!label.is_valid()) {
-                                continue;  // Skip invalid labels
+                continue;  // Skip invalid labels
             }
 
             // Get the address of this label from the CodeHolder
             // CRITICAL: label_offset() can crash if label is not bound to code
             // Only call it if the label is valid and bound
             if (!labelManager.isLabelDefined(pc)) {
-                                continue;
+                continue;
             }
 
             uint64_t offset = code.label_offset(label);
@@ -1916,12 +1908,6 @@ extern "C" void freeDispatcherTable_x64(void* _Nullable funcPtr) noexcept {
 
         // Remove from map
         s_dispatcherTables.erase(it);
-
-        #ifdef DEBUG_JIT
-                #endif
-    } else {
-        #ifdef DEBUG_JIT
-                #endif
     }
 }
 
@@ -1939,9 +1925,6 @@ extern "C" void freeAllDispatcherTables_x64() noexcept {
 
     size_t count = s_dispatcherTables.size();
     s_dispatcherTables.clear();
-
-    #ifdef DEBUG_JIT
-        #endif
 }
 
 /// Release JIT-compiled code memory (x64 version)
