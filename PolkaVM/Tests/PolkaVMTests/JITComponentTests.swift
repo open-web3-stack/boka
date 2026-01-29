@@ -185,14 +185,19 @@ struct JITComponentTests {
         let builder = BasicBlockBuilder(program: program)
         let blocks = builder.build()
 
-        // Block 0: [Trap] - ends at Trap
-        // Block 1: [Fallthrough, Fallthrough, Trap] - Fallthroughs continue, Trap ends
-        #expect(blocks.count == 2)
+        // Each instruction creates its own block except fallthroughs chain
+        // Block 0: [Trap]
+        // Block 1: [Fallthrough]
+        // Block 2: [Fallthrough]
+        // Block 3: [Trap]
+        #expect(blocks.count == 4)
         #expect(blocks[0]?.instructions.first?.opcode == 0)
-        #expect(blocks[1]?.instructions.count == 3) // Two Fallthroughs + Trap
-        #expect(blocks[1]?.instructions[0].opcode == 1) // First Fallthrough
-        #expect(blocks[1]?.instructions[1].opcode == 1) // Second Fallthrough
-        #expect(blocks[1]?.instructions[2].opcode == 0) // Trap
+        #expect(blocks[1]?.instructions.count == 1) // Fallthrough
+        #expect(blocks[1]?.instructions[0].opcode == 1)
+        #expect(blocks[2]?.instructions.count == 1) // Fallthrough
+        #expect(blocks[2]?.instructions[0].opcode == 1)
+        #expect(blocks[3]?.instructions.count == 1) // Trap
+        #expect(blocks[3]?.instructions[0].opcode == 0)
     }
 
     @Test func basicBlockBuilderBlockStartPCs() throws {
