@@ -164,31 +164,31 @@ struct JITControlFlowTests {
         var code = Data()
 
         // LoadImm64 r1, 22 (jump target offset - points to Halt at PC 22)
-        code.append(0x14) // LoadImm64 opcode
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 opcode
         code.append(0x01) // r1
         code.append(contentsOf: [0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]) // immediate = 22
 
-        // Skipped instructions - use Trap as padding (opcode 0)
+        // Skipped instructions - use Trap as padding
         // LoadImm64 is 10 bytes (PC 0-9), we need padding before JumpInd
-        code.append(0x00) // Trap at PC 10
-        code.append(0x00) // Trap at PC 11
-        code.append(0x00) // Trap at PC 12
-        code.append(0x00) // Trap at PC 13
-        code.append(0x00) // Trap at PC 14
-        code.append(0x00) // Trap at PC 15
-        code.append(0x00) // Trap at PC 16
+        code.append(PVMOpcodes.trap.rawValue) // Trap at PC 10
+        code.append(PVMOpcodes.trap.rawValue) // Trap at PC 11
+        code.append(PVMOpcodes.trap.rawValue) // Trap at PC 12
+        code.append(PVMOpcodes.trap.rawValue) // Trap at PC 13
+        code.append(PVMOpcodes.trap.rawValue) // Trap at PC 14
+        code.append(PVMOpcodes.trap.rawValue) // Trap at PC 15
+        code.append(PVMOpcodes.trap.rawValue) // Trap at PC 16
 
         // LoadImm r3, 0x42 (should be skipped)
-        code.append(0x33) // LoadImm opcode
+        code.append(PVMOpcodes.loadImm.rawValue) // LoadImm opcode
         code.append(0x03) // r3
         code.append(0x42) // immediate 0x42 (varint: single byte)
 
-        // JumpInd r1 (opcode 50 = 0x32) - jumps to PC 21
-        code.append(0x32) // JumpInd opcode
+        // JumpInd r1 - jumps to PC 21
+        code.append(PVMOpcodes.jumpInd.rawValue) // JumpInd opcode
         code.append(0x01) // r1
 
         // Halt at PC 22 (target of JumpInd)
-        code.append(0x01)
+        code.append(PVMOpcodes.halt.rawValue)
 
         // Build blob with jump table using helper
         // Since we need a jump table, we can't use createProgramCode directly
@@ -230,8 +230,7 @@ struct JITControlFlowTests {
         var code = Data()
 
         // LoadImmJump r1, 0x12345678, jump_forward by 1 instruction
-        // Opcode 80 (0x50), r1, immediate, jump_offset
-        code.append(0x50) // LoadImmJump opcode
+        code.append(PVMOpcodes.loadImmJump.rawValue) // LoadImmJump opcode
         code.append(0x01) // r1
         // Immediate 0x12345678 (varint encoded)
         var imm = UInt64(0x1234_5678)
@@ -259,17 +258,17 @@ struct JITControlFlowTests {
         // LoadImm uses varint encoding for immediate value
         // IMPORTANT: Values >= 128 require multi-byte varint encoding, which complicates testing
         // Using value < 128 for single-byte varint encoding
-        code.append(0x33) // LoadImm opcode (varint immediate)
+        code.append(PVMOpcodes.loadImm.rawValue) // LoadImm opcode (varint immediate)
         code.append(0x02) // r2
         code.append(0x42) // immediate 0x42 (66, single-byte varint)
 
         // LoadImm r3, 0x53 (should execute)
-        code.append(0x33) // LoadImm opcode (varint immediate)
+        code.append(PVMOpcodes.loadImm.rawValue) // LoadImm opcode (varint immediate)
         code.append(0x03) // r3
         code.append(0x53) // immediate 0x53 (83, single-byte varint)
 
         // Halt
-        code.append(0x01)
+        code.append(PVMOpcodes.halt.rawValue)
 
         // Build blob using helper
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
@@ -287,7 +286,7 @@ struct JITControlFlowTests {
         // Use same construction as jitLoadImmJump
         var code = Data()
 
-        code.append(0x50) // LoadImmJump
+        code.append(PVMOpcodes.loadImmJump.rawValue) // LoadImmJump
         code.append(0x01) // r1
         var imm = UInt64(0x1234_5678)
         while imm > 0 {
@@ -310,15 +309,15 @@ struct JITControlFlowTests {
             code.append(byte)
         }
 
-        code.append(0x33) // Skipped: LoadImm r2, 0x42 (opcode 51 = 0x33)
+        code.append(PVMOpcodes.loadImm.rawValue) // Skipped: LoadImm r2, 0x42
         code.append(0x02)
         code.append(0x42) // immediate 0x42 (varint: single byte)
 
-        code.append(0x33) // Execute: LoadImm r3, 0x53 (opcode 51 = 0x33)
+        code.append(PVMOpcodes.loadImm.rawValue) // Execute: LoadImm r3, 0x53
         code.append(0x03)
         code.append(0x53) // immediate 0x53 (varint: single byte)
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
 
@@ -341,7 +340,7 @@ struct JITControlFlowTests {
         var code = Data()
 
         // LoadImmJumpInd r1, jump_target=8
-        code.append(0xB4) // LoadImmJumpInd opcode (180)
+        code.append(PVMOpcodes.loadImmJumpInd.rawValue) // LoadImmJumpInd opcode (180)
         code.append(0x01) // r1
         // Target offset 8
         var target = UInt64(8)
@@ -356,16 +355,16 @@ struct JITControlFlowTests {
 
         // Skipped instructions (padding to reach offset 8)
         while code.count < 8 {
-            code.append(0x00) // Trap as padding
+            code.append(PVMOpcodes.trap.rawValue) // Trap as padding
         }
 
-        // Target instruction at offset 8: LoadImm32 r2, 0xBB
-        code.append(0x33) // LoadImm opcode (32-bit immediate, sign-extended)
+        // Target instruction at offset 8: LoadImm r2, 0xBB
+        code.append(PVMOpcodes.loadImm.rawValue) // LoadImm opcode (32-bit immediate, sign-extended)
         code.append(0x02) // r2
         code.append(contentsOf: [0xBB, 0x00, 0x00, 0x00]) // immediate
 
         // Halt
-        code.append(0x01)
+        code.append(PVMOpcodes.halt.rawValue)
 
         // Build blob with jump table (1 entry at offset 0)
         var programCode = Data()
@@ -392,7 +391,7 @@ struct JITControlFlowTests {
         // Use same construction as jitLoadImmJumpInd
         var code = Data()
 
-        code.append(0xB4) // LoadImmJumpInd
+        code.append(PVMOpcodes.loadImmJumpInd.rawValue) // LoadImmJumpInd
         code.append(0x01) // r1
         var target = UInt64(8)
         while target > 0 {
@@ -408,11 +407,11 @@ struct JITControlFlowTests {
             code.append(0x00)
         }
 
-        code.append(0x33) // Target: LoadImm r2, 0xBB
+        code.append(PVMOpcodes.loadImm.rawValue) // Target: LoadImm r2, 0xBB
         code.append(0x02)
         code.append(contentsOf: [0xBB, 0x00, 0x00, 0x00])
 
-        code.append(0x01) // Halt
+        code.append(PVMOpcodes.halt.rawValue) // Halt
 
         // Build blob with jump table (1 entry at offset 0)
         var programCode = Data()
@@ -449,13 +448,12 @@ struct JITControlFlowTests {
         // Jump to offset 3 (middle of next instruction)
         // Jump instruction format: [opcode][offset_32bit] = 5 bytes
         var jumpOffset = Int32(3)
-        code.append(0x28) // Jump opcode
+        code.append(PVMOpcodes.jump.rawValue) // Jump opcode
         code.append(contentsOf: withUnsafeBytes(of: jumpOffset.littleEndian) { Array($0) })
 
         // LoadImm instruction (varint encoded) - offset 3 is in the middle
         // LoadImm format: [opcode][reg_index][varint_value]
-        // opcode 0x33 (51), r1 (0x01), immediate 0x12345678 (varint encoded)
-        code.append(0x33) // LoadImm opcode
+        code.append(PVMOpcodes.loadImm.rawValue) // LoadImm opcode
         code.append(0x01) // r1
         // Immediate 0x12345678 encoded as varint
         var imm = UInt64(0x1234_5678)
@@ -469,7 +467,7 @@ struct JITControlFlowTests {
         }
 
         // Halt
-        code.append(0x01)
+        code.append(PVMOpcodes.halt.rawValue)
 
         // Build blob using helper
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
@@ -491,18 +489,18 @@ struct JITControlFlowTests {
         // Jump forward by 100 bytes
         // Jump instruction format: [opcode][offset_32bit]
         var jumpOffset = Int32(100)
-        code.append(0x28) // Jump opcode
+        code.append(PVMOpcodes.jump.rawValue) // Jump opcode
         code.append(contentsOf: withUnsafeBytes(of: jumpOffset.littleEndian) { Array($0) })
 
         // Add padding NOPs (using LoadImm to r0 which is a no-op since r0 is always 0)
         for _ in 0 ..< 100 {
-            code.append(0x33) // LoadImm opcode
+            code.append(PVMOpcodes.loadImm.rawValue) // LoadImm opcode
             code.append(0x00) // r0
             code.append(0x00) // immediate 0 (varint: single byte)
         }
 
         // Halt
-        code.append(0x01)
+        code.append(PVMOpcodes.halt.rawValue)
 
         // Build blob using helper
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
