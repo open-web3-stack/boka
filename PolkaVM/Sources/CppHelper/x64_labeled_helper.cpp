@@ -1772,10 +1772,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         std::vector<uint32_t> labeledPCs = labelManager.getAllPCs();
 
         // DEBUG: Log dispatcher table creation
-                *funcOut, labeledPCs.size(), codeSize);
+                // DEBUG: Dispatcher table creation
         for (size_t i = 0; i < std::min(size_t(10), labeledPCs.size()); i++) {
-            fprintf(stderr, "  labeledPC[%zu] = %u\n", i, labeledPCs[i]);
-        }
+                    }
         if (labeledPCs.size() > 10) {
             fprintf(stderr, "  ... and %zu more\n", labeledPCs.size() - 10);
         }
@@ -1794,22 +1793,19 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // labeledPCs may contain out-of-bounds values from markJumpTarget
             if (pc >= codeSize) {
                 // Skip out-of-bounds PC values silently
-                fprintf(stderr, "  Skipping out-of-bounds PC: %u (>= codeSize %zu)\n", pc, codeSize);
-                continue;
+                                continue;
             }
 
             Label label = labelManager.getLabel(pc);
             if (!label.is_valid()) {
-                fprintf(stderr, "  Skipping invalid label at PC: %u\n", pc);
-                continue;  // Skip invalid labels
+                                continue;  // Skip invalid labels
             }
 
             // Get the address of this label from the CodeHolder
             // CRITICAL: label_offset() can crash if label is not bound to code
             // Only call it if the label is valid and bound
             if (!labelManager.isLabelDefined(pc)) {
-                fprintf(stderr, "  Skipping undefined (not bound) label at PC: %u\n", pc);
-                continue;
+                                continue;
             }
 
             uint64_t offset = code.label_offset(label);
@@ -1922,12 +1918,10 @@ extern "C" void freeDispatcherTable_x64(void* _Nullable funcPtr) noexcept {
         s_dispatcherTables.erase(it);
 
         #ifdef DEBUG_JIT
-        fprintf(stderr, "[JIT x64] Freed dispatcher table for function %p\n", funcPtr);
-        #endif
+                #endif
     } else {
         #ifdef DEBUG_JIT
-        fprintf(stderr, "[JIT x64] Warning: No dispatcher table for function %p\n", funcPtr);
-        #endif
+                #endif
     }
 }
 
@@ -1947,8 +1941,7 @@ extern "C" void freeAllDispatcherTables_x64() noexcept {
     s_dispatcherTables.clear();
 
     #ifdef DEBUG_JIT
-    fprintf(stderr, "[JIT x64] Freed %zu dispatcher tables\n", count);
-    #endif
+        #endif
 }
 
 /// Release JIT-compiled code memory (x64 version)
