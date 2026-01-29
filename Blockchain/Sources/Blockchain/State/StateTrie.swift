@@ -89,9 +89,8 @@ private struct TrieNode {
             return nil
         }
         // For embedded leaves: length is stored in first byte
-        let len = Int(left.data[relative: 0])
-        let safeLen = min(len, 32)
-        return right.data[relative: 0 ..< safeLen]
+        let len = left.data[relative: 0]
+        return right.data[relative: 0 ..< Int(len)]
     }
 
     static func leaf(key: Data31, value: Data) -> TrieNode {
