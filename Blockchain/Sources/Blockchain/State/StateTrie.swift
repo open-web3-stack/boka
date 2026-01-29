@@ -695,15 +695,7 @@ public actor StateTrie {
     private func removeNode(node: TrieNode) {
         let id = node.hash.data.suffix(31)
         deleted.insert(id)
-
-        // Only remove from nodes map if it's a new node (never persisted)
-        // For persisted nodes, we need to keep them in memory until save() processes
-        // their reference counts (decrementing children's ref counts)
-        if node.isNew {
-            nodes.removeValue(forKey: id)
-        } else {
-            nodes[id] = node
-        }
+        nodes.removeValue(forKey: id)
     }
 
     private func saveNode(node: TrieNode) {
