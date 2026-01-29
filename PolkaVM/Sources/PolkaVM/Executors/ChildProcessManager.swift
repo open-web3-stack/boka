@@ -66,6 +66,17 @@ actor ChildProcessManager {
         // This is async-signal-safe and avoids unsafe withCString in child after fork
         let execPathCArray = executablePath.utf8CString
 
+        // Pre-allocate argv array BEFORE fork (async-signal-safe)
+        // Get pointer to first element of the C string array
+        let execPathPtr = execPathCArray.withUnsafeBufferPointer { buffer in
+            UnsafeMutablePointer(mutating: buffer.baseAddress!)
+        }
+
+        var argv: ContiguousArray<UnsafeMutablePointer<CChar>?> = [
+            execPathPtr,
+            nil,
+        ]
+
         // Fork child process
         let pid = Glibc.fork()
 
@@ -96,17 +107,12 @@ actor ChildProcessManager {
             Glibc.close(childFD)
 
             // Execute child process
-            // Use pre-allocated C string array (async-signal-safe)
+            // argv was pre-allocated before fork (async-signal-safe)
             // withUnsafeBufferPointer is safe here because we're in the child process
             // and the array lives until execvp replaces the process image
-            execPathCArray.withUnsafeBufferPointer { buffer in
-                let execPath = buffer.baseAddress!
-                var argv: [UnsafeMutablePointer<CChar>?] = [
-                    UnsafeMutablePointer(mutating: execPath),
-                    nil,
-                ]
-
-                let exeResult = Glibc.execvp(execPath, &argv)
+            argv.withUnsafeBufferPointer { buffer in
+                let argvPtr = UnsafeMutablePointer(mutating: buffer.baseAddress!)
+                let exeResult = Glibc.execvp(argv[0]!, argvPtr)
 
                 // execvp only returns on failure
                 // Use _exit() instead of exit() to avoid calling atexit() handlers
