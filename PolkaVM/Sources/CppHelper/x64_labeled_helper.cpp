@@ -61,12 +61,20 @@ extern "C" bool jit_emitter_emit_basic_block_instructions(
 
 // Varint decoder for variable-length integer encoding
 // Returns the decoded value and updates out_size to include varint bytes
-static uint64_t decode_varint(const uint8_t* bytecode, uint32_t offset, uint32_t& out_size) {
+// CRITICAL: Will return 0 and set out_size to 0 if max_size is exceeded (invalid varint)
+static uint64_t decode_varint(const uint8_t* bytecode, uint32_t offset, uint32_t max_size, uint32_t& out_size) {
     uint64_t result = 0;
     uint32_t shift = 0;
     uint32_t i = 0;
 
     while (true) {
+        // CRITICAL: Bounds check to prevent out-of-bounds read
+        if (offset + i >= max_size) {
+            // Unterminated varint (e.g., 0x80 at last byte) or malformed
+            out_size = 0;
+            return 0;
+        }
+
         uint8_t byte = bytecode[offset + i];
         result |= (uint64_t(byte & 0x7F)) << shift;
         i++;
@@ -100,7 +108,7 @@ static uint32_t getInstructionSize(const uint8_t* bytecode, uint32_t pc, size_t 
 
 // Helper to extract jump target from instruction
 // Returns the target PC for branch instructions, or fallthrough PC for non-branches
-static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t instrSize) {
+static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t instrSize, size_t bytecodeSize) {
     uint8_t opcode = bytecode[pc];
 
     // Jump: [opcode][offset_32bit] = 5 bytes
@@ -132,10 +140,16 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
         // Skip reg byte and first varint (value)
         uint32_t offset = pc + 2;
         uint32_t varintSize1;
-        decode_varint(bytecode, offset, varintSize1);  // Skip value
+        decode_varint(bytecode, offset, bytecodeSize, varintSize1);  // Skip value
+        if (varintSize1 == 0) {
+            return pc + instrSize;  // Invalid varint, fallthrough
+        }
         uint32_t offset2 = offset + varintSize1;
         uint32_t varintSize2;
-        uint64_t jumpOffset = decode_varint(bytecode, offset2, varintSize2);
+        uint64_t jumpOffset = decode_varint(bytecode, offset2, bytecodeSize, varintSize2);
+        if (varintSize2 == 0) {
+            return pc + instrSize;  // Invalid varint, fallthrough
+        }
         return pc + uint32_t(jumpOffset);
     }
 
@@ -248,7 +262,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
         // Mark jump targets for all control flow instructions
         // This is necessary to handle backward jumps (loops) correctly
-        uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
+        uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
         if (targetPC != pc + instrSize) {
             // This is a branch/jump instruction (not a fallthrough)
             labelManager.markJumpTarget(targetPC);
@@ -303,7 +317,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
         // Handle control flow instructions with labels
         if (opcode_is(opcode, Opcode::Jump)) {
-            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
+            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "x86_64");
             jit_emit_jump_labeled(&a, "x86_64", targetLabel);
             pc += instrSize;
@@ -313,7 +327,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         if (opcode_is(opcode, Opcode::BranchEq)) {
             uint8_t reg1 = codeBuffer[pc + 1];
             uint8_t reg2 = codeBuffer[pc + 2];
-            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
+            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "x86_64");
             jit_emit_branch_eq_labeled(&a, "x86_64", reg1, reg2, targetLabel);
@@ -325,7 +339,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         if (opcode_is(opcode, Opcode::BranchNe)) {
             uint8_t reg1 = codeBuffer[pc + 1];
             uint8_t reg2 = codeBuffer[pc + 2];
-            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
+            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "x86_64");
             jit_emit_branch_ne_labeled(&a, "x86_64", reg1, reg2, targetLabel);
@@ -339,12 +353,22 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // Use varint decoding for immediate value (starts at pc + 2)
             uint32_t varintSize1;
-            uint64_t immediate = decode_varint(codeBuffer, pc + 2, varintSize1);
+            uint64_t immediate = decode_varint(codeBuffer, pc + 2, codeSize, varintSize1);
+            if (varintSize1 == 0) {
+                // Invalid varint encoding, skip this instruction
+                pc += instrSize;
+                continue;
+            }
 
             // Use varint decoding for jump offset (starts after immediate)
             uint32_t offsetStart = pc + 2 + varintSize1;
             uint32_t varintSize2;
-            uint64_t jumpOffset = decode_varint(codeBuffer, offsetStart, varintSize2);
+            uint64_t jumpOffset = decode_varint(codeBuffer, offsetStart, codeSize, varintSize2);
+            if (varintSize2 == 0) {
+                // Invalid varint encoding, skip this instruction
+                pc += instrSize;
+                continue;
+            }
 
             uint32_t targetPC = pc + uint32_t(jumpOffset);  // Offset is relative to instruction start
 
@@ -652,11 +676,21 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // Decode offset varint starting at pc + 2
             uint32_t offset_varint_size = 0;
-            uint64_t offset = decode_varint(codeBuffer, pc + 2, offset_varint_size);
+            uint64_t offset = decode_varint(codeBuffer, pc + 2, codeSize, offset_varint_size);
+            if (offset_varint_size == 0) {
+                // Invalid varint encoding, skip this instruction
+                pc += instrSize;
+                continue;
+            }
 
             // Decode value varint starting after offset varint
             uint32_t value_varint_size = 0;
-            uint64_t value = decode_varint(codeBuffer, pc + 2 + offset_varint_size, value_varint_size);
+            uint64_t value = decode_varint(codeBuffer, pc + 2 + offset_varint_size, codeSize, value_varint_size);
+            if (value_varint_size == 0) {
+                // Invalid varint encoding, skip this instruction
+                pc += instrSize;
+                continue;
+            }
 
             // Load base address from register
             a.mov(x86::rax, x86::qword_ptr(x86::rbx, base_reg * 8));
@@ -1549,7 +1583,12 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // Decode varint immediate starting at pc + 2 (after register)
             uint32_t varint_size = 0;
-            uint64_t immediate = decode_varint(codeBuffer, pc + 2, varint_size);
+            uint64_t immediate = decode_varint(codeBuffer, pc + 2, codeSize, varint_size);
+            if (varint_size == 0) {
+                // Invalid varint encoding, skip this instruction
+                pc += instrSize;
+                continue;
+            }
 
             // LoadImm loads signed 32-bit values and sign-extends to 64-bit
             // Use movsxd to sign-extend the 32-bit immediate to 64-bit
