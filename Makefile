@@ -93,11 +93,11 @@ devnet:
 # Benchmark targets
 .PHONY: benchmark
 benchmark: githooks deps
-	cd JAMTests && swift package benchmark
+	cd JAMTests && BOKA_SANDBOX_PATH=$(CURDIR)/PolkaVM/.build/x86_64-unknown-linux-gnu/debug/boka-sandbox swift package benchmark
 
 .PHONY: benchmark-list
 benchmark-list: githooks deps
-	cd JAMTests && swift package benchmark list
+	cd JAMTests && BOKA_SANDBOX_PATH=$(CURDIR)/PolkaVM/.build/x86_64-unknown-linux-gnu/debug/boka-sandbox swift package benchmark list
 
 .PHONY: benchmark-filter
 benchmark-filter: githooks deps
@@ -107,7 +107,7 @@ benchmark-filter: githooks deps
 		echo "Error: FILTER parameter is required"; \
 		exit 1; \
 	fi
-	cd JAMTests && swift package benchmark --filter $(FILTER)
+	cd JAMTests && BOKA_SANDBOX_PATH=$(CURDIR)/PolkaVM/.build/x86_64-unknown-linux-gnu/debug/boka-sandbox swift package benchmark --filter $(FILTER)
 
 .PHONY: benchmark-baseline
 benchmark-baseline: githooks deps
@@ -117,7 +117,7 @@ benchmark-baseline: githooks deps
 		echo "Error: BASELINE parameter is required"; \
 		exit 1; \
 	fi
-	cd JAMTests && swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update $(BASELINE)
+	cd JAMTests && BOKA_SANDBOX_PATH=$(CURDIR)/PolkaVM/.build/x86_64-unknown-linux-gnu/debug/boka-sandbox swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update $(BASELINE)
 
 .PHONY: benchmark-compare
 benchmark-compare: githooks deps
@@ -127,7 +127,7 @@ benchmark-compare: githooks deps
 		echo "Error: BASELINE1 and BASELINE2 parameters are required"; \
 		exit 1; \
 	fi
-	cd JAMTests && swift package benchmark baseline compare $(BASELINE1) $(BASELINE2)
+	cd JAMTests && BOKA_SANDBOX_PATH=$(CURDIR)/PolkaVM/.build/x86_64-unknown-linux-gnu/debug/boka-sandbox swift package benchmark baseline compare $(BASELINE1) $(BASELINE2)
 
 .PHONY: benchmark-check
 benchmark-check: githooks deps
@@ -137,8 +137,8 @@ benchmark-check: githooks deps
 		echo "Error: BASELINE1 and BASELINE2 parameters are required"; \
 		exit 1; \
 	fi
-	cd JAMTests && swift package benchmark baseline check $(BASELINE1) $(BASELINE2) --thresholds .benchmarkBaselines/thresholds.json
+	cd JAMTests && BOKA_SANDBOX_PATH=$(CURDIR)/PolkaVM/.build/x86_64-unknown-linux-gnu/debug/boka-sandbox swift package benchmark baseline check $(BASELINE1) $(BASELINE2) --thresholds .benchmarkBaselines/thresholds.json
 
 .PHONY: benchmark-all
 benchmark-all: githooks deps
-	cd JAMTests && swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update all
+	cd JAMTests && BOKA_SANDBOX_PATH=$(CURDIR)/PolkaVM/.build/x86_64-unknown-linux-gnu/debug/boka-sandbox swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update all
