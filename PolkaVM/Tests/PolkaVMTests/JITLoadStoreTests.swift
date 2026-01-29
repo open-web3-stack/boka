@@ -157,12 +157,12 @@ struct JITLoadStoreTests {
         var code = Data()
 
         // LoadU8 r2, [0x10000] - direct address (not register-relative!)
-        code.append(0x34) // LoadU8 opcode (52)
+        code.append(PVMOpcodes.loadU8.rawValue) // LoadU8 opcode
         code.append(0x02) // r2 (destination register)
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0001_0000).littleEndian) { Array($0) }) // address
 
         // Halt
-        code.append(0x01)
+        code.append(PVMOpcodes.halt.rawValue)
 
         // Create program with read-only data containing 0xAB at offset 0
         let readOnlyData = Data([0xAB]) // Only 1 byte
@@ -187,7 +187,7 @@ struct JITLoadStoreTests {
         var code = Data()
 
         // LoadI8 r2, [0x10000]
-        code.append(0x35) // LoadI8 opcode (53)
+        code.append(PVMOpcodes.loadI8.rawValue) // LoadI8 opcode
         code.append(0x02) // r2
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0001_0000).littleEndian) { Array($0) })
 
@@ -216,7 +216,7 @@ struct JITLoadStoreTests {
         var code = Data()
 
         // LoadU16 r2, [0x10000]
-        code.append(0x36) // LoadU16 opcode (54)
+        code.append(PVMOpcodes.loadU16.rawValue) // LoadU16 opcode
         code.append(0x02) // r2
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0001_0000).littleEndian) { Array($0) })
 
@@ -278,12 +278,12 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 0xAB
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0xAB
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0000_0000_0000_00AB).littleEndian) { Array($0) })
 
         // StoreU8 [0x20000], r1
-        code.append(0x3B) // StoreU8 opcode (59)
+        code.append(PVMOpcodes.storeU8.rawValue) // StoreU8 opcode
         code.append(0x01) // r1 (source register)
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0002_0000).littleEndian) { Array($0) }) // address
 
@@ -318,7 +318,7 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 0x1234
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0x1234
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0000_0000_0000_1234).littleEndian) { Array($0) })
 
@@ -351,7 +351,7 @@ struct JITLoadStoreTests {
     func jitStoreU8Parity() async throws {
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 0xFF
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0xFF
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0000_0000_0000_00FF).littleEndian) { Array($0) })
 
@@ -391,7 +391,7 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 0x20000
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0x20000
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
 
@@ -430,7 +430,7 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 0x20000
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0x20000
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
 
@@ -464,7 +464,7 @@ struct JITLoadStoreTests {
     func jitStoreImmU8Parity() async throws {
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 0x20000
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0x20000
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
 
@@ -504,7 +504,7 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 0x63000000 (invalid)
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0x63000000 (invalid)
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x6300_0000).littleEndian) { Array($0) })
 
@@ -547,11 +547,11 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(0x14) // LoadImm64 r1, 0x10000 (read-only)
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0x10000 (read-only)
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0001_0000).littleEndian) { Array($0) })
 
-        code.append(0x14) // LoadImm64 r2, 0xAB
+        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 0xAB
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0000_0000_0000_00AB).littleEndian) { Array($0) })
 
