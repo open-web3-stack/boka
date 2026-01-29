@@ -545,199 +545,62 @@ public actor StateTrie {
         writeBuffer?.clear()
     }
 
-    // MARK: - Iterative Insert (stack-based to prevent stack overflow)
-
-    // Frame structure for tracking traversal path
-    private struct InsertPathFrame {
-        let hash: Data32
-        let depth: UInt8
-        let isLeftChild: Bool  // true if we went left, false if right
-    }
-
     private func insert(
         hash: Data32, key: Data31, value: Data, depth: UInt8
     ) async throws -> Data32 {
-        // Special case: empty trie
-        guard let parentNode = try await get(hash: hash) else {
+        guard let parent = try await get(hash: hash) else {
             let node = TrieNode.leaf(key: key, value: value)
             saveNode(node: node)
             return node.hash
         }
 
-        // If parent is a branch, traverse iteratively to find insertion point
-        if parentNode.isBranch {
-            // Read parent's children first, then remove parent
+        if parent.isBranch {
+            removeNode(node: parent)
+
             let bitValue = Self.bitAt(key.data, position: depth)
-            let initialChildHash = bitValue ? parentNode.right : parentNode.left
-            let initialOtherChildHash = bitValue ? parentNode.left : parentNode.right
-
-            removeNode(node: parentNode)
-
-            // Track path: (node_hash, depth, is_left_child, node_snapshot)
-            // We need to snapshot the node data since we'll need it later
-            var path: [(frame: InsertPathFrame, left: Data32, right: Data32)] = []
-            var currentHash = initialChildHash
-            var currentDepth = depth + 1
-
-            // Add root to path with saved data
-            path.append((
-                frame: InsertPathFrame(
-                    hash: hash,
-                    depth: depth,
-                    isLeftChild: !bitValue
-                ),
-                left: parentNode.left,
-                right: parentNode.right
-            ))
-
-            // Traverse down to find the leaf node
-            while true {
-                guard let currentNode = try await get(hash: currentHash) else {
-                    throw StateTrieError.invalidData
-                }
-
-                if currentNode.isBranch {
-                    let bitValue = Self.bitAt(key.data, position: currentDepth)
-
-                    // Remove this branch node as we traverse (prevents memory leaks)
-                    removeNode(node: currentNode)
-
-                    // Record path frame with node data
-                    path.append((
-                        frame: InsertPathFrame(
-                            hash: currentHash,
-                            depth: currentDepth,
-                            isLeftChild: !bitValue
-                        ),
-                        left: currentNode.left,
-                        right: currentNode.right
-                    ))
-
-                    // Move to next level
-                    currentHash = bitValue ? currentNode.right : currentNode.left
-                    currentDepth += 1
-                } else {
-                    // Found leaf node - insert here
-                    let newChildHash = try await insertAtLeaf(
-                        existing: currentNode,
-                        newKey: key,
-                        newValue: value,
-                        depth: currentDepth
-                    )
-
-                    // Update all ancestors on the path using saved node data
-                    return try await updateAncestors(
-                        path: path,
-                        newChildHash: newChildHash,
-                        key: key.data
-                    )
-                }
-            }
-        } else {
-            // Root is a leaf - insert directly
-            return try await insertAtLeaf(
-                existing: parentNode,
-                newKey: key,
-                newValue: value,
-                depth: depth
-            )
-        }
-    }
-
-    // Update ancestor nodes after inserting at leaf
-    private func updateAncestors(
-        path: [(frame: InsertPathFrame, left: Data32, right: Data32)],
-        newChildHash: Data32,
-        key: Data
-    ) async throws -> Data32 {
-        var currentChildHash = newChildHash
-
-        // Process path in reverse order (from leaf up to root)
-        for (frame, left, right) in path.reversed() {
-            let bitValue = Self.bitAt(key, position: frame.depth)
-            var newLeft: Data32
-            var newRight: Data32
-
+            var left = parent.left
+            var right = parent.right
             if bitValue {
-                // Right child gets updated
-                newLeft = left
-                newRight = currentChildHash
+                right = try await insert(hash: parent.right, key: key, value: value, depth: depth + 1)
             } else {
-                // Left child gets updated
-                newLeft = currentChildHash
-                newRight = right
+                left = try await insert(hash: parent.left, key: key, value: value, depth: depth + 1)
             }
-
-            let newBranch = TrieNode.branch(left: newLeft, right: newRight)
+            let newBranch = TrieNode.branch(left: left, right: right)
             saveNode(node: newBranch)
-            currentChildHash = newBranch.hash
+            return newBranch.hash
+        } else {
+            // leaf
+            return try await insertLeafNode(existing: parent, newKey: key, newValue: value, depth: depth)
         }
-
-        return currentChildHash
     }
 
-    // Insert at a leaf node (handles both replacement and divergence)
-    private func insertAtLeaf(
-        existing: TrieNode,
-        newKey: Data31,
-        newValue: Data,
-        depth: UInt8
-    ) async throws -> Data32 {
-        // Check if we're updating the same key
+    private func insertLeafNode(existing: TrieNode, newKey: Data31, newValue: Data, depth: UInt8) async throws -> Data32 {
         if existing.isLeaf(key: newKey) {
+            // update existing leaf
             removeNode(node: existing)
             let newLeaf = TrieNode.leaf(key: newKey, value: newValue)
             saveNode(node: newLeaf)
             return newLeaf.hash
         }
 
-        // Keys diverge - create new branch structure iteratively
         let existingKeyBit = Self.bitAt(existing.left.data[relative: 1...], position: depth)
         let newKeyBit = Self.bitAt(newKey.data, position: depth)
 
-        // Remove existing leaf since it will be replaced
-        removeNode(node: existing)
-
         if existingKeyBit == newKeyBit {
-            // Need to go deeper - iterate until we find divergence
-            var currentDepth = depth + 1
-
-            while true {
-                // Keys are stored in leaf starting at byte 1 (byte 0 is length)
-                // So we compare starting from the key data, not including the length byte
-                let existingBit = Self.bitAt(existing.left.data[relative: 1...], position: currentDepth)
-                let newBit = Self.bitAt(newKey.data, position: currentDepth)
-
-                if existingBit != newBit {
-                    // Found divergence point - create branch
-                    let newLeaf = TrieNode.leaf(key: newKey, value: newValue)
-                    saveNode(node: newLeaf)
-
-                    let newBranch = if existingBit {
-                        TrieNode.branch(left: newLeaf.hash, right: existing.hash)
-                    } else {
-                        TrieNode.branch(left: existing.hash, right: newLeaf.hash)
-                    }
-                    saveNode(node: newBranch)
-                    return newBranch.hash
-                }
-
-                currentDepth += 1
-
-                if currentDepth == 0 {
-                    // Overflow - keys are identical at all bit positions
-                    // This should not happen since isLeaf() check should have caught it
-                    // But handle it gracefully by updating the value
-                    let newLeaf = TrieNode.leaf(key: newKey, value: newValue)
-                    saveNode(node: newLeaf)
-                    return newLeaf.hash
-                }
+            // need to go deeper
+            let childNodeHash = try await insertLeafNode(
+                existing: existing, newKey: newKey, newValue: newValue, depth: depth + 1
+            )
+            let newBranch = if existingKeyBit {
+                TrieNode.branch(left: Data32(), right: childNodeHash)
+            } else {
+                TrieNode.branch(left: childNodeHash, right: Data32())
             }
+            saveNode(node: newBranch)
+            return newBranch.hash
         } else {
-            // Keys diverge at current level
             let newLeaf = TrieNode.leaf(key: newKey, value: newValue)
             saveNode(node: newLeaf)
-
             let newBranch = if existingKeyBit {
                 TrieNode.branch(left: newLeaf.hash, right: existing.hash)
             } else {
@@ -748,17 +611,6 @@ public actor StateTrie {
         }
     }
 
-    // MARK: - Delete (iterative to prevent stack overflow)
-
-    // Frame structure for delete traversal
-    private struct DeletePathFrame {
-        let hash: Data32
-        let depth: UInt8
-        let isLeftChild: Bool
-        let left: Data32
-        let right: Data32
-    }
-
     private func delete(hash: Data32, key: Data31, depth: UInt8) async throws -> Data32 {
         let node = try await get(hash: hash)
         guard let node else {
@@ -766,65 +618,52 @@ public actor StateTrie {
         }
 
         if node.isBranch {
-            // Track path to target with node data (don't remove yet)
-            var path: [DeletePathFrame] = []
-            var currentHash = hash
-            var currentDepth = depth
-            var leafHash: Data32? = nil
+            removeNode(node: node)
 
-            // First pass: traverse and record path with node data
-            while true {
-                guard let currentNode = try await get(hash: currentHash) else {
-                    return hash // Node not found, return original
-                }
+            let bitValue = Self.bitAt(key.data, position: depth)
+            var left = node.left
+            var right = node.right
 
-                if currentNode.isBranch {
-                    let bitValue = Self.bitAt(key.data, position: currentDepth)
+            if bitValue {
+                right = try await delete(hash: node.right, key: key, depth: depth + 1)
+            } else {
+                left = try await delete(hash: node.left, key: key, depth: depth + 1)
+            }
 
-                    // Record path frame with node data
-                    path.append(DeletePathFrame(
-                        hash: currentHash,
-                        depth: currentDepth,
-                        isLeftChild: !bitValue,
-                        left: currentNode.left,
-                        right: currentNode.right
-                    ))
-
-                    currentHash = bitValue ? currentNode.right : currentNode.left
-                    currentDepth += 1
+            if left == Data32(), right == Data32() {
+                // this branch is empty
+                return Data32()
+            } else if left == Data32() {
+                // only right child remains - check if we can collapse
+                let rightNode = try await get(hash: right)
+                if let rightNode, rightNode.isLeaf {
+                    // Can collapse: right child is a leaf
+                    return right
                 } else {
-                    // Found leaf - check if it matches our key
-                    if currentNode.isLeaf(key: key) {
-                        leafHash = currentNode.hash
-                        break
-                    } else {
-                        // Key not found - return original hash without changes
-                        return hash
-                    }
+                    // Cannot collapse: right child is a branch that needs to maintain its depth
+                    let newBranch = TrieNode.branch(left: left, right: right)
+                    saveNode(node: newBranch)
+                    return newBranch.hash
+                }
+            } else if right == Data32() {
+                // only left child remains - check if we can collapse
+                let leftNode = try await get(hash: left)
+                if let leftNode, leftNode.isLeaf {
+                    // Can collapse: left child is a leaf
+                    return left
+                } else {
+                    // Cannot collapse: left child is a branch that needs to maintain its depth
+                    let newBranch = TrieNode.branch(left: left, right: right)
+                    saveNode(node: newBranch)
+                    return newBranch.hash
                 }
             }
 
-            // If we found the key to delete, remove nodes and update ancestors
-            guard let foundLeafHash = leafHash else {
-                return hash
-            }
-
-            // Remove all branch nodes from the path
-            for frame in path {
-                removeNode(node: TrieNode.branch(
-                    left: frame.left,
-                    right: frame.right
-                ))
-            }
-
-            // Update ancestors using saved data
-            return try await updateAncestorsAfterDelete(
-                path: path,
-                deletedHash: Data32(),
-                key: key
-            )
+            let newBranch = TrieNode.branch(left: left, right: right)
+            saveNode(node: newBranch)
+            return newBranch.hash
         } else {
-            // Root is a leaf - only remove if it matches
+            // leaf - only remove if the leaf matches the key we're deleting
             if node.isLeaf(key: key) {
                 removeNode(node: node)
                 return Data32()
@@ -832,69 +671,6 @@ public actor StateTrie {
                 return hash
             }
         }
-    }
-
-    // Update ancestors after deleting a leaf
-    private func updateAncestorsAfterDelete(
-        path: [DeletePathFrame],
-        deletedHash: Data32,
-        key: Data31
-    ) async throws -> Data32 {
-        var currentChildHash: Data32 = deletedHash
-
-        // Process path from bottom (deleted leaf's parent) to top (root)
-        for frame in path.reversed() {
-            let bitValue = Self.bitAt(key.data, position: frame.depth)
-            var left: Data32
-            var right: Data32
-
-            if bitValue {
-                // Right child was deleted
-                left = frame.left
-                right = currentChildHash
-            } else {
-                // Left child was deleted
-                left = currentChildHash
-                right = frame.right
-            }
-
-            // Check for collapse opportunities
-            if left == Data32(), right == Data32() {
-                // Both children empty - this branch becomes empty
-                currentChildHash = Data32()
-            } else if left == Data32() {
-                // Only right child remains - check if we can collapse
-                let rightNode = try await get(hash: right)
-                if let rightNode, rightNode.isLeaf {
-                    // Can collapse: right child is a leaf
-                    currentChildHash = right
-                } else {
-                    // Cannot collapse: right child is a branch
-                    let newBranch = TrieNode.branch(left: left, right: right)
-                    saveNode(node: newBranch)
-                    currentChildHash = newBranch.hash
-                }
-            } else if right == Data32() {
-                // Only left child remains - check if we can collapse
-                let leftNode = try await get(hash: left)
-                if let leftNode, leftNode.isLeaf {
-                    // Can collapse: left child is a leaf
-                    currentChildHash = left
-                } else {
-                    // Cannot collapse: left child is a branch
-                    let newBranch = TrieNode.branch(left: left, right: right)
-                    saveNode(node: newBranch)
-                    currentChildHash = newBranch.hash
-                }
-            } else {
-                // Both children present - no collapse
-                let newBranch = TrieNode.branch(left: left, right: right)
-                saveNode(node: newBranch)
-                currentChildHash = newBranch.hash
-            }
-        }
-
-        return currentChildHash
     }
 
     private func removeNode(node: TrieNode) {
