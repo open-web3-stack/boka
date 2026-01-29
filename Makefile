@@ -90,25 +90,20 @@ run: githooks
 devnet:
 	./scripts/devnet.sh
 
-# Determine build architecture dynamically
-ARCH := $(shell uname -m)
-ifeq ($(ARCH),x86_64)
-	BUILD_ARCH := x86_64-unknown-linux-gnu
-else ifeq ($(ARCH),aarch64)
-	BUILD_ARCH := aarch64-unknown-linux-gnu
-else
-	BUILD_ARCH := unknown-unknown-linux-gnu
-endif
+# Determine build directory using SwiftPM
+# This works cross-platform (Linux, macOS) for both x86_64 and arm64
+BUILD_DIR := $(shell swift build --show-bin-path -c release 2>/dev/null)
+SANDBOX_PATH := $(BUILD_DIR)/boka-sandbox
 
 # Benchmark targets
 # Build sandbox in release mode and use it for benchmarks
 .PHONY: benchmark
 benchmark: githooks deps build-sandbox-release
-	cd JAMTests && BOKA_SANDBOX_PATH=$(CURDIR)/PolkaVM/.build/$(BUILD_ARCH)/release/boka-sandbox swift package benchmark
+	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package benchmark
 
 .PHONY: benchmark-list
 benchmark-list: githooks deps build-sandbox-release
-	cd JAMTests && BOKA_SANDBOX_PATH=$(CURDIR)/PolkaVM/.build/$(BUILD_ARCH)/release/boka-sandbox swift package benchmark list
+	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package benchmark list
 
 .PHONY: benchmark-filter
 benchmark-filter: githooks deps build-sandbox-release
@@ -118,7 +113,7 @@ benchmark-filter: githooks deps build-sandbox-release
 		echo "Error: FILTER parameter is required"; \
 		exit 1; \
 	fi
-	cd JAMTests && BOKA_SANDBOX_PATH=$(CURDIR)/PolkaVM/.build/$(BUILD_ARCH)/release/boka-sandbox swift package benchmark --filter $(FILTER)
+	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package benchmark --filter $(FILTER)
 
 .PHONY: benchmark-baseline
 benchmark-baseline: githooks deps build-sandbox-release
@@ -128,7 +123,7 @@ benchmark-baseline: githooks deps build-sandbox-release
 		echo "Error: BASELINE parameter is required"; \
 		exit 1; \
 	fi
-	cd JAMTests && BOKA_SANDBOX_PATH=$(CURDIR)/PolkaVM/.build/$(BUILD_ARCH)/release/boka-sandbox swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update $(BASELINE)
+	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update $(BASELINE)
 
 .PHONY: benchmark-compare
 benchmark-compare: githooks deps build-sandbox-release
@@ -138,7 +133,7 @@ benchmark-compare: githooks deps build-sandbox-release
 		echo "Error: BASELINE1 and BASELINE2 parameters are required"; \
 		exit 1; \
 	fi
-	cd JAMTests && BOKA_SANDBOX_PATH=$(CURDIR)/PolkaVM/.build/$(BUILD_ARCH)/release/boka-sandbox swift package benchmark baseline compare $(BASELINE1) $(BASELINE2)
+	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package benchmark baseline compare $(BASELINE1) $(BASELINE2)
 
 .PHONY: benchmark-check
 benchmark-check: githooks deps build-sandbox-release
@@ -148,11 +143,11 @@ benchmark-check: githooks deps build-sandbox-release
 		echo "Error: BASELINE1 and BASELINE2 parameters are required"; \
 		exit 1; \
 	fi
-	cd JAMTests && BOKA_SANDBOX_PATH=$(CURDIR)/PolkaVM/.build/$(BUILD_ARCH)/release/boka-sandbox swift package benchmark baseline check $(BASELINE1) $(BASELINE2) --thresholds .benchmarkBaselines/thresholds.json
+	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package benchmark baseline check $(BASELINE1) $(BASELINE2) --thresholds .benchmarkBaselines/thresholds.json
 
 .PHONY: benchmark-all
 benchmark-all: githooks deps build-sandbox-release
-	cd JAMTests && BOKA_SANDBOX_PATH=$(CURDIR)/PolkaVM/.build/$(BUILD_ARCH)/release/boka-sandbox swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update all
+	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update all
 
 # Helper target to build sandbox in release mode
 .PHONY: build-sandbox-release
