@@ -766,14 +766,13 @@ public actor StateTrie {
         }
 
         if node.isBranch {
-            removeNode(node: node)
-
-            // Track path to target with node data
+            // Track path to target with node data (don't remove yet)
             var path: [DeletePathFrame] = []
             var currentHash = hash
             var currentDepth = depth
+            var leafHash: Data32? = nil
 
-            // Find the target node and track path with node data
+            // First pass: traverse and record path with node data
             while true {
                 guard let currentNode = try await get(hash: currentHash) else {
                     return hash // Node not found, return original
@@ -782,8 +781,7 @@ public actor StateTrie {
                 if currentNode.isBranch {
                     let bitValue = Self.bitAt(key.data, position: currentDepth)
 
-                    // Remove and record path frame with node data
-                    removeNode(node: currentNode)
+                    // Record path frame with node data
                     path.append(DeletePathFrame(
                         hash: currentHash,
                         depth: currentDepth,
@@ -797,18 +795,34 @@ public actor StateTrie {
                 } else {
                     // Found leaf - check if it matches our key
                     if currentNode.isLeaf(key: key) {
-                        // Leaf deleted - now update ancestors using saved data
-                        return try await updateAncestorsAfterDelete(
-                            path: path,
-                            deletedHash: Data32(),
-                            key: key
-                        )
+                        leafHash = currentNode.hash
+                        break
                     } else {
-                        // Key not found - return original hash
+                        // Key not found - return original hash without changes
                         return hash
                     }
                 }
             }
+
+            // If we found the key to delete, remove nodes and update ancestors
+            guard let foundLeafHash = leafHash else {
+                return hash
+            }
+
+            // Remove all branch nodes from the path
+            for frame in path {
+                removeNode(node: TrieNode.branch(
+                    left: frame.left,
+                    right: frame.right
+                ))
+            }
+
+            // Update ancestors using saved data
+            return try await updateAncestorsAfterDelete(
+                path: path,
+                deletedHash: Data32(),
+                key: key
+            )
         } else {
             // Root is a leaf - only remove if it matches
             if node.isLeaf(key: key) {
