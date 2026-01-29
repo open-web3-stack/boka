@@ -599,6 +599,9 @@ public actor StateTrie {
                 if currentNode.isBranch {
                     let bitValue = Self.bitAt(key.data, position: currentDepth)
 
+                    // Remove this branch node as we traverse (prevents memory leaks)
+                    removeNode(node: currentNode)
+
                     // Record path frame with node data
                     path.append((
                         frame: InsertPathFrame(
@@ -692,6 +695,9 @@ public actor StateTrie {
         let existingKeyBit = Self.bitAt(existing.left.data[relative: 1...], position: depth)
         let newKeyBit = Self.bitAt(newKey.data, position: depth)
 
+        // Remove existing leaf since it will be replaced
+        removeNode(node: existing)
+
         if existingKeyBit == newKeyBit {
             // Need to go deeper - iterate until we find divergence
             var currentDepth = depth + 1
@@ -722,7 +728,6 @@ public actor StateTrie {
                     // Overflow - keys are identical at all bit positions
                     // This should not happen since isLeaf() check should have caught it
                     // But handle it gracefully by updating the value
-                    removeNode(node: existing)
                     let newLeaf = TrieNode.leaf(key: newKey, value: newValue)
                     saveNode(node: newLeaf)
                     return newLeaf.hash
@@ -750,6 +755,8 @@ public actor StateTrie {
         let hash: Data32
         let depth: UInt8
         let isLeftChild: Bool
+        let left: Data32
+        let right: Data32
     }
 
     private func delete(hash: Data32, key: Data31, depth: UInt8) async throws -> Data32 {
@@ -761,12 +768,12 @@ public actor StateTrie {
         if node.isBranch {
             removeNode(node: node)
 
-            // Track path to target
+            // Track path to target with node data
             var path: [DeletePathFrame] = []
             var currentHash = hash
             var currentDepth = depth
 
-            // Find the target node and track path
+            // Find the target node and track path with node data
             while true {
                 guard let currentNode = try await get(hash: currentHash) else {
                     return hash // Node not found, return original
@@ -775,10 +782,14 @@ public actor StateTrie {
                 if currentNode.isBranch {
                     let bitValue = Self.bitAt(key.data, position: currentDepth)
 
+                    // Remove and record path frame with node data
+                    removeNode(node: currentNode)
                     path.append(DeletePathFrame(
                         hash: currentHash,
                         depth: currentDepth,
-                        isLeftChild: !bitValue
+                        isLeftChild: !bitValue,
+                        left: currentNode.left,
+                        right: currentNode.right
                     ))
 
                     currentHash = bitValue ? currentNode.right : currentNode.left
@@ -786,11 +797,10 @@ public actor StateTrie {
                 } else {
                     // Found leaf - check if it matches our key
                     if currentNode.isLeaf(key: key) {
-                        removeNode(node: currentNode)
-                        // Leaf deleted - now update ancestors
+                        // Leaf deleted - now update ancestors using saved data
                         return try await updateAncestorsAfterDelete(
                             path: path,
-                            deletedHash: currentNode.hash,
+                            deletedHash: Data32(),
                             key: key
                         )
                     } else {
@@ -820,24 +830,18 @@ public actor StateTrie {
 
         // Process path from bottom (deleted leaf's parent) to top (root)
         for frame in path.reversed() {
-            guard let node = try await get(hash: frame.hash) else {
-                throw StateTrieError.invalidData
-            }
-
-            removeNode(node: node)
-
             let bitValue = Self.bitAt(key.data, position: frame.depth)
             var left: Data32
             var right: Data32
 
             if bitValue {
                 // Right child was deleted
-                left = node.left
+                left = frame.left
                 right = currentChildHash
             } else {
                 // Left child was deleted
                 left = currentChildHash
-                right = node.right
+                right = frame.right
             }
 
             // Check for collapse opportunities
