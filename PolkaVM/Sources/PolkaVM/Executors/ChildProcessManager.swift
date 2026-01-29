@@ -70,7 +70,7 @@ actor ChildProcessManager {
             findBokaSandbox()
         }
 
-        logger.info("Spawning child process: \(resolvedPath)")
+        logger.debug("Spawning child process: \(resolvedPath)")
         // Create socket pair for IPC
         var sockets: [Int32] = [0, 0]
 
@@ -94,12 +94,12 @@ actor ChildProcessManager {
         let parentFD = sockets[0]
         let childFD = sockets[1]
 
-        logger.info("Created socketpair: parentFD=\(parentFD), childFD=\(childFD)")
+        logger.debug("Created socketpair: parentFD=\(parentFD), childFD=\(childFD)")
 
         // Validate both FDs are valid
         let parentFlags = fcntl(parentFD, F_GETFL)
         let childFlags = fcntl(childFD, F_GETFL)
-        logger.info("Socketpair validation: parentFD flags=\(parentFlags), childFD flags=\(childFlags)")
+        logger.debug("Socketpair validation: parentFD flags=\(parentFlags), childFD flags=\(childFlags)")
 
         // Fork child process
         let pid = Glibc.fork()
@@ -175,22 +175,22 @@ actor ChildProcessManager {
             _exit(1)
         } else {
             // Parent process
-            logger.info("Parent: Closing childFD \(childFD)")
+            logger.debug("Parent: Closing childFD \(childFD)")
             Glibc.close(childFD)
 
             // Validate parentFD is still valid after closing childFD
             let parentFlagsAfterClose = fcntl(parentFD, F_GETFL)
-            logger.info("Parent: parentFD \(parentFD) validation after close: flags=\(parentFlagsAfterClose)")
+            logger.debug("Parent: parentFD \(parentFD) validation after close: flags=\(parentFlagsAfterClose)")
 
             let handle = ProcessHandle(pid: pid, ipcFD: parentFD)
             activeProcesses[pid] = handle
 
-            logger.info("Spawned child process: PID \(pid), returning parentFD \(parentFD)")
+            logger.debug("Spawned child process: PID \(pid), returning parentFD \(parentFD)")
 
             // Wait a moment for child to start
             try await Task.sleep(nanoseconds: 100_000_000) // 100ms
 
-            logger.info("Parent: Returning handle and parentFD \(parentFD) to caller")
+            logger.debug("Parent: Returning handle and parentFD \(parentFD) to caller")
             return (handle, parentFD)
         }
     }

@@ -49,7 +49,7 @@ public actor SandboxPool {
         logger.debug("[POOL] Spawning \(config.poolSize) initial workers")
         try await spawnInitialWorkers()
 
-        logger.info("[POOL] Pool initialized with \(workers.count) workers (target: \(config.poolSize))")
+        logger.debug("[POOL] Pool initialized with \(workers.count) workers (target: \(config.poolSize))")
 
         // Start health check task if enabled
         if config.healthCheckInterval > 0 {
@@ -189,7 +189,7 @@ public actor SandboxPool {
 
     /// Gracefully shutdown the pool
     public func shutdown() async {
-        logger.info("Shutting down sandbox pool...")
+        logger.debug("Shutting down sandbox pool...")
         isShutdown = true
 
         // Terminate all workers explicitly to close FDs and clean up processes
@@ -199,7 +199,7 @@ public actor SandboxPool {
 
         workers.removeAll()
 
-        logger.info("Sandbox pool shutdown complete")
+        logger.debug("Sandbox pool shutdown complete")
     }
 
     // MARK: - Private Methods
@@ -246,7 +246,7 @@ public actor SandboxPool {
             }
         }
 
-        logger.info("[POOL] All \(workers.count) workers spawned successfully")
+        logger.debug("[POOL] All \(workers.count) workers spawned successfully")
     }
 
     /// Get an available worker from the pool

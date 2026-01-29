@@ -88,7 +88,6 @@ let package = Package(
             dependencies: [
             ],
             exclude: [
-                "asmjit/asmjit.natvis",
                 "asmjit/include/asmjit.natvis",
                 "asmjit/asmjit/asmjit.natvis",
                 "asmjit/.git",

@@ -40,7 +40,7 @@ public class IPCServer {
             return
         }
 
-        logger.info("[IPC-SERVER] Starting server run loop with FD \(fd)")
+        logger.trace("[IPC-SERVER] Starting server run loop with FD \(fd)")
 
         // Validate FD before starting
         let flags = fcntl(fd, F_GETFL)
@@ -48,7 +48,7 @@ public class IPCServer {
             logger.error("[IPC-SERVER] FD \(fd) is INVALID at start: \(errnoToString(errno))")
             return
         } else {
-            logger.info("[IPC-SERVER] FD \(fd) is valid at start (flags: \(flags))")
+            logger.trace("[IPC-SERVER] FD \(fd) is valid at start (flags: \(flags))")
         }
 
         isRunning = true
@@ -56,24 +56,24 @@ public class IPCServer {
 
         while isRunning {
             iterationCount += 1
-            logger.debug("[IPC-SERVER] Iteration \(iterationCount): About to read message from FD \(fd)")
+            logger.trace("[IPC-SERVER] Iteration \(iterationCount): About to read message from FD \(fd)")
 
             do {
                 // Read message
-                logger.debug("[IPC-SERVER] Calling readMessage()...")
+                logger.trace("[IPC-SERVER] Calling readMessage()...")
                 let message = try await readMessage(from: fd)
-                logger.info("[IPC-SERVER] Successfully read message type: \(message.type), requestId: \(message.requestId)")
+                logger.trace("[IPC-SERVER] Successfully read message type: \(message.type), requestId: \(message.requestId)")
 
                 // Handle based on message type
                 switch message.type {
                 case .executeRequest:
-                    logger.debug("[IPC-SERVER] Handling execute request")
+                    logger.trace("[IPC-SERVER] Handling execute request")
                     await handleExecuteRequest(message, handler: handler)
-                    logger.debug("[IPC-SERVER] Execute request handling complete")
+                    logger.trace("[IPC-SERVER] Execute request handling complete")
 
                 case .heartbeat:
                     // Respond to heartbeat
-                    logger.debug("[IPC-SERVER] Received heartbeat, sending response")
+                    logger.trace("[IPC-SERVER] Received heartbeat, sending response")
                     let response = IPCMessage(type: .heartbeat, requestId: message.requestId)
                     try? writeMessage(response, to: fd)
 
@@ -99,7 +99,7 @@ public class IPCServer {
             }
         }
 
-        logger.info("[IPC-SERVER] Server run loop exiting after \(iterationCount) iterations")
+        logger.trace("[IPC-SERVER] Server run loop exiting after \(iterationCount) iterations")
     }
 
     /// Handle execute request
@@ -156,16 +156,16 @@ public class IPCServer {
 
     /// Read message from file descriptor
     private func readMessage(from fd: Int32) async throws -> IPCMessage {
-        logger.debug("[IPC-SERVER] readMessage: Reading length prefix (\(IPCProtocol.lengthPrefixSize) bytes) from FD \(fd)")
+        logger.trace("[IPC-SERVER] readMessage: Reading length prefix (\(IPCProtocol.lengthPrefixSize) bytes) from FD \(fd)")
 
         // Read length prefix (4 bytes)
         let lengthData = try readExactBytes(IPCProtocol.lengthPrefixSize, from: fd)
-        logger.debug("[IPC-SERVER] readMessage: Successfully read length prefix")
+        logger.trace("[IPC-SERVER] readMessage: Successfully read length prefix")
 
         let length = lengthData.withUnsafeBytes {
             $0.load(as: UInt32.self).littleEndian
         }
-        logger.debug("[IPC-SERVER] readMessage: Message length: \(length) bytes")
+        logger.trace("[IPC-SERVER] readMessage: Message length: \(length) bytes")
 
         guard length > 0, length < 1024 * 1024 * 100 else {
             logger.error("[IPC-SERVER] readMessage: Invalid length \(length)")
@@ -173,9 +173,9 @@ public class IPCServer {
         }
 
         // Read message payload
-        logger.debug("[IPC-SERVER] readMessage: Reading message payload (\(length) bytes)")
+        logger.trace("[IPC-SERVER] readMessage: Reading message payload (\(length) bytes)")
         let messageData = try readExactBytes(Int(length), from: fd)
-        logger.debug("[IPC-SERVER] readMessage: Successfully read message payload")
+        logger.trace("[IPC-SERVER] readMessage: Successfully read message payload")
 
         // Decode message
         let decodeResult = try? IPCProtocol.decodeMessage(lengthData + messageData)
@@ -184,7 +184,7 @@ public class IPCServer {
             throw IPCError.decodingFailed("Failed to decode IPC message")
         }
 
-        logger.debug("[IPC-SERVER] readMessage: Successfully decoded message, type: \(message.type)")
+        logger.trace("[IPC-SERVER] readMessage: Successfully decoded message, type: \(message.type)")
         return message
     }
 
@@ -229,7 +229,7 @@ public class IPCServer {
 
     /// Read exact number of bytes from file descriptor
     private func readExactBytes(_ count: Int, from fd: Int32) throws -> Data {
-        logger.debug("[IPC-SERVER] readExactBytes: Reading \(count) bytes from FD \(fd)")
+        logger.trace("[IPC-SERVER] readExactBytes: Reading \(count) bytes from FD \(fd)")
 
         var buffer = Data(count: count)
         var bytesRead = 0
@@ -244,19 +244,19 @@ public class IPCServer {
                 let ptr = baseAddr.advanced(by: bytesRead)
                 let bytesToRead = count - bytesRead
 
-                logger.debug("[IPC-SERVER] readExactBytes: Calling read() for \(bytesToRead) bytes (already read: \(bytesRead)/\(count))")
+                logger.trace("[IPC-SERVER] readExactBytes: Calling read() for \(bytesToRead) bytes (already read: \(bytesRead)/\(count))")
 
                 let result = ptr.withMemoryRebound(to: UInt8.self, capacity: count - bytesRead) {
                     Glibc.read(fd, $0, count - bytesRead)
                 }
 
-                logger.debug("[IPC-SERVER] readExactBytes: read() returned \(result)")
+                logger.trace("[IPC-SERVER] readExactBytes: read() returned \(result)")
 
                 if result < 0 {
                     let err = errno
                     // EINTR: Interrupted system call - retry the read
                     if err == EINTR {
-                        logger.debug("[IPC-SERVER] readExactBytes: Got EINTR, retrying")
+                        logger.trace("[IPC-SERVER] readExactBytes: Got EINTR, retrying")
                         return
                     }
                     logger.error("[IPC-SERVER] readExactBytes: Failed to read: \(errnoToString(err))")
@@ -269,11 +269,11 @@ public class IPCServer {
                 }
 
                 bytesRead += Int(result)
-                logger.debug("[IPC-SERVER] readExactBytes: Read progress: \(bytesRead)/\(count) bytes")
+                logger.trace("[IPC-SERVER] readExactBytes: Read progress: \(bytesRead)/\(count) bytes")
             }
         }
 
-        logger.debug("[IPC-SERVER] readExactBytes: Successfully read all \(count) bytes")
+        logger.trace("[IPC-SERVER] readExactBytes: Successfully read all \(count) bytes")
         return buffer
     }
 

@@ -20,7 +20,7 @@ private func debugWrite(_ message: String) {
 @main
 enum SandboxMain {
     static func main() async {
-        logger.info("Boka VM Sandbox starting...")
+        logger.debug("Boka VM Sandbox starting...")
 
         // DEBUG: Track initialization
         debugWrite("Sandbox: main() started\n")
@@ -40,14 +40,14 @@ enum SandboxMain {
         server.setFileDescriptor(STDIN_FILENO)
         debugWrite("Sandbox: FD set\n")
 
-        logger.info("Sandbox process ready, listening for IPC messages")
+        logger.debug("Sandbox process ready, listening for IPC messages")
 
         await server.run { request in
             // Handle execute request
             await handleExecuteRequest(request)
         }
 
-        logger.info("Sandbox process exiting")
+        logger.debug("Sandbox process exiting")
     }
 
     private static func setupSignalHandlers() {
@@ -98,7 +98,7 @@ enum SandboxMain {
             // - chroot() for filesystem isolation
             // - Landlock for fine-grained filesystem access control
 
-            logger.info("Basic sandbox security applied")
+            logger.debug("Basic sandbox security applied")
         #else
             logger.warning("Sandbox security restrictions not implemented for this platform")
         #endif

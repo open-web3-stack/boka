@@ -25,7 +25,7 @@ final class IPCClient: @unchecked Sendable {
 
     /// Set the file descriptor for communication
     func setFileDescriptor(_ fd: Int32) {
-        logger.info("[IPC] Setting file descriptor: \(fd)")
+        logger.trace("[IPC] Setting file descriptor: \(fd)")
 
         // Validate FD is valid using fcntl
         let flags = fcntl(fd, F_GETFL)
@@ -33,7 +33,7 @@ final class IPCClient: @unchecked Sendable {
             let err = errno
             logger.error("[IPC] File descriptor \(fd) is INVALID: \(errnoToString(err))")
         } else {
-            logger.info("[IPC] File descriptor \(fd) is valid (flags: \(flags))")
+            logger.trace("[IPC] File descriptor \(fd) is valid (flags: \(flags))")
         }
 
         fileDescriptor = fd
@@ -98,7 +98,7 @@ final class IPCClient: @unchecked Sendable {
         }
 
         let timestamp = Date().timeIntervalSince1970
-        logger.debug("[IPC][\(timestamp)] Using file descriptor: \(fd)")
+        logger.trace("[IPC][\(timestamp)] Using file descriptor: \(fd)")
 
         // Validate FD is still valid before writing
         let flags = fcntl(fd, F_GETFL)
@@ -107,13 +107,13 @@ final class IPCClient: @unchecked Sendable {
             logger.error("[IPC][\(timestamp)] File descriptor \(fd) is INVALID before write: \(errnoToString(err))")
             throw IPCError.writeFailed(Int(err))
         } else {
-            logger.debug("[IPC][\(timestamp)] File descriptor \(fd) is valid before write (flags: \(flags))")
+            logger.trace("[IPC][\(timestamp)] File descriptor \(fd) is valid before write (flags: \(flags))")
         }
 
         // Generate request ID
         requestIdCounter = requestIdCounter &+ 1
         let requestId = requestIdCounter
-        logger.debug("[IPC][\(timestamp)] Sending request \(requestId), blob size: \(blob.count)")
+        logger.trace("[IPC][\(timestamp)] Sending request \(requestId), blob size: \(blob.count)")
 
         // Create and send request
         let requestData = try IPCProtocol.createExecuteRequest(
@@ -125,9 +125,9 @@ final class IPCClient: @unchecked Sendable {
             executionMode: executionMode
         )
 
-        logger.info("[IPC][\(timestamp)] Writing \(requestData.count) bytes to FD \(fd)")
+        logger.trace("[IPC][\(timestamp)] Writing \(requestData.count) bytes to FD \(fd)")
         try writeData(requestData, to: fd)
-        logger.info("[IPC][\(timestamp)] Write completed successfully")
+        logger.trace("[IPC][\(timestamp)] Write completed successfully")
 
         // Wait for response (blocking)
         let responseMessage = try readMessageBlocking(requestId: requestId, from: fd)
