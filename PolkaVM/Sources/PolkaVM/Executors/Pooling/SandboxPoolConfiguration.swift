@@ -38,6 +38,9 @@ public struct SandboxPoolConfiguration: Sendable {
     /// Pool exhaustion policy
     public var exhaustionPolicy: ExhaustionPolicy
 
+    /// Path to the boka-sandbox executable
+    public var sandboxPath: String
+
     public init(
         poolSize: Int = ProcessInfo.processInfo.processorCount,
         maxQueueDepth: Int = 1000,
@@ -50,7 +53,8 @@ public struct SandboxPoolConfiguration: Sendable {
         failureTrackingWindow: TimeInterval = 60.0,
         allowOverflowWorkers: Bool = false,
         maxOverflowWorkers: Int = 0,
-        exhaustionPolicy: ExhaustionPolicy = .queue
+        exhaustionPolicy: ExhaustionPolicy = .queue,
+        sandboxPath: String = "boka-sandbox"
     ) {
         self.poolSize = poolSize
         self.maxQueueDepth = maxQueueDepth
@@ -64,6 +68,7 @@ public struct SandboxPoolConfiguration: Sendable {
         self.allowOverflowWorkers = allowOverflowWorkers
         self.maxOverflowWorkers = maxOverflowWorkers
         self.exhaustionPolicy = exhaustionPolicy
+        self.sandboxPath = sandboxPath
     }
 
     /// Default configuration optimized for throughput

@@ -4,12 +4,15 @@ import Utils
 public final class Executor: @unchecked Sendable {
     let mode: ExecutionMode
     let config: PvmConfig
+    let sandboxPath: String
 
     var frontend: ExecutorFrontend
 
     public init(mode: ExecutionMode, config: PvmConfig) {
         self.mode = mode
         self.config = config
+        // Read sandbox path from environment variable, default to "boka-sandbox"
+        self.sandboxPath = ProcessInfo.processInfo.environment["BOKA_SANDBOX_PATH"] ?? "boka-sandbox"
 
         if mode.contains(.sandboxed) {
             frontend = ExecutorFrontendSandboxed(mode: mode)

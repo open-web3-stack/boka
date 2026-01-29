@@ -11,11 +11,13 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
     private let logger = Logger(label: "ExecutorFrontendSandboxed")
     private let mode: ExecutionMode
     private let childProcessManager: ChildProcessManager
-    private let executablePath: String
+    private let sandboxPath: String
 
     init(mode: ExecutionMode) {
         self.mode = mode
-        self.executablePath = "boka-sandbox"
+        // Default to "boka-sandbox", can be overridden by setting the environment variable
+        // or by creating the Executor with a custom sandbox path
+        self.sandboxPath = ProcessInfo.processInfo.environment["BOKA_SANDBOX_PATH"] ?? "boka-sandbox"
         self.childProcessManager = ChildProcessManager()
     }
 
@@ -45,7 +47,7 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
         do {
             // Spawn child process
             (handle, clientFD) = try await childProcessManager.spawnChildProcess(
-                executablePath: executablePath
+                executablePath: sandboxPath
             )
 
             // Create IPC client and transfer ownership of the FD
