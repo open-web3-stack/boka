@@ -39,11 +39,9 @@ extern "C" void* _Nullable * _Nullable getDispatcherTable(void* _Nonnull funcPtr
     auto it = s_dispatcherTables.find(funcPtr);
     if (it != s_dispatcherTables.end()) {
         *outSize = it->second.second;
-        fprintf(stderr, "DEBUG: getDispatcherTable(%p) FOUND table with size %zu\n", funcPtr, *outSize);
         return it->second.first;
     }
     *outSize = 0;
-    fprintf(stderr, "DEBUG: getDispatcherTable(%p) NOT FOUND - returning nullptr\n", funcPtr);
     return nullptr;
 }
 
@@ -245,7 +243,6 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         if (opcode_is(opcode, Opcode::JumpInd) ||
             opcode_is(opcode, Opcode::LoadImmJump) ||
             opcode_is(opcode, Opcode::LoadImmJumpInd)) {
-            fprintf(stderr, "DEBUG: PC %u: Found opcode 0x%02X, setting needsDispatcherTable=true\n", pc, opcode);
             needsDispatcherTable = true;
         }
 
@@ -296,7 +293,6 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         } else if (needsDispatcherTable) {
             // For dispatcher table, we need labels for ALL instruction PCs
             // This allows JumpInd to jump to any PC without falling back to interpreter
-            fprintf(stderr, "DEBUG: PC %u: Binding label for dispatcher table (opcode=0x%02X)\n", pc, opcode);
             labelManager.bindLabel(&a, pc, "x86_64");
         }
 
@@ -1239,7 +1235,6 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             memcpy(&offset, &codeBuffer[pc + 2], 4);
 
             // DEBUG: Log instruction details
-            fprintf(stderr, "DEBUG LoadIndU32: ra=%d, rb=%d, offset=0x%x\n", ra, rb, offset);
 
             // Load base address from rb register into rax
             a.mov(x86::rax, x86::qword_ptr(x86::rbx, rb * 8));
@@ -1777,7 +1772,6 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         std::vector<uint32_t> labeledPCs = labelManager.getAllPCs();
 
         // DEBUG: Log dispatcher table creation
-        fprintf(stderr, "DEBUG: Creating dispatcher table for %p with %zu labeledPCs (codeSize=%zu)\n",
                 *funcOut, labeledPCs.size(), codeSize);
         for (size_t i = 0; i < std::min(size_t(10), labeledPCs.size()); i++) {
             fprintf(stderr, "  labeledPC[%zu] = %u\n", i, labeledPCs[i]);
@@ -1823,7 +1817,6 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             entriesPopulated++;
         }
 
-        fprintf(stderr, "DEBUG: Dispatcher table populated with %zu entries\n", entriesPopulated);
 
         // Store the dispatcher table in global map for later retrieval
         {
@@ -1831,7 +1824,6 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Transfer ownership to global storage
             void** tablePtr = dispatcherTable.release();
             s_dispatcherTables[*funcOut] = {tablePtr, static_cast<size_t>(codeSize)};
-            fprintf(stderr, "DEBUG: Dispatcher table stored in global map for %p\n", *funcOut);
         }
     }
 
