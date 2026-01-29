@@ -355,9 +355,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint32_t varintSize1;
             uint64_t immediate = decode_varint(codeBuffer, pc + 2, codeSize, varintSize1);
             if (varintSize1 == 0) {
-                // Invalid varint encoding, skip this instruction
-                pc += instrSize;
-                continue;
+                // Invalid varint encoding - compilation error
+                return 3;
             }
 
             // Use varint decoding for jump offset (starts after immediate)
@@ -365,9 +364,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint32_t varintSize2;
             uint64_t jumpOffset = decode_varint(codeBuffer, offsetStart, codeSize, varintSize2);
             if (varintSize2 == 0) {
-                // Invalid varint encoding, skip this instruction
-                pc += instrSize;
-                continue;
+                // Invalid varint encoding - compilation error
+                return 3;
             }
 
             uint32_t targetPC = pc + uint32_t(jumpOffset);  // Offset is relative to instruction start
@@ -678,18 +676,16 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint32_t offset_varint_size = 0;
             uint64_t offset = decode_varint(codeBuffer, pc + 2, codeSize, offset_varint_size);
             if (offset_varint_size == 0) {
-                // Invalid varint encoding, skip this instruction
-                pc += instrSize;
-                continue;
+                // Invalid varint encoding - compilation error
+                return 3;
             }
 
             // Decode value varint starting after offset varint
             uint32_t value_varint_size = 0;
             uint64_t value = decode_varint(codeBuffer, pc + 2 + offset_varint_size, codeSize, value_varint_size);
             if (value_varint_size == 0) {
-                // Invalid varint encoding, skip this instruction
-                pc += instrSize;
-                continue;
+                // Invalid varint encoding - compilation error
+                return 3;
             }
 
             // Load base address from register
@@ -1585,9 +1581,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint32_t varint_size = 0;
             uint64_t immediate = decode_varint(codeBuffer, pc + 2, codeSize, varint_size);
             if (varint_size == 0) {
-                // Invalid varint encoding, skip this instruction
-                pc += instrSize;
-                continue;
+                // Invalid varint encoding - compilation error
+                return 3;
             }
 
             // LoadImm loads signed 32-bit values and sign-extends to 64-bit
