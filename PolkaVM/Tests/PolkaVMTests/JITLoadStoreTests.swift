@@ -98,6 +98,23 @@ struct JITLoadStoreTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 1), equals: expected)
     }
 
+    @Test("JIT: LoadImm sign-extends negative 32-bit values")
+    func jitLoadImmNegative() async throws {
+        // LoadImm r1, -1 (0xFFFFFFFF as signed 32-bit)
+        // When sign-extended to 64-bit, this becomes 0xFFFFFFFFFFFFFFFF
+        let value = UInt64(bitPattern: Int64(Int32(bitPattern: 0xFFFF_FFFF)))
+        let instruction: [UInt8] = [
+            0x33, // LoadImm opcode (32-bit immediate, sign-extended)
+            0x01, // r1
+        ] + encodeVarint(value)
+
+        let result = await JITInstructionExecutor.executeSingleInstruction(instruction)
+
+        // -1 sign-extended to 64-bit should be all 0xFF
+        let expected = UInt64(bitPattern: Int64(-1))
+        JITTestAssertions.assertRegister(result, Registers.Index(raw: 1), equals: expected)
+    }
+
     @Test("JIT: LoadImm64 loads unsigned 32-bit value zero-extended")
     func jitLoadImmU32() async throws {
         // LoadImm64 r1, 0xFFFFFFFF (zero-extended 32-bit value)

@@ -158,4 +158,60 @@ extension Instructions {
         let rd = try Registers.Index(r3: data.at(relative: 1))
         return (ra, rb, rd)
     }
+
+    /// Decode two varint-encoded values from data starting at offset
+    /// Used for LoadImmJump, LoadImmJumpInd, and BranchImm instructions
+    /// - Parameters:
+    ///   - data: Instruction bytecode
+    ///   - offset: Starting offset for first varint (after register byte)
+    /// - Returns: Tuple of (firstValue, secondValue, bytesConsumed)
+    static func decodeVarintPair(_ data: Data, offset: Int = 1) throws -> (UInt32, UInt32, Int) {
+        var currentOffset = offset
+        var bytesConsumed = 0
+
+        // Decode first varint
+        var firstValue: UInt64 = 0
+        var shift = 0
+        while currentOffset < data.count {
+            let byte = data[currentOffset]
+            firstValue |= UInt64(byte & 0x7F) << shift
+            bytesConsumed += 1
+            currentOffset += 1
+
+            if (byte & 0x80) == 0 {
+                break
+            }
+
+            shift += 7
+            if shift >= 64 {
+                throw InstructionDecodingError.varintOverflow
+            }
+        }
+
+        // Decode second varint
+        var secondValue: UInt64 = 0
+        shift = 0
+        while currentOffset < data.count {
+            let byte = data[currentOffset]
+            secondValue |= UInt64(byte & 0x7F) << shift
+            bytesConsumed += 1
+            currentOffset += 1
+
+            if (byte & 0x80) == 0 {
+                break
+            }
+
+            shift += 7
+            if shift >= 64 {
+                throw InstructionDecodingError.varintOverflow
+            }
+        }
+
+        return (UInt32(truncatingIfNeeded: firstValue), UInt32(truncatingIfNeeded: secondValue), bytesConsumed)
+    }
+
+    enum InstructionDecodingError: Swift.Error {
+        case varintOverflow
+        case insufficientData
+    }
 }

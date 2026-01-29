@@ -39,9 +39,11 @@ extern "C" void* _Nullable * _Nullable getDispatcherTable(void* _Nonnull funcPtr
     auto it = s_dispatcherTables.find(funcPtr);
     if (it != s_dispatcherTables.end()) {
         *outSize = it->second.second;
+        fprintf(stderr, "DEBUG: getDispatcherTable(%p) FOUND table with size %zu\n", funcPtr, *outSize);
         return it->second.first;
     }
     *outSize = 0;
+    fprintf(stderr, "DEBUG: getDispatcherTable(%p) NOT FOUND - returning nullptr\n", funcPtr);
     return nullptr;
 }
 
@@ -103,8 +105,8 @@ static uint32_t getInstructionSize(const uint8_t* bytecode, uint32_t pc, size_t 
 static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t instrSize) {
     uint8_t opcode = bytecode[pc];
 
-    // Jump (5 bytes): [opcode][offset_32bit]
-    if (instrSize == 5 && opcode_is(opcode, Opcode::Jump)) {
+    // Jump: [opcode][offset_32bit] = 5 bytes
+    if (opcode_is(opcode, Opcode::Jump)) {
         uint32_t offset;
         memcpy(&offset, &bytecode[pc + 1], 4);
         return pc + int32_t(offset);
@@ -127,11 +129,16 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
         return pc + int32_t(offset);
     }
 
-    // LoadImmJump (10 bytes): [opcode][reg_index][immediate_32bit][offset_32bit]
+    // LoadImmJump: [opcode][reg_index][varint_value][varint_offset] - variable size
     if (opcode_is(opcode, Opcode::LoadImmJump)) {
-        uint32_t offset;
-        memcpy(&offset, &bytecode[pc + 6], 4);  // Offset starts at byte 6
-        return pc + int32_t(offset);
+        // Skip reg byte and first varint (value)
+        uint32_t offset = pc + 2;
+        uint32_t varintSize1;
+        decode_varint(bytecode, offset, varintSize1);  // Skip value
+        uint32_t offset2 = offset + varintSize1;
+        uint32_t varintSize2;
+        uint64_t jumpOffset = decode_varint(bytecode, offset2, varintSize2);
+        return pc + uint32_t(jumpOffset);
     }
 
     return pc + instrSize; // Fallthrough
@@ -234,8 +241,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             return 3; // Compilation error
         }
 
-        // Check if this code has JumpInd or LoadImmJumpInd (which need dispatcher)
-        if (opcode_is(opcode, Opcode::JumpInd) || opcode_is(opcode, Opcode::LoadImmJumpInd)) {
+        // Check if this code has JumpInd, LoadImmJump, or LoadImmJumpInd (which need dispatcher)
+        if (opcode_is(opcode, Opcode::JumpInd) ||
+            opcode_is(opcode, Opcode::LoadImmJump) ||
+            opcode_is(opcode, Opcode::LoadImmJumpInd)) {
+            fprintf(stderr, "DEBUG: PC %u: Found opcode 0x%02X, setting needsDispatcherTable=true\n", pc, opcode);
             needsDispatcherTable = true;
         }
 
@@ -286,6 +296,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         } else if (needsDispatcherTable) {
             // For dispatcher table, we need labels for ALL instruction PCs
             // This allows JumpInd to jump to any PC without falling back to interpreter
+            fprintf(stderr, "DEBUG: PC %u: Binding label for dispatcher table (opcode=0x%02X)\n", pc, opcode);
             labelManager.bindLabel(&a, pc, "x86_64");
         }
 
@@ -329,15 +340,17 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
         if (opcode_is(opcode, Opcode::LoadImmJump)) {
             uint8_t destReg = codeBuffer[pc + 1];
-            uint32_t immediate;
-            uint32_t jumpOffset;
-            memcpy(&immediate, &codeBuffer[pc + 2], 4);   // Immediate value is at bytes 2-5
-            memcpy(&jumpOffset, &codeBuffer[pc + 6], 4);   // Jump offset is at bytes 6-9
-            uint32_t targetPC = pc + int32_t(jumpOffset);  // Offset is relative to instruction start
 
-            // DEBUG: Log LoadImmJump details
-            fprintf(stderr, "DEBUG LoadImmJump: pc=%u, destReg=%u, immediate=0x%x, jumpOffset=0x%x (%d), targetPC=%u\n",
-                    pc, destReg, immediate, jumpOffset, (int32_t)jumpOffset, targetPC);
+            // Use varint decoding for immediate value (starts at pc + 2)
+            uint32_t varintSize1;
+            uint64_t immediate = decode_varint(codeBuffer, pc + 2, varintSize1);
+
+            // Use varint decoding for jump offset (starts after immediate)
+            uint32_t offsetStart = pc + 2 + varintSize1;
+            uint32_t varintSize2;
+            uint64_t jumpOffset = decode_varint(codeBuffer, offsetStart, varintSize2);
+
+            uint32_t targetPC = pc + uint32_t(jumpOffset);  // Offset is relative to instruction start
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "x86_64");
             jit_emit_load_imm_jump_labeled(&a, "x86_64", destReg, immediate, targetLabel);
@@ -370,21 +383,21 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // Validate target != 0
             a.test(x86::eax, x86::eax);
-            a.jz(pagefaultLabel);  // Invalid target (0)
+            a.jz(panicLabel);  // Invalid target (0) - changed from pagefaultLabel
 
             // Validate target alignment
             a.mov(x86::r10d, x86::eax);  // Copy target
             a.test(x86::ecx, x86::ecx);  // Check if alignmentFactor is 0
-            a.jz(pagefaultLabel);  // Division by zero is invalid
+            a.jz(panicLabel);  // Division by zero is invalid - changed from pagefaultLabel
             a.mov(x86::edx, 0);   // Clear edx for division
             a.div(x86::ecx);  // Divide by alignmentFactor, quotient in eax, remainder in edx
             a.cmp(x86::edx, 0);  // Check if remainder is 0 (aligned)
-            a.jne(pagefaultLabel);  // Not aligned, invalid jump
+            a.jne(panicLabel);  // Not aligned, invalid jump - changed from pagefaultLabel
 
             // Calculate entry index: (target / alignmentFactor) - 1
             a.dec(x86::eax);  // Decrement to get entry index
             a.cmp(x86::eax, x86::r9d);  // Compare with entriesCount
-            a.jae(pagefaultLabel);  // Index >= entriesCount, invalid jump
+            a.jae(panicLabel);  // Index >= entriesCount, invalid jump - changed from pagefaultLabel
 
             // Calculate byte offset: entryIndex * entrySize
             a.mov(x86::edx, x86::eax);  // Copy entry index
@@ -1543,9 +1556,10 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint32_t varint_size = 0;
             uint64_t immediate = decode_varint(codeBuffer, pc + 2, varint_size);
 
-            // Load immediate into eax (zero-extends to rax per x86-64 ABI)
-            // Truncate to 32-bit as LoadImm loads signed 32-bit values
+            // LoadImm loads signed 32-bit values and sign-extends to 64-bit
+            // Use movsxd to sign-extend the 32-bit immediate to 64-bit
             a.mov(x86::eax, static_cast<uint32_t>(immediate));
+            a.movsxd(x86::rax, x86::eax);  // Sign-extend eax to rax
             a.mov(x86::qword_ptr(x86::rbx, destReg * 8), x86::rax);
 
             pc += instrSize;
@@ -1762,6 +1776,16 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         // Get all PCs that have labels (now includes ALL instruction PCs when needsDispatcherTable is true)
         std::vector<uint32_t> labeledPCs = labelManager.getAllPCs();
 
+        // DEBUG: Log dispatcher table creation
+        fprintf(stderr, "DEBUG: Creating dispatcher table for %p with %zu labeledPCs (codeSize=%zu)\n",
+                *funcOut, labeledPCs.size(), codeSize);
+        for (size_t i = 0; i < std::min(size_t(10), labeledPCs.size()); i++) {
+            fprintf(stderr, "  labeledPC[%zu] = %u\n", i, labeledPCs[i]);
+        }
+        if (labeledPCs.size() > 10) {
+            fprintf(stderr, "  ... and %zu more\n", labeledPCs.size() - 10);
+        }
+
         // Allocate table (one entry per possible PC, initialized to null)
         auto dispatcherTable = std::make_unique<void*[]>(codeSize);
         std::memset(dispatcherTable.get(), 0, codeSize * sizeof(void*));
@@ -1770,23 +1794,36 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         uint8_t* funcBase = reinterpret_cast<uint8_t*>(*funcOut);
 
         // Resolve label addresses and populate the jump table
+        size_t entriesPopulated = 0;
         for (uint32_t pc : labeledPCs) {
             // CRITICAL: Bounds check to prevent heap buffer overflow
             // labeledPCs may contain out-of-bounds values from markJumpTarget
             if (pc >= codeSize) {
                 // Skip out-of-bounds PC values silently
+                fprintf(stderr, "  Skipping out-of-bounds PC: %u (>= codeSize %zu)\n", pc, codeSize);
                 continue;
             }
 
             Label label = labelManager.getLabel(pc);
             if (!label.is_valid()) {
+                fprintf(stderr, "  Skipping invalid label at PC: %u\n", pc);
                 continue;  // Skip invalid labels
             }
 
             // Get the address of this label from the CodeHolder
+            // CRITICAL: label_offset() can crash if label is not bound to code
+            // Only call it if the label is valid and bound
+            if (!labelManager.isLabelDefined(pc)) {
+                fprintf(stderr, "  Skipping undefined (not bound) label at PC: %u\n", pc);
+                continue;
+            }
+
             uint64_t offset = code.label_offset(label);
             dispatcherTable[pc] = funcBase + offset;
+            entriesPopulated++;
         }
+
+        fprintf(stderr, "DEBUG: Dispatcher table populated with %zu entries\n", entriesPopulated);
 
         // Store the dispatcher table in global map for later retrieval
         {
@@ -1794,6 +1831,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Transfer ownership to global storage
             void** tablePtr = dispatcherTable.release();
             s_dispatcherTables[*funcOut] = {tablePtr, static_cast<size_t>(codeSize)};
+            fprintf(stderr, "DEBUG: Dispatcher table stored in global map for %p\n", *funcOut);
         }
     }
 

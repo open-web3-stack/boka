@@ -406,7 +406,8 @@ extension CppHelper.Instructions.StoreImmIndU64: Instruction {
 extension CppHelper.Instructions.LoadImmJump: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
-        let (value, offset): (UInt32, UInt32) = try Instructions.decodeImmediate2(data, divideBy: 16)
+        // LoadImmJump format: [opcode][reg_index][varint_value][varint_offset]
+        let (value, offset, _) = try Instructions.decodeVarintPair(data, offset: 1)
         self.init(reg: register, value: value, offset: offset)
     }
 
@@ -1443,7 +1444,8 @@ extension CppHelper.Instructions.BranchGeS: BranchInstructionBase2 {
 extension CppHelper.Instructions.LoadImmJumpInd: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let (value, offset): (UInt32, UInt32) = try Instructions.decodeImmediate2(data, minus: 2, startIdx: 1)
+        // LoadImmJumpInd format: [opcode][packed_ra_rb][varint_value][varint_offset]
+        let (value, offset, _) = try Instructions.decodeVarintPair(data, offset: 1)
         self.init(ra: ra, rb: rb, value: value, offset: offset)
     }
 
