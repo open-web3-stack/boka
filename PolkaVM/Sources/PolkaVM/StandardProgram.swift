@@ -56,7 +56,10 @@ public class StandardProgram {
         guard totalSize <= 0x1_0000_0000 else {
             throw Error.invalidTotalMemorySize
         }
-        code = try ProgramCode(blob[slice.startIndex ..< slice.startIndex + Int(codeLength)])
+        // CRITICAL: Create a new Data object with indices starting from 0
+        // ProgramCode expects blob.startIndex to be 0, not an offset into the original blob
+        let programCodeData = Data(blob[slice.startIndex ..< slice.startIndex + Int(codeLength)])
+        code = try ProgramCode(programCodeData)
 
         initialRegisters = Registers(config: config, argumentData: argumentData)
 
