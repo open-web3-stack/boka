@@ -454,11 +454,11 @@ enum ProgramBlobBuilder {
             return 3
         }
 
-        // LoadU8/I8/U16/I16/U32/I32/U64 (7 bytes: opcode + 2 registers + 32-bit offset)
-        // Format: opcode (1) + dest_reg (1) + base_reg (1) + offset32 (4)
+        // LoadU8/I8/U16/I16/U32/I32/U64 (6 bytes: direct addressing)
+        // Format: [opcode][reg_index][address_32bit]
         // Opcodes 0x34-0x3A
         if opcode >= 0x34, opcode <= 0x3A {
-            return 1 + 2 + 4
+            return 6
         }
 
         // StoreU8/U16/U32/U64 (6 bytes: direct addressing)
