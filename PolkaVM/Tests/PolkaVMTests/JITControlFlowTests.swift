@@ -160,42 +160,55 @@ struct JITControlFlowTests {
 
     @Test("JIT vs Interpreter: JumpInd parity")
     func jitJumpIndParity() async throws {
-        // JumpInd through register
+        // JumpInd through register - jump forward to Halt
         var code = Data()
 
-        // LoadImm64 r1, 8 (jump target offset)
+        // LoadImm64 r1, 22 (jump target offset - points to Halt at PC 22)
         code.append(0x14) // LoadImm64 opcode
         code.append(0x01) // r1
-        code.append(contentsOf: [0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]) // immediate = 8
+        code.append(contentsOf: [0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]) // immediate = 22
 
-        // Skipped instruction
-        code.append(0x32) // LoadImm32 r1
-        code.append(0x02) // r2
-        code.append(contentsOf: [0xFF, 0x00, 0x00, 0x00]) // immediate
+        // Skipped instructions - use Trap as padding (opcode 0)
+        // LoadImm64 is 10 bytes (PC 0-9), we need padding before JumpInd
+        code.append(0x00) // Trap at PC 10
+        code.append(0x00) // Trap at PC 11
+        code.append(0x00) // Trap at PC 12
+        code.append(0x00) // Trap at PC 13
+        code.append(0x00) // Trap at PC 14
+        code.append(0x00) // Trap at PC 15
+        code.append(0x00) // Trap at PC 16
 
-        // Target instruction at offset 8 (approximately)
-        code.append(0x32) // LoadImm32 r2
+        // LoadImm r3, 0x42 (should be skipped)
+        code.append(0x33) // LoadImm opcode
         code.append(0x03) // r3
-        code.append(contentsOf: [0xBB, 0x00, 0x00, 0x00]) // immediate
+        code.append(0x42) // immediate 0x42 (varint: single byte)
 
-        // JumpInd r1 (opcode 50 = 0x32)
+        // JumpInd r1 (opcode 50 = 0x32) - jumps to PC 21
         code.append(0x32) // JumpInd opcode
         code.append(0x01) // r1
 
-        // Halt
+        // Halt at PC 22 (target of JumpInd)
         code.append(0x01)
 
-        // Build blob with jump table
-        var blob = Data()
-        blob.append(1) // 1 jump table entry
-        blob.append(0) // encode size
+        // Build blob with jump table using helper
+        // Since we need a jump table, we can't use createProgramCode directly
+        // We need to manually build the programCode blob with jump table
+        print("[DEBUG] code.count = \(code.count)")
+        var programCode = Data()
+        programCode.append(contentsOf: ProgramBlobBuilder.encodeVarint(1)) // 1 jump table entry
+        programCode.append(0) // encode size (0 = no offset encoding)
         let codeLength = Data(UInt64(code.count).encode(method: .variableWidth))
-        blob.append(contentsOf: codeLength)
-        // Jump table entry: offset 0
-        blob.append(contentsOf: Data(repeating: 0, count: 8))
-        blob.append(contentsOf: code)
-        let bitmaskSize = (code.count + 7) / 8
-        blob.append(contentsOf: Data(repeating: 0, count: bitmaskSize))
+        programCode.append(contentsOf: codeLength)
+        // Jump table: entry 0 -> offset 0
+        programCode.append(contentsOf: Data(repeating: 0, count: 8))
+        programCode.append(contentsOf: code)
+        // Generate bitmask for the code
+        let bitmask = ProgramBlobBuilder.generateBitmask([UInt8](code))
+        print("[DEBUG] bitmask.count = \(bitmask.count), expected = \((code.count + 7) / 8)")
+        programCode.append(contentsOf: bitmask)
+        print("[DEBUG] programCode.count = \(programCode.count)")
+
+        let blob = ProgramBlobBuilder.createStandardProgram(programCode: programCode)
 
         let (interpreterResult, jitResult, differences) = await JITParityComparator.compare(
             blob: blob,
@@ -230,38 +243,43 @@ struct JITControlFlowTests {
             }
             code.append(byte)
         }
-        // Jump offset = 1 (skip next instruction)
-        code.append(0x01) // jump offset
+        // Jump offset = 11 (skip LoadImm r2 to execute LoadImm r3)
+        // LoadImmJump is 8 bytes (PC 0-7), LoadImm r2 is 3 bytes (PC 8-10), so target is PC 11
+        var jumpOffset = UInt64(11)
+        while jumpOffset > 0 {
+            var byte = UInt8(jumpOffset & 0x7F)
+            jumpOffset >>= 7
+            if jumpOffset > 0 {
+                byte |= 0x80
+            }
+            code.append(byte)
+        }
 
-        // LoadImm32 r2, 0xFF (should be skipped)
-        code.append(0x33) // LoadImm opcode (32-bit immediate, sign-extended)
+        // LoadImm r2, 0x42 (should be skipped)
+        // LoadImm uses varint encoding for immediate value
+        // IMPORTANT: Values >= 128 require multi-byte varint encoding, which complicates testing
+        // Using value < 128 for single-byte varint encoding
+        code.append(0x33) // LoadImm opcode (varint immediate)
         code.append(0x02) // r2
-        code.append(contentsOf: [0xFF, 0x00, 0x00, 0x00]) // immediate
+        code.append(0x42) // immediate 0x42 (66, single-byte varint)
 
-        // LoadImm32 r3, 0xAA (should execute)
-        code.append(0x33) // LoadImm opcode (32-bit immediate, sign-extended)
+        // LoadImm r3, 0x53 (should execute)
+        code.append(0x33) // LoadImm opcode (varint immediate)
         code.append(0x03) // r3
-        code.append(contentsOf: [0xAA, 0x00, 0x00, 0x00]) // immediate
+        code.append(0x53) // immediate 0x53 (83, single-byte varint)
 
         // Halt
         code.append(0x01)
 
-        // Build blob
-        var blob = Data()
-        blob.append(0) // 0 jump table entries
-        blob.append(0) // encode size
-        let codeLength = Data(UInt64(code.count).encode(method: .variableWidth))
-        blob.append(contentsOf: codeLength)
-        blob.append(contentsOf: code)
-        let bitmaskSize = (code.count + 7) / 8
-        blob.append(contentsOf: Data(repeating: 0, count: bitmaskSize))
+        // Build blob using helper
+        let blob = ProgramBlobBuilder.createProgramCode(Array(code))
 
         let result = await JITInstructionExecutor.execute(blob: blob)
 
-        // r1 should be loaded, r2 should be 0 (skipped), r3 should be 0xAA
+        // r1 should be loaded, r2 should be 0 (skipped), r3 should be 0x53
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 1), equals: 0x1234_5678)
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 2), equals: 0)
-        JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: 0xAA)
+        JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: 0x53)
     }
 
     @Test("JIT vs Interpreter: LoadImmJump parity")
@@ -280,26 +298,29 @@ struct JITControlFlowTests {
             }
             code.append(byte)
         }
-        code.append(0x01) // jump offset
+        // Jump offset = 11 (skip LoadImm r2 to execute LoadImm r3)
+        // LoadImmJump is 8 bytes (PC 0-7), LoadImm r2 is 3 bytes (PC 8-10), so target is PC 11
+        var jumpOffset = UInt64(11)
+        while jumpOffset > 0 {
+            var byte = UInt8(jumpOffset & 0x7F)
+            jumpOffset >>= 7
+            if jumpOffset > 0 {
+                byte |= 0x80
+            }
+            code.append(byte)
+        }
 
-        code.append(0x32) // Skipped: LoadImm32 r2, 0xFF
+        code.append(0x33) // Skipped: LoadImm r2, 0x42 (opcode 51 = 0x33)
         code.append(0x02)
-        code.append(contentsOf: [0xFF, 0x00, 0x00, 0x00])
+        code.append(0x42) // immediate 0x42 (varint: single byte)
 
-        code.append(0x32) // Execute: LoadImm32 r3, 0xAA
+        code.append(0x33) // Execute: LoadImm r3, 0x53 (opcode 51 = 0x33)
         code.append(0x03)
-        code.append(contentsOf: [0xAA, 0x00, 0x00, 0x00])
+        code.append(0x53) // immediate 0x53 (varint: single byte)
 
         code.append(0x01) // Halt
 
-        var blob = Data()
-        blob.append(0)
-        blob.append(0)
-        let codeLength = Data(UInt64(code.count).encode(method: .variableWidth))
-        blob.append(contentsOf: codeLength)
-        blob.append(contentsOf: code)
-        let bitmaskSize = (code.count + 7) / 8
-        blob.append(contentsOf: Data(repeating: 0, count: bitmaskSize))
+        let blob = ProgramBlobBuilder.createProgramCode(Array(code))
 
         let (_, _, differences) = await JITParityComparator.compare(
             blob: blob,
@@ -346,17 +367,19 @@ struct JITControlFlowTests {
         // Halt
         code.append(0x01)
 
-        // Build blob with jump table
-        var blob = Data()
-        blob.append(1) // 1 jump table entry
-        blob.append(0) // encode size
+        // Build blob with jump table (1 entry at offset 0)
+        var programCode = Data()
+        programCode.append(contentsOf: ProgramBlobBuilder.encodeVarint(1)) // 1 jump table entry
+        programCode.append(0) // encode size
         let codeLength = Data(UInt64(code.count).encode(method: .variableWidth))
-        blob.append(contentsOf: codeLength)
+        programCode.append(contentsOf: codeLength)
         // Jump table: entry 0 -> offset 0
-        blob.append(contentsOf: Data(repeating: 0, count: 8))
-        blob.append(contentsOf: code)
-        let bitmaskSize = (code.count + 7) / 8
-        blob.append(contentsOf: Data(repeating: 0, count: bitmaskSize))
+        programCode.append(contentsOf: Data(repeating: 0, count: 8))
+        programCode.append(contentsOf: code)
+        let bitmask = ProgramBlobBuilder.generateBitmask([UInt8](code))
+        programCode.append(contentsOf: bitmask)
+
+        let blob = ProgramBlobBuilder.createStandardProgram(programCode: programCode)
 
         let result = await JITInstructionExecutor.execute(blob: blob)
 
@@ -392,15 +415,19 @@ struct JITControlFlowTests {
 
         code.append(0x01) // Halt
 
-        var blob = Data()
-        blob.append(1)
-        blob.append(0)
+        // Build blob with jump table (1 entry at offset 0)
+        var programCode = Data()
+        programCode.append(contentsOf: ProgramBlobBuilder.encodeVarint(1)) // 1 jump table entry
+        programCode.append(0) // encode size
         let codeLength = Data(UInt64(code.count).encode(method: .variableWidth))
-        blob.append(contentsOf: codeLength)
-        blob.append(contentsOf: Data(repeating: 0, count: 8))
-        blob.append(contentsOf: code)
-        let bitmaskSize = (code.count + 7) / 8
-        blob.append(contentsOf: Data(repeating: 0, count: bitmaskSize))
+        programCode.append(contentsOf: codeLength)
+        // Jump table: entry 0 -> offset 0
+        programCode.append(contentsOf: Data(repeating: 0, count: 8))
+        programCode.append(contentsOf: code)
+        let bitmask = ProgramBlobBuilder.generateBitmask([UInt8](code))
+        programCode.append(contentsOf: bitmask)
+
+        let blob = ProgramBlobBuilder.createStandardProgram(programCode: programCode)
 
         let (interpreterResult, jitResult, differences) = await JITParityComparator.compare(
             blob: blob,
@@ -422,26 +449,32 @@ struct JITControlFlowTests {
         var code = Data()
 
         // Jump to offset 3 (middle of next instruction)
+        // Jump instruction format: [opcode][offset_32bit] = 5 bytes
+        var jumpOffset = Int32(3)
         code.append(0x28) // Jump opcode
-        code.append(0x03) // offset 3
+        code.append(contentsOf: withUnsafeBytes(of: jumpOffset.littleEndian) { Array($0) })
 
-        // LoadImm32 instruction (6 bytes) - offset 3 is in the middle
-        code.append(0x33) // LoadImm opcode (32-bit immediate, sign-extended)
+        // LoadImm instruction (varint encoded) - offset 3 is in the middle
+        // LoadImm format: [opcode][reg_index][varint_value]
+        // opcode 0x33 (51), r1 (0x01), immediate 0x12345678 (varint encoded)
+        code.append(0x33) // LoadImm opcode
         code.append(0x01) // r1
-        code.append(contentsOf: [0x78, 0x56, 0x34, 0x12]) // immediate
+        // Immediate 0x12345678 encoded as varint
+        var imm = UInt64(0x1234_5678)
+        while imm > 0 {
+            var byte = UInt8(imm & 0x7F)
+            imm >>= 7
+            if imm > 0 {
+                byte |= 0x80
+            }
+            code.append(byte)
+        }
 
         // Halt
         code.append(0x01)
 
-        // Build blob
-        var blob = Data()
-        blob.append(0)
-        blob.append(0)
-        let codeLength = Data(UInt64(code.count).encode(method: .variableWidth))
-        blob.append(contentsOf: codeLength)
-        blob.append(contentsOf: code)
-        let bitmaskSize = (code.count + 7) / 8
-        blob.append(contentsOf: Data(repeating: 0, count: bitmaskSize))
+        // Build blob using helper
+        let blob = ProgramBlobBuilder.createProgramCode(Array(code))
 
         let result = await JITInstructionExecutor.execute(blob: blob)
 
@@ -458,36 +491,23 @@ struct JITControlFlowTests {
         var code = Data()
 
         // Jump forward by 100 bytes
+        // Jump instruction format: [opcode][offset_32bit]
+        var jumpOffset = Int32(100)
         code.append(0x28) // Jump opcode
-        var offset = UInt64(100)
-        while offset > 0 {
-            var byte = UInt8(offset & 0x7F)
-            offset >>= 7
-            if offset > 0 {
-                byte |= 0x80
-            }
-            code.append(byte)
-        }
+        code.append(contentsOf: withUnsafeBytes(of: jumpOffset.littleEndian) { Array($0) })
 
-        // Add padding NOPs (using LoadImm32 to r0 which is a no-op since r0 is always 0)
+        // Add padding NOPs (using LoadImm to r0 which is a no-op since r0 is always 0)
         for _ in 0 ..< 100 {
-            code.append(0x32) // LoadImm32
+            code.append(0x33) // LoadImm opcode
             code.append(0x00) // r0
-            code.append(contentsOf: [0x00, 0x00, 0x00, 0x00]) // immediate 0
+            code.append(0x00) // immediate 0 (varint: single byte)
         }
 
         // Halt
         code.append(0x01)
 
-        // Build blob
-        var blob = Data()
-        blob.append(0)
-        blob.append(0)
-        let codeLength = Data(UInt64(code.count).encode(method: .variableWidth))
-        blob.append(contentsOf: codeLength)
-        blob.append(contentsOf: code)
-        let bitmaskSize = (code.count + 7) / 8
-        blob.append(contentsOf: Data(repeating: 0, count: bitmaskSize))
+        // Build blob using helper
+        let blob = ProgramBlobBuilder.createProgramCode(Array(code))
 
         let result = await JITInstructionExecutor.execute(blob: blob)
 

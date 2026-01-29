@@ -391,10 +391,29 @@ enum ProgramBlobBuilder {
             return 1 + 1 // opcode (1) + register (1) = 2 bytes
         }
 
-        // LoadImmJump (10 bytes: opcode + register + 32-bit offset + 32-bit value)
-        // Format: opcode (1) + register (1) + offset32 (4) + value32 (4)
+        // LoadImmJump (variable size: opcode + register + varint_value + varint_offset)
+        // Format: opcode (1) + register (1) + varint_value (variable) + varint_offset (variable)
         if opcode == 0x50 { // LoadImmJump (opcode 80)
-            return 1 + 1 + 4 + 4 // 10 bytes total
+            var size = 2 // opcode + register
+            var offset = pc + 2
+
+            // Decode first varint (value)
+            while offset < instructionBytes.count {
+                let byte = instructionBytes[offset]
+                size += 1
+                offset += 1
+                if byte & 0x80 == 0 { break } // Last varint byte
+            }
+
+            // Decode second varint (offset)
+            while offset < instructionBytes.count {
+                let byte = instructionBytes[offset]
+                size += 1
+                offset += 1
+                if byte & 0x80 == 0 { break } // Last varint byte
+            }
+
+            return size
         }
 
         // LoadImmJumpInd - variable size due to varint encoding

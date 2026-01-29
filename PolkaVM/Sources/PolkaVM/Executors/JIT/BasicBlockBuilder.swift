@@ -38,36 +38,9 @@ final class BasicBlockBuilder {
         // TODO: Implement jump target parsing from instruction data
         // var jumpTargets: Set<UInt32> = []
 
-        // Get basic block ending instructions - cache opcodes as constants to avoid C++ layer access
-        // TODO: Import BASIC_BLOCK_INSTRUCTIONS from Instructions.swift properly
-        // Block-ending opcodes matching instruction_dispatcher.cpp implementation
-        // NOTE: Halt/Fallthrough (opcode 1) is NOT included - it continues to next instruction for basic block purposes
-        let blockEndingOpcodes: Set<UInt8> = [
-            PVMOpcodes.trap.rawValue,
-            // PVMOpcodes.halt.rawValue,  // NOT included - halt/fallthrough continues to next instruction
-            PVMOpcodes.jump.rawValue,
-            PVMOpcodes.jumpInd.rawValue,
-            PVMOpcodes.loadImmJump.rawValue,
-            PVMOpcodes.loadImmJumpInd.rawValue,
-            // Branch instructions (all variants)
-            PVMOpcodes.branchEq.rawValue,
-            PVMOpcodes.branchNe.rawValue,
-            PVMOpcodes.branchLtU.rawValue,
-            PVMOpcodes.branchLtS.rawValue,
-            PVMOpcodes.branchGeU.rawValue,
-            PVMOpcodes.branchGeS.rawValue,
-            // Branch immediate instructions (all variants)
-            PVMOpcodes.branchEqImm.rawValue,
-            PVMOpcodes.branchNeImm.rawValue,
-            PVMOpcodes.branchLtUImm.rawValue,
-            PVMOpcodes.branchLeUImm.rawValue,
-            PVMOpcodes.branchGeUImm.rawValue,
-            PVMOpcodes.branchGtUImm.rawValue,
-            PVMOpcodes.branchLtSImm.rawValue,
-            PVMOpcodes.branchLeSImm.rawValue,
-            PVMOpcodes.branchGeSImm.rawValue,
-            PVMOpcodes.branchGtSImm.rawValue,
-        ]
+        // Use the canonical BASIC_BLOCK_INSTRUCTIONS constant from Instructions.swift
+        // This ensures consistency across the codebase for basic block detection
+        let blockEndingOpcodes = BASIC_BLOCK_INSTRUCTIONS
 
         // First pass: identify all blocks and their instructions
         while currentPC < program.code.count {
