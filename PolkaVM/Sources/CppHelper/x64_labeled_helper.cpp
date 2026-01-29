@@ -661,8 +661,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Load base address from register
             a.mov(x86::rax, x86::qword_ptr(x86::rbx, base_reg * 8));
 
-            // Add offset (zero-extend to 64-bit by loading into register first)
-            a.mov(x86::rcx, offset);
+            // Add offset (truncate to 32-bit for parity with Swift interpreter)
+            a.mov(x86::ecx, static_cast<uint32_t>(offset));  // Zero-extend to 64-bit in rcx
             a.add(x86::rax, x86::rcx);
 
             // Read-only protection: address < 0x20000 (131072) → panic

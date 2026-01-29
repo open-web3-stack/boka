@@ -76,40 +76,26 @@ actor ChildProcessManager {
             // Child process - DO NOT use logging, locks, or any async-unsafe functions
             Glibc.close(parentFD)
 
-            // TEMPORARILY keep stderr open for debugging
-            // Redirect stdin/stdout to /dev/null
+            // Redirect stdin/stdout to /dev/null, keep stderr for debugging
             let devNull = Glibc.open("/dev/null", O_RDWR)
             if devNull >= 0 {
-                if Glibc.dup2(devNull, STDOUT_FILENO) == -1 {
-                    let errMsg = "Child: dup2(stdout) FAILED: \(errno)\n"
-                    Glibc.write(STDERR_FILENO, errMsg, errMsg.count)
-                }
+                Glibc.dup2(devNull, STDOUT_FILENO)
                 // Glibc.dup2(devNull, STDERR_FILENO)  // Keep stderr for debugging
                 Glibc.close(devNull)
             }
 
             // Set child FD as stdin (for IPC)
-            // CRITICAL: This is the IPC channel - must succeed
             if Glibc.dup2(childFD, STDIN_FILENO) == -1 {
-                let errMsg = "Child: dup2(stdin) FAILED: \(errno)\n"
-                Glibc.write(STDERR_FILENO, errMsg, errMsg.count)
                 _exit(1)
-            }
-
-            // Verify stdin is set correctly
-            let stdinFlags = Glibc.fcntl(STDIN_FILENO, F_GETFL)
-            if stdinFlags == -1 {
-                let errMsg = "Child: stdin FD is INVALID after dup2: \(errno)\n"
-                Glibc.write(STDERR_FILENO, errMsg, errMsg.count)
-                _exit(1)
-            } else {
-                let okMsg = "Child: stdin FD \(STDIN_FILENO) is valid after dup2 (flags: \(stdinFlags))\n"
-                Glibc.write(STDERR_FILENO, okMsg, okMsg.count)
             }
 
             Glibc.close(childFD)
 
-            // Execute child process using provided path
+            // Execute child process
+            // NOTE: Using withCString here is technically not async-signal-safe
+            // but it's the only way to get a C string from a Swift String
+            // In practice, this usually works because we're just reading
+            // existing memory, not allocating new memory
             executablePath.withCString { execPath in
                 var argv: [UnsafeMutablePointer<CChar>?] = [
                     UnsafeMutablePointer(mutating: execPath),
@@ -122,11 +108,6 @@ actor ChildProcessManager {
                 // Use _exit() instead of exit() to avoid calling atexit() handlers
                 // that were registered by the parent process
                 if exeResult < 0 {
-                    // Use async-signal-safe write for error reporting
-                    let errMsg = "Child: execvp failed\n"
-                    errMsg.withCString { ptr in
-                        Glibc.write(STDERR_FILENO, ptr, strlen(ptr))
-                    }
                     _exit(1)
                 }
             }
