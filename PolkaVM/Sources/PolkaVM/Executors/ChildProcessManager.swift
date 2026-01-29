@@ -62,6 +62,10 @@ actor ChildProcessManager {
         let childFlags = fcntl(childFD, F_GETFL)
         logger.debug("Socketpair validation: parentFD flags=\(parentFlags), childFD flags=\(childFlags)")
 
+        // Convert executable path to null-terminated C string array BEFORE fork
+        // This is async-signal-safe and avoids unsafe withCString in child after fork
+        let execPathCArray = executablePath.utf8CString
+
         // Fork child process
         let pid = Glibc.fork()
 
@@ -92,11 +96,11 @@ actor ChildProcessManager {
             Glibc.close(childFD)
 
             // Execute child process
-            // NOTE: Using withCString here is technically not async-signal-safe
-            // but it's the only way to get a C string from a Swift String
-            // In practice, this usually works because we're just reading
-            // existing memory, not allocating new memory
-            executablePath.withCString { execPath in
+            // Use pre-allocated C string array (async-signal-safe)
+            // withUnsafeBufferPointer is safe here because we're in the child process
+            // and the array lives until execvp replaces the process image
+            execPathCArray.withUnsafeBufferPointer { buffer in
+                let execPath = buffer.baseAddress!
                 var argv: [UnsafeMutablePointer<CChar>?] = [
                     UnsafeMutablePointer(mutating: execPath),
                     nil,
