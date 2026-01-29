@@ -116,7 +116,7 @@ final class JITExecutor {
         if jitMemorySize >= largeAllocationThreshold {
             // Use mmap with MAP_NORESERVE to reserve virtual address space
             // without allocating physical memory upfront
-            logger.info("Using mmap for large allocation: \(jitMemorySize) bytes (\(Double(jitMemorySize) / 1024 / 1024 / 1024) GB)")
+            logger.debug("Using mmap for large allocation: \(jitMemorySize) bytes (\(Double(jitMemorySize) / 1024 / 1024 / 1024) GB)")
 
             // Platform-specific mmap flags: macOS uses MAP_ANON, Linux uses MAP_ANONYMOUS
             #if os(Linux)
@@ -143,10 +143,10 @@ final class JITExecutor {
             // mmap returns UnsafeMutableRawPointer? (optional), but MAP_FAILED check ensures it's valid
             memoryBuffer = UnsafeMutableRawPointer(ptr!).assumingMemoryBound(to: UInt8.self)
             usesMmap = true
-            logger.info("✅ mmap reserved \(jitMemorySize) bytes of virtual address space")
+            logger.debug("✅ mmap reserved \(jitMemorySize) bytes of virtual address space")
         } else {
             // Use normal allocation for smaller buffers
-            logger.info("Allocating compact buffer: \(jitMemorySize) bytes")
+            logger.debug("Allocating compact buffer: \(jitMemorySize) bytes")
             memoryBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: Int(jitMemorySize))
             usesMmap = false
         }
@@ -155,12 +155,12 @@ final class JITExecutor {
         // We use original addresses (e.g., 0xFF000000 for stack), NOT rebased offsets
         if let layout = memoryLayout {
             // Copy zone data to original addresses in the buffer
-            logger.info("Copying zones to original addresses")
+            logger.debug("Copying zones to original addresses")
 
             if usesMmap {
                 // For mmap: only zero-initialize and copy zones that actually have data
                 // This is much faster than zeroing 4GB
-                logger.info("Using mmap - only initializing pages with data")
+                logger.debug("Using mmap - only initializing pages with data")
             } else {
                 // For normal allocation: zero-initialize the entire buffer
                 memoryBuffer.initialize(repeating: 0, count: Int(jitMemorySize))
@@ -169,7 +169,7 @@ final class JITExecutor {
             // Copy zones using layout for efficient initialization
             var totalCopied = 0
             for zone in layout.zones {
-                logger.info("  Zone: base=0x\(String(zone.originalBase, radix: 16)), size=\(zone.size), dataCount=\(zone.data.count)")
+                logger.debug("  Zone: base=0x\(String(zone.originalBase, radix: 16)), size=\(zone.size), dataCount=\(zone.data.count)")
 
                 let zoneBase = memoryBuffer.advanced(by: Int(zone.originalBase))
 
@@ -180,14 +180,14 @@ final class JITExecutor {
                 // The cost is acceptable because it's done once during initialization,
                 // and MAP_NORESERVE still saves us from allocating physical memory upfront.
                 if usesMmap, zone.size > 0 {
-                    logger.info("  Zone has size=\(zone.size), touching pages")
+                    logger.debug("  Zone has size=\(zone.size), touching pages")
                     let pageSize = 4096
                     var pagesTouched = 0
                     for offset in stride(from: 0, to: Int(zone.size), by: pageSize) {
                         zoneBase.advanced(by: offset).pointee = 0 // Touch the page
                         pagesTouched += 1
                     }
-                    logger.info("  ✅ Touched \(pagesTouched) pages across zone")
+                    logger.debug("  ✅ Touched \(pagesTouched) pages across zone")
                 }
 
                 // Copy zone data to its original address
@@ -203,7 +203,7 @@ final class JITExecutor {
                     }
                 }
             }
-            logger.info("✅ Initialized JIT memory: \(totalCopied) bytes copied to original addresses")
+            logger.debug("✅ Initialized JIT memory: \(totalCopied) bytes copied to original addresses")
         } else if let initialMemory {
             // Fallback: Copy from initialMemory (old method - scans entire address space)
             logger.warning("⚠️ Using legacy memory initialization (no rebased layout provided)")
@@ -240,7 +240,7 @@ final class JITExecutor {
 
                 address += UInt32(currentChunkSize)
             }
-            logger.info("✅ Initialized JIT memory from StandardProgram zones: \(totalCopied) bytes copied out of \(jitMemorySize) total")
+            logger.debug("✅ Initialized JIT memory from StandardProgram zones: \(totalCopied) bytes copied out of \(jitMemorySize) total")
         } else {
             // Initialize memory to zeros (fallback behavior)
             if usesMmap {
@@ -254,7 +254,7 @@ final class JITExecutor {
 
         // Execute the JIT-compiled function
         logger.debug("Executing JIT-compiled function with initial PC: \(initialPC), Gas: \(gas.value)")
-        logger.info("JIT memory size: \(jitMemorySize), memoryBuffer: \(memoryBuffer)")
+        logger.debug("JIT memory size: \(jitMemorySize), memoryBuffer: \(memoryBuffer)")
 
         var exitCode: Int32
         var gasValue = gas.value // Local copy since we can't modify gas.value directly

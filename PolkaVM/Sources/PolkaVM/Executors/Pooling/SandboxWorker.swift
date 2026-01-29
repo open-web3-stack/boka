@@ -42,7 +42,7 @@ actor SandboxWorker {
 
         logger.debug("[INIT] Worker \(workerID): Spawning worker process")
         try await spawnWorker()
-        logger.info("[INIT] Worker \(workerID): Initialization complete")
+        logger.debug("[INIT] Worker \(workerID): Initialization complete")
     }
 
     // MARK: - Public API
@@ -242,7 +242,7 @@ actor SandboxWorker {
         isAlive = true
         startTime = Date()
 
-        logger.info("[SPAWN] Worker \(workerID): Spawned successfully with PID \(handle.pid), isAlive=\(isAlive)")
+        logger.debug("[SPAWN] Worker \(workerID): Spawned successfully with PID \(handle.pid), isAlive=\(isAlive)")
     }
 
     /// Terminate the worker process
@@ -267,7 +267,7 @@ actor SandboxWorker {
         isAlive = false
         isBusy = false
 
-        logger.info("[TERM] Worker \(workerID): Termination complete, isAlive=\(isAlive)")
+        logger.debug("[TERM] Worker \(workerID): Termination complete, isAlive=\(isAlive)")
     }
 
     /// Cleanup old failure timestamps outside tracking window

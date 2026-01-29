@@ -6,10 +6,10 @@
 #   echo "warning: SwiftLint not installed, download from https://github.com/realm/SwiftLint"
 # fi
 
-git diff --diff-filter=d --staged --name-only | grep -e '\(.*\).swift$' | while read line; do
-  swiftformat "${line}";
-  git add "$line";
-done
+# git diff --diff-filter=d --staged --name-only | grep -e '\(.*\).swift$' | while read line; do
+#   swiftformat "${line}";
+#   git add "$line";
+# done
 
 files=$((git diff --cached --name-only --diff-filter=ACMR | grep -Ei "\.rs$") || true)
 if [ ! -z "${files}" ]; then

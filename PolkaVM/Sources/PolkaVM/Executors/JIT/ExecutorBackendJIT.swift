@@ -470,13 +470,13 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 // changing the interpreter's memory model, which is beyond the current scope.
                 totalMemorySize = UInt32(config.pvmProgramInitStackBaseAddress)
 
-                logger.info("🔍 Using pvmProgramInitStackBaseAddress for memory size: 0x\(String(totalMemorySize, radix: 16))")
+                logger.debug("🔍 Using pvmProgramInitStackBaseAddress for memory size: 0x\(String(totalMemorySize, radix: 16))")
 
                 let actualUsage = layout.totalSize
                 let usageMB = Double(actualUsage) / (1024.0 * 1024.0)
                 let totalMB = Double(totalMemorySize) / (1024.0 * 1024.0)
 
-                logger.info(
+                logger.debug(
                     "✅ Using interpreter-compatible layout: total=\(String(format: "%.2f", totalMB)) MB (data: \(String(format: "%.2f", usageMB)) MB)"
                 )
             } catch {
@@ -509,7 +509,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 .info(
                     "🔍 JIT bytecode: \(bytecode.prefix(20).map { String(format: "%02x", $0) }.joined(separator: " "))... (total: \(bytecode.count) bytes)"
                 )
-            logger.info("🔍 JIT initial PC: \(pc)")
+            logger.debug("🔍 JIT initial PC: \(pc)")
             let compiledFuncPtr: UnsafeMutableRawPointer
             let dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?
             let dispatcherTableSize: UInt32
