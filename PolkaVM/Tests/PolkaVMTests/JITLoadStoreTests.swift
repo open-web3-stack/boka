@@ -509,9 +509,9 @@ struct JITLoadStoreTests {
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x6300_0000).littleEndian) { Array($0) })
 
         // LoadIndU8 r2, [r1 + 0] - register-relative addressing
+        // Format: [opcode][ra_rb_packed][offset_32bit] where ra_rb = (ra | rb << 4)
         code.append(0x7C) // LoadIndU8 opcode (124)
-        code.append(0x02) // r2 (destination)
-        code.append(0x01) // r1 (base register)
+        code.append(0x12) // r2 (ra=2) | (r1 (rb=1) << 4) = 0x02 | 0x10 = 0x12
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian) { Array($0) }) // offset
 
         code.append(0x01) // Halt
@@ -556,9 +556,9 @@ struct JITLoadStoreTests {
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0000_0000_0000_00AB).littleEndian) { Array($0) })
 
         // StoreIndU8 [r1 + 0], r2 - register-relative addressing
+        // Format: [opcode][src_dest_packed][offset_32bit] where src_dest = (src | dest << 4)
         code.append(0x78) // StoreIndU8 opcode (120)
-        code.append(0x02) // r2 (source register)
-        code.append(0x01) // r1 (base register)
+        code.append(0x12) // r2 (src=2) | (r1 (dest=1) << 4) = 0x02 | 0x10 = 0x12
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian) { Array($0) }) // offset
 
         code.append(0x01) // Halt
