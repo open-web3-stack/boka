@@ -408,7 +408,7 @@ struct JITControlFlowTests {
             code.append(0x00)
         }
 
-        code.append(0x32) // Target: LoadImm32 r2, 0xBB
+        code.append(0x33) // Target: LoadImm r2, 0xBB
         code.append(0x02)
         code.append(contentsOf: [0xBB, 0x00, 0x00, 0x00])
 
