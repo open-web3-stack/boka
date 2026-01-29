@@ -232,7 +232,7 @@ actor SandboxWorker {
 
         logger.debug("[SPAWN] Worker \(workerID): Calling spawnChildProcess")
         let (handle, clientFD) = try await processManager.spawnChildProcess(
-            executablePath: "boka-sandbox"
+            executablePath: config.sandboxPath
         )
 
         logger.debug("[SPAWN] Worker \(workerID): Got handle PID=\(handle.pid), clientFD=\(clientFD)")

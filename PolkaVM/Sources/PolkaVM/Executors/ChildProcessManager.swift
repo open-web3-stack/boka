@@ -8,53 +8,6 @@ import TracingUtils
 
 private let logger = Logger(label: "ChildProcessManager")
 
-/// Find the boka-sandbox executable
-/// - Returns: Path to the executable
-/// - Note: For development, looks in build directory relative to the main executable.
-///          For production, should be installed system-wide or in PATH.
-private func findBokaSandbox() -> String {
-    // Get the path of the currently executing executable
-    let executablePath = CommandLine.arguments[0]
-    let executableURL = URL(fileURLWithPath: executablePath)
-    let executableDir = executableURL.deletingLastPathComponent()
-
-    // Construct possible build paths relative to the executable
-    let possiblePaths = [
-        // Same directory as executable (for installed builds)
-        executableDir.appendingPathComponent("boka-sandbox").path,
-        // Debug build relative to .build directory
-        executableDir.appendingPathComponent("../PolkaVM/.build/debug/boka-sandbox").path,
-        // Release build relative to .build directory
-        executableDir.appendingPathComponent("../PolkaVM/.build/release/boka-sandbox").path,
-        // Try architecture-specific paths (Linux)
-        executableDir.appendingPathComponent("../PolkaVM/.build/x86_64-unknown-linux-gnu/debug/boka-sandbox").path,
-        executableDir.appendingPathComponent("../PolkaVM/.build/x86_64-unknown-linux-gnu/release/boka-sandbox").path,
-        // Direct .build paths (when running from .build/debug)
-        executableDir.appendingPathComponent("../../../PolkaVM/.build/debug/boka-sandbox").path,
-        executableDir.appendingPathComponent("../../../PolkaVM/.build/release/boka-sandbox").path,
-        // Current working directory
-        "./boka-sandbox",
-        // System PATH
-        "boka-sandbox",
-    ]
-
-    for path in possiblePaths {
-        // Resolve any ".." in the path by standardizing the path
-        let resolvedPath = URL(fileURLWithPath: path).standardized.path
-
-        if FileManager.default.fileExists(atPath: resolvedPath) {
-            // Verify it's executable
-            if FileManager.default.isExecutableFile(atPath: resolvedPath) {
-                logger.debug("Found boka-sandbox at: \(resolvedPath)")
-                return resolvedPath
-            }
-        }
-    }
-
-    logger.error("boka-sandbox not found in any known location, falling back to PATH")
-    return "boka-sandbox"
-}
-
 /// Process handle for managing child process lifecycle
 struct ProcessHandle {
     let pid: pid_t
@@ -72,22 +25,13 @@ actor ChildProcessManager {
 
     /// Spawn a new child process with socketpair for IPC
     ///
-    /// - Parameter executablePath: Name or path of the executable to spawn.
-    ///   If not an absolute path, will search for boka-sandbox in build directory.
+    /// - Parameter executablePath: Absolute or relative path to the executable to spawn.
+    ///   If relative, will be searched in PATH.
     ///
     /// - Returns: Tuple of process handle and client file descriptor for IPC
     /// - Throws: IPCError if spawning fails
     func spawnChildProcess(executablePath: String) async throws -> (handle: ProcessHandle, clientFD: Int32) {
-        // Resolve executable path
-        let resolvedPath: String = if executablePath.hasPrefix("/") {
-            // Absolute path provided
-            executablePath
-        } else {
-            // Find boka-sandbox in build directory or PATH
-            findBokaSandbox()
-        }
-
-        logger.debug("Spawning child process: \(resolvedPath)")
+        logger.debug("Spawning child process: \(executablePath)")
         // Create socket pair for IPC
         var sockets: [Int32] = [0, 0]
 
@@ -165,8 +109,8 @@ actor ChildProcessManager {
 
             Glibc.close(childFD)
 
-            // Execute child process using resolved path
-            resolvedPath.withCString { execPath in
+            // Execute child process using provided path
+            executablePath.withCString { execPath in
                 var argv: [UnsafeMutablePointer<CChar>?] = [
                     UnsafeMutablePointer(mutating: execPath),
                     nil,
