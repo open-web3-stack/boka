@@ -116,18 +116,17 @@ actor ChildProcessManager {
                     nil,
                 ]
 
-                // Write debug message to stderr before exec
-                let debugMsg = "Child: About to execvp: \(String(cString: execPath))\n"
-                Glibc.write(STDERR_FILENO, debugMsg, debugMsg.count)
-
                 let exeResult = Glibc.execvp(execPath, &argv)
 
                 // execvp only returns on failure
                 // Use _exit() instead of exit() to avoid calling atexit() handlers
                 // that were registered by the parent process
                 if exeResult < 0 {
-                    let errMsg = "Child: execvp FAILED: \(errno)\n"
-                    Glibc.write(STDERR_FILENO, errMsg, errMsg.count)
+                    // Use async-signal-safe write for error reporting
+                    let errMsg = "Child: execvp failed\n"
+                    errMsg.withCString { ptr in
+                        Glibc.write(STDERR_FILENO, ptr, strlen(ptr))
+                    }
                     _exit(1)
                 }
             }

@@ -210,6 +210,37 @@ extension Instructions {
         return (UInt32(truncatingIfNeeded: firstValue), UInt32(truncatingIfNeeded: secondValue), bytesConsumed)
     }
 
+    /// Decode a single varint-encoded value from data starting at offset
+    /// Used for StoreImmInd instructions
+    /// - Parameters:
+    ///   - data: Instruction bytecode
+    ///   - offset: Starting offset for varint (after register byte)
+    /// - Returns: Tuple of (value, bytesConsumed)
+    static func decodeVarintSingle(_ data: Data, offset: Int = 1) throws -> (UInt64, Int) {
+        var currentOffset = offset
+        var bytesConsumed = 0
+        var value: UInt64 = 0
+        var shift = 0
+
+        while currentOffset < data.count {
+            let byte = data[currentOffset]
+            value |= UInt64(byte & 0x7F) << shift
+            bytesConsumed += 1
+            currentOffset += 1
+
+            if (byte & 0x80) == 0 {
+                break
+            }
+
+            shift += 7
+            if shift >= 64 {
+                throw InstructionDecodingError.varintOverflow
+            }
+        }
+
+        return (value, bytesConsumed)
+    }
+
     enum InstructionDecodingError: Swift.Error {
         case varintOverflow
         case insufficientData
