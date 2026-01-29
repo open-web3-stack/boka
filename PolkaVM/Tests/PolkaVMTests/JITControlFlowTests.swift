@@ -196,11 +196,11 @@ struct JITControlFlowTests {
         print("[DEBUG] code.count = \(code.count)")
         var programCode = Data()
         programCode.append(contentsOf: ProgramBlobBuilder.encodeVarint(1)) // 1 jump table entry
-        programCode.append(0) // encode size (0 = no offset encoding)
+        programCode.append(0) // encode size (0 = no offset encoding, means 0-byte jump table entries)
         let codeLength = Data(UInt64(code.count).encode(method: .variableWidth))
         programCode.append(contentsOf: codeLength)
-        // Jump table: entry 0 -> offset 0
-        programCode.append(contentsOf: Data(repeating: 0, count: 8))
+        // Jump table: 0 bytes when encode size is 0
+        // programCode.append(contentsOf: Data(repeating: 0, count: 8)) // NOT: this would be for encode size 8
         programCode.append(contentsOf: code)
         // Generate bitmask for the code
         let bitmask = ProgramBlobBuilder.generateBitmask([UInt8](code))
@@ -370,11 +370,10 @@ struct JITControlFlowTests {
         // Build blob with jump table (1 entry at offset 0)
         var programCode = Data()
         programCode.append(contentsOf: ProgramBlobBuilder.encodeVarint(1)) // 1 jump table entry
-        programCode.append(0) // encode size
+        programCode.append(0) // encode size (0 = no offset encoding, means 0-byte jump table entries)
         let codeLength = Data(UInt64(code.count).encode(method: .variableWidth))
         programCode.append(contentsOf: codeLength)
-        // Jump table: entry 0 -> offset 0
-        programCode.append(contentsOf: Data(repeating: 0, count: 8))
+        // Jump table: 0 bytes when encode size is 0
         programCode.append(contentsOf: code)
         let bitmask = ProgramBlobBuilder.generateBitmask([UInt8](code))
         programCode.append(contentsOf: bitmask)
@@ -418,11 +417,10 @@ struct JITControlFlowTests {
         // Build blob with jump table (1 entry at offset 0)
         var programCode = Data()
         programCode.append(contentsOf: ProgramBlobBuilder.encodeVarint(1)) // 1 jump table entry
-        programCode.append(0) // encode size
+        programCode.append(0) // encode size (0 = no offset encoding, means 0-byte jump table entries)
         let codeLength = Data(UInt64(code.count).encode(method: .variableWidth))
         programCode.append(contentsOf: codeLength)
-        // Jump table: entry 0 -> offset 0
-        programCode.append(contentsOf: Data(repeating: 0, count: 8))
+        // Jump table: 0 bytes when encode size is 0
         programCode.append(contentsOf: code)
         let bitmask = ProgramBlobBuilder.generateBitmask([UInt8](code))
         programCode.append(contentsOf: bitmask)

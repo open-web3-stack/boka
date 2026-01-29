@@ -58,7 +58,9 @@ public class StandardProgram {
         }
         // CRITICAL: Create a new Data object with indices starting from 0
         // ProgramCode expects blob.startIndex to be 0, not an offset into the original blob
-        let programCodeData = Data(blob[slice.startIndex ..< slice.startIndex + Int(codeLength)])
+        // Using Array to ensure we get a copy with zero-based indices
+        let programCodeBytes = Array(blob[slice.startIndex ..< slice.startIndex + Int(codeLength)])
+        let programCodeData = Data(programCodeBytes)
         code = try ProgramCode(programCodeData)
 
         initialRegisters = Registers(config: config, argumentData: argumentData)
